@@ -35,6 +35,7 @@ namespace idni {
 #define emeasure_time_end(start, end) end = clock(), std::cout << std::fixed <<\
 	std::setprecision(2) << (start, end) << " ms"
 
+typedef std::basic_ostream<char> ostream_t;
 typedef int32_t int_t;
 
 template <typename CharT>
@@ -81,7 +82,7 @@ public:
 	typedef std::pair<string, action_fn> action_pair;
 	typedef std::map<string, action_fn> actions;
 
-	parser(const grammar& g, const char_builtins_map& bm = {},
+	parser(const grammar& g, const char_builtins_map& bm,
 		bool _bin_lr = false, bool _incr_gen_forest = false);
 	parser(const grammar& g, bool _bin_lr = false,
 		bool _incr_gen_forest = false)

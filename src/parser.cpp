@@ -16,14 +16,14 @@ using namespace std;
 namespace idni {
 
 string to_std_string(const string& s) { return s; }
-string to_std_string(const u32string& s) { return to_string(to_string_t(s)); }
-string to_std_string(const char32_t& ch) { return to_string(to_string_t(ch)); }
+string to_std_string(const u32string& s) { return to_string(to_utf8string(s)); }
+string to_std_string(const char32_t& ch) { return to_string(to_utf8string(ch));}
 
 template <>
 string from_cstr<char>(const char* s) { return std::string(s); }
 template <>
 u32string from_cstr<char32_t>(const char* s) {
-	return to_u32string(to_string_t(s));
+	return to_u32string(to_utf8string(s));
 }
 
 template <typename CharT>
