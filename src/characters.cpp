@@ -13,87 +13,46 @@
 #include <sstream>
 #include <string.h>
 #include "characters.h"
-
 using namespace std;
 namespace idni {
 
-string_t unquote(string_t str) {
-	for (size_t i = 0; i != str.size(); ++i)
-		if (str[i] == (unsigned char) '\\') str.erase(str.begin() + i);
-	return str;
+string to_string(int_t v) { stringstream ss; ss << v; return ss.str(); }
+string to_string(const string_t& s) { return string(s.begin(), s.end()); }
+string_t to_string_t(int_t v) {	return to_string_t(to_string(v)); }
+string_t to_string_t(const string& s) {	return string_t(s.begin(), s.end()); }
+string_t to_string_t(const char* s) { return to_string_t(string(s)); }
+string_t to_string_t(char ch) {	return to_string_t(string{ ch }); }
+string_t to_string_t(char32_t ch) {
+	char_t s[4];
+	size_t l = emit_codepoint(ch, s);
+	if (l == (size_t) -1) return string_t();
+	return string_t(s, l);
 }
-
-string to_string_(int_t v) { stringstream ss; ss << v; return ss.str(); }
-string_t to_string_t(int_t v) {
-	return to_string_t(to_string_(v));
+string_t to_string_t(const u32string& str) {
+	basic_ostringstream<char_t> ss;
+	auto it = str.begin();
+	while (it != str.end()) emit_codepoint(ss, *(it++));
+	return ss.str();
 }
-string_t to_string_t(const string& s) {
-	return string_t(s.begin(), s.end());
+u32string to_u32string(const string_t& str) {
+	basic_ostringstream<char32_t> ss;
+	char32_t ch;
+	const char_t* s = str.c_str();
+	size_t chl, sl = str.size();
+	while ((chl = peek_codepoint(s, sl, ch)) > 0) {
+		sl -= chl;
+		s += chl;
+		ss.put(ch);
+	}
+	// if (chl == (size_t) -1) return U""; // throw invalid UTF-8?
+	return ss.str();
 }
-string_t to_string_t(const char* s) {
-	return to_string_t(string(s));
-}
-string to_string(const string_t& s) {
-	return string(s.begin(), s.end());
-}
-
-string_t to_lower_first(string_t s) {
-	if (s[0] >= (unsigned char)'A' && s[0] <= (unsigned char)'Z')
-		s[0] = s[0] - ((unsigned char)'A' - (unsigned char)'a');
-	return s;
-}
-
-string_t to_upper_first(string_t s) {
-	if (s[0] >= (unsigned char)'a' && s[0] <= (unsigned char)'z')
-		s[0] = s[0] + ((unsigned char)'A' - (unsigned char)'a');
-	return s;
-}
-
-string_t to_string_t(const char* s);
-
-unsigned char *strdup(const unsigned char *src) {
-	return reinterpret_cast<unsigned char*>(
-		::strdup(reinterpret_cast<const char *>(src)));
-}
-size_t strlen(const unsigned char *src) {
-	return ::strlen(reinterpret_cast<const char *>(src));
-}
-unsigned char* strcpy(unsigned char* dst, const unsigned char* src) {
-	return reinterpret_cast<unsigned char *>(
-		::strcpy(reinterpret_cast<char *>(dst),
-			reinterpret_cast<const char *>(src)));
-}
-int strncmp(const unsigned char* str1, const unsigned char* str2, size_t num) {
-	return ::strncmp(reinterpret_cast<const char *>(str1),
-		reinterpret_cast<const char *>(str2), num);
-}
-int strncmp(const unsigned char* str1, const char* str2, size_t num) {
-	return ::strncmp(reinterpret_cast<const char*>(str1), str2, num);
-}
-int strcmp(const unsigned char* str1, const char* str2) {
-	return ::strcmp(reinterpret_cast<const char *>(str1), str2);
-}
-
-
-/**
- * checks if character is a begining of a multibyte codepoint
- */
-bool is_mb_codepoint(const char_t ch) {
-	return ch >= 0x80;
-}
-
-/**
- * convert ccs sequence s of 1-4 utf8 code units into codepoint &ch
- * @param str string of unsigned chars containing utf8 text
- * @param l size of the str string
- * @param ch reference to a codepoint read from string
- * @return size (0, 1 - 4 bytes) or (size_t) -1 if illegal UTF8 code unit
- */
+bool is_mb_codepoint(const char_t ch) {	return ch >= 0x80; }
 #define utf_cont(ch) (((ch) & 0xc0) == 0x80)
-size_t peek_codepoint(ccs str, size_t l, char32_t &ch) {
+size_t peek_codepoint(const char_t* str, size_t l, char32_t &ch) {
 	ch = -1;
   	if (!l) return 0;
-	ccs end = str + l;
+	const char_t* end = str + l;
 	unsigned char s[4] = { str[0] };
 	ch = s[0];
 	if  (ch < 0x80) return 1;
@@ -123,25 +82,13 @@ size_t peek_codepoint(ccs str, size_t l, char32_t &ch) {
 	ch = ((ch&7)<<18) | ((s[1]&0x3f)<<12) | ((s[2]&0x3f)<<6) | (s[3]&0x3f);
 	return 4;
 }
-
-/**
- * Returns size of a unicode codepoint in bytes
- * @return size (0-4)
- */
 size_t codepoint_size(char32_t ch) {
-	if      (ch < 0x80)     return 1;
-	else if (ch < 0x800)    return 2;
-	else if (ch < 0x10000)  return 3;
-	else if (ch < 0x110000) return 4;
-	else return 0;
+	return    ch < 0x80     ? 1
+		: ch < 0x800    ? 2
+		: ch < 0x10000  ? 3
+		: ch < 0x110000 ? 4
+		:                 0;
 }
-
-/**
- * Converts char32_t to a unsigned char *
- * @param ch unicode codepoint
- * @param s pointer to a char_t (of size 4+ bytes) where the result is stored
- * @return byte size of the codepoint
- */
 size_t emit_codepoint(char32_t ch, char_t *s) {
 	if (ch < 0x80) {
 		s[0] = (char_t) ch;
@@ -163,13 +110,6 @@ size_t emit_codepoint(char32_t ch, char_t *s) {
 		return 4;
 	} else return 0;
 }
-
-/**
- * Converts char32_t to a 1-4 char_ts and outputs them into a stream
- * @param os output stream
- * @param ch unicode codepoint
- * @return output stream
- */
 basic_ostream<char_t>& emit_codepoint(basic_ostream<char_t>& o, char32_t ch) {
 	if (ch < 0x80)
 		return o.put((char_t) ch);
@@ -187,81 +127,15 @@ basic_ostream<char_t>& emit_codepoint(basic_ostream<char_t>& o, char32_t ch) {
 			.put((char_t) (0x80 + (ch & 0x3F)));
 	return o;
 }
-
-string_t to_string_t(char ch) {
-	return to_string_t(string{ ch });
+basic_ostream<char32_t>& operator<<(basic_ostream<char32_t>& ss, const char* c){
+	for (const auto& ch : to_u32string(to_string_t(c))) ss.put(ch);
+	return ss;
+}
+basic_ostream<char32_t>& operator<<(basic_ostream<char32_t>& ss,
+	const std::string& s)
+{
+	for (const auto& ch : to_u32string(to_string_t(s))) ss.put(ch);
+	return ss;
 }
 
-string_t to_string_t(char32_t ch) {
-	char_t s[4];
-	size_t l = emit_codepoint(ch, s);
-	if (l == (size_t) -1) return string_t();
-	return string_t(s, l);
-}
-
-string_t to_string_t(const u32string& str) {
-	basic_ostringstream<char_t> ss;
-	auto it = str.begin();
-	while (it != str.end()) emit_codepoint(ss, *(it++));
-	return ss.str();
-}
-
-u32string to_u32string(const string_t& str) {
-	basic_ostringstream<char32_t> ss;
-	char32_t ch;
-	ccs s = str.c_str();
-	size_t chl, sl = str.size();
-	while ((chl = peek_codepoint(s, sl, ch)) > 0) {
-		sl -= chl;
-		s += chl;
-		ss.put(ch);
-	}
-	// if (chl == (size_t) -1) return U""; // throw invalid UTF-8?
-	return ss.str();
-}
-
-bool isalnum(ccs s, size_t n, size_t& l) {
-	char32_t ch;
-	l = peek_codepoint(s, n, ch);
-	if (l == 1) return ::isalnum(s[0]);
-	return l >= 2 && l <= n; // all unicode symbols above ascii are alnum
-}
-
-bool isalpha(ccs s, size_t n, size_t& l) {
-	char32_t ch;
-	l = peek_codepoint(s, n, ch);
-	if (l == 1) return ::isalpha(s[0]);
-	return l >= 2 && l <= n; // all unicode symbols above ascii are alpha
-}
-
-bool isprint(ccs s, size_t n, size_t& l) {
-	char32_t ch;
-	l = peek_codepoint(s, n, ch);
-	if (l == 1) return ::isprint(s[0]);
-	return l >= 2 && l <= n; // all unicode symbols above ascii are print
-}
-
-bool isspace(ccs s, size_t n, size_t& l) {
-	char32_t ch;
-	l = peek_codepoint(s, n, ch);
-	return l == 1 && ::isspace(s[0]);
-}
-
-bool isprint(char32_t ch) {
-	return ch < 256 ? ::isprint(ch) : true;// TODO is_printable for ch > 255
-}
-
-int_t hex_to_int_t(ccs str, size_t len) {
-	int_t c = 1, val = 0;
-	for (int_t i = len - 1; i >= 0; --i)
-		if      (str[i] >= '0' && str[i] <= '9')
-			(val += (str[i] - 48) * c), c *= 16;
-		else if (str[i] >= 'A' && str[i] <= 'F')
-			(val += (str[i] - 55) * c), c *= 16;
-		else if (str[i] >= 'a' && str[i] <= 'f')
-			(val += (str[i] - 87) * c), c *= 16;
-		else return -1;
-	return val;
-}
-
-}
+} // idni namespace
