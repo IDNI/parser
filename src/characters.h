@@ -10,8 +10,8 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#ifndef __IDNI__CHARACTERS_H__
-#define __IDNI__CHARACTERS_H__
+#ifndef __IDNI__PARSER__CHARACTERS_H__
+#define __IDNI__PARSER__CHARACTERS_H__
 #include <array>
 #include <iostream>
 namespace idni {
@@ -29,7 +29,9 @@ utf8string to_utf8string(const std::u32string& str);
 
 // utf8string to other strings
 std::string to_string(const utf8string& s);
+std::string to_string(const std::u32string& s);
 std::u32string to_u32string(const utf8string& str);
+std::u32string to_u32string(const std::string& str);
 
 /**
  * checks if character is a begining of a multibyte codepoint
@@ -80,4 +82,4 @@ std::basic_ostream<char32_t>& operator<<(std::basic_ostream<char32_t>& os,
 	const std::string& s);
 
 } // idni namespace
-#endif // __IDNI__CHARACTERS_H__
+#endif // __IDNI__PARSER__CHARACTERS_H__

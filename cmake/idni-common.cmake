@@ -91,6 +91,11 @@ function(target_setup target)
 		RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 		PUBLIC_HEADER            "${PROJECT_HEADERS}"
 	)
+	foreach(X IN LISTS PROJECT_DEFINITIONS)
+		if(${X})
+			target_compile_definitions(${target} PRIVATE "-D${X}")
+		endif()
+	endforeach()
 endfunction()
 
 

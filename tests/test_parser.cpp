@@ -28,7 +28,7 @@ int test_out(int c, parser<CharT> &e){
 	
 	ssf<<"parse_rules"<<c<<".tml";
 	ofstream file2(ssf.str());
-	e.to_tml_rule(ptd);
+	e.to_tml_rules(ptd);
 	file2 << ptd.str();
 	file2.close();
 
@@ -40,6 +40,11 @@ int main() {
 	bool incr_gen = true;
 
 	size_t c = 0;
+
+	parser<char>::parser_options o;
+	o.bin_lr = binlr;
+	o.incr_gen_forest = incr_gen;
+
 	// Using Elizbeth Scott paper example 2, pg 64
 	parser<char> e({
 			{"start", { { "b" }, { "start", "start" } } }
@@ -47,30 +52,25 @@ int main() {
 //			{"start", { { "" }, { "A", "start", "B", "start" } } },
 //			{"A", { { "" }, { "A", "a" } } },
 //			{"B", { { "b" }, { "B", "b" } } }
-		} , binlr, incr_gen );
+		}, o);
 	cout << e.recognize("bbb") << endl << endl;
 	test_out<char>(c++, e);	
-	
-	
+
 	// infinite ambiguous grammar, advanced parsing pdf, pg 86
 	// will capture cycles
-	parser<char> e1({{"start", { { "b" }, {"start"} }}}, binlr, incr_gen);
+	parser<char> e1({{"start", { { "b" }, {"start"} }}}, o);
 	cout << e1.recognize("b") << endl << endl;
 	test_out<char>(c++, e1);	
-	
 
 	// another ambigous grammar
 	parser<char> e2({ {"start", { { "a", "X", "X", "c" }, {"start"} }},
 				{"X", { {"X", "b"}, { "" } } },
-
-	}, binlr, incr_gen);
+	}, o);
 	cout << e2.recognize("abbc") << endl << endl;
 	test_out<char>(c++, e2);	
-	
 
 	// highly ambigous grammar, advanced parsing pdf, pg 89
-	parser<char> e3({ {"start", { { "start", "start" }, {"a"} }}
-	}, binlr, incr_gen);
+	parser<char> e3({ {"start", { { "start", "start" }, {"a"} }} }, o);
 	cout << e3.recognize("aaaaa") << endl << endl;
 	test_out<char>(c++, e3);
 
@@ -79,18 +79,18 @@ int main() {
 				{"A", { { "a" }, {"B","A"} }},
 				{"B", { { ""} }},
 				{"T", { { "b","b","b" } }},
-	}, binlr, incr_gen);
+	}, o);
 	cout << e4.recognize("abbb") << endl << endl;
 	test_out<char>(c++, e4);
 
 	parser<char> e5({{"start", { { "b", }, {"start", "start", "start", "start"}, {""} }}}, 
-		binlr, incr_gen);
+		o);
 	cout << e5.recognize("b") << endl << endl;
 	test_out<char>(c++, e5);
 
 	parser<char> e6({{"start", { {"n"}, { "start", "X", "start" }}},
 				{"X", { {"p"}, {"m"}}}
-	}, binlr, incr_gen);
+	}, o);
 	cout << e6.recognize("npnmn") << endl;
 	test_out<char>(c++, e6);
 /*	cout << e.recognize("aa") << endl << endl;
@@ -99,14 +99,16 @@ int main() {
 	cout << e.recognize("aabb") << endl << endl;
 	cout << e.recognize("aabbc") << endl << endl;
 */
-
+	parser<char32_t>::parser_options o32;
+	o32.bin_lr = binlr;
+	o32.incr_gen_forest = incr_gen;
 	parser<char32_t> e7({ { U"start", {
 		{ U"τ" },
 		{ U"ξεσκεπάζω"},
 		{ U"žluťoučký" },
 		{ U"ᚠᛇᚻ᛫ᛒᛦᚦ᛫ᚠᚱᚩᚠᚢᚱ᛫ᚠᛁᚱᚪ᛫ᚷᛖᚻᚹᛦᛚᚳᚢᛗ" },
 		{ U"start", U"start" }
-	} } }, binlr, incr_gen);
+	} } }, o32);
 	cout << e7.recognize(U"τžluťoučkýτᚠᛇᚻ᛫ᛒᛦᚦ᛫ᚠᚱᚩᚠᚢᚱ᛫ᚠᛁᚱᚪ᛫ᚷᛖᚻᚹᛦᛚᚳᚢᛗτξεσκεπάζωτ") << endl << endl;
 	test_out<char32_t>(c++, e7);
 
