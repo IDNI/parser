@@ -30,12 +30,7 @@ struct forest {
 	typedef std::vector<edge> edges;
 	typedef std::pair<nodes, edges> nodes_and_edges;
 	node_graph g;
-	void clear() {
-		DBG(std::cout << "g.size(): " << g.size() << "\n";)
-		g.clear();
-		DBG(std::cout << "forest's node_graph g cleared" << std::endl;)
-		DBG(std::cout << "g.size(): " << g.size() << "\n";)
-	}
+	void clear() { g.clear(); }
 	bool contains(const node& n) { return g.find(n) != g.end(); }
 	nodes_set& operator[](const node& p)             { return g[p]; }
 	const nodes_set& operator[](const node& p) const { return g[p]; }	

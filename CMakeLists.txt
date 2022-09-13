@@ -19,7 +19,7 @@ option(WITH_TO_METHODS "add to_dot, to_tml and to_tml_rules methods" FALSE)
 option(BUILD_TESTS "build library tests" TRUE)
 option(BUILD_STATIC_LIBRARY "build static library" TRUE)
 option(BUILD_SHARED_LIBRARY "build shared library" TRUE)
-option(BUILD_EXAMPLES "build examples" FALSE)
+option(BUILD_EXAMPLES "build examples" TRUE)
 set(BUILD_EXECUTABLE FALSE)
 set(BUILD_SHARED_EXECUTABLE FALSE)
 ################################################################################

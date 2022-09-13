@@ -1,0 +1,4 @@
+#!/bin/sh
+
+./g2cpp.sh ./src/glanguage/g.g ./src/glanguage/g.grammar.inc.h
+./g2cpp.sh ./src/glanguage/g.g ./src/glanguage/g.grammar_char.inc.h --char

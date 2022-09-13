@@ -16,52 +16,56 @@
 #include "parser.h"
 namespace idni { namespace glanguage {
 
+#ifndef WITH_CHARCLASSES
+#error glanguage.h requires WITH_CHARCLASSES to be defined
+#endif
+
 // template declarations
 
-template <typename CharT>
-parser<CharT> g_parser();
-template <typename CharT>
-typename parser<CharT>::grammar g_grammar();
-template <typename CharT>
-typename parser<CharT>::grammar transform_parsed_g_to_grammar(parser<CharT>& p);
-template <typename CharT>
-ostream_t& grammar_to_cpp(ostream_t& ss,
+// returns parser of g language
+template <typename CharT> parser<CharT> g_parser();
+// returns grammar of g language
+template <typename CharT> typename parser<CharT>::grammar g_grammar();
+// transforms parsed forest of a g language into a grammar structure
+template <typename CharT> typename parser<CharT>::grammar
+	transform_parsed_g_to_grammar(parser<CharT>& p);
+// transforms provided grammar to a cpp code, stream interface
+// if basic_char is true, exports char parsers, otherwise for char32_t parsers
+template <typename CharT> ostream_t& grammar_to_cpp(ostream_t& ss,
 	const typename parser<CharT>::grammar& g, bool basic_char = false);
-template <typename CharT>
-std::string grammar_to_cpp(const typename parser<CharT>::grammar& g,
-	bool basic_char = false);
-template <typename CharT>
-bool load_g(const std::string& filename, typename parser<CharT>::grammar& g);
+// transforms provided grammar `g` to a cpp code, returns string
+// if basic_char is true, exports char parsers, otherwise for char32_t parsers
+template <typename CharT> std::string grammar_to_cpp(
+	const typename parser<CharT>::grammar& g, bool basic_char = false);
+// loads a grammar into `g` of a language defined in a g language in `filename` 
+// returns true if success and false if loading failed
+template <typename CharT> bool load_g(const std::string& filename,
+	typename parser<CharT>::grammar& g);
 
 // template definitions
 
+// convert const char* string into parser's string<CharT> at compile time
 template <typename CharT>
 constexpr typename parser<CharT>::string S(const char* s) {
 	return from_cstr<CharT>(s);
 }
 
-//#define S(x) (from_cstr<CharT>(x))
-
 template <typename CharT>
 parser<CharT> g_parser() {
 	typename parser<CharT>::parser_options o;
 	o.cc_fns = { "eof", "alpha", "alnum", "printable", "space" };
-	auto g = g_grammar<CharT>();
-	auto p = parser<CharT>(g, o);
-	//DBG(p.print_grammar(std::cout << "g grammar: ", g) << "\n\n";)
-	return p;
-	//return parser<CharT>(g_grammar<CharT>(), o);
+	return parser<CharT>(g_grammar<CharT>(), o);
 }
 template <>
 parser<char32_t>::grammar g_grammar<char32_t>() {
 	typename parser<char32_t>::grammar g
-#include "g.grammar.inc.h"
+	#include "glanguage/g.grammar.inc.h"
 	return g;
 }
 template <>
 parser<char>::grammar g_grammar<char>() {
 	typename parser<char>::grammar g
-#include "g.grammar_char.inc.h"
+	#include "glanguage/g.grammar_char.inc.h"
 	return g;
 }
 template <typename CharT>
@@ -82,39 +86,23 @@ typename parser<CharT>::grammar transform_parsed_g_to_grammar(parser<CharT>& p){
 		bool is_constraint = false; // are we in a constraint
 		size_t id = 0;              // id of the new term
 		void add_element(string e) {
-			//DBG(std::cout << "  add_element: " << to_std_string(e)
-			//	<< " head: " << head << " in_factor: "
-			//	<< in_factor << "\n";)
 			if (e == S<CharT>("null")) e = S<CharT>("\0");
 			if (head) r.first = e, head = false;
 			else if (in_factor) f.back().push_back(e);
 			else r.second.back().push_back(e);
 		}
-		void alt_sep() { r.second.emplace_back();
-			//DBG(std::cout << "  alt_sep\n";)
-		}
+		void alt_sep() { r.second.emplace_back(); }
 		void new_rule() { head = true, r = { {}, { {} } }; }
-			//DBG(std::cout << "new_rule\n";) }
 		void new_factor() { in_factor = true,
 			f.emplace_back(), ft.emplace_back(SINGLE); }
-			//DBG(std::cout << "  new_factor\n";) }
 		void add_new_factor(const string& nn) {
 			(f.size() ? f.back() : r.second.back())
-				.push_back(nn);
-		}
+				.push_back(nn); }
 		void save_factor() {
-			//DBG(std::cout << "  save_factor\n";)
 			auto lf =  f.back();  f.pop_back();
 			auto lt = ft.back(); ft.pop_back();
 			strings nll = { S<CharT>("") };
 			in_factor = !f.size();
-//#ifdef DEBUG
-//			std::cout << "\tR: " << to_std_string(r.first)<<" lf: ";
-//			for (auto& t : lf)
-//				std::cout << '"' << to_std_string(t) << "\" ";
-//			std::cout << "| unot: " << (int_t) ut
-//				<< " lt: " << (int_t) lt << "\n";
-//#endif
 			if (lt == SINGLE && ut != PLUS && ut != MULTI) {
 				add_new_factor(lf[0]);
 				return;
@@ -139,37 +127,20 @@ typename parser<CharT>::grammar transform_parsed_g_to_grammar(parser<CharT>& p){
 			}
 			add_new_factor(nn);
 		}
-		void save_rule() {
-			//DBG(std::cout << "save_rule\n";)
-			g.push_back(r);
-		}
-		void group() {
-			ft.back() = GROUP;
-			//DBG(std::cout << "  ft: " << (int_t) ft.back()<<"\n";)
-		}
-		void optional() {
-			ft.back() = OPTIONAL;
-			//DBG(std::cout << "  ft: " << (int_t) ft.back()<<"\n";)
-		}
-		void plus() {
-			ft.back() = ATLEASTONE;
-			//DBG(std::cout << "  ft: " << (int_t) ft.back()<<"\n";)
-		}
-		void unot(string c) {
-			//DBG(std::cout << "  unot: " << (int_t) ut << "\n";)
-			ut = c == S<CharT>("+") ? PLUS : c == S<CharT>("*") ? MULTI : NONE;
-		};
+		void save_rule() { g.push_back(r); }
+		void group() {    ft.back() = GROUP; }
+		void optional() { ft.back() = OPTIONAL; }
+		void plus() {     ft.back() = ATLEASTONE; }
+		void unot(string c) { ut = c == S<CharT>("+") ? PLUS
+					: c == S<CharT>("*") ? MULTI : NONE; };
 		string get_new_name() {
 			std::stringstream ss;
 			ss << "_R" << to_std_string(r.first) << "_" << id++;
-			//DBG(std::cout << "  new_name: " << ss.str() << "\n";)
 			return from_str<CharT>(ss.str());
 		}
 	} x;
-	auto cb_enter = [&p, &x](const auto& n) { // entering a node
+	auto cb_enter = [&p, &x](const auto& n) {
 		if (!n.first.nt()) return;
-		//DBG(std::cout << "entering " << (n.first.nt() ? "NT" : " T")
-		//	<< ": `" << to_std_string(p.to_string(n.first))<< "`\n";)
 		const auto& s = p.dict(n.first.n());
 		if      (s == S<CharT>("production"))      x.new_rule();
 		else if (s == S<CharT>("alt_separator"))   x.alt_sep();
@@ -182,19 +153,24 @@ typename parser<CharT>::grammar transform_parsed_g_to_grammar(parser<CharT>& p){
 			 s == S<CharT>("quoted_char"))
 		{
 			auto str = p.flatten(n);
-			str.erase(str.begin());
-			str.erase(str.end() - 1);
+			str.erase(str.begin()), str.erase(str.end() - 1);
+			if (s == S<CharT>("quoted_char") && str.size() > 1) {
+				switch (str[1]) {
+					case 'r':  str = S<CharT>("\r"); break;
+					case 'n':  str = S<CharT>("\n"); break;
+					case 't':  str = S<CharT>("\t"); break;
+					default: str = str[1];
+				}
+			}
 			x.add_element(str);
 		}
-		else if (s == S<CharT>("constraints"))   x.is_constraint = true;
+		else if (s == S<CharT>("constraints")) x.is_constraint = true;
 		else if (s == S<CharT>("t_t_factor") ||
 			 s == S<CharT>("nt_t_factor") ||
-			 s == S<CharT>("nt_nt_factor"))    x.new_factor();
+			 s == S<CharT>("nt_nt_factor")) x.new_factor();
 	};
 	auto cb_exit = [&p, &x](const auto& n, const auto&) {
 		if (!n.first.nt()) return;
-		//DBG(std::cout << "leaving " << (n.first.nt() ? "NT" : " T") <<
-		//	": `" << to_std_string(p.to_string(n.first))<< "`\n";)
 		const auto& s = p.dict(n.first.n());
 		if      (s == S<CharT>("production"))      x.save_rule();
 		else if (s == S<CharT>("constraints"))  x.is_constraint = false;
@@ -219,23 +195,36 @@ ostream_t& grammar_to_cpp(ostream_t& ss,
 	const typename parser<CharT>::grammar& g, bool basic_char)
 {
 	std::string u = basic_char ? "" : "U";
+	auto escape = [](char s) -> std::string {
+		std::string r({ s });
+		return    s == '\r' ? "\\r"
+			: s == '\n' ? "\\n"
+			: s == '\t' ? "\\t"
+			: s == '"' ?  "\\\""
+			: s == '\\' ? "\\\\" : r.c_str();
+	};
 	ss << "{";
+	size_t i = 0;
 	for (auto& r : g) {
+		if (i != 0) ss << ","; else i++;
 		ss << "\n\t{ " << u <<"\"" << to_std_string(r.first) << "\", {";
+		size_t j = 0;
 		for (auto& a : r.second) {
+			if (j != 0) ss << ","; else j++;
 			ss << "\n\t\t{ ";
+			size_t k = 0;
 			for (auto& t : a) {
+				if (k != 0) ss << ", "; else k++;
 				ss << u << "\"";
-				if (t != S<CharT>("null"))
+				if (t.size() == 1)
+					ss << escape(to_std_string(t)[0]);
+				else  if (t != S<CharT>("null"))
 					ss << to_std_string(t);
 				ss << "\"";
-				/*if (t != a.back())*/ ss << ", ";
 			}
 			ss << " }";
-			/*if (a != r.second.back())*/ ss << ",";
 		}
 		ss << "\n\t} }";
-		/*if (r != g.back())*/ ss << ",";
 	}
 	return ss << "\n};\n";
 }
@@ -245,12 +234,10 @@ bool load_g(const std::string& filename, typename parser<CharT>::grammar& g) {
 	if (!s.is_open()) return std::cerr << "failed to open grammar from: `"
 		<< filename << "`\n", false;
 	std::stringstream ss; ss << s.rdbuf();
-	//std::cout << "grammar: `" << ss.str() << "`\n";
 	auto gp = g_parser<char32_t>();
 	if (!gp.recognize(from_str<CharT>(ss.str()))) return
 		std::cerr<<"grammar: `"<<filename<<"` not recognized", false;
 	g = transform_parsed_g_to_grammar(gp);
-	//DBG(gp.print_grammar(std::cout << "grammar: ", g) << "\n\n";)
 	return true;
 }
 
