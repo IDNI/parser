@@ -238,7 +238,7 @@ bool parser<CharT>::recognize(const typename parser<CharT>::string s) {
 			//DBG(cout << "set: " << n << endl;)
 			const auto& cont = S[n];
 			for (auto it = cont.begin(); it != cont.end(); ++it)
-				if(completed(*it)) pre_process(*it);
+				pre_process(*it);
 				
 			for (auto it = cont.begin(); it != cont.end(); ++it)
 				if (completed(*it)) { 
@@ -246,7 +246,8 @@ bool parser<CharT>::recognize(const typename parser<CharT>::string s) {
 					//	it->prod << it->dot <<endl);				
 					pnode curroot(get_nt(*it),
 						{it->from, it->set});
-					build_forest(curroot);
+					if( o.bin_lr) build_forest2(curroot); 
+					else build_forest(curroot);
 				}
 		}
 	}

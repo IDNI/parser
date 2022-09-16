@@ -35,9 +35,22 @@ int test_out(int c, parser<CharT> &e){
 	return 1;
 }
 
-int main() {
-	bool binlr    = true;
+int main(int argc, char**argv ) {
+	bool binlr    = false;
 	bool incr_gen = true;
+
+	std::vector<std::string> args(argv+1 , argv + argc);	
+
+	for( auto opt : args) {
+		if ( opt == "-enable_binlr") binlr = true;
+		else if ( opt == "-enable_incrgen") incr_gen = true;
+		else if ( opt == "-disable_binlr") binlr = false;
+		else if ( opt == "-disable_incrgen") incr_gen = false;
+		else {
+			cout << "Invalid option: " << opt << endl << "Valid options:" << 
+			"[enable|disable]_incrgen , [enable|disable]_binlr" <<endl, exit(1);
+		}
+	}
 
 	size_t c = 0;
 
