@@ -169,7 +169,6 @@ private:
 #endif
 	parse_forest f; // forest
 	bool init_forest();
-	bool build_forest(const pnode &root);
 	bool build_forest2(const pnode &root);
 	bool bin_lr_comb(const item&, std::set<std::vector<pnode>>&);
 	void sbl_chd_forest(const item&, std::vector<pnode>&, size_t,

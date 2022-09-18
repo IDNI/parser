@@ -193,6 +193,8 @@ bool parser<CharT>::recognize(const typename parser<CharT>::string s) {
 	inputstr = s;
 	size_t len = s.size();
 	f.clear();
+	sorted_citem.clear();
+	rsorted_citem.clear();
 	bin_tnt.clear();
 	tid = 0;
 	S.clear();//, S.resize(len + 1);//, C.clear(), C.resize(len + 1);
@@ -244,10 +246,8 @@ bool parser<CharT>::recognize(const typename parser<CharT>::string s) {
 				if (completed(*it)) { 
 					//DBG(cout<<"\n"<< it->from <<it->set << 
 					//	it->prod << it->dot <<endl);				
-					pnode curroot(get_nt(*it),
-						{it->from, it->set});
-					if( o.bin_lr) build_forest2(curroot); 
-					else build_forest(curroot);
+					pnode curroot(get_nt(*it), {it->from, it->set});
+					build_forest2(curroot); 
 				}
 		}
 	}
@@ -298,6 +298,8 @@ bool parser<CharT>::init_forest() {
 	// clear forest structure if any
 	f.clear();
 	bin_tnt.clear();
+	sorted_citem.clear();
+	rsorted_citem.clear();
 	tid = 0;
 	// set the start root node
 	size_t len = inputstr.length();
@@ -313,7 +315,7 @@ bool parser<CharT>::init_forest() {
 						rsorted_citem.size() << " \n";)
 	// build forest
 	MS(emeasure_time_start(tsf, tef);)
-	ret = o.bin_lr ? build_forest2(root) : build_forest(root);
+	ret = build_forest2(root);
 	MS(emeasure_time_end(tsf, tef) <<" :: forest time\n";)
 #ifdef DEBUG
 	auto n = f.count_trees(root);
@@ -374,28 +376,6 @@ void parser<CharT>::sbl_chd_forest(const item &eitem,
 	}
 }
 
-// builds the forest starting with root
-template <typename CharT>
-bool parser<CharT>::build_forest(const pnode& root) {
-	if (!root.first.nt()) return false;
-	if (f.contains(root)) return false;
-
-	//auto &nxtset = sorted_citem[root.n()][root.second[0]];
-	auto &nxtset = sorted_citem[{ root.first.n(), root.second[0] }];
-	pnodes_set ambset;
-	for (const item &cur : nxtset) {
-		if (cur.set != root.second[1]) continue;
-		DBG(assert(root.first.n() == G[cur.prod][0].n());)
-		pnode cnode(G[cur.prod][0], { cur.from, cur.set });
-		pnodes nxtlits;
-		sbl_chd_forest(cur, nxtlits, cur.from, ambset);
-		f[cnode] = ambset;
-		for (auto &aset : ambset)
-			for (const pnode& nxt : aset)
-				build_forest(nxt);
-	}	
-	return true;
-}
 
 template <typename CharT>
 bool parser<CharT>::bin_lr_comb(const item& eitem,
@@ -475,6 +455,7 @@ bool parser<CharT>::bin_lr_comb(const item& eitem,
 	return true;
 }
 
+// builds the forest starting with root
 template <typename CharT>
 bool parser<CharT>::build_forest2(const pnode &root) {
 	if (!root.first.nt()) return false;
@@ -487,7 +468,12 @@ bool parser<CharT>::build_forest2(const pnode &root) {
 		pnode cnode(completed(cur)
 				? G[cur.prod][0] : lit{ root.first.n() },
 			{ cur.from, cur.set });
-		bin_lr_comb(cur, ambset);
+
+		if(o.bin_lr) bin_lr_comb(cur, ambset);
+		else {
+			pnodes nxtlits;
+			sbl_chd_forest(cur, nxtlits, cur.from, ambset);
+		}
 		f[cnode] = ambset;
 		for (auto &aset: ambset)
 			for (const pnode& nxt : aset) build_forest2(nxt);
