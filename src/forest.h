@@ -12,6 +12,7 @@
 // modified over time by the Author.
 #ifndef __IDNI__PARSER__FOREST_H__
 #define __IDNI__PARSER__FOREST_H__
+#include <cassert>
 namespace idni {
 
 #ifdef DEBUG
@@ -30,6 +31,11 @@ struct forest {
 	typedef std::vector<edge> edges;
 	typedef std::pair<nodes, edges> nodes_and_edges;
 	node_graph g;
+	typedef node_graph node_tree;
+	typedef std::vector<node_tree> node_trees;
+	typedef std::vector<size_t> fpath;
+	typedef std::vector<fpath> fpaths;
+	
 	void clear() { g.clear(); }
 	bool contains(const node& n) { return g.find(n) != g.end(); }
 	nodes_set& operator[](const node& p)             { return g[p]; }
@@ -37,7 +43,7 @@ struct forest {
 
 	size_t count_trees(const node& root);
 	nodes_and_edges get_nodes_and_edges() const;
-
+	node_trees extract_trees( const node& root ) const;
 	template <typename cb_enter_t, typename cb_exit_t,
 		typename cb_revisit_t, typename cb_ambig_t>
 	bool traverse(const node &root, cb_enter_t cb_enter, cb_exit_t cb_exit,
@@ -70,6 +76,8 @@ private:
 	bool _traverse(const node &root, std::set<node> &done,
 		cb_enter_t cb_enter, cb_exit_t cb_exit,
 		cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const;
+	bool _extract_trees( const node& root, std::set<node>& done, 
+		fpaths &paths, size_t pathid = 0 ) const;
 };
 
 template <typename NodeT>
@@ -107,6 +115,87 @@ typename forest<NodeT>::nodes_and_edges forest<NodeT>::get_nodes_and_edges()
 	n.resize(id);
 	for (auto& p : ns) n[p.first] = p.second;
 	return nodes_and_edges{ n, es };
+}
+
+template <typename NodeT>
+bool forest<NodeT>::_extract_trees( const node& root, std::set<node>& done, 
+	fpaths &paths, size_t pathid ) const{
+
+	bool ret = true;
+	nodes_set pack ;
+	if (root.first.nt()) {
+		auto it = g.find(root);
+		if (it == g.end()) return false;
+		pack = it->second;
+		done.insert(root);
+	}
+	
+	int id = 0;
+	fpath cur = paths[pathid];
+	std::set<node> curd = done;
+	for (auto& nodes : pack) {
+		std::set<node> ndone;
+		if(pack.size() > 1) {
+				if( id != 0) 
+					paths.emplace_back(cur),
+					paths.back().push_back(id),
+					ndone.insert(curd.begin(), curd.end());
+				else paths[pathid].push_back(id);
+		}
+		for (auto& chd : nodes) {
+			if (id == 0 ? !done.count(chd) : !ndone.count(chd)) {
+				ret &= _extract_trees(chd, 
+					id == 0 ? done : ndone, paths, 
+					id == 0 ? pathid : pathid = paths.size()-1 );
+			}
+		}
+		id++;
+	}
+	return ret;
+}
+
+
+template <typename NodeT>
+typename forest<NodeT>::node_trees forest<NodeT>::extract_trees(
+	 const node& root ) const {
+	
+	fpaths paths;
+	std::set<node> done;
+	paths.emplace_back();
+	_extract_trees(root, done, paths);
+
+	fpath path;
+	node_tree tree;
+	node_trees trees;
+
+	auto cb_enter = [](const auto&) {};
+	auto cb_revisit =  [](const auto&) { return false; }; // revisit
+		// make tree node while exiting from the forest node
+	auto cb_exit = [&tree](const node& root, const nodes_set& ambig_set) {
+		DBG( assert(ambig_set.size() <= 1) );
+		if (root.first.nt()) tree.insert({root, ambig_set});
+	};
+	//select one of the ambiguous nodes as per paths[id]
+	auto cb_select_one = [&path ](const node&, auto& ambset) {
+			std::set<std::vector<node>> selected;
+			DBG(assert(ambset.size() > path.front() ));
+			
+			auto it = std::next(ambset.begin(), path.front());
+			if( path.size()) path.erase(path.begin());
+			selected.insert(*it );
+			return selected;
+		};
+	
+	for(size_t i = 0 ; i< paths.size(); i++ ) {
+		std::cout << std::endl << "#" << i << std::endl;
+		path = paths[i];
+		for( size_t tid: path ) std::cout<< tid << " ";
+		std::cout << std::endl;
+		traverse(root, cb_enter, cb_exit, cb_revisit, cb_select_one);
+		trees.emplace_back(tree);
+		tree.clear();
+	}
+	return trees;
 }
 
 template <typename NodeT>

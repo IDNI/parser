@@ -32,6 +32,27 @@ int test_out(int c, parser<CharT> &e){
 	file2 << ptd.str();
 	file2.close();
 
+	auto trees = e.parsed_forest().extract_trees(e.root());
+	int i=0;
+	for( auto &t : trees ){
+		ssf.str({});
+		ptd.str({});
+		ssf<<"graph"<<c<<"_"<<i++<<".dot";
+		ofstream filet(ssf.str());
+		e.to_dot(ptd, t);
+		filet << ptd.str();
+		filet.close();
+	}
+	i=0;
+	for( auto &t : trees ){
+		ssf.str({});
+		ptd.str({});
+		ssf<<"parse_rules"<<c<<"_"<<i++<<".tml";
+		ofstream filet(ssf.str());
+		e.to_tml_rules(ptd, t);
+		filet << ptd.str();
+		filet.close();
+	}
 	return 1;
 }
 
@@ -96,7 +117,7 @@ int main(int argc, char**argv){
 	cout << e4.recognize("abbb") << endl << endl;
 	test_out<char>(c++, e4);
 
-	parser<char> e5({{"start", { { "b", }, {"start", "start", "start", "start"}, {""} }}}, 
+	parser<char> e5({{"start", { { "b", }, {"start", "start", "start"}, {""} }}}, 
 		o);
 	cout << e5.recognize("b") << endl << endl;
 	test_out<char>(c++, e5);
@@ -106,12 +127,6 @@ int main(int argc, char**argv){
 	}, o);
 	cout << e6.recognize("npnmn") << endl;
 	test_out<char>(c++, e6);
-/*	cout << e.recognize("aa") << endl << endl;
-	cout << e.recognize("aab") << endl << endl;
-	cout << e.recognize("abb") << endl << endl;
-	cout << e.recognize("aabb") << endl << endl;
-	cout << e.recognize("aabbc") << endl << endl;
-*/
 	parser<char32_t>::parser_options o32;
 	o32.bin_lr = binlr;
 	o32.incr_gen_forest = incr_gen;
