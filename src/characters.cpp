@@ -18,6 +18,7 @@ namespace idni {
 
 string to_string(const utf8string& s) { return string(s.begin(), s.end()); }
 string to_string(const u32string& s) { return to_string(to_utf8string(s)); }
+string to_string(const string& s) { return s; }
 utf8string to_utf8string(int32_t v) { return to_utf8string(::to_string(v)); }
 utf8string to_utf8string(char ch) { return to_utf8string(string{ ch }); }
 utf8string to_utf8string(const char* s) { return to_utf8string(string(s)); }

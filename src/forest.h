@@ -15,12 +15,6 @@
 #include <cassert>
 namespace idni {
 
-#ifdef DEBUG
-#define DBG(x) x
-#else
-#define DBG(x)
-#endif
-
 template <typename NodeT>
 struct forest {
 	typedef NodeT node;
@@ -30,55 +24,108 @@ struct forest {
 	typedef std::pair<size_t, size_t> edge;
 	typedef std::vector<edge> edges;
 	typedef std::pair<nodes, edges> nodes_and_edges;
-	node_graph g;
 	typedef node_graph node_tree;
 	typedef std::vector<node_tree> node_trees;
 	typedef std::vector<size_t> fpath;
 	typedef std::vector<fpath> fpaths;
-	
+	node_graph g;
+	node rt;
+	node root() const { return rt; }
+	void root(const node& n) { rt = n; }
 	void clear() { g.clear(); }
 	bool contains(const node& n) { return g.find(n) != g.end(); }
 	nodes_set& operator[](const node& p)             { return g[p]; }
 	const nodes_set& operator[](const node& p) const { return g[p]; }	
-
-	size_t count_trees(const node& root);
+	size_t count_trees(const node& root) const;
+	size_t count_trees() const { return count_trees(root()); };
 	nodes_and_edges get_nodes_and_edges() const;
 	node_trees extract_trees( const node& root ) const;
+	std::function<void(const node&)> no_enter;
+	std::function<void(const node&, const nodes_set&)> no_exit;
+	std::function<bool(const node&)> no_revisit;
+	std::function<bool(const node&)> do_revisit;
+	std::function<nodes_set(const node&, const nodes_set&)> no_ambig;
+	forest() {
+		no_enter   = [](const node&) { };
+		no_exit    = [](const node&, const nodes_set&) { };
+		no_revisit = [](const node&) { return true; };
+		do_revisit = [](const node&) { return false; };
+		no_ambig   = [](const node&, const nodes_set& ns) { return ns;};
+	}
 	template <typename cb_enter_t, typename cb_exit_t,
 		typename cb_revisit_t, typename cb_ambig_t>
 	bool traverse(const node &root, cb_enter_t cb_enter, cb_exit_t cb_exit,
 		cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const;
-	// traverse methods with default parameters
+	// traverse() with default parameters
 	template <typename cb_enter_t>
 	bool traverse(const node &root, cb_enter_t cb_enter) const {
-		return traverse(root, cb_enter, ([](const auto&,const auto&){}),
-			([](const auto&) { return true; }),
-			([](const auto&, auto&) { return nodes_set{}; }));
+		return traverse(root, cb_enter, no_exit, no_revisit, no_ambig);
 	}
 	template <typename cb_enter_t, typename cb_exit_t>
 	bool traverse(const node &root, cb_enter_t cb_enter, cb_exit_t cb_exit)
 		const
 	{
-		return traverse(root, cb_enter, cb_exit,
-			([](const auto&) { return true; }),
-			([](const auto&, auto&) { return nodes_set{}; }));
+		return traverse(root, cb_enter, cb_exit, no_revisit, no_ambig);
 	}
 	template <typename cb_enter_t, typename cb_exit_t,typename cb_revisit_t>
 	bool traverse(const node &root, cb_enter_t cb_enter, cb_exit_t cb_exit,
 		cb_revisit_t cb_revisit) const
 	{
-		return traverse(root, cb_enter, cb_exit, cb_revisit,
-			([](const auto&, auto&) { return nodes_set{}; }));
+		return traverse(root, cb_enter, cb_exit, cb_revisit, no_ambig);
 	}
+	template <typename cb_enter_t, typename cb_exit_t,
+		typename cb_revisit_t, typename cb_ambig_t>
+	bool traverse(cb_enter_t cb_enter, cb_exit_t cb_exit,
+		cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const
+	{
+		return traverse(root(), cb_enter, cb_exit, cb_revisit,cb_ambig);
+		
+	}
+	template <typename cb_enter_t>
+	bool traverse(cb_enter_t cb_enter) const {
+		return traverse(cb_enter, no_exit, no_revisit, no_ambig);
+	}
+	template <typename cb_enter_t, typename cb_exit_t>
+	bool traverse(cb_enter_t cb_enter, cb_exit_t cb_exit)
+		const
+	{
+		return traverse(cb_enter, cb_exit, no_revisit, no_ambig);
+	}
+	template <typename cb_enter_t, typename cb_exit_t,typename cb_revisit_t>
+	bool traverse(cb_enter_t cb_enter, cb_exit_t cb_exit,
+		cb_revisit_t cb_revisit) const
+	{
+		return traverse(cb_enter, cb_exit, cb_revisit, no_ambig);
+	}
+#ifdef DEBUG
+	ostream_t& print_data(ostream_t& os) const;
+#endif
 private:
 	template <typename cb_enter_t, typename cb_exit_t,
 		typename cb_revisit_t, typename cb_ambig_t>
 	bool _traverse(const node &root, std::set<node> &done,
 		cb_enter_t cb_enter, cb_exit_t cb_exit,
 		cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const;
-	bool _extract_trees( const node& root, std::set<node>& done, 
-		fpaths &paths, size_t pathid = 0 ) const;
+	bool _extract_trees(const node& root, std::set<node>& done, 
+		fpaths &paths, size_t pathid = 0) const;
 };
+
+#ifdef DEBUG
+template <typename NodeT>
+ostream_t& forest<NodeT>::print_data(ostream_t& os) const {
+	os << "number of nodes: " << g.size() << endl;
+	for (const auto& n : g) {
+		os << n.first.first.to_std_string() << "\n";
+		for (const auto& p : n.second) {
+			os << "\t";
+			for (const auto &c : p)
+				os << " `" << c.first.to_std_string() << "`";
+			os << "\n";
+		}
+	}
+	return os;
+}
+#endif
 
 template <typename NodeT>
 typename forest<NodeT>::nodes_and_edges forest<NodeT>::get_nodes_and_edges()
@@ -118,9 +165,9 @@ typename forest<NodeT>::nodes_and_edges forest<NodeT>::get_nodes_and_edges()
 }
 
 template <typename NodeT>
-bool forest<NodeT>::_extract_trees( const node& root, std::set<node>& done, 
-	fpaths &paths, size_t pathid ) const{
-
+bool forest<NodeT>::_extract_trees(const node& root, std::set<node>& done, 
+	fpaths &paths, size_t pathid) const
+{
 	bool ret = true;
 	nodes_set pack ;
 	if (root.first.nt()) {
@@ -154,11 +201,10 @@ bool forest<NodeT>::_extract_trees( const node& root, std::set<node>& done,
 	return ret;
 }
 
-
 template <typename NodeT>
 typename forest<NodeT>::node_trees forest<NodeT>::extract_trees(
-	 const node& root ) const {
-	
+	const node& root) const
+{
 	fpaths paths;
 	std::set<node> done;
 	paths.emplace_back();
@@ -186,11 +232,13 @@ typename forest<NodeT>::node_trees forest<NodeT>::extract_trees(
 			return selected;
 		};
 	
-	for(size_t i = 0 ; i< paths.size(); i++ ) {
-		std::cout << std::endl << "#" << i << std::endl;
+	for(size_t i = 0; i< paths.size(); i++) {
 		path = paths[i];
-		for( size_t tid: path ) std::cout<< tid << " ";
+#if DEBUG
+		std::cout << std::endl << "#" << i << std::endl;
+		for (size_t tid: path ) std::cout<< tid << " ";
 		std::cout << std::endl;
+#endif
 		traverse(root, cb_enter, cb_exit, cb_revisit, cb_select_one);
 		trees.emplace_back(tree);
 		tree.clear();
@@ -215,6 +263,15 @@ bool forest<NodeT>::_traverse(const node &root, std::set<node> &done,
 	cb_enter_t cb_enter, cb_exit_t cb_exit,
 	cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const
 {
+//#define DEBUG_TRAVERSE
+#ifdef DEBUG_TRAVERSE
+	std::cout << "enter: \t\t" << root.first.to_std_string() << std::endl;
+	std::cout << "\t" << (root.first.nt() ? "NT" : " T") << " ";
+	if (root.first.nt()) std::cout << "n: " << root.first.n()
+		<< " `" << root.first.to_std_string();
+	else std::cout << "c: `" << to_std_string(root.first.c()) << "`";
+	std::cout << std::endl;
+#endif
 	bool ret = true;
 	nodes_set pack;
 	if (root.first.nt()) {
@@ -232,21 +289,21 @@ bool forest<NodeT>::_traverse(const node &root, std::set<node> &done,
 			if (!done.count(chd) || cb_revisit(chd)) 
 				ret &= _traverse(chd, done, cb_enter, cb_exit,
 					cb_revisit, cb_ambig);
+#ifdef DEBUG_TRAVERSE
+	std::cout << "exit: \t" << root.first.to_std_string() << std::endl;
+#endif
 	cb_exit(root, choosen_pack);
 	return ret;
 }
 
 template <typename NodeT>
-size_t forest<NodeT>::count_trees(const node& root) {
+size_t forest<NodeT>::count_trees(const node& root) const {
 	size_t count = 1;
-	auto cb_enter = [](const auto&) {};
-	auto cb_exit =  [](const auto&, const auto&) {};
 	auto cb_keep_ambig = [&count](const node&, auto& ambset) {
 		count *= ambset.size();
 		return ambset;
 	};
-	auto cb_revisit =  [](const auto&) { return false; }; // revisit
-	traverse(root, cb_enter, cb_exit, cb_revisit, cb_keep_ambig);
+	traverse(root, no_enter, no_exit, do_revisit, cb_keep_ambig);
 	return count; 
 }
 

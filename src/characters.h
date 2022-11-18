@@ -12,8 +12,8 @@
 // modified over time by the Author.
 #ifndef __IDNI__PARSER__CHARACTERS_H__
 #define __IDNI__PARSER__CHARACTERS_H__
-#include <array>
-#include <iostream>
+#include <vector>
+#include <string>
 namespace idni {
 
 typedef unsigned char utf8char;
@@ -33,10 +33,22 @@ std::string to_string(const std::u32string& s);
 std::u32string to_u32string(const utf8string& str);
 std::u32string to_u32string(const std::string& str);
 
+std::string to_std_string(const std::string& s);
+std::string to_std_string(const utf8string& s);
+std::string to_std_string(const std::u32string& s);
+std::string to_std_string(const char32_t& ch);
+
+std::string to_string(const std::string& s);
+
+template <typename CharT>
+typename std::basic_string<CharT> from_cstr(const char *);
+template <typename CharT>
+typename std::basic_string<CharT> from_str(const std::string&);
+
 /**
  * checks if character is a begining of a multibyte codepoint
  */
-bool is_mb_codepoint(const utf8char str);
+bool is_mb_codepoint(const utf8char ch);
 
 /**
  * convert const utf8char* sequence s of 1-4 utf8 code units into codepoint &ch
@@ -67,19 +79,29 @@ size_t emit_codepoint(char32_t ch, utf8char *s);
  * @param ch unicode codepoint
  * @return output stream
  */
-std::basic_ostream<utf8char>& emit_codepoint(std::basic_ostream<utf8char>& os,
-	char32_t ch);
+std::basic_ostream<utf8char>& emit_codepoint(
+	std::basic_ostream<utf8char>& os, char32_t ch);
+
+/**
+ * Converts char32_t to a 1-4 utf8chars and outputs them into a vector
+ * @param os resulting vector
+ * @param ch unicode codepoint
+ * @return output stream
+ */
+std::vector<utf8char>& emit_codepoint(std::vector<utf8char>& os, char32_t ch);
 
 /**
  * convert const char* to u32string when streaming into char32_t stream
  */
 std::basic_ostream<char32_t>& operator<<(std::basic_ostream<char32_t>& os,
 	const char* s);
+
 /**
  * convert const std::string to u32string when streaming into char32_t stream
  */
-std::basic_ostream<char32_t>& operator<<(std::basic_ostream<char32_t>& os,
-	const std::string& s);
+std::basic_ostream<char32_t>& operator<<(
+	std::basic_ostream<char32_t>& os, const std::string& s);
+
 
 } // idni namespace
 #endif // __IDNI__PARSER__CHARACTERS_H__

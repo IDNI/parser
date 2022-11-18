@@ -1,144 +1,194 @@
 #include <sstream>
 #include <fstream>
 #include "../src/parser.h"
-
 using namespace std;
 using namespace idni;
-
+template <typename CharT> parser<CharT>::options options;
 template <typename CharT>
-int test_out(int c, parser<CharT> &e){
+int test_out(int c, const typename grammar<CharT>::grammar& g,
+	const std::basic_string<CharT>& inputstr,
+	const typename parser<CharT>::pforest& f)
+{
 	stringstream ptd;
 	stringstream ssf;
 
+	g.print_internal_grammar(ssf, "\\l");
+	std::string s = ssf.str();
+	ssf.str({});
+
 	ssf<<"graph"<<c<<".dot";
 	ofstream file(ssf.str());
-	e.to_dot(ptd);
+	to_dot<CharT>(ptd, f, to_std_string(inputstr), s);
 	file << ptd.str();
 	file.close();
 	ssf.str({});
 	ptd.str({});
-	
+
 	ssf<<"parse_graph"<<c<<".tml";
 	ofstream file1(ssf.str());
-	e.to_tml_facts(ptd);
+	to_tml_facts<CharT>(ptd, f);
 	file1 << ptd.str();
 	file1.close();
 	ssf.str({});
 	ptd.str({});
-	
+
 	ssf<<"parse_rules"<<c<<".tml";
 	ofstream file2(ssf.str());
-	e.to_tml_rules(ptd);
+	to_tml_rules<CharT>(ptd, f);
 	file2 << ptd.str();
 	file2.close();
 
-	auto trees = e.parsed_forest().extract_trees(e.root());
-	int i=0;
-	for( auto &t : trees ){
+	auto trees = f.extract_trees(f.root());
+	int i = 0;
+	for (auto &t : trees) {
 		ssf.str({});
 		ptd.str({});
 		ssf<<"graph"<<c<<"_"<<i++<<".dot";
 		ofstream filet(ssf.str());
-		e.to_dot(ptd, t);
+		to_dot<CharT>(ptd, t, to_std_string(inputstr), s);
 		filet << ptd.str();
 		filet.close();
 	}
 	i=0;
-	for( auto &t : trees ){
+	for (auto &t : trees) {
 		ssf.str({});
 		ptd.str({});
 		ssf<<"parse_rules"<<c<<"_"<<i++<<".tml";
 		ofstream filet(ssf.str());
-		e.to_tml_rules(ptd, t);
+		to_tml_rules<CharT>(ptd, t);
 		filet << ptd.str();
 		filet.close();
 	}
 	return 1;
 }
-
-int main(int argc, char**argv){
+template <typename CharT>
+bool run_test(const prods<CharT>& ps, nonterminals<CharT>& nts,
+	const prods<CharT>& start, const typename parser<CharT>::string& input,
+	char_class_fns<CharT> cc = {}, bool dump = false,
+	std::string contains = "")
+{
+	grammar<CharT> g(nts, ps, start, cc);
+	parser<CharT> e(g, options<CharT>);
+	bool found;
+	//cout << "parsing: `" << to_std_string(input) << "`" << endl;
+	auto f = e.parse(input, found);
+	//f->print_data(cout << "dumping forest:\n") << "\n\n";
+	bool contained = false;
+	if (found && (dump || contains.size())) {
+		f->traverse([&dump, &contains, &contained](const auto& n) {
+			if (contains == n.first.to_std_string()) contained=true;
+			if (dump) cout << "entering: `" <<
+				n.first.to_std_string() << "`\n";
+		}, [&dump](const auto& n, const auto&) {
+			if (dump) cout << "exiting: `" <<
+				n.first.to_std_string() << "`\n";
+		});
+	}
+	cout << found << "\n\n";
+	//if (contains.size())
+	//	cout << "contains: `" << contains << "`: " << contained << endl;
+	if (!found || (contains.size() && !contained)) return false;
+	static size_t c = 0;
+	return test_out<CharT>(c++, g, input, *f), true;
+}
+int main(int argc, char**argv) {
+	std::vector<std::string> args(argv + 1 , argv + argc);	
 	bool binlr    = false;
 	bool incr_gen = true;
-
-	std::vector<std::string> args(argv + 1 , argv + argc);	
-
-	for( auto opt : args) {
-		if ( opt == "-enable_binlr") binlr = true;
-		else if ( opt == "-enable_incrgen") incr_gen = true;
-		else if ( opt == "-disable_binlr") binlr = false;
-		else if ( opt == "-disable_incrgen") incr_gen = false;
+	for (auto opt : args) {
+		if      (opt == "-enable_binlr")    binlr    = true;
+		else if (opt == "-enable_incrgen")  incr_gen = true;
+		else if (opt == "-disable_binlr")   binlr    = false;
+		else if (opt == "-disable_incrgen") incr_gen = false;
 		else {
-			cout << "Invalid option: " << opt << endl << "Valid options:" << 
-			"-[enable|disable]_incrgen , -[enable|disable]_binlr" <<endl, exit(1);
+			cout<< "Invalid option: "<< opt<< "\nValid options:"<<
+			"-[enable|disable]_incrgen, -[enable|disable]_binlr\n",
+			exit(1);
 		}
 	}
+	options<char>.bin_lr =
+		options<char32_t>.bin_lr = binlr;
+	options<char>.incr_gen_forest =
+		options<char32_t>.incr_gen_forest = incr_gen;
 
-	size_t c = 0;
+	nonterminals<char> nts;
+	char_class_fns cc = predefined_char_classes<char>(
+		{ "alpha", "alnum" }, nts);
+	auto nt = [&nts](const std::string& s) {
+		return lit<char>{ nts.get(s), &nts };
+	};
+	prods<char> ps, start(nt("start")), nll('\0'),
+		alnum(nt("alnum")), alpha(nt("alpha")), chars(nt("chars")),
+		identifier(nt("identifier")), keyword(nt("keyword")),
+		a('a'), b('b'), c('c'), n('n'), p('p'), m('m'),
+		A(nt("A")), B(nt("B")), T(nt("T")), X(nt("X"));
 
-	parser<char>::parser_options o;
-	o.bin_lr = binlr;
-	o.incr_gen_forest = incr_gen;
+	bool failed = false;
+	auto fail = [&failed]() { cout << "\nFAIL\n"; failed = true; };
 
 	// Using Elizbeth Scott paper example 2, pg 64
-	parser<char> e({
-			{"start", { { "b" }, { "start", "start" } } }
-			//{"start", { { "" }, { "a", "start", "b", "start" } } },
-//			{"start", { { "" }, { "A", "start", "B", "start" } } },
-//			{"A", { { "" }, { "A", "a" } } },
-//			{"B", { { "b" }, { "B", "b" } } }
-		}, o);
-	cout << e.recognize("bbb") << endl << endl;
-	test_out<char>(c++, e);	
+	ps(start, b | start + start);
+	if (!run_test<char>(ps, nts, start, "bbb")) fail();
+	ps.clear();
 
 	// infinite ambiguous grammar, advanced parsing pdf, pg 86
 	// will capture cycles
-	parser<char> e1({{"start", { { "b" }, {"start"} }}}, o);
-	cout << e1.recognize("b") << endl << endl;
-	test_out<char>(c++, e1);	
+	ps(start, b | start);
+	if (!run_test<char>(ps, nts, start, "b")) fail();
+	ps.clear();
 
 	// another ambigous grammar
-	parser<char> e2({ {"start", { { "a", "X", "X", "c" }, {"start"} }},
-				{"X", { {"X", "b"}, { "" } } },
-	}, o);
-	cout << e2.recognize("abbc") << endl << endl;
-	test_out<char>(c++, e2);	
+	ps(start, (a + X + X + c) | start);
+	ps(X,     (X + b) | nll);
+	if (!run_test<char>(ps, nts, start, "abbc")) fail();
+	ps.clear();
 
 	// highly ambigous grammar, advanced parsing pdf, pg 89
-	parser<char> e3({ {"start", { { "start", "start" }, {"a"} }} }, o);
-	cout << e3.recognize("aaaaa") << endl << endl;
-	test_out<char>(c++, e3);
+	ps(start, (start + start) | a);
+	if (!run_test<char>(ps, nts, start, "aaaaa")) fail();
+	ps.clear();
 
 	//using Elizabeth sott paper, example 3, pg 64.
-	parser<char> e4({{"start", { { "A", "T" }, {"a","T"} }},
-				{"A", { { "a" }, {"B","A"} }},
-				{"B", { { ""} }},
-				{"T", { { "b","b","b" } }},
-	}, o);
-	cout << e4.recognize("abbb") << endl << endl;
-	test_out<char>(c++, e4);
+	ps(start, (A + T) | (a + T));
+	ps(A,     a | (B + A));
+	ps(B,     nll);
+	ps(T,     b + b + b);
+	if (!run_test<char>(ps, nts, start, "abbb")) fail();
+	ps.clear();
 
-	parser<char> e5({{"start", { { "b", }, {"start", "start", "start"}, {""} }}}, 
-		o);
-	cout << e5.recognize("b") << endl << endl;
-	test_out<char>(c++, e5);
+	ps(start, b | (start + start + start) | nll);
+	if (!run_test<char>(ps, nts, start, "b")) fail();
+	ps.clear();
 
-	parser<char> e6({{"start", { {"n"}, { "start", "X", "start" }}},
-				{"X", { {"p"}, {"m"}}}
-	}, o);
-	cout << e6.recognize("npnmn") << endl;
-	test_out<char>(c++, e6);
-	parser<char32_t>::parser_options o32;
-	o32.bin_lr = binlr;
-	o32.incr_gen_forest = incr_gen;
-	parser<char32_t> e7({ { U"start", {
-		{ U"τ" },
-		{ U"ξεσκεπάζω"},
-		{ U"žluťoučký" },
-		{ U"ᚠᛇᚻ᛫ᛒᛦᚦ᛫ᚠᚱᚩᚠᚢᚱ᛫ᚠᛁᚱᚪ᛫ᚷᛖᚻᚹᛦᛚᚳᚢᛗ" },
-		{ U"start", U"start" }
-	} } }, o32);
-	cout << e7.recognize(U"τžluťoučkýτᚠᛇᚻ᛫ᛒᛦᚦ᛫ᚠᚱᚩᚠᚢᚱ᛫ᚠᛁᚱᚪ᛫ᚷᛖᚻᚹᛦᛚᚳᚢᛗτξεσκεπάζωτ") << endl << endl;
-	test_out<char32_t>(c++, e7);
+	ps(start, n | (start + X + start));
+	ps(X,     p | m);
+	if (!run_test<char>(ps, nts, start, "npnmn")) fail();
+	ps.clear();
 
-	return 0;
+	ps(start, X & ~b);
+	ps(X,     a | b);
+	if (!run_test<char>(ps, nts, start, "a") ||
+		run_test<char>(ps, nts, start, "b")) fail();
+	ps.clear();
+
+	ps(start,      identifier | keyword);
+	ps(identifier, chars & ~ keyword);
+	ps(chars,      alpha | (chars + alnum));
+	ps(keyword,    {"print"});
+	if (!run_test<char>(ps, nts, start, "var123", cc, false, "identifier")||
+		!run_test<char>(ps, nts, start, "print", cc, false, "keyword"))
+			fail();
+	ps.clear();
+
+	// char32_t parser with Unicode
+	nonterminals<char32_t> nts32;
+	prods<char32_t> ps32,
+		start32(lit<char32_t>{ nts32.get(U"start"), &nts32 });
+	ps32(start32, prods<char32_t>{U"τ"} | U"ξεσκεπάζω" | U"žluťoučký"
+		| U"ᚠᛇᚻ᛫ᛒᛦᚦ᛫ᚠᚱᚩᚠᚢᚱ᛫ᚠᛁᚱᚪ᛫ᚷᛖᚻᚹᛦᛚᚳᚢᛗ" | (start32 + start32));
+	if (!run_test<char32_t>(ps32, nts32, start32,
+		U"τžluťoučkýτᚠᛇᚻ᛫ᛒᛦᚦ᛫ᚠᚱᚩᚠᚢᚱ᛫ᚠᛁᚱᚪ᛫ᚷᛖᚻᚹᛦᛚᚳᚢᛗτξεσκεπάζωτ")) fail();
+	ps32.clear();
+
+	return failed ? 1 : 0;
 }

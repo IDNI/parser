@@ -1,4 +1,11 @@
-add_executable(test_parser test_parser.cpp)
-target_setup(test_parser)
-target_link_libraries(test_parser ${OBJECT_LIB_NAME} ${TEST_FRAMEWORK})
-target_compile_definitions(test_parser PRIVATE "-DWITH_TO_METHODS")
+set(TESTS
+	parser
+)
+
+foreach(X IN LISTS TESTS)
+	set(N "test_${X}")
+	add_executable(${N} "${N}.cpp")
+	target_setup(${N})
+	target_compile_options(${N} PUBLIC "-Wno-parentheses")
+	target_link_libraries(${N} ${OBJECT_LIB_NAME} ${TEST_FRAMEWORK})
+endforeach()

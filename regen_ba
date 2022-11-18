@@ -1,6 +1,0 @@
-#!/bin/sh
-
-G="./examples/basic_arithmetic/basic_arithmetic.g"
-CPP="${G}rammar.inc.h"
-
-./g2cpp.sh "$G" "$CPP"
