@@ -86,7 +86,7 @@ bool to_dot(ostream_t& ss, P&& g, const std::string& inputstr,
 				auto nkey = keyfun(nn);
 				ss << "\n" << nkey.first << "[label=\"" <<
 					nkey.second << "\"];";
-				//if (edgedone.insert({ ambkey, nkey.first }).second) 
+				//if (edgedone.insert({ ambkey, nkey.first }).second)
 					ss << "\n" << ambkey << "->" <<
 						nkey.first<< ';';
 			}

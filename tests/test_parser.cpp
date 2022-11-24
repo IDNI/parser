@@ -96,7 +96,7 @@ bool run_test(const prods<CharT>& ps, nonterminals<CharT>& nts,
 int main(int argc, char**argv) {
 	bool binlr    = false;
 	bool incr_gen = false;
-	std::vector<std::string> args(argv + 1 , argv + argc);	
+	std::vector<std::string> args(argv + 1 , argv + argc);
 
 	for( auto opt : args) {
 		if ( opt == "-enable_binlr") binlr = true;

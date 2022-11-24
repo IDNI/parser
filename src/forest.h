@@ -27,7 +27,7 @@ struct forest {
 	typedef std::pair<nodes, edges> nodes_and_edges;
 	node_graph g;
 	typedef std::vector<node_graph> node_graphs;
-	
+
 	node rt;
 	node root() const { return rt; }
 	void root(const node& n) { rt = n; }
@@ -105,9 +105,9 @@ private:
 	bool _traverse(const node &root, std::set<node> &done,
 		cb_enter_t cb_enter, cb_exit_t cb_exit,
 		cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const;
-	bool _extract_graph_uniq_edge(std::map<node,size_t> &ndmap, std::set<edge>& done, 
+	bool _extract_graph_uniq_edge(std::map<node,size_t> &ndmap, std::set<edge>& done,
 	std::deque<node>& todo, node_graphs &graphs,  size_t tr = 0) const;
-	bool _extract_graph_uniq_node(std::set<node>& done, std::deque<node>& todo, 
+	bool _extract_graph_uniq_node(std::set<node>& done, std::deque<node>& todo,
 		node_graphs &graphs, size_t tr = 0) const;
 };
 
@@ -168,7 +168,7 @@ typename forest<NodeT>::nodes_and_edges forest<NodeT>::get_nodes_and_edges()
 template <typename NodeT>
 bool forest<NodeT>::_extract_graph_uniq_node( std::set<node>& done, std::deque<node>& todo,
 	node_graphs& graphs, size_t trid ) const{
-	
+
 	bool ret = true;
 	while( todo.size()) {
 		const node root = todo.back();
@@ -178,7 +178,7 @@ bool forest<NodeT>::_extract_graph_uniq_node( std::set<node>& done, std::deque<n
 		const auto &it = g.find(root);
 		if (it == g.end()) continue;
 		if(!done.insert(root).second ) continue;
-		
+
 		const nodes_set &packs = it->second;
 		auto curtree = graphs[trid];
 		auto curdone = done;
@@ -198,7 +198,7 @@ bool forest<NodeT>::_extract_graph_uniq_node( std::set<node>& done, std::deque<n
 				auto ntodo(curtodo);
 				auto ndone(curdone);
 				for( auto& node : pack) ntodo.push_back(node);
-			
+
 				ret &= _extract_graph_uniq_node( ndone, ntodo, graphs, ntrid);
 
 			}
@@ -216,14 +216,13 @@ bool forest<NodeT>::_extract_graph_uniq_edge(std::map<node, size_t> &ndmap, std:
 	
 	bool ret = true;
 	while( todo.size()) {
-		
 		const node root = todo.back();
 		todo.pop_back();
 
 		if( !root.first.nt()) continue;
 		const auto &it = g.find(root);
 		if (it == g.end()) continue;
-		
+
 		const nodes_set &packs = it->second;
 		node_graph curtree = graphs[trid];
 		std::set<edge> curdone(done);
@@ -231,7 +230,7 @@ bool forest<NodeT>::_extract_graph_uniq_edge(std::map<node, size_t> &ndmap, std:
 
 		size_t ambpid = 0;
 		size_t rootid = ndmap[root];
-		
+
 		for(auto& pack : packs) {
 			if( ambpid == 0) {
 				if(!done.insert( {rootid, rootid + ambpid + 1} ).second ) 
@@ -239,30 +238,31 @@ bool forest<NodeT>::_extract_graph_uniq_edge(std::map<node, size_t> &ndmap, std:
 
 				if( graphs[trid].find(root) == graphs[trid].end() )
 					graphs[trid].insert( {root, {pack} });
-				else graphs[trid][root].insert(pack); 
-				for( auto& node : pack) 
-					if( node.first.nt() &&  
+				else graphs[trid][root].insert(pack);
+				for( auto& node : pack)
+					if( node.first.nt() &&
 						done.insert({ rootid + ambpid + 1, ndmap[node] }).second )
 							todo.push_back(node);
 			}
 			else {
 				auto ntodo(curtodo);
 				auto ndone(curdone);
-				if(!ndone.insert( {rootid, rootid + ambpid + 1} ).second ) 
+				if(!ndone.insert( {rootid, rootid + ambpid + 1} ).second )
 					goto _skip;
-					
+
 				graphs.emplace_back(curtree);
 				if( graphs.back().find(root) == graphs.back().end() )
 					graphs.back().insert( {root, {pack} });
-				else graphs.back()[root].insert(pack); 
+				else graphs.back()[root].insert(pack);
 
 				size_t ntrid = graphs.size() - 1;
+
 				
-				for( auto& node : pack) 
-					if( node.first.nt() &&  
+				for( auto& node : pack)
+					if( node.first.nt() &&
 						ndone.insert({ rootid + ambpid + 1, ndmap[node]}).second )
 							ntodo.push_back(node);
-				
+
 				ret &= _extract_graph_uniq_edge(ndmap, ndone, ntodo, graphs, ntrid);
 
 			}
@@ -276,8 +276,7 @@ bool forest<NodeT>::_extract_graph_uniq_edge(std::map<node, size_t> &ndmap, std:
 
 template <typename NodeT>
 typename forest<NodeT>::node_graphs forest<NodeT>::extract_graphs(
-	const node& root, bool unique_edge ) const{
-	
+	const node& root, bool unique_edge ) const{	
 	node_graphs graphs;
 	std::set<node> dn;
 	std::set<edge> de;
@@ -292,7 +291,7 @@ typename forest<NodeT>::node_graphs forest<NodeT>::extract_graphs(
 	}
 	if( unique_edge )
 		_extract_graph_uniq_edge( ndmap, de, todo, graphs );
-	else 
+	else
 		_extract_graph_uniq_node( dn, todo, graphs );
 
 	return graphs;
