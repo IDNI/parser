@@ -14,6 +14,7 @@
 #define __IDNI__PARSER__PARSER_TMPL_H__
 #include "parser.h"
 namespace idni {
+
 template <typename CharT>
 typename parser<CharT>::ostream& flatten(typename parser<CharT>::ostream& os,
 	const typename parser<CharT>::pforest& f,

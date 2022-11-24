@@ -80,14 +80,14 @@ bool to_dot(ostream_t& ss, P&& g, const std::string& inputstr,
 			auto ambkey = std::hash<std::string>()(pstr.str());
 			ss << "\n" << ambkey << "[shape = point,label=\"" <<
 				pstr.str() << "\"];";
-			if (edgedone.insert({ key.first, ambkey }).second)
+			//if (edgedone.insert({ key.first, ambkey }).second)
 				ss << "\n" << key.first << "->" << ambkey <<';';
 			for (auto & nn: pack) {
 				auto nkey = keyfun(nn);
 				ss << "\n" << nkey.first << "[label=\"" <<
 					nkey.second << "\"];";
-				if (edgedone.insert({ ambkey, nkey.first })
-					.second) ss << "\n" << ambkey << "->" <<
+				//if (edgedone.insert({ ambkey, nkey.first }).second) 
+					ss << "\n" << ambkey << "->" <<
 						nkey.first<< ';';
 			}
 			pstr.str({});

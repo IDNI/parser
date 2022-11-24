@@ -22,7 +22,7 @@ using namespace idni::charclasses;
 	setprecision(2) << (start, end) << " ms"
 
 template <typename CharT>
-parser<CharT>::parser(grammar<CharT>& g, const options& o) : g(g), o(o) {};
+parser<CharT>::parser(grammar<CharT>& g, const options& o) : g(g), o(o) {}
 
 template <typename CharT>
 bool parser<CharT>::nullable(const item& i) const {

@@ -13,6 +13,7 @@
 #ifndef __IDNI__PARSER__FOREST_H__
 #define __IDNI__PARSER__FOREST_H__
 #include <cassert>
+#include <deque>
 namespace idni {
 
 template <typename NodeT>
@@ -24,11 +25,9 @@ struct forest {
 	typedef std::pair<size_t, size_t> edge;
 	typedef std::vector<edge> edges;
 	typedef std::pair<nodes, edges> nodes_and_edges;
-	typedef node_graph node_tree;
-	typedef std::vector<node_tree> node_trees;
-	typedef std::vector<size_t> fpath;
-	typedef std::vector<fpath> fpaths;
 	node_graph g;
+	typedef std::vector<node_graph> node_graphs;
+	
 	node rt;
 	node root() const { return rt; }
 	void root(const node& n) { rt = n; }
@@ -39,7 +38,7 @@ struct forest {
 	size_t count_trees(const node& root) const;
 	size_t count_trees() const { return count_trees(root()); };
 	nodes_and_edges get_nodes_and_edges() const;
-	node_trees extract_trees( const node& root ) const;
+	node_graphs extract_graphs( const node& root, bool unique_edge = false ) const;
 	std::function<void(const node&)> no_enter;
 	std::function<void(const node&, const nodes_set&)> no_exit;
 	std::function<bool(const node&)> no_revisit;
@@ -106,8 +105,10 @@ private:
 	bool _traverse(const node &root, std::set<node> &done,
 		cb_enter_t cb_enter, cb_exit_t cb_exit,
 		cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const;
-	bool _extract_trees(const node& root, std::set<node>& done, 
-		fpaths &paths, size_t pathid = 0) const;
+	bool _extract_graph_uniq_edge(std::map<node,size_t> &ndmap, std::set<edge>& done, 
+	std::deque<node>& todo, node_graphs &graphs,  size_t tr = 0) const;
+	bool _extract_graph_uniq_node(std::set<node>& done, std::deque<node>& todo, 
+		node_graphs &graphs, size_t tr = 0) const;
 };
 
 #ifdef DEBUG
@@ -165,54 +166,140 @@ typename forest<NodeT>::nodes_and_edges forest<NodeT>::get_nodes_and_edges()
 }
 
 template <typename NodeT>
-bool forest<NodeT>::_extract_trees(const node& root, std::set<node>& done, 
-	fpaths &paths, size_t pathid) const
-{
-	bool ret = true;
-	nodes_set pack ;
-	if (root.first.nt()) {
-		auto it = g.find(root);
-		if (it == g.end()) return false;
-		pack = it->second;
-		done.insert(root);
-	}
+bool forest<NodeT>::_extract_graph_uniq_node( std::set<node>& done, std::deque<node>& todo,
+	node_graphs& graphs, size_t trid ) const{
 	
-	int id = 0;
-	fpath cur = paths[pathid];
-	std::set<node> curd = done;
-	for (auto& nodes : pack) {
-		std::set<node> ndone;
-		if(pack.size() > 1) {
-				if( id != 0) 
-					paths.emplace_back(cur),
-					paths.back().push_back(id),
-					ndone.insert(curd.begin(), curd.end());
-				else paths[pathid].push_back(id);
-		}
-		for (auto& chd : nodes) {
-			if (id == 0 ? !done.count(chd) : !ndone.count(chd)) {
-				ret &= _extract_trees(chd, 
-					id == 0 ? done : ndone, paths, 
-					id == 0 ? pathid : pathid = paths.size()-1 );
+	bool ret = true;
+	while( todo.size()) {
+		const node root = todo.back();
+		todo.pop_back();
+
+		if( !root.first.nt()) continue;
+		const auto &it = g.find(root);
+		if (it == g.end()) continue;
+		if(!done.insert(root).second ) continue;
+		
+		const nodes_set &packs = it->second;
+		auto curtree = graphs[trid];
+		auto curdone = done;
+		auto curtodo = todo;
+
+		size_t ambpid = 0;
+		for(auto& pack : packs) {
+			if( ambpid == 0) {
+				graphs[trid].insert( {root, {pack} });
+				for( auto& node : pack) todo.push_back(node);
 			}
+			else {
+				graphs.emplace_back(curtree);
+				graphs.back().insert( {root, {pack} });
+				size_t ntrid = graphs.size() - 1;
+
+				auto ntodo(curtodo);
+				auto ndone(curdone);
+				for( auto& node : pack) ntodo.push_back(node);
+			
+				ret &= _extract_graph_uniq_node( ndone, ntodo, graphs, ntrid);
+
+			}
+			ambpid++;
 		}
-		id++;
+
 	}
+
 	return ret;
 }
 
 template <typename NodeT>
-typename forest<NodeT>::node_trees forest<NodeT>::extract_trees(
-	const node& root) const
-{
-	fpaths paths;
-	std::set<node> done;
-	paths.emplace_back();
-	_extract_trees(root, done, paths);
+bool forest<NodeT>::_extract_graph_uniq_edge(std::map<node, size_t> &ndmap, std::set<edge>& done, std::deque<node>& todo,
+	node_graphs& graphs, size_t trid ) const {
+	
+	bool ret = true;
+	while( todo.size()) {
+		
+		const node root = todo.back();
+		todo.pop_back();
 
+		if( !root.first.nt()) continue;
+		const auto &it = g.find(root);
+		if (it == g.end()) continue;
+		
+		const nodes_set &packs = it->second;
+		node_graph curtree = graphs[trid];
+		std::set<edge> curdone(done);
+		std::deque<node> curtodo(todo);
+
+		size_t ambpid = 0;
+		size_t rootid = ndmap[root];
+		
+		for(auto& pack : packs) {
+			if( ambpid == 0) {
+				if(!done.insert( {rootid, rootid + ambpid + 1} ).second ) 
+					goto _skip;
+
+				if( graphs[trid].find(root) == graphs[trid].end() )
+					graphs[trid].insert( {root, {pack} });
+				else graphs[trid][root].insert(pack); 
+				for( auto& node : pack) 
+					if( node.first.nt() &&  
+						done.insert({ rootid + ambpid + 1, ndmap[node] }).second )
+							todo.push_back(node);
+			}
+			else {
+				auto ntodo(curtodo);
+				auto ndone(curdone);
+				if(!ndone.insert( {rootid, rootid + ambpid + 1} ).second ) 
+					goto _skip;
+					
+				graphs.emplace_back(curtree);
+				if( graphs.back().find(root) == graphs.back().end() )
+					graphs.back().insert( {root, {pack} });
+				else graphs.back()[root].insert(pack); 
+
+				size_t ntrid = graphs.size() - 1;
+				
+				for( auto& node : pack) 
+					if( node.first.nt() &&  
+						ndone.insert({ rootid + ambpid + 1, ndmap[node]}).second )
+							ntodo.push_back(node);
+				
+				ret &= _extract_graph_uniq_edge(ndmap, ndone, ntodo, graphs, ntrid);
+
+			}
+			_skip: ambpid++;
+		}
+	}
+	return ret;
+
+}
+
+
+template <typename NodeT>
+typename forest<NodeT>::node_graphs forest<NodeT>::extract_graphs(
+	const node& root, bool unique_edge ) const{
+	
+	node_graphs graphs;
+	std::set<node> dn;
+	std::set<edge> de;
+	std::deque<node> todo;
+	todo.push_back(root);
+	graphs.emplace_back();
+	std::map<node, size_t> ndmap;
+	int id = 0;
+	for (auto& it : g) {
+		ndmap[it.first] = id++;
+		id +=  it.second.size(); // ambig node ids;
+	}
+	if( unique_edge )
+		_extract_graph_uniq_edge( ndmap, de, todo, graphs );
+	else 
+		_extract_graph_uniq_node( dn, todo, graphs );
+
+	return graphs;
+/*
 	fpath path;
-	node_tree tree;
-	node_trees trees;
+	node_graph tree;
+	node_graphs graphs;
 
 	auto cb_enter = [](const auto&) {};
 	auto cb_revisit =  [](const auto&) { return false; }; // revisit
@@ -224,7 +311,7 @@ typename forest<NodeT>::node_trees forest<NodeT>::extract_trees(
 	//select one of the ambiguous nodes as per paths[id]
 	auto cb_select_one = [&path ](const node&, auto& ambset) {
 			std::set<std::vector<node>> selected;
-			DBG(assert(ambset.size() > path.front() ));
+			if(ambset.size() > path.front() ) return selected;
 			
 			auto it = std::next(ambset.begin(), path.front());
 			if( path.size()) path.erase(path.begin());
@@ -232,18 +319,17 @@ typename forest<NodeT>::node_trees forest<NodeT>::extract_trees(
 			return selected;
 		};
 	
-	for(size_t i = 0; i< paths.size(); i++) {
-		path = paths[i];
-#if DEBUG
+	for(size_t i = 0 ; i< paths.size(); i++ ) {
 		std::cout << std::endl << "#" << i << std::endl;
-		for (size_t tid: path ) std::cout<< tid << " ";
+		path = paths[i];
+		for( size_t tid: path ) std::cout<< tid << " ";
 		std::cout << std::endl;
-#endif
 		traverse(root, cb_enter, cb_exit, cb_revisit, cb_select_one);
-		trees.emplace_back(tree);
+		graphs.emplace_back(tree);
 		tree.clear();
 	}
-	return trees;
+	return graphs;
+	*/
 }
 
 template <typename NodeT>

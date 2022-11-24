@@ -4,6 +4,8 @@
 using namespace std;
 using namespace idni;
 template <typename CharT> parser<CharT>::options options;
+static bool opt_edge = false;
+static size_t c = 0;
 template <typename CharT>
 int test_out(int c, const typename grammar<CharT>::grammar& g,
 	const std::basic_string<CharT>& inputstr,
@@ -38,7 +40,7 @@ int test_out(int c, const typename grammar<CharT>::grammar& g,
 	file2 << ptd.str();
 	file2.close();
 
-	auto trees = f.extract_trees(f.root());
+	auto trees = f.extract_graphs(f.root(), opt_edge);
 	int i = 0;
 	for (auto &t : trees) {
 		ssf.str({});
@@ -88,22 +90,26 @@ bool run_test(const prods<CharT>& ps, nonterminals<CharT>& nts,
 	//if (contains.size())
 	//	cout << "contains: `" << contains << "`: " << contained << endl;
 	if (!found || (contains.size() && !contained)) return false;
-	static size_t c = 0;
+	
 	return test_out<CharT>(c++, g, input, *f), true;
 }
 int main(int argc, char**argv) {
-	std::vector<std::string> args(argv + 1 , argv + argc);	
 	bool binlr    = false;
-	bool incr_gen = true;
-	for (auto opt : args) {
-		if      (opt == "-enable_binlr")    binlr    = true;
-		else if (opt == "-enable_incrgen")  incr_gen = true;
-		else if (opt == "-disable_binlr")   binlr    = false;
-		else if (opt == "-disable_incrgen") incr_gen = false;
+	bool incr_gen = false;
+	std::vector<std::string> args(argv + 1 , argv + argc);	
+
+	for( auto opt : args) {
+		if ( opt == "-enable_binlr") binlr = true;
+		else if ( opt == "-enable_incrgen") incr_gen = true;
+		else if ( opt == "-disable_binlr") binlr = false;
+		else if ( opt == "-disable_incrgen") incr_gen = false;
+		else if ( opt == "-unique_edge") opt_edge = true;
 		else {
-			cout<< "Invalid option: "<< opt<< "\nValid options:"<<
-			"-[enable|disable]_incrgen, -[enable|disable]_binlr\n",
-			exit(1);
+			cout << "Invalid option: " << opt << endl << "Valid options: \n \
+			-[enable|disable]_incrgen 		enables incremental generation of forest \n \
+			-[enable|disable]_binlr 		enables binarization and leftright optimization of forest \n \
+			-unique_edge		retrieves graphs from forest based on edges, not nodes \n"
+			<<endl, exit(1);
 		}
 	}
 	options<char>.bin_lr =
@@ -121,7 +127,9 @@ int main(int argc, char**argv) {
 		alnum(nt("alnum")), alpha(nt("alpha")), chars(nt("chars")),
 		identifier(nt("identifier")), keyword(nt("keyword")),
 		a('a'), b('b'), c('c'), n('n'), p('p'), m('m'),
-		A(nt("A")), B(nt("B")), T(nt("T")), X(nt("X"));
+		A(nt("A")), B(nt("B")), T(nt("T")), X(nt("X")),
+		one('1'), PO( nt("PO")), IO( nt("IO")),
+		plus('+'), minus('-'), mult('*');
 
 	bool failed = false;
 	auto fail = [&failed]() { cout << "\nFAIL\n"; failed = true; };
@@ -165,6 +173,31 @@ int main(int argc, char**argv) {
 	if (!run_test<char>(ps, nts, start, "npnmn")) fail();
 	ps.clear();
 
+// char32_t parser with Unicode
+	nonterminals<char32_t> nts32;
+	prods<char32_t> ps32,
+		start32(lit<char32_t>{ nts32.get(U"start"), &nts32 });
+	ps32(start32, prods<char32_t>{U"τ"} | U"ξεσκεπάζω" | U"žluťoučký"
+		| U"ᚠᛇᚻ᛫ᛒᛦᚦ᛫ᚠᚱᚩᚠᚢᚱ᛫ᚠᛁᚱᚪ᛫ᚷᛖᚻᚹᛦᛚᚳᚢᛗ" | (start32 + start32));
+	if (!run_test<char32_t>(ps32, nts32, start32,
+		U"τžluťoučkýτᚠᛇᚻ᛫ᛒᛦᚦ᛫ᚠᚱᚩᚠᚢᚱ᛫ᚠᛁᚱᚪ᛫ᚷᛖᚻᚹᛦᛚᚳᚢᛗτξεσκεπάζωτ")) fail();
+	ps32.clear();
+
+	//thesis van, figure 4.11
+
+	ps(start, one | (start + IO + start) | PO + start );
+	ps(IO, plus| minus| mult);
+	ps(PO, minus);
+	if(!run_test<char>(ps, nts, start, "1+1+1")) fail();
+	ps.clear();
+
+	// thesis van, 4.1 fig example
+	ps(	start, plus + start | start + plus + start | 
+		start + plus | one);
+	if( !run_test<char>( ps, nts, start, "1+++1")) fail();
+	ps.clear();
+
+	std::cout<<"others"<<endl;
 	ps(start, X & ~b);
 	ps(X,     a | b);
 	if (!run_test<char>(ps, nts, start, "a") ||
@@ -179,16 +212,7 @@ int main(int argc, char**argv) {
 		!run_test<char>(ps, nts, start, "print", cc, false, "keyword"))
 			fail();
 	ps.clear();
-
-	// char32_t parser with Unicode
-	nonterminals<char32_t> nts32;
-	prods<char32_t> ps32,
-		start32(lit<char32_t>{ nts32.get(U"start"), &nts32 });
-	ps32(start32, prods<char32_t>{U"τ"} | U"ξεσκεπάζω" | U"žluťoučký"
-		| U"ᚠᛇᚻ᛫ᛒᛦᚦ᛫ᚠᚱᚩᚠᚢᚱ᛫ᚠᛁᚱᚪ᛫ᚷᛖᚻᚹᛦᛚᚳᚢᛗ" | (start32 + start32));
-	if (!run_test<char32_t>(ps32, nts32, start32,
-		U"τžluťoučkýτᚠᛇᚻ᛫ᛒᛦᚦ᛫ᚠᚱᚩᚠᚢᚱ᛫ᚠᛁᚱᚪ᛫ᚷᛖᚻᚹᛦᛚᚳᚢᛗτξεσκεπάζωτ")) fail();
-	ps32.clear();
+	
 
 	return failed ? 1 : 0;
 }
