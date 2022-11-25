@@ -244,7 +244,7 @@ void parser<CharT>::pre_process(const item &i) {
 		// Precreating temporaries to help in binarisation later
 		// each temporary represents a partial rhs production with
 		// atleast 3 symbols
-		if (i.dot >= 3) {
+		if (i.dot >= 2) {
 			vector<lit<CharT>> v(g[i.prod][i.con].begin(),
 					g[i.prod][i.con].begin() + i.dot);
 			lit<CharT> tlit;
@@ -344,7 +344,7 @@ void parser<CharT>::sbl_chd_forest(const item &eitem,
 template <typename CharT>
 bool parser<CharT>::bin_lr_comb(const item& eitem, set<vector<pnode>>& ambset) {
 	vector<pnode> rcomb, lcomb;
-	if (eitem.dot < 2) return false;
+	if (eitem.dot < 1) return false;
 	pnode right = { g[eitem.prod][eitem.con][eitem.dot-1], {} };
 	if (!right.first.nt()) {
 		right.second[1] = eitem.set;
@@ -363,7 +363,7 @@ bool parser<CharT>::bin_lr_comb(const item& eitem, set<vector<pnode>>& ambset) {
 				rcomb.emplace_back(right);
 	}
 	// many literals in rhs
-	if (eitem.dot > 3) {
+	if (eitem.dot > 2) {
 		//DBG(print(cout, eitem);)
 		vector<lit<CharT>> v(g[eitem.prod][eitem.con].begin(),
 					g[eitem.prod][eitem.con].begin() +
@@ -382,7 +382,7 @@ bool parser<CharT>::bin_lr_comb(const item& eitem, set<vector<pnode>>& ambset) {
 				} 
 	}
 	// exact two literals in rhs
-	else if (eitem.dot == 3) {
+	else if (eitem.dot == 2) {
 		pnode left = { g[eitem.prod][eitem.con][eitem.dot - 2], {} };
 		auto& l = left.first;
 		if (!l.nt()) {
@@ -408,7 +408,7 @@ bool parser<CharT>::bin_lr_comb(const item& eitem, set<vector<pnode>>& ambset) {
 		}
 	}
 	else {
-		DBG(assert(eitem.dot == 2));
+		DBG(assert(eitem.dot == 1));
 		for (auto &rit : rcomb)
 			if (eitem.from <= rit.second[0])
 				ambset.insert({ rit });
@@ -427,7 +427,7 @@ bool parser<CharT>::build_forest(pforest& f, const pnode &root) {
 		if (cur.set != root.second[1]) continue;
 		pnode cnode(completed(cur) ? g(cur.prod) : g.nt(root.first.n()),
 			{ cur.from, cur.set });
-		if(o.bin_lr) bin_lr_comb(cur, ambset);
+		if (o.bin_lr) bin_lr_comb(cur, ambset);
 		else {
 			pnodes nxtlits;
 			sbl_chd_forest(cur, nxtlits, cur.from, ambset);

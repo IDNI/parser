@@ -173,7 +173,7 @@ int main(int argc, char**argv) {
 	if (!run_test<char>(ps, nts, start, "npnmn")) fail();
 	ps.clear();
 
-// char32_t parser with Unicode
+	// char32_t parser with Unicode
 	nonterminals<char32_t> nts32;
 	prods<char32_t> ps32,
 		start32(lit<char32_t>{ nts32.get(U"start"), &nts32 });
@@ -184,7 +184,6 @@ int main(int argc, char**argv) {
 	ps32.clear();
 
 	//thesis van, figure 4.11
-
 	ps(start, one | (start + IO + start) | PO + start );
 	ps(IO, plus| minus| mult);
 	ps(PO, minus);
@@ -197,13 +196,16 @@ int main(int argc, char**argv) {
 	if( !run_test<char>( ps, nts, start, "1+++1")) fail();
 	ps.clear();
 
-	std::cout<<"others"<<endl;
+	std::cout << "others" << endl;
+
+	// conjunction + negation
 	ps(start, X & ~b);
 	ps(X,     a | b);
 	if (!run_test<char>(ps, nts, start, "a") ||
 		run_test<char>(ps, nts, start, "b")) fail();
 	ps.clear();
 
+	// keyword vs identifier
 	ps(start,      identifier | keyword);
 	ps(identifier, chars & ~ keyword);
 	ps(chars,      alpha | (chars + alnum));
@@ -213,6 +215,5 @@ int main(int argc, char**argv) {
 			fail();
 	ps.clear();
 	
-
 	return failed ? 1 : 0;
 }
