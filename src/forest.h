@@ -27,6 +27,7 @@ struct forest {
 	typedef std::pair<nodes, edges> nodes_and_edges;
 	node_graph g;
 	typedef std::vector<node_graph> node_graphs;
+	typedef std::function<bool(node_graph&)> cb_next_graph_t;
 
 	node rt;
 	node root() const { return rt; }
@@ -38,7 +39,7 @@ struct forest {
 	size_t count_trees(const node& root) const;
 	size_t count_trees() const { return count_trees(root()); };
 	nodes_and_edges get_nodes_and_edges() const;
-	node_graphs extract_graphs( const node& root, bool unique_edge = false ) const;
+	node_graphs extract_graphs( const node& root, cb_next_graph_t cb_next_graph, bool unique_edge = false) const;
 	std::function<void(const node&)> no_enter;
 	std::function<void(const node&, const nodes_set&)> no_exit;
 	std::function<bool(const node&)> no_revisit;
@@ -106,9 +107,11 @@ private:
 		cb_enter_t cb_enter, cb_exit_t cb_exit,
 		cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const;
 	bool _extract_graph_uniq_edge(std::map<node,size_t> &ndmap, std::set<edge>& done,
-	std::deque<node>& todo, node_graphs &graphs,  size_t tr = 0) const;
+	std::deque<node>& todo, node_graphs &graphs,  size_t tr, cb_next_graph_t g,
+	bool &no_stop ) const; 
+	
 	bool _extract_graph_uniq_node(std::set<node>& done, std::deque<node>& todo,
-		node_graphs &graphs, size_t tr = 0) const;
+		node_graphs &graphs, size_t tr, cb_next_graph_t g, bool &no_stop ) const;
 };
 
 #ifdef DEBUG
@@ -167,10 +170,10 @@ typename forest<NodeT>::nodes_and_edges forest<NodeT>::get_nodes_and_edges()
 
 template <typename NodeT>
 bool forest<NodeT>::_extract_graph_uniq_node( std::set<node>& done, std::deque<node>& todo,
-	node_graphs& graphs, size_t trid ) const{
+	node_graphs& graphs, size_t trid, cb_next_graph_t cb_next_graph, bool &no_stop ) const{
 
 	bool ret = true;
-	while( todo.size()) {
+	while( todo.size() && no_stop) {
 		const node root = todo.back();
 		todo.pop_back();
 
@@ -199,23 +202,23 @@ bool forest<NodeT>::_extract_graph_uniq_node( std::set<node>& done, std::deque<n
 				auto ndone(curdone);
 				for( auto& node : pack) ntodo.push_back(node);
 
-				ret &= _extract_graph_uniq_node( ndone, ntodo, graphs, ntrid);
+				ret &= _extract_graph_uniq_node( ndone, ntodo, graphs, ntrid, cb_next_graph, no_stop);
 
 			}
 			ambpid++;
 		}
 
 	}
-
+	if(no_stop) no_stop = cb_next_graph(graphs[trid]);
 	return ret;
 }
 
 template <typename NodeT>
 bool forest<NodeT>::_extract_graph_uniq_edge(std::map<node, size_t> &ndmap, std::set<edge>& done, std::deque<node>& todo,
-	node_graphs& graphs, size_t trid ) const {
+	node_graphs& graphs, size_t trid, cb_next_graph_t cb_next_graph, bool &no_stop ) const {
 	
 	bool ret = true;
-	while( todo.size()) {
+	while( todo.size() && no_stop) {
 		const node root = todo.back();
 		todo.pop_back();
 
@@ -263,12 +266,13 @@ bool forest<NodeT>::_extract_graph_uniq_edge(std::map<node, size_t> &ndmap, std:
 						ndone.insert({ rootid + ambpid + 1, ndmap[node]}).second )
 							ntodo.push_back(node);
 
-				ret &= _extract_graph_uniq_edge(ndmap, ndone, ntodo, graphs, ntrid);
+				ret &= _extract_graph_uniq_edge(ndmap, ndone, ntodo, graphs, ntrid, cb_next_graph, no_stop);
 
 			}
 			_skip: ambpid++;
 		}
 	}
+	if(no_stop) no_stop = cb_next_graph(graphs[trid]);
 	return ret;
 
 }
@@ -276,7 +280,7 @@ bool forest<NodeT>::_extract_graph_uniq_edge(std::map<node, size_t> &ndmap, std:
 
 template <typename NodeT>
 typename forest<NodeT>::node_graphs forest<NodeT>::extract_graphs(
-	const node& root, bool unique_edge ) const{	
+	const node& root, cb_next_graph_t cb_next_graph, bool unique_edge ) const{	
 	node_graphs graphs;
 	std::set<node> dn;
 	std::set<edge> de;
@@ -289,10 +293,11 @@ typename forest<NodeT>::node_graphs forest<NodeT>::extract_graphs(
 		ndmap[it.first] = id++;
 		id +=  it.second.size(); // ambig node ids;
 	}
+	bool no_stop = true;
 	if( unique_edge )
-		_extract_graph_uniq_edge( ndmap, de, todo, graphs );
+		_extract_graph_uniq_edge( ndmap, de, todo, graphs, 0, cb_next_graph, no_stop);
 	else
-		_extract_graph_uniq_node( dn, todo, graphs );
+		_extract_graph_uniq_node( dn, todo, graphs, 0, cb_next_graph, no_stop);
 
 	return graphs;
 /*

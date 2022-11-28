@@ -3,14 +3,15 @@
 #include "../src/parser.h"
 using namespace std;
 using namespace idni;
-template <typename CharT> parser<CharT>::options options;
+template <typename CharT> typename parser<CharT>::options options;
 static bool opt_edge = false;
-static size_t c = 0;
+static size_t c = 0; 
+static size_t stop_after = SIZE_MAX;
+
 template <typename CharT>
 int test_out(int c, const typename grammar<CharT>::grammar& g,
 	const std::basic_string<CharT>& inputstr,
-	const typename parser<CharT>::pforest& f)
-{
+	const typename parser<CharT>::pforest& f) {
 	stringstream ptd;
 	stringstream ssf;
 
@@ -40,27 +41,29 @@ int test_out(int c, const typename grammar<CharT>::grammar& g,
 	file2 << ptd.str();
 	file2.close();
 
-	auto trees = f.extract_graphs(f.root(), opt_edge);
-	int i = 0;
-	for (auto &t : trees) {
+	size_t i = 0;
+	auto cb_next_graph = [&] (parser<CharT>::pforest::node_graph &g ) {
+		
 		ssf.str({});
 		ptd.str({});
-		ssf<<"graph"<<c<<"_"<<i++<<".dot";
+		ssf<<"graph"<<c<<"_"<<i<<".dot";
 		ofstream filet(ssf.str());
-		to_dot<CharT>(ptd, t, to_std_string(inputstr), s);
+		to_dot<CharT>(ptd, g, to_std_string(inputstr), s);
 		filet << ptd.str();
 		filet.close();
-	}
-	i=0;
-	for (auto &t : trees) {
 		ssf.str({});
 		ptd.str({});
-		ssf<<"parse_rules"<<c<<"_"<<i++<<".tml";
-		ofstream filet(ssf.str());
-		to_tml_rules<CharT>(ptd, t);
+		ssf<<"parse_rules"<<c<<"_"<<i<<".tml";
+		filet.open(ssf.str());
+		to_tml_rules<CharT>(ptd, g);
 		filet << ptd.str();
 		filet.close();
-	}
+		i++;
+
+		return i < stop_after ? true: false;
+	};
+
+	f.extract_graphs(f.root(), cb_next_graph, opt_edge);
 	return 1;
 }
 template <typename CharT>
@@ -104,12 +107,14 @@ int main(int argc, char**argv) {
 		else if ( opt == "-disable_binlr") binlr = false;
 		else if ( opt == "-disable_incrgen") incr_gen = false;
 		else if ( opt == "-unique_edge") opt_edge = true;
+		else if ( opt == "-stop_after_1") stop_after = 1;
+		else if ( opt == "-stop_after_5") stop_after = 5;
 		else {
 			cout << "Invalid option: " << opt << endl << "Valid options: \n \
 			-[enable|disable]_incrgen 		enables incremental generation of forest \n \
 			-[enable|disable]_binlr 		enables binarization and leftright optimization of forest \n \
-			-unique_edge		retrieves graphs from forest based on edges, not nodes \n"
-			<<endl, exit(1);
+			-unique_edge		retrieves graphs from forest based on edges, not nodes \n \
+			-stop_after_[1|5]	stop retrieving further graphs after 1 or 5 count \n" <<endl, exit(1);
 		}
 	}
 	options<char>.bin_lr =
