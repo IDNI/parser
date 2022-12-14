@@ -16,6 +16,26 @@
 #include <deque>
 namespace idni {
 
+
+// a least maximal core graph without ambiguityr/repeating nodes/edges
+// possibly with cycles or shared nodes. 
+// no cycles and no sharing implies its a tree
+template<typename NodeT>
+struct forest;
+
+template <typename NodeT>
+struct graph: private forest<NodeT>::node_graph{
+	NodeT root;
+	//forest<NodeT>::node_graph g;
+	//if g contains cycles due to left recursion
+	// or empty strings
+	std::set<NodeT> cycles;
+	std::set<NodeT> shared;
+	//if there are any shared substructures in g
+};
+
+// shared packed parse forest (SPPF) that captures ambiguities while
+// reusing shared sub structure across the forest
 template <typename NodeT>
 struct forest {
 	typedef NodeT node;
@@ -107,11 +127,11 @@ private:
 		cb_enter_t cb_enter, cb_exit_t cb_exit,
 		cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const;
 	bool _extract_graph_uniq_edge(std::map<node,size_t> &ndmap, std::set<edge>& done,
-	std::deque<node>& todo, node_graphs &graphs,  size_t tr, cb_next_graph_t g,
+	std::deque<node>& todo, node_graphs &graphs, size_t gid, cb_next_graph_t g,
 	bool &no_stop ) const; 
 	
 	bool _extract_graph_uniq_node(std::set<node>& done, std::deque<node>& todo,
-		node_graphs &graphs, size_t tr, cb_next_graph_t g, bool &no_stop ) const;
+		node_graphs &graphs, size_t gid, cb_next_graph_t g, bool &no_stop ) const;
 };
 
 #ifdef DEBUG
@@ -183,7 +203,7 @@ bool forest<NodeT>::_extract_graph_uniq_node( std::set<node>& done, std::deque<n
 		if(!done.insert(root).second ) continue;
 
 		const nodes_set &packs = it->second;
-		auto curtree = graphs[trid];
+		auto curgraph = graphs[trid];
 		auto curdone = done;
 		auto curtodo = todo;
 
@@ -194,7 +214,7 @@ bool forest<NodeT>::_extract_graph_uniq_node( std::set<node>& done, std::deque<n
 				for( auto& node : pack) todo.push_back(node);
 			}
 			else {
-				graphs.emplace_back(curtree);
+				graphs.emplace_back(curgraph);
 				graphs.back().insert( {root, {pack} });
 				size_t ntrid = graphs.size() - 1;
 
@@ -207,18 +227,18 @@ bool forest<NodeT>::_extract_graph_uniq_node( std::set<node>& done, std::deque<n
 			}
 			ambpid++;
 		}
-
 	}
 	if(no_stop) no_stop = cb_next_graph(graphs[trid]);
 	return ret;
 }
 
 template <typename NodeT>
-bool forest<NodeT>::_extract_graph_uniq_edge(std::map<node, size_t> &ndmap, std::set<edge>& done, std::deque<node>& todo,
-	node_graphs& graphs, size_t trid, cb_next_graph_t cb_next_graph, bool &no_stop ) const {
+bool forest<NodeT>::_extract_graph_uniq_edge(std::map<node, size_t> &ndmap,
+	std::set<edge>& done, std::deque<node>& todo, node_graphs& graphs, size_t gid,
+	cb_next_graph_t cb_next_graph, bool &no_stop ) const {
 	
 	bool ret = true;
-	while( todo.size() && no_stop) {
+	while( todo.size() && no_stop ) {
 		const node root = todo.back();
 		todo.pop_back();
 
@@ -227,21 +247,22 @@ bool forest<NodeT>::_extract_graph_uniq_edge(std::map<node, size_t> &ndmap, std:
 		if (it == g.end()) continue;
 
 		const nodes_set &packs = it->second;
-		node_graph curtree = graphs[trid];
+		node_graph curgraph = graphs[gid];
 		std::set<edge> curdone(done);
 		std::deque<node> curtodo(todo);
 
-		size_t ambpid = 0;
-		size_t rootid = ndmap[root];
+		size_t rootid = ndmap[root], ambpid = -1;
+		bool spawn = false;
 
 		for(auto& pack : packs) {
-			if( ambpid == 0) {
-				if(!done.insert( {rootid, rootid + ambpid + 1} ).second ) 
-					goto _skip;
+			++ambpid;
+			if( curdone.find({rootid, rootid + ambpid + 1}) != curdone.end() ) continue;
 
-				if( graphs[trid].find(root) == graphs[trid].end() )
-					graphs[trid].insert( {root, {pack} });
-				else graphs[trid][root].insert(pack);
+			if( !spawn ){
+				done.insert({rootid, rootid + ambpid + 1}), spawn = true;
+				if( graphs[gid].find(root) == graphs[gid].end() )
+					graphs[gid].insert( {root, {pack} });
+				else graphs[gid][root].insert(pack);
 				for( auto& node : pack)
 					if( node.first.nt() &&
 						done.insert({ rootid + ambpid + 1, ndmap[node] }).second )
@@ -250,29 +271,24 @@ bool forest<NodeT>::_extract_graph_uniq_edge(std::map<node, size_t> &ndmap, std:
 			else {
 				auto ntodo(curtodo);
 				auto ndone(curdone);
-				if(!ndone.insert( {rootid, rootid + ambpid + 1} ).second )
-					goto _skip;
-
-				graphs.emplace_back(curtree);
+				ndone.insert( {rootid, rootid + ambpid + 1});
+				graphs.emplace_back(curgraph);
 				if( graphs.back().find(root) == graphs.back().end() )
 					graphs.back().insert( {root, {pack} });
 				else graphs.back()[root].insert(pack);
 
-				size_t ntrid = graphs.size() - 1;
-
-				
+				size_t ngid = graphs.size()-1;
 				for( auto& node : pack)
 					if( node.first.nt() &&
 						ndone.insert({ rootid + ambpid + 1, ndmap[node]}).second )
 							ntodo.push_back(node);
 
-				ret &= _extract_graph_uniq_edge(ndmap, ndone, ntodo, graphs, ntrid, cb_next_graph, no_stop);
+				ret &= _extract_graph_uniq_edge(ndmap, ndone, ntodo, graphs, ngid, cb_next_graph, no_stop);
 
 			}
-			_skip: ambpid++;
 		}
 	}
-	if(no_stop) no_stop = cb_next_graph(graphs[trid]);
+	if(no_stop) no_stop = cb_next_graph(graphs[gid]);
 	return ret;
 
 }
