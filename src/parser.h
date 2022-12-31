@@ -14,6 +14,7 @@
 #define __IDNI__PARSER__PARSER_H__
 #include <unordered_map>
 #include <unordered_set>
+#include <type_traits>
 #include <iomanip>
 #include "defs.h"
 #include "grammar.h"
@@ -43,6 +44,9 @@ public:
 	typedef pforest::nodes pnodes;
 	typedef pforest::nodes_set pnodes_set;
 	typedef pforest::node_graph pnode_graph;
+	typedef pforest::graph pgraph;
+	typedef pforest::tree ptree;
+	typedef pforest::sptree psptree;
 
 	parser(grammar<CharT>& g, const options& o = {});
 	parser(const string& s, grammar<CharT>& g, const options& o = {});
