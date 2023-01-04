@@ -28,7 +28,7 @@ struct forest {
 	typedef std::vector<edge> edges;
 	typedef std::pair<nodes, edges> nodes_and_edges;
 	
-	// shared packed parse forest (SPP) that captures ambiguities while
+	// shared packed parse forest (SPPF) that captures ambiguities while
 	// reusing shared sub structure within the forest
 	node_graph g;
 	// parse tree extracted from graphs of the forest
@@ -396,40 +396,7 @@ typename forest<NodeT>::graphv forest<NodeT>::extract_graphs(
 		_extract_graph_uniq_node( dn, todo, graphs, 0, cb_next_graph, no_stop);
 
 	return graphs;
-/*
-	fpath path;
-	node_graph tree;
-	node_graphs graphs;
 
-	auto cb_enter = [](const auto&) {};
-	auto cb_revisit =  [](const auto&) { return false; }; // revisit
-		// make tree node while exiting from the forest node
-	auto cb_exit = [&tree](const node& root, const nodes_set& ambig_set) {
-		DBG( assert(ambig_set.size() <= 1) );
-		if (root.first.nt()) tree.insert({root, ambig_set});
-	};
-	//select one of the ambiguous nodes as per paths[id]
-	auto cb_select_one = [&path ](const node&, auto& ambset) {
-			std::set<std::vector<node>> selected;
-			if(ambset.size() > path.front() ) return selected;
-			
-			auto it = std::next(ambset.begin(), path.front());
-			if( path.size()) path.erase(path.begin());
-			selected.insert(*it );
-			return selected;
-		};
-	
-	for(size_t i = 0 ; i< paths.size(); i++ ) {
-		std::cout << std::endl << "#" << i << std::endl;
-		path = paths[i];
-		for( size_t tid: path ) std::cout<< tid << " ";
-		std::cout << std::endl;
-		traverse(root, cb_enter, cb_exit, cb_revisit, cb_select_one);
-		graphs.emplace_back(tree);
-		tree.clear();
-	}
-	return graphs;
-	*/
 }
 
 template <typename NodeT>

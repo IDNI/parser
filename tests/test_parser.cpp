@@ -262,6 +262,7 @@ int main(int argc, char **argv)
 		fail();
 	ps.clear();
 
+	// all cycles 
 	ps(start, A & B);
 	ps(A, X);
 	ps(X, start | b);
