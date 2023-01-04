@@ -35,6 +35,15 @@ struct forest {
 	struct tree {
 		node value;
 		std::vector<std::shared_ptr<struct tree>> child;
+
+		void to_print( ostream_t &os, size_t l=0){
+			os <<endl;
+			for( size_t t=0; t<l; t++ ) os<<" ";
+			os << value.first;
+			for( auto &d: child)
+				d->to_print(os,l+1);
+		}
+
 	};
 	typedef std::shared_ptr<tree> sptree;
 
@@ -212,8 +221,10 @@ typename forest<NodeT>::sptree forest<NodeT>::graph::_extract_trees (
 		stk.pop_back();
 		// skip for terminal
 		if(!cur->value.first.nt()) continue;
-		auto &ns = this->find(cur->value)->second;
-		
+		auto fit = this->find(cur->value);
+		if(fit == this->end()) continue;
+		auto &ns = fit->second;
+		if(!ns.size()) continue;
 		auto it = ns.begin();
 		if( ns.size() > 1 ) {
 			// select which descendants to traverse not already done;

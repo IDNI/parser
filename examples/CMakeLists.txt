@@ -1,5 +1,6 @@
 set(EXAMPLES
 	basic_arithmetic
+	tau_parser
 )
 
 foreach(X IN LISTS EXAMPLES)
