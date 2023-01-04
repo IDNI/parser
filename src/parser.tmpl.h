@@ -34,6 +34,13 @@ typename parser<CharT>::string flatten(const typename parser<CharT>::pforest& f,
 	flatten<CharT>(ss, f, root);
 	return ss.str();
 }
+template <typename CharT>
+int_t flatten_to_int(
+	const typename parser<CharT>::pforest& f,
+	const typename parser<CharT>::pnode& root)
+{
+	return stoi(to_std_string(flatten<CharT>(f, root)));
+}
 #ifdef DEBUG
 template <typename CharT>
 idni::ostream_t& operator<<(idni::ostream_t& os,
@@ -59,8 +66,8 @@ ostream_t& parser<CharT>::print(ostream_t& os, const item& i) const {
 	//size_t j = 0;
 	const auto& x = g[i.prod][i.con];
 	//os << i.from << " " << i.set << " " << "x.size():" << x.size() << " ";
+	os << g(i.prod).to_std_string() << "\t => ";
 	if (x.neg) os << "~( ";
-	else os << g(i.prod).to_std_string() << "\t => ";
 	for (size_t n = 0; n != x.size(); ++n) {
 		if (n == i.dot) os << "• ";
 		os << x[n].to_std_string(from_cstr<CharT>("ε ")) << " ";

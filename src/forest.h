@@ -36,12 +36,13 @@ struct forest {
 		node value;
 		std::vector<std::shared_ptr<struct tree>> child;
 
-		void to_print( ostream_t &os, size_t l=0){
+		ostream_t& to_print(ostream_t &os, size_t l=0){
 			os <<endl;
 			for( size_t t=0; t<l; t++ ) os<<" ";
 			os << value.first;
 			for( auto &d: child)
 				d->to_print(os,l+1);
+			return os;
 		}
 
 	};

@@ -1,5 +1,6 @@
 set(TESTS
 	parser
+	tgf
 )
 
 foreach(X IN LISTS TESTS)

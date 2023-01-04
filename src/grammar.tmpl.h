@@ -68,6 +68,13 @@ const typename nonterminals<CharT>::string& nonterminals<CharT>::get(size_t n)
 	return this->at(n);
 }
 
+template <typename CharT>
+lit<CharT> nonterminals<CharT>::operator()(
+	const typename nonterminals<CharT>::string& s)
+{
+	return lit<CharT>{ get(s), &*this };
+}
+
 //-----------------------------------------------------------------------------
 
 template <typename CharT>
@@ -238,7 +245,9 @@ void simplify(prods<CharT>& p) {
 }
 template <typename CharT>
 prods<CharT> operator|(const prods<CharT>& x, const prods<CharT>& y) {
-	assert(!x.empty() && !y.empty());
+	//assert(!x.empty() && !y.empty());
+	if (x.empty()) return y;
+	if (y.empty()) return x;
 	prods<CharT> r;
 	for (size_t n = 0; n != x.size() - 1; ++n) r.push_back(x[n]);
 	for (size_t n = 0; n != y.size() - 1; ++n) r.push_back(y[n]);
@@ -247,7 +256,8 @@ prods<CharT> operator|(const prods<CharT>& x, const prods<CharT>& y) {
 }
 template <typename CharT>
 prods<CharT> operator|(const prods<CharT>& x, const CharT& c) {
-	assert(!x.empty());
+	//assert(!x.empty());
+	if (x.empty()) return prods<CharT>{ c };
 	return x | prods<CharT>{ c };
 }
 template <typename CharT>
@@ -257,12 +267,15 @@ prods<CharT> operator|(const prods<CharT>& x, const CharT* s) {
 }
 template <typename CharT>
 prods<CharT> operator|(const prods<CharT>& x,const std::basic_string<CharT>& s){
-	assert(!x.empty());
+	//assert(!x.empty());
+	if (x.empty()) return prods<CharT>(s);
 	return x | prods<CharT>(s);
 }
 template <typename CharT>
 prods<CharT> operator&(const prods<CharT>& x, const prods<CharT>& y) {
-	assert(!x.empty() && !y.empty());
+	//assert(!x.empty() && !y.empty());
+	if (x.empty()) return y;
+	if (y.empty()) return x;
 	prods<CharT> r;
 	for (size_t n = 0; n != x.size() - 1; ++n) r.push_back(x[n]);
 	for (size_t n = 0; n != y.size() - 1; ++n) r.push_back(y[n]);
@@ -271,7 +284,8 @@ prods<CharT> operator&(const prods<CharT>& x, const prods<CharT>& y) {
 
 template <typename CharT>
 prods<CharT> operator&(const prods<CharT>& x, const CharT& c) {
-	assert(!x.empty());
+	//assert(!x.empty());
+	if (x.empty()) return prods<CharT>{ c };
 	return x & prods<CharT>{ c };
 }
 template <typename CharT>
@@ -281,12 +295,14 @@ prods<CharT> operator&(const prods<CharT>& x, const CharT* s) {
 }
 template <typename CharT>
 prods<CharT> operator&(const prods<CharT>& x,const std::basic_string<CharT>& s){
-	assert(!x.empty());
+	//assert(!x.empty());
+	if (x.empty()) return prods<CharT>(s);
 	return x & prods<CharT>(s);
 }
 template <typename CharT>
 prods<CharT> operator+(const prods<CharT>& x, const prods<CharT>& y) {
-	assert(!x.empty() && !y.empty());
+	if (x.empty()) return y;
+	if (y.empty()) return x;
 	prods<CharT> r;
 	for (size_t n = 0; n != x.size() - 1; ++n) r.push_back(x[n]);
 	for (size_t n = 0; n != y.size() - 1; ++n) r.push_back(y[n]);
@@ -305,7 +321,7 @@ prods<CharT> operator+(const prods<CharT>& x, const CharT* s) {
 }
 template <typename CharT>
 prods<CharT> operator+(const prods<CharT>& x,const std::basic_string<CharT>& s){
-	assert(!x.empty());
+	//assert(!x.empty());
 	prods<CharT> r(x);
 	for (const auto& c : s) r = r + c;
 	return r;
@@ -324,9 +340,8 @@ template <typename CharT>
 void char_class_fns<CharT>::operator()(size_t nt,
 	const char_class_fn<CharT>& fn)
 {
-	this->push_back(nt);
 	this->fns.emplace(nt, fn);
-	this->ps.emplace_back();
+	this->ps.emplace(nt, std::map<CharT, size_t>{});
 }
 template <typename CharT>
 char_class_fns<CharT> predefined_char_classes(
@@ -369,9 +384,15 @@ grammar<CharT>::grammar(nonterminals<CharT>& nts, const prods<CharT>& ps,
 {
 	// load prods
 	for (const prod<CharT>& p : ps) // every disjunction has its own prod rule
-		for (const clause<CharT>& c : p.second)
+		for (const clause<CharT>& c : p.second) {
 			G.push_back(production{ p.first,
 				conjunctions{ c.begin(), c.end() }});
+			if (c.size() > 1) conjunctives.insert(G.size()-1);
+		}
+		
+	// cout << "conjunctive rules[" << conjunctives.size() << "]   ";
+	// for (const auto& d : conjunctives) cout << " " << d;
+	// cout << endl;
 	// create ntsm: nt -> prod rule map
 	for (size_t n = 0; n != G.size(); ++n) ntsm[G[n].first].insert(n);
 	size_t k;
@@ -404,14 +425,19 @@ bool grammar<CharT>::nullable(literal l) const {
 		(l.nt() && (nullables.find(l.n()) != nullables.end()));
 }
 template <typename CharT>
+bool grammar<CharT>::conjunctive(size_t p) const {
+	return conjunctives.find(p) != conjunctives.end();
+}
+template <typename CharT>
 size_t grammar<CharT>::char_class_check(literal l, CharT ch) {
-	auto f = l.n();
-	auto it = cc_fns.ps[f].find(ch);
-	if (it == cc_fns.ps[f].end()) {
-		if (!cc_fns.fns[f](ch)) return static_cast<size_t>(-1);
+	//DBG(std::cout << "char_class_check: " << l.n() << std::endl;)
+	auto& x = cc_fns.ps[l.n()];
+	auto it = x.find(ch);
+	if (it == x.end()) {
+		if (!cc_fns.fns[l.n()](ch)) return static_cast<size_t>(-1);
 		G.push_back(production{ l, {{{{ literal{ ch } }}}}});
 		ntsm[G.back().first].insert(G.size() - 1);
-		return (cc_fns.ps[f][ch] = G.size() - 1);
+		return x[ch] = G.size() - 1;
 	} else return it->second;
 }
 template <typename CharT>
@@ -447,7 +473,9 @@ ostream_t& grammar<CharT>::print_internal_grammar(ostream_t& os,
 				l.to_std_string(from_cstr<CharT>("ε"));
 			if (c.neg) os << " )";
 		}
-		os << ".\n";
+		os << ".";
+		if (conjunctive(i)) os << "\t # conjunctive";
+		os << "\n";
 	}
 	return os;
 }
@@ -455,7 +483,8 @@ template<typename CharT>
 ostream_t& grammar<CharT>::print_data(ostream_t& os, std::string prep) const {
 	os << "nonterminals:\n";
 	for (size_t i = 0; i != nts.size(); ++i)
-		os << prep << i << ": " << to_std_string(nts[i]) << "\n";
+		os << prep << i << ": " << to_std_string(nts[i]) <<
+		(cc_fns.is_fn(i) ? " (char class)" : "") << "\n";
 	print_internal_grammar(os << "productions:\n", prep);
 	os << "nonterminals to productions map:\n";
 	for (auto& x : ntsm) {

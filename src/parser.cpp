@@ -11,6 +11,9 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include <cassert>
+#ifdef DEBUG
+#include <fstream>
+#endif
 #include "parser.h"
 using namespace std;
 namespace idni {
@@ -27,38 +30,6 @@ parser<CharT>::parser(grammar<CharT>& g, const options& o) : g(g), o(o) {}
 template <typename CharT>
 bool parser<CharT>::nullable(const item& i) const {
 	return i.dot < g[i.prod][i.con].size() && g.nullable(get_lit(i));
-}
-
-template <typename CharT>
-void parser<CharT>::uncomplete_if_not_conj(container_t& t) {
-	//DBG(cout << "uncomplete_if_not_conj..." << endl;)
-	std::map<size_t, std::set<std::pair<size_t, item>>> ps;
-	for (const item &x : t) {
-		if (ps.find(x.prod) == ps.end()) ps[x.prod] = {};
-		if (completed(x)) ps[x.prod].insert({ x.con, x });
-	}
-	//DBG(cout << "ps.size(): " << ps.size() << endl;)
-	
-	for (const auto& p : ps) {
-		bool uncomplete = false;
-		for (size_t c = 0; c != g[p.first].size(); ++c) {
-			bool found = false;
-			for (const auto& x : p.second) {
-				//DBG(print(cout << "\tcheck p: " << p.first <<
-				// 	" c: " << c <<
-				//	" x: " << x.first << " ",
-				//	x.second) << endl;)
-				if (x.first == c) { found = true; break; }
-			}
-			uncomplete = (g[p.first][c].neg && found) ||
-					(!g[p.first][c].neg && !found);
-			if (uncomplete) break;
-		}
-		if (uncomplete) for (const auto& x : p.second) {
-			//DBG(print(cout << "uncompleting: ", x.second) << endl;)
-			t.erase(x.second);
-		}
-	}
 }
 
 template <typename CharT>
@@ -94,6 +65,44 @@ void parser<CharT>::complete(const item& i, container_t& t) {
 }
 
 template <typename CharT>
+void parser<CharT>::resolve_conjunctions(container_t& t)
+	const
+{
+	//DBG(cout << "resolve conjunctions...\n";)
+	//print_S(cout) << endl;
+	std::map<std::pair<size_t, size_t>,
+		std::set<std::pair<size_t, item>>> ps;
+	for (const item &x : t) if (g.conjunctive(x.prod) && completed(x)) {
+		if (ps.find({ x.prod, x.from }) == ps.end())
+			ps[{ x.prod, x.from }] = {};
+		ps[{ x.prod, x.from }].insert({ x.con, x });
+	}
+	//DBG(cout << "t.size(): " << t.size() << endl;)
+	//DBG(cout << "ps.size(): " << ps.size() << endl;)
+	for (const auto& p : ps) {
+		bool conj_failed = false;
+		for (size_t c = 0; c != g[p.first.first].size(); ++c) {
+			bool found = false;
+			for (const auto& x : p.second) {
+				//DBG(print(cout << "\tcheck p: " << p.first.first
+				//	<< " c: " << c << " x: " << x.first
+				//	<< " ",
+				//	x.second) << endl;)
+				if (x.first == c) { found = true; break; }
+			}
+			conj_failed = (g[p.first.first][c].neg && found) ||
+					(!g[p.first.first][c].neg && !found);
+			if (conj_failed) break;
+		}
+		if (conj_failed) for (const auto& x : p.second) {
+			//DBG(print(cout << "uncompleting: ", x.second) << endl;)
+			t.erase(x.second);
+		}
+	}
+	//DBG(cout << "... conjunctions resolved\n";)
+}
+
+template <typename CharT>
 void parser<CharT>::predict(const item& i, container_t& t) {
 	//DBG(print(cout << "predicting ", i) << endl;)
 	for (size_t p : g.ntsm[get_lit(i)])
@@ -103,17 +112,19 @@ void parser<CharT>::predict(const item& i, container_t& t) {
 
 template <typename CharT>
 void parser<CharT>::scan(const item& i, size_t n, CharT ch) {
+	//DBG(print(cout << "scanning ", i) << " ch: " << to_std_string(ch) << endl;)
 	if (ch != get_lit(i).c()) return;
 	item j(n + 1, i.prod, i.con, i.from, i.dot + 1);
+	if (j.set >= S.size()) S.resize(j.set + 1);
 	S[j.set].insert(j);
 }
 
 template <typename CharT>
-void parser<CharT>::scan_cc_function(const item&i, size_t n, const string&s) {
+void parser<CharT>::scan_cc_function(const item&i, size_t n, CharT ch) {
+	//DBG(print(cout << "scanning cc function ", i) << " s: " << to_std_string(s) << endl;)
 	size_t p = 0; // character's prod rule
 	lit<CharT> l = get_lit(i);
-	bool eof = n == s.size();
-	CharT ch = eof ? char_traits<CharT>::eof() : s[n];
+	bool eof = ch == e;
 	p = g.char_class_check(l, ch);
 	if (p == static_cast<size_t>(-1)) return;
 	item j(n + (eof ? 0 : 1), i.prod, i.con, n, 1); // complete char fn
@@ -124,69 +135,99 @@ void parser<CharT>::scan_cc_function(const item&i, size_t n, const string&s) {
 
 template <typename CharT>
 std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::parse(
-	const typename parser<CharT>::string& s, bool &found)
+	int fd, size_t size, CharT eof)
 {
-	auto f = parse(s);
-	size_t len = inputstr.size();
-	found = false;
+	n = 0, e = eof, max_length = size;
+	if (fd != -1) {
+		l = lseek(fd, 0, SEEK_END);
+		if (l > max_length) l = max_length;
+		d = reinterpret_cast<CharT*>(mmap(nullptr, l, PROT_READ,
+			MAP_PRIVATE, fd, 0));
+		close(fd);
+		reads_mmap = true;
+	}
+	//DBG(cout << "filename l: " << l << endl;)
+	return _parse();	
+}
+
+template <typename CharT>
+std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::parse(
+	istream& is, size_t size, CharT eof)
+{
+	n = 0, e = eof, s = &is, max_length = size, l = 1, reads_stream = true;
+	//DBG(cout << "istream& l: " << l << endl;)
+	return _parse();
+}
+
+template <typename CharT>
+std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::parse(
+	const CharT* data, size_t size, CharT eof)
+{
+	n = 0, e = eof, d = data, max_length = l = size;
+	//DBG(cout << "CharT* l: " << l << endl;)
+	return _parse();
+}
+
+template <typename CharT>
+bool parser<CharT>::found() {
+	bool f = false;
 	//DBG(cout<<"finding completed `start` over the input string: "<<endl;)
+	//DBG(cout<<"len: "<<l<<" start_nt: "<<g.start.to_std_string()<<endl;)
+	//print_S(cout);
 	//for (const auto& x : S[len]) print(cout << "\t", x) << endl;
 	for (size_t n : g.ntsm[g.start]) {
 		//DBG(cout << "N: " << n << endl;)
 		for (size_t c = 0; c != g[n].size(); ++c) {
 			//DBG(print(cout << "find: ",
-			//	item(len, n, c, 0, g.len(n, c))) << endl;)
+			//	item(l, n, c, 0, g.len(n, c))) << endl;)
 			//DBG(cout << "C: " << c << endl;)
-			bool t = S[len].find(item(len, n, c, 0, g.len(n, c)))
-					!= S[len].end();
+			bool t = S[l].find(item(l, n, c, 0, g.len(n, c)))
+					!= S[l].end();
 			//DBG(cout << "~: " << g[n][c].neg << endl;)
 			//DBG(cout << "T: " << t << endl;)
-			if (!g[n][c].neg) found = t;
-			else if (t) found = false;
+			if (!g[n][c].neg) f = t;
+			else if (t) f = false;
 			//DBG(cout << "F: " << found << endl;)
-			if (!found) break;
+			if (!f) break;
 		}
-		if (found) break;
+		if (f) break;
 	}
 #ifdef DEBUG
-	//if (!found) print_data(cout);
+	//if (!f) print_data(cout);
 #endif
 	return f;
 }
 
 template <typename CharT>
-std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::parse(
-	const typename parser<CharT>::string& s)
-{
+std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::_parse() {
 	MS(emeasure_time_start(tsr, ter);)
-	inputstr = s;
-	size_t len = s.size();
 	//DBG(cout << "parse: `"<<to_std_string(s)<<"`["<<len<<"] g.start:"<<g.start<<"("<<g.start.nt()<<")"<<"\n";)
 	auto f = make_unique<pforest>();
-	f->root(pnode(g.start, { 0, len }));
 	sorted_citem.clear();
 	rsorted_citem.clear();
 	bin_tnt.clear();
 	tid = 0;
 	S.clear();//, S.resize(len + 1);//, C.clear(), C.resize(len + 1);
-	S.resize(len+1);
-	for (size_t n : g.ntsm[g.start]) {
+	S.resize(reads_stream ? 1 : l + 1);
+	for (size_t p : g.ntsm[g.start]) {
 		//cout << "n:"<<n << endl;
 		auto& cont = S[0];
-		for (size_t c = 0; c != g[n].size(); ++c) {
-			auto it = cont.emplace(0, n, c, 0, 0).first;
+		for (size_t c = 0; c != g[p].size(); ++c) {
+			auto it = cont.emplace(0, p, c, 0, 0).first;
 			// fix the bug for missing Start( 0 0) when start is nulllable
-			if (nullable(*it)) cont.emplace(0, n, c, 0, 1);
+			if (nullable(*it)) cont.emplace(0, p, c, 0, 1);
 		}
 	}
 	container_t t;
 #if MEASURE_EACH_POS
 	size_t r = 1, cb = 0; // row and cel beginning
 #endif
-	//size_t proc = 0;
-	for (size_t n = 0; n != len + 1; ++n) {
+	//DBG(size_t proc = 0;)
+	do {
+		CharT ch = cur();
+		//cout << "cur: '" << to_std_string(ch) << "'\n";
 #if MEASURE_EACH_POS
-		if (s[n] == '\n') (cb = n), r++;
+		if (ch == (CharT) '\n') (cb = n), r++;
 		emeasure_time_start(tsp, tep);
 #endif
 		do {
@@ -197,18 +238,17 @@ std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::parse(
 				//DBG(print(cout << "\nprocessing(" << proc++ << ") ", *it) << endl;)
 				if (completed(*it)) complete(*it, t);
 				else if (get_lit(*it).nt()) {
-					if (get_lit(*it).n() < g.cc_fns.size()){
-						if (n <= len) scan_cc_function(
-								*it, n, s);
-					} else predict(*it, t);
-				} else if (n < len) scan(*it, n, s[n]);
+					if (g.cc_fns.is_fn(get_lit(*it).n()))
+						scan_cc_function(*it, n, ch);
+					else predict(*it, t);
+				} else if (n < l) scan(*it, n, ch);
 			}
 		} while (!t.empty());
 		//DBG(print_S(cout);)
-		uncomplete_if_not_conj(S[n]);
+		resolve_conjunctions(S[n]);
 #if MEASURE_EACH_POS
 		cout << n << " \tln: " << r << " col: " << (n-cb+1) << " :: ";
-		emeasure_time_end(tsp, tep)<<"\n";
+		emeasure_time_end(tsp, tep) << "\n";
 #endif
 		if (o.incr_gen_forest) {
 			//DBG(cout << "set: " << n << endl;)
@@ -224,16 +264,64 @@ std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::parse(
 					build_forest(*f, curroot);
 				}
 		}
-	}
+	} while (next());
 	MS(emeasure_time_end(tsr, ter) <<" :: parse time\n";)
 	if (!o.incr_gen_forest) init_forest(*f);
+	else f->root(pnode(g.start, { 0, l }));
 #ifdef DEBUG
-	auto n = f->count_trees();
-	if (n > 1) cout << "# parse trees: " << n << "\n";
+	auto nt = f->count_trees();
+	if (nt > 1) {
+		cout << "# parse trees: " << nt << "\n";
+		static bool opt_edge = false;
+		static int_t c = 0;
+		std::stringstream ssf, ptd;
+		ssf<<"parse_rules"<<++c<<".tml";
+		ofstream file2(ssf.str());
+		to_tml_rules<CharT>(ptd, f->g);
+		file2 << ptd.str();
+		file2.close();
+		size_t i = 0;
+		auto cb_next_graph = [&](parser<CharT>::pforest::node_graph &g){
+			ssf.str({});
+			ptd.str({});
+			ssf<<"parse_rules"<<c<<"_"<<i++<<".tml";
+			ofstream filet(ssf.str());
+			to_tml_rules<CharT>(ptd, g);
+			filet << ptd.str();
+			filet.close();
+			return true;
+		};
+		f->extract_graphs(f->root(), cb_next_graph, opt_edge);
+	}
 #endif
 	return f;
 }
 
+template <typename CharT>
+CharT parser<CharT>::cur() const {
+	//DBG(cout << "cur " << reads_stream << " n: " << n
+	//	<< " l: " << l << endl;)
+	if (!reads_stream) return n >= l ? e : d[n];
+	if (!s->good()) return e;
+	return s->peek();
+}
+
+template <typename CharT>
+bool parser<CharT>::next() {
+	CharT ch;
+	if (reads_stream) return !s->good() || l >= max_length ? false
+		: (s->get(ch), n = s->tellg(), l = n + (s->peek() == e ? 0 : 1),
+			S.resize(l + 1), true);
+	else return n >= l ? false : (n++, true);
+}
+
+template <typename CharT>
+CharT parser<CharT>::at(size_t p) {
+	if (p >= l) return e;
+	if (!reads_stream) return d[p];
+	return s->seekg(p), s->get();
+}
+	
 template <typename CharT>
 void parser<CharT>::pre_process(const item &i) {
 	//sorted_citem[G[i.prod][0].n()][i.from].emplace_back(i);
@@ -255,7 +343,6 @@ void parser<CharT>::pre_process(const item &i) {
 				bin_tnt.insert({ v, tlit });
 			}
 			else tlit = bin_tnt[v];
-			
 			//DBG(print(cout, i);)
 			//cout<< "\n" << d->get(tlit.n()) << v << endl;
 			sorted_citem[{ tlit.n(), i.from }].emplace_back(i),
@@ -271,13 +358,12 @@ bool parser<CharT>::init_forest(pforest& f) {
 	rsorted_citem.clear();
 	tid = 0;
 	// set the start root node
-	size_t len = inputstr.length();
-	pnode root(g.start, { 0, len });
+	pnode root(g.start, { 0, l });
 	f.root(root);
 	// preprocess parser items for faster retrieval
 	MS(emeasure_time_start(tspfo, tepfo);)
 	int count = 0;
-	for (size_t n = 0; n < len + 1; n++)
+	for (size_t n = 0; n < l + 1; n++)
 		for (const item& i : S[n]) count++, pre_process(i);
 	MS(emeasure_time_end(tspfo, tepfo) << " :: preprocess time, " <<
 						"size : "<< count << "\n";)
@@ -306,14 +392,13 @@ void parser<CharT>::sbl_chd_forest(const item &eitem,
 	}
 	// curchd.size() refers to index of cur literal to process in the rhs of production
 	pnode nxtl = { g[eitem.prod][eitem.con][curchd.size()], {} };
-	// set the span start/end of the terminal symbol 
+	// set the span start/end of the terminal symbol
 	if (!nxtl.first.nt()) {
 		nxtl.second[0] = xfrom;
 		// for empty, use same span edge as from
 		if (nxtl.first.c() == (CharT) 0) nxtl.second[1] = xfrom;
 		// ensure well-formed combination (matching input) early
-		else if (xfrom < inputstr.size() &&
-					inputstr.at(xfrom) == nxtl.first.c())
+		else if (xfrom < l && at(xfrom) == nxtl.first.c())
 			nxtl.second[1] = ++xfrom ;
 		else // if not building the correction variation, prune this path quickly 
 			return;
@@ -332,7 +417,7 @@ void parser<CharT>::sbl_chd_forest(const item &eitem,
 			// ignore beyond the span
 			if (v.set > eitem.set) continue;
 			// store current and recursively build for next nt
-			size_t lastpos = curchd.size(); 
+			size_t lastpos = curchd.size();
 			nxtl.second[1] = v.set,
 			curchd.push_back(nxtl), xfrom = v.set,
 			sbl_chd_forest(eitem, curchd, xfrom, ambset);
@@ -350,7 +435,7 @@ bool parser<CharT>::bin_lr_comb(const item& eitem, set<vector<pnode>>& ambset) {
 		right.second[1] = eitem.set;
 		if (right.first.c() == (CharT) 0)
 			right.second[0] = right.second[1];
-		else if (inputstr.at(eitem.set - 1) == right.first.c())
+		else if (at(eitem.set - 1) == right.first.c())
 			right.second[0] = eitem.set - 1;
 		else return false;
 		rcomb.emplace_back(right);
@@ -389,7 +474,7 @@ bool parser<CharT>::bin_lr_comb(const item& eitem, set<vector<pnode>>& ambset) {
 			left.second[0] = eitem.from;
 			if (l.c() == (CharT) '\0')
 				left.second[1] = left.second[0];
-			else if (inputstr.at(eitem.from) == l.c() )
+			else if (at(eitem.from) == l.c() )
 				left.second[1] = eitem.from + 1  ;
 			else return false;
 			//do Left right optimisation

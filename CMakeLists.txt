@@ -41,10 +41,10 @@ set(PROJECT_HEADERS
 	src/defs.h
 	src/devhelpers.h
 	src/forest.h
-#	src/glanguage.h
 	src/grammar.h
 	src/parser.h
 	src/parser.tpl.h
+	src/tgf.h
 )
 set(PROJECT_SOURCES
 	src/characters.cpp

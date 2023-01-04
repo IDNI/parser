@@ -18,13 +18,6 @@ using namespace idni;
 
 
 typedef char char_t;
-typedef prods<char_t> prods_t;
-typedef lit<char_t> lit_t;
-typedef nonterminals<char_t> nonterminals_t;
-typedef grammar<char_t> grammar_t;
-typedef parser<char_t> parser_t;
-typedef char_class_fns<char_t> char_class_fns_t;
-typedef parser<char_t>::pforest forest_t;
 
 struct tau_parser {
 	tau_parser() :
@@ -44,33 +37,32 @@ struct tau_parser {
 		ws_required(nt("ws_required")), ws(nt("ws")),
 		g(nts, ba_prods(), start, cc), p(g) { }
 	bool eval(const string& s) {
-		bool match = false; 
-		auto f = p.parse(s, match);
-		if (!match) { 
+		auto f = p.parse(s.c_str(), s.size());
+		if (!p.found()) { 
 			cerr << "input text does not match syntax.. try again\n";
 			return true; 
 		}
-		auto next_g = [](forest_t::graph &g){
-			auto tree = g.extract_trees();
-			tree->to_print(std::cout);
+		auto next_g = [](parser<char_t>::pforest::graph &fg) {
+			auto tree = fg.extract_trees();
+			tree->to_print(cout) << "\n";
 			return false;
 		};
 		f->extract_graphs( f->root(), next_g);
 		return true;
 	}
 private:
-	nonterminals_t nts{};
-	char_class_fns_t cc;
-	prods_t null_{'\0'},
+	nonterminals<char_t> nts{};
+	char_class_fns<char_t> cc;
+	prods<char_t> null_{'\0'},
 		addsub, digit, eof, eol, expr_op, expr, factor, integer,
 		integer_rest, muldiv, printable, printable_chars,
 		printable_chars1, sign, space, start, statement, statements,
 		statements1, term, term_op, ws_comment, ws_required, ws;
-	grammar_t g;
-	parser_t p;
-	lit_t nt(const string& s) { return lit_t{ nts.get(s), &nts }; };
-	prods_t ba_prods() {
-		prods_t q, hash{'#'}, cr{'\r'}, nl{'\n'}, plus{'+'},
+	grammar<char_t> g;
+	parser<char_t> p;
+	lit<char_t> nt(const string& s){ return lit<char_t>{nts.get(s),&nts}; };
+	prods<char_t> ba_prods() {
+		prods<char_t> q, hash{'#'}, cr{'\r'}, nl{'\n'}, plus{'+'},
 			star{'*'}, lparen{'('};
 		q(ws_comment,       (hash + eol) |
 					(hash + printable_chars + eol));

@@ -18,15 +18,20 @@
 namespace idni {
 using namespace idni::charclasses;
 
+template <typename CharT>
+struct lit;
+
 // nonterminals dict = vector with index being nonterminal's id
 template <typename CharT>
 struct nonterminals : public std::vector<std::basic_string<CharT>> {
 	typedef CharT char_t;
 	typedef std::basic_string<CharT> string;
 	typedef std::vector<string> strings;
+	typedef std::function<lit<CharT>(const string& s)> lit_maker_t;
 	std::map<string, size_t> m;
 	size_t get(const string& s);
 	const string& get(size_t n) const;
+	lit<CharT> operator()(const string& s);
 };
 
 // literal containing terminal (c where if c = 0 then null) or nonterminal (n)
@@ -70,11 +75,13 @@ struct prods : public std::vector<prod<CharT>> { // productions
 	typedef CharT char_t;
 	typedef std::vector<prod<CharT>> prods_t;
 	prods() : prods_t() {}
-	prods(const lit<CharT>& l) : prods_t() {
+	prods(const lit<CharT>& l) : prods_t() { (*this)(l); }
+	prods(const std::basic_string<CharT>& s) : prods_t() { (*this)(s); }
+	void operator()(const lit<CharT>& l) {
 		this->emplace_back(lit<CharT>{},
 			dnf<CharT>{clause<CharT>{alt<CharT>({l})}});
 	}
-	prods(const std::basic_string<CharT>& s) : prods_t() {
+	void operator()(const std::basic_string<CharT>& s) {
 		alt<CharT> a;
 		for (const CharT& c : s) a.emplace_back(c);
 		this->emplace_back(lit<CharT>{},
@@ -138,11 +145,13 @@ prods<char32_t> operator+(const prods<char32_t>& x,
 template <typename CharT>
 using char_class_fn = std::function<bool(CharT)>;
 template <typename CharT>
-struct char_class_fns : public std::vector<size_t> {
+struct char_class_fns {
 	std::map<size_t, char_class_fn<CharT>> fns = {};
-	std::vector<std::map<CharT, size_t>> ps = {}; //char -> production
+	std::map<size_t, std::map<CharT, size_t>> ps = {}; //char -> production
 	// adds new char class function
 	void operator()(size_t nt, const char_class_fn<CharT>& fn);
+	// returns true if a nt is a cc function
+	bool is_fn(size_t nt) const { return fns.find(nt) != fns.end(); }
 };
 
 template <typename CharT>
@@ -177,6 +186,7 @@ struct grammar {
 	size_t len(const size_t& p, const size_t& c) const;
 	// returns true if the literal is nullable
 	bool nullable(literal l) const;
+	bool conjunctive(size_t p) const;
 	// checks if the char class function returns true on the char ch
 	// if true then adds new production rule: name-of-cc_fn => ch.
 	// returns id of the production rule or (size_t)-1 if the check fails
@@ -193,6 +203,7 @@ private:
 	char_class_fns<CharT> cc_fns = {};
 	std::map<literal, std::set<size_t>> ntsm = {};
 	std::set<size_t> nullables = {};
+	std::set<size_t> conjunctives = {};
 	productions G;
 	literal nt(size_t n);
 	literal nt(const string& s);
