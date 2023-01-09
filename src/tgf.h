@@ -48,6 +48,7 @@ struct tgf {
 		grp_expr(nt("grp_expr")),
 		literal(nt("literal")),
 		literals(nt("literals")),
+		literals1(nt("literals1")),
 		multi(nt("multi")),
 		nonterminal(nt("nonterminal")),
 		negation(nt("negation")),
@@ -126,13 +127,13 @@ struct tgf {
 			void directive() {
 				in_directive = false;
 			}
-			void new_expr() {
-//#ifdef DEBUG
-//				DBG(cout << "new_expr " << p.size() << "\n";)
-//				for (const auto& t : p)
-//					cout << "\t" << t << endl;
-//#endif				
+			void new_literals() {
 				p.push_back({});
+//#ifdef DEBUG
+//				DBG(cout << "new_literals " << p.size() << "\n";)
+//				for (const auto& t : p)
+//					cout << "\t:" << t << endl;
+//#endif
 			}
 			void new_production() {
 				if (cc_names.size()) cc =
@@ -182,7 +183,11 @@ struct tgf {
 		//DBG(std::cout << "parsing: " << s << std::endl;)
 		auto f = p.parse(s.c_str(), s.size());
 		bool found = p.found();
-		//DBG(p.print_data(cout << "PARSER DATA:\n") << endl;)
+//#ifdef DEBUG
+//		//DBG(
+//		if (!found) p.print_data(cout << "PARSER DATA:\n") << endl;
+//			//)
+//#endif
 		auto cb_enter = [&f, &x, this](const auto& n) {
 			const auto& l = n.first;
 			if (!l.nt()) return;
@@ -192,7 +197,7 @@ struct tgf {
 			else if (l == directive_param)
 				x.cc_names.push_back(flatten<CharT>(*f, n));
 			else if (l == production_) x.new_production();
-			else if (l == expr4) x.new_expr();
+			else if (l == literals) x.new_literals();
 			else if (l == string_ || l == quoted_char) {
 				auto str = flatten<CharT>(*f, n);
 				str.erase(str.begin()), str.erase(str.end() - 1);
@@ -242,12 +247,12 @@ private:
 		alnum, alpha, char_, char0, chars, chars1, conjunction, command,
 		commands, commands_rest, directive, directive_param,
 		directive_params, disjunction, eof, eol, expr1, expr2, expr3,
-		expr4, group, grp_expr, literal, literals, multi, nonterminal,
-		negation, optional, opt_expr, plus, printable, printable_chars,
-		printable_chars1, production_, production_sep, quoted_char,
-		quoted_char_esc, repeat, rep_expr, space, start, string_,
-		string_char, string_chars, string_chars1, sym, terminal, ws,
-		ws_comment, ws_required;
+		expr4, group, grp_expr, literal, literals, literals1, multi,
+		nonterminal, negation, optional, opt_expr, plus, printable,
+		printable_chars, printable_chars1, production_, production_sep,
+		quoted_char, quoted_char_esc, repeat, rep_expr, space, start,
+		string_, string_char, string_chars, string_chars1, sym,
+		terminal, ws, ws_comment, ws_required;
 	grammar<CharT> g;
 	parser<CharT> p;
 	string U(const char* s) { return from_cstr<CharT>(s); }
@@ -292,8 +297,8 @@ private:
 		q(rep_expr,         expr1);
 		q(plus,             expr4 + ws + U('+'));
 		q(multi,            expr4 + ws + U('*'));
-		q(literals,         literal |
-					(literal + ws_required + literals));
+		q(literals,         literal + literals1);
+		q(literals1,        (ws_required + literal + literals1) | nll);
 		q(literal,          terminal | nonterminal);
 		q(terminal,         quoted_char | string_);
 		q(nonterminal,      sym);

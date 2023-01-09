@@ -2,10 +2,27 @@
 using namespace std;
 using namespace idni;
 
-int main() {
+bool run_test(const char* g_tgf, const string& input) {
 	nonterminals<char> nts;
-	
-	grammar<char> g = tgf<char>::from_string(nts,
+	grammar<char> g = tgf<char>::from_string(nts, g_tgf);
+	//g.print_data(cout << "grammar data:\n") << endl;
+	parser<char> p(g);
+	auto f = p.parse(input.c_str(), input.size());
+	if (!p.found()) {
+		auto error = p.get_error();
+		cerr << error.to_str();
+		return false;
+	}
+	//f->print_data(cout << "FOREST:\n") << endl;
+	return true;
+}
+
+int main() {
+
+	bool failed = false;
+	auto fail = [&failed]() { cerr << "\nFAIL\n"; failed = true; };
+
+	if (!run_test(
 	"	@use_char_class eof, digit, space, printable. \n"
 
 	"	ws_comment   => '#' eol | '#' printable_chars eol. \n"
@@ -31,43 +48,26 @@ int main() {
 	"	statements   => statement statements1. \n"
 	"	statements1  => eol statement statements1 | null. \n"
 	"	start        => statements ws | null. \n"
-	);
+	, "(1+2)*3/2")) fail();
 
-//	grammar<char> g = tgf<char>::from_string(nts,
-//	"	start => A B & D C. \n"
-//	"	A  => 'a' A     | null. \n"
-//	"	B  => 'b' B 'c' | null. \n"
-//	"	C  => 'c' C     | null. \n"
-//	"	D  => 'a' D 'b' | null. \n"
-//	);
+	if (!run_test(
+	"	start => A B & D C. \n"
+	"	A  => 'a' A     | null. \n"
+	"	B  => 'b' B 'c' | null. \n"
+	"	C  => 'c' C     | null. \n"
+	"	D  => 'a' D 'b' | null. \n"
+	, "abc")) fail();
 
-//	grammar<char> g = tgf<char>::from_string(nts,
-//	"	start => X & ~'b'. \n"
-//	"	X  => 'a' | 'b'. \n"
-//	);
+	if (!run_test(
+	"	start => X & ~'b'. \n"
+	"	X  => 'a' | 'b'. \n"
+	, "a")) fail();
 
-	g.print_data(cout, "\t") << endl;
+	if (!run_test(
+	"	start => { elem } | { tau }. \n"
+	"	elem  => '0' | '1'. \n"
+	"	tau   => '2'. \n"
+	, "0101010100001001111")) fail();
 
-	//nonterminals<char> nts0;
-	//auto nt = [&nts0](const string&s){return lit<char>{nts0.get(s),&nts0};};
-	//prods<char> Q, a('a'), b('b'), c('c'), nll('\0'),
-	//	A(nt("A")), B(nt("B")), C(nt("C")), D(nt("D")), S(nt("start"));
-	//Q(S, (A + B) & (D + C));
-	//Q(A, (a + A)     | nll);
-	//Q(B, (b + B + c) | nll);
-	//Q(C, (c + C)     | nll);
-	//Q(D, (a + D + b) | nll);
-	//grammar<char> g0(nts0, Q, S, {});
-	//g0.print_data(cout, "\t") << endl;
-
-	//return 0;
-
-	cout << "PARSER\n";
-	parser<char> p(g);
-	cout << "PARSE\n";
-	const string s = "1+2*3";
-	auto f = p.parse(s.c_str(), s.size());
-	bool found = p.found();
-	cout << (found ? "FOUND" : "FAILED") << endl;
-	f->print_data(cout << "FOREST:\n") << endl;
+	return failed ? 1 : 0;
 }

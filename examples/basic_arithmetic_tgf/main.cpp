@@ -37,9 +37,7 @@ struct basic_arithmetic {
 	"	start        => ws expr1 ws. "
 	;
 	basic_arithmetic() :
-		g(tgf<char_t>::from_string(nts, ba_tgf)), p(g),
-		add(id("add")), sub(id("sub")),	mul(id("mul")), div(id("div")),
-		integer(id("integer")),	neg(id("neg")) { }
+		g(tgf<char_t>::from_string(nts, ba_tgf)), p(g) { }
 	bool eval(const string& s) {
 		auto f = p.parse(s.c_str(), s.size());
 		if (!f || !p.found()) {
@@ -52,27 +50,26 @@ private:
 	nonterminals<char_t> nts{};
 	grammar<char_t> g;
 	parser<char_t> p;
-	size_t add, sub, mul, div, integer, neg;
 	size_t id(const string& s) { return nts.get(s); }
 	int_t evaluate_forest(typename parser<char_t>::pforest& f) {
 		vector<int_t> x;  // intermediate evaluations (nested)
 		auto cb_enter = [&x, &f, this](const auto& n) {
 			//DBG(cout << "entering: `" << n.first.to_std_string() << "`\n";)
-			if (n.first.nt() && n.first.n() == integer)
+			if (n.first.nt() && n.first.n() == id("integer"))
 				x.push_back(flatten_to_int<char_t>(f, n));
 		};
 		auto cb_exit = [&x, this](const auto& n, const auto&) {
 			//DBG(cout << "exiting: `" << n.first.to_std_string() << "`\n";)
 			if (!n.first.nt()) return;
 			const auto& l = n.first.n();
-			if      (l == neg) x.back() = -x.back();
-			else if (l == add) (x[x.size()-2] += x.back()),
+			if      (l == id("neg")) x.back() = -x.back();
+			else if (l == id("add")) (x[x.size()-2] += x.back()),
 						x.pop_back();
-			else if (l == sub) (x[x.size()-2] -= x.back()),
+			else if (l == id("sub")) (x[x.size()-2] -= x.back()),
 						x.pop_back();
-			else if (l == mul) (x[x.size()-2] *= x.back()),
+			else if (l == id("mul")) (x[x.size()-2] *= x.back()),
 						x.pop_back();
-			else if (l == div) (x[x.size()-2] /= x.back()),
+			else if (l == id("div")) (x[x.size()-2] /= x.back()),
 						x.pop_back();
 		};
 		f.traverse(cb_enter, cb_exit);
