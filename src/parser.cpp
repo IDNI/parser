@@ -169,6 +169,59 @@ std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::parse(
 }
 
 template <typename CharT>
+std::string parser<CharT>::perror_t::to_str(){
+	std::stringstream ss;
+	ss << "\nSyntax Error: Unexpected \""<< unexp << "\" close to position "
+	<< loc << " near \"" << ctxt << "\""<< endl;
+	for( auto& e: expv){
+		ss <<" ..expecting \""<<e.exp <<"\" due to ["<< e.prod_nt << 
+		"->"<< e.prod_body <<"]"<<endl;
+	}
+	return ss.str();
+}
+
+template <typename CharT>
+typename parser<CharT>::perror_t parser<CharT>::get_error(){
+	
+	perror_t err;
+	auto near_ctxt = [this](int_t from, int_t pos){	
+		std::string errctxt;
+		// using from as delimiter..
+		while(pos >= from)
+				errctxt = to_std_string(at(pos--)) + errctxt;
+		return errctxt;		
+	};
+	// find error location and build error stream
+	std::stringstream es;
+	for( int_t i = (int_t)l; i >= 0; i-- )
+		if(S[i].size()) {
+			size_t from = 0;
+			// smallest length item that may be used as delimiter
+			for(const item &t : S[i]){
+				if( t.from > from && t.from != t.set)
+					from = t.from;	
+				
+				//ignoring empty string, completed and nts
+				if( completed(t) || get_lit(t).nt()  
+					|| (!get_lit(t).nt() && 
+					get_lit(t).c() == CharT(0)) ) continue;
+				
+				err.expv.emplace_back();
+				es.str(""), es << get_lit(t),
+				err.expv.back().exp = es.str();
+				es.str(""), es << get_nt(t),
+				err.expv.back().prod_nt = es.str();
+				es.str(""), es << g[t.prod][t.con],
+				err.expv.back().prod_body = es.str();
+			}
+			err.unexp = to_std_string(at(i));
+			err.loc = i;
+			err.ctxt = near_ctxt(from, i);
+			break;
+		} 
+	return err;
+}
+template <typename CharT>
 bool parser<CharT>::found() {
 	bool f = false;
 	//DBG(cout<<"finding completed `start` over the input string: "<<endl;)
@@ -272,7 +325,6 @@ std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::_parse() {
 	auto nt = f->count_trees();
 	if (nt > 1) {
 		cout << "# parse trees: " << nt << "\n";
-		static bool opt_edge = false;
 		static int_t c = 0;
 		std::stringstream ssf, ptd;
 		ssf<<"parse_rules"<<++c<<".tml";
@@ -281,7 +333,7 @@ std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::_parse() {
 		file2 << ptd.str();
 		file2.close();
 		size_t i = 0;
-		auto cb_next_graph = [&](parser<CharT>::pforest::node_graph &g){
+		auto cb_next_graph = [&](parser<CharT>::pforest::graph &g){
 			ssf.str({});
 			ptd.str({});
 			ssf<<"parse_rules"<<c<<"_"<<i++<<".tml";
@@ -289,9 +341,11 @@ std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::_parse() {
 			to_tml_rules<CharT>(ptd, g);
 			filet << ptd.str();
 			filet.close();
+			// get parse tree
+			g.extract_trees();
 			return true;
 		};
-		f->extract_graphs(f->root(), cb_next_graph, opt_edge);
+		f->extract_graphs(f->root(), cb_next_graph);
 	}
 #endif
 	return f;

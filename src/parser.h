@@ -17,6 +17,7 @@
 #include <type_traits>
 #include <iomanip>
 #include <fcntl.h>
+#include <unistd.h>
 #include <sys/mman.h>
 #include "defs.h"
 #include "grammar.h"
@@ -74,6 +75,25 @@ public:
 		size_t operator()(const pnode &k) const;
 		size_t operator()(const item &k) const;
 	};
+	struct perror_t{
+		int_t loc;	// location of error
+		std::string ctxt; // closest matching ctxt
+		std::string unexp; // unexpected character
+		typedef struct _exp_prod{
+			std::string exp;
+			std::string prod_nt;
+			std::string prod_body;
+			std::vector<std::string> bktrk;
+		}exp_prod_t;
+
+		// list of expected token and respective productions
+		std::vector<exp_prod_t> expv;
+
+		perror_t(): loc(-1) {}
+		std::string to_str();
+	};
+	perror_t get_error();
+
 private:
 	typedef std::unordered_set<parser<CharT>::item, parser<CharT>::hasher_t> container_t;
 	typedef typename container_t::iterator container_iter;

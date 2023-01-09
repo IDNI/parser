@@ -39,7 +39,8 @@ struct tau_parser {
 	bool eval(const string& s) {
 		auto f = p.parse(s.c_str(), s.size());
 		if (!p.found()) { 
-			cerr << "input text does not match syntax.. try again\n";
+			auto error = p.get_error();
+			cerr << error.to_str();
 			return true; 
 		}
 		auto next_g = [](parser<char_t>::pforest::graph &fg) {
@@ -96,7 +97,7 @@ int main() {
 	string line;
 	while (getline(cin, line)) {
 		if (line.size() == 0) continue;
-		cout << "> " << line << " = ";
+		cout << "> " << line << "";
 		if (!taup.eval(line)) return 1;
 	}
 }
