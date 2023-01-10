@@ -6,9 +6,12 @@ bool run_test(const char* g_tgf, const string& input) {
 	nonterminals<char> nts;
 	grammar<char> g = tgf<char>::from_string(nts, g_tgf);
 	//g.print_data(cout << "grammar data:\n") << endl;
+	//g.print_internal_grammar(cout << "grammar rules:\n") << endl;
+	if (g.size() == 0) return false;
 	parser<char> p(g);
 	auto f = p.parse(input.c_str(), input.size());
 	if (!p.found()) {
+		//DBG(g.print_internal_grammar(cout << "grammar productions:\n") << endl;)
 		auto error = p.get_error();
 		cerr << error.to_str();
 		return false;
@@ -20,7 +23,7 @@ bool run_test(const char* g_tgf, const string& input) {
 int main() {
 
 	bool failed = false;
-	auto fail = [&failed]() { cerr << "\nFAIL\n"; failed = true; };
+	auto fail = [&failed]() { cerr << "\nFAIL\n"; failed = true; exit(1); };
 
 	if (!run_test(
 	"	@use_char_class eof, digit, space, printable. \n"
@@ -64,10 +67,52 @@ int main() {
 	, "a")) fail();
 
 	if (!run_test(
-	"	start => { elem } | { tau }. \n"
-	"	elem  => '0' | '1'. \n"
-	"	tau   => '2'. \n"
+	"	start  => binary [ two ]. \n"
+	"	binary => '0' | '1'. \n"
+	"	two    => '2'. \n"
+	, "02")) fail();
+
+	if (!run_test(
+	"	start  => { binary } | { two }. \n"
+	"	binary => '0' | '1'. \n"
+	"	two    => '2'. \n"
 	, "0101010100001001111")) fail();
+
+	if (!run_test(
+	"	@use_char_class digit. \n"
+	"	start  => digit+. \n"
+	, "1382746358690")) fail();
+
+	if (!run_test(
+	"	@use_char_class digit. \n"
+	"	start  => digit*. \n"
+	, "1382746358690")) fail();
+
+	if (!run_test(
+	"	start  => '1' ( '0' ) '1'. \n"
+	, "101")) fail();
+
+	if (!run_test(
+	"	start  => '1' ( '0' '0' )+ '1'. \n"
+	, "100001")) fail();
+
+	if (!run_test(
+	"	start  => '1' ( '0' '0' )* '1'. \n"
+	, "11")) fail();
+
+	if (!run_test(
+	"	start  => '1' { '0' } '1'. \n"
+	, "1000001")) fail();
+
+	if (!run_test(
+	"	start  => '1' [ '0' ] '1'. \n"
+	, "11")) fail();
+
+	if (!run_test(
+	"	start  => [ '0' ]. \n"
+	, "")) fail();
+
+
 
 	return failed ? 1 : 0;
 }
