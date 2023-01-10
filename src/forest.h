@@ -35,19 +35,15 @@ struct forest {
 	struct tree {
 		node value;
 		std::vector<std::shared_ptr<struct tree>> child;
-
-		ostream_t& to_print(ostream_t &os, size_t l=0){
-			os <<endl;
-			for( size_t t=0; t<l; t++ ) os<<" ";
+		ostream_t& to_print(ostream_t &os, size_t l = 0) {
+			os << "\n";
+			for (size_t t = 0; t < l; t++) os << " ";
 			os << value.first;
-			for( auto &d: child)
-				d->to_print(os,l+1);
+			for (auto& d : child) d->to_print(os, l + 1);
 			return os;
 		}
-
 	};
 	typedef std::shared_ptr<tree> sptree;
-
 
 	// a least maximal core graph without ambiguity/repeating nodes/edges
 	// possibly with cycles or shared nodes. 
@@ -58,10 +54,10 @@ struct forest {
 		std::set<node> cycles;
 		sptree extract_trees();
 		private:
-		sptree _extract_trees( node &r, int choice = 0);	
+		sptree _extract_trees(node& r, int choice = 0);	
 	};
 
-	bool detect_cycle(graph &g) const;
+	bool detect_cycle(graph& g) const;
 
 	//vector of graph with callback
 	typedef std::vector<graph> graphv;
@@ -77,7 +73,8 @@ struct forest {
 	size_t count_trees(const node& root) const;
 	size_t count_trees() const { return count_trees(root()); };
 	nodes_and_edges get_nodes_and_edges() const;
-	graphv extract_graphs( const node& root, cb_next_graph_t cb_next_graph, bool unique_edge = true) const;
+	graphv extract_graphs(const node& root, cb_next_graph_t cb_next_graph,
+		bool unique_edge = true) const;
 	std::function<void(const node&)> no_enter;
 	std::function<void(const node&, const nodes_set&)> no_exit;
 	std::function<bool(const node&)> no_revisit;
@@ -97,7 +94,8 @@ struct forest {
 	
 	template <typename cb_enter_t, typename cb_exit_t,
 		typename cb_revisit_t, typename cb_ambig_t>
-	bool traverse(const node_graph& gr, const node &root, cb_enter_t cb_enter, cb_exit_t cb_exit,
+	bool traverse(const node_graph& gr, const node &root,
+		cb_enter_t cb_enter, cb_exit_t cb_exit,
 		cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const;
 
 	// traverse() with default parameters
@@ -123,7 +121,6 @@ struct forest {
 		cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const
 	{
 		return traverse(root(), cb_enter, cb_exit, cb_revisit,cb_ambig);
-		
 	}
 	template <typename cb_enter_t>
 	bool traverse(cb_enter_t cb_enter) const {
@@ -147,15 +144,15 @@ struct forest {
 private:
 	template <typename cb_enter_t, typename cb_exit_t,
 		typename cb_revisit_t, typename cb_ambig_t>
-	bool _traverse(const node_graph &g, const node &root, std::set<node> &done,
-		cb_enter_t cb_enter, cb_exit_t cb_exit,
+	bool _traverse(const node_graph& g, const node& root,
+		std::set<node>& done, cb_enter_t cb_enter, cb_exit_t cb_exit,
 		cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const;
-	bool _extract_graph_uniq_edge(std::map<node,size_t> &ndmap, std::set<edge>& done,
-	std::vector<node>& todo, graphv &graphs, size_t gid, cb_next_graph_t g,
-	bool &no_stop ) const; 
-	
-	bool _extract_graph_uniq_node(std::set<node>& done, std::vector<node>& todo,
-		graphv &graphs, size_t gid, cb_next_graph_t g, bool &no_stop ) const;
+	bool _extract_graph_uniq_edge(std::map<node,size_t>& ndmap,
+		std::set<edge>& done, std::vector<node>& todo, graphv& graphs,
+		size_t gid, cb_next_graph_t g, bool& no_stop) const; 
+	bool _extract_graph_uniq_node(std::set<node>& done,
+		std::vector<node>& todo, graphv& graphs, size_t gid,
+		cb_next_graph_t g, bool& no_stop) const;
 };
 
 #ifdef DEBUG
@@ -178,15 +175,13 @@ ostream_t& forest<NodeT>::print_data(ostream_t& os) const {
 // a dfs based approach to detect cycles
 template<typename NodeT>
 bool forest<NodeT>::detect_cycle(graph &gr) const {
-	
 	std::map<NodeT, bool> inprog;
-
 	auto cb_enter = [&inprog, &gr](const auto& n) { 
 		if (n.first.nt()) 
 			inprog[n] = true;
 	};
-	auto cb_revisit =  [&inprog, &gr](const auto& n) { 
-		if( inprog[n] == true ) 
+	auto cb_revisit = [&inprog, &gr](const auto& n) { 
+		if (inprog[n] == true) 
 			gr.cycles.insert(n);
 		return false; 
 	}; // revisit
@@ -194,10 +189,10 @@ bool forest<NodeT>::detect_cycle(graph &gr) const {
 		if (n.first.nt()) inprog[n] = false;
 	};
 	auto cb_child_all = [](const auto&, auto& ambset) {
-			return ambset;
-		};
+		return ambset;
+	};
 
-	return traverse(gr, gr.root, cb_enter, cb_exit, cb_revisit, cb_child_all);
+	return traverse(gr,gr.root,cb_enter, cb_exit, cb_revisit, cb_child_all);
 }
 
 
@@ -209,9 +204,9 @@ forest<NodeT>::graph::extract_trees(){
 }
 
 template <typename NodeT>
-typename forest<NodeT>::sptree forest<NodeT>::graph::_extract_trees (
-	NodeT &r, int ){
-	
+typename forest<NodeT>::sptree forest<NodeT>::graph::_extract_trees(
+	NodeT& r, int)
+{	
 	std::deque<sptree> stk;
 	sptree troot = NULL;
 	troot = std::make_shared<tree>(r);
@@ -221,20 +216,20 @@ typename forest<NodeT>::sptree forest<NodeT>::graph::_extract_trees (
 		sptree cur = stk.back();
 		stk.pop_back();
 		// skip for terminal
-		if(!cur->value.first.nt()) continue;
+		if (!cur->value.first.nt()) continue;
 		auto fit = this->find(cur->value);
-		if(fit == this->end()) continue;
+		if (fit == this->end()) continue;
 		auto &ns = fit->second;
-		if(!ns.size()) continue;
+		if (!ns.size()) continue;
 		auto it = ns.begin();
-		if( ns.size() > 1 ) {
+		if (ns.size() > 1) {
 			// select which descendants to traverse not already done;
-			if( edgcount[cur->value] ==  ns.size() ) continue;
-			for(size_t i = 0 ; i < edgcount[cur->value]; i++, ++it );
+			if (edgcount[cur->value] == ns.size()) continue;
+			for (size_t i = 0; i < edgcount[cur->value]; i++, ++it);
 
 			edgcount[cur->value]++;
 		}
-		for( auto& cnode : *(it))
+		for (auto& cnode : *(it))
 			cur->child.push_back(std::make_shared<tree>(cnode));
 		// pushing in stack in reverse order to keep left to right child dfs
 		stk.insert(stk.end(), cur->child.rbegin(), cur->child.rend());
@@ -280,18 +275,19 @@ typename forest<NodeT>::nodes_and_edges forest<NodeT>::get_nodes_and_edges()
 }
 
 template <typename NodeT>
-bool forest<NodeT>::_extract_graph_uniq_node( std::set<node>& done, std::vector<node>& todo,
-	graphv& graphs, size_t trid, cb_next_graph_t cb_next_graph, bool &no_stop ) const{
-
+bool forest<NodeT>::_extract_graph_uniq_node(std::set<node>& done,
+	std::vector<node>& todo, graphv& graphs, size_t trid,
+	cb_next_graph_t cb_next_graph, bool& no_stop) const
+{
 	bool ret = true;
-	while( todo.size() && no_stop) {
+	while (todo.size() && no_stop) {
 		const node root = todo.back();
 		todo.pop_back();
 
-		if( !root.first.nt()) continue;
+		if (!root.first.nt()) continue;
 		const auto &it = g.find(root);
 		if (it == g.end()) continue;
-		if(!done.insert(root).second ) continue;
+		if (!done.insert(root).second) continue;
 
 		const nodes_set &packs = it->second;
 		auto curgraph = graphs[trid];
@@ -299,42 +295,41 @@ bool forest<NodeT>::_extract_graph_uniq_node( std::set<node>& done, std::vector<
 		auto curtodo = todo;
 
 		size_t ambpid = 0;
-		for(auto& pack : packs) {
-			if( ambpid == 0) {
-				graphs[trid].insert( {root, {pack} });
-				for( auto& node : pack) todo.push_back(node);
-			}
-			else {
+		for (auto& pack : packs) {
+			if (ambpid == 0) {
+				graphs[trid].insert({ root, { pack } });
+				for (auto& node : pack) todo.push_back(node);
+			} else {
 				graphs.emplace_back(curgraph);
-				graphs.back().insert( {root, {pack} });
+				graphs.back().insert({ root, { pack } });
 				size_t ntrid = graphs.size() - 1;
 
 				auto ntodo(curtodo);
 				auto ndone(curdone);
-				for( auto& node : pack) ntodo.push_back(node);
-
-				ret &= _extract_graph_uniq_node( ndone, ntodo, graphs, ntrid, cb_next_graph, no_stop);
-
+				for (auto& node : pack) ntodo.push_back(node);
+				ret &= _extract_graph_uniq_node(ndone, ntodo,
+					graphs, ntrid, cb_next_graph, no_stop);
 			}
 			ambpid++;
 		}
 	}
-	if(no_stop) no_stop = cb_next_graph(graphs[trid]);
+	if (no_stop) no_stop = cb_next_graph(graphs[trid]);
 	return ret;
 }
 
 template <typename NodeT>
-bool forest<NodeT>::_extract_graph_uniq_edge(std::map<node, size_t> &ndmap,
-	std::set<edge>& done, std::vector<node>& todo, graphv& graphs, size_t gid,
-	cb_next_graph_t cb_next_graph, bool &no_stop ) const {
+bool forest<NodeT>::_extract_graph_uniq_edge(std::map<node, size_t>& ndmap,
+	std::set<edge>& done, std::vector<node>& todo, graphv& graphs,
+	size_t gid, cb_next_graph_t cb_next_graph, bool& no_stop) const
+{
 	
 	bool ret = true;
-	while( todo.size() && no_stop ) {
+	while (todo.size() && no_stop) {
 		const node root = todo.back();
 		todo.pop_back();
 
-		if( !root.first.nt()) continue;
-		const auto &it = g.find(root);
+		if (!root.first.nt()) continue;
+		const auto& it = g.find(root);
 		if (it == g.end()) continue;
 
 		const nodes_set &packs = it->second;
@@ -345,49 +340,51 @@ bool forest<NodeT>::_extract_graph_uniq_edge(std::map<node, size_t> &ndmap,
 		size_t rootid = ndmap[root], ambpid = -1;
 		bool derived = false;
 
-		for(auto& pack : packs) {
+		for (auto& pack : packs) {
 			++ambpid;
-			if( curdone.find({rootid, rootid + ambpid + 1}) != curdone.end() ) continue;
-
-			if( !derived ){
-				done.insert({rootid, rootid + ambpid + 1}), derived = true;
-				if( graphs[gid].find(root) == graphs[gid].end() )
-					graphs[gid].insert( {root, {pack} });
+			if (curdone.find({ rootid, rootid + ambpid + 1 })
+				!= curdone.end()) continue;
+			if (!derived) {
+				done.insert({ rootid, rootid + ambpid + 1 }),
+				derived = true;
+				if (graphs[gid].find(root) == graphs[gid].end())
+					graphs[gid].insert( { root, { pack } });
 				else graphs[gid][root].insert(pack);
-				for( auto& node : pack)
-					if( node.first.nt() &&
-						done.insert({ rootid + ambpid + 1, ndmap[node] }).second )
+				for (auto& node : pack)
+					if (node.first.nt() && done.insert({
+						rootid+ambpid+1, ndmap[node] })
+						.second)
 							todo.push_back(node);
-			}
-			else {
+			} else {
 				auto ntodo(curtodo);
 				auto ndone(curdone);
-				ndone.insert( {rootid, rootid + ambpid + 1});
+				ndone.insert({ rootid, rootid + ambpid + 1 });
 				graphs.emplace_back(curgraph);
-				if( graphs.back().find(root) == graphs.back().end() )
-					graphs.back().insert( {root, {pack} });
+				if (graphs.back().find(root) ==
+					graphs.back().end()) graphs.back()
+						.insert({ root, { pack } });
 				else graphs.back()[root].insert(pack);
-
 				size_t ngid = graphs.size()-1;
-				for( auto& node : pack)
-					if( node.first.nt() &&
-						ndone.insert({ rootid + ambpid + 1, ndmap[node]}).second )
+				for (auto& node : pack)
+					if (node.first.nt() && ndone.insert({
+						rootid+ambpid+1, ndmap[node]})
+						.second )
 							ntodo.push_back(node);
-
-				ret &= _extract_graph_uniq_edge(ndmap, ndone, ntodo, graphs, ngid, cb_next_graph, no_stop);
-
+				ret &= _extract_graph_uniq_edge(ndmap, ndone,
+					ntodo, graphs, ngid, cb_next_graph,
+					no_stop);
 			}
 		}
 	}
-	if(no_stop) no_stop = cb_next_graph(graphs[gid]);
+	if (no_stop) no_stop = cb_next_graph(graphs[gid]);
 	return ret;
 
 }
 
-
 template <typename NodeT>
 typename forest<NodeT>::graphv forest<NodeT>::extract_graphs(
-	const node& root, cb_next_graph_t cb_next_graph, bool unique_edge ) const{	
+	const node& root, cb_next_graph_t cb_next_graph, bool unique_edge) const
+{	
 	graphv graphs;
 	std::set<node> dn;
 	std::set<edge> de;
@@ -399,14 +396,12 @@ typename forest<NodeT>::graphv forest<NodeT>::extract_graphs(
 	int id = 0;
 	for (auto& it : g) {
 		ndmap[it.first] = id++;
-		id +=  it.second.size(); // ambig node ids;
+		id += it.second.size(); // ambig node ids;
 	}
 	bool no_stop = true;
-	if( unique_edge )
-		_extract_graph_uniq_edge( ndmap, de, todo, graphs, 0, cb_next_graph, no_stop);
-	else
-		_extract_graph_uniq_node( dn, todo, graphs, 0, cb_next_graph, no_stop);
-
+	if (unique_edge) _extract_graph_uniq_edge(ndmap, de, todo, graphs, 0,
+						cb_next_graph, no_stop);
+	else _extract_graph_uniq_node(dn, todo, graphs,0,cb_next_graph,no_stop);
 	return graphs;
 
 }
@@ -414,38 +409,41 @@ typename forest<NodeT>::graphv forest<NodeT>::extract_graphs(
 template <typename NodeT>
 template <typename cb_enter_t, typename cb_exit_t,
 	typename cb_revisit_t, typename cb_ambig_t>
-bool forest<NodeT>::traverse(const node &root, cb_enter_t cb_enter,
+bool forest<NodeT>::traverse(const node& root, cb_enter_t cb_enter,
 	cb_exit_t cb_exit, cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const
 {
 	std::set<node> done;
-	return _traverse(this->g, root, done, cb_enter, cb_exit, cb_revisit, cb_ambig);
+	return _traverse(this->g, root, done, cb_enter, cb_exit, cb_revisit,
+		cb_ambig);
 }
 
 template <typename NodeT>
 template <typename cb_enter_t, typename cb_exit_t,
 	typename cb_revisit_t, typename cb_ambig_t>
-bool forest<NodeT>::traverse(const node_graph &gr, const node &root, cb_enter_t cb_enter,
-	cb_exit_t cb_exit, cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const
-{
-	std::set<node> done;
-	return _traverse(gr, root, done, cb_enter, cb_exit, cb_revisit, cb_ambig);
-}
-
-template <typename NodeT>
-template <typename cb_enter_t, typename cb_exit_t,
-	typename cb_revisit_t, typename cb_ambig_t>
-bool forest<NodeT>::_traverse(const node_graph &g, const node &root, std::set<node> &done,
+bool forest<NodeT>::traverse(const node_graph& gr, const node& root,
 	cb_enter_t cb_enter, cb_exit_t cb_exit,
+	cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const
+{
+	std::set<node> done;
+	return _traverse(gr, root, done, cb_enter, cb_exit, cb_revisit,
+		cb_ambig);
+}
+
+template <typename NodeT>
+template <typename cb_enter_t, typename cb_exit_t,
+	typename cb_revisit_t, typename cb_ambig_t>
+bool forest<NodeT>::_traverse(const node_graph& g, const node& root,
+	std::set<node>& done, cb_enter_t cb_enter, cb_exit_t cb_exit,
 	cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const
 {
 //#define DEBUG_TRAVERSE
 #ifdef DEBUG_TRAVERSE
-	std::cout << "enter: \t\t" << root.first.to_std_string() << std::endl;
+	std::cout << "enter: \t\t" << root.first.to_std_string() << "\n";
 	std::cout << "\t" << (root.first.nt() ? "NT" : " T") << " ";
 	if (root.first.nt()) std::cout << "n: " << root.first.n()
 		<< " `" << root.first.to_std_string();
 	else std::cout << "c: `" << to_std_string(root.first.c()) << "`";
-	std::cout << std::endl;
+	std::cout << "\n";
 #endif
 	bool ret = true;
 	nodes_set pack;
@@ -462,10 +460,10 @@ bool forest<NodeT>::_traverse(const node_graph &g, const node &root, std::set<no
 	for (auto& nodes : choosen_pack)
 		for (auto& chd : nodes)
 			if (!done.count(chd) || cb_revisit(chd)) 
-				ret &= _traverse(g, chd, done, cb_enter, cb_exit,
-					cb_revisit, cb_ambig);
+				ret &= _traverse(g, chd, done, cb_enter,
+					cb_exit, cb_revisit, cb_ambig);
 #ifdef DEBUG_TRAVERSE
-	std::cout << "exit: \t" << root.first.to_std_string() << std::endl;
+	std::cout << "exit: \t" << root.first.to_std_string() << "\n";
 #endif
 	cb_exit(root, choosen_pack);
 	return ret;
