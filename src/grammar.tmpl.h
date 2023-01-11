@@ -429,8 +429,15 @@ bool grammar<CharT>::conjunctive(size_t p) const {
 	return conjunctives.find(p) != conjunctives.end();
 }
 template <typename CharT>
-size_t grammar<CharT>::char_class_check(literal l, CharT ch) {
+bool grammar<CharT>::char_class_check(literal l, CharT ch) const
+{
 	//DBG(std::cout << "char_class_check: " << l.n() << std::endl;)
+	auto& x = cc_fns.ps[l.n()];
+	return (x.find(ch) == x.end()) && !cc_fns.fns[l.n()](ch);
+}
+template <typename CharT>
+size_t grammar<CharT>::get_char_class_production(literal l, CharT ch) {
+	//DBG(std::cout << "get_char_class_prod: " << l.n() << std::endl;)
 	auto& x = cc_fns.ps[l.n()];
 	auto it = x.find(ch);
 	if (it == x.end()) {

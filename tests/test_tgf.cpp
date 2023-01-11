@@ -112,7 +112,9 @@ int main() {
 	"	start  => [ '0' ]. \n"
 	, "")) fail();
 
-
+	if (!run_test(
+	"	start  => \"hi\". \n"
+	, "hi")) fail();
 
 	return failed ? 1 : 0;
 }

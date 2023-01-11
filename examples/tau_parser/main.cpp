@@ -16,26 +16,54 @@
 using namespace std;
 using namespace idni;
 
-
 typedef char char_t;
 
 struct tau_parser {
+	const char* tau_tgf =
+	"	@use_char_class eof, alpha, alnum, space, printable. "
+	// whitespace and comments
+	"\n	eol            => '\n' | '\r' | eof. "
+	"\n	ws             => ws_required | null. "
+	"\n	ws_required    => space ws | ws_comment ws. "
+	"\n	ws_comment     => '#' eol | '#' printable+ eol. "
+
+	"\n	tau            => tau ws \"&&\" ws tau "
+	"\n			| tau ws \"||\" ws tau "
+	"\n			| '!' ws tau "
+	"\n			| '(' ws tau ws ')' "
+	"\n			| \"ex\" ws_required var ws_required tau "
+	"\n			| \"all\" ws_required var ws_required tau "
+	"\n			| bf ws '=' ws bf "
+	"\n			| bf ws \"!=\" ws bf. "
+	"\n	bf             => bf ws '&' ws bf "
+	"\n			| bf ws '|' ws bf "
+	"\n			| '~' ws bf "
+	"\n			| bf ws '+' ws bf "
+	"\n			| '(' ws bf ws ')'  "
+	"\n			| var "
+	"\n			| const "
+	"\n			| macro. "
+	"\n	const          => {elem} | {tau} | '0' | '1'. "
+	"\n	var            => sym. "
+	"\n	sym            => chars. "
+	"\n	chars          => alpha | chars alnum. "
+	"\n	prefix         => \"@prefix\" { ws_required "
+	"\n				[ (\"all\" | \"ex\") ws_required ] "
+	"\n					var }. "
+	"\n	arg            => var | const | macro. "
+	"\n	macro_sgn      => sym ws '(' ws [ arg ws {',' ws arg ws} ] ')'. "
+	"\n	macro_def      => macro_sgn ws \":=\" ws bf."
+	"\n	macro          => macro_sgn. "
+
+	"\n	statement      => prefix | macro_def | tau. "
+
+	"\n	start          => (ws statement ws '.')* ws. "
+	;
 	tau_parser() :
-		cc(predefined_char_classes<char_t>({ "eof",
-				"digit", "space", "printable" }, nts)),
-		addsub(nt("addsub")), digit(nt("digit")), eof(nt("eof")),
-		eol(nt("eol")), expr_op(nt("expr_op")), expr(nt("expr")),
-		factor(nt("factor")), integer(nt("integer")),
-		integer_rest(nt("integer_rest")), muldiv(nt("muldiv")),
-		printable(nt("printable")),
-		printable_chars(nt("printable_chars")),
-		printable_chars1(nt("printable_chars1")),
-		sign(nt("sign")), space(nt("space")), start(nt("start")),
-		statement(nt("statement")), statements(nt("statements")),
-		statements1(nt("statements1")), term(nt("term")),
-		term_op(nt("term_op")), ws_comment(nt("ws_comment")),
-		ws_required(nt("ws_required")), ws(nt("ws")),
-		g(nts, ba_prods(), start, cc), p(g) { }
+		g(tgf<char_t>::from_string(nts, tau_tgf)), p(g) {
+			DBG(g.print_internal_grammar(
+				cout << "parsed grammar rules: \n") << "\n";)
+		}
 	bool eval(const string& s) {
 		auto f = p.parse(s.c_str(), s.size());
 		if (!p.found()) { 
@@ -45,51 +73,17 @@ struct tau_parser {
 		}
 		auto next_g = [](parser<char_t>::pforest::graph &fg) {
 			auto tree = fg.extract_trees();
-			tree->to_print(cout) << "\n";
-			return false;
+			tree->to_print(cout << "\n\n------\n"), cout << endl;
+			return true;
 		};
-		f->extract_graphs( f->root(), next_g);
+		f->extract_graphs(f->root(), next_g);
 		return true;
 	}
 private:
 	nonterminals<char_t> nts{};
-	char_class_fns<char_t> cc;
-	prods<char_t> null_{'\0'},
-		addsub, digit, eof, eol, expr_op, expr, factor, integer,
-		integer_rest, muldiv, printable, printable_chars,
-		printable_chars1, sign, space, start, statement, statements,
-		statements1, term, term_op, ws_comment, ws_required, ws;
 	grammar<char_t> g;
 	parser<char_t> p;
-	lit<char_t> nt(const string& s){ return lit<char_t>{nts.get(s),&nts}; };
-	prods<char_t> ba_prods() {
-		prods<char_t> q, hash{'#'}, cr{'\r'}, nl{'\n'}, plus{'+'},
-			star{'*'}, lparen{'('};
-		q(ws_comment,       (hash + eol) |
-					(hash + printable_chars + eol));
-		q(ws_required,      (space + ws) | (ws_comment + ws));
-		q(ws,               ws_required | null_);
-		q(eol,              cr | nl | eof);
-		q(printable_chars,  printable + printable_chars1);
-		q(printable_chars1, (printable + printable_chars1) | null_);
-		q(sign,             plus | '-');
-		q(integer,          digit + integer_rest);
-		q(integer_rest,     (digit + integer_rest) | null_);
-		q(expr,             expr_op | term);
-		q(term,             term_op | factor);
-		q(expr_op,          expr + ws + addsub + ws + term);
-		q(term_op,          term + ws + muldiv + ws + factor);
-		q(addsub,           plus | '-');
-		q(muldiv,           star | '/');
-		q(factor,           (lparen + ws + expr + ws + ')') |
-					integer | (sign + ws + factor));
-		q(statement,        ws + expr);
-		q(statements,       statement + statements1);
-		q(statements1,      (eol + statement + statements1) | null_);
-		q(start,            (statements + ws) | null_);
-		return q;
-	}
-	
+	size_t id(const string& s) { return nts.get(s); }
 };
 
 int main() {

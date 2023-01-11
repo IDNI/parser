@@ -188,9 +188,11 @@ struct grammar {
 	bool nullable(literal l) const;
 	bool conjunctive(size_t p) const;
 	// checks if the char class function returns true on the char ch
-	// if true then adds new production rule: name-of-cc_fn => ch.
-	// returns id of the production rule or (size_t)-1 if the check fails
-	size_t char_class_check(literal l, CharT ch);
+	bool char_class_check(literal l, CharT ch) const;
+	// does the same check as char_class_check and if the check is true then
+	// it adds new rule: "cc_fn_name => ch." into the grammar
+	// returns id of the rule or (size_t)-1 if the check fails
+	size_t get_char_class_production(literal l, CharT ch);
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
 	ostream_t& print_internal_grammar(ostream_t& os, std::string prep = {})
 		const;

@@ -125,7 +125,7 @@ void parser<CharT>::scan_cc_function(const item&i, size_t n, CharT ch) {
 	size_t p = 0; // character's prod rule
 	lit<CharT> l = get_lit(i);
 	bool eof = ch == e;
-	p = g.char_class_check(l, ch);
+	p = g.get_char_class_production(l, ch);
 	if (p == static_cast<size_t>(-1)) return;
 	item j(n + (eof ? 0 : 1), i.prod, i.con, n, 1); // complete char fn
 	S[j.set].insert(j);
@@ -172,7 +172,7 @@ template <typename CharT>
 std::string parser<CharT>::perror_t::to_str(){
 	std::stringstream ss;
 	ss << "\nSyntax Error: Unexpected \""<< unexp << "\" close to position "
-	<< loc << " near \"" << ctxt << "\""<< endl;
+	<< loc << " near \"" << ctxt << "\" at line " << line << endl;
 	for( auto& e: expv){
 		ss <<" ..expecting \""<<e.exp <<"\" due to ["<< e.prod_nt << 
 		"->"<< e.prod_body <<"]"<<endl;
@@ -182,7 +182,6 @@ std::string parser<CharT>::perror_t::to_str(){
 
 template <typename CharT>
 typename parser<CharT>::perror_t parser<CharT>::get_error(){
-	
 	perror_t err;
 	auto near_ctxt = [this](int_t from, int_t pos){	
 		std::string errctxt;
@@ -193,7 +192,7 @@ typename parser<CharT>::perror_t parser<CharT>::get_error(){
 	};
 	// find error location and build error stream
 	std::stringstream es;
-	for( int_t i = (int_t)l; i >= 0; i-- )
+	for (int_t i = (int_t)l; i >= 0; i--)
 		if(S[i].size()) {
 			size_t from = 0;
 			// smallest length item that may be used as delimiter
@@ -218,7 +217,10 @@ typename parser<CharT>::perror_t parser<CharT>::get_error(){
 			err.loc = i;
 			err.ctxt = near_ctxt(from, i);
 			break;
-		} 
+		}
+	err.line = 1;
+	for (int_t j = 0; err.loc > -1 && j != err.loc; ++j)
+		if (at(j) == (CharT) '\n') err.line++;
 	return err;
 }
 template <typename CharT>

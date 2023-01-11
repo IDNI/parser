@@ -120,6 +120,10 @@ struct tgf {
 				//DBG(std::cout << "add_terminal: " << to_std_string(ch) << std::endl;)
 				add_literal(lit<CharT>{ch});
 			}
+			void add_terminals(const string& s) {
+				//DBG(std::cout << "add_terminals: " << to_std_string(s) << std::endl;)
+				for (const auto& ch : s) add_terminal(ch);
+			}
 			void directive() {
 				in_directive = false;
 			}
@@ -242,7 +246,7 @@ struct tgf {
 						default: str = str[1];
 					}
 					x.add_terminal(str[0]);
-				} else x.add_nonterminal(str);
+				} else x.add_terminals(str);
 			}
 		};
 		auto cb_exit = [&x, this](const auto& n, const auto&) {
