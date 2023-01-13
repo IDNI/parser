@@ -35,7 +35,7 @@ struct forest {
 	struct tree {
 		node value;
 		std::vector<std::shared_ptr<struct tree>> child;
-		ostream_t& to_print(ostream_t &os, size_t l = 0) {
+		std::ostream& to_print(std::ostream &os, size_t l = 0) {
 			os << "\n";
 			for (size_t t = 0; t < l; t++) os << " ";
 			os << value.first;
@@ -139,7 +139,7 @@ struct forest {
 		return traverse(cb_enter, cb_exit, cb_revisit, no_ambig);
 	}
 #ifdef DEBUG
-	ostream_t& print_data(ostream_t& os) const;
+	std::ostream& print_data(std::ostream& os) const;
 #endif
 private:
 	template <typename cb_enter_t, typename cb_exit_t,
@@ -157,7 +157,7 @@ private:
 
 #ifdef DEBUG
 template <typename NodeT>
-ostream_t& forest<NodeT>::print_data(ostream_t& os) const {
+std::ostream& forest<NodeT>::print_data(std::ostream& os) const {
 	os << "number of nodes: " << g.size() << endl;
 	for (const auto& n : g) {
 		os << n.first.first.to_std_string() << "\n";

@@ -19,6 +19,7 @@ option(BUILD_TESTS "build library tests" TRUE)
 option(BUILD_STATIC_LIBRARY "build static library" TRUE)
 option(BUILD_SHARED_LIBRARY "build shared library" TRUE)
 option(BUILD_EXAMPLES "build examples" TRUE)
+option(BUILD_TOOLS "build library tools" TRUE)
 set(BUILD_EXECUTABLE FALSE)
 set(BUILD_SHARED_EXECUTABLE FALSE)
 if(BUILD_TESTS)
@@ -32,6 +33,7 @@ message(STATUS "BUILD_STATIC_LIBRARY: ${BUILD_STATIC_LIBRARY}")
 message(STATUS "BUILD_SHARED_LIBRARY: ${BUILD_SHARED_LIBRARY}")
 message(STATUS "BUILD_TESTS: ${BUILD_TESTS}")
 message(STATUS "BUILD_EXAMPLES: ${BUILD_EXAMPLES}")
+message(STATUS "BUILD_TOOLS: ${BUILD_TOOLS}")
 ################################################################################
 
 # public headers and sources
@@ -72,5 +74,9 @@ endif()
 if(BUILD_TESTS)
 	add_subdirectory(tests)
 endif()	
+
+if(BUILD_TOOLS)
+	add_subdirectory(tools)
+endif()
 
 include(installation)

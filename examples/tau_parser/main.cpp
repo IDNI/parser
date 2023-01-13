@@ -51,12 +51,11 @@ struct tau_parser {
 	"\n				[ (\"all\" | \"ex\") ws_required ] "
 	"\n					var }. "
 	"\n	arg            => var | const | macro. "
-	"\n	macro_sgn      => sym ws '(' ws [ arg ws {',' ws arg ws} ] ')'. "
+	"\n	macro_sgn      => sym ws '(' ws [ arg ws {',' ws arg ws} ] ')'."
 	"\n	macro_def      => macro_sgn ws \":=\" ws bf."
 	"\n	macro          => macro_sgn. "
 
 	"\n	statement      => prefix | macro_def | tau. "
-
 	"\n	start          => (ws statement ws '.')* ws. "
 	;
 	tau_parser() :

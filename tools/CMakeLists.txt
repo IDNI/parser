@@ -1,11 +1,8 @@
-set(EXAMPLES
-	basic_arithmetic
-	basic_arithmetic_tgf
-	tau_parser
-	tml_parser
+set(TOOLS
+	parser_gen
 )
 
-foreach(X IN LISTS EXAMPLES)
+foreach(X IN LISTS TOOLS)
 	add_executable(${X})
 	target_setup(${X})
 	target_sources(${X} PRIVATE ${X}/main.cpp)

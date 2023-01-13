@@ -25,21 +25,18 @@ struct lit;
 template <typename CharT>
 struct nonterminals : public std::vector<std::basic_string<CharT>> {
 	typedef CharT char_t;
-	typedef std::basic_string<CharT> string;
-	typedef std::vector<string> strings;
-	typedef std::function<lit<CharT>(const string& s)> lit_maker_t;
-	std::map<string, size_t> m;
-	size_t get(const string& s);
-	const string& get(size_t n) const;
-	lit<CharT> operator()(const string& s);
+	typedef std::function<lit<CharT>(const std::basic_string<CharT>& s)>
+								lit_maker_t;
+	std::map<std::basic_string<CharT>, size_t> m;
+	size_t get(const std::basic_string<CharT>& s);
+	const std::basic_string<CharT>& get(size_t n) const;
+	lit<CharT> operator()(const std::basic_string<CharT>& s);
 };
 
 // literal containing terminal (c where if c = 0 then null) or nonterminal (n)
 template <typename CharT>
 struct lit : public std::variant<size_t, CharT> {
 	typedef CharT char_t;
-	typedef std::basic_string<CharT> string;
-	typedef std::vector<string> strings;
 	typedef std::variant<size_t, CharT> lit_t;
 	using typename lit_t::variant;
 	nonterminals<CharT>* nts = 0;
@@ -50,22 +47,26 @@ struct lit : public std::variant<size_t, CharT> {
 	bool  nt() const { return std::holds_alternative<size_t>(*this);}
 	size_t n() const { return std::get<size_t>(*this); }
 	CharT  c() const { return std::get<CharT>(*this); }
-	string to_string(const string& nll = {}) const;
-	std::string to_std_string(const string& nll = {}) const {
+	std::basic_string<CharT> to_string(
+		const std::basic_string<CharT>& nll = {}) const;
+	std::string to_std_string(
+		const std::basic_string<CharT>& nll = {}) const
+	{
 		return idni::to_std_string(to_string(nll));
 	}
+	bool is_null() const { return c() == (CharT)0; }
 	bool operator<(const lit& l) const;
 	bool operator==(const lit& l) const;
 };
 
-// alt as a vector of literals which should match to the parser item.
+// lits as a vector of literals which should match to the parser item.
 template <typename CharT>
-struct alt : public std::vector<lit<CharT>> {
+struct lits : public std::vector<lit<CharT>> {
 	bool neg = false;
 };
 
 template <typename CharT>
-using clause = std::set<alt<CharT>>; // conjunctions of alts
+using clause = std::set<lits<CharT>>; // conjunctions of literals
 template <typename CharT>
 using dnf = std::set<clause<CharT>>; // disjunctions of conjunctions
 template <typename CharT>
@@ -79,10 +80,10 @@ struct prods : public std::vector<prod<CharT>> { // productions
 	prods(const std::basic_string<CharT>& s) : prods_t() { (*this)(s); }
 	void operator()(const lit<CharT>& l) {
 		this->emplace_back(lit<CharT>{},
-			dnf<CharT>{clause<CharT>{alt<CharT>({l})}});
+			dnf<CharT>{clause<CharT>{lits<CharT>({l})}});
 	}
 	void operator()(const std::basic_string<CharT>& s) {
-		alt<CharT> a;
+		lits<CharT> a;
 		for (const CharT& c : s) a.emplace_back(c);
 		this->emplace_back(lit<CharT>{},
 			dnf<CharT>{clause<CharT>{a}});
@@ -163,17 +164,20 @@ template <typename CharT>
 struct parser;
 
 template <typename CharT>
+struct grammar_inspector;
+
+template <typename CharT>
 struct grammar {
 	friend parser<CharT>;
+	friend grammar_inspector<CharT>;
 	typedef CharT char_t;
-	typedef std::basic_string<CharT> string;
-	typedef std::vector<string> strings;
 	typedef lit<CharT> literal;
-	typedef alt<CharT> literals;
+	typedef lits<CharT> literals;
 	typedef std::vector<literals> conjunctions;
 	typedef std::pair<literal, conjunctions> production;
 	typedef std::vector<production> productions;
 
+	grammar(nonterminals<CharT>& nts) : nts(nts) {}
 	grammar(nonterminals<CharT>& nts, const prods<CharT>& ps,
 		const prods<CharT>& start, const char_class_fns<CharT>& cc_fns);
 	// returns number of productions (every disjunction has a prod rule)
@@ -194,10 +198,9 @@ struct grammar {
 	// returns id of the rule or (size_t)-1 if the check fails
 	size_t get_char_class_production(literal l, CharT ch);
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
-	ostream_t& print_internal_grammar(ostream_t& os, std::string prep = {})
-		const;
-	ostream_t& print_data(ostream_t& os, std::string prep = {})
-		const;
+	std::ostream& print_internal_grammar(std::ostream& os,
+		std::string prep = {}) const;
+	std::ostream& print_data(std::ostream& os, std::string prep = {}) const;
 #endif
 private:
 	nonterminals<CharT>& nts;
@@ -208,7 +211,7 @@ private:
 	std::set<size_t> conjunctives = {};
 	productions G;
 	literal nt(size_t n);
-	literal nt(const string& s);
+	literal nt(const std::basic_string<CharT>& s);
 	bool all_nulls(const literals& a) const;
 };
 

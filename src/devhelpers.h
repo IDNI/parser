@@ -16,24 +16,24 @@
 namespace idni {
 
 template <typename CharT>
-bool to_tml_facts(ostream_t& os, const typename parser<CharT>::pforest& f);
+bool to_tml_facts(std::ostream& os, const typename parser<CharT>::pforest& f);
 template <typename CharT>
-bool to_dot(ostream_t& os, const typename parser<CharT>::pforest& f,
+bool to_dot(std::ostream& os, const typename parser<CharT>::pforest& f,
 	const std::string& inputstr = "",
 	const std::string& grammar_text = "");
 template <typename CharT, typename P>
-bool to_dot(ostream_t& os, P& g,
+bool to_dot(std::ostream& os, P& g,
 	const std::string& inputstr = "",
 	const std::string& grammar_text = "");
 template <typename CharT>
-bool to_tml_rules(ostream_t& os, const typename parser<CharT>::pforest& f);
+bool to_tml_rules(std::ostream& os,const typename parser<CharT>::pforest& f);
 template <typename CharT, typename P = parser<CharT>::pnode_graph>
-bool to_tml_rules(ostream_t& os, P& g);
+bool to_tml_rules(std::ostream& os, P& g);
 template<typename CharT>
 std::string to_tml_rule(const typename parser<CharT>::pnode& nd);
 //------------------------------------------------------------------------------
 template <typename CharT>
-bool to_dot(ostream_t& ss, const typename parser<CharT>::pforest& f,
+bool to_dot(std::ostream& ss, const typename parser<CharT>::pforest& f,
 	const std::string& inputstr,
 	const std::string& grammar_text)
 {
@@ -41,7 +41,7 @@ bool to_dot(ostream_t& ss, const typename parser<CharT>::pforest& f,
 }
 
 template <typename CharT, typename P>
-bool to_dot(ostream_t& ss, P& g, const std::string& inputstr,
+bool to_dot(std::ostream& ss, P& g, const std::string& inputstr,
 	const std::string& grammar_text)
 {
 	auto dot_safe = [](const std::string &s) {
@@ -134,7 +134,7 @@ bool to_dot(ostream_t& ss, P& g, const std::string& inputstr,
 	}
 }
 template <typename CharT>
-bool to_tml_facts(ostream_t& ss, const typename parser<CharT>::pforest& f) {
+bool to_tml_facts(std::ostream& ss, const typename parser<CharT>::pforest& f) {
 	auto n_e = f.get_nodes_and_edges();
 	auto& n = n_e.first;
 	auto& e = n_e.second;
@@ -154,11 +154,11 @@ std::string to_tml_rule(const typename parser<CharT>::pnode& nd)
 	return ss.str();
 }
 template <typename CharT>
-bool to_tml_rules(ostream_t& ss, const typename parser<CharT>::pforest& f) {
+bool to_tml_rules(std::ostream& ss, const typename parser<CharT>::pforest& f) {
 	return to_tml_rules<CharT>(ss, f.g);
 }
 template <typename CharT, typename P>
-bool to_tml_rules(ostream_t& ss, P& g) {
+bool to_tml_rules(std::ostream& ss, P& g) {
 	std::set<std::string> terminals;
 	for (auto &it : g) {
 		for (auto &pack : it.second) { 

@@ -10,34 +10,16 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#ifndef __IDNI__PARSER__DEFS_H__
-#define __IDNI__PARSER__DEFS_H__
 #include <cassert>
-#include <vector>
-#include <map>
-#include <set>
-#include <string>
-#include <variant>
-#include <functional>
-#include <memory>
-#include <iostream>
-namespace idni {
+#include <string.h>
+#include <fstream>
+#include "parser_gen.h"
+using namespace std;
+using namespace idni;
 
-#define DEFAULT_BIN_LR false
-#define DEFAULT_INCR_GEN_FOREST false
-
-#ifdef DEBUG
-#define DBG(x) x
-#else
-#define DBG(x)
-#endif
-#ifdef MEASURE
-#define MS(x) x
-#else
-#define MS(x)
-#endif
-
-typedef int32_t int_t;
-
-} // idni namespace
-#endif // __IDNI__PARSER__DEFS_H__
+int main(int argc, char** argv) {
+	if (argc != 3) return cerr << argv[0] <<
+		": requires 2 arguments: parser_name and a tgf_filename\n", 1;
+	string parser_name(argv[1]), tgf_filename(argv[2]);
+	generate_parser_cpp<char32_t>(cout, parser_name, tgf_filename);
+}

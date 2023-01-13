@@ -16,11 +16,11 @@ using namespace std;
 namespace idni {
 
 template <typename CharT>
-ostream_t& operator<<(ostream_t& os, const lit<CharT>& l) {
+std::ostream& operator<<(std::ostream& os, const lit<CharT>& l) {
 	return os << l.to_std_string();
 }
 template <typename CharT>
-ostream_t& operator<<(ostream_t& os, const alt<CharT>& a) {
+std::ostream& operator<<(std::ostream& os, const lits<CharT>& a) {
 	size_t n = 0;
 	if (a.neg) os << "~(";
 	for (const lit<CharT>& l : a) if (os << l; ++n != a.size()) os << " ";
@@ -28,23 +28,23 @@ ostream_t& operator<<(ostream_t& os, const alt<CharT>& a) {
 	return os;
 }
 template <typename CharT>
-ostream_t& operator<<(ostream_t& os, const clause<CharT>& c) {
+std::ostream& operator<<(std::ostream& os, const clause<CharT>& c) {
 	size_t n = 0;
 	if (c.size()) os << "(";
-	for (const alt<CharT>& a : c)
+	for (const lits<CharT>& a : c)
 		if (os << a; ++n != c.size()) os << " & ";
 	if (c.size()) os << ")";
 	return os;
 }
 template <typename CharT>
-ostream_t& operator<<(ostream_t& os, const dnf<CharT>& d) {
+std::ostream& operator<<(std::ostream& os, const dnf<CharT>& d) {
 	size_t n = 0;
 	for (const clause<CharT>& c : d)
 		if (os << c; ++n != d.size()) os << " | ";
 	return os;
 }
 template <typename CharT>
-ostream_t& operator<<(ostream_t& os, const prods<CharT>& p) {
+std::ostream& operator<<(std::ostream& os, const prods<CharT>& p) {
 	for (size_t n = 0; n != p.size(); ++n)
 		os << '\t' << p.at(n).first.to_std_string() << " => " <<
 			p.at(n).second << '.' << endl;
@@ -54,32 +54,31 @@ ostream_t& operator<<(ostream_t& os, const prods<CharT>& p) {
 //-----------------------------------------------------------------------------
 
 template <typename CharT>
-size_t nonterminals<CharT>::get(const string& s) {
+size_t nonterminals<CharT>::get(const std::basic_string<CharT>& s) {
 	if (auto it = m.find(s); it != m.end())
 		return it->second;
 	return m.emplace(s, this->size()),
 		this->push_back(s), this->size() - 1;
 }
 template <typename CharT>
-const typename nonterminals<CharT>::string& nonterminals<CharT>::get(size_t n)
-	const
-{
+const std::basic_string<CharT>& nonterminals<CharT>::get(size_t n) const {
 	assert(n < this->size());
 	return this->at(n);
 }
 
 template <typename CharT>
-lit<CharT> nonterminals<CharT>::operator()(
-	const typename nonterminals<CharT>::string& s)
-{
+lit<CharT> nonterminals<CharT>::operator()(const std::basic_string<CharT>& s) {
 	return lit<CharT>{ get(s), &*this };
 }
 
 //-----------------------------------------------------------------------------
 
 template <typename CharT>
-typename lit<CharT>::string lit<CharT>::to_string(const string& nll) const {
-	return nt() ? nts->get(n()) : c() == (CharT)0 ? nll : string{c()};
+std::basic_string<CharT> lit<CharT>::to_string(
+	const std::basic_string<CharT>& nll) const
+{
+	return nt() ? nts->get(n())
+		: c() == (CharT)0 ? nll : std::basic_string<CharT>{ c() };
 }
 template <typename CharT>
 bool lit<CharT>::operator<(const lit& l) const {
@@ -97,23 +96,23 @@ bool lit<CharT>::operator==(const lit& l) const {
 //-----------------------------------------------------------------------------
 
 template <typename CharT>
-alt<CharT> operator+(const lit<CharT>& x, const lit<CharT>& y) {
-	return alt<CharT>({ x, y });
+lits<CharT> operator+(const lit<CharT>& x, const lit<CharT>& y) {
+	return lits<CharT>({ x, y });
 }
 template <typename CharT>
-alt<CharT> operator+(const alt<CharT>& x, const lit<CharT>& l) {
-	alt<CharT> a(x);
+lits<CharT> operator+(const lits<CharT>& x, const lit<CharT>& l) {
+	lits<CharT> a(x);
 	return a.push_back(l), a;
 }
 template <typename CharT>
-alt<CharT> operator+(const alt<CharT>& x, const alt<CharT>& y) {
-	alt<CharT> a(x);
+lits<CharT> operator+(const lits<CharT>& x, const lits<CharT>& y) {
+	lits<CharT> a(x);
 	for (const lit<CharT>& l : y) a.push_back(l);
 	return a;
 }
 template <typename CharT>
-alt<CharT> operator~(const alt<CharT>& x) {
-	alt<CharT> r(x);
+lits<CharT> operator~(const lits<CharT>& x) {
+	lits<CharT> r(x);
 	return r.neg = !x.neg, r;
 }
 
@@ -121,14 +120,14 @@ alt<CharT> operator~(const alt<CharT>& x) {
 
 template <typename CharT>
 bool operator<=(const clause<CharT>& x, const clause<CharT>& y) {
-	for (const alt<CharT>& a : x) if (y.find(a) == y.end()) return false;
+	for (const lits<CharT>& a : x) if (y.find(a) == y.end()) return false;
 	return true;
 }
 template <typename CharT>
 clause<CharT> simplify(const clause<CharT>& c) {
-	for (alt<CharT> na : c) {
+	for (lits<CharT> na : c) {
 		na.neg = !na.neg;
-		for (const alt<CharT>& a : c) if (a.neg == na.neg && a == na) {
+		for (const lits<CharT>& a : c) if (a.neg == na.neg && a == na) {
 			//cout << "simplified to {} a["<<a<<"] == na["<<na<<"]\n";
 			return {};
 		}
@@ -143,8 +142,8 @@ clause<CharT> operator&(const clause<CharT>& x, const clause<CharT>& y) {
 template <typename CharT>
 clause<CharT> operator+(const clause<CharT>& x, const clause<CharT>& y) {
 	clause<CharT> r;
-	for (const alt<CharT>& a : x)
-		for (const alt<CharT>& b : y) r.insert(a + b);
+	for (const lits<CharT>& a : x)
+		for (const lits<CharT>& b : y) r.insert(a + b);
 	return simplify<CharT>(r);
 }
 
@@ -205,7 +204,7 @@ dnf<CharT> operator+(const dnf<CharT>& x, const dnf<CharT>& y) {
 template <typename CharT>
 dnf<CharT> operator~(const clause<CharT>& x) {
 	dnf<CharT> r;
-	for (const alt<CharT>& a : x) r.insert(clause<CharT>{~a});
+	for (const lits<CharT>& a : x) r.insert(clause<CharT>{~a});
 	//cout << "\nnegating clause: " << x << " to: " << r << endl;
 	return r;
 }
@@ -448,7 +447,7 @@ size_t grammar<CharT>::get_char_class_production(literal l, CharT ch) {
 	} else return it->second;
 }
 template <typename CharT>
-bool grammar<CharT>::all_nulls(const alt<CharT>& a) const {
+bool grammar<CharT>::all_nulls(const lits<CharT>& a) const {
 	for (size_t k = 0; k != a.size(); ++k)
 		if ((!a[k].nt() && a[k].c() != (CharT) 0) || (a[k].nt() &&
 			nullables.find(a[k].n()) == nullables.end()))
@@ -460,13 +459,15 @@ typename grammar<CharT>::literal grammar<CharT>::nt(size_t n) {
 	return literal(n, &nts);
 }
 template <typename CharT>
-typename grammar<CharT>::literal grammar<CharT>::nt(const string& s) {
+typename grammar<CharT>::literal grammar<CharT>::nt(
+	const std::basic_string<CharT>& s)
+{
 	return nt(nts.get(s));
 }
 
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
 template<typename CharT>
-ostream_t& grammar<CharT>::print_internal_grammar(ostream_t& os,
+std::ostream& grammar<CharT>::print_internal_grammar(std::ostream& os,
 	std::string prep) const
 {
 	for (size_t i = 0; i != G.size(); ++i) {
@@ -487,7 +488,9 @@ ostream_t& grammar<CharT>::print_internal_grammar(ostream_t& os,
 	return os;
 }
 template<typename CharT>
-ostream_t& grammar<CharT>::print_data(ostream_t& os, std::string prep) const {
+std::ostream& grammar<CharT>::print_data(std::ostream& os, std::string prep)
+	const
+{
 	os << "nonterminals:\n";
 	for (size_t i = 0; i != nts.size(); ++i)
 		os << prep << i << ": " << to_std_string(nts[i]) <<

@@ -28,11 +28,6 @@ template <typename CharT>
 class parser {
 public:
 	typedef CharT char_t;
-	typedef std::basic_stringstream<CharT> stringstream;
-	typedef std::basic_istream<CharT> istream;
-	typedef std::basic_ostream<CharT> ostream;
-	typedef std::basic_string<CharT> string;
-	typedef std::vector<string> strings;
 	struct options {
 		bool bin_lr = DEFAULT_BIN_LR;
 		bool incr_gen_forest = DEFAULT_INCR_GEN_FOREST;
@@ -54,20 +49,21 @@ public:
 	typedef pforest::sptree psptree;
 	typedef std::map<std::pair<size_t, size_t>,std::set<item>> conjunctions;
 	parser(grammar<CharT>& g, const options& o = {});
-	parser(const string& s, grammar<CharT>& g, const options& o = {});
-	parser(const string& s, const options& o = {});
+	parser(const std::basic_string<CharT>& s, grammar<CharT>& g,
+						const options& o = {});
+	parser(const std::basic_string<CharT>& s, const options& o = {});
 	~parser() { if (d!=0 && reads_mmap) munmap(const_cast<CharT*>(d), l); }
 	std::unique_ptr<pforest> parse(const CharT* data, size_t size = 0,
 		CharT eof = std::char_traits<CharT>::eof());
 	std::unique_ptr<pforest> parse(int filedescriptor, size_t size = 0,
 		CharT eof = std::char_traits<CharT>::eof());
-	std::unique_ptr<pforest> parse(istream& is, size_t size = 0,
-		CharT eof = std::char_traits<CharT>::eof());
+	std::unique_ptr<pforest> parse(std::basic_istream<CharT>& is,
+		size_t size = 0, CharT eof = std::char_traits<CharT>::eof());
 	bool found();
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
-	ostream_t& print(ostream_t& os, const item& i) const;
-	ostream_t& print_data(ostream_t& os) const;
-	ostream_t& print_S(ostream_t& os) const;
+	std::ostream& print(std::ostream& os, const item& i) const;
+	std::ostream& print_data(std::ostream& os) const;
+	std::ostream& print_S(std::ostream& os) const;
 #endif
 	struct hasher_t {
 		size_t hash_size_t(const size_t &val) const;
@@ -78,6 +74,7 @@ public:
 	struct perror_t{
 		int_t loc;	// location of error
 		size_t line;    // line of error
+		size_t col;     // column of error
 		std::string ctxt; // closest matching ctxt
 		std::string unexp; // unexpected character
 		typedef struct _exp_prod {
@@ -137,9 +134,9 @@ private:
 	std::unique_ptr<pforest> _parse();
 #ifdef DEBUG
 	template <typename CharU>
-	friend ostream_t& operator<<(ostream_t& os, lit<CharT>& l);
+	friend std::ostream& operator<<(std::ostream& os, lit<CharT>& l);
 	template <typename CharU>
-	friend ostream_t& operator<<(ostream_t& os, const std::vector<lit<CharT>>& v);
+	friend std::ostream& operator<<(std::ostream& os, const std::vector<lit<CharT>>& v);
 #endif
 };
 
@@ -156,9 +153,9 @@ int_t flatten_to_int(const typename parser<CharT>::pforest& f,
 
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
 template<typename CharT>
-ostream_t& print_grammar(ostream_t& os, const grammar<CharT>& g);
+std::ostream& print_grammar(std::ostream& os, const grammar<CharT>& g);
 template<typename CharT>
-ostream_t& print_dictmap(ostream_t& os,
+std::ostream& print_dictmap(std::ostream& os,
 	const std::map<typename parser<CharT>::string, size_t>& dm);
 #endif
 

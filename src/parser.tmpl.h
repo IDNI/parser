@@ -16,7 +16,7 @@
 namespace idni {
 
 template <typename CharT>
-typename parser<CharT>::ostream& flatten(typename parser<CharT>::ostream& os,
+std::basic_ostream<CharT>& flatten(std::basic_ostream<CharT>& os,
 	const typename parser<CharT>::pforest& f,
 	const typename parser<CharT>::pnode& root)
 {
@@ -27,10 +27,10 @@ typename parser<CharT>::ostream& flatten(typename parser<CharT>::ostream& os,
 	return os;
 }
 template <typename CharT>
-typename parser<CharT>::string flatten(const typename parser<CharT>::pforest& f,
+std::basic_string<CharT> flatten(const typename parser<CharT>::pforest& f,
 	const typename parser<CharT>::pnode& root)
 {
-	typename parser<CharT>::stringstream ss;
+	std::basic_stringstream<CharT> ss;
 	flatten<CharT>(ss, f, root);
 	return ss.str();
 }
@@ -43,13 +43,13 @@ int_t flatten_to_int(
 }
 #ifdef DEBUG
 template <typename CharT>
-idni::ostream_t& operator<<(idni::ostream_t& os,
+std::ostream& operator<<(std::ostream& os,
 	const typename idni::parser<CharT>::lit& l)
 {
 	return os << l.to_string();
 }
 template <typename CharT>
-idni::ostream_t& operator<<(idni::ostream_t& os,
+std::ostream& operator<<(std::ostream& os,
 	const std::vector<typename idni::parser<CharT>::lit>& v)
 {
 	int i = 0;
@@ -59,7 +59,7 @@ idni::ostream_t& operator<<(idni::ostream_t& os,
 #endif
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
 template <typename CharT>
-ostream_t& parser<CharT>::print(ostream_t& os, const item& i) const {
+std::ostream& parser<CharT>::print(std::ostream& os, const item& i) const {
 	os << "I(" << i.prod << "." << i.con << ", " << i.dot << ", "
 		 << i.from << ", " << i.set << "):\t ";
 	//os << "g[i.prod].size():" << g[i.prod].size() << " ";
@@ -77,7 +77,7 @@ ostream_t& parser<CharT>::print(ostream_t& os, const item& i) const {
 	return os << ".";
 }
 template <typename CharT>
-ostream_t& parser<CharT>::print_S(ostream_t& os) const {
+std::ostream& parser<CharT>::print_S(std::ostream& os) const {
 	for (size_t n = 0; n != S.size(); ++n) {
 		os << "S["<<n<<"]:\n";
 		for(const item &x : S[n])
@@ -86,7 +86,7 @@ ostream_t& parser<CharT>::print_S(ostream_t& os) const {
 	return os;
 }
 template<typename CharT>
-ostream_t& parser<CharT>::print_data(ostream_t& os) const {
+std::ostream& parser<CharT>::print_data(std::ostream& os) const {
 	os << "S:\n";
 	for (auto& x : S) {
 		for (auto& y : x) {
@@ -106,7 +106,7 @@ ostream_t& parser<CharT>::print_data(ostream_t& os) const {
 	return os;
 }
 template<typename CharT>
-ostream_t& print_grammar(ostream_t& os,	const grammar<CharT>& g) {
+std::ostream& print_grammar(std::ostream& os,	const grammar<CharT>& g) {
 	for (size_t i = 0; i != g.size(); ++i) {
 		const auto& x = g[i];
 		for (const auto& y : x.second) {
@@ -121,7 +121,7 @@ ostream_t& print_grammar(ostream_t& os,	const grammar<CharT>& g) {
 	return os;
 }
 template<typename CharT>
-ostream_t& print_dictmap(ostream_t& os,
+std::ostream& print_dictmap(std::ostream& os,
 	const std::map<typename parser<CharT>::string, size_t>& dm)
 {
 	for (const auto& x : dm)

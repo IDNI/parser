@@ -25,7 +25,7 @@ struct basic_arithmetic {
 	"	integer      => digit+. "
 	"	expr1        => addsub | expr2. "
 	"	expr2        => muldiv | factor. "
-	"	addsub       => add | sub & ~sum. "
+	"	addsub       => add | sub & ~add. "
 	"	muldiv       => mul | div & ~mul. "
 	"	add          => expr1 ws '+' ws expr2. "
 	"	sub          => expr1 ws '-' ws expr2. "

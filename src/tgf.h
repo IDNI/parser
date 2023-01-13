@@ -12,6 +12,8 @@
 // modified over time by the Author.
 #ifndef __IDNI__PARSER__TGF_H__
 #define __IDNI__PARSER__TGF_H__
+#include <cstring>
+#include <fstream>
 #include "parser.h"
 namespace idni {
 
@@ -74,12 +76,30 @@ struct tgf {
 		ws_required(nt("ws_required")),
 		g(nts, setup_productions(), start, cc), p(g) { }
 	static grammar<CharT> from_string(nonterminals<CharT>& nts_,
-		const string& s, const string& start_nt = "start")
+		const string& s, const string& start_nt
+			= from_cstr<CharT>("start"))
 	{
 		tgf<CharT> f;
 		//DBG(f.g.print_data(cout << "\n>>>\n\n") << "\n<<<" << std::endl;)
 		return f.parse(nts_, s, start_nt);
 	}
+	static grammar<CharT> from_file(nonterminals<CharT>& nts_,
+		const std::string& filename, const string& start_nt
+			= from_cstr<CharT>("start"))
+	{
+		tgf<CharT> f;
+		ifstream ifs(filename);
+		if (!ifs) {
+			cerr << "Failed to open file '" << filename << "':"
+				<< strerror(errno) << endl;
+			return grammar<CharT>(nts_);
+		}
+		return f.parse(nts_, from_str<CharT>(std::string(
+				(istreambuf_iterator<char>(ifs)),
+				(istreambuf_iterator<char>()))
+			), start_nt);
+	}
+
 	grammar<CharT> parse(nonterminals<CharT>& nts_, const string& s,
 		const string& start_nt = "start")
 	{
@@ -94,13 +114,12 @@ struct tgf {
 			bool in_directive = false;
 			nonterminals<CharT>& nts;
 			char_class_fns<CharT> cc;
-			std::vector<alt<CharT>> f; // factors (with nesting) 
+			std::vector<lits<CharT>> f; // factors (with nesting) 
 			std::vector<ftype> ft;  // types of factors
 			context(nonterminals<CharT>& nts) : nts(nts) {}
 			size_t id = 0;          // id of the new term
 			lit<CharT> nt(const string& s) {
-				return lit<CharT>{
-					nts.get(from_str<CharT>(s)), &nts };
+				return lit<CharT>{ nts.get(s), &nts };
 			};
 			void add_literal(const lit<CharT>& l) {
 				//DBG(print_data();)
@@ -200,7 +219,9 @@ struct tgf {
 				std::basic_stringstream<CharT> s;
 				s << from_cstr<CharT>("_R") <<
 					p_head.to_string() <<
-					from_cstr<CharT>("_") << id++;
+					from_cstr<CharT>("_") <<
+					from_str<CharT>(::to_string(id++));
+				//cout << "new name: " << id << " " << to_std_string(s.str()) << "\n";
 				return s.str();
 			}
 #ifdef DEBUG
@@ -368,8 +389,8 @@ private:
 		q(quoted_char,      (apostrophe + char_ + apostrophe) |
 					quoted_char_esc);
 		q(quoted_char_esc,  apostrophe + U('\\') +
-					printable + apostrophe);
-		q(char_,            char0 | U("\\'") | U('"'));
+					char_ + apostrophe);
+		q(char_,            char0 | U("\\'") | U('"') | U("`"));
 		q(char0,            alnum | space | U('!') | U('#') | U('$') |
 					U('%') | U('&') | U('(') | U(')') |
 					U('*') | U('+') | U(',') | U('-') |

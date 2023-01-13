@@ -152,7 +152,7 @@ std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::parse(
 
 template <typename CharT>
 std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::parse(
-	istream& is, size_t size, CharT eof)
+	std::basic_istream<CharT>& is, size_t size, CharT eof)
 {
 	n = 0, e = eof, s = &is, max_length = size, l = 1, reads_stream = true;
 	//DBG(cout << "istream& l: " << l << endl;)
@@ -171,11 +171,11 @@ std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::parse(
 template <typename CharT>
 std::string parser<CharT>::perror_t::to_str(){
 	std::stringstream ss;
-	ss << "\nSyntax Error: Unexpected \""<< unexp << "\" close to position "
-	<< loc << " near \"" << ctxt << "\" at line " << line << endl;
-	for( auto& e: expv){
-		ss <<" ..expecting \""<<e.exp <<"\" due to ["<< e.prod_nt << 
-		"->"<< e.prod_body <<"]"<<endl;
+	ss << "\nSyntax Error: Unexpected \""<< unexp << "\"  at line " <<
+		line << ":" << col << " (" << loc << "):\n" << ctxt << " ...\n";
+	for (auto& e : expv){
+		ss << "\t...expecting \"" << e.exp << "\" due to [ " <<
+			e.prod_nt << "->" << e.prod_body << " ]" << endl;
 	}
 	return ss.str();
 }
@@ -215,12 +215,14 @@ typename parser<CharT>::perror_t parser<CharT>::get_error(){
 			}
 			err.unexp = to_std_string(at(i));
 			err.loc = i;
-			err.ctxt = near_ctxt(from, i);
 			break;
 		}
 	err.line = 1;
+	size_t line_loc = 0;
 	for (int_t j = 0; err.loc > -1 && j != err.loc; ++j)
-		if (at(j) == (CharT) '\n') err.line++;
+		if (at(j) == (CharT) '\n') err.line++, line_loc = j;
+	err.col = err.loc - line_loc + 1;
+	err.ctxt = near_ctxt(line_loc, err.loc);
 	return err;
 }
 template <typename CharT>
@@ -327,6 +329,7 @@ std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::_parse() {
 	auto nt = f->count_trees();
 	if (nt > 1) {
 		cout << "# parse trees: " << nt << "\n";
+#ifdef WITH_DEVHELPERS
 		static int_t c = 0;
 		std::stringstream ssf, ptd;
 		ssf<<"parse_rules"<<++c<<".tml";
@@ -348,6 +351,7 @@ std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::_parse() {
 			return true;
 		};
 		f->extract_graphs(f->root(), cb_next_graph);
+#endif
 	}
 #endif
 	return f;
@@ -393,7 +397,7 @@ void parser<CharT>::pre_process(const item &i) {
 					g[i.prod][i.con].begin() + i.dot);
 			lit<CharT> tlit;
 			if (bin_tnt.find(v) == bin_tnt.end()) {
-				stringstream ss;
+				std::basic_stringstream<CharT> ss;
 				ss << "temp" << tid++;
 				tlit = g.nt(ss.str());
 				bin_tnt.insert({ v, tlit });

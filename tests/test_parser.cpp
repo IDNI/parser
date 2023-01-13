@@ -11,14 +11,14 @@ static size_t stop_after = SIZE_MAX;
 
 template <typename CharT>
 int test_out(int c, const typename grammar<CharT>::grammar &g,
-			const std::basic_string<CharT> &inputstr,
-			const typename parser<CharT>::pforest &f)
+	const basic_string<CharT> &inputstr,
+	const typename parser<CharT>::pforest &f)
 {
 	stringstream ptd;
 	stringstream ssf;
 
 	g.print_internal_grammar(ssf, "\\l");
-	std::string s = ssf.str();
+	string s = ssf.str();
 	ssf.str({});
 
 	ssf << "graph" << c << ".dot";
@@ -80,9 +80,8 @@ int test_out(int c, const typename grammar<CharT>::grammar &g,
 }
 template <typename CharT>
 bool run_test(const prods<CharT> &ps, nonterminals<CharT> &nts,
-			  const prods<CharT> &start, const typename parser<CharT>::string &input,
-			  char_class_fns<CharT> cc = {}, bool dump = false,
-			  std::string contains = "")
+	const prods<CharT> &start, const basic_string<CharT> &input,
+	char_class_fns<CharT> cc = {}, bool dump = false, string contains = "")
 {
 	grammar<CharT> g(nts, ps, start, cc);
 	parser<CharT> e(g, options<CharT>);
@@ -119,7 +118,7 @@ int main(int argc, char **argv)
 	bool binlr = false;
 	bool incr_gen = false;
 	
-	std::vector<std::string> args(argv + 1, argv + argc);
+	vector<string> args(argv + 1, argv + argc);
 
 	for (auto opt : args)
 	{
@@ -234,7 +233,7 @@ int main(int argc, char **argv)
 	if (!run_test<char>(ps, nt, start, "1+++1")) fail();
 	ps.clear();
 
-	std::cout << "others" << endl;
+	cout << "others" << endl;
 
 	// conjunction + negation
 	ps(start, X & ~b);
