@@ -12,6 +12,8 @@
 // modified over time by the Author.
 #ifndef __IDNI__PARSER__DEVHELPERS_H__
 #define __IDNI__PARSER__DEVHELPERS_H__
+#include <sstream>
+#include <iomanip>
 #include "parser.h"
 namespace idni {
 
@@ -68,31 +70,35 @@ bool to_dot(std::ostream& ss, P& g, const std::string& inputstr,
 	ss << "\nnode" << "[ ordering =\"out\"];";
 	ss << "\ngraph" << "[ overlap =false, splines = true];";
 
-	if constexpr( std::is_same<P, typename parser<CharT>::psptree>::value ) {
-		stringstream pss;
+	if constexpr(std::is_same<P, typename parser<CharT>::psptree>::value) {
+		std::stringstream pss;
 		auto pointerid = [&pss]( auto &p){
 			pss << p;
-			string s = pss.str();
+			std::string s = pss.str();
 			pss.str({});
 			s[0]='_', s[1]='_';
 			return s;
 		};
 		std::deque<typename parser<CharT>::psptree> stk;
 		stk.push_back(g);
-		while( !stk.empty() ){
+		while (!stk.empty()){
 			typename parser<CharT>::psptree cur = stk.back();
 			stk.pop_back();
-			
-			if(!cur->value.first.nt()) continue;
+		
+			if (!cur->value.first.nt()) continue;
 			auto key = keyfun(cur->value);
-			ss << "\n" << pointerid(cur) << "["<<"label=\"" << key.second <<"\"];";
+			ss << "\n" << pointerid(cur) << "["<<"label=\"" <<
+				key.second << "\"];";
 			std::stringstream pstr;
 			for (auto & nn: cur->child) {
 				auto nkey = keyfun(nn->value);
-				ss << "\n" << pointerid(nn) << "[label=\"" << nkey.second << "\"];";
-				ss << "\n" << pointerid(cur) << "->" << pointerid(nn) << ';';
+				ss << "\n" << pointerid(nn) << "[label=\"" <<
+					nkey.second << "\"];";
+				ss << "\n" << pointerid(cur) << "->" <<
+					pointerid(nn) << ';';
 			}
-			stk.insert(stk.end(), cur->child.rbegin(), cur->child.rend());
+			stk.insert(stk.end(),
+				cur->child.rbegin(), cur->child.rend());
 			pstr.str({});
 		}
 		ss << "\n}\n";
@@ -105,23 +111,26 @@ bool to_dot(std::ostream& ss, P& g, const std::string& inputstr,
 		for (auto &it : g) {
 			auto key = keyfun(it.first);
 			std::string ctxt;
-			if constexpr ( std::is_same<P, typename parser<CharT>::pgraph>::value ) 
-				if(g.cycles.contains(it.first) ) ctxt="shape = doublecircle,";
-			
-			ss << "\n" << key.first << "["<< ctxt <<"label=\"" << key.second <<"\"];";
+			if constexpr(std::is_same<P, typename
+					parser<CharT>::pgraph>::value)
+				if (g.cycles.contains(it.first))
+					ctxt = "shape = doublecircle,";
+			ss << "\n" << key.first << "[" << ctxt << "label=\"" <<
+				key.second << "\"];";
 			size_t p = 0;
 			std::stringstream pstr;
 			for (auto &pack : it.second) {
 				pstr<<key.second<<p++;
-				auto ambkey = std::hash<std::string>()(pstr.str());
-				ss << "\n" << ambkey << "[shape = point,label=\"" <<
-					pstr.str() << "\"];";
+				auto ambkey = std::hash<std::string>()(
+								pstr.str());
+				ss << "\n" << ambkey <<"[shape = point,label=\""
+					<< pstr.str() << "\"];";
 				//if (edgedone.insert({ key.first, ambkey }).second)
-					ss << "\n" << key.first << "->" << ambkey <<';';
+					ss<<"\n"<<key.first<<"->"<<ambkey<<';';
 				for (auto & nn: pack) {
 					auto nkey = keyfun(nn);
-					ss << "\n" << nkey.first << "[label=\"" <<
-						nkey.second << "\"];";
+					ss << "\n" << nkey.first << "[label=\""
+						<< nkey.second << "\"];";
 					//if (edgedone.insert({ ambkey, nkey.first }).second)
 						ss << "\n" << ambkey << "->" <<
 							nkey.first<< ';';

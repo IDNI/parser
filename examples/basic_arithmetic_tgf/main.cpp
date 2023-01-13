@@ -56,7 +56,7 @@ private:
 		auto cb_enter = [&x, &f, this](const auto& n) {
 			//DBG(cout << "entering: `" << n.first.to_std_string() << "`\n";)
 			if (n.first.nt() && n.first.n() == id("integer"))
-				x.push_back(flatten_to_int<char_t>(f, n));
+				x.push_back(terminals_to_int<char_t>(f, n));
 		};
 		auto cb_exit = [&x, this](const auto& n, const auto&) {
 			//DBG(cout << "exiting: `" << n.first.to_std_string() << "`\n";)

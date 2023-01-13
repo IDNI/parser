@@ -12,8 +12,12 @@
 // modified over time by the Author.
 #ifndef __IDNI__PARSER__FOREST_H__
 #define __IDNI__PARSER__FOREST_H__
-#include <cassert>
+#include <set>
+#include <map>
+#include <memory>
+#include <functional>
 #include <deque>
+#include "defs.h"
 namespace idni {
 
 
@@ -54,7 +58,7 @@ struct forest {
 		std::set<node> cycles;
 		sptree extract_trees();
 		private:
-		sptree _extract_trees(node& r, int choice = 0);	
+		sptree _extract_trees(node& r, int_t choice = 0);	
 	};
 
 	bool detect_cycle(graph& g) const;
@@ -158,7 +162,7 @@ private:
 #ifdef DEBUG
 template <typename NodeT>
 std::ostream& forest<NodeT>::print_data(std::ostream& os) const {
-	os << "number of nodes: " << g.size() << endl;
+	os << "number of nodes: " << g.size() << std::endl;
 	for (const auto& n : g) {
 		os << n.first.first.to_std_string() << "\n";
 		for (const auto& p : n.second) {
@@ -205,7 +209,7 @@ forest<NodeT>::graph::extract_trees(){
 
 template <typename NodeT>
 typename forest<NodeT>::sptree forest<NodeT>::graph::_extract_trees(
-	NodeT& r, int)
+	NodeT& r, int_t)
 {	
 	std::deque<sptree> stk;
 	sptree troot = NULL;
@@ -393,7 +397,7 @@ typename forest<NodeT>::graphv forest<NodeT>::extract_graphs(
 	graphs.emplace_back();
 	graphs.back().root = root;
 	std::map<node, size_t> ndmap;
-	int id = 0;
+	int_t id = 0;
 	for (auto& it : g) {
 		ndmap[it.first] = id++;
 		id += it.second.size(); // ambig node ids;

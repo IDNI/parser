@@ -10,10 +10,6 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#include <cassert>
-#ifdef DEBUG
-#include <fstream>
-#endif
 #include "parser.h"
 using namespace std;
 namespace idni {
@@ -24,12 +20,55 @@ using namespace idni::charclasses;
 #define emeasure_time_end(start, end) end = clock(), cout << fixed <<\
 	setprecision(2) << (start, end) << " ms"
 
+prods<char32_t> operator+(const prods<char32_t>& x,
+	const std::basic_string<char>& s)
+{
+	assert(!x.empty());
+	prods<char32_t> r(x);
+	for (const auto& c : s) r = r + (char32_t) c;
+	return r;
+}
+prods<char32_t> operator|(const prods<char32_t>& x,
+	const std::basic_string<char>& s)
+{
+	assert(!x.empty());
+	return x | prods<char32_t>(to_u32string(s));
+}
+prods<char32_t> operator&(const prods<char32_t>& x,
+	const std::basic_string<char>& s)
+{
+	assert(!x.empty());
+	return x & prods<char32_t>(to_u32string(s));
+}
 template <typename CharT>
 parser<CharT>::parser(grammar<CharT>& g, const options& o) : g(g), o(o) {}
-
 template <typename CharT>
-bool parser<CharT>::nullable(const item& i) const {
-	return i.dot < g[i.prod][i.con].size() && g.nullable(get_lit(i));
+lit<CharT> parser<CharT>::get_lit(const item& i) const {
+	return g[i.prod][i.con][i.dot];
+}
+template <typename CharT>
+lit<CharT> parser<CharT>::get_nt(const item& i) const { return g(i.prod); }
+template <typename CharT>
+CharT parser<CharT>::cur() const {
+	//DBG(cout << "cur " << reads_stream << " n: " << n
+	//	<< " l: " << l << endl;)
+	if (!reads_stream) return n >= l ? e : d[n];
+	if (!s->good()) return e;
+	return s->peek();
+}
+template <typename CharT>
+bool parser<CharT>::next() {
+	CharT ch;
+	if (reads_stream) return !s->good() || l >= max_length ? false
+		: (s->get(ch), n = s->tellg(), l = n + (s->peek() == e ? 0 : 1),
+			S.resize(l + 1), true);
+	else return n >= l ? false : (n++, true);
+}
+template <typename CharT>
+CharT parser<CharT>::at(size_t p) {
+	if (p >= l) return e;
+	if (!reads_stream) return d[p];
+	return s->seekg(p), s->get();
 }
 
 template <typename CharT>
@@ -46,14 +85,16 @@ typename parser<CharT>::container_iter
 		add(t, item(it->set, it->prod, it->con, it->from, it->dot + 1));
 	return it;
 }
-
+template <typename CharT>
+bool parser<CharT>::nullable(const item& i) const {
+	return i.dot < g[i.prod][i.con].size() && g.nullable(get_lit(i));
+}
 template <typename CharT>
 bool parser<CharT>::completed(const item& i) const {
 	const auto& a = g[i.prod][i.con];
 	bool r = a.size() == i.dot;
 	return r;
 }
-
 template <typename CharT>
 void parser<CharT>::complete(const item& i, container_t& t) {
 	//DBG(print(cout << "\tcompleting ", i) << endl;)
@@ -63,7 +104,6 @@ void parser<CharT>::complete(const item& i, container_t& t) {
 			get_lit(*it) == get_nt(i)) add(t, item(i.set,
 				it->prod, it->con, it->from, it->dot + 1));
 }
-
 template <typename CharT>
 void parser<CharT>::resolve_conjunctions(container_t& t)
 	const
@@ -101,7 +141,6 @@ void parser<CharT>::resolve_conjunctions(container_t& t)
 	}
 	//DBG(cout << "... conjunctions resolved\n";)
 }
-
 template <typename CharT>
 void parser<CharT>::predict(const item& i, container_t& t) {
 	//DBG(print(cout << "predicting ", i) << endl;)
@@ -109,7 +148,6 @@ void parser<CharT>::predict(const item& i, container_t& t) {
 		for (size_t c = 0; c != g[p].size(); ++c)
 			add(t, item(i.set, p, c, i.set, 0));
 }
-
 template <typename CharT>
 void parser<CharT>::scan(const item& i, size_t n, CharT ch) {
 	//DBG(print(cout << "scanning ", i) << " ch: " << to_std_string(ch) << endl;)
@@ -118,7 +156,6 @@ void parser<CharT>::scan(const item& i, size_t n, CharT ch) {
 	if (j.set >= S.size()) S.resize(j.set + 1);
 	S[j.set].insert(j);
 }
-
 template <typename CharT>
 void parser<CharT>::scan_cc_function(const item&i, size_t n, CharT ch) {
 	//DBG(print(cout << "scanning cc function ", i) << " s: " << to_std_string(s) << endl;)
@@ -132,7 +169,6 @@ void parser<CharT>::scan_cc_function(const item&i, size_t n, CharT ch) {
 	item k(n + (eof ? 0 : 1), p, 0, n, 1); // complete char functions's char
 	S[k.set].insert(k);
 }
-
 template <typename CharT>
 std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::parse(
 	int fd, size_t size, CharT eof)
@@ -149,7 +185,6 @@ std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::parse(
 	//DBG(cout << "filename l: " << l << endl;)
 	return _parse();	
 }
-
 template <typename CharT>
 std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::parse(
 	std::basic_istream<CharT>& is, size_t size, CharT eof)
@@ -158,7 +193,6 @@ std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::parse(
 	//DBG(cout << "istream& l: " << l << endl;)
 	return _parse();
 }
-
 template <typename CharT>
 std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::parse(
 	const CharT* data, size_t size, CharT eof)
@@ -167,7 +201,6 @@ std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::parse(
 	//DBG(cout << "CharT* l: " << l << endl;)
 	return _parse();
 }
-
 template <typename CharT>
 std::string parser<CharT>::perror_t::to_str(){
 	std::stringstream ss;
@@ -179,7 +212,6 @@ std::string parser<CharT>::perror_t::to_str(){
 	}
 	return ss.str();
 }
-
 template <typename CharT>
 typename parser<CharT>::perror_t parser<CharT>::get_error(){
 	perror_t err;
@@ -254,7 +286,6 @@ bool parser<CharT>::found() {
 #endif
 	return f;
 }
-
 template <typename CharT>
 std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::_parse() {
 	MS(emeasure_time_start(tsr, ter);)
@@ -356,39 +387,13 @@ std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::_parse() {
 #endif
 	return f;
 }
-
-template <typename CharT>
-CharT parser<CharT>::cur() const {
-	//DBG(cout << "cur " << reads_stream << " n: " << n
-	//	<< " l: " << l << endl;)
-	if (!reads_stream) return n >= l ? e : d[n];
-	if (!s->good()) return e;
-	return s->peek();
-}
-
-template <typename CharT>
-bool parser<CharT>::next() {
-	CharT ch;
-	if (reads_stream) return !s->good() || l >= max_length ? false
-		: (s->get(ch), n = s->tellg(), l = n + (s->peek() == e ? 0 : 1),
-			S.resize(l + 1), true);
-	else return n >= l ? false : (n++, true);
-}
-
-template <typename CharT>
-CharT parser<CharT>::at(size_t p) {
-	if (p >= l) return e;
-	if (!reads_stream) return d[p];
-	return s->seekg(p), s->get();
-}
-	
 template <typename CharT>
 void parser<CharT>::pre_process(const item &i) {
 	//sorted_citem[G[i.prod][0].n()][i.from].emplace_back(i);
 	if (completed(i))
 		sorted_citem[{ g(i.prod).n(), i.from }].emplace_back(i),
 		rsorted_citem[{ g(i.prod).n(), i.set }].emplace_back(i);
-	else if (o.bin_lr) {
+	else if (o.binarize) {
 		// Precreating temporaries to help in binarisation later
 		// each temporary represents a partial rhs production with
 		// atleast 3 symbols
@@ -435,7 +440,6 @@ bool parser<CharT>::init_forest(pforest& f) {
 	MS(emeasure_time_end(tsf, tef) <<" :: forest time\n";)
 	return ret;
 }
-
 // collects all possible variations of the given item's rhs while respecting the
 // span of the item and stores them in the set ambset. 
 template <typename CharT>
@@ -485,9 +489,9 @@ void parser<CharT>::sbl_chd_forest(const item &eitem,
 		}
 	}
 }
-
 template <typename CharT>
-bool parser<CharT>::bin_lr_comb(const item& eitem, set<vector<pnode>>& ambset) {
+bool parser<CharT>::binarize_comb(const item& eitem, set<vector<pnode>>& ambset)
+{
 	vector<pnode> rcomb, lcomb;
 	if (eitem.dot < 1) return false;
 	pnode right = { g[eitem.prod][eitem.con][eitem.dot-1], {} };
@@ -572,7 +576,7 @@ bool parser<CharT>::build_forest(pforest& f, const pnode &root) {
 		if (cur.set != root.second[1]) continue;
 		pnode cnode(completed(cur) ? g(cur.prod) : g.nt(root.first.n()),
 			{ cur.from, cur.set });
-		if (o.bin_lr) bin_lr_comb(cur, ambset);
+		if (o.binarize) binarize_comb(cur, ambset);
 		else {
 			pnodes nxtlits;
 			sbl_chd_forest(cur, nxtlits, cur.from, ambset);
@@ -632,7 +636,6 @@ size_t parser<CharT>::hasher_t::operator()(const item &k) const {
 	h ^= hash_size_t(k.dot);
 	return h;
 }
-
 std::string to_std_string(const std::string& s) { return s; }
 std::string to_std_string(const utf8string& s) { return to_string(s); }
 std::string to_std_string(const std::u32string& s) {

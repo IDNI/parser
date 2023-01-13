@@ -115,19 +115,19 @@ bool run_test(const prods<CharT> &ps, nonterminals<CharT> &nts,
 }
 int main(int argc, char **argv)
 {
-	bool binlr = false;
+	bool binarize = false;
 	bool incr_gen = false;
 	
 	vector<string> args(argv + 1, argv + argc);
 
 	for (auto opt : args)
 	{
-		if (opt == "-enable_binlr")
-			binlr = true;
+		if (opt == "-enable_binarization")
+			binarize = true;
 		else if (opt == "-enable_incrgen")
 			incr_gen = true;
-		else if (opt == "-disable_binlr")
-			binlr = false;
+		else if (opt == "-disable_binarization")
+			binarize = false;
 		else if (opt == "-disable_incrgen")
 			incr_gen = false;
 		else if (opt == "-unique_node")
@@ -141,14 +141,14 @@ int main(int argc, char **argv)
 			cout << "Invalid option: " << opt << endl
 				 << "Valid options: \n \
 			-[enable|disable]_incrgen 		enables incremental generation of forest \n \
-			-[enable|disable]_binlr 		enables binarization and leftright optimization of forest \n \
+			-[enable|disable]_binarization 		enables binarization and leftright optimization of forest \n \
 			-unique_node		retrieves graphs from forest based on nodes, not edges \n \
 			-stop_after_[1|5]	stop retrieving further graphs after 1 or 5 count \n"
 				 << endl,
 				exit(1);
 		}
 	}
-	options<char>.bin_lr = options<char32_t>.bin_lr = binlr;
+	options<char>.binarize = options<char32_t>.binarize = binarize;
 	options<char>.incr_gen_forest =
 		options<char32_t>.incr_gen_forest = incr_gen;
 

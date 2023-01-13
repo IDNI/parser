@@ -15,7 +15,7 @@
 namespace idni { namespace charclasses {
 
 template <typename CharT>
-bool iseof(CharT c);
+bool iseof(CharT c) { return c == std::char_traits<CharT>::eof(); }
 template <typename CharT>
 bool isalnum(CharT c);
 template <typename CharT>

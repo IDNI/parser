@@ -15,11 +15,7 @@
 #include "charclasses.h"
 namespace idni { namespace charclasses {
 
-template <typename CharT>
-bool iseof(CharT c) { return c == std::char_traits<CharT>::eof(); }
-template bool iseof<char>(char c);
-template bool iseof<utf8char>(utf8char c);
-template bool iseof<char32_t>(char32_t c);
+// char
 template<> bool isalnum<char>(char c) { return ::isalnum(c); }
 template<> bool isalpha<char>(char c) { return ::isalpha(c); }
 template<> bool isblank<char>(char c) { return ::isblank(c); }

@@ -88,16 +88,15 @@ struct tgf {
 			= from_cstr<CharT>("start"))
 	{
 		tgf<CharT> f;
-		ifstream ifs(filename);
+		std::ifstream ifs(filename);
 		if (!ifs) {
-			cerr << "Failed to open file '" << filename << "':"
-				<< strerror(errno) << endl;
+			std::cerr << "Failed to open file '" << filename << "':"
+				<< strerror(errno) << std::endl;
 			return grammar<CharT>(nts_);
 		}
 		return f.parse(nts_, from_str<CharT>(std::string(
-				(istreambuf_iterator<char>(ifs)),
-				(istreambuf_iterator<char>()))
-			), start_nt);
+				(std::istreambuf_iterator<char>(ifs)),
+				(std::istreambuf_iterator<char>()))), start_nt);
 	}
 
 	grammar<CharT> parse(nonterminals<CharT>& nts_, const string& s,
@@ -148,12 +147,12 @@ struct tgf {
 			}
 			
 			void push() {
-				//DBG(cout << "push" << "\n";)
+				//DBG(std::cout << "push" << "\n";)
 				p.push_back({});
 				//DBG(print_data();)
 			}
 			void pop() {
-				//DBG(cout << "pop" << "\n";)
+				//DBG(std::cout << "pop" << "\n";)
 				if (p.back().size() == 0) p.pop_back();
 				//DBG(print_data();)
 			}
@@ -220,7 +219,7 @@ struct tgf {
 				s << from_cstr<CharT>("_R") <<
 					p_head.to_string() <<
 					from_cstr<CharT>("_") <<
-					from_str<CharT>(::to_string(id++));
+					from_str<CharT>(std::to_string(id++));
 				//cout << "new name: " << id << " " << to_std_string(s.str()) << "\n";
 				return s.str();
 			}
@@ -244,16 +243,18 @@ struct tgf {
 			const auto& l = n.first;
 			if (!l.nt()) return;
 			//DBG(cout << "entering: `" << l.to_std_string() << "`\n";)
-			if (l == sym) x.add_nonterminal(flatten<CharT>(*f, n));
+			if (l == sym) x.add_nonterminal(
+					terminals_to_str<CharT>(*f, n));
 			else if (l == directive) x.in_directive = true;
 			else if (l == directive_param)
-				x.cc_names.push_back(flatten<CharT>(*f, n));
+				x.cc_names.push_back(
+					terminals_to_str<CharT>(*f, n));
 			else if (l == literals) x.push();
 			else if (l == group || l == optional || l == repeat)
 						x.pop();
 			else if (l == production_) x.new_production();
 			else if (l == string_ || l == quoted_char) {
-				auto str = flatten<CharT>(*f, n);
+				auto str = terminals_to_str<CharT>(*f, n);
 				str.erase(str.begin()), str.erase(str.end() - 1);
 				// DBG(cout << "quoted_char?: " << (l == quoted_char)
 				// 	<< " str.size(): " << str.size()
@@ -285,24 +286,24 @@ struct tgf {
 			else if (l == plus || l == repeat) x.repeat();
 		};
 		if (!found) {
-			cout << "There is an error in the grammar. "
+			std::cout << "There is an error in the grammar. "
 					"Cannot recognize TGF.\n";
 			//DBG(g.print_internal_grammar(cout << "TGF productions:\n") << endl;)
 			auto error = p.get_error();
-			cerr << error.to_str();
+			std::cerr << error.to_str();
 		} else {
 			//DBG(cout << "TRAVERSE parsed TGF source and "
 			//			"generate productions\n";)
 			auto c = f->count_trees();
 			if (c > 1) {
-				cerr << "Forest contains more than one tree: "
-					<< c << "\nDumping trees...\n";
+				std::cerr << "Forest contains more than one "
+					"tree: " << c << "\nDumping trees...\n";
 				static bool opt_edge = true;
 				size_t n = 0;
 				auto next_g = [&n](
 					parser<char_t>::pforest::graph &fg)
 				{
-					fg.extract_trees()->to_print(cout
+					fg.extract_trees()->to_print(std::cout
 						<< ">>> tree " << ++n << "\n")
 						<< "\n<<<\n\n";
 					return true;
