@@ -1,7 +1,6 @@
 set(EXAMPLES
 	basic_arithmetic
 	basic_arithmetic_tgf
-	tau_parser
 	tml_parser
 )
 
