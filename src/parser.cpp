@@ -11,6 +11,7 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include "parser.h"
+#include "unistd.h"
 using namespace std;
 namespace idni {
 using namespace idni::charclasses;
@@ -202,15 +203,46 @@ std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::parse(
 	return _parse();
 }
 template <typename CharT>
-std::string parser<CharT>::perror_t::to_str(){
+std::string parser<CharT>::perror_t::to_str( info_lvl elvl ){
 	std::stringstream ss;
 	ss << "\nSyntax Error: Unexpected \""<< unexp << "\"  at line " <<
-		line << ":" << col << " (" << loc << "):\n" << ctxt << " ...\n";
+		line << ":" << col << " (" << loc << "):\n " << ctxt << "\n";
+	if (elvl == INFO_BASIC) return ss.str();
 	for (auto& e : expv){
-		ss << "\t...expecting \"" << e.exp << "\" due to [ " <<
+		ss << "...expecting \"" << e.exp << "\" due to [ " <<
 			e.prod_nt << "->" << e.prod_body << " ]" << endl;
+
+		if (elvl == INFO_DETAILED) continue;
+		size_t tab = 0;
+		for( auto &bk: e.bktrk) {
+			tab++;
+			ss << "\t";
+			for (size_t i = 0; i < tab; i++) ss<< " ";
+			ss << "..required from \""<<bk.exp <<"\" in ["<< bk.prod_nt << 
+			"->"<< bk.prod_body <<"]"<<endl;
+		}
 	}
 	return ss.str();
+}
+template <typename CharT>
+std::vector<typename parser<CharT>::item> parser<CharT>::back_track(
+	const item &obj){
+		
+	std::vector<item> ret;
+	std::unordered_set<item, hasher_t> exists;	
+	item cur = obj;
+	while( true ) {
+	//cerr<< S[cur.from].size() << " " << "(" << cur.from << " " << cur.set <<") ";
+	//cerr<< get_nt(cur)<< " "<< g[cur.prod][cur.con] << endl
+		auto pit = find_if(S[cur.from].begin(), S[cur.from].end(), [&](const item &a) {
+			return exists.find(a) == exists.end() && get_lit(a) == get_nt(cur) && 
+					cur.from == a.set ? true : false ;
+		});
+		if( pit != S[cur.from].end() ) cur = *pit, exists.insert(cur);
+		else break;
+		ret.push_back(*pit);
+	}
+	return ret;
 }
 template <typename CharT>
 typename parser<CharT>::perror_t parser<CharT>::get_error(){
@@ -222,8 +254,25 @@ typename parser<CharT>::perror_t parser<CharT>::get_error(){
 				errctxt = to_std_string(at(pos--)) + errctxt;
 		return errctxt;		
 	};
-	// find error location and build error stream
+	
 	std::stringstream es;
+	auto item2_ept = [this, &es]( const item &t ){
+		typename perror_t::exp_prod_t ept;
+		es.str(""), es << get_lit(t),
+		ept.exp = es.str();
+		es.str(""), es << get_nt(t),
+		ept.prod_nt = es.str();
+		es.str("");
+		for (size_t i = 0; i < g[t.prod][t.con].size(); i++) {
+			if(t.dot == i ) es << '.' ;
+			es << " " << g[t.prod][t.con][i];
+		} 
+		es << " "<< t.from << "--" << t.set;
+		ept.prod_body = es.str();	
+		return ept;
+	};
+
+	// find error location and build error stream
 	for (int_t i = (int_t)l; i >= 0; i--)
 		if(S[i].size()) {
 			size_t from = 0;
@@ -232,18 +281,15 @@ typename parser<CharT>::perror_t parser<CharT>::get_error(){
 				if( t.from > from && t.from != t.set)
 					from = t.from;	
 				
-				//ignoring empty string, completed and nts
-				if( completed(t) || get_lit(t).nt()  
-					|| (!get_lit(t).nt() && 
-					get_lit(t).c() == CharT(0)) ) continue;
+				//ignoring empty string, completed 
+				if (completed(t) || (get_lit(t).nt() && 
+				!g.cc_fns.is_fn(get_lit(t).n())) || (!get_lit(t).nt() && 
+				get_lit(t).c() == CharT(0)) ) continue;
 				
-				err.expv.emplace_back();
-				es.str(""), es << get_lit(t),
-				err.expv.back().exp = es.str();
-				es.str(""), es << get_nt(t),
-				err.expv.back().prod_nt = es.str();
-				es.str(""), es << g[t.prod][t.con],
-				err.expv.back().prod_body = es.str();
+				err.expv.emplace_back( item2_ept(t));
+				auto bv = back_track(t);
+				for (const item &b : bv)
+					err.expv.back().bktrk.emplace_back( item2_ept(b));
 			}
 			err.unexp = to_std_string(at(i));
 			err.loc = i;

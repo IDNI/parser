@@ -197,6 +197,11 @@ public:
 		size_t operator()(const item &k) const;
 	};
 	struct perror_t {
+		enum info_lvl{
+			INFO_BASIC,
+			INFO_DETAILED,
+			INFO_ROOT_CAUSE
+		};
 		int_t loc;	// location of error
 		size_t line;    // line of error
 		size_t col;     // column of error
@@ -206,14 +211,18 @@ public:
 			std::string exp;
 			std::string prod_nt;
 			std::string prod_body;
-			std::vector<std::string> bktrk;
-		} exp_prod_t;
+			// back track information to higher derivations
+			std::vector<_exp_prod> bktrk;
+		}exp_prod_t;
+
 		// list of expected token and respective productions
 		std::vector<exp_prod_t> expv;
 		perror_t() : loc(-1) {}
-		std::string to_str();
+		std::string to_str(info_lvl lv = INFO_ROOT_CAUSE);
 	};
 	perror_t get_error();
+	std::vector<item> back_track(const item& obj);
+
 private:
 	typedef std::unordered_set<parser<CharT>::item, parser<CharT>::hasher_t>
 			container_t;

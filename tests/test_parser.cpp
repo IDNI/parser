@@ -80,8 +80,9 @@ int test_out(int c, const typename grammar<CharT>::grammar &g,
 }
 template <typename CharT>
 bool run_test(const prods<CharT> &ps, nonterminals<CharT> &nts,
-	const prods<CharT> &start, const basic_string<CharT> &input,
-	char_class_fns<CharT> cc = {}, bool dump = false, string contains = "")
+			const prods<CharT> &start, const basic_string<CharT> &input,
+			char_class_fns<CharT> cc = {}, bool dump = false,
+			string contains = "", string error_expected = "" )
 {
 	grammar<CharT> g(nts, ps, start, cc);
 	parser<CharT> e(g, options<CharT>);
@@ -108,6 +109,16 @@ bool run_test(const prods<CharT> &ps, nonterminals<CharT> &nts,
 	cout << found << "\n\n";
 	// if (contains.size())
 	//	cout << "contains: `" << contains << "`: " << contained << endl;
+	
+	if(error_expected.size()){ // negative test case
+		auto errstr = e.get_error().to_str();
+		if( errstr.find(error_expected) ==
+		 	decltype(error_expected)::npos ) {
+			 std::cerr<< "\n Failed to find "<< error_expected << " in " << errstr<<endl;
+			 return false;
+			 }
+		return true;
+	} 
 	if (!found || (contains.size() && !contained))
 		return false;
 
@@ -172,8 +183,12 @@ int main(int argc, char **argv)
 
 	// Using Elizbeth Scott paper example 2, pg 64
 	ps(start, b | start + start);
-	if (!run_test<char>(ps, nt, start, "bbb"))
-		fail();
+	if (!run_test<char>(ps, nt, start, "bbb")) fail();
+	//negative tests
+	if (!run_test<char>(ps, nt, start, "bbba",{},false,"","Unexpected")) fail();
+	if (!run_test<char>(ps, nt, start, "a",{},false,"","\"a\"")) fail();
+	if (!run_test<char>(ps, nt, start, "a",{},false,"","\"b\"")) fail();
+	if (run_test<char>(ps, nt, start, "a",{},false,"","success")) fail();
 	ps.clear();
 
 	// infinite ambiguous grammar, advanced parsing pdf, pg 86
