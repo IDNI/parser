@@ -294,11 +294,10 @@ struct tgf {
 		} else {
 			//DBG(cout << "TRAVERSE parsed TGF source and "
 			//			"generate productions\n";)
-			auto c = f->count_trees();
-			if (c > 1) {
+			auto c = f->has_single_parse_tree();
+			if (!c) {
 				std::cerr << "Forest contains more than one "
-					"tree: " << c << "\nDumping trees...\n";
-				static bool opt_edge = true;
+					"tree " <<  "\nDumping trees...\n";
 				size_t n = 0;
 				auto next_g = [&n](
 					parser<char_t>::pforest::graph &fg)
@@ -308,7 +307,7 @@ struct tgf {
 						<< "\n<<<\n\n";
 					return true;
 				};
-				f->extract_graphs(f->root(), next_g, opt_edge);
+				f->extract_graphs(f->root(), next_g);
 			} else f->traverse(cb_enter, cb_exit);
 		}
 		return grammar<CharT>(nts_, x.ps, prods<CharT>(x.nt(start_nt)),

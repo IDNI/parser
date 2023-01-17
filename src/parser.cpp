@@ -403,9 +403,9 @@ std::unique_ptr<typename parser<CharT>::pforest> parser<CharT>::_parse() {
 	if (!o.incr_gen_forest) init_forest(*f);
 	else f->root(pnode(g.start, { 0, l }));
 #ifdef DEBUG
-	auto nt = f->count_trees();
-	if (nt > 1) {
-		cout << "# parse trees: " << nt << "\n";
+	bool nt = f->has_single_parse_tree();
+	if (!nt) {
+		cout << "# has single parse tree : " << false << "\n";
 #ifdef WITH_DEVHELPERS
 		static int_t c = 0;
 		std::stringstream ssf, ptd;

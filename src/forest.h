@@ -74,6 +74,8 @@ struct forest {
 	bool contains(const node& n) { return g.find(n) != g.end(); }
 	nodes_set& operator[](const node& p)             { return g[p]; }
 	const nodes_set& operator[](const node& p) const { return g[p]; }	
+	bool is_ambiguous() const;
+	bool has_single_parse_tree() const { return !is_ambiguous(); };
 	size_t count_trees(const node& root) const;
 	size_t count_trees() const { return count_trees(root()); };
 	nodes_and_edges get_nodes_and_edges() const;
@@ -471,6 +473,13 @@ bool forest<NodeT>::_traverse(const node_graph& g, const node& root,
 #endif
 	cb_exit(root, choosen_pack);
 	return ret;
+}
+
+template <typename NodeT>
+bool forest<NodeT>::is_ambiguous() const {
+	for( auto &kv: this->g )
+		if( kv.second.size() > 1 ) return true;
+	return false;
 }
 
 template <typename NodeT>
