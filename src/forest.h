@@ -484,13 +484,18 @@ bool forest<NodeT>::is_ambiguous() const {
 
 template <typename NodeT>
 size_t forest<NodeT>::count_trees(const node& root) const {
-	size_t count = 1;
-	auto cb_keep_ambig = [&count](const node&, auto& ambset) {
-		count *= ambset.size();
-		return ambset;
+	std::map<node, size_t> ndc;
+	auto cb_exit = [&ndc](const node& croot, auto& ambset) {
+		for( auto &pack : ambset) {
+			size_t pkc = 1; // count of the pack
+			for( auto &sym : pack) 
+				if(sym.first.nt()) pkc *= ndc[sym];
+			ndc[croot] += pkc; // adding to curroot count
+		}
 	};
-	traverse(root, no_enter, no_exit, do_revisit, cb_keep_ambig);
-	return count; 
+	auto cb_no_revisit = [](const node&) { return false; };
+	traverse(root, no_enter, cb_exit, cb_no_revisit, no_ambig);
+	return ndc[root]; 
 }
 
 } // idni namespace

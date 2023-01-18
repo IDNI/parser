@@ -106,7 +106,8 @@ bool run_test(const prods<CharT> &ps, nonterminals<CharT> &nts,
 							cout << "exiting: `" << n.first.to_std_string() << "`\n";
 					});
 	}
-	cout << found << "\n\n";
+	cout << "#found" << found << "\n";
+	cout << "#count "<< f->count_trees() << std::endl;
 	// if (contains.size())
 	//	cout << "contains: `" << contains << "`: " << contained << endl;
 	
