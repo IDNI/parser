@@ -12,11 +12,14 @@
 // modified over time by the Author.
 #ifndef __IDNI__PARSER__PARSER_H__
 #define __IDNI__PARSER__PARSER_H__
+
 #include <variant>
 #include <unordered_set>
 #include <iostream>
 #include <cassert>
 #include <sys/mman.h>
+#include <sstream>
+
 #include "defs.h"
 #include "characters.h"
 #include "charclasses.h"
