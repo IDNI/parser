@@ -16,6 +16,10 @@
 #include <variant>
 #include <unordered_set>
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <spanstream>
+#include <span>
 #include <cassert>
 #include <sys/mman.h>
 #include <sstream>
@@ -30,143 +34,200 @@
 
 namespace idni {
 
-template <typename CharT>
+template <typename C, typename T>
 struct lit;
 
 // nonterminals dict = vector with index being nonterminal's id
-template <typename CharT>
-struct nonterminals : public std::vector<std::basic_string<CharT>> {
-	size_t get(const std::basic_string<CharT>& s);
-	const std::basic_string<CharT>& get(size_t n) const;
-	lit<CharT> operator()(const std::basic_string<CharT>& s);
+template <typename C = char, typename T = C>
+struct nonterminals : public std::vector<std::basic_string<C>> {
+	size_t get(const std::basic_string<C>& s);
+	const std::basic_string<C>& get(size_t n) const;
+	lit<C, T> operator()(const std::basic_string<C>& s);
 private:
-	std::map<std::basic_string<CharT>, size_t> m;
+	std::map<std::basic_string<C>, size_t> m;
 };
 
 // literal containing terminal (c where if c = 0 then null) or nonterminal (n)
-template <typename CharT>
-struct lit : public std::variant<size_t, CharT> {
-	typedef std::variant<size_t, CharT> lit_t;
+template <typename C = char, typename T = C>
+struct lit : public std::variant<size_t, T> {
+	typedef std::variant<size_t, T> lit_t;
 	using typename lit_t::variant;
-	nonterminals<CharT>* nts = 0;
+	nonterminals<C, T>* nts = 0;
+	bool is_null_ = false;
 	lit();
-	lit(CharT c);
-	lit(size_t n, nonterminals<CharT>* nts);
+	lit(T t);
+	lit(size_t n, nonterminals<C, T>* nts);
 	bool  nt() const;
 	size_t n() const;
-	CharT  c() const;
-	std::basic_string<CharT> to_string(
-				const std::basic_string<CharT>& nll={}) const;
-	std::string to_std_string(const std::basic_string<CharT>& nll={}) const;
+	T      t() const;
 	bool is_null() const;
-	bool operator<(const lit& l) const;
-	bool operator==(const lit& l) const;
+	bool operator<(const lit<C, T>& l) const;
+	bool operator==(const lit<C, T>& l) const;
+	//std::ostream& operator<<(std::ostream& os)
+	std::basic_string<C> to_string(const std::basic_string<C>& nll = {})
+		const;
+	std::string to_std_string(const std::basic_string<C>& nll = {}) const;
 };
 
-template <typename CharT> //  literals which should match the parser item
-struct lits : public std::vector<lit<CharT>> { bool neg = false; };
-template <typename CharT>
-using clause = std::set<lits<CharT>>; // conjunctions of literals
-template <typename CharT>
-using dnf = std::set<clause<CharT>>; // disjunctions of literal conjunctions
-template <typename CharT>
-using prod = std::pair<lit<CharT>, dnf<CharT>>; // production rule
-template <typename CharT>
-struct prods : public std::vector<prod<CharT>> { // productions
-	typedef std::vector<prod<CharT>> prods_t;
+// production rules in a disjunctive normal form of conjunction clauses of lits
+template <typename C = char, typename T = C> //  literals
+struct lits : public std::vector<lit<C, T>> { bool neg = false; };
+template <typename C = char, typename T = C>
+using clause = std::set<lits<C, T>>; // conjunctions of literals
+template <typename C = char, typename T = C>
+using dnf = std::set<clause<C, T>>; // disjunctions of literal conjunctions
+template <typename C = char, typename T = C>
+using prod = std::pair<lit<C, T>, dnf<C, T>>; // production rule
+template <typename C = char, typename T = C>
+struct prods : public std::vector<prod<C, T>> { // productions
+	typedef std::vector<prod<C, T>> prods_t;
 	prods();
-	prods(const lit<CharT>& l);
-	prods(const std::basic_string<CharT>& s);
-	void operator()(const lit<CharT>& l);
-	void operator()(const std::basic_string<CharT>& s);
-	void operator()(const prods<CharT>& l, const prods<CharT>& p);
-	void operator()(const lit<CharT>& l, const prods<CharT>& p);
-	bool operator==(const lit<CharT>& l) const;
-	lit<CharT> to_lit() const;
-	dnf<CharT> to_dnf() const;
+	prods(const lit<C, T>& l);
+	prods(const std::basic_string<C>& s);
+	prods(const std::vector<T>& v);
+	void operator()(const lit<C, T>& l);
+	void operator()(const std::basic_string<C>& s);
+	void operator()(const std::vector<T>& v);
+	void operator()(const prods<C, T>& l, const prods<C, T>& p);
+	void operator()(const lit<C, T>& l, const prods<C, T>& p);
+	bool operator==(const lit<C, T>& l) const;
+	lit<C, T> to_lit() const;
+	dnf<C, T> to_dnf() const;
 };
 
 // char class functions
-template <typename CharT>
-using char_class_fn = std::function<bool(CharT)>;
-template <typename CharT>
+template <typename T = char>
+using char_class_fn = std::function<bool(T)>;
+template <typename T = char>
 struct char_class_fns {
-	std::map<size_t, char_class_fn<CharT>> fns = {};
-	std::map<size_t, std::map<CharT, size_t>> ps = {}; //char -> production
+	std::map<size_t, char_class_fn<T>> fns = {};
+	std::map<size_t, std::map<T, size_t>> ps = {}; //char -> production
 	// adds new char class function
-	void operator()(size_t nt, const char_class_fn<CharT>& fn);
+	void operator()(size_t nt, const char_class_fn<T>& fn);
 	// returns true if a nt is a cc function
 	bool is_fn(size_t nt) const;
+	bool is_eof_fn(size_t nt) const; // returns true if a nt is an eof fn
+	size_t eof_fn = -1; // id of an eof fn
 };
-template <typename CharT>
-char_class_fns<CharT> predefined_char_classes(
-	const std::vector<std::basic_string<CharT>>& cc_fn_names,
-	nonterminals<CharT>& nts);
+template <typename C = char, typename T = C>
+char_class_fns<T> predefined_char_classes(
+	const std::vector<std::string>& cc_fn_names, nonterminals<C, T>& nts);
 
 // grammar struct required by parser.
 // accepts nonterminals ref, prods and char class functions
-template <typename CharT> struct parser;
-template <typename CharT> struct grammar_inspector;
-template <typename CharT>
+template <typename C, typename T> struct grammar_inspector;
+template <typename C = char, typename T = C>
 struct grammar {
-	friend parser<CharT>;
-	friend grammar_inspector<CharT>;
-	typedef std::pair<lit<CharT>, std::vector<lits<CharT>>> production;
+	friend struct grammar_inspector<C, T>;
+	typedef std::pair<lit<C, T>, std::vector<lits<C, T>>> production;
 
-	grammar(nonterminals<CharT>& nts) : nts(nts) {}
-	grammar(nonterminals<CharT>& nts, const prods<CharT>& ps,
-		const prods<CharT>& start, const char_class_fns<CharT>& cc_fns);
+	grammar(nonterminals<C, T>& nts) : nts(nts) {}
+	grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
+		const prods<C, T>& start, const char_class_fns<T>& cc_fns);
 	// returns number of productions (every disjunction has a prod rule)
 	size_t size() const;
 	// returns head of the prod rule - literal
-	lit<CharT> operator()(const size_t& i) const;
+	lit<C, T> operator()(const size_t& i) const;
 	// returns body of the prod rule - conjunctions of literals
-	const std::vector<lits<CharT>>& operator[](const size_t& i) const;
+	const std::vector<lits<C, T>>& operator[](const size_t& i) const;
 	// returns length of the conjunction
 	size_t len(const size_t& p, const size_t& c) const;
 	// returns true if the literal is nullable
-	bool nullable(lit<CharT> l) const;
+	bool nullable(lit<C, T> l) const;
 	// returns true if the production has more then 1 conjunction
 	bool conjunctive(size_t p) const;
 	// checks if the char class function returns true on the char ch
-	bool char_class_check(lit<CharT> l, CharT ch) const;
+	bool char_class_check(lit<C, T> l, T ch) const;
 	// does the same check as char_class_check and if the check is true then
 	// it adds new rule: "cc_fn_name => ch." into the grammar
 	// returns id of the rule or (size_t)-1 if the check fails
-	size_t get_char_class_production(lit<CharT> l, CharT ch);
+	size_t get_char_class_production(lit<C, T> l, T ch);
+	size_t add_char_class_production(lit<C, T> l, T ch);
+	const std::set<size_t>& prod_ids_of_literal(const lit<C, T>& l);
+	const lit<C, T>& start_literal() const;
+	bool is_cc_fn(const size_t &p) const;
+	bool is_eof_fn(const size_t &p) const;
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
 	std::ostream& print_internal_grammar(std::ostream& os,
 		std::string prep = {}) const;
 	std::ostream& print_data(std::ostream& os, std::string prep = {}) const;
 #endif
+	lit<C, T> nt(size_t n);
+	lit<C, T> nt(const std::basic_string<C>& s);
 private:
-	nonterminals<CharT>& nts;
-	lit<CharT> start;
-	char_class_fns<CharT> cc_fns = {};
-	std::map<lit<CharT>, std::set<size_t>> ntsm = {};
+	bool all_nulls(const lits<C, T>& a) const;
+	nonterminals<C, T>& nts;
+	lit<C, T> start;
+	char_class_fns<T> cc_fns = {};
+	std::map<lit<C, T>, std::set<size_t>> ntsm = {};
 	std::set<size_t> nullables = {};
 	std::set<size_t> conjunctives = {};
 	std::vector<production> G;
-	lit<CharT> nt(size_t n);
-	lit<CharT> nt(const std::basic_string<CharT>& s);
-	bool all_nulls(const lits<CharT>& a) const;
 };
 
-template <typename CharT>
+template <typename C = char, typename T = C>
 class parser {
 public:
-	typedef CharT char_t;
-	typedef typename std::pair<lit<CharT>, std::array<size_t, 2>> pnode;
+	struct input;
+	using char_type     = C;
+	using terminal_type = T;
+	using traits_type   = std::char_traits<C>;
+	using int_type      = typename traits_type::int_type;
+	using parser_type   = parser<C, T>;
+	using input_type    = parser_type::input;
+	using decoder_type  = parser_type::input::decoder_type;
+	typedef typename std::pair<lit<C, T>, std::array<size_t, 2>> pnode;
 	struct options {
 		bool binarize = DEFAULT_BINARIZE;
 		bool incr_gen_forest = DEFAULT_INCR_GEN_FOREST;
+		decoder_type char_to_terminals = 0;
 	};
 	struct item {
-		item(size_t set, size_t prod, size_t con, size_t from, size_t dot) :
-			set(set), prod(prod), con(con), from(from), dot(dot) {}
-		size_t set, prod, con, from, dot;
+		item(size_t set, size_t prod,size_t con,size_t from,size_t dot);
 		bool operator<(const item& i) const;
 		bool operator==(const item& i) const;
+		size_t set, prod, con, from, dot;
+	};
+	struct input {
+		using decoder_type =
+				std::function<std::vector<T>(input&)>;
+		input(const C* data, size_t length = 0,
+			decoder_type decoder = 0,
+			int_type e = std::char_traits<C>::eof());
+		input(std::basic_istream<C>& is, size_t length = 0,
+			decoder_type decoder = 0,
+			int_type e = std::char_traits<C>::eof());
+		input(int filedescriptor, size_t length = 0,
+			decoder_type decoder = 0,
+			int_type e = std::char_traits<C>::eof());
+		~input();
+		inline bool isstream() const;
+		void clear(); // resets stream (if used) to reenable at()/tat()
+		// source stream access
+		C cur();
+		size_t pos();
+		bool next();
+		bool eof();
+		C at(size_t p); // reads value at pos (uses seek, if stream)
+		// transformed stream access
+		T tcur();
+		size_t tpos();
+		bool tnext();
+		bool teof();
+		T tat(size_t p); // reads value at tpos
+	private:
+		void decode();
+		enum type { POINTER, STREAM, MMAP } itype = POINTER;//input type
+		int_type e = std::char_traits<C>::eof(); // end of a stream
+		decoder_type decoder = 0;
+		size_t max_l = 0;   // read up to max length of the input size
+		size_t n = 0;         // input position
+		size_t l = 0;         // input length
+		const C* d = 0;       // input data pointer if needed
+		std::basic_istream<C> s{};
+		std::vector<T> ts{};  // all collected terminals
+		size_t tp = 0;        // current terminal pos
+		C c;
 	};
 	typedef forest<pnode> pforest;
 	typedef pforest::nodes pnodes;
@@ -176,17 +237,13 @@ public:
 	typedef pforest::tree ptree;
 	typedef pforest::sptree psptree;
 	typedef std::map<std::pair<size_t, size_t>,std::set<item>> conjunctions;
-	parser(grammar<CharT>& g, const options& o = {});
-	parser(const std::basic_string<CharT>& s, grammar<CharT>& g,
-						const options& o = {});
-	parser(const std::basic_string<CharT>& s, const options& o = {});
-	~parser() { if (d!=0 && reads_mmap) munmap(const_cast<CharT*>(d), l); }
-	std::unique_ptr<pforest> parse(const CharT* data, size_t size = 0,
-		CharT eof = std::char_traits<CharT>::eof());
+	parser(grammar<C, T>& g, const options& o = {});
+	std::unique_ptr<pforest> parse(const C* data, size_t size = 0,
+		int_type eof = std::char_traits<C>::eof());
 	std::unique_ptr<pforest> parse(int filedescriptor, size_t size = 0,
-		CharT eof = std::char_traits<CharT>::eof());
-	std::unique_ptr<pforest> parse(std::basic_istream<CharT>& is,
-		size_t size = 0, CharT eof = std::char_traits<CharT>::eof());
+		int_type eof = std::char_traits<C>::eof());
+	std::unique_ptr<pforest> parse(std::basic_istream<C>& is,
+		size_t size = 0, int_type eof = std::char_traits<C>::eof());
 	bool found();
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
 	std::ostream& print(std::ostream& os, const item& i) const;
@@ -200,16 +257,16 @@ public:
 		size_t operator()(const item &k) const;
 	};
 	struct perror_t {
-		enum info_lvl{
+		enum info_lvl {
 			INFO_BASIC,
 			INFO_DETAILED,
 			INFO_ROOT_CAUSE
 		};
-		int_t loc;	// location of error
-		size_t line;    // line of error
-		size_t col;     // column of error
-		std::string ctxt; // closest matching ctxt
-		std::string unexp; // unexpected character
+		int_t loc;	     // location of error
+		size_t line;         // line of error
+		size_t col;          // column of error
+		std::vector<T> ctxt; // closest matching ctxt
+		T unexp;             // unexpected token
 		typedef struct _exp_prod {
 			std::string exp;
 			std::string prod_nt;
@@ -227,35 +284,25 @@ public:
 	std::vector<item> back_track(const item& obj);
 
 private:
-	typedef std::unordered_set<parser<CharT>::item, parser<CharT>::hasher_t>
-			container_t;
+	typedef std::unordered_set<parser<C, T>::item,
+		parser<C, T>::hasher_t> container_t;
 	typedef typename container_t::iterator container_iter;
-	grammar<CharT>& g;
-	const CharT* d = 0;           // input data (for file)
-	size_t max_length = 0;        // read up to max length of the input size
-	size_t l = 0;                 // input size
-	CharT e;                      // end of file (input) character
-	size_t n = 0;                 // current input position
-	std::basic_istream<CharT>* s; // input stream
-	bool reads_stream = false;    // true if stream input
-	bool reads_mmap   = false;    // true if file input
+	grammar<C, T>& g;
 	options o;
+	std::unique_ptr<input> in = 0;
 	std::vector<container_t> S;
 	std::unordered_map<std::pair<size_t, size_t>, std::vector<item>,
 		hasher_t> sorted_citem, rsorted_citem;
-	std::map<std::vector<lit<CharT>>, lit<CharT>> bin_tnt; // binariesed temporary intermediate non-terminals
+	std::map<std::vector<lit<C, T>>, lit<C, T>> bin_tnt; // binariesed temporary intermediate non-terminals
 	size_t tid; // id for temporary non-terminals
-	CharT cur() const;
-	bool next();
-	CharT at(size_t p);
-	lit<CharT> get_lit(const item& i) const;
-	lit<CharT> get_nt(const item& i) const;
+	lit<C, T> get_lit(const item& i) const;
+	lit<C, T> get_nt(const item& i) const;
 	container_iter add(container_t& t, const item& i);
 	bool nullable(const item& i) const;
 	void resolve_conjunctions(container_t& t) const;
 	void predict(const item& i, container_t& t);
-	void scan(const item& i, size_t n, CharT ch);
-	void scan_cc_function(const item& i, size_t n, CharT ch);
+	void scan(const item& i, size_t n, T ch);
+	void scan_cc_function(const item& i, size_t n, T ch);
 	void complete(const item& i, container_t& t);
 	bool completed(const item& i) const;
 	void pre_process(const item &i);
@@ -267,66 +314,69 @@ private:
 	std::unique_ptr<pforest> _parse();
 #ifdef DEBUG
 	template <typename CharU>
-	friend std::ostream& operator<<(std::ostream& os, lit<CharT>& l);
+	friend std::ostream& operator<<(std::ostream& os, lit<C, T>& l);
 	template <typename CharU>
-	friend std::ostream& operator<<(std::ostream& os, const std::vector<lit<CharT>>& v);
+	friend std::ostream& operator<<(std::ostream& os,
+		const std::vector<lit<C, T>>& v);
 #endif
 };
 
-template <typename CharT> // flattens terminals of a subforest into an ostream
-std::basic_ostream<CharT>& terminals_to_stream(std::basic_ostream<CharT>& os,
-	const typename parser<CharT>::pforest& f,
-	const typename parser<CharT>::pnode& r);
-template <typename CharT> // flattens terminals of a subforest into a string
-std::basic_string<CharT> terminals_to_str(
-	const typename parser<CharT>::pforest& f,
-	const typename parser<CharT>::pnode& r);
-template <typename CharT> // flattens terminals of a subforest into an int
-int_t terminals_to_int(const typename parser<CharT>::pforest& f,
-	const typename parser<CharT>::pnode& r);
+template <typename C = char, typename T = C> // flattens terminals of a subforest into an ostream
+std::basic_ostream<C>& terminals_to_stream(std::basic_ostream<C>& os,
+	const typename parser<C, T>::pforest& f,
+	const typename parser<C, T>::pnode& r);
+template <typename C = char, typename T = C> // flattens terminals of a subforest into a string
+std::basic_string<C> terminals_to_str(
+	const typename parser<C, T>::pforest& f,
+	const typename parser<C, T>::pnode& r);
+template <typename C = char, typename T = C> // flattens terminals of a subforest into an int
+int_t terminals_to_int(const typename parser<C, T>::pforest& f,
+	const typename parser<C, T>::pnode& r);
 
-template <typename CharT>
-bool operator==(const lit<CharT>& l, const prods<CharT>& p);
-template <typename CharT>
-prods<CharT> operator~(const prods<CharT>&);
-template <typename CharT>
-prods<CharT> operator&(const prods<CharT>&, const prods<CharT>&);
-template <typename CharT>
-prods<CharT> operator&(const prods<CharT>& x, const CharT& c);
-template <typename CharT>
-prods<CharT> operator&(const prods<CharT>& x, const CharT* c);
-template <typename CharT>
-prods<CharT> operator&(const prods<CharT>& x, const std::basic_string<CharT>& s);
-prods<char32_t> operator&(const prods<char32_t>& x, const std::basic_string<char>& s);
-template <typename CharT>
-prods<CharT> operator|(const prods<CharT>&, const prods<CharT>&);
-template <typename CharT>
-prods<CharT> operator|(const prods<CharT>& x, const CharT& c);
-template <typename CharT>
-prods<CharT> operator|(const prods<CharT>& x, const CharT* s);
-template <typename CharT>
-prods<CharT> operator|(const prods<CharT>& x,const std::basic_string<CharT>& s);
+template <typename C, typename T>
+bool operator==(const lit<C, T>& l, const prods<C, T>& p);
+template <typename C, typename T>
+prods<C, T> operator~(const prods<C, T>&);
+template <typename C, typename T>
+prods<C, T> operator&(const prods<C, T>&, const prods<C, T>&);
+template <typename C, typename T>
+prods<C, T> operator&(const prods<C, T>& x, const T& c);
+template <typename C, typename T>
+prods<C, T> operator&(const prods<C, T>& x, const T* c);
+template <typename C, typename T>
+prods<C, T> operator&(const prods<C, T>& x, const std::basic_string<C>& s);
+prods<char32_t> operator&(const prods<char32_t>& x,
+					const std::basic_string<char>& s);
+template <typename C, typename T>
+prods<C, T> operator|(const prods<C, T>&, const prods<C, T>&);
+template <typename C, typename T>
+prods<C, T> operator|(const prods<C, T>& x, const C& c);
+template <typename C, typename T>
+prods<C, T> operator|(const prods<C, T>& x, const C* s);
+template <typename C, typename T>
+prods<C, T> operator|(const prods<C, T>& x, const std::basic_string<C>& s);
 prods<char32_t> operator|(const prods<char32_t>& x,
 	const std::basic_string<char>& s);
-template <typename CharT>
-prods<CharT> operator+(const prods<CharT>& x, const CharT& c);
-template <typename CharT>
-prods<CharT> operator+(const prods<CharT>& x, const CharT* s);
-template <typename CharT>
-prods<CharT> operator+(const prods<CharT>& x,const std::basic_string<CharT>& s);
+template <typename C, typename T>
+prods<C, T> operator+(const prods<C, T>& x, const T& c);
+template <typename C, typename T>
+prods<C, T> operator+(const prods<C, T>& x, const T* s);
+template <typename C, typename T>
+prods<C, T> operator+(const prods<C, T>& x,const std::basic_string<C>& s);
 prods<char32_t> operator+(const prods<char32_t>& x,
 	const std::basic_string<char>& s);
 
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
-template<typename CharT>
-std::ostream& print_grammar(std::ostream& os, const grammar<CharT>& g);
-template<typename CharT>
+template<typename C = char, typename T = C>
+std::ostream& print_grammar(std::ostream& os, const grammar<C, T>& g);
+template<typename C>
 std::ostream& print_dictmap(std::ostream& os,
-	const std::map<typename parser<CharT>::string, size_t>& dm);
+	const std::map<std::basic_string<C>, size_t>& dm);
 #endif
 
 } // idni namespace
-#include "parser.tmpl.h"  // template definitions
+#include "grammar.tmpl.h" // template definitions for grammar and related
+#include "parser.tmpl.h"  // template definitions for parser
 #include "tgf.h"          // Tau Grammar Form
 #ifdef WITH_DEVHELPERS
 #include "devhelpers.h"   // various helpers for converting forest
@@ -334,4 +384,4 @@ std::ostream& print_dictmap(std::ostream& os,
 // undef local macros
 #undef DEFAULT_BINARIZE
 #undef DEFAULT_INCR_GEN_FOREST
-#endif
+#endif // __IDNI__PARSER__PARSER_H__

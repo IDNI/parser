@@ -14,6 +14,7 @@
 #define __IDNI__PARSER__CHARACTERS_H__
 #include <vector>
 #include <string>
+#include <cstdint>
 namespace idni {
 
 typedef unsigned char utf8char;
@@ -27,28 +28,37 @@ utf8string to_utf8string(const std::string& s);
 utf8string to_utf8string(char32_t ch);
 utf8string to_utf8string(const std::u32string& str);
 
-// utf8string to other strings
-std::string to_string(const utf8string& s);
-std::string to_string(const std::u32string& s);
+// u32string
+std::u32string to_u32string(const std::u32string& str);
 std::u32string to_u32string(const utf8string& str);
 std::u32string to_u32string(const std::string& str);
+
+// utf8string to other strings
+std::string to_string(const std::string& s);
+std::string to_string(const utf8string& s);
+std::string to_string(const std::u32string& s);
+std::string to_string(const char32_t& s);
 
 std::string to_std_string(const std::string& s);
 std::string to_std_string(const utf8string& s);
 std::string to_std_string(const std::u32string& s);
 std::string to_std_string(const char32_t& ch);
 
-std::string to_string(const std::string& s);
 
 template <typename CharT>
 typename std::basic_string<CharT> from_cstr(const char *);
 template <typename CharT>
 typename std::basic_string<CharT> from_str(const std::string&);
+template <typename CharT>
+typename std::basic_string<CharT> from_cstr(const char32_t *);
+template <typename CharT>
+typename std::basic_string<CharT> from_str(const std::u32string&);
 
 /**
- * checks if character is a begining of a multibyte codepoint
+ * checks if character is a begining of a multibyte codepoint or
+ * if it is a part of a multibyte codepoint
  */
-bool is_mb_codepoint(const utf8char ch);
+bool is_mb_codepoint(utf8char ch, uint8_t p = 0);
 
 /**
  * convert const utf8char* sequence s of 1-4 utf8 code units into codepoint &ch

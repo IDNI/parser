@@ -12,20 +12,17 @@
 // modified over time by the Author.
 #ifndef __IDNI__PARSER__TGF_H__
 #define __IDNI__PARSER__TGF_H__
+#include <fcntl.h>
 #include <cstring>
-#include <fstream>
 #include "parser.h"
 namespace idni {
 
-template <typename CharT>
+template <typename C = char, typename T = C>
 struct tgf {
-	typedef CharT char_t;
-	typedef std::basic_string<CharT> string;
-	typedef std::vector<string> strings;
-	typedef typename parser<CharT>::pforest forest_t;
+	typedef typename parser<C, T>::pforest forest_t;
 	tgf() :
-		cc(predefined_char_classes({ U("eof"), U("alpha"), U("alnum"),
-			U("digit"), U("printable"), U("space") }, nts)),
+		cc(predefined_char_classes<C, T>({ "eof", "alpha", "alnum",
+			"digit", "printable", "space" }, nts)),
 		alnum(nt("alnum")),
 		alpha(nt("alpha")),
 		char_(nt("char")),
@@ -33,9 +30,6 @@ struct tgf {
 		chars(nt("chars")),
 		chars1(nt("chars1")),
 		conjunction(nt("conjunction")),
-		command(nt("command")),
-		commands(nt("commands")),
-		commands_rest(nt("commands_rest")),
 		directive(nt("directive")),
 		directive_param(nt("directive_param")),
 		directive_params(nt("directive_params")),
@@ -65,6 +59,9 @@ struct tgf {
 		repeat(nt("repeat")),
 		space(nt("space")),
 		start(nt("start")),
+		statement(nt("statement")),
+		statements(nt("statements")),
+		statements1(nt("statements1")),
 		string_(nt("string")),
 		string_char(nt("string_char")),
 		string_chars(nt("string_chars")),
@@ -75,86 +72,79 @@ struct tgf {
 		ws_comment(nt("ws_comment")),
 		ws_required(nt("ws_required")),
 		g(nts, setup_productions(), start, cc), p(g) { }
-	static grammar<CharT> from_string(nonterminals<CharT>& nts_,
-		const string& s, const string& start_nt
-			= from_cstr<CharT>("start"))
+	static grammar<C, T> from_string(nonterminals<C, T>& nts_,
+		const std::basic_string<C>& s,
+		const std::basic_string<C>& start_nt = from_cstr<C>("start"))
 	{
-		tgf<CharT> f;
-		//DBG(f.g.print_data(cout << "\n>>>\n\n") << "\n<<<" << std::endl;)
-		return f.parse(nts_, s, start_nt);
+		tgf<C, T> f;
+		//std::cout << "parsing: " << to_std_string(s) << std::endl;
+		//DBG(f.g.print_data(std::cout << "\n>>>\n\n") << "\n<<<" << std::endl;)
+		//return {nts_};
+		return f.transform(f.p.parse(s.c_str(), s.size()),
+			nts_, start_nt);
 	}
-	static grammar<CharT> from_file(nonterminals<CharT>& nts_,
-		const std::string& filename, const string& start_nt
-			= from_cstr<CharT>("start"))
+	static grammar<C, T> from_file(nonterminals<C, T>& nts_,
+		const std::string& filename,
+		const std::basic_string<C>& start_nt = from_cstr<C>("start"))
 	{
-		tgf<CharT> f;
-		std::ifstream ifs(filename);
-		if (!ifs) {
+		tgf<C, T> f;
+		int fd;
+		//std::cout << "parsing file: " << filename << std::endl;
+		if ((fd = ::open(filename.c_str(), O_RDONLY)) == -1) {
 			std::cerr << "Failed to open file '" << filename << "':"
 				<< strerror(errno) << std::endl;
-			return grammar<CharT>(nts_);
+			return grammar<C, T>(nts_);
 		}
-		return f.parse(nts_, from_str<CharT>(std::string(
-				(std::istreambuf_iterator<char>(ifs)),
-				(std::istreambuf_iterator<char>()))), start_nt);
+		//std::cout << "fd: " << fd << " l: " << l << std::endl;
+		return f.transform(f.p.parse(fd), nts_, start_nt);
 	}
-
-	grammar<CharT> parse(nonterminals<CharT>& nts_, const string& s,
-		const string& start_nt = "start")
+private:
+	grammar<C, T> transform(
+		std::unique_ptr<typename parser<C, T>::pforest> f,
+		nonterminals<C, T>& nts_,
+		const std::basic_string<C>& start_nt = from_cstr<C>("start"))
 	{
 		struct context {
-			enum ftype { SIMPLE, GROUP, OPTIONAL, REPEAT };
-			enum utype { NONE, PLUS, MULTI } ut = NONE; // type of unot
-			prods<CharT> ps{}, nll{'\0'};
-			lit<CharT> p_head{};
-			std::vector<prods<CharT>> p{};
-			std::vector<string> cc_names{};
+			prods<C, T> ps{}, nul{lit<C, T>{}};
+			lit<C, T> p_head{};
+			std::vector<prods<C, T>> p{};
+			std::vector<std::string> cc_names{};
 			bool head = true;       // first sym in rule is head
 			bool in_directive = false;
-			nonterminals<CharT>& nts;
-			char_class_fns<CharT> cc;
-			std::vector<lits<CharT>> f; // factors (with nesting) 
-			std::vector<ftype> ft;  // types of factors
-			context(nonterminals<CharT>& nts) : nts(nts) {}
+			nonterminals<C, T>& nts;
+			char_class_fns<C> cc;
+			context(nonterminals<C, T>& nts) : nts(nts) {}
 			size_t id = 0;          // id of the new term
-			lit<CharT> nt(const string& s) {
-				return lit<CharT>{ nts.get(s), &nts };
+			lit<C, T> nt(const std::basic_string<C>& s) {
+				return lit<C, T>{ nts.get(s), &nts };
 			};
-			void add_literal(const lit<CharT>& l) {
-				//DBG(print_data();)
+			void add_literal(const lit<C, T>& l) {
 				//DBG(std::cout << "add_literal: " << l.to_std_string() << std::endl;)
 				if (head) p_head = l, p = {}, head = false;
-				else p.back() = p.back() + prods<CharT>{ l };
-				//DBG(print_data();)
+				else p.back() = p.back() + prods<C, T>{ l };
 			}
-			void add_nonterminal(const string& s) {
+			void add_nonterminal(const std::basic_string<C>& s) {
 				if (in_directive) return;
 				//DBG(std::cout << "add_nonterminal: " << to_std_string(s) << std::endl;)
-				if (s == from_cstr<CharT>("null"))
-					add_literal(lit<CharT>{'\0'});
-				else add_literal(lit<CharT>{nt(s)});
+				if (s == from_cstr<C>("null")) add_literal({});
+				else add_literal(lit<C, T>{ nt(s) });
 			}
-			void add_terminal(const CharT& ch) {
+			void add_terminal(const T& ch) {
 				//DBG(std::cout << "add_terminal: " << to_std_string(ch) << std::endl;)
-				add_literal(lit<CharT>{ch});
+				add_literal(lit<C, T>{ ch });
 			}
-			void add_terminals(const string& s) {
+			void add_terminals(const std::basic_string<C>& s) {
 				//DBG(std::cout << "add_terminals: " << to_std_string(s) << std::endl;)
 				for (const auto& ch : s) add_terminal(ch);
 			}
-			void directive() {
-				in_directive = false;
-			}
-			
+			void directive() { in_directive = false; }
 			void push() {
 				//DBG(std::cout << "push" << "\n";)
 				p.push_back({});
-				//DBG(print_data();)
 			}
 			void pop() {
 				//DBG(std::cout << "pop" << "\n";)
 				if (p.back().size() == 0) p.pop_back();
-				//DBG(print_data();)
 			}
 			void new_production() {
 				if (cc_names.size()) cc =
@@ -162,22 +152,17 @@ struct tgf {
 					cc_names.clear();
 			}
 			void disjunction() {
-				//DBG(print_data();)
 				//DBG(std::cout << "disjunction" << std::endl;)
 				p[p.size()-2] = p[p.size()-2] | p.back();
 				p.pop_back();
-				//DBG(print_data();)
 			}
 			void conjunction() {
-				//DBG(print_data();)
 				//DBG(std::cout << "conjunction" << std::endl;)
 				p[p.size()-2] = p[p.size()-2] & p.back();
 				p.pop_back();
-				//DBG(print_data();)
 			}
 			void production() {
 				//DBG(std::cout << "production: " << std::endl;)
-				//DBG(print_data();)
 				auto p_body = p[0];
 				for (size_t i = 1; i != p.size(); ++i)
 					p_body = p_body + p[i];
@@ -186,42 +171,33 @@ struct tgf {
 			}
 			void negate() {
 				//DBG(std::cout << "negation: " << std::endl;)
-				//DBG(print_data();)
 				p.back() = ~ p.back();
 			}
 			void group() {
 				//DBG(std::cout << "group\n";)
-				//DBG(print_data();)
-				auto nn = prods<CharT>(nt(get_new_name()));
-				ps(nn, p.back()), p.back() = nn;				
-				//DBG(print_data();)
+				auto nn = prods<C, T>(nt(get_new_name()));
+				ps(nn, p.back()), p.back() = nn;
 			}
 			void optional() {
 				//DBG(std::cout << "optional\n";)
-				//DBG(print_data();)
-				auto nn = prods<CharT>(nt(get_new_name()));
-				ps(nn, p.back() | nll), p.back() = nn;
-				//DBG(print_data();)
+				auto nn = prods<C, T>(nt(get_new_name()));
+				ps(nn, p.back() | nul), p.back() = nn;
 			}
 			void repeat() {
 				//DBG(std::cout << "repeat\n";)
-				//DBG(print_data();)
-				auto nn = prods<CharT>(nt(get_new_name()));
+				auto nn = prods<C, T>(nt(get_new_name()));
 				ps(nn, (p.back()+nn) | p.back()), p.back() = nn;
-				//DBG(print_data();)
 			}
 			void multi() {
-				auto nn = prods<CharT>(nt(get_new_name()));
-				ps(nn, (p.back() + nn) | nll), p.back() = nn;
+				auto nn = prods<C, T>(nt(get_new_name()));
+				ps(nn, (p.back() + nn) | nul), p.back() = nn;
 			}
-			string get_new_name() {
-				std::basic_stringstream<CharT> s;
-				s << from_cstr<CharT>("_R") <<
-					p_head.to_string() <<
-					from_cstr<CharT>("_") <<
-					from_str<CharT>(std::to_string(id++));
-				//cout << "new name: " << id << " " << to_std_string(s.str()) << "\n";
-				return s.str();
+			std::basic_string<C> get_new_name() {
+				std::stringstream ss;
+				ss << "_R" << p_head.to_std_string() << "_"
+									<< id++;
+				//cout << "new name: " << id << " " << to_std_string(ss.str()) << "\n";
+				return from_str<C>(ss.str());
 			}
 #ifdef DEBUG
 			void print_data() const {
@@ -232,29 +208,22 @@ struct tgf {
 			}
 #endif
 		} x(nts_);
-		//DBG(std::cout << "parsing: " << s << std::endl;)
-		auto f = p.parse(s.c_str(), s.size());
-		bool found = p.found();
-#ifdef DEBUG
-		//if (!found) 
-		//	p.print_data(cout << "PARSER DATA:\n") << endl;
-#endif
 		auto cb_enter = [&f, &x, this](const auto& n) {
 			const auto& l = n.first;
 			if (!l.nt()) return;
-			//DBG(cout << "entering: `" << l.to_std_string() << "`\n";)
+			//DBG(std::cout << "//entering: `" << l.to_std_string() << "`\n";)
 			if (l == sym) x.add_nonterminal(
-					terminals_to_str<CharT>(*f, n));
+					terminals_to_str<C, T>(*f, n));
 			else if (l == directive) x.in_directive = true;
 			else if (l == directive_param)
-				x.cc_names.push_back(
-					terminals_to_str<CharT>(*f, n));
+				x.cc_names.push_back(to_std_string(
+					terminals_to_str<C, T>(*f, n)));
 			else if (l == literals) x.push();
 			else if (l == group || l == optional || l == repeat)
 						x.pop();
 			else if (l == production_) x.new_production();
 			else if (l == string_ || l == quoted_char) {
-				auto str = terminals_to_str<CharT>(*f, n);
+				auto str = terminals_to_str<C, T>(*f, n);
 				str.erase(str.begin()), str.erase(str.end() - 1);
 				// DBG(cout << "quoted_char?: " << (l == quoted_char)
 				// 	<< " str.size(): " << str.size()
@@ -274,7 +243,7 @@ struct tgf {
 		auto cb_exit = [&x, this](const auto& n, const auto&) {
 			const auto&l = n.first;
 			if (!l.nt()) return;
-			//DBG(cout << "\t// leaving: `" << l.to_std_string() << "`\n";)
+			//DBG(std::cout << "\t// leaving: `" << l.to_std_string() << "`\n";)
 			if      (l == production_) x.production();
 			else if (l == directive)   x.directive();
 			else if (l == negation)    x.negate();
@@ -285,68 +254,85 @@ struct tgf {
 			else if (l == optional)    x.optional();
 			else if (l == plus || l == repeat) x.repeat();
 		};
-		if (!found) {
-			std::cout << "There is an error in the grammar. "
+#if DEBUG
+		auto cb_ambig = [](const auto& n, auto& ambset) {
+			const auto&l = n.first;
+			std::cout << "\t\tAMBIG: `" << l.to_std_string() << "`\n";
+			return ambset;
+		};
+#endif
+		if (!p.found()) {
+			std::cerr << "There is an error in the grammar. "
 					"Cannot recognize TGF.\n";
+			//DBG(p.print_data(std::cout << "PARSER DATA:\n") << "\n";)
 			//DBG(g.print_internal_grammar(cout << "TGF productions:\n") << endl;)
 			auto error = p.get_error();
 			std::cerr << error.to_str();
+				//parser<C, T>::perror_t::info_lvl::INFO_DETAILED);
 		} else {
 			//DBG(cout << "TRAVERSE parsed TGF source and "
 			//			"generate productions\n";)
 			auto c = f->has_single_parse_tree();
+			f->traverse(cb_enter, cb_exit
+#if DEBUG
+				, f->no_revisit, cb_ambig
+#endif
+				);
 			if (!c) {
-				std::cerr << "Forest contains more than one "
-					"tree " <<  "\nDumping trees...\n";
-				size_t n = 0;
-				auto next_g = [&n](
-					parser<char_t>::pforest::graph &fg)
-				{
-					fg.extract_trees()->to_print(std::cout
-						<< ">>> tree " << ++n << "\n")
-						<< "\n<<<\n\n";
-					return true;
-				};
-				f->extract_graphs(f->root(), next_g);
-			} else f->traverse(cb_enter, cb_exit);
+				std::cerr <<
+					"Forest contains more than one tree\n";
+					//<< "\nDumping 1 tree..." << std::endl;
+				//size_t n = 0;
+				//auto next_g = [&n](parser<C, T>
+				//			::pforest::graph &fg)
+				//{
+				//	fg.extract_trees()->to_print(std::cout
+				//		<< ">>> tree " << ++n << "\n")
+				//		<< "\n<<<\n\n";
+				//	return false;
+				//};
+				//f->extract_graphs(f->root(), next_g);
+			}
 		}
-		return grammar<CharT>(nts_, x.ps, prods<CharT>(x.nt(start_nt)),
-			x.cc);
+		return grammar<C, T>(nts_, x.ps, prods<C, T>(x.nt(start_nt)), x.cc);
 	}
-private:
-	nonterminals<CharT> nts{};
-	char_class_fns<CharT> cc;
-	prods<CharT> nll{'\0'},
-		alnum, alpha, char_, char0, chars, chars1, conjunction, command,
-		commands, commands_rest, directive, directive_param,
+	nonterminals<C, T> nts{};
+	char_class_fns<C> cc;
+	prods<C, T> nul{lit<C, T>{}},
+		alnum, alpha, char_, char0, chars, chars1, conjunction,
+		directive, directive_param,
 		directive_params, disjunction, eof, eol, expr1, expr2, expr3,
 		group, literal, literals, literals1, multi, nonliteral,
 		nonterminal, negation, optional, plus, printable,
 		printable_chars, printable_chars1, production_, production_sep,
-		quoted_char, quoted_char_esc, repeat, space, start, string_,
+		quoted_char, quoted_char_esc, repeat, space, start,
+		statement, statements, statements1,
+		string_,
 		string_char, string_chars, string_chars1, sym, terminal, ws,
 		ws_comment, ws_required;
-	grammar<CharT> g;
-	parser<CharT> p;
-	string U(const char* s) { return from_cstr<CharT>(s); }
-	string U(const char  c) { return from_str<CharT>({ c }); }
-	lit<CharT> nt(const std::string& s) {
-		return lit<CharT>{ nts.get(from_str<CharT>(s)), &nts }; };
-	prods<CharT> setup_productions() {
-		prods<CharT> q, sep{U("=>")}, underscore{'_'},
+	grammar<C, T> g;
+	parser<C, T> p;
+	forest<T> f;
+	std::basic_string<C> U(const char* s) { return from_cstr<C>(s); }
+	std::basic_string<C> U(const char  c) {
+		return from_str<C>(std::string{ c }); }
+	lit<C, T> nt(const std::string& s) {
+		return lit<C, T>{ nts.get(from_str<C>(s)), &nts }; };
+	prods<C, T> setup_productions() {
+		prods<C, T> q, sep{U("=>")}, underscore{'_'},
 			lparen{'('}, lbracket{'['}, lbrace('{'), tilde{'~'},
 			hash{'#'}, cr{'\r'}, nl{'\n'}, quotes{'"'}, at{'@'},
 			apostrophe{'\''};
-		q(start,            commands + ws);
-		q(commands,         ws + command + commands_rest);
-		q(commands_rest,    (ws + command + commands_rest) | nll);
-		q(command,          directive | production_);
+		q(start,            (ws + statements + ws) | nul);
+		q(statements,       statement + statements1);
+		q(statements1,      (ws + statement + statements1) | nul);
+		q(statement,        directive | production_);
 		q(directive,        at + U("use_char_class") + ws_required +
 					directive_params + ws + U('.'));
 		q(directive_params, directive_param |
 					(directive_param + ws + U(',') + ws +
 					directive_params));
-		q(directive_param,  prods<CharT>(U("eof")) | U("alnum") |
+		q(directive_param,  prods<C, T>(U("eof")) | U("alnum") |
 					U("alpha") | U("blank") | U("cntrl") |
 					U("digit") | U("graph") | U("lower") |
 					U("printable") | U("punct") |
@@ -366,7 +352,7 @@ private:
 		q(plus,             literal + ws + U('+'));
 		q(multi,            literal + ws + U('*'));
 		q(literals,         literal + literals1);
-		q(literals1,        (ws_required + literal + literals1) | nll);
+		q(literals1,        (ws_required + literal + literals1) | nul);
 		q(literal,          terminal | nonterminal);
 		q(terminal,         quoted_char | string_);
 		q(nonterminal,      sym | nonliteral);
@@ -374,17 +360,17 @@ private:
 		q(sym,              chars);
 		q(chars,            (alpha + chars1) | (underscore + chars1));
 		q(chars1,           (alnum + chars1) | (underscore + chars1) |
-					nll);
+					nul);
 		q(printable_chars,  printable + printable_chars1);
-		q(printable_chars1, (printable + printable_chars1) | nll);
+		q(printable_chars1, (printable + printable_chars1) | nul);
 		q(ws_comment,       (hash + eol) |
 					(hash + printable_chars + eol));
 		q(ws_required,      (space + ws) | (ws_comment + ws));
-		q(ws,               ws_required | nll);
+		q(ws,               ws_required | nul);
 		q(eol,              cr | nl | eof);
 		q(string_,          quotes + string_chars + quotes);
 		q(string_chars,     string_char + string_chars1);
-		q(string_chars1,    (string_char + string_chars1) | nll);
+		q(string_chars1,    (string_char + string_chars1) | nul);
 		q(string_char,      char0 | apostrophe | U("\\\""));
 		q(quoted_char,      (apostrophe + char_ + apostrophe) |
 					quoted_char_esc);

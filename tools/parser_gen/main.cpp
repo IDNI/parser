@@ -21,5 +21,5 @@ int main(int argc, char** argv) {
 	if (argc != 3) return cerr << argv[0] <<
 		": requires 2 arguments: parser_name and a tgf_filename\n", 1;
 	string parser_name(argv[1]), tgf_filename(argv[2]);
-	generate_parser_cpp<char32_t>(cout, parser_name, tgf_filename);
+	generate_parser_cpp_from_file<>(cout, parser_name, tgf_filename);
 }

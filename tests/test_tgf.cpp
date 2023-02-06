@@ -25,6 +25,8 @@ int main() {
 	bool failed = false;
 	auto fail = [&failed]() { cerr << "\nFAIL\n"; failed = true; exit(1); };
 
+	if (!run_test(" start => 'a'. ", "a")) fail();
+
 	if (!run_test(
 	"	@use_char_class eof, digit, space, printable. \n"
 

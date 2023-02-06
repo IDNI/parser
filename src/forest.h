@@ -20,7 +20,6 @@
 #include "defs.h"
 namespace idni {
 
-
 template <typename NodeT>
 struct forest {
 	typedef NodeT node;
@@ -448,7 +447,7 @@ bool forest<NodeT>::_traverse(const node_graph& g, const node& root,
 	std::cout << "\t" << (root.first.nt() ? "NT" : " T") << " ";
 	if (root.first.nt()) std::cout << "n: " << root.first.n()
 		<< " `" << root.first.to_std_string();
-	else std::cout << "c: `" << to_std_string(root.first.c()) << "`";
+	else std::cout << "t: `" << to_std_string(root.first.t()) << "`";
 	std::cout << "\n";
 #endif
 	bool ret = true;

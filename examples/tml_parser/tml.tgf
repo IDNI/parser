@@ -4,7 +4,7 @@
 eol            => '\n' | '\r' | eof.
 ws_comment     => '#' eol | '#' printable+ eol.
 ws_required    => space ws | ws_comment ws.
-ws             => [ ws_required ].
+ws             => ws_required | null.
 
 # characters
 hex_escape     => "\\x" xdigit xdigit.
@@ -176,5 +176,7 @@ fof0           => preds ws ":-" ws form.
 statement      => block | state_block | directive | query | guard_statement
 		| typedef_ | fact | rule | macro | fof | production.
 
-program        => (ws statement)* ws.
+program        => ws statements ws.
+statements     => statement statements1.
+statements1    => ws statement statements1 | null.
 start          => program.

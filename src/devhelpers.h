@@ -17,32 +17,32 @@
 #include "parser.h"
 namespace idni {
 
-template <typename CharT>
-bool to_tml_facts(std::ostream& os, const typename parser<CharT>::pforest& f);
-template <typename CharT>
-bool to_dot(std::ostream& os, const typename parser<CharT>::pforest& f,
+template <typename C, typename T = C>
+bool to_tml_facts(std::ostream& os, const typename parser<C, T>::pforest& f);
+template <typename C, typename T = C>
+bool to_dot(std::ostream& os, const typename parser<C, T>::pforest& f,
 	const std::string& inputstr = "",
 	const std::string& grammar_text = "");
-template <typename CharT, typename P>
+template <typename C, typename T = C, typename P = parser<C, T>::pnode_graph>
 bool to_dot(std::ostream& os, P& g,
 	const std::string& inputstr = "",
 	const std::string& grammar_text = "");
-template <typename CharT>
-bool to_tml_rules(std::ostream& os,const typename parser<CharT>::pforest& f);
-template <typename CharT, typename P = parser<CharT>::pnode_graph>
+template <typename C, typename T = C>
+bool to_tml_rules(std::ostream& os, const typename parser<C, T>::pforest& f);
+template <typename C, typename T = C, typename P = parser<C, T>::pnode_graph>
 bool to_tml_rules(std::ostream& os, P& g);
-template<typename CharT>
-std::string to_tml_rule(const typename parser<CharT>::pnode& nd);
+template<typename C, typename T = C>
+std::string to_tml_rule(const typename parser<C, T>::pnode& nd);
 //------------------------------------------------------------------------------
-template <typename CharT>
-bool to_dot(std::ostream& ss, const typename parser<CharT>::pforest& f,
+template <typename C, typename T>
+bool to_dot(std::ostream& ss, const typename parser<C, T>::pforest& f,
 	const std::string& inputstr,
 	const std::string& grammar_text)
 {
-	return to_dot<CharT>(ss, f.g, inputstr, grammar_text);
+	return to_dot<C>(ss, f.g, inputstr, grammar_text);
 }
 
-template <typename CharT, typename P>
+template <typename C, typename T, typename P>
 bool to_dot(std::ostream& ss, P& g, const std::string& inputstr,
 	const std::string& grammar_text)
 {
@@ -54,10 +54,9 @@ bool to_dot(std::ostream& ss, P& g, const std::string& inputstr,
 		}
 		return ss.str();
 	};
-	auto keyfun = [](const typename parser<CharT>::pnode& k) {
+	auto keyfun = [](const typename parser<C, T>::pnode& k) {
 		std::stringstream l;
-		l << k.first.to_std_string(from_cstr<CharT>("ε")) <<
-			"_" << k.second[0] << "_" << k.second[1] << "_";
+		l << "ε_" << k.second[0] << "_" << k.second[1] << "_";
 		std::string desc = l.str();
 		return std::pair<size_t, std::string>(
 			std::hash<std::string>()(desc), desc);
@@ -70,7 +69,7 @@ bool to_dot(std::ostream& ss, P& g, const std::string& inputstr,
 	ss << "\nnode" << "[ ordering =\"out\"];";
 	ss << "\ngraph" << "[ overlap =false, splines = true];";
 
-	if constexpr(std::is_same<P, typename parser<CharT>::psptree>::value) {
+	if constexpr(std::is_same<P, typename parser<C, T>::psptree>::value){
 		std::stringstream pss;
 		auto pointerid = [&pss]( auto &p){
 			pss << p;
@@ -79,10 +78,10 @@ bool to_dot(std::ostream& ss, P& g, const std::string& inputstr,
 			s[0]='_', s[1]='_';
 			return s;
 		};
-		std::deque<typename parser<CharT>::psptree> stk;
+		std::deque<typename parser<C, T>::psptree> stk;
 		stk.push_back(g);
 		while (!stk.empty()){
-			typename parser<CharT>::psptree cur = stk.back();
+			typename parser<C, T>::psptree cur = stk.back();
 			stk.pop_back();
 		
 			if (!cur->value.first.nt()) continue;
@@ -106,13 +105,13 @@ bool to_dot(std::ostream& ss, P& g, const std::string& inputstr,
 	}
 	else {
 		std::unordered_set<std::pair<size_t,size_t>,
-			typename parser<CharT>::hasher_t> edgedone;
+			typename parser<C, T>::hasher_t> edgedone;
 		edgedone.clear();
 		for (auto &it : g) {
 			auto key = keyfun(it.first);
 			std::string ctxt;
 			if constexpr(std::is_same<P, typename
-					parser<CharT>::pgraph>::value)
+					parser<C, T>::pgraph>::value)
 				if (g.cycles.contains(it.first))
 					ctxt = "shape = doublecircle,";
 			ss << "\n" << key.first << "[" << ctxt << "label=\"" <<
@@ -142,8 +141,8 @@ bool to_dot(std::ostream& ss, P& g, const std::string& inputstr,
 		return true;
 	}
 }
-template <typename CharT>
-bool to_tml_facts(std::ostream& ss, const typename parser<CharT>::pforest& f) {
+template <typename C, typename T>
+bool to_tml_facts(std::ostream& ss, const typename parser<C, T>::pforest& f){
 	auto n_e = f.get_nodes_and_edges();
 	auto& n = n_e.first;
 	auto& e = n_e.second;
@@ -154,29 +153,29 @@ bool to_tml_facts(std::ostream& ss, const typename parser<CharT>::pforest& f) {
 	for (auto& x : e) ss << "edge(" << x.first << ", " << x.second <<").\n";
 	return true;
 }
-template <typename CharT>
-std::string to_tml_rule(const typename parser<CharT>::pnode& nd)
+template <typename C, typename T>
+std::string to_tml_rule(const typename parser<C, T>::pnode& nd)
 {
 	std::stringstream ss;
-	ss << nd.first.to_std_string(from_cstr<CharT>("ε")) <<
+	ss << nd.first.to_std_string(from_cstr<C>("ε")) <<
 		"(" << nd.second[0] << " " << nd.second[1] << ")";
 	return ss.str();
 }
-template <typename CharT>
-bool to_tml_rules(std::ostream& ss, const typename parser<CharT>::pforest& f) {
-	return to_tml_rules<CharT>(ss, f.g);
+template <typename C, typename T>
+bool to_tml_rules(std::ostream& ss, const typename parser<C, T>::pforest& f){
+	return to_tml_rules<C, T>(ss, f.g);
 }
-template <typename CharT, typename P>
+template <typename C, typename T, typename P>
 bool to_tml_rules(std::ostream& ss, P& g) {
 	std::set<std::string> terminals;
 	for (auto &it : g) {
 		for (auto &pack : it.second) { 
-			ss << to_tml_rule<CharT>(it.first) << " :- ";
+			ss << to_tml_rule<C, T>(it.first) << " :- ";
 			for (size_t i = 0; i < pack.size(); i++) {
 				// if terminal
 				if (g.find(pack[i]) == g.end()) terminals
-					.insert(to_tml_rule<CharT>(pack[i]));
-				ss << to_tml_rule<CharT>(pack[i])
+					.insert(to_tml_rule<C, T>(pack[i]));
+				ss << to_tml_rule<C, T>(pack[i])
 					<< (i == pack.size()-1 ? "." : ", ");
 			};
 			ss << "\n";

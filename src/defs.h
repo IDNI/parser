@@ -13,6 +13,7 @@
 #ifndef __IDNI__PARSER__DEFS_H__
 #define __IDNI__PARSER__DEFS_H__
 #include <cstdint>
+#include <iomanip>
 namespace idni {
 
 #ifdef DEBUG
@@ -25,6 +26,11 @@ namespace idni {
 #else
 #define MS(x)
 #endif
+
+#define tdiff(start, end) ((double(end - start) / CLOCKS_PER_SEC) * 1000)
+#define emeasure_time_start(start, end) clock_t end, start = clock()
+#define emeasure_time_end(start, end) end = clock(), std::cout << std::fixed <<\
+	std::setprecision(2) << (start, end) << " ms"
 
 typedef int32_t int_t;
 

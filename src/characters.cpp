@@ -18,7 +18,9 @@ namespace idni {
 
 string to_string(const utf8string& s) { return string(s.begin(), s.end()); }
 string to_string(const u32string& s) { return to_string(to_utf8string(s)); }
+string to_string(const char32_t& s) { return to_string(to_utf8string(s)); }
 string to_string(const string& s) { return s; }
+
 utf8string to_utf8string(int32_t v) { return to_utf8string(::to_string(v)); }
 utf8string to_utf8string(char ch) { return to_utf8string(string{ ch }); }
 utf8string to_utf8string(const char* s) { return to_utf8string(string(s)); }
@@ -50,11 +52,20 @@ u32string to_u32string(const utf8string& str) {
 	// if (chl == (size_t) -1) return U""; // throw invalid UTF-8?
 	return ss.str();
 }
+u32string to_u32string(const u32string& str) { return str; }
 u32string to_u32string(const string& str) {
 	return to_u32string(to_utf8string(str));
 }
-bool is_mb_codepoint(const utf8char ch) { return ch >= 0x80; }
+
 #define utf_cont(ch) (((ch) & 0xc0) == 0x80)
+bool is_mb_codepoint(utf8char ch, uint8_t p) {
+	auto i = static_cast<unsigned int>(ch);
+	if (p == 0) return i >= 0x80 && ((i - 0xc2) <= (0xf4 - 0xc2));
+	if (p == 1) return i >= 0xe0 && utf_cont(i);
+	if (p == 2) return i >= 0xf0 && utf_cont(i);
+	if (p == 3) return utf_cont(i);
+	return false;
+}
 size_t peek_codepoint(const utf8char* str, size_t l, char32_t &ch) {
 	ch = -1;
   	if (!l) return 0;
@@ -64,7 +75,7 @@ size_t peek_codepoint(const utf8char* str, size_t l, char32_t &ch) {
 	if  (ch < 0x80) return 1;
 	if ((ch - 0xc2) > (0xf4 - 0xc2)) return -1;
 	s[1] = *(str + 1);
-	if  (ch < 0xe0) {
+	if (ch < 0xe0) {
 		if ((size_t)(str + 1) >= (size_t)end || !utf_cont(s[1]))
 			return -1;
 		ch = ((ch & 0x1f) << 6) | (s[1] & 0x3f);

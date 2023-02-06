@@ -16,8 +16,6 @@
 using namespace std;
 using namespace idni;
 
-typedef char char_t;
-
 struct basic_arithmetic {
 	const char* ba_tgf =
 	"	@use_char_class space, digit. "
@@ -37,7 +35,7 @@ struct basic_arithmetic {
 	"	start        => ws expr1 ws. "
 	;
 	basic_arithmetic() :
-		g(tgf<char_t>::from_string(nts, ba_tgf)), p(g) { }
+		g(tgf<char>::from_string(nts, ba_tgf)), p(g) { }
 	bool eval(const string& s) {
 		auto f = p.parse(s.c_str(), s.size());
 		if (!f || !p.found()) {
@@ -47,16 +45,16 @@ struct basic_arithmetic {
 		return true;
 	}
 private:
-	nonterminals<char_t> nts{};
-	grammar<char_t> g;
-	parser<char_t> p;
+	nonterminals<char> nts{};
+	grammar<char> g;
+	parser<char> p;
 	size_t id(const string& s) { return nts.get(s); }
-	int_t evaluate_forest(typename parser<char_t>::pforest& f) {
+	int_t evaluate_forest(parser<char>::pforest& f) {
 		vector<int_t> x;  // intermediate evaluations (nested)
 		auto cb_enter = [&x, &f, this](const auto& n) {
-			//DBG(cout << "entering: `" << n.first.to_std_string() << "`\n";)
+			//DBG(cout << "entering: `" << n.first.to_std_string() << "` ["<<n.second[0]<<","<<n.second[1]<<"]\n";)
 			if (n.first.nt() && n.first.n() == id("integer"))
-				x.push_back(terminals_to_int<char_t>(f, n));
+				x.push_back(terminals_to_int<char>(f, n));
 		};
 		auto cb_exit = [&x, this](const auto& n, const auto&) {
 			//DBG(cout << "exiting: `" << n.first.to_std_string() << "`\n";)
@@ -73,7 +71,7 @@ private:
 						x.pop_back();
 		};
 		f.traverse(cb_enter, cb_exit);
-		return x.back();
+		return x.size() ? x.back() : 0;
 	}
 };
 

@@ -2,6 +2,7 @@ set(EXAMPLES
 	basic_arithmetic
 	basic_arithmetic_tgf
 	tml_parser
+	bitparser
 )
 
 foreach(X IN LISTS EXAMPLES)
