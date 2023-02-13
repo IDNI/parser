@@ -18,7 +18,6 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <spanstream>
 #include <span>
 #include <cassert>
 #include <sys/mman.h>

@@ -56,7 +56,8 @@ bool to_dot(std::ostream& ss, P& g, const std::string& inputstr,
 	};
 	auto keyfun = [](const typename parser<C, T>::pnode& k) {
 		std::stringstream l;
-		l << "ε_" << k.second[0] << "_" << k.second[1] << "_";
+		l << k.first.to_std_string(from_cstr<C>("ε")) <<
+			"_" << k.second[0] << "_" << k.second[1] << "_";
 		std::string desc = l.str();
 		return std::pair<size_t, std::string>(
 			std::hash<std::string>()(desc), desc);
@@ -83,7 +84,7 @@ bool to_dot(std::ostream& ss, P& g, const std::string& inputstr,
 		while (!stk.empty()){
 			typename parser<C, T>::psptree cur = stk.back();
 			stk.pop_back();
-		
+
 			if (!cur->value.first.nt()) continue;
 			auto key = keyfun(cur->value);
 			ss << "\n" << pointerid(cur) << "["<<"label=\"" <<
@@ -169,7 +170,7 @@ template <typename C, typename T, typename P>
 bool to_tml_rules(std::ostream& ss, P& g) {
 	std::set<std::string> terminals;
 	for (auto &it : g) {
-		for (auto &pack : it.second) { 
+		for (auto &pack : it.second) {
 			ss << to_tml_rule<C, T>(it.first) << " :- ";
 			for (size_t i = 0; i < pack.size(); i++) {
 				// if terminal
