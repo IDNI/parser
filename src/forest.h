@@ -541,25 +541,25 @@ bool forest<NodeT>::replace_node(graph &g, const node &torepl, const nodes& repl
 			// better detect and prevent replacement in such a case, but its callers
 			// responsibility
 
-			std::cout<<"making change" << std::endl;
+			//std::cout<<"making change" << std::endl;
 			auto newrhs = *rhs_it;
 			auto inspos = newrhs.erase(newrhs.begin() + rpos);
 			newrhs.insert(inspos, repl.begin(), repl.end());
-			///*
+			/*
 			for( auto &v : newrhs)
 				std::cout << v.first ;
 			std::cout << std::endl;
-			//*/
-			std::cout<<"making change2" << std::endl;
+			*/
+			//std::cout<<"making change2" << std::endl;
 			rhs_it = kv.second.erase(rhs_it);
 			rhs_it = kv.second.insert(rhs_it, newrhs);
 			gchange = true;
-			///*
+			/*
 			for( auto &v : *rhs_it)
 				std::cout << v.first ;
 			std::cout << std::endl;
-			//*/
-			std::cout<<"done making change2" << std::endl;
+			*/
+			//std::cout<<"done making change2" << std::endl;
 		}
 	return gchange;
 }

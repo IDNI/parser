@@ -347,7 +347,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 #ifdef DEBUG
 #ifdef WITH_DEVHELPERS
 	bool nt = f->has_single_parse_tree();
-    std::cout<<"forest has more one parse tree:"<< (!nt ?
+    std::cout<<"forest has more than one parse tree:"<< (!nt ?
     "true" : "false") << std::endl;
 
 	if (!nt) {
