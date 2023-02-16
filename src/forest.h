@@ -53,14 +53,16 @@ struct forest {
 	// no cycles and no sharing implies its a tree
 	struct graph: public node_graph{
 		node root;
-		// nodes that lead to cycle
+		/// nodes that lead to cycle
 		std::set<node> cycles;
+		/// builds and returns a tree with nodes 
 		sptree extract_trees();
 		private:
 		sptree _extract_trees(node& r, int_t choice = 0);	
 	};
-
-	bool detect_cycle(graph& g) const;
+	std::set<node> cycles;
+	template<typename TraversableT>
+	bool detect_cycle(TraversableT& g) const;
 
 	//vector of graph with callback
 	typedef std::vector<graph> graphv;
@@ -75,6 +77,16 @@ struct forest {
 	const nodes_set& operator[](const node& p) const { return g[p]; }	
 	bool is_ambiguous() const;
 	bool has_single_parse_tree() const { return !is_ambiguous(); };
+	bool is_binarized() const;
+	/// removes all __temp symbols from the graph everywhere
+	/// by replacing them with their immediate children nodes
+	bool remove_binarization(graph&);
+	/// replaces node 'torep' in one pass with the given nodes 
+	/// 'replacement' everywhere in the forest and returns true 
+	/// if changed. Does not care if its recursive or cyclic, its
+	/// caller's responsibility to ensure
+	bool replace_node(graph &g, const node &torep, const nodes& replacement);
+	
 	size_t count_trees(const node& root) const;
 	size_t count_trees() const { return count_trees(root()); };
 	nodes_and_edges get_nodes_and_edges() const;
@@ -177,27 +189,24 @@ std::ostream& forest<NodeT>::print_data(std::ostream& os) const {
 }
 #endif
 
-// a dfs based approach to detect cycles
+// a dfs based approach to detect cycles for
+// any traversable type
 template<typename NodeT>
-bool forest<NodeT>::detect_cycle(graph &gr) const {
+template<typename TraversableT>
+bool forest<NodeT>::detect_cycle(TraversableT &gr) const {
 	std::map<NodeT, bool> inprog;
 	auto cb_enter = [&inprog, &gr](const auto& n) { 
-		if (n.first.nt()) 
-			inprog[n] = true;
+		if (n.first.nt()) inprog[n] = true;
 	};
 	auto cb_revisit = [&inprog, &gr](const auto& n) { 
-		if (inprog[n] == true) 
-			gr.cycles.insert(n);
+		if (inprog[n] == true) gr.cycles.insert(n);
 		return false; 
-	}; // revisit
+	};
 	auto cb_exit = [&inprog](const auto& n, auto&) {
 		if (n.first.nt()) inprog[n] = false;
 	};
-	auto cb_child_all = [](const auto&, auto& ambset) {
-		return ambset;
-	};
-
-	return traverse(gr,gr.root,cb_enter, cb_exit, cb_revisit, cb_child_all);
+	gr.cycles.clear();
+	return traverse(gr, gr.root, cb_enter, cb_exit, cb_revisit, no_ambig);
 }
 
 
@@ -464,7 +473,7 @@ bool forest<NodeT>::_traverse(const node_graph& g, const node& root,
 		? cb_ambig(root, pack) : pack; 
 	for (auto& nodes : choosen_pack)
 		for (auto& chd : nodes)
-			if (!done.count(chd) || cb_revisit(chd)) 
+			if (done.find(chd) == done.end() || cb_revisit(chd)) 
 				ret &= _traverse(g, chd, done, cb_enter,
 					cb_exit, cb_revisit, cb_ambig);
 #ifdef DEBUG_TRAVERSE
@@ -472,6 +481,87 @@ bool forest<NodeT>::_traverse(const node_graph& g, const node& root,
 #endif
 	cb_exit(root, choosen_pack);
 	return ret;
+}
+
+template <typename NodeT>
+bool forest<NodeT>::is_binarized() const {
+	for (auto &kv: this->g)
+		for (auto &rhs: kv.second) 
+			if (rhs.size() > 2 ) return false;
+	return true;
+}
+
+template <typename NodeT>
+bool forest<NodeT>::remove_binarization(graph &g){
+	
+	bool changed = false;
+	// use prefix from parser:: class instead
+	decltype(NodeT().first.t()) prefix []= {'t','e','m','p'};
+
+	//collect all prefix like nodes for replacement
+	std::set<NodeT> s;
+	for (auto &kv: g) {
+		auto name = kv.first.first.to_string();	
+		if (name.find(prefix) != decltype(name)::npos) 
+			s.insert(kv.first);
+	}
+	// replace the node with its immediate children,
+	// assuming its only one pack (unambigous)
+	// the caller to ensure the right order to avoid cyclic
+	// dependency if any. delete it from graph as well
+	for (auto &n : s) {
+		DBG(assert(g[n].size() == 1);)
+		if ( replace_node(g, n, *(g[n].begin())) )
+			changed = true, g.erase(n);
+	}
+	return changed;
+}
+
+template <typename NodeT>
+bool forest<NodeT>::replace_node(graph &g, const node &torepl, const nodes& repl) {
+	bool gchange = false;
+	for (auto &kv: g)
+		for (auto rhs_it = kv.second.begin(); 
+				rhs_it != kv.second.end(); rhs_it++ ) {
+
+			std::cout << "\n comparing" <<torepl.first << "with ";
+			size_t rpos = 0; bool change = false;
+			for ( ;rpos < rhs_it->size(); rpos++ ) {
+				std::cout<< rhs_it->at(rpos).first <<std::endl;
+				if (rhs_it->at(rpos) == torepl) {
+					// whatif there are multiple torepl in rhs_it
+					// better record all and replace all in a loop
+					// currently just the first one
+					change = true; break;
+				}
+			}
+			
+			if(!change) { continue; }
+			// if repl contains torepl as well (cyclic case), we still do replacement
+			// better detect and prevent replacement in such a case, but its callers
+			// responsibility
+
+			std::cout<<"making change" << std::endl;
+			auto newrhs = *rhs_it;
+			auto inspos = newrhs.erase(newrhs.begin() + rpos);
+			newrhs.insert(inspos, repl.begin(), repl.end());
+			///*
+			for( auto &v : newrhs)
+				std::cout << v.first ;
+			std::cout << std::endl;
+			//*/
+			std::cout<<"making change2" << std::endl;
+			rhs_it = kv.second.erase(rhs_it);
+			rhs_it = kv.second.insert(rhs_it, newrhs);
+			gchange = true;
+			///*
+			for( auto &v : *rhs_it)
+				std::cout << v.first ;
+			std::cout << std::endl;
+			//*/
+			std::cout<<"done making change2" << std::endl;
+		}
+	return gchange;
 }
 
 template <typename NodeT>

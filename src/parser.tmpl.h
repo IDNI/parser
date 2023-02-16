@@ -347,7 +347,11 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 #ifdef DEBUG
 #ifdef WITH_DEVHELPERS
 	bool nt = f->has_single_parse_tree();
+    std::cout<<"forest has more one parse tree:"<< (!nt ?
+    "true" : "false") << std::endl;
+
 	if (!nt) {
+        /*
 		std::cout<<"# parsed forest contains more than one tree\n";
 		static int_t c = 0;
 		std::stringstream ssf, ptd;
@@ -370,6 +374,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 			return true;
 		};
 		f->extract_graphs(f->root(), cb_next_graph);
+        */
 	}
 #endif
 #endif

@@ -12,7 +12,7 @@ static size_t stop_after = SIZE_MAX;
 template <typename T>
 int test_out(int c, const typename grammar<T>::grammar &g,
 	const basic_string<T> &inputstr,
-	const typename parser<T>::pforest &f)
+	typename parser<T>::pforest &f)
 {
 	stringstream ptd;
 	stringstream ssf;
@@ -21,42 +21,41 @@ int test_out(int c, const typename grammar<T>::grammar &g,
 	string s = ssf.str();
 	ssf.str({});
 
-	ssf << "graph" << c << ".dot";
+	ssf << "forest" << c << ".dot";
 	ofstream file(ssf.str());
-	to_dot<T>(ptd, f, to_std_string(inputstr), s);
+	to_dot<T>(ptd, std::as_const(f), to_std_string(inputstr), s);
 	file << ptd.str();
 	file.close();
 	ssf.str({});
 	ptd.str({});
 
-	ssf << "parse_graph" << c << ".tml";
+	ssf << "forest_facts" << c << ".tml";
 	ofstream file1(ssf.str());
-	to_tml_facts<T>(ptd, f);
+	to_tml_facts<T>(ptd, std::as_const(f));
 	file1 << ptd.str();
 	file1.close();
 	ssf.str({});
 	ptd.str({});
 
-	ssf << "parse_rules" << c << ".tml";
+	ssf << "forest_grammar_rules" << c << ".tml";
 	ofstream file2(ssf.str());
-	to_tml_rules<T>(ptd, f);
+	to_tml_rules<T>(ptd, std::as_const(f));
 	file2 << ptd.str();
 	file2.close();
 
 	size_t i = 0;
-	auto cb_next_graph = [&](typename parser<T>::pgraph &g)
-	{
-		f.detect_cycle(g);
+	auto dump_files = [&] (typename parser<T>::pgraph &g,
+							std::string suffix = "") {
 		ssf.str({});
 		ptd.str({});
-		ssf << "graph" << c << "_" << i << ".dot";
+		ssf << "graph" << c << "_" << i << suffix << ".dot";
 		ofstream filet(ssf.str());
 		to_dot<T, T, typename parser<T>::pgraph>(ptd, g, to_std_string(inputstr), s);
 		filet << ptd.str();
 		filet.close();
 		ssf.str({});
 		ptd.str({});
-		ssf << "parse_rules" << c << "_" << i << ".tml";
+		ssf << "graph_grammar_rules" << c << "_" << i << suffix << ".tml";
 		filet.open(ssf.str());
 		to_tml_rules<T>(ptd, g);
 		filet << ptd.str();
@@ -65,11 +64,18 @@ int test_out(int c, const typename grammar<T>::grammar &g,
 		typename parser<T>::psptree tr= g.extract_trees();
 		ssf.str({});
 		ptd.str({});
-		ssf << "tree" << c << "_" << i << ".dot";
+		ssf << "tree" << c << "_" << i << suffix << ".dot";
 		filet.open(ssf.str());
 		to_dot<T>(ptd, tr, to_std_string(inputstr), s);
 		filet << ptd.str();
 		filet.close();
+	};
+	auto cb_next_graph = [&](typename parser<T>::pgraph &g){
+		f.detect_cycle(g);
+		dump_files(g);
+		if (options<T>.binarize) 
+			f.remove_binarization(g),
+			dump_files(g, "rembin");
 		i++;
 
 		return i < stop_after ? true : false;

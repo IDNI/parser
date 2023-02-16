@@ -18,6 +18,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <unistd.h>
 #include <span>
 #include <cassert>
 #include <sys/mman.h>
@@ -292,8 +293,12 @@ private:
 	std::vector<container_t> S;
 	std::unordered_map<std::pair<size_t, size_t>, std::vector<item>,
 		hasher_t> sorted_citem, rsorted_citem;
-	std::map<std::vector<lit<C, T>>, lit<C, T>> bin_tnt; // binariesed temporary intermediate non-terminals
+	// binarized temporary intermediate non-terminals
+	std::map<std::vector<lit<C, T>>, lit<C, T>> bin_tnt;
+	std::basic_string<T> tnt_prefix() const { 
+		return std::basic_string<T>({'_','_', 't', 'e', 'm', 'p' }); } 
 	size_t tid; // id for temporary non-terminals
+	std::basic_string<T> get_fresh_tnt() ;
 	lit<C, T> get_lit(const item& i) const;
 	lit<C, T> get_nt(const item& i) const;
 	container_iter add(container_t& t, const item& i);
