@@ -295,10 +295,15 @@ private:
 		hasher_t> sorted_citem, rsorted_citem;
 	// binarized temporary intermediate non-terminals
 	std::map<std::vector<lit<C, T>>, lit<C, T>> bin_tnt;
-	std::basic_string<T> tnt_prefix() const { 
-		return std::basic_string<T>({'_','_', 't', 'e', 'm', 'p' }); } 
+	static std::basic_string<C> tnt_prefix() { 
+		static std::basic_string<C> pr = {'_','_', 't', 'e', 'm', 'p' };
+		return pr; } 
 	size_t tid; // id for temporary non-terminals
-	std::basic_string<T> get_fresh_tnt() ;
+	std::basic_string<C> get_fresh_tnt() {
+		std::basic_stringstream<C> ss;
+		ss << tnt_prefix() << tid++;
+		return ss.str();
+	}
 	lit<C, T> get_lit(const item& i) const;
 	lit<C, T> get_nt(const item& i) const;
 	container_iter add(container_t& t, const item& i);

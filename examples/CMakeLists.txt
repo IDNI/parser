@@ -3,6 +3,7 @@ set(EXAMPLES
 	basic_arithmetic_tgf
 	tml_parser
 	bitparser
+	csv_parser
 )
 
 foreach(X IN LISTS EXAMPLES)

@@ -81,11 +81,10 @@ struct forest {
 	/// removes all __temp symbols from the graph everywhere
 	/// by replacing them with their immediate children nodes
 	bool remove_binarization(graph&);
-	/// replaces node 'torep' in one pass with the given nodes 
-	/// 'replacement' everywhere in the forest and returns true 
-	/// if changed. Does not care if its recursive or cyclic, its
-	/// caller's responsibility to ensure
-	bool replace_node(graph &g, const node &torep, const nodes& replacement);
+	/// removes all __R symbols from the graph everywhere
+	/// by replacing them with their immediate children nodes
+	bool remove_recursive_nodes(graph&);
+	
 	
 	size_t count_trees(const node& root) const;
 	size_t count_trees() const { return count_trees(root()); };
@@ -170,6 +169,21 @@ private:
 	bool _extract_graph_uniq_node(std::set<node>& done,
 		std::vector<node>& todo, graphv& graphs, size_t gid,
 		cb_next_graph_t g, bool& no_stop) const;
+	
+
+	/// replace each node with its immediate children,
+	/// assuming its only one pack (unambigous)
+	/// the caller to ensure the right order to avoid cyclic
+	/// dependency if any. deletes from graph g as well.
+	/// return true if any one of the nodes' replacement
+	/// succeeds
+	bool replace_nodes(graph &g, std::vector<NodeT> &s);
+
+	/// replaces node 'torep' in one pass with the given nodes 
+	/// 'replacement' everywhere in the forest and returns true 
+	/// if changed. Does not care if its recursive or cyclic, its
+	/// caller's responsibility to ensure
+	bool replace_node(graph &g, const node &torep, const nodes& replacement);
 };
 
 #ifdef DEBUG
@@ -492,27 +506,43 @@ bool forest<NodeT>::is_binarized() const {
 }
 
 template <typename NodeT>
-bool forest<NodeT>::remove_binarization(graph &g){
-	
-	bool changed = false;
-	// use prefix from parser:: class instead
-	decltype(NodeT().first.t()) prefix []= {'t','e','m','p'};
+bool forest<NodeT>::remove_recursive_nodes(graph &g){
 
+	decltype(NodeT().first.t()) prefix []= {'_','R'};
 	//collect all prefix like nodes for replacement
-	std::set<NodeT> s;
+	std::vector<NodeT> s;
 	for (auto &kv: g) {
 		auto name = kv.first.first.to_string();	
 		if (name.find(prefix) != decltype(name)::npos) 
-			s.insert(kv.first);
+			s.insert(s.end(), kv.first);
 	}
-	// replace the node with its immediate children,
-	// assuming its only one pack (unambigous)
-	// the caller to ensure the right order to avoid cyclic
-	// dependency if any. delete it from graph as well
+	return replace_nodes(g, s);
+}
+
+template <typename NodeT>
+bool forest<NodeT>::remove_binarization(graph &g){
+	
+	//better use parser::tnt_prefix()
+	decltype(NodeT().first.t()) prefix []= {'_','_','t','e','m','p'};
+	//collect all prefix like nodes for replacement
+	std::vector<NodeT> s;
+	for (auto &kv: g) {
+		auto name = kv.first.first.to_string();	
+		if (name.find(prefix) != decltype(name)::npos) 
+			s.insert(s.end(), kv.first);
+	}
+	return replace_nodes(g, s);
+}
+
+template <typename NodeT>
+bool forest<NodeT>::replace_nodes(graph &g, std::vector<NodeT> &s ){
+
+	bool changed = false;
 	for (auto &n : s) {
 		DBG(assert(g[n].size() == 1);)
-		if ( replace_node(g, n, *(g[n].begin())) )
+		if (replace_node(g, n, *(g[n].begin())))
 			changed = true, g.erase(n);
+		else DBG( std::cout<<"Could not replace node"; ) ;	
 	}
 	return changed;
 }
@@ -520,40 +550,44 @@ bool forest<NodeT>::remove_binarization(graph &g){
 template <typename NodeT>
 bool forest<NodeT>::replace_node(graph &g, const node &torepl, const nodes& repl) {
 	bool gchange = false;
+
+	//return false if torepl is in repl to avoid infinite loop
+	for( auto &n : repl)
+		if( n == torepl) return false;
+
 	for (auto &kv: g)
 		for (auto rhs_it = kv.second.begin(); 
 				rhs_it != kv.second.end(); rhs_it++ ) {
 
-			std::cout << "\n comparing" <<torepl.first << "with ";
-			size_t rpos = 0; bool change = false;
-			for ( ;rpos < rhs_it->size(); rpos++ ) {
-				std::cout<< rhs_it->at(rpos).first <<std::endl;
-				if (rhs_it->at(rpos) == torepl) {
-					// whatif there are multiple torepl in rhs_it
-					// better record all and replace all in a loop
-					// currently just the first one
-					change = true; break;
+			//std::cout << "\n comparing" <<torepl.first << "with ";
+			auto newrhs = *rhs_it;
+			bool lchange = false;
+			//keep replacing torepl's any occurence in the newrhs
+			for(bool change = true; change ; ) {
+				size_t rpos = 0; change = false;
+				for ( ;rpos < newrhs.size(); rpos++ ) {
+				//	std::cout<< rhs_it->at(rpos).first <<std::endl;
+					if (newrhs.at(rpos) == torepl) {
+						// std::cout<<"making change" << std::endl;
+						//erase the current torepl from rpos position
+						auto inspos = newrhs.erase(newrhs.begin() + rpos);
+						//do replacement at its new position
+						newrhs.insert(inspos, repl.begin(), repl.end());
+						lchange = change = true; break;
+					}
 				}
 			}
-			
-			if(!change) { continue; }
-			// if repl contains torepl as well (cyclic case), we still do replacement
-			// better detect and prevent replacement in such a case, but its callers
-			// responsibility
-
-			//std::cout<<"making change" << std::endl;
-			auto newrhs = *rhs_it;
-			auto inspos = newrhs.erase(newrhs.begin() + rpos);
-			newrhs.insert(inspos, repl.begin(), repl.end());
 			/*
 			for( auto &v : newrhs)
 				std::cout << v.first ;
 			std::cout << std::endl;
 			*/
 			//std::cout<<"making change2" << std::endl;
-			rhs_it = kv.second.erase(rhs_it);
-			rhs_it = kv.second.insert(rhs_it, newrhs);
-			gchange = true;
+			if (lchange) {
+				rhs_it = kv.second.erase(rhs_it);
+				rhs_it = kv.second.insert(rhs_it, newrhs);
+				gchange = true;
+			}
 			/*
 			for( auto &v : *rhs_it)
 				std::cout << v.first ;

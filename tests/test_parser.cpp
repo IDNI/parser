@@ -165,6 +165,10 @@ int main(int argc, char **argv)
 			stop_after = 5;
 		else help(opt), exit(1);
 	}
+	std::cout<< "Running with options: ";
+	for_each(args.begin(), args.end(),[](string &a){std::cout<< a << " ";});
+	std::cout<<std::endl;
+
 	options<char>.binarize =        options<char32_t>.binarize = binarize;
 	options<char>.incr_gen_forest =	options<char32_t>.incr_gen_forest =
 								incr_gen;

@@ -535,9 +535,7 @@ void parser<C, T>::pre_process(const item &i) {
 					g[i.prod][i.con].begin() + i.dot);
 			lit<C, T> l;
 			if (bin_tnt.find(v) == bin_tnt.end()) {
-				std::stringstream ss;
-				ss << "temp" << tid++;
-				l = g.nt(from_str<C>(ss.str()));
+				l = g.nt(from_str<C>(get_fresh_tnt()));
 				bin_tnt.insert({ v, l });
 			}
 			else l = bin_tnt[v];
