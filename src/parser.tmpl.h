@@ -141,18 +141,20 @@ lit<C, T> parser<C, T>::get_lit(const item& i) const {
 template <typename C, typename T>
 lit<C, T> parser<C, T>::get_nt(const item& i) const { return g(i.prod); }
 template <typename C, typename T>
-typename parser<C, T>::container_iter
+std::pair<typename parser<C, T>::container_iter, bool> 
 	parser<C, T>::add(container_t& t, const item& i)
 {
 	//DBG(print(std::cout << "adding ", i) << std::endl;)
+	// now return iterator along with whether insertions
+	// succeeded or not
 	auto& cont = S[i.set];
 	auto it = cont.find(i);
-	if (it != cont.end()) return it;
-	if ((it = t.find(i)) != t.end()) return it;
+	if (it != cont.end()) return {it, false};
+	if ((it = t.find(i)) != t.end()) return {it, false};
 	it = t.insert(i).first;
 	if (nullable(*it))
 		add(t, item(it->set, it->prod, it->con, it->from, it->dot + 1));
-	return it;
+	return {it, true} ;
 }
 template <typename C, typename T>
 bool parser<C, T>::nullable(const item& i) const {
@@ -173,8 +175,16 @@ void parser<C, T>::complete(const item& i, container_t& t) {
 	const container_t& cont = S[i.from];
 	for (auto it = cont.begin(); it != cont.end(); ++it)
 		if (g[it->prod][it->con].size() > it->dot &&
-			get_lit(*it) == get_nt(i)) add(t, item(i.set,
+			get_lit(*it) == get_nt(i)) {
+				add(t, item(i.set,
 				it->prod, it->con, it->from, it->dot + 1));
+				// whence the item is completed, then
+				// decrement the refcount for the one 
+				// that predicted and inserted it
+				if (refi.count(*it) && refi[*it] > 0) 
+					--refi[*it];
+			}
+	gcready.insert(i);
 }
 template <typename C, typename T>
 void parser<C, T>::resolve_conjunctions(container_t& t)
@@ -215,13 +225,32 @@ template <typename C, typename T>
 void parser<C, T>::predict(const item& i, container_t& t) {
 	//DBG(print(std::cout << "predicting ", i) << std::endl;)
 	for (size_t p : g.prod_ids_of_literal(get_lit(i)))
-		for (size_t c = 0; c != g[p].size(); ++c)
-			add(t, item(i.set, p, c, i.set, 0));
+		for (size_t c = 0; c != g[p].size(); ++c) {
+			// predicting item should have ref count increased
+			// since predicting item, for its advancement over 
+			// non-terminal, depends on the completion of
+			// predicted item.
+			// same item can predict one or more predicted
+			// items, if added, must increment predicting 
+			// item accordingly. 
+			// if different items predict the same predicted
+			// item, just use one
+			// Should we use S[n] to see if new item is insertable
+			//
+			if (add(t, item(i.set, p, c, i.set, 0)).second)
+				++refi[i];
+		}
 }
 template <typename C, typename T>
 void parser<C, T>::scan(const item& i, size_t n, T ch) {
 	//DBG(print(std::cout << "scanning ", i) << " ch: " << to_std_string(ch) << std::endl;)
 	if (ch != get_lit(i).t()) return;
+	// by this time, terminal is advanced over
+	// and new item j will be created.
+	// hence, the previous item i can be marked
+	// for gc 
+	gcready.insert(i);
+
 	item j(n + 1, i.prod, i.con, i.from, i.dot + 1);
 	if (j.set >= S.size()) S.resize(j.set + 1);
 	S[j.set].insert(j);
@@ -275,6 +304,11 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 	sorted_citem.clear();
 	rsorted_citem.clear();
 	bin_tnt.clear();
+	//clear the refcount
+	refi.clear();
+	gcready.clear();
+	// number of items that have been collected
+	int gcnt = 0;
 	tid = 0;
 	S.clear();//, S.resize(len + 1);//, C.clear(), C.resize(len + 1);
 	S.resize(1);
@@ -338,10 +372,41 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 						{ it->from, it->set });
 					build_forest(*f, curroot);
 				}
+			// check if we have some candidate ready for being
+			// collected. store the current container for found()
+			//------ 
+			lastcnt = S[n];
+			if (gcready.size()) {
+				for( auto &rm : gcready)
+					if(refi[rm] == 0) {
+						// since the refc is zero, remove it from the 
+						// main container
+						S[rm.set].erase(rm);
+						refi.erase(rm);
+						gcnt++;
+					}
+					else {
+						DBG(assert(refi[rm] == 0));
+					}
+				//gcready.clear();
+			}
 		}
 	} while (in->tnext());
 	MS(emeasure_time_end(tsr, ter) <<" :: parse time\n";)
 	in->clear();
+	
+	// remaining total items 
+	size_t count = 0;
+	for( size_t i = 0 ; i< S.size(); i++)
+		count += S[i].size();
+
+	std::cout<<"-----------"<<std::endl;
+	std::cout<<"GC: total input size = "<< n<<std::endl;
+	std::cout<<"GC: total remaining = "<< count<<std::endl;
+	std::cout<<"GC: total collected = "<< gcnt<<std::endl;
+	if(count+gcnt)
+	std::cout<<"GC: % = "<<100*gcnt/(count+gcnt)<<std::endl;
+
 	if (!o.incr_gen_forest) init_forest(*f);
 	else f->root(pnode(g.start_literal(), { 0, in->tpos() }));
 #ifdef DEBUG
@@ -394,9 +459,9 @@ bool parser<C, T>::found() {
 			//DBG(print(std::cout << "find: ",
 			//	item(in->tpos(), n, c, 0, g.len(n, c))) << std::endl;)
 			//DBG(std::cout << "C: " << c << std::endl;)
-			bool t = S[in->tpos()].find(
+			bool t = lastcnt.find(
 				item(in->tpos(), n, c, 0, g.len(n, c)))
-					!= S[in->tpos()].end();
+					!= lastcnt.end();
 			//DBG(std::cout << "~: " << g[n][c].neg << std::endl;)
 			//DBG(std::cout << "T: " << t << std::endl;)
 			if (!g[n][c].neg) f = t;
