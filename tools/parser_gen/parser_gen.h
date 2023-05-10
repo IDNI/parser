@@ -59,6 +59,15 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name, con
 		os << "\n";
 		return os.str();
 	};
+	auto gen_nts_enum_cte = [&gi, &U]() {
+		std::stringstream os;
+		auto& x = gi.nts();
+		for (size_t n = 0; n != x.size(); ++n)
+			os << (n % 10 == 0 ? "\n\t\t\t" : "") <<
+				U << to_std_string(x[n]) << ", ";
+		os << "\n";
+		return os.str();
+	};
 	auto gen_nts = [&gi, &U]() {
 		std::stringstream os;
 		auto& x = gi.nts();
@@ -141,6 +150,7 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name, con
 		"	typename idni::parser<" <<cht<< ">::perror_t "
 								"get_error()\n"
 		"		{ return p.get_error(); }\n"
+		"   enum struct nonterminal : size_t {\n" << gen_nts_enum_cte() << "   };\n"
 		"private:\n"
 		"	std::vector<" <<cht<< "> ts{\n" <<
 				gen_ts() <<
