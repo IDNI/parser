@@ -64,7 +64,7 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name, con
 		auto& x = gi.nts();
 		for (size_t n = 0; n != x.size(); ++n)
 			os << (n % 10 == 0 ? "\n\t\t\t" : "") <<
-				U << to_std_string(x[n]) << ", ";
+				U << (n == 0? "empty_string": to_std_string(x[n])) << ", ";
 		os << "\n";
 		return os.str();
 	};
