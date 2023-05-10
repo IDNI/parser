@@ -28,6 +28,7 @@ utf8string to_utf8string(const string& s) {
 	return utf8string(s.begin(), s.end());
 }
 utf8string to_utf8string(char32_t ch) {
+	if (ch == static_cast<char32_t>(0)) return {};
 	utf8char s[4];
 	size_t l = emit_codepoint(ch, s);
 	if (l == (size_t) -1) return utf8string();

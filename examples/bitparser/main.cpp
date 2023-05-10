@@ -41,7 +41,7 @@ int test(const basic_string<C>& inputstr, T tval, T fval,
 	q(value, TRUE | FALSE);
 	grammar<C, T>g(nt, q, start, {});
 	typename parser<C, T>::options o;
-	if (conv) o.char_to_terminals = conv;
+	if (conv) o.chars_to_terminals = conv;
 	parser<C, T> p(g, o);
 	auto f = p.parse(inputstr.c_str(), inputstr.size());
 	auto found = p.found();

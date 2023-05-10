@@ -75,7 +75,7 @@ int test_out(int c, const typename grammar<T>::grammar &g,
 	auto cb_next_graph = [&](typename parser<T>::pgraph &g){
 		f.detect_cycle(g);
 		dump_files(g);
-		if (options<T>.binarize) 
+		if (options<T>.binarize)
 			f.remove_binarization(g),
 			dump_files(g, "rembin");
 		i++;
@@ -96,7 +96,7 @@ bool run_test(const prods<T> &ps, nonterminals<T> &nts,
 	parser<T> e(g, options<T>);
 
 	//cout << ".";
-	//cerr << "parsing: `" << to_std_string(input) << "` [" << input.size() << "]" << endl;
+	cerr << "parsing: `" << to_std_string(input) << "` [" << input.size() << "]" << endl;
 
 	auto f = e.parse(input.c_str(), input.size());
 	bool found = e.found();
@@ -117,8 +117,11 @@ bool run_test(const prods<T> &ps, nonterminals<T> &nts,
 	}
 	cout << "#found " << found << "\n";
 	cout << "#count " << f->count_trees() << std::endl;
+	cout << "#ambiguous " << f->is_ambiguous() << std::endl;
 	// if (contains.size())
 	//	cout << "contains: `" << contains << "`: " << contained << endl;
+
+	if (!found) cerr << e.get_error().to_str() << endl;
 
 	if (error_expected.size()) { // negative test case
 		auto msg = e.get_error().to_str();
@@ -176,7 +179,7 @@ int main(int argc, char **argv)
 								incr_gen;
 	nonterminals<> nt;
 	char_class_fns cc = predefined_char_classes<>(
-		{ "eof", "alpha", "alnum", "digit" }, nt);
+		{ "eof", "alpha", "alnum", "digit", "printable" }, nt);
 
 	prods<> ps, start(nt("start")), nll(lit<>{}),
 		alnum(nt("alnum")), alpha(nt("alpha")), digit(nt("digit")),
@@ -188,19 +191,26 @@ int main(int argc, char **argv)
 		A(nt("A")), B(nt("B")), T(nt("T")), X(nt("X")),
 		one('1'), PO(nt("PO")), IO(nt("IO")),
 		plus('+'), minus('-'), mult('*'),
-		cr('\r'), lf('\n'), eof(nt("eof")), eol(nt("eol"));
+		cr('\r'), lf('\n'), eof(nt("eof")), eol(nt("eol")),
+		string_(nt("string")), string_char(nt("string_char")),
+		string_chars(nt("string_chars")),
+		string_chars1(nt("string_chars1")),
+		char_(nt("char_")), char0(nt("char0")),
+		printable(nt("printable")),
+		enabled(nt("enabled")), disabled(nt("disabled")),
+		q_str(lit<>{'"'}), esc(lit<>{'\\'});
 
 	bool failed = false;
-	auto fail = [&failed]() { cerr << "\nFAIL\n"; failed = true; };
+	auto fail = [&failed]() { cerr << "\nFAIL\n"; failed = true; exit(1); };
 
 	// Using Elizbeth Scott paper example 2, pg 64
-	ps(start, b | start + start);
+	ps(start, b | (start + start));
 	if (!run_test<char>(ps, nt, start, "bbb")) fail();
 	//negative tests
 	if (!run_test<char>(ps, nt, start, "bbba",{},false,"","Unexpected"))
 									 fail();
-	if (!run_test<char>(ps, nt, start, "a", {}, false, "", "\"a\"")) fail();
-	if (!run_test<char>(ps, nt, start, "a", {}, false, "", "\"b\"")) fail();
+	if (!run_test<char>(ps, nt, start, "a", {}, false, "", "'a'")) fail();
+	if (!run_test<char>(ps, nt, start, "a", {}, false, "", "'b'")) fail();
 	if ( run_test<char>(ps, nt, start, "a", {}, false, "","success"))fail();
 	ps.clear();
 
@@ -270,6 +280,18 @@ int main(int argc, char **argv)
 	if ( run_test<char>(ps, nt, start, "b")) fail();
 	ps.clear();
 
+	// conjunction + negation of nonterminals deeper in grammar
+	ps(start, expression);
+	ps(expression, char_);
+	ps(char_, enabled & ~disabled);
+	ps(enabled,    A | B);
+	ps(disabled,   A);
+	ps(A,          a);
+	ps(B,          b);
+	if (!run_test<char>(ps, nt, start, "b")) fail();
+	if ( run_test<char>(ps, nt, start, "a")) fail();
+	ps.clear();
+
 	// keyword vs identifier
 	ps(start,      identifier | keyword);
 	ps(identifier, chars & ~ keyword);
@@ -297,8 +319,30 @@ int main(int argc, char **argv)
 	if (!run_test<char>(ps, nt, start, "b")) fail();
 	ps.clear();
 
+	ps(char_, a | q_str);
+	ps(char0, char_ | (esc + char_));
+	ps(string_char, char0 & ~q_str);
+	ps(string_chars,  string_char + string_chars1);
+	ps(string_chars1, (string_char + string_chars1) | nll);
+	ps(string_, (q_str + string_chars + q_str));
+	ps(start, string_ | (string_ + start));
+	if (!run_test<char>(ps, nt, start, "\"\\\"a\"\"\\\"a\"\"\\\"a\"\"\\\"a\\\"\"")) fail();
+	ps.clear();
+
 	// test eof / eol
-	ps(start, (a + eol));
+	ps(start, eof);
+	if (!run_test<char>(ps, nt, start, "", cc)) fail();
+	ps.clear();
+	ps(start, a + eof);
+	if (!run_test<char>(ps, nt, start, "a", cc)) fail();
+	ps.clear();
+	ps(start, eol);
+	ps(eol,   cr | lf | eof);
+	if (!run_test<char>(ps, nt, start, "\n", cc)) fail();
+	if (!run_test<char>(ps, nt, start, "\r", cc)) fail();
+	if (!run_test<char>(ps, nt, start, "",   cc)) fail();
+	ps.clear();
+	ps(start, a + eol);
 	ps(eol,   cr | lf | eof);
 	if (!run_test<char>(ps, nt, start, "a\n", cc)) fail();
 	if (!run_test<char>(ps, nt, start, "a\r", cc)) fail();

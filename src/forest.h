@@ -30,7 +30,7 @@ struct forest {
 	typedef std::pair<size_t, size_t> edge;
 	typedef std::vector<edge> edges;
 	typedef std::pair<nodes, edges> nodes_and_edges;
-	
+
 	// shared packed parse forest (SPPF) that captures ambiguities while
 	// reusing shared sub structure within the forest
 	node_graph g;
@@ -49,16 +49,16 @@ struct forest {
 	typedef std::shared_ptr<tree> sptree;
 
 	// a least maximal core graph without ambiguity/repeating nodes/edges
-	// possibly with cycles or shared nodes. 
+	// possibly with cycles or shared nodes.
 	// no cycles and no sharing implies its a tree
 	struct graph: public node_graph{
 		node root;
 		/// nodes that lead to cycle
 		std::set<node> cycles;
-		/// builds and returns a tree with nodes 
+		/// builds and returns a tree with nodes
 		sptree extract_trees();
 		private:
-		sptree _extract_trees(node& r, int_t choice = 0);	
+		sptree _extract_trees(node& r, int_t choice = 0);
 	};
 	std::set<node> cycles;
 	template<typename TraversableT>
@@ -74,7 +74,7 @@ struct forest {
 	void clear() { g.clear(); }
 	bool contains(const node& n) { return g.find(n) != g.end(); }
 	nodes_set& operator[](const node& p)             { return g[p]; }
-	const nodes_set& operator[](const node& p) const { return g[p]; }	
+	const nodes_set& operator[](const node& p) const { return g[p]; }
 	bool is_ambiguous() const;
 	bool has_single_parse_tree() const { return !is_ambiguous(); };
 	bool is_binarized() const;
@@ -84,8 +84,8 @@ struct forest {
 	/// removes all __R symbols from the graph everywhere
 	/// by replacing them with their immediate children nodes
 	bool remove_recursive_nodes(graph&);
-	
-	
+
+	std::set<std::pair<node, nodes_set>> ambiguous_nodes() const;
 	size_t count_trees(const node& root) const;
 	size_t count_trees() const { return count_trees(root()); };
 	nodes_and_edges get_nodes_and_edges() const;
@@ -107,7 +107,7 @@ struct forest {
 		typename cb_revisit_t, typename cb_ambig_t>
 	bool traverse(const node &root, cb_enter_t cb_enter, cb_exit_t cb_exit,
 		cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const;
-	
+
 	template <typename cb_enter_t, typename cb_exit_t,
 		typename cb_revisit_t, typename cb_ambig_t>
 	bool traverse(const node_graph& gr, const node &root,
@@ -165,11 +165,11 @@ private:
 		cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const;
 	bool _extract_graph_uniq_edge(std::map<node,size_t>& ndmap,
 		std::set<edge>& done, std::vector<node>& todo, graphv& graphs,
-		size_t gid, cb_next_graph_t g, bool& no_stop) const; 
+		size_t gid, cb_next_graph_t g, bool& no_stop) const;
 	bool _extract_graph_uniq_node(std::set<node>& done,
 		std::vector<node>& todo, graphv& graphs, size_t gid,
 		cb_next_graph_t g, bool& no_stop) const;
-	
+
 
 	/// replace each node with its immediate children,
 	/// assuming its only one pack (unambigous)
@@ -179,8 +179,8 @@ private:
 	/// succeeds
 	bool replace_nodes(graph &g, std::vector<NodeT> &s);
 
-	/// replaces node 'torep' in one pass with the given nodes 
-	/// 'replacement' everywhere in the forest and returns true 
+	/// replaces node 'torep' in one pass with the given nodes
+	/// 'replacement' everywhere in the forest and returns true
 	/// if changed. Does not care if its recursive or cyclic, its
 	/// caller's responsibility to ensure
 	bool replace_node(graph &g, const node &torep, const nodes& replacement);
@@ -209,12 +209,12 @@ template<typename NodeT>
 template<typename TraversableT>
 bool forest<NodeT>::detect_cycle(TraversableT &gr) const {
 	std::map<NodeT, bool> inprog;
-	auto cb_enter = [&inprog, &gr](const auto& n) { 
+	auto cb_enter = [&inprog, &gr](const auto& n) {
 		if (n.first.nt()) inprog[n] = true;
 	};
-	auto cb_revisit = [&inprog, &gr](const auto& n) { 
+	auto cb_revisit = [&inprog, &gr](const auto& n) {
 		if (inprog[n] == true) gr.cycles.insert(n);
-		return false; 
+		return false;
 	};
 	auto cb_exit = [&inprog](const auto& n, auto&) {
 		if (n.first.nt()) inprog[n] = false;
@@ -234,7 +234,7 @@ forest<NodeT>::graph::extract_trees(){
 template <typename NodeT>
 typename forest<NodeT>::sptree forest<NodeT>::graph::_extract_trees(
 	NodeT& r, int_t)
-{	
+{
 	std::deque<sptree> stk;
 	sptree troot = NULL;
 	troot = std::make_shared<tree>(r);
@@ -350,7 +350,7 @@ bool forest<NodeT>::_extract_graph_uniq_edge(std::map<node, size_t>& ndmap,
 	std::set<edge>& done, std::vector<node>& todo, graphv& graphs,
 	size_t gid, cb_next_graph_t cb_next_graph, bool& no_stop) const
 {
-	
+
 	bool ret = true;
 	while (todo.size() && no_stop) {
 		const node root = todo.back();
@@ -412,7 +412,7 @@ bool forest<NodeT>::_extract_graph_uniq_edge(std::map<node, size_t>& ndmap,
 template <typename NodeT>
 typename forest<NodeT>::graphv forest<NodeT>::extract_graphs(
 	const node& root, cb_next_graph_t cb_next_graph, bool unique_edge) const
-{	
+{
 	graphv graphs;
 	std::set<node> dn;
 	std::set<edge> de;
@@ -484,10 +484,10 @@ bool forest<NodeT>::_traverse(const node_graph& g, const node& root,
 	done.insert(root);
 
 	nodes_set choosen_pack = pack.size() > 1
-		? cb_ambig(root, pack) : pack; 
+		? cb_ambig(root, pack) : pack;
 	for (auto& nodes : choosen_pack)
 		for (auto& chd : nodes)
-			if (done.find(chd) == done.end() || cb_revisit(chd)) 
+			if (done.find(chd) == done.end() || cb_revisit(chd))
 				ret &= _traverse(g, chd, done, cb_enter,
 					cb_exit, cb_revisit, cb_ambig);
 #ifdef DEBUG_TRAVERSE
@@ -500,7 +500,7 @@ bool forest<NodeT>::_traverse(const node_graph& g, const node& root,
 template <typename NodeT>
 bool forest<NodeT>::is_binarized() const {
 	for (auto &kv: this->g)
-		for (auto &rhs: kv.second) 
+		for (auto &rhs: kv.second)
 			if (rhs.size() > 2 ) return false;
 	return true;
 }
@@ -512,8 +512,8 @@ bool forest<NodeT>::remove_recursive_nodes(graph &g){
 	//collect all prefix like nodes for replacement
 	std::vector<NodeT> s;
 	for (auto &kv: g) {
-		auto name = kv.first.first.to_string();	
-		if (name.find(prefix) != decltype(name)::npos) 
+		auto name = kv.first.first.to_string();
+		if (name.find(prefix) != decltype(name)::npos)
 			s.insert(s.end(), kv.first);
 	}
 	return replace_nodes(g, s);
@@ -521,14 +521,14 @@ bool forest<NodeT>::remove_recursive_nodes(graph &g){
 
 template <typename NodeT>
 bool forest<NodeT>::remove_binarization(graph &g){
-	
+
 	//better use parser::tnt_prefix()
 	decltype(NodeT().first.t()) prefix []= {'_','_','t','e','m','p'};
 	//collect all prefix like nodes for replacement
 	std::vector<NodeT> s;
 	for (auto &kv: g) {
-		auto name = kv.first.first.to_string();	
-		if (name.find(prefix) != decltype(name)::npos) 
+		auto name = kv.first.first.to_string();
+		if (name.find(prefix) != decltype(name)::npos)
 			s.insert(s.end(), kv.first);
 	}
 	return replace_nodes(g, s);
@@ -542,7 +542,9 @@ bool forest<NodeT>::replace_nodes(graph &g, std::vector<NodeT> &s ){
 		DBG(assert(g[n].size() == 1);)
 		if (replace_node(g, n, *(g[n].begin())))
 			changed = true, g.erase(n);
-		else DBG( std::cout<<"Could not replace node"; ) ;	
+#ifdef DEBUG
+		else std::cout << "Could not replace node";
+#endif
 	}
 	return changed;
 }
@@ -556,7 +558,7 @@ bool forest<NodeT>::replace_node(graph &g, const node &torepl, const nodes& repl
 		if( n == torepl) return false;
 
 	for (auto &kv: g)
-		for (auto rhs_it = kv.second.begin(); 
+		for (auto rhs_it = kv.second.begin();
 				rhs_it != kv.second.end(); rhs_it++ ) {
 
 			//std::cout << "\n comparing" <<torepl.first << "with ";
@@ -600,9 +602,19 @@ bool forest<NodeT>::replace_node(graph &g, const node &torepl, const nodes& repl
 
 template <typename NodeT>
 bool forest<NodeT>::is_ambiguous() const {
-	for( auto &kv: this->g )
-		if( kv.second.size() > 1 ) return true;
+	for (auto& kv : this->g)
+		if (kv.second.size() > 1) return true;
 	return false;
+}
+
+template <typename NodeT>
+std::set<std::pair<NodeT, std::set<std::vector<NodeT>>>>
+	forest<NodeT>::ambiguous_nodes() const
+{
+	std::set<std::pair<node, nodes_set>> r;
+	for (auto& kv : this->g)
+		if (kv.second.size() > 1) r.insert(kv);
+	return r;
 }
 
 template <typename NodeT>
@@ -611,14 +623,14 @@ size_t forest<NodeT>::count_trees(const node& root) const {
 	auto cb_exit = [&ndc](const node& croot, auto& ambset) {
 		for( auto &pack : ambset) {
 			size_t pkc = 1; // count of the pack
-			for( auto &sym : pack) 
+			for( auto &sym : pack)
 				if(sym.first.nt()) pkc *= ndc[sym];
 			ndc[croot] += pkc; // adding to curroot count
 		}
 	};
 	auto cb_no_revisit = [](const node&) { return false; };
 	traverse(root, no_enter, cb_exit, cb_no_revisit, no_ambig);
-	return ndc[root]; 
+	return ndc[root];
 }
 
 } // idni namespace
