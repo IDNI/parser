@@ -377,8 +377,8 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 			//------ 
 			lastcnt = S[n];
 			if (gcready.size()) {
-				for( auto &rm : gcready)
-					if(refi[rm] == 0) {
+				for (auto &rm : gcready)
+					if (refi[rm] == 0) {
 						// since the refc is zero, remove it from the 
 						// main container
 						S[rm.set].erase(rm);
@@ -392,6 +392,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 			}
 		}
 	} while (in->tnext());
+	if(!o.incr_gen_forest) lastcnt = S[in->tpos()];
 	MS(emeasure_time_end(tsr, ter) <<" :: parse time\n";)
 	in->clear();
 	
@@ -404,7 +405,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 	std::cout<<"GC: total input size = "<< n<<std::endl;
 	std::cout<<"GC: total remaining = "<< count<<std::endl;
 	std::cout<<"GC: total collected = "<< gcnt<<std::endl;
-	if(count+gcnt)
+	if (count+gcnt)
 	std::cout<<"GC: % = "<<100*gcnt/(count+gcnt)<<std::endl;
 
 	if (!o.incr_gen_forest) init_forest(*f);
