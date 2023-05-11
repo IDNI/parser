@@ -231,7 +231,7 @@ void parser<C, T>::predict(const item& i, container_t& t) {
 			// Should we use S[n] to see if new item is insertable
 			//
 			if (add(t, item(i.set, p, c, i.set, 0)).second)
-				++refi[i];
+				++refi[i]; //insert and increment
 		}
 }
 template <typename C, typename T>
@@ -376,14 +376,10 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 						{ it->from, it->set });
 					build_forest(*f, curroot);
 				}
-			// check if we have some candidate ready for being
-			// collected. store the current container for found()
-			//------
-			lastcnt = S[n];
 			if (gcready.size()) {
 				for (auto &rm : gcready)
-					if (refi[rm] == 0) {
-						// since the refc is zero, remove it from the
+					if (refi[rm] == 0 && (rm.set + o.gc_lag) <= n) {
+						// since the refi is zero, remove it from the
 						// main container
 						S[rm.set].erase(rm);
 						refi.erase(rm);
@@ -396,7 +392,6 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 			}
 		}
 	} while (in->tnext());
-	if(!o.incr_gen_forest) lastcnt = S[in->tpos()];
 	MS(emeasure_time_end(tsr, ter) <<" :: parse time\n";)
 	in->clear();
 
@@ -404,15 +399,13 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 	size_t count = 0;
 	for( size_t i = 0 ; i< S.size(); i++)
 		count += S[i].size();
-//#define DEBUG_GC
-#ifdef DEBUG_GC
-	std::cout<<"-----------"<<std::endl;
-	std::cout<<"GC: total input size = "<< n<<std::endl;
-	std::cout<<"GC: total remaining = "<< count<<std::endl;
-	std::cout<<"GC: total collected = "<< gcnt<<std::endl;
+	
+	DBG(std::cout<<"-----------"<<std::endl;)
+	DBG(std::cout<<"GC: total input size = "<< n<<std::endl;)
+	DBG(std::cout<<"GC: total remaining = "<< count<<std::endl;)
+	DBG(std::cout<<"GC: total collected = "<< gcnt<<std::endl;)
 	if (count+gcnt)
-		std::cout<<"GC: % = "<<100*gcnt/(count+gcnt)<<std::endl;
-#endif
+		DBG(std::cout<<"GC: % = "<<100*gcnt/(count+gcnt)<<std::endl);
 	if (!o.incr_gen_forest) init_forest(*f);
 	else f->root(pnode(g.start_literal(), { 0, in->tpos() }));
 #if defined(DEBUG) && defined(WITH_DEVHELPERS)
@@ -456,17 +449,16 @@ bool parser<C, T>::found() {
 	//print_S(std::cout);
 	//DBG(std::cout << "tpos: " << in->tpos() << std::endl;)
 	//for (const auto& x : S[in->tpos()]) print(std::cout << "\t", x) << std::endl;
-	//DBG(std::cout << "lastcnt: " << std::endl;)
-	//for (const auto& x : lastcnt) print(std::cout << "\t", x) << std::endl;
+
 	for (size_t n : g.prod_ids_of_literal(g.start_literal())) {
 		//DBG(std::cout << "N: " << n << std::endl;)
 		for (size_t c = 0; c != g[n].size(); ++c) {
 			//DBG(print(std::cout << "find: ",
 			//	item(in->tpos(), n, c, 0, g.len(n, c))) << std::endl;)
 			//DBG(std::cout << "C: " << c << std::endl;)
-			bool t = lastcnt.find(
+			bool t = S[in->tpos()].find(
 				item(in->tpos(), n, c, 0, g.len(n, c)))
-					!= lastcnt.end();
+					!= S[in->tpos()].end();
 			//DBG(std::cout << "~: " << g[n][c].neg << std::endl;)
 			//DBG(std::cout << "T: " << t << std::endl;)
 			if (!g[n][c].neg) f = t;
