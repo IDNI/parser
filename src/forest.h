@@ -25,7 +25,11 @@ struct forest {
 	typedef NodeT node;
 	typedef std::vector<node> nodes;
 	typedef std::set<nodes> nodes_set;
-	typedef std::map<node, nodes_set> node_graph;
+	struct fhasher_t{
+		size_t operator()(const node &k) const;
+		size_t hash_size_t(const size_t &val) const;
+	};
+	typedef std::unordered_map<node, nodes_set, fhasher_t> node_graph;
 	typedef std::pair<node, node> node_edge;
 	typedef std::pair<size_t, size_t> edge;
 	typedef std::vector<edge> edges;
@@ -203,6 +207,22 @@ std::ostream& forest<NodeT>::print_data(std::ostream& os) const {
 }
 #endif
 
+template <typename NodeT>
+size_t forest<NodeT>::fhasher_t::hash_size_t(const size_t &val) const{
+	return std::hash<size_t>()(val) +
+		0x9e3779b9 + (val << 6) + (val >> 2);
+}
+
+template <typename NodeT>
+size_t forest<NodeT>::fhasher_t::operator()(const NodeT &k) const {
+	// lets substitute with better if possible.
+	size_t h = 0;
+	h ^= hash_size_t(k.second[0]);
+	h ^= hash_size_t(k.second[1]);
+	h ^= hash_size_t(size_t(
+		k.first.nt() ? k.first.n() : k.first.t()));
+	return h;
+}
 // a dfs based approach to detect cycles for
 // any traversable type
 template<typename NodeT>
@@ -619,7 +639,9 @@ std::set<std::pair<NodeT, std::set<std::vector<NodeT>>>>
 
 template <typename NodeT>
 size_t forest<NodeT>::count_trees(const node& root) const {
-	std::map<node, size_t> ndc;
+	
+	std::unordered_map<node, size_t, fhasher_t > ndc;
+	
 	auto cb_exit = [&ndc](const node& croot, auto& ambset) {
 		for( auto &pack : ambset) {
 			size_t pkc = 1; // count of the pack

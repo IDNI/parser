@@ -312,11 +312,6 @@ private:
 	std::unordered_map<item, int_t, hasher_t> refi;
 	// items ready for collection
 	std::unordered_set<item, hasher_t> gcready;
-	// store the current container items before 
-	// these are garbage collected in order for them to be
-	// found() to find the right start's completed item
-	// to indicate successful parsing.
-	container_t lastcnt;
 
 	std::unordered_map<std::pair<size_t, size_t>, std::vector<item>,
 		hasher_t> sorted_citem, rsorted_citem;

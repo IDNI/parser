@@ -237,7 +237,18 @@ void parser<C, T>::predict(const item& i, container_t& t) {
 template <typename C, typename T>
 void parser<C, T>::scan(const item& i, size_t n, T ch) {
 	//DBG(print(std::cout << "scanning ", i) << " ch: " << to_std_string(ch) << std::endl;)
-	if (ch != get_lit(i).t()) return;
+	if (ch != get_lit(i).t()) {  
+    	//when the item fails, decrement refcount of items that
+ 		//predicted it i.e predicting items ( only the one) for
+        // which refc was incremented when this item was predicted
+        const container_t& cont = S[i.from];
+        for (auto it = cont.begin(); it != cont.end(); ++it)
+        if (!completed(*it) && get_lit(*it) == get_nt(i)) 
+            if ( refi.count(*it) && refi[*it] > 0) --refi[*it];
+        //DBG(std::cout<< "GC: adding failing scan\n");
+        gcready.insert(i);
+        return;
+	}
 	// by this time, terminal is advanced over
 	// and new item j will be created.
 	// hence, the previous item i can be marked
