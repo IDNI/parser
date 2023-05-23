@@ -26,7 +26,7 @@ struct csv_parser {
 	"	start        => ws ( line el )*  ws . "
 	;
 	csv_parser() :
-		g(tgf<char>::from_string(nts, csv_tgf)), p(g) { }
+		g(tgf<char>::from_string(nts, csv_tgf)), p( g, {true, true}) { }
 
 	bool eval(const string& s) {
 		auto f = p.parse(s.c_str(), s.size());
@@ -35,8 +35,9 @@ struct csv_parser {
 		
 		auto cb_next_g = [&f] (decltype(p)::pgraph &g ){
 			g.extract_trees()->to_print(std::cout);
+			f->remove_binarization(g);
 			f->remove_recursive_nodes(g);
-			std::cout<< "\nafter removal of _R..\n";
+			std::cout<< "\nafter removal of _temp/_R..\n";
 			g.extract_trees()->to_print(std::cout);
 			return true;
 		};
@@ -47,16 +48,19 @@ private:
 	nonterminals<char> nts{};
 	grammar<char> g;
 	parser<char> p;
-	size_t id(const string& s) { return nts.get(s); }
 	
 };
 
 int main() {
 	csv_parser csv;
-	string line, lines;
-	while (getline(cin, line)) {
-		if (line.size() == 0) break;
-		lines += from_str<char>(line + "\n") ;
+	std::string line, lines;
+	cin.clear();
+
+	while (true) {
+		cin >> line;
+		if (line == "q") break;
+		lines.append(line);
+		lines.append("\n");
 	}
 	std::cout<<lines;
 	csv.eval(lines);

@@ -8,7 +8,9 @@ bool run_test(const char* g_tgf, const string& input) {
 	//g.print_data(cout << "grammar data:\n") << endl;
 	//g.print_internal_grammar(cout << "grammar rules:\n") << endl;
 	if (g.size() == 0) return false;
-	parser<char> p(g);
+	parser<char>::options opts;
+	opts.incr_gen_forest = true;
+	parser<char> p(g, opts);
 	auto f = p.parse(input.c_str(), input.size());
 	if (!p.found()) {
 		//DBG(g.print_internal_grammar(cout << "grammar productions:\n") << endl;)
@@ -117,6 +119,10 @@ int main() {
 	if (!run_test(
 	"	start  => \"hi\". \n"
 	, "hi")) fail();
+
+	if (!run_test(
+	"	start  => 'a' 'b'+ 'c'. \n"
+	, "abbbc")) fail();
 
 	return failed ? 1 : 0;
 }

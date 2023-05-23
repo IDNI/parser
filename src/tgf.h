@@ -15,6 +15,7 @@
 #include <fcntl.h>
 #include <cstring>
 #include "parser.h"
+#include "devhelpers.h"
 namespace idni {
 
 template <typename C = char, typename T = C>
@@ -184,12 +185,19 @@ private:
 				ps(nn, p.back() | nul), p.back() = nn;
 			}
 			void repeat() {
-				//DBG(std::cout << "repeat\n";)
 				auto nn = prods<C, T>(nt(get_new_name()));
-				ps(nn, (p.back()+nn) | p.back()), p.back() = nn;
+				prods<C, T> t = p.back();
+				p.back() = prods<C, T>{};
+				auto it = t.back().second.begin()->begin();
+				for (size_t i = 0; i != it->size()-1; ++i)
+					p.back()=p.back()+prods<C, T>((*it)[i]);
+				p.back() = p.back() + nn;
+				auto last = prods<C, T>((*it)[it->size()-1]);
+				ps(nn, (last+nn) | last);
 			}
 			void multi() {
 				auto nn = prods<C, T>(nt(get_new_name()));
+				//std::cout << "p.back(): " << p.back() << std::endl;
 				ps(nn, (p.back() + nn) | nul), p.back() = nn;
 			}
 			std::basic_string<C> get_new_name() {
@@ -212,12 +220,12 @@ private:
 			const auto& l = n.first;
 			if (!l.nt()) return;
 			//DBG(std::cout << "//entering: `" << l.to_std_string() << "`\n";)
-			if (l == sym) x.add_nonterminal(
-					terminals_to_str<C, T>(*f, n));
+			if (l == sym) x.add_nonterminal(from_str<C>(
+				terminals_to_str<C, T>(*f, n)));
 			else if (l == directive) x.in_directive = true;
 			else if (l == directive_param)
-				x.cc_names.push_back(to_std_string(
-					terminals_to_str<C, T>(*f, n)));
+				x.cc_names.push_back(to_std_string(from_str<C>(
+					terminals_to_str<C, T>(*f, n))));
 			else if (l == literals) x.push();
 			else if (l == group || l == optional || l == repeat)
 						x.pop();
@@ -225,10 +233,10 @@ private:
 			else if (l == string_ || l == quoted_char) {
 				auto str = terminals_to_str<C, T>(*f, n);
 				str.erase(str.begin()), str.erase(str.end() - 1);
-				// DBG(cout << "quoted_char?: " << (l == quoted_char)
-				// 	<< " str.size(): " << str.size()
-				// 	<< " str: `" << to_std_string(str)
-				// 	<< "`" << endl;)
+				//DBG(std::cout << "quoted_char?: " << (l == quoted_char)
+				//	<< " str.size(): " << str.size()
+				//	<< " str: `" << to_std_string(str)
+				//	<< "`" << std::endl;)
 				if (l == quoted_char) {
 					if (str.size() > 1) switch (str[1]) {
 						case 'r':  str = U('\r'); break;
@@ -272,15 +280,47 @@ private:
 		} else {
 			//DBG(cout << "TRAVERSE parsed TGF source and "
 			//			"generate productions\n";)
-			auto c = f->has_single_parse_tree();
+			//auto c = f->has_single_parse_tree();
+			size_t c = f->count_trees();
+			//std::cout << "trees: " << c << std::endl;
+			if (c > 1) {
+				size_t i = 0;
+				std::cerr << "ambiguity. number of trees: " << c << std::endl;
+				auto cb_next_graph = [&i, &f](
+					typename parser<C, T>::pgraph &g)
+				{
+					std::stringstream ptd;
+					std::stringstream ssf;
+					//f->detect_cycle(g);
+					std::cerr << "tree " << i << std::endl;
+					ssf << "parse_rules_" << i << ".tml";
+					std::ofstream filet(ssf.str());
+					to_tml_rules<C, T>(ptd, g);
+					filet << ptd.str();
+					filet.close();
+					i++;
+					return true;
+				};
+				std::cerr << "ambiguous nodes:\n";
+				for (auto& n : f->ambiguous_nodes()) {
+					std::cerr << "\t `" << n.first.first << "` [" << n.first.second[0] << "," << n.first.second[1] << "]\n";
+					size_t d = 0;
+					for (auto ns : n.second) {
+						std::cerr << "\t\t " <<  d++ << "\t";
+						for (auto nt : ns) std::cerr << " `" << nt.first << "`["<< nt.second[0] << "," << nt.second[1] << "] ";
+						std::cerr << "\n";
+					}
+					f->extract_graphs(n.first, cb_next_graph, false);
+				}
+			}
 			f->traverse(cb_enter, cb_exit
 #if DEBUG
 				, f->no_revisit, cb_ambig
 #endif
 				);
-			if (!c) {
-				std::cerr <<
-					"Forest contains more than one tree\n";
+			//if (!c) {
+			//	std::cerr <<
+			//		"Forest contains more than one tree\n";
 					//<< "\nDumping 1 tree..." << std::endl;
 				//size_t n = 0;
 				//auto next_g = [&n](parser<C, T>
@@ -292,7 +332,7 @@ private:
 				//	return false;
 				//};
 				//f->extract_graphs(f->root(), next_g);
-			}
+			//}
 		}
 		return grammar<C, T>(nts_, x.ps, prods<C, T>(x.nt(start_nt)), x.cc);
 	}

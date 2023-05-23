@@ -64,8 +64,8 @@ struct lit : public std::variant<size_t, T> {
 	bool operator<(const lit<C, T>& l) const;
 	bool operator==(const lit<C, T>& l) const;
 	//std::ostream& operator<<(std::ostream& os)
-	std::basic_string<C> to_string(const std::basic_string<C>& nll = {})
-		const;
+	std::vector<T> to_terminals() const;
+	std::basic_string<C> to_string(const std::basic_string<C>& nll={})const;
 	std::string to_std_string(const std::basic_string<C>& nll = {}) const;
 };
 
@@ -73,11 +73,11 @@ struct lit : public std::variant<size_t, T> {
 template <typename C = char, typename T = C> //  literals
 struct lits : public std::vector<lit<C, T>> { bool neg = false; };
 template <typename C = char, typename T = C>
-using clause = std::set<lits<C, T>>; // conjunctions of literals
+using conjs = std::set<lits<C, T>>; // conjunctions of literals
 template <typename C = char, typename T = C>
-using dnf = std::set<clause<C, T>>; // disjunctions of literal conjunctions
+using disjs = std::set<conjs<C, T>>; // disjunctions of literal conjunctions
 template <typename C = char, typename T = C>
-using prod = std::pair<lit<C, T>, dnf<C, T>>; // production rule
+using prod = std::pair<lit<C, T>, disjs<C, T>>; // production rule
 template <typename C = char, typename T = C>
 struct prods : public std::vector<prod<C, T>> { // productions
 	typedef std::vector<prod<C, T>> prods_t;
@@ -92,7 +92,7 @@ struct prods : public std::vector<prod<C, T>> { // productions
 	void operator()(const lit<C, T>& l, const prods<C, T>& p);
 	bool operator==(const lit<C, T>& l) const;
 	lit<C, T> to_lit() const;
-	dnf<C, T> to_dnf() const;
+	disjs<C, T> to_disjs() const;
 };
 
 // char class functions
@@ -176,11 +176,25 @@ public:
 	using parser_type   = parser<C, T>;
 	using input_type    = parser_type::input;
 	using decoder_type  = parser_type::input::decoder_type;
+	using encoder_type  = std::function<
+				std::basic_string<C>(const std::vector<T>&)>;
 	typedef typename std::pair<lit<C, T>, std::array<size_t, 2>> pnode;
 	struct options {
+		// applying binarization to ensure every forest node
+		// has atmost 2 or less children nodes
 		bool binarize = DEFAULT_BINARIZE;
+		// build forest incrementally as soon any
+		// item is completed
 		bool incr_gen_forest = DEFAULT_INCR_GEN_FOREST;
-		decoder_type char_to_terminals = 0;
+		// number of steps garbage collection lags behind
+		// parsing position n. should be greater than 
+		// 0 and less than the size of the input
+		// for any collection activity. We cannot use 
+		// % since in the streaming case, we do not know
+		// exact size in advance
+		size_t gc_lag = 1;  
+		decoder_type chars_to_terminals = 0;
+		encoder_type terminals_to_chars = 0;
 	};
 	struct item {
 		item(size_t set, size_t prod,size_t con,size_t from,size_t dot);
@@ -227,7 +241,7 @@ public:
 		std::basic_istream<C> s{};
 		std::vector<T> ts{};  // all collected terminals
 		size_t tp = 0;        // current terminal pos
-		C c;
+//		C c = e;
 	};
 	typedef forest<pnode> pforest;
 	typedef pforest::nodes pnodes;
@@ -273,7 +287,7 @@ public:
 			std::string prod_body;
 			// back track information to higher derivations
 			std::vector<_exp_prod> bktrk;
-		}exp_prod_t;
+		} exp_prod_t;
 
 		// list of expected token and respective productions
 		std::vector<exp_prod_t> expv;
@@ -291,6 +305,14 @@ private:
 	options o;
 	std::unique_ptr<input> in = 0;
 	std::vector<container_t> S;
+	
+	// refcounter for the earley item
+	// default value is 0, which means it can be garbaged
+	// non-zero implies, its not to be collected
+	std::unordered_map<item, int_t, hasher_t> refi;
+	// items ready for collection
+	std::unordered_set<item, hasher_t> gcready;
+
 	std::unordered_map<std::pair<size_t, size_t>, std::vector<item>,
 		hasher_t> sorted_citem, rsorted_citem;
 	// binarized temporary intermediate non-terminals
@@ -306,12 +328,12 @@ private:
 	}
 	lit<C, T> get_lit(const item& i) const;
 	lit<C, T> get_nt(const item& i) const;
-	container_iter add(container_t& t, const item& i);
+	std::pair<container_iter, bool> add(container_t& t, const item& i);
 	bool nullable(const item& i) const;
 	void resolve_conjunctions(container_t& t) const;
 	void predict(const item& i, container_t& t);
 	void scan(const item& i, size_t n, T ch);
-	void scan_cc_function(const item& i, size_t n, T ch);
+	void scan_cc_function(const item& i, size_t n, T ch, container_t& c);
 	void complete(const item& i, container_t& t);
 	bool completed(const item& i) const;
 	void pre_process(const item &i);
@@ -331,11 +353,11 @@ private:
 };
 
 template <typename C = char, typename T = C> // flattens terminals of a subforest into an ostream
-std::basic_ostream<C>& terminals_to_stream(std::basic_ostream<C>& os,
+std::basic_ostream<T>& terminals_to_stream(std::basic_ostream<T>& os,
 	const typename parser<C, T>::pforest& f,
 	const typename parser<C, T>::pnode& r);
 template <typename C = char, typename T = C> // flattens terminals of a subforest into a string
-std::basic_string<C> terminals_to_str(
+std::basic_string<T> terminals_to_str(
 	const typename parser<C, T>::pforest& f,
 	const typename parser<C, T>::pnode& r);
 template <typename C = char, typename T = C> // flattens terminals of a subforest into an int

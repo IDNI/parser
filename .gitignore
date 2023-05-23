@@ -2,3 +2,9 @@ build*
 *-config.cmake
 *.inc.h.bak*
 .vscode/settings.json
+forest*.dot
+graph*.dot
+tree*.dot
+forest_facts*.tml
+graph_grammar_rules*.tml
+forest_grammar_rules*.tml
