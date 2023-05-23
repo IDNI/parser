@@ -118,6 +118,9 @@ int main() {
 	const bool stream = true;
 
 	test<char>("<char>", "");
+	test<char>("<char> stream", "", 0, stream);
+	test<char>("<char>", "a");
+	test<char>("<char> stream", "a", 0, stream);
 	test<char>("<char>", i);
 	test<char>("<char> stream", i, 0, stream);
 	test<char32_t>("<char32_t>", i32);

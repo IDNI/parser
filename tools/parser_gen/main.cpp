@@ -17,9 +17,28 @@
 using namespace std;
 using namespace idni;
 
+ostream& help(ostream& os, char* cmd) {
+	os << cmd << " <parser name> <TGF file> [ <start> [ <char type> [ <terminal type>"
+		" [ decoder [ encoder ] ] ] ] ]\n";
+	return os;
+}
+
+int error(char* cmd, std::string msg, bool print_help = true) {
+	cerr << cmd << ": " << msg << endl;
+	if (print_help) help(cerr, cmd);
+	return 1;
+}
+
 int main(int argc, char** argv) {
-	if (argc != 3) return cerr << argv[0] <<
-		": requires 2 arguments: parser_name and a tgf_filename\n", 1;
+	std::string start_nt = "start", char_type = "char", terminal_type = "",
+		decoder = "", encoder = "";
+	if (argc < 3) return error(argv[0], "requires at least 2 arguments");
+	if (argc > 7) encoder       = argv[7];
+	if (argc > 6) decoder       = argv[6];
+	if (argc > 5) terminal_type = argv[5];
+	if (argc > 4) char_type     = argv[4];
+	if (argc > 3) start_nt      = argv[3];
 	string parser_name(argv[1]), tgf_filename(argv[2]);
-	generate_parser_cpp_from_file<>(cout, parser_name, tgf_filename);
+	generate_parser_cpp_from_file<char>(cout, parser_name, tgf_filename,
+		start_nt, char_type, terminal_type, decoder, encoder);
 }

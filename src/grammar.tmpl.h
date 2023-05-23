@@ -31,7 +31,7 @@ std::ostream& operator<<(std::ostream& os, const lits<C, T>& a) {
 	return os;
 }
 template <typename C, typename T>
-std::ostream& operator<<(std::ostream& os, const clause<C, T>& c) {
+std::ostream& operator<<(std::ostream& os, const conjs<C, T>& c) {
 	size_t n = 0;
 	if (c.size()) os << "(";
 	for (const lits<C, T>& a : c)
@@ -40,9 +40,9 @@ std::ostream& operator<<(std::ostream& os, const clause<C, T>& c) {
 	return os;
 }
 template <typename C, typename T>
-std::ostream& operator<<(std::ostream& os, const dnf<C, T>& d) {
+std::ostream& operator<<(std::ostream& os, const disjs<C, T>& d) {
 	size_t n = 0;
-	for (const clause<C, T>& c : d)
+	for (const conjs<C, T>& c : d)
 		if (os << c; ++n != d.size()) os << " | ";
 	return os;
 }
@@ -76,7 +76,7 @@ lit<C, T> nonterminals<C, T>::operator()(const std::basic_string<C>& s) {
 //-----------------------------------------------------------------------------
 
 template <typename C, typename T>
-lit<C, T>::lit() : lit_t((T) 0), is_null_(true) { }
+lit<C, T>::lit() : lit_t(static_cast<T>(0)), is_null_(true) { }
 template <typename C, typename T>
 lit<C, T>::lit(T c) : lit_t(c), nts(0) { }
 template <typename C, typename T>
@@ -91,28 +91,64 @@ template <typename C, typename T>
 bool lit<C, T>::is_null() const { return is_null_; }
 
 template <typename C, typename T>
+std::vector<T> lit<C, T>::to_terminals() const {
+	if (nt() || is_null()) return {};
+	return { t() };
+}
+
+template <typename C, typename T>
 std::basic_string<C> lit<C, T>::to_string(const std::basic_string<C>& nll)const{
+	auto escape = [](const char& t) {
+		return t == '\n' ? "\\n" :
+			t == '\r' ? "\\r" :
+			t == '\t' ? "\\t" :
+			t == '\v' ? "\\v" :
+			t == '\'' ? "\\'" :
+			t == '\0' ? "\\0" : "";
+	};
+	auto escape32 = [](const char32_t& t) {
+		return t == U'\n' ? "\\n" :
+			t == U'\r' ? "\\r" :
+			t == U'\t' ? "\\t" :
+			t == U'\v' ? "\\v" :
+			t == U'\'' ? "\\'" :
+			t == U'\0' ? "\\0" : "";
+	};
 	if (nt()) return nts->get(n());
 	else if (is_null()) return nll;
 	else if constexpr (std::is_same_v<T, bool>)
 		return from_cstr<C>(t() ? "1" : "0");
-	else if constexpr (std::is_same_v<C, T>) return { t() };
+	else if constexpr (std::is_same_v<C,char> && std::is_same_v<C, T>) {
+		std::basic_stringstream<C> ss;
+		std::string r = escape(t());
+		ss << "'" << (r.size() ? r : idni::to_std_string(t())) << "'";
+		return ss.str();
+	} else if constexpr ((std::is_same_v<C,char32_t> && std::is_same_v<C, T>) ||
+		(std::is_same_v<C,char> && std::is_same_v<T,char32_t>))
+	{
+		std::basic_stringstream<C> ss;
+		std::string r = escape32(t());
+		ss << "'" << (r.size() ? r : idni::to_std_string(t())) << "'";
+		return ss.str();
+	}
 	return nll;
 }
 template <typename C, typename T>
 std::string lit<C, T>::to_std_string(const std::basic_string<C>& nll) const {
-	return idni::to_std_string(to_string(nll));
+	return idni::to_std_string(this->to_string(nll));
 }
 template <typename C, typename T>
 bool lit<C, T>::operator<(const lit<C, T>& l) const {
 	if (nt() != l.nt()) return nt() < l.nt();
 	if (nt()) return n() == l.n() ? *nts < *l.nts : n() < l.n();
+	if (is_null()) return is_null() < l.is_null();
 	return t() < l.t();
 }
 template <typename C, typename T>
 bool lit<C, T>::operator==(const lit<C, T>& l) const {
 	if (nt() != l.nt()) return false;
 	if (nt()) return n() == l.n() && *nts == *l.nts;
+	if (is_null() != l.is_null()) return is_null() == l.is_null();
 	else return t() == l.t();
 }
 
@@ -142,12 +178,12 @@ lits<C, T> operator~(const lits<C, T>& x) {
 //-----------------------------------------------------------------------------
 
 template <typename C, typename T>
-bool operator<=(const clause<C, T>& x, const clause<C, T>& y) {
+bool operator<=(const conjs<C, T>& x, const conjs<C, T>& y) {
 	for (const lits<C, T>& a : x) if (y.find(a) == y.end()) return false;
 	return true;
 }
 template <typename C, typename T>
-clause<C, T> simplify(const clause<C, T>& c) {
+conjs<C, T> simplify(const conjs<C, T>& c) {
 	for (lits<C, T> na : c) {
 		na.neg = !na.neg;
 		for (const lits<C, T>& a : c) if (a.neg == na.neg && a == na) {
@@ -158,13 +194,13 @@ clause<C, T> simplify(const clause<C, T>& c) {
 	return c;
 }
 template <typename C, typename T>
-clause<C, T> operator&(const clause<C, T>& x, const clause<C, T>& y) {
-	clause<C, T> r = x;
+conjs<C, T> operator&(const conjs<C, T>& x, const conjs<C, T>& y) {
+	conjs<C, T> r = x;
 	return r.insert(y.begin(), y.end()), simplify<C, T>(r);
 }
 template <typename C, typename T>
-clause<C, T> operator+(const clause<C, T>& x, const clause<C, T>& y) {
-	clause<C, T> r;
+conjs<C, T> operator+(const conjs<C, T>& x, const conjs<C, T>& y) {
+	conjs<C, T> r;
 	for (const lits<C, T>& a : x)
 		for (const lits<C, T>& b : y) r.insert(a + b);
 	return simplify<C, T>(r);
@@ -173,89 +209,89 @@ clause<C, T> operator+(const clause<C, T>& x, const clause<C, T>& y) {
 //-----------------------------------------------------------------------------
 
 template <typename C, typename T>
-dnf<C, T>& top(prods<C, T>& p) {
+disjs<C, T>& top(prods<C, T>& p) {
 	return p.back().second;
 }
 template <typename C, typename T>
-const dnf<C, T>& top(const prods<C, T>& p) {
+const disjs<C, T>& top(const prods<C, T>& p) {
 	return p.back().second;
 }
 template <typename C, typename T>
-dnf<C, T> simplify(const dnf<C, T>& x) {
-	dnf<C, T> y, z;
-	for (clause<C, T> c : x)
+disjs<C, T> simplify(const disjs<C, T>& x) {
+	disjs<C, T> y, z;
+	for (conjs<C, T> c : x)
 		if (!(c = simplify(c)).empty()) y.insert(c);
-	for (clause<C, T> c : y) {
+	for (conjs<C, T> c : y) {
 		bool f = false;
-		for (clause<C, T> d : y)
+		for (conjs<C, T> d : y)
 			if (c != d && c <= d) { f = true; break; }
 		if (!f) z.insert(c);
 	}
 	return z;
 }
 template <typename C, typename T>
-dnf<C, T> operator|(const dnf<C, T>& x, const dnf<C, T>& y) {
-	dnf<C, T> r;
+disjs<C, T> operator|(const disjs<C, T>& x, const disjs<C, T>& y) {
+	disjs<C, T> r;
 	return r.insert(x.begin(), x.end()), r.insert(y.begin(), y.end()), r;
 }
 template <typename C, typename T>
-dnf<C, T> operator&(const dnf<C, T>& x, const clause<C, T>& y) {
-	dnf<C, T> r;
-	for (const clause<C, T>& c : x) r.insert(c & y);
+disjs<C, T> operator&(const disjs<C, T>& x, const conjs<C, T>& y) {
+	disjs<C, T> r;
+	for (const conjs<C, T>& c : x) r.insert(c & y);
 	return r;
 }
 template <typename C, typename T>
-dnf<C, T> operator&(const dnf<C, T>& x, const dnf<C, T>& y) {
-	dnf<C, T> r;
-	for (const clause<C, T>& c : x)
-		for (const clause<C, T>& d : (y & c)) r.insert(d);
+disjs<C, T> operator&(const disjs<C, T>& x, const disjs<C, T>& y) {
+	disjs<C, T> r;
+	for (const conjs<C, T>& c : x)
+		for (const conjs<C, T>& d : (y & c)) r.insert(d);
 	return simplify<C, T>(r);
 }
 template <typename C, typename T>
-dnf<C, T> operator+(const dnf<C, T>& x, const clause<C, T>& y) {
-	dnf<C, T> r;
-	for (const clause<C, T>& c : x) r.insert(c + y);
+disjs<C, T> operator+(const disjs<C, T>& x, const conjs<C, T>& y) {
+	disjs<C, T> r;
+	for (const conjs<C, T>& c : x) r.insert(c + y);
 	return r;
 }
 template <typename C, typename T>
-dnf<C, T> operator+(const dnf<C, T>& x, const dnf<C, T>& y) {
-	dnf<C, T> r;
-	for (const clause<C, T>& c : x)
-		for (const clause<C, T>& d : y) r.insert(c + d);
+disjs<C, T> operator+(const disjs<C, T>& x, const disjs<C, T>& y) {
+	disjs<C, T> r;
+	for (const conjs<C, T>& c : x)
+		for (const conjs<C, T>& d : y) r.insert(c + d);
 	return r;
 }
 template <typename C, typename T>
-dnf<C, T> operator~(const clause<C, T>& x) {
-	dnf<C, T> r;
-	for (const lits<C, T>& a : x) r.insert(clause<C, T>{~a});
-	//cout << "\nnegating clause: " << x << " to: " << r << std::endl;
+disjs<C, T> operator~(const conjs<C, T>& x) {
+	disjs<C, T> r;
+	for (const lits<C, T>& a : x) r.insert(conjs<C, T>{~a});
+	//cout << "\nnegating conjs: " << x << " to: " << r << std::endl;
 	return r;
 }
 template <typename C, typename T>
-dnf<C, T> operator~(const dnf<C, T>& x) {
-	std::set<dnf<C, T>> ncs; // negated conjunctions = disjunctions
-	for (const clause<C, T>& c : x) ncs.insert(~c);
-	if (ncs.size() == 0) return {}; // empty, return empty dnf
+disjs<C, T> operator~(const disjs<C, T>& x) {
+	std::set<disjs<C, T>> ncs; // negated conjunctions = disjunctions
+	for (const conjs<C, T>& c : x) ncs.insert(~c);
+	if (ncs.size() == 0) return {}; // empty, return empty disjs
 	if (ncs.size() == 1) return *(ncs.begin()); // return first if only one
 	// otherwise do combinations
-	std::vector<clause<C, T>> rcs; // disjuncted clauses to return
-	std::vector<dnf<C, T>> ncsv(ncs.begin(), ncs.end()); // negated conjunctions vector = vector of disjunctions
-	std::vector<clause<C, T>> cs(ncsv[0].begin(), ncsv[0].end());
-	//cout << "cs("<<cs.size()<<"): " << dnf(cs.begin(), cs.end()) << std::endl;
+	std::vector<conjs<C, T>> rcs; // disjuncted conjss to return
+	std::vector<disjs<C, T>> ncsv(ncs.begin(), ncs.end()); // negated conjunctions vector = vector of disjunctions
+	std::vector<conjs<C, T>> cs(ncsv[0].begin(), ncsv[0].end());
+	//cout << "cs("<<cs.size()<<"): " << disjs(cs.begin(), cs.end()) << std::endl;
 	for (size_t i = 1; i != ncsv.size(); ++i) {
-		std::vector<clause<C, T>> ncs(ncsv[i].begin(), ncsv[i].end());
-		//cout << "\tncs("<<ncs.size()<<"): " << dnf(ncs.begin(), ncs.end()) << std::endl;
+		std::vector<conjs<C, T>> ncs(ncsv[i].begin(), ncsv[i].end());
+		//cout << "\tncs("<<ncs.size()<<"): " << disjs(ncs.begin(), ncs.end()) << std::endl;
 		for (size_t j = 0; j != ncs.size(); ++j)
 			for (size_t k = 0; k != cs.size(); ++k) {
-				clause<C, T> c(cs[k]);
+				conjs<C, T> c(cs[k]);
 				c.insert(*(ncs[j].begin()));
 				rcs.push_back(c);
 			}
 		cs = rcs;
-		//cout << "cs*("<<cs.size()<<"): " << dnf(cs.begin(), cs.end()) << std::endl;
+		//cout << "cs*("<<cs.size()<<"): " << disjs(cs.begin(), cs.end()) << std::endl;
 	}
-	dnf<C, T> r(cs.begin(), cs.end());
-	//cout << "\nnegating dnf d: " << x << " to: `" << r << "`" << std::endl;
+	disjs<C, T> r(cs.begin(), cs.end());
+	//cout << "\nnegating disjs d: " << x << " to: `" << r << "`" << std::endl;
 	return simplify<C, T>(r); // is simplify needed here?
 }
 
@@ -366,21 +402,21 @@ prods<C, T>::prods(const std::vector<T>& v) : prods_t() { (*this)(v); }
 template <typename C, typename T>
 void prods<C, T>::operator()(const lit<C, T>& l) {
 	this->emplace_back(lit<C, T>{},
-		dnf<C, T>{clause<C, T>{lits<C, T>({l})}});
+		disjs<C, T>{conjs<C, T>{lits<C, T>({l})}});
 }
 template <typename C, typename T>
 void prods<C, T>::operator()(const std::basic_string<C>& s) {
 	lits<C, T> a;
 	for (const C& c : s) a.emplace_back(c);
 	this->emplace_back(lit<C, T>{},
-		dnf<C, T>{clause<C, T>{a}});
+		disjs<C, T>{conjs<C, T>{a}});
 }
 template <typename C, typename T>
 void prods<C, T>::operator()(const std::vector<T>& s) {
 	lits<C, T> a;
 	for (const T& t : s) a.emplace_back(t);
 	this->emplace_back(lit<C, T>{},
-		dnf<C, T>{clause<C, T>{a}});
+		disjs<C, T>{conjs<C, T>{a}});
 }
 template <typename C, typename T>
 void prods<C, T>::operator()(const prods<C, T>& l, const prods<C, T>& p) {
@@ -389,7 +425,7 @@ void prods<C, T>::operator()(const prods<C, T>& l, const prods<C, T>& p) {
 template <typename C, typename T>
 void prods<C, T>::operator()(const lit<C, T>& l, const prods<C, T>& p) {
 	assert(p.size());
-	this->emplace_back(l, p.to_dnf());
+	this->emplace_back(l, p.to_disjs());
 }
 template <typename C, typename T>
 bool prods<C, T>::operator==(const lit<C, T>& l) const { return l == to_lit(); }
@@ -401,7 +437,7 @@ lit<C, T> prods<C, T>::to_lit() const {
 	return this->back().second.begin()->begin()->back();
 }
 template <typename C, typename T>
-dnf<C, T> prods<C, T>::to_dnf() const {
+disjs<C, T> prods<C, T>::to_disjs() const {
 	assert(this->size());
 	return this->back().second;
 }
@@ -471,7 +507,7 @@ grammar<C, T>::grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
 {
 	// load prods
 	for (const prod<C, T>& p : ps) // every disjunction has its own prod rule
-		for (const clause<C, T>& c : p.second) {
+		for (const conjs<C, T>& c : p.second) {
 			G.emplace_back(p.first,
 				std::vector<lits<C, T>>{ c.begin(), c.end() });
 			if (c.size() > 1) conjunctives.insert(G.size()-1);
@@ -577,7 +613,9 @@ std::ostream& grammar<C, T>::print_internal_grammar(std::ostream& os,
 			if (j++ != 0) os << " &";
 			if (c.neg) os << " ~(";
 			for (const auto& l : c) os << " " <<
-				l.to_std_string(from_cstr<C>("ε"));
+				(!l.nt() && !l.is_null()
+					? (std::string("'") + to_string(l.t()) + std::string("'"))
+					: l.to_std_string(from_cstr<C>("ε")));
 			if (c.neg) os << " )";
 		}
 		os << ".";

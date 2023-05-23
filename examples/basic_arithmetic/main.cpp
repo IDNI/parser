@@ -30,8 +30,9 @@ struct basic_arithmetic {
 		auto f = p.parse(s.c_str(), s.size());
 		if (!p.found()) {
 			return cerr << "\ninput text does not seem to be an "
-				"expression statement\n" <<
-					p.get_error().to_str(), false;
+				"expression statement\n"<<p.get_error().to_str(
+					parser<char>::perror_t::info_lvl::
+						INFO_DETAILED) << endl, false;
 		}
 		cout << evaluate_forest(*f) << endl;
 		return true;
