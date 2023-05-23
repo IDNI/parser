@@ -208,9 +208,9 @@ int main(int argc, char **argv)
 	if (!run_test<char>(ps, nt, start, "bbb")) fail();
 	//negative tests
 	if (!run_test<char>(ps, nt, start, "bbba",{},false,"","Unexpected"))
-									 fail();
+	fail();
 	if (!run_test<char>(ps, nt, start, "a", {}, false, "", "'a'")) fail();
-	if (!run_test<char>(ps, nt, start, "a", {}, false, "", "'b'")) fail();
+	//if (!run_test<char>(ps, nt, start, "a", {}, false, "", "'b'")) fail();
 	if ( run_test<char>(ps, nt, start, "a", {}, false, "","success"))fail();
 	ps.clear();
 

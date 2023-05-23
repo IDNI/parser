@@ -180,8 +180,19 @@ public:
 				std::basic_string<C>(const std::vector<T>&)>;
 	typedef typename std::pair<lit<C, T>, std::array<size_t, 2>> pnode;
 	struct options {
+		// applying binarization to ensure every forest node
+		// has atmost 2 or less children nodes
 		bool binarize = DEFAULT_BINARIZE;
+		// build forest incrementally as soon any
+		// item is completed
 		bool incr_gen_forest = DEFAULT_INCR_GEN_FOREST;
+		// number of steps garbage collection lags behind
+		// parsing position n. should be greater than 
+		// 0 and less than the size of the input
+		// for any collection activity. We cannot use 
+		// % since in the streaming case, we do not know
+		// exact size in advance
+		size_t gc_lag = 1;  
 		decoder_type chars_to_terminals = 0;
 		encoder_type terminals_to_chars = 0;
 	};
@@ -301,11 +312,6 @@ private:
 	std::unordered_map<item, int_t, hasher_t> refi;
 	// items ready for collection
 	std::unordered_set<item, hasher_t> gcready;
-	// store the current container items before 
-	// these are garbage collected in order for them to be
-	// found() to find the right start's completed item
-	// to indicate successful parsing.
-	container_t lastcnt;
 
 	std::unordered_map<std::pair<size_t, size_t>, std::vector<item>,
 		hasher_t> sorted_citem, rsorted_citem;
