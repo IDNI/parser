@@ -285,6 +285,10 @@ void parser<C, T>::scan_cc_function(const item&i, size_t n, T ch, container_t& c
 	S[k.set].insert(k);
 	c.insert(k);
 	//if (completed(k)) c.insert(k); //complete(j, S[j.set]);
+	// i is scanned over and 
+	// item k is completed so collectible.
+	gcready.insert(i);
+	gcready.insert(k);
 }
 template <typename C, typename T>
 std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
