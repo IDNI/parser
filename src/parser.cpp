@@ -11,11 +11,13 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include "parser.h"
+
 using namespace std;
+
 namespace idni {
 
 prods<char32_t, char32_t> operator+(const prods<char32_t, char32_t>& x,
-	const std::basic_string<char>& s)
+	const string& s)
 {
 	assert(!x.empty());
 	prods<char32_t> r(x);
@@ -23,59 +25,51 @@ prods<char32_t, char32_t> operator+(const prods<char32_t, char32_t>& x,
 	return r;
 }
 prods<char32_t, char32_t> operator|(const prods<char32_t, char32_t>& x,
-	const std::basic_string<char>& s)
+	const string& s)
 {
 	assert(!x.empty());
 	return x | prods<char32_t>(to_u32string(s));
 }
 prods<char32_t, char32_t> operator&(const prods<char32_t, char32_t>& x,
-	const std::basic_string<char>& s)
+	const string& s)
 {
 	assert(!x.empty());
 	return x & prods<char32_t>(to_u32string(s));
 }
 
-std::string to_std_string(const std::string& s) { return s; }
-std::string to_std_string(const utf8string& s) { return to_string(s); }
-std::string to_std_string(const std::u32string& s) {
+string to_std_string(const string& s) { return s; }
+string to_std_string(const utf8string& s) { return to_string(s); }
+string to_std_string(const u32string& s) {
 	return to_std_string(to_utf8string(s)); }
-std::string to_std_string(const char32_t& ch) {
+string to_std_string(const char32_t& ch) {
 	return to_std_string(to_utf8string(ch));}
 template <>
-std::string from_cstr<char>(const char* s) { return std::string(s); }
+string from_cstr<char>(const char* s) { return string(s); }
 template <>
 utf8string from_cstr<utf8char>(const char* s) {
 	return to_utf8string(from_cstr<char>(s)); }
 template <>
-std::u32string from_cstr<char32_t>(const char* s) {
+u32string from_cstr<char32_t>(const char* s) {
 	return to_u32string(to_utf8string(s)); }
 template <>
-std::string from_str<char>(const std::string& s) {
-	return s; }
+string from_str<char>(const string& s) { return s; }
 template <>
-utf8string from_str<utf8char>(const std::string& s) {
-	return to_utf8string(s); }
+utf8string from_str<utf8char>(const string& s) { return to_utf8string(s); }
 template <>
-std::u32string from_str<char32_t>(const std::string& s) {
+u32string from_str<char32_t>(const string& s) {
 	return to_u32string(to_utf8string(s)); }
 template <>
-std::string from_cstr<char>(const char32_t* s) {
-	return to_std_string(std::u32string(s)); }
+string from_cstr<char>(const char32_t* s) { return to_std_string(u32string(s));}
 template <>
 utf8string from_cstr<utf8char>(const char32_t* s) {
-	return to_utf8string(std::u32string(s)); }
+	return to_utf8string(u32string(s)); }
 template <>
-std::u32string from_cstr<char32_t>(const char32_t* s) {
-	return std::u32string(s); }
+u32string from_cstr<char32_t>(const char32_t* s) { return u32string(s); }
 template <>
-std::string from_str<char>(const std::u32string& s) {
-	return to_std_string(s); }
+string from_str<char>(const u32string& s) { return to_std_string(s); }
 template <>
-utf8string from_str<utf8char>(const std::u32string& s) {
-	return to_utf8string(s); }
+utf8string from_str<utf8char>(const u32string& s) { return to_utf8string(s); }
 template <>
-std::u32string from_str<char32_t>(const std::u32string& s) {
-	return s; }
-
+u32string from_str<char32_t>(const u32string& s) { return s; }
 
 } // idni namespace

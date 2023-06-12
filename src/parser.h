@@ -12,7 +12,6 @@
 // modified over time by the Author.
 #ifndef __IDNI__PARSER__PARSER_H__
 #define __IDNI__PARSER__PARSER_H__
-
 #include <variant>
 #include <unordered_set>
 #include <iostream>
@@ -23,7 +22,6 @@
 #include <cassert>
 #include <sys/mman.h>
 #include <sstream>
-
 #include "defs.h"
 #include "characters.h"
 #include "charclasses.h"
@@ -120,7 +118,6 @@ template <typename C = char, typename T = C>
 struct grammar {
 	friend struct grammar_inspector<C, T>;
 	typedef std::pair<lit<C, T>, std::vector<lits<C, T>>> production;
-
 	grammar(nonterminals<C, T>& nts) : nts(nts) {}
 	grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
 		const prods<C, T>& start, const char_class_fns<T>& cc_fns);
@@ -145,8 +142,10 @@ struct grammar {
 	size_t add_char_class_production(lit<C, T> l, T ch);
 	const std::set<size_t>& prod_ids_of_literal(const lit<C, T>& l);
 	const lit<C, T>& start_literal() const;
-	bool is_cc_fn(const size_t &p) const;
-	bool is_eof_fn(const size_t &p) const;
+	bool is_cc_fn(const size_t& p) const;
+	bool is_eof_fn(const size_t& p) const;
+	std::ostream& print_production(std::ostream& os,
+		const production& p) const;
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
 	std::ostream& print_internal_grammar(std::ostream& os,
 		std::string prep = {}) const;
@@ -187,12 +186,12 @@ public:
 		// item is completed
 		bool incr_gen_forest = DEFAULT_INCR_GEN_FOREST;
 		// number of steps garbage collection lags behind
-		// parsing position n. should be greater than 
+		// parsing position n. should be greater than
 		// 0 and less than the size of the input
-		// for any collection activity. We cannot use 
+		// for any collection activity. We cannot use
 		// % since in the streaming case, we do not know
 		// exact size in advance
-		size_t gc_lag = 1;  
+		size_t gc_lag = 1;
 		decoder_type chars_to_terminals = 0;
 		encoder_type terminals_to_chars = 0;
 	};
@@ -265,10 +264,10 @@ public:
 	std::ostream& print_S(std::ostream& os) const;
 #endif
 	struct hasher_t {
-		size_t hash_size_t(const size_t &val) const;
-		size_t operator()(const std::pair<size_t, size_t> &k) const;
-		size_t operator()(const pnode &k) const;
-		size_t operator()(const item &k) const;
+		size_t hash_size_t(const size_t& val) const;
+		size_t operator()(const std::pair<size_t, size_t>& k) const;
+		size_t operator()(const pnode& k) const;
+		size_t operator()(const item& k) const;
 	};
 	struct perror_t {
 		enum info_lvl {
@@ -296,7 +295,6 @@ public:
 	};
 	perror_t get_error();
 	std::vector<item> back_track(const item& obj);
-
 private:
 	typedef std::unordered_set<parser<C, T>::item,
 		parser<C, T>::hasher_t> container_t;
@@ -305,7 +303,7 @@ private:
 	options o;
 	std::unique_ptr<input> in = 0;
 	std::vector<container_t> S;
-	
+
 	// refcounter for the earley item
 	// default value is 0, which means it can be garbaged
 	// non-zero implies, its not to be collected
@@ -317,9 +315,9 @@ private:
 		hasher_t> sorted_citem, rsorted_citem;
 	// binarized temporary intermediate non-terminals
 	std::map<std::vector<lit<C, T>>, lit<C, T>> bin_tnt;
-	static std::basic_string<C> tnt_prefix() { 
-		static std::basic_string<C> pr = {'_','_', 't', 'e', 'm', 'p' };
-		return pr; } 
+	static std::basic_string<C> tnt_prefix() {
+		static std::basic_string<C> pr = { '_','_','t','e','m','p' };
+		return pr; }
 	size_t tid; // id for temporary non-terminals
 	std::basic_string<C> get_fresh_tnt() {
 		std::basic_stringstream<C> ss;
@@ -336,9 +334,9 @@ private:
 	void scan_cc_function(const item& i, size_t n, T ch, container_t& c);
 	void complete(const item& i, container_t& t);
 	bool completed(const item& i) const;
-	void pre_process(const item &i);
+	void pre_process(const item& i);
 	bool init_forest(pforest& f);
-	bool build_forest(pforest& f, const pnode &root);
+	bool build_forest(pforest& f, const pnode& root);
 	bool binarize_comb(const item&, std::set<std::vector<pnode>>&);
 	void sbl_chd_forest(const item&,
 		std::vector<pnode>&, size_t, std::set<std::vector<pnode>>&);

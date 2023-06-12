@@ -13,6 +13,7 @@
 #ifndef __IDNI__PARSER__PARSER_TMPL_H__
 #define __IDNI__PARSER__PARSER_TMPL_H__
 #include "parser.h"
+
 namespace idni {
 
 template <typename C, typename T>
@@ -31,25 +32,20 @@ bool parser<C, T>::item::operator==(const item& i) const {
 	return set == i.set && prod == i.prod && con == i.con &&
 		from == i.from && dot == i.dot;
 }
-
-// //------------------------------------------------------------------------------
-
+//------------------------------------------------------------------------------
 template <typename C, typename T>
 parser<C, T>::input::input(const C* data, size_t length, decoder_type decoder,
 	int_type eof) : itype(POINTER), e(eof), decoder(decoder), max_l(length),
-		l(length), d(data), s({}) { }
+	l(length), d(data), s({}) {}
 template <typename C, typename T>
 parser<C, T>::input::input(std::basic_istream<C>& is, size_t length,
-	decoder_type decoder, int_type eof)
-	: itype(STREAM), e(eof), decoder(decoder), max_l(length), l(0), d(0),
-		s({})
-{
-	s.rdbuf(is.rdbuf());
-}
+	decoder_type decoder, int_type eof) : itype(STREAM), e(eof),
+	decoder(decoder), max_l(length), l(0), d(0), s({})
+	{ s.rdbuf(is.rdbuf()); }
 template <typename C, typename T>
 parser<C, T>::input::input(int fd, size_t length, decoder_type decoder,
 	int_type eof) : itype(MMAP), e(eof), decoder(decoder), max_l(length),
-		l(length), d(0), s({})
+	l(length), d(0), s({})
 {
 	if (fd != -1) {
 		max_l = lseek(fd, 0, SEEK_END);
@@ -125,12 +121,9 @@ void parser<C, T>::input::decode() {
 	std::vector<T> x = decoder(*this);
 	ts.insert(ts.end(), x.begin(), x.end());
 }
-
 //------------------------------------------------------------------------------
-
 template <typename C, typename T>
 parser<C, T>::parser(grammar<C, T>& g, const options& o) : g(g), o(o) {}
-
 template <typename C, typename T>
 lit<C, T> parser<C, T>::get_lit(const item& i) const {
 	return g[i.prod][i.con][i.dot];
@@ -180,14 +173,12 @@ void parser<C, T>::complete(const item& i, container_t& t) {
 	gcready.insert(i);
 }
 template <typename C, typename T>
-void parser<C, T>::resolve_conjunctions(container_t& t)
-	const
-{
+void parser<C, T>::resolve_conjunctions(container_t& t)	const {
 	//DBG(std::cout << "resolve conjunctions...\n";)
 	//DBG(print_S(std::cout) << std::endl;)
 	std::map<std::pair<size_t, size_t>,
 		std::set<std::pair<size_t, item>>> ps;
-	for (const item &x : t) if (g.conjunctive(x.prod) && completed(x)) {
+	for (const item& x : t) if (g.conjunctive(x.prod) && completed(x)) {
 		if (ps.find({ x.prod, x.from }) == ps.end())
 			ps[{ x.prod, x.from }] = {};
 		ps[{ x.prod, x.from }].insert({ x.con, x });
@@ -237,14 +228,14 @@ void parser<C, T>::predict(const item& i, container_t& t) {
 template <typename C, typename T>
 void parser<C, T>::scan(const item& i, size_t n, T ch) {
 	//DBG(print(std::cout << "scanning ", i) << " ch: " << to_std_string(ch) << std::endl;)
-	if (ch != get_lit(i).t()) {  
+	if (ch != get_lit(i).t()) {
     	//when the item fails, decrement refcount of items that
  		//predicted it i.e predicting items ( only the one) for
         // which refc was incremented when this item was predicted
         const container_t& cont = S[i.from];
         for (auto it = cont.begin(); it != cont.end(); ++it)
-        if (!completed(*it) && get_lit(*it) == get_nt(i)) 
-            if ( refi.count(*it) && refi[*it] > 0) --refi[*it];
+        if (!completed(*it) && get_lit(*it) == get_nt(i))
+            if (refi.count(*it) && refi[*it] > 0) --refi[*it];
         //DBG(std::cout<< "GC: adding failing scan\n");
         gcready.insert(i);
         return;
@@ -254,14 +245,15 @@ void parser<C, T>::scan(const item& i, size_t n, T ch) {
 	// hence, the previous item i can be marked
 	// for gc
 	gcready.insert(i);
-
 	item j(n + (ch == static_cast<T>(0) ? 0 : 1),
 		i.prod, i.con, i.from, i.dot + 1);
 	if (j.set >= S.size()) S.resize(j.set + 1);
 	S[j.set].insert(j);
 }
 template <typename C, typename T>
-void parser<C, T>::scan_cc_function(const item&i, size_t n, T ch, container_t& c) {
+void parser<C, T>::scan_cc_function(const item&i, size_t n, T ch,
+	container_t& c)
+{
 	//DBG(print(std::cout << "scanning cc function ", i) << " s: `" << to_std_string(ch) << "`[" << (int_t) ch << "]" << std::endl;)
 	size_t p = 0; // character's prod rule
 	lit<C, T> l = get_lit(i);
@@ -285,7 +277,7 @@ void parser<C, T>::scan_cc_function(const item&i, size_t n, T ch, container_t& c
 	S[k.set].insert(k);
 	c.insert(k);
 	//if (completed(k)) c.insert(k); //complete(j, S[j.set]);
-	// i is scanned over and 
+	// i is scanned over and
 	// item k is completed so collectible.
 	gcready.insert(i);
 	gcready.insert(k);
@@ -317,17 +309,12 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 	MS(emeasure_time_start(tsr, ter);)
 	//DBG(std::cout << "parse: `"<<to_std_string(s)<<"`["<<len<<"] g.start:"<<g.start<<"("<<g.start.nt()<<")"<<"\n";)
 	auto f = std::make_unique<pforest>();
-	sorted_citem.clear();
-	rsorted_citem.clear();
-	bin_tnt.clear();
-	//clear the refcount
-	refi.clear();
-	gcready.clear();
+	S.clear(), sorted_citem.clear(), rsorted_citem.clear(), bin_tnt.clear(),
+	gcready.clear(), refi.clear(); // clear the refcount
 	// number of items that have been collected
 	int gcnt = 0;
 	tid = 0;
-	S.clear();//, S.resize(len + 1);//, C.clear(), C.resize(len + 1);
-	S.resize(1);
+	S.resize(1); // S.resize(len + 1);
 	for (size_t p : g.prod_ids_of_literal(g.start_literal())) {
 		auto& cont = S[0];
 		for (size_t c = 0; c != g[p].size(); ++c) {
@@ -343,8 +330,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 #endif
 	//DBG(size_t proc = 0;)
 	T ch = 0;
-	size_t n = 0;
-	size_t cn = -1;
+	size_t n = 0, cn = -1;
 	bool new_pos = true;
 	do {
 		if ((new_pos = (cn != in->pos()))) cn = in->pos();
@@ -358,7 +344,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 		}
 #endif
 		do {
-			for (const item &x : t) S[x.set].insert(x);
+			for (const item& x : t) S[x.set].insert(x);
 			t.clear();
 			c.clear();
 			const auto& cont = S[n];
@@ -391,36 +377,35 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 						{ it->from, it->set });
 					build_forest(*f, curroot);
 				}
-			if (gcready.size()) {
-				for (auto &rm : gcready)
-					if (refi[rm] == 0 && (rm.set + o.gc_lag) <= n) {
+			if (gcready.size())
+				for (auto& rm : gcready) {
+					if (refi[rm] == 0 &&
+						(rm.set + o.gc_lag) <= n)
+					{
 						// since the refi is zero, remove it from the
 						// main container
 						S[rm.set].erase(rm);
 						refi.erase(rm);
 						gcnt++;
-					}
-					else {
-						DBG(assert(refi[rm] == 0));
-					}
+					} else { DBG(assert(refi[rm] == 0)); }
 				//gcready.clear();
-			}
+				}
 		}
 	} while (in->tnext());
 	MS(emeasure_time_end(tsr, ter) <<" :: parse time\n";)
 	in->clear();
-
 	// remaining total items
 	size_t count = 0;
-	for( size_t i = 0 ; i< S.size(); i++)
+	for (size_t i = 0 ; i< S.size(); i++)
 		count += S[i].size();
-	
-	DBG(std::cout<<"-----------"<<std::endl;)
-	DBG(std::cout<<"GC: total input size = "<< n<<std::endl;)
-	DBG(std::cout<<"GC: total remaining = "<< count<<std::endl;)
-	DBG(std::cout<<"GC: total collected = "<< gcnt<<std::endl;)
-	if (count+gcnt)
-		DBG(std::cout<<"GC: % = "<<100*gcnt/(count+gcnt)<<std::endl);
+	DBG(std::cout << "-----------";)
+	DBG(std::cout << "\nGC: total input size = " << n;)
+	DBG(std::cout << "\nGC: total remaining  = " << count;)
+	DBG(std::cout << "\nGC: total collected  = " << gcnt;)
+#ifdef DEBUG
+	if (count + gcnt)
+		std::cout << "\nGC: % = " << 100*gcnt/(count+gcnt) << std::endl;
+#endif
 	if (!o.incr_gen_forest) init_forest(*f);
 	else f->root(pnode(g.start_literal(), { 0, in->tpos() }));
 #if defined(DEBUG) && defined(WITH_DEVHELPERS)
@@ -438,7 +423,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 		file2 << ptd.str();
 		file2.close();
 		size_t i = 0;
-		auto cb_next_graph = [&](parser<C, T>::pforest::graph &g){
+		auto cb_next_graph = [&](parser<C, T>::pforest::graph& g){
 			ssf.str({});
 			ptd.str({});
 			ssf<<"parse_rules"<<c<<"_"<<i++<<".tml";
@@ -464,7 +449,6 @@ bool parser<C, T>::found() {
 	//print_S(std::cout);
 	//DBG(std::cout << "tpos: " << in->tpos() << std::endl;)
 	//for (const auto& x : S[in->tpos()]) print(std::cout << "\t", x) << std::endl;
-
 	for (size_t n : g.prod_ids_of_literal(g.start_literal())) {
 		//DBG(std::cout << "N: " << n << std::endl;)
 		for (size_t c = 0; c != g[n].size(); ++c) {
@@ -500,7 +484,7 @@ std::string parser<C, T>::perror_t::to_str(info_lvl elvl) {
 	s = s.size() == 0 ? "end of file" : "'" + s + "'";
 	ss << "\nSyntax Error: Unexpected " << s << " at " << line << ":"
 		<< col << " (" << loc+1 << "): ";
-	for (size_t i = ctxt.size()-1; i != 0; --i)
+	for (size_t i = ctxt.size() - 1; i != 0; --i)
 		if constexpr (std::is_same_v<T, char32_t>)
 			ss << to_std_string(ctxt[i]);
 		else ss << ctxt[i];
@@ -512,7 +496,7 @@ std::string parser<C, T>::perror_t::to_str(info_lvl elvl) {
 		if (elvl == INFO_DETAILED) continue;
 		size_t tab = 0;
 		const size_t max_bk_nest = 10; // 0 to disable
-		for (auto &bk : e.bktrk) {
+		for (auto& bk : e.bktrk) {
 			tab++;
 			if (tab == max_bk_nest) break;
 			ss << "\t";
@@ -525,7 +509,7 @@ std::string parser<C, T>::perror_t::to_str(info_lvl elvl) {
 }
 template <typename C, typename T>
 std::vector<typename parser<C, T>::item> parser<C, T>::back_track(
-	const item &obj)
+	const item& obj)
 {
 	std::vector<item> ret;
 	std::unordered_set<item, hasher_t> exists;
@@ -534,7 +518,7 @@ std::vector<typename parser<C, T>::item> parser<C, T>::back_track(
 	//cerr<< S[cur.from].size() << " " << "(" << cur.from << " " << cur.set <<") ";
 	//cerr<< get_nt(cur)<< " "<< g[cur.prod][cur.con] << endl
 		auto pit = std::find_if(S[cur.from].begin(), S[cur.from].end(),
-			[&](const item &a)
+			[&](const item& a)
 		{
 			return exists.find(a) == exists.end() &&
 				get_lit(a) == get_nt(cur) &&
@@ -557,13 +541,10 @@ typename parser<C, T>::perror_t parser<C, T>::get_error() {
 		return errctxt;
 	};
 	std::stringstream es;
-	auto item2_ept = [this, &es]( const item &t ){
+	auto item2_ept = [this, &es](const item& t ) {
 		typename perror_t::exp_prod_t ept;
-		es.str(""), es << get_lit(t),
-		ept.exp = es.str();
-		es.str(""), es << get_nt(t),
-		ept.prod_nt = es.str();
-		es.str("");
+		es.str(""), es << get_lit(t), ept.exp = es.str(),
+		es.str(""), es << get_nt(t),  ept.prod_nt = es.str(), es.str("");
 		if (g[t.prod][t.con].neg) es << "~( ";
 		for (size_t i = 0; i < g[t.prod][t.con].size(); i++) {
 			es << " ";
@@ -576,38 +557,36 @@ typename parser<C, T>::perror_t parser<C, T>::get_error() {
 		return ept;
 	};	// find error location and build error stream
 	in->clear();
-	for (int_t i = (int_t) in->tpos(); i >= 0; i--)
-		if (S[i].size()) {
-			size_t from = 0;
-			// smallest length item that may be used as delimiter
-			for (const item& t : S[i]) {
-				if (t.from > from && t.from != t.set)
-					from = t.from;
-				//ignoring empty string, completed and nts
-				if (completed(t) || (get_lit(t).nt() &&
-						!g.is_cc_fn(get_lit(t).n()))
-					|| (!get_lit(t).nt() &&
-						get_lit(t).is_null()))
-								continue;
-				err.expv.emplace_back(item2_ept(t));
-				auto bv = back_track(t);
-				for (const item &b : bv) err.expv.back()
+	for (int_t i = (int_t) in->tpos(); i >= 0; i--) if (S[i].size()) {
+		size_t from = 0;
+		// smallest length item that may be used as delimiter
+		for (const item& t : S[i]) {
+			if (t.from > from && t.from != t.set)
+				from = t.from;
+			//ignoring empty string, completed and nts
+			if (completed(t) ||
+				(get_lit(t).nt() && !g.is_cc_fn(get_lit(t).n()))
+				|| (!get_lit(t).nt() &&	get_lit(t).is_null()))
+					continue;
+			err.expv.emplace_back(item2_ept(t));
+			auto bv = back_track(t);
+			for (const item& b : bv) err.expv.back()
 					.bktrk.emplace_back(item2_ept(b));
-			}
-			err.unexp = in->tat(i);
-			err.loc = i;
-			break;
 		}
+		err.unexp = in->tat(i);
+		err.loc = i;
+		break;
+	}
 	err.line = 1;
 	size_t line_loc = 0;
 	for (int_t j = 0; err.loc > -1 && j != err.loc; ++j)
 		if (in->tat(j) == (T)'\n') err.line++, line_loc = j;
 	err.col = err.loc - line_loc + 1;
-	err.ctxt = near_ctxt(line_loc, err.loc+1);
+	err.ctxt = near_ctxt(line_loc, err.loc + 1);
 	return err;
 }
 template <typename C, typename T>
-void parser<C, T>::pre_process(const item &i) {
+void parser<C, T>::pre_process(const item& i) {
 	//sorted_citem[G[i.prod][0].n()][i.from].emplace_back(i);
 	if (completed(i))
 		sorted_citem[{ g(i.prod).n(), i.from }].emplace_back(i),
@@ -660,15 +639,14 @@ bool parser<C, T>::init_forest(pforest& f) {
 // collects all possible variations of the given item's rhs while respecting the
 // span of the item and stores them in the set ambset.
 template <typename C, typename T>
-void parser<C, T>::sbl_chd_forest(const item &eitem,
-	std::vector<pnode> &curchd, size_t xfrom,
-	std::set<std::vector<pnode>> &ambset)
+void parser<C, T>::sbl_chd_forest(const item& eitem,
+	std::vector<pnode>& curchd, size_t xfrom,
+	std::set<std::vector<pnode>>& ambset)
 {
 	//check if we have reached the end of the rhs of prod
 	if (g.len(eitem.prod, eitem.con) <= curchd.size())  {
 		// match the end of the span we are searching in.
-		if (curchd.back().second[1] == eitem.set)
-			ambset.insert(curchd);
+		if (curchd.back().second[1] == eitem.set) ambset.insert(curchd);
 		return;
 	}
 	// curchd.size() refers to index of cur literal to process in the rhs of production
@@ -681,7 +659,7 @@ void parser<C, T>::sbl_chd_forest(const item &eitem,
 		// ensure well-formed combination (matching input) early
 		else if (xfrom < in->tpos()
 			 && in->tat(xfrom) == nxtl.first.t())
-				nxtl.second[1] = ++xfrom ;
+				nxtl.second[1] = ++xfrom;
 		else // if not building the correction variation, prune this path quickly
 			return;
 		// build from the next in the line
@@ -692,10 +670,9 @@ void parser<C, T>::sbl_chd_forest(const item &eitem,
 	} else {
 		// get the from/to span of all non-terminals in the rhs of production.
 		nxtl.second[0] = xfrom;
-
-		//auto &nxtl_froms = sorted_citem[nxtl.n()][xfrom];
-		auto &nxtl_froms = sorted_citem[{ nxtl.first.n(), xfrom }];
-		for (auto &v : nxtl_froms) {
+		//auto& nxtl_froms = sorted_citem[nxtl.n()][xfrom];
+		auto& nxtl_froms = sorted_citem[{ nxtl.first.n(), xfrom }];
+		for (auto& v : nxtl_froms) {
 			// ignore beyond the span
 			if (v.set > eitem.set) continue;
 			// store current and recursively build for next nt
@@ -713,7 +690,7 @@ bool parser<C, T>::binarize_comb(const item& eitem,
 {
 	std::vector<pnode> rcomb, lcomb;
 	if (eitem.dot < 1) return false;
-	pnode right = { g[eitem.prod][eitem.con][eitem.dot-1], {} };
+	pnode right = { g[eitem.prod][eitem.con][eitem.dot - 1], {} };
 	if (!right.first.nt()) {
 		right.second[1] = eitem.set;
 		if (right.first.is_null())
@@ -723,8 +700,8 @@ bool parser<C, T>::binarize_comb(const item& eitem,
 		else return false;
 		rcomb.emplace_back(right);
 	} else {
-		auto &rightit = rsorted_citem[{ right.first.n(), eitem.set }];
-		for (auto &it : rightit)
+		auto& rightit = rsorted_citem[{ right.first.n(), eitem.set }];
+		for (auto& it : rightit)
 			if (eitem.from <= it.from)
 				right.second[1] = it.set,
 				right.second[0] = it.from,
@@ -734,20 +711,17 @@ bool parser<C, T>::binarize_comb(const item& eitem,
 	if (eitem.dot > 2) {
 		//DBG(print(std::cout, eitem);)
 		std::vector<lit<C, T>> v(g[eitem.prod][eitem.con].begin(),
-					g[eitem.prod][eitem.con].begin() +
+					 g[eitem.prod][eitem.con].begin() +
 						eitem.dot - 1);
 		//DBG(assert(bin_tnt.find(v) != bin_tnt.end());)
 		pnode left = { bin_tnt[v], {} };
 		//DBG(std::cout << "\n" << d->get(bin_tnt[v].n()) << std::endl);
-		auto &leftit = sorted_citem[{ left.first.n(), eitem.from }];
+		auto& leftit = sorted_citem[{ left.first.n(), eitem.from }];
 		// doing left right optimization
-		for (auto &it : leftit)
-			for (auto &rit : rcomb)
-				if (it.set == rit.second[0]) {
-					left.second[0] = it.from;
-					left.second[1] = it.set;
-					ambset.insert({ left, rit });
-				}
+		for (auto& it : leftit) for (auto& rit : rcomb)
+			if (it.set == rit.second[0]) left.second[0] = it.from,
+				left.second[1]=it.set,
+				ambset.insert({ left, rit });
 	}
 	// exact two literals in rhs
 	else if (eitem.dot == 2) {
@@ -755,29 +729,27 @@ bool parser<C, T>::binarize_comb(const item& eitem,
 		auto& l = left.first;
 		if (!l.nt()) {
 			left.second[0] = eitem.from;
-			if (l.is_null())
-				left.second[1] = left.second[0];
+			if (l.is_null()) left.second[1] = left.second[0];
 			else if (in->tat(eitem.from) == l.t() )
-				left.second[1] = eitem.from + 1  ;
+				left.second[1] = eitem.from + 1;
 			else return false;
 			//do Left right optimisation
-			for (auto &rit : rcomb)
+			for (auto& rit : rcomb)
 				if (left.second[1] == rit.second[0])
 					ambset.insert({ left, rit });
 		}
 		else {
-			auto &leftit = sorted_citem[{ l.n(), eitem.from }];
-			for (auto &it : leftit)
-				for (auto &rit : rcomb)
-					if (it.set == rit.second[0])
-						left.second[0] = it.from,
-						left.second[1] = it.set,
-						ambset.insert({ left, rit });
+			auto& leftit = sorted_citem[{ l.n(), eitem.from }];
+			for (auto& it : leftit)	for (auto& rit : rcomb)
+				if (it.set == rit.second[0])
+					left.second[0] = it.from,
+					left.second[1] = it.set,
+					ambset.insert({ left, rit });
 		}
 	}
 	else {
 		DBG(assert(eitem.dot == 1));
-		for (auto &rit : rcomb)
+		for (auto& rit : rcomb)
 			if (eitem.from <= rit.second[0])
 				ambset.insert({ rit });
 	}
@@ -785,11 +757,11 @@ bool parser<C, T>::binarize_comb(const item& eitem,
 }
 // builds the forest starting with root
 template <typename C, typename T>
-bool parser<C, T>::build_forest(pforest& f, const pnode &root) {
+bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 	if (!root.first.nt()) return false;
 	if (f.contains(root)) return false;
-	//auto &nxtset = sorted_citem[root.n()][root.second[0]];
-	auto &nxtset = sorted_citem[{ root.first.n(), root.second[0] }];
+	//auto& nxtset = sorted_citem[root.n()][root.second[0]];
+	auto& nxtset = sorted_citem[{ root.first.n(), root.second[0] }];
 	pnodes_set ambset;
 	for (const item& cur : nxtset) {
 		if (cur.set != root.second[1]) continue;
@@ -807,22 +779,19 @@ bool parser<C, T>::build_forest(pforest& f, const pnode &root) {
 	return true;
 }
 template <typename C, typename T>
-size_t parser<C, T>::hasher_t::hash_size_t(const size_t &val) const{
+size_t parser<C, T>::hasher_t::hash_size_t(const size_t& val) const{
 	return std::hash<size_t>()(val) +
 		0x9e3779b9 + (val << 6) + (val >> 2);
 }
 template <typename C, typename T>
-size_t parser<C, T>::hasher_t::operator()(const std::pair<size_t, size_t> &k)
+size_t parser<C, T>::hasher_t::operator()(const std::pair<size_t, size_t>& k)
 	const
 {
-	// lets substitute with better if possible.
-	size_t h = 0;
-	h ^= hash_size_t(k.first);
-	h ^= hash_size_t(k.second);
-	return h;
+	size_t h = 0; // lets substitute with better if possible.
+	return h ^= hash_size_t(k.first), h ^= hash_size_t(k.second), h;
 }
 template <typename C, typename T>
-size_t parser<C, T>::hasher_t::operator()(const pnode &k) const {
+size_t parser<C, T>::hasher_t::operator()(const pnode& k) const {
 	// lets substitute with better if possible.
 	size_t h = 0;
 	h ^= hash_size_t(k.second[0]);
@@ -832,7 +801,7 @@ size_t parser<C, T>::hasher_t::operator()(const pnode &k) const {
 	return h;
 }
 template <typename C, typename T>
-size_t parser<C, T>::hasher_t::operator()(const item &k) const {
+size_t parser<C, T>::hasher_t::operator()(const item& k) const {
 	// lets substitute with better if possible.
 	size_t h = 0;
 	h ^= hash_size_t(k.set);
@@ -892,8 +861,7 @@ template <typename C, typename T>
 std::ostream& parser<C, T>::print_S(std::ostream& os) const {
 	for (size_t n = 0; n != S.size(); ++n) {
 		os << "S["<<n<<"]:\n";
-		for(const item &x : S[n])
-			print(os << "\t", x) << "\n";
+		for (const item& x : S[n]) print(os << "\t", x) << "\n";
 	}
 	return os;
 }
@@ -901,18 +869,15 @@ template<typename C, typename T>
 std::ostream& parser<C, T>::print_data(std::ostream& os) const {
 	os << "S:\n";
 	for (auto& x : S) {
-		for (auto& y : x) {
-			if (y.from != y.set)
-				print(os << "\t " << y.prod << "/" << y.con << " \t", y) <<"\n";
-		}
+		for (auto& y : x) if (y.from != y.set) print(os << "\t " <<
+				y.prod << "/" << y.con << " \t", y) <<"\n";
 		os << "---:\n";
 	}
 	os << "completed S:\n";
 	for (auto& x : S) {
-		for (auto& y : x) {
+		for (auto& y : x)
 			if (y.from != y.set && y.dot == g.len(y.prod, y.con))
 				print(os << "\t " << y.prod << " \t", y) <<"\n";
-		}
 		os << "---:\n";
 	}
 	return os;

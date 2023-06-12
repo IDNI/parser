@@ -15,6 +15,7 @@
 #include <sstream>
 #include <iomanip>
 #include "parser.h"
+
 namespace idni {
 
 template <typename C, typename T = C>
@@ -46,7 +47,7 @@ template <typename C, typename T, typename P>
 bool to_dot(std::ostream& ss, P& g, const std::string& inputstr,
 	const std::string& grammar_text)
 {
-	auto dot_safe = [](const std::string &s) {
+	auto dot_safe = [](const std::string& s) {
 		std::stringstream ss;
 		for (size_t n = 0; n != s.size(); ++n) {
 			if (s[n] == '"') ss << '\\';
@@ -72,7 +73,7 @@ bool to_dot(std::ostream& ss, P& g, const std::string& inputstr,
 
 	if constexpr(std::is_same<P, typename parser<C, T>::psptree>::value){
 		std::stringstream pss;
-		auto pointerid = [&pss]( auto &p){
+		auto pointerid = [&pss](auto& p) {
 			pss << p;
 			std::string s = pss.str();
 			pss.str({});
@@ -81,10 +82,9 @@ bool to_dot(std::ostream& ss, P& g, const std::string& inputstr,
 		};
 		std::deque<typename parser<C, T>::psptree> stk;
 		stk.push_back(g);
-		while (!stk.empty()){
+		while (!stk.empty()) {
 			typename parser<C, T>::psptree cur = stk.back();
 			stk.pop_back();
-
 			if (!cur->value.first.nt()) continue;
 			auto key = keyfun(cur->value);
 			ss << "\n" << pointerid(cur) << "["<<"label=\"" <<
@@ -108,7 +108,7 @@ bool to_dot(std::ostream& ss, P& g, const std::string& inputstr,
 		std::unordered_set<std::pair<size_t,size_t>,
 			typename parser<C, T>::hasher_t> edgedone;
 		edgedone.clear();
-		for (auto &it : g) {
+		for (auto& it : g) {
 			auto key = keyfun(it.first);
 			std::string ctxt;
 			if constexpr(std::is_same<P, typename
@@ -119,7 +119,7 @@ bool to_dot(std::ostream& ss, P& g, const std::string& inputstr,
 				key.second << "\"];";
 			size_t p = 0;
 			std::stringstream pstr;
-			for (auto &pack : it.second) {
+			for (auto& pack : it.second) {
 				pstr<<key.second<<p++;
 				auto ambkey = std::hash<std::string>()(
 								pstr.str());
@@ -169,8 +169,8 @@ bool to_tml_rules(std::ostream& ss, const typename parser<C, T>::pforest& f){
 template <typename C, typename T, typename P>
 bool to_tml_rules(std::ostream& ss, P& g) {
 	std::set<std::string> terminals;
-	for (auto &it : g) {
-		for (auto &pack : it.second) {
+	for (auto& it : g) {
+		for (auto& pack : it.second) {
 			ss << to_tml_rule<C, T>(it.first) << " :- ";
 			for (size_t i = 0; i < pack.size(); i++) {
 				// if terminal
@@ -182,7 +182,7 @@ bool to_tml_rules(std::ostream& ss, P& g) {
 			ss << "\n";
 		}
 	}
-	for (auto &t: terminals) ss << t << ".\n";
+	for (auto& t: terminals) ss << t << ".\n";
 	return true;
 }
 

@@ -14,6 +14,7 @@
 #define __IDNI__PARSER__DEFS_H__
 #include <cstdint>
 #include <iomanip>
+
 namespace idni {
 
 #ifdef DEBUG

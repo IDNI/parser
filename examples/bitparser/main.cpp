@@ -22,7 +22,7 @@ auto bconv = [](parser<char, bool>::input& in) {
 	return in.next(), r;
 };
 auto b32conv = [](parser<char32_t, bool>::input& in) {
-	std::vector<bool> r;
+	vector<bool> r;
 	for (int i = 31; i >= 0; --i) r.push_back(in.cur() & (1 << i));
 	return in.next(), r;
 };
@@ -47,7 +47,7 @@ int test(const basic_string<C>& inputstr, T tval, T fval,
 	auto found = p.found();
 	if (!found) return failed = true,
 		cerr << "ERROR:" << p.get_error().to_str() << endl, 1;
-	auto next_g = [](parser<C, T>::pforest::graph &fg) {
+	auto next_g = [](parser<C, T>::pforest::graph& fg) {
 		auto tree = fg.extract_trees();
 		tree->to_print(cout << "\n\n------\n"), cout << endl;
 		return true;

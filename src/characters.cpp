@@ -13,14 +13,15 @@
 #include <sstream>
 #include <string.h>
 #include "characters.h"
+
 using namespace std;
+
 namespace idni {
 
 string to_string(const utf8string& s) { return string(s.begin(), s.end()); }
 string to_string(const u32string& s) { return to_string(to_utf8string(s)); }
 string to_string(const char32_t& s) { return to_string(to_utf8string(s)); }
 string to_string(const string& s) { return s; }
-
 utf8string to_utf8string(int32_t v) { return to_utf8string(::to_string(v)); }
 utf8string to_utf8string(char ch) { return to_utf8string(string{ ch }); }
 utf8string to_utf8string(const char* s) { return to_utf8string(string(s)); }
@@ -67,7 +68,7 @@ bool is_mb_codepoint(utf8char ch, uint8_t p) {
 	if (p == 3) return utf_cont(i);
 	return false;
 }
-size_t peek_codepoint(const utf8char* str, size_t l, char32_t &ch) {
+size_t peek_codepoint(const utf8char* str, size_t l, char32_t& ch) {
 	ch = -1;
   	if (!l) return 0;
 	const utf8char* end = str + l;
@@ -128,7 +129,7 @@ size_t emit_codepoint(char32_t ch, utf8char *s) {
 		return 4;
 	} else return 0;
 }
-basic_ostream<utf8char>& emit_codepoint(basic_ostream<utf8char>& o, char32_t ch) {
+basic_ostream<utf8char>& emit_codepoint(basic_ostream<utf8char>& o,char32_t ch){
 	if (ch < 0x80)
 		return o.put((utf8char) ch);
 	else if (ch < 0x800)
@@ -150,7 +151,7 @@ basic_ostream<char32_t>& operator<<(basic_ostream<char32_t>& ss, const char* c){
 	return ss;
 }
 basic_ostream<char32_t>& operator<<(basic_ostream<char32_t>& ss,
-	const std::string& s)
+	const string& s)
 {
 	for (const auto& ch : to_u32string(to_utf8string(s))) ss.put(ch);
 	return ss;

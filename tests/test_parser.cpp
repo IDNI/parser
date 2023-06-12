@@ -1,20 +1,22 @@
 #include <sstream>
 #include <fstream>
 #include <utility>
-
 #include "../src/parser.h"
+
 using namespace std;
 using namespace idni;
+
 template <typename T = char>
 typename parser<T>::options options;
+
 static bool opt_edge = true;
 static size_t c = 0;
 static size_t stop_after = SIZE_MAX;
 
 template <typename T>
-int test_out(int c, const typename grammar<T>::grammar &g,
-	const basic_string<T> &inputstr,
-	typename parser<T>::pforest &f)
+int test_out(int c, const typename grammar<T>::grammar& g,
+	const basic_string<T>& inputstr,
+	typename parser<T>::pforest& f)
 {
 	stringstream ptd;
 	stringstream ssf;
@@ -25,7 +27,7 @@ int test_out(int c, const typename grammar<T>::grammar &g,
 
 	ssf << "forest" << c << ".dot";
 	ofstream file(ssf.str());
-	to_dot<T>(ptd, std::as_const(f), to_std_string(inputstr), s);
+	to_dot<T>(ptd, as_const(f), to_std_string(inputstr), s);
 	file << ptd.str();
 	file.close();
 	ssf.str({});
@@ -33,7 +35,7 @@ int test_out(int c, const typename grammar<T>::grammar &g,
 
 	ssf << "forest_facts" << c << ".tml";
 	ofstream file1(ssf.str());
-	to_tml_facts<T>(ptd, std::as_const(f));
+	to_tml_facts<T>(ptd, as_const(f));
 	file1 << ptd.str();
 	file1.close();
 	ssf.str({});
@@ -41,13 +43,12 @@ int test_out(int c, const typename grammar<T>::grammar &g,
 
 	ssf << "forest_grammar_rules" << c << ".tml";
 	ofstream file2(ssf.str());
-	to_tml_rules<T>(ptd, std::as_const(f));
+	to_tml_rules<T>(ptd, as_const(f));
 	file2 << ptd.str();
 	file2.close();
 
 	size_t i = 0;
-	auto dump_files = [&] (typename parser<T>::pgraph &g,
-							std::string suffix = "") {
+	auto dump_files = [&](typename parser<T>::pgraph& g, string suffix="") {
 		ssf.str({});
 		ptd.str({});
 		ssf << "graph" << c << "_" << i << suffix << ".dot";
@@ -72,7 +73,7 @@ int test_out(int c, const typename grammar<T>::grammar &g,
 		filet << ptd.str();
 		filet.close();
 	};
-	auto cb_next_graph = [&](typename parser<T>::pgraph &g){
+	auto cb_next_graph = [&](typename parser<T>::pgraph& g){
 		f.detect_cycle(g);
 		dump_files(g);
 		if (options<T>.binarize)
@@ -87,8 +88,8 @@ int test_out(int c, const typename grammar<T>::grammar &g,
 	return 1;
 }
 template <typename T>
-bool run_test(const prods<T> &ps, nonterminals<T> &nts,
-	const prods<T> &start, const basic_string<T> &input,
+bool run_test(const prods<T>& ps, nonterminals<T>& nts,
+	const prods<T>& start, const basic_string<T>& input,
 	char_class_fns<T> cc = {}, bool dump = false, string contains = "",
 	string error_expected = "")
 {
@@ -104,20 +105,21 @@ bool run_test(const prods<T> &ps, nonterminals<T> &nts,
 	bool contained = false;
 	if (found && (dump || contains.size()))
 	{
-		f->traverse([&dump, &contains, &contained](const auto &n)
+		f->traverse([&dump, &contains, &contained](const auto& n)
 					{
 			if (contains == n.first.to_std_string()) contained=true;
 			if (dump) cout << "entering: `" <<
 				n.first.to_std_string() << "`\n"; },
-					[&dump](const auto &n, const auto &)
+					[&dump](const auto& n, const auto&)
 					{
-						if (dump)
-							cout << "exiting: `" << n.first.to_std_string() << "`\n";
+						if (dump) cout << "exiting: `"<<
+							n.first.to_std_string()
+							<< "`\n";
 					});
 	}
 	cout << "#found " << found << "\n";
-	cout << "#count " << f->count_trees() << std::endl;
-	cout << "#ambiguous " << f->is_ambiguous() << std::endl;
+	cout << "#count " << f->count_trees() << endl;
+	cout << "#ambiguous " << f->is_ambiguous() << endl;
 	// if (contains.size())
 	//	cout << "contains: `" << contains << "`: " << contained << endl;
 
@@ -170,9 +172,9 @@ int main(int argc, char **argv)
 			stop_after = 5;
 		else help(opt), exit(1);
 	}
-	std::cout<< "Running with options: ";
-	for_each(args.begin(), args.end(),[](string &a){std::cout<< a << " ";});
-	std::cout<<std::endl;
+	cout << "Running with options: ";
+	for_each(args.begin(), args.end(),[](string& a) { cout << a << " "; });
+	cout << endl;
 
 	options<char>.binarize =        options<char32_t>.binarize = binarize;
 	options<char>.incr_gen_forest =	options<char32_t>.incr_gen_forest =

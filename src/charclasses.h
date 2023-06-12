@@ -12,6 +12,7 @@
 // modified over time by the Author.
 #ifndef __IDNI__PARSER__CHARCLASSES_H__
 #define __IDNI__PARSER__CHARCLASSES_H__
+
 namespace idni { namespace charclasses {
 
 template <typename C> bool iseof(C c) {return c==std::char_traits<C>::eof();}

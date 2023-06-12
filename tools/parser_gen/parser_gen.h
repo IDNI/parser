@@ -86,7 +86,7 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name,
 			<< encoder << "\n\t\t};\n";
 		return os.str();
 	};
-	auto gen_prods = [&gi, &ts]() {
+	auto gen_prods = [&g, &gi, &ts]() {
 		std::stringstream os;
 		auto terminal = [&ts](const lit<C, T>& l) {
 			for (size_t n = 0; n != ts.size(); ++n)
@@ -95,6 +95,7 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name,
 			return ts.size()-1;
 		};
 		for (const auto& p : gi.G()) {
+			g.print_production(os << "\t\t// ", p) << "\n";
 			os << "\t\tq(nt(" << p.first.n() << "), ";
 			bool first_c = true;
 			for (const auto& c : p.second) {

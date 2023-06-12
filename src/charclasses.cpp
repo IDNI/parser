@@ -15,7 +15,9 @@
 #include <iostream>
 #include "characters.h"
 #include "charclasses.h"
+
 using namespace std;
+
 namespace idni { namespace charclasses {
 // char
 template<> bool isalnum<char>(char c) { return ::isalnum(c); }

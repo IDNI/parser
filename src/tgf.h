@@ -16,6 +16,7 @@
 #include <cstring>
 #include "parser.h"
 #include "devhelpers.h"
+
 namespace idni {
 
 template <typename C = char, typename T = C>
@@ -81,8 +82,8 @@ struct tgf {
 		//std::cout << "parsing: " << to_std_string(s) << std::endl;
 		//DBG(f.g.print_data(std::cout << "\n>>>\n\n") << "\n<<<" << std::endl;)
 		//return {nts_};
-		return f.transform(f.p.parse(s.c_str(), s.size()),
-			nts_, start_nt);
+		return f.transform(
+			f.p.parse(s.c_str(), s.size()), nts_, start_nt);
 	}
 	static grammar<C, T> from_file(nonterminals<C, T>& nts_,
 		const std::string& filename,
@@ -91,11 +92,10 @@ struct tgf {
 		tgf<C, T> f;
 		int fd;
 		//std::cout << "parsing file: " << filename << std::endl;
-		if ((fd = ::open(filename.c_str(), O_RDONLY)) == -1) {
-			std::cerr << "Failed to open file '" << filename << "':"
-				<< strerror(errno) << std::endl;
-			return grammar<C, T>(nts_);
-		}
+		if ((fd = ::open(filename.c_str(), O_RDONLY)) == -1)
+			return std::cerr << "Failed to open file '" << filename
+					<< "':" << strerror(errno) << std::endl,
+				grammar<C, T>(nts_);
 		//std::cout << "fd: " << fd << " l: " << l << std::endl;
 		return f.transform(f.p.parse(fd), nts_, start_nt);
 	}
@@ -106,7 +106,7 @@ private:
 		const std::basic_string<C>& start_nt = from_cstr<C>("start"))
 	{
 		struct context {
-			prods<C, T> ps{}, nul{lit<C, T>{}};
+			prods<C, T> ps{}, nul{ lit<C, T>{} };
 			lit<C, T> p_head{};
 			std::vector<prods<C, T>> p{};
 			std::vector<std::string> cc_names{};
@@ -154,12 +154,12 @@ private:
 			}
 			void disjunction() {
 				//DBG(std::cout << "disjunction" << std::endl;)
-				p[p.size()-2] = p[p.size()-2] | p.back();
+				p[p.size() - 2] = p[p.size() - 2] | p.back();
 				p.pop_back();
 			}
 			void conjunction() {
 				//DBG(std::cout << "conjunction" << std::endl;)
-				p[p.size()-2] = p[p.size()-2] & p.back();
+				p[p.size() - 2] = p[p.size() - 2] & p.back();
 				p.pop_back();
 			}
 			void production() {
@@ -172,7 +172,7 @@ private:
 			}
 			void negate() {
 				//DBG(std::cout << "negation: " << std::endl;)
-				p.back() = ~ p.back();
+				p.back() = ~p.back();
 			}
 			void group() {
 				//DBG(std::cout << "group\n";)
@@ -187,13 +187,13 @@ private:
 			void repeat() {
 				auto nn = prods<C, T>(nt(get_new_name()));
 				prods<C, T> t = p.back();
-				p.back() = prods<C, T>{};
+				p.back() = prods<C, T>{ };
 				auto it = t.back().second.begin()->begin();
-				for (size_t i = 0; i != it->size()-1; ++i)
+				for (size_t i = 0; i != it->size() - 1; ++i)
 					p.back()=p.back()+prods<C, T>((*it)[i]);
 				p.back() = p.back() + nn;
-				auto last = prods<C, T>((*it)[it->size()-1]);
-				ps(nn, (last+nn) | last);
+				auto last = prods<C, T>((*it)[it->size() - 1]);
+				ps(nn, (last + nn) | last);
 			}
 			void multi() {
 				auto nn = prods<C, T>(nt(get_new_name()));
@@ -201,9 +201,8 @@ private:
 				ps(nn, (p.back() + nn) | nul), p.back() = nn;
 			}
 			std::basic_string<C> get_new_name() {
-				std::stringstream ss;
-				ss << "_R" << p_head.to_std_string() << "_"
-									<< id++;
+				std::stringstream ss("_R");
+				ss << p_head.to_std_string() << "_" << id++;
 				//cout << "new name: " << id << " " << to_std_string(ss.str()) << "\n";
 				return from_str<C>(ss.str());
 			}
@@ -211,8 +210,8 @@ private:
 			void print_data() const {
 				std::cout << "\tp.size(): " << p.size() << "\n";
 				size_t i = 0;
-				for (const auto& t : p) std::cout << "\tp[" << i++
-					<< "]:\t " << t << "\n";
+				for (const auto& t : p) std::cout << "\tp[" <<
+						i++ << "]:\t " << t << "\n";
 			}
 #endif
 		} x(nts_);
@@ -232,7 +231,7 @@ private:
 			else if (l == production_) x.new_production();
 			else if (l == string_ || l == quoted_char) {
 				auto str = terminals_to_str<C, T>(*f, n);
-				str.erase(str.begin()), str.erase(str.end() - 1);
+				str.erase(str.begin()), str.erase(str.end()-1);
 				//DBG(std::cout << "quoted_char?: " << (l == quoted_char)
 				//	<< " str.size(): " << str.size()
 				//	<< " str: `" << to_std_string(str)
@@ -249,35 +248,33 @@ private:
 			}
 		};
 		auto cb_exit = [&x, this](const auto& n, const auto&) {
-			const auto&l = n.first;
+			const auto& l = n.first;
 			if (!l.nt()) return;
 			//DBG(std::cout << "\t// leaving: `" << l.to_std_string() << "`\n";)
-			if      (l == production_) x.production();
-			else if (l == directive)   x.directive();
-			else if (l == negation)    x.negate();
-			else if (l == conjunction) x.conjunction();
-			else if (l == disjunction) x.disjunction();
-			else if (l == multi)       x.multi();
-			else if (l == group)       x.group();
-			else if (l == optional)    x.optional();
+			if      (l == production_)         x.production();
+			else if (l == directive)           x.directive();
+			else if (l == negation)            x.negate();
+			else if (l == conjunction)         x.conjunction();
+			else if (l == disjunction)         x.disjunction();
+			else if (l == multi)               x.multi();
+			else if (l == group)               x.group();
+			else if (l == optional)            x.optional();
 			else if (l == plus || l == repeat) x.repeat();
 		};
-#if DEBUG
+#ifdef DEBUG
 		auto cb_ambig = [](const auto& n, auto& ambset) {
-			const auto&l = n.first;
-			std::cout << "\t\tAMBIG: `" << l.to_std_string() << "`\n";
+			const auto& l = n.first;
+			std::cout << "\t\tAMBIG: `"<< l.to_std_string()<< "`\n";
 			return ambset;
 		};
 #endif
-		if (!p.found()) {
-			std::cerr << "There is an error in the grammar. "
-					"Cannot recognize TGF.\n";
+		if (!p.found()) std::cerr << "There is an error in the grammar."
+						" Cannot recognize TGF.\n"
+				<< p.get_error().to_str();
+			//parser<C, T>::perror_t::info_lvl::INFO_DETAILED);
 			//DBG(p.print_data(std::cout << "PARSER DATA:\n") << "\n";)
 			//DBG(g.print_internal_grammar(cout << "TGF productions:\n") << endl;)
-			auto error = p.get_error();
-			std::cerr << error.to_str();
-				//parser<C, T>::perror_t::info_lvl::INFO_DETAILED);
-		} else {
+		else {
 			//DBG(cout << "TRAVERSE parsed TGF source and "
 			//			"generate productions\n";)
 			//auto c = f->has_single_parse_tree();
@@ -285,9 +282,10 @@ private:
 			//std::cout << "trees: " << c << std::endl;
 			if (c > 1) {
 				size_t i = 0;
-				std::cerr << "ambiguity. number of trees: " << c << std::endl;
+				std::cerr << "ambiguity. number of trees: " <<
+								c << std::endl;
 				auto cb_next_graph = [&i, &f](
-					typename parser<C, T>::pgraph &g)
+					typename parser<C, T>::pgraph& g)
 				{
 					std::stringstream ptd;
 					std::stringstream ssf;
@@ -303,18 +301,24 @@ private:
 				};
 				std::cerr << "ambiguous nodes:\n";
 				for (auto& n : f->ambiguous_nodes()) {
-					std::cerr << "\t `" << n.first.first << "` [" << n.first.second[0] << "," << n.first.second[1] << "]\n";
+					std::cerr << "\t `" << n.first.first <<
+						"` [" << n.first.second[0] <<","
+						<< n.first.second[1] << "]\n";
 					size_t d = 0;
 					for (auto ns : n.second) {
-						std::cerr << "\t\t " <<  d++ << "\t";
-						for (auto nt : ns) std::cerr << " `" << nt.first << "`["<< nt.second[0] << "," << nt.second[1] << "] ";
+						std::cerr<<"\t\t "<< d++ <<"\t";
+						for (auto nt : ns) std::cerr <<
+							" `" << nt.first << "`["
+							<< nt.second[0] << ","
+							<< nt.second[1] << "] ";
 						std::cerr << "\n";
 					}
-					f->extract_graphs(n.first, cb_next_graph, false);
+					f->extract_graphs(n.first,
+							cb_next_graph, false);
 				}
 			}
 			f->traverse(cb_enter, cb_exit
-#if DEBUG
+#ifdef DEBUG
 				, f->no_revisit, cb_ambig
 #endif
 				);
@@ -324,7 +328,7 @@ private:
 					//<< "\nDumping 1 tree..." << std::endl;
 				//size_t n = 0;
 				//auto next_g = [&n](parser<C, T>
-				//			::pforest::graph &fg)
+				//			::pforest::graph& fg)
 				//{
 				//	fg.extract_trees()->to_print(std::cout
 				//		<< ">>> tree " << ++n << "\n")
@@ -334,11 +338,12 @@ private:
 				//f->extract_graphs(f->root(), next_g);
 			//}
 		}
-		return grammar<C, T>(nts_, x.ps, prods<C, T>(x.nt(start_nt)), x.cc);
+		return grammar<C, T>(
+			nts_, x.ps, prods<C, T>(x.nt(start_nt)), x.cc);
 	}
 	nonterminals<C, T> nts{};
 	char_class_fns<C> cc;
-	prods<C, T> nul{lit<C, T>{}},
+	prods<C, T> nul{ lit<C, T>{} },
 		alnum, alpha, char_, char0, chars, chars1, conjunction,
 		directive, directive_param,
 		directive_params, disjunction, eof, eol, expr1, expr2, expr3,

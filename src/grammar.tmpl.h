@@ -13,10 +13,8 @@
 #ifndef __IDNI__PARSER__GRAMMAR_TMPL_H__
 #define __IDNI__PARSER__GRAMMAR_TMPL_H__
 #include "parser.h"
-namespace idni {
-using namespace idni::charclasses;
 
-// -----------------------------------------------------------------------------
+namespace idni {
 
 template <typename C, typename T>
 std::ostream& operator<<(std::ostream& os, const lit<C, T>& l) {
@@ -53,9 +51,7 @@ std::ostream& operator<<(std::ostream& os, const prods<C, T>& p) {
 			p.at(n).second << '.' << std::endl;
 	return os;
 }
-
 //-----------------------------------------------------------------------------
-
 template <typename C, typename T>
 size_t nonterminals<C, T>::get(const std::basic_string<C>& s) {
 	if (auto it = m.find(s); it != m.end())
@@ -72,9 +68,7 @@ template <typename C, typename T>
 lit<C, T> nonterminals<C, T>::operator()(const std::basic_string<C>& s) {
 	return lit<C, T>{ get(s), &*this };
 }
-
 //-----------------------------------------------------------------------------
-
 template <typename C, typename T>
 lit<C, T>::lit() : lit_t(static_cast<T>(0)), is_null_(true) { }
 template <typename C, typename T>
@@ -89,13 +83,11 @@ template <typename C, typename T>
 T lit<C, T>::t() const { return std::get<T>(*this); }
 template <typename C, typename T>
 bool lit<C, T>::is_null() const { return is_null_; }
-
 template <typename C, typename T>
 std::vector<T> lit<C, T>::to_terminals() const {
 	if (nt() || is_null()) return {};
 	return { t() };
 }
-
 template <typename C, typename T>
 std::basic_string<C> lit<C, T>::to_string(const std::basic_string<C>& nll)const{
 	auto escape = [](const char& t) {
@@ -104,6 +96,7 @@ std::basic_string<C> lit<C, T>::to_string(const std::basic_string<C>& nll)const{
 			t == '\t' ? "\\t" :
 			t == '\v' ? "\\v" :
 			t == '\'' ? "\\'" :
+			t == '\\' ? "\\\\" :
 			t == '\0' ? "\\0" : "";
 	};
 	auto escape32 = [](const char32_t& t) {
@@ -112,6 +105,7 @@ std::basic_string<C> lit<C, T>::to_string(const std::basic_string<C>& nll)const{
 			t == U'\t' ? "\\t" :
 			t == U'\v' ? "\\v" :
 			t == U'\'' ? "\\'" :
+			t == U'\\' ? "\\\\" :
 			t == U'\0' ? "\\0" : "";
 	};
 	if (nt()) return nts->get(n());
@@ -123,7 +117,8 @@ std::basic_string<C> lit<C, T>::to_string(const std::basic_string<C>& nll)const{
 		std::string r = escape(t());
 		ss << "'" << (r.size() ? r : idni::to_std_string(t())) << "'";
 		return ss.str();
-	} else if constexpr ((std::is_same_v<C,char32_t> && std::is_same_v<C, T>) ||
+	} else if constexpr ((std::is_same_v<C,char32_t> &&
+							std::is_same_v<C, T>) ||
 		(std::is_same_v<C,char> && std::is_same_v<T,char32_t>))
 	{
 		std::basic_stringstream<C> ss;
@@ -151,9 +146,7 @@ bool lit<C, T>::operator==(const lit<C, T>& l) const {
 	if (is_null() != l.is_null()) return is_null() == l.is_null();
 	else return t() == l.t();
 }
-
 //-----------------------------------------------------------------------------
-
 template <typename C, typename T>
 lits<C, T> operator+(const lit<C, T>& x, const lit<C, T>& y) {
 	return lits<C, T>({ x, y });
@@ -174,9 +167,7 @@ lits<C, T> operator~(const lits<C, T>& x) {
 	lits<C, T> r(x);
 	return r.neg = !x.neg, r;
 }
-
 //-----------------------------------------------------------------------------
-
 template <typename C, typename T>
 bool operator<=(const conjs<C, T>& x, const conjs<C, T>& y) {
 	for (const lits<C, T>& a : x) if (y.find(a) == y.end()) return false;
@@ -186,10 +177,8 @@ template <typename C, typename T>
 conjs<C, T> simplify(const conjs<C, T>& c) {
 	for (lits<C, T> na : c) {
 		na.neg = !na.neg;
-		for (const lits<C, T>& a : c) if (a.neg == na.neg && a == na) {
-			//cout << "simplified to {} a["<<a<<"] == na["<<na<<"]\n";
+		for (const lits<C, T>& a : c) if (a.neg == na.neg && a == na)
 			return {};
-		}
 	}
 	return c;
 }
@@ -205,17 +194,11 @@ conjs<C, T> operator+(const conjs<C, T>& x, const conjs<C, T>& y) {
 		for (const lits<C, T>& b : y) r.insert(a + b);
 	return simplify<C, T>(r);
 }
-
 //-----------------------------------------------------------------------------
-
 template <typename C, typename T>
-disjs<C, T>& top(prods<C, T>& p) {
-	return p.back().second;
-}
+disjs<C, T>& top(prods<C, T>& p) { return p.back().second; }
 template <typename C, typename T>
-const disjs<C, T>& top(const prods<C, T>& p) {
-	return p.back().second;
-}
+const disjs<C, T>& top(const prods<C, T>& p) { return p.back().second; }
 template <typename C, typename T>
 disjs<C, T> simplify(const disjs<C, T>& x) {
 	disjs<C, T> y, z;
@@ -263,7 +246,7 @@ disjs<C, T> operator+(const disjs<C, T>& x, const disjs<C, T>& y) {
 template <typename C, typename T>
 disjs<C, T> operator~(const conjs<C, T>& x) {
 	disjs<C, T> r;
-	for (const lits<C, T>& a : x) r.insert(conjs<C, T>{~a});
+	for (const lits<C, T>& a : x) r.insert(conjs<C, T>{ ~a });
 	//cout << "\nnegating conjs: " << x << " to: " << r << std::endl;
 	return r;
 }
@@ -294,9 +277,7 @@ disjs<C, T> operator~(const disjs<C, T>& x) {
 	//cout << "\nnegating disjs d: " << x << " to: `" << r << "`" << std::endl;
 	return simplify<C, T>(r); // is simplify needed here?
 }
-
 //-----------------------------------------------------------------------------
-
 template <typename C, typename T>
 void simplify(prods<C, T>& p) {
 	for (auto& x : p) x.second = simplify<C, T>(x.second);
@@ -402,21 +383,21 @@ prods<C, T>::prods(const std::vector<T>& v) : prods_t() { (*this)(v); }
 template <typename C, typename T>
 void prods<C, T>::operator()(const lit<C, T>& l) {
 	this->emplace_back(lit<C, T>{},
-		disjs<C, T>{conjs<C, T>{lits<C, T>({l})}});
+		disjs<C, T>{ conjs<C, T>{ lits<C, T>({ l }) } });
 }
 template <typename C, typename T>
 void prods<C, T>::operator()(const std::basic_string<C>& s) {
 	lits<C, T> a;
 	for (const C& c : s) a.emplace_back(c);
 	this->emplace_back(lit<C, T>{},
-		disjs<C, T>{conjs<C, T>{a}});
+		disjs<C, T>{ conjs<C, T>{ a } });
 }
 template <typename C, typename T>
 void prods<C, T>::operator()(const std::vector<T>& s) {
 	lits<C, T> a;
 	for (const T& t : s) a.emplace_back(t);
 	this->emplace_back(lit<C, T>{},
-		disjs<C, T>{conjs<C, T>{a}});
+		disjs<C, T>{ conjs<C, T>{ a } });
 }
 template <typename C, typename T>
 void prods<C, T>::operator()(const prods<C, T>& l, const prods<C, T>& p) {
@@ -445,9 +426,7 @@ template <typename C, typename T>
 bool operator==(const lit<C, T>& l, const prods<C, T>& p) {
 	return p == l;
 }
-
 //-----------------------------------------------------------------------------
-
 template <typename T>
 void char_class_fns<T>::operator()(size_t nt, const char_class_fn<T>& fn) {
 	this->fns.emplace(nt, fn);
@@ -470,19 +449,19 @@ char_class_fns<T> predefined_char_classes(
 	if constexpr (!std::is_same_v<T, char> && !std::is_same_v<T, char32_t>)
 		return r;
 	std::map<std::string, char_class_fn<T>> predef{
-		{ "eof",       iseof<T>    },
-		{ "alnum",     isalnum<T>  },
-		{ "alpha",     isalpha<T>  },
-		{ "blank",     isblank<T>  },
-		{ "cntrl",     iscntrl<T>  },
-		{ "digit",     isdigit<T>  },
-		{ "graph",     isgraph<T>  },
-		{ "lower",     islower<T>  },
-		{ "printable", isprint<T>  },
-		{ "punct",     ispunct<T>  },
-		{ "space",     isspace<T>  },
-		{ "upper",     isupper<T>  },
-		{ "xdigit",    isxdigit<T> }
+		{ "eof",       charclasses::iseof<T>    },
+		{ "alnum",     charclasses::isalnum<T>  },
+		{ "alpha",     charclasses::isalpha<T>  },
+		{ "blank",     charclasses::isblank<T>  },
+		{ "cntrl",     charclasses::iscntrl<T>  },
+		{ "digit",     charclasses::isdigit<T>  },
+		{ "graph",     charclasses::isgraph<T>  },
+		{ "lower",     charclasses::islower<T>  },
+		{ "printable", charclasses::isprint<T>  },
+		{ "punct",     charclasses::ispunct<T>  },
+		{ "space",     charclasses::isspace<T>  },
+		{ "upper",     charclasses::isupper<T>  },
+		{ "xdigit",    charclasses::isxdigit<T> }
 	};
 	r(nts.get(std::basic_string<C>{}), [](T) { return false; });
 	for (const auto& cc : cc_fn_names) {
@@ -497,9 +476,7 @@ char_class_fns<T> predefined_char_classes(
 	}
 	return r;
 }
-
 //-----------------------------------------------------------------------------
-
 template <typename C, typename T>
 grammar<C, T>::grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
 	const prods<C, T>& start, const char_class_fns<T>& cc_fns)
@@ -527,11 +504,10 @@ grammar<C, T>::grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
 	} while (k != nullables.size());
 	//DBG(print_data(std::cout << "\n", "\t") << "\n\n";)
 }
-
 template <typename C, typename T>
 size_t grammar<C, T>::size() const { return G.size(); }
 template <typename C, typename T>
-lit<C, T> grammar<C, T>::operator()(const size_t&i) const {return G[i].first;}
+lit<C, T> grammar<C, T>::operator()(const size_t&i) const  {return G[i].first; }
 template <typename C, typename T>
 const std::vector<lits<C, T>>& grammar<C, T>::operator[](const size_t& i)
 	const {	return G[i].second; }
@@ -556,7 +532,7 @@ bool grammar<C, T>::char_class_check(lit<C, T> l, T ch) const
 }
 template <typename C, typename T>
 size_t grammar<C, T>::add_char_class_production(lit<C, T> l, T ch) {
-	G.push_back(production{ l, {{{{ lit<C, T>{ ch } }}}}});
+	G.push_back(production{ l, { { { { lit<C, T>{ ch } } } } } });
 	ntsm[G.back().first].insert(G.size() - 1);
 	return cc_fns.ps[l.n()][ch] = G.size() - 1;
 }
@@ -571,7 +547,6 @@ size_t grammar<C, T>::get_char_class_production(lit<C, T> l, T ch) {
 		return add_char_class_production(l, ch);
 	} else return it->second;
 }
-
 template <typename C, typename T>
 const std::set<size_t>& grammar<C, T>::prod_ids_of_literal(const lit<C, T>& l) {
 	return ntsm[l];
@@ -579,12 +554,11 @@ const std::set<size_t>& grammar<C, T>::prod_ids_of_literal(const lit<C, T>& l) {
 template <typename C, typename T>
 const lit<C, T>& grammar<C, T>::start_literal() const { return start; }
 template <typename C, typename T>
-bool grammar<C, T>::is_cc_fn(const size_t &p) const { return cc_fns.is_fn(p); }
+bool grammar<C, T>::is_cc_fn(const size_t& p) const { return cc_fns.is_fn(p); }
 template <typename C, typename T>
-bool grammar<C, T>::is_eof_fn(const size_t &p) const {
+bool grammar<C, T>::is_eof_fn(const size_t& p) const {
 	return cc_fns.is_eof_fn(p);
 }
-
 template <typename C, typename T>
 bool grammar<C, T>::all_nulls(const lits<C, T>& a) const {
 	for (size_t k = 0; k != a.size(); ++k)
@@ -594,31 +568,37 @@ bool grammar<C, T>::all_nulls(const lits<C, T>& a) const {
 	return true;
 }
 template <typename C, typename T>
-lit<C, T> grammar<C, T>::nt(size_t n) { return lit<C, T>(n, &nts); }
+lit<C, T> grammar<C, T>::nt(size_t n) { return lit<C, T>(n,& nts); }
 template <typename C, typename T>
 lit<C, T> grammar<C, T>::nt(const std::basic_string<C>& s) {
 	return nt(nts.get(s));
 }
 
+template <typename C, typename T>
+std::ostream& grammar<C, T>::print_production(std::ostream& os,
+	const production& p) const
+{
+	os << p.first.to_std_string(from_cstr<C>("ε")) <<" =>";
+	size_t j = 0;
+	for (const auto& c : p.second) {
+		if (j++ != 0) os << " &";
+		if (c.neg) os << " ~(";
+		for (const auto& l : c) os << " " <<
+			(!l.nt() && !l.is_null()
+				? l.to_std_string()
+				: l.to_std_string(from_cstr<C>("ε")));
+		if (c.neg) os << " )";
+	}
+	return os << ".";
+}
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
 template <typename C, typename T>
 std::ostream& grammar<C, T>::print_internal_grammar(std::ostream& os,
 	std::string prep) const
 {
 	for (size_t i = 0; i != G.size(); ++i) {
-		os << prep << i << ": " <<
-			G[i].first.to_std_string(from_cstr<C>("ε")) <<" =>";
-		size_t j = 0;
-		for (const auto& c : G[i].second) {
-			if (j++ != 0) os << " &";
-			if (c.neg) os << " ~(";
-			for (const auto& l : c) os << " " <<
-				(!l.nt() && !l.is_null()
-					? (std::string("'") + to_string(l.t()) + std::string("'"))
-					: l.to_std_string(from_cstr<C>("ε")));
-			if (c.neg) os << " )";
-		}
-		os << ".";
+		os << prep << i << ": ";
+		print_production(os, G[i]);
 		if (conjunctive(i)) os << "\t # conjunctive";
 		os << "\n";
 	}
@@ -631,7 +611,8 @@ std::ostream& grammar<C, T>::print_data(std::ostream& os, std::string prep)
 	os << "nonterminals:\n";
 	for (size_t i = 0; i != nts.size(); ++i)
 		os << prep << i << ": " << to_std_string(nts[i]) <<
-		(cc_fns.is_fn(i) ? (cc_fns.is_eof_fn(i) ? " (eof)" : " (char class)") : "") << "\n";
+		(cc_fns.is_fn(i) ? (cc_fns.is_eof_fn(i) ?
+				" (eof)" : " (char class)") : "") << "\n";
 	print_internal_grammar(os << "productions:\n", prep);
 	os << "nonterminals to productions map:\n";
 	for (auto& x : ntsm) {
@@ -642,7 +623,6 @@ std::ostream& grammar<C, T>::print_data(std::ostream& os, std::string prep)
 	return os;
 }
 #endif
-
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
 template<typename C, typename T>
 std::ostream& print_grammar(std::ostream& os, const grammar<C, T>& g) {

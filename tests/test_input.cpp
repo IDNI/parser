@@ -5,7 +5,7 @@ using namespace idni;
 
 auto noconv = [](parser<char32_t, char32_t>::input& in) {
 	auto x = in.cur();
-	//std::cout << " <" << to_std_string(x) << ">" << std::endl;
+	//cout << " <" << to_std_string(x) << ">" << endl;
 	return in.next(), vector<char32_t>{ x };
 };
 auto u8conv = [](parser<char, char32_t>::input& in) {
@@ -27,7 +27,7 @@ auto bconv = [](parser<char, bool>::input& in) {
 	return in.next(), r;
 };
 auto b32conv = [](parser<char32_t, bool>::input& in) {
-	std::vector<bool> r;
+	vector<bool> r;
 	for (int i = 31; i >= 0; --i) r.push_back(in.cur() & (1 << i));
 	return in.next(), r;
 };
@@ -37,8 +37,8 @@ struct token {
 	vector<string> tnames = {
 		"NONE", "WS", "GREETINGS", "ADDRESS", "GREEK", "PUNCT"
 	};
-	std::basic_string<S> value{};
-	std::string to_str() const {
+	basic_string<S> value{};
+	string to_str() const {
 		if (value.empty()) return {};
 		stringstream ss;
 		ss << tnames[ttype] << "("<< to_std_string(value) <<")";
@@ -78,12 +78,12 @@ auto tokenize32 = [](
 	return tokenize_<char32_t>(in);
 };
 template <typename C, typename T = C>
-bool test(const char* msg, const std::basic_string<C>& istr,
+bool test(const char* msg, const basic_string<C>& istr,
 	typename parser<C, T>::decoder_type decoder = 0, bool stream = false)
 {
 	using input_t = typename parser<C, T>::input;
 	cout << "\"" << to_std_string(istr) << "\" " << msg << endl;
-	std::basic_istringstream<C> is(istr);
+	basic_istringstream<C> is(istr);
 	auto in = stream ? input_t(is, 0, decoder)
 			: input_t(istr.c_str(), istr.size(), decoder);
 	size_t counter = 0;
@@ -92,7 +92,7 @@ bool test(const char* msg, const std::basic_string<C>& istr,
 		if constexpr (is_same_v<T, bool>) {
 			if (n % 4 == 0) cout << " ";
 			if constexpr (is_same_v<C, char>) {
-				if (n % 8 == 0) cout << "\n";
+				if (n % 8  == 0) cout << "\n";
 			}
 			if constexpr (is_same_v<C, char32_t>) {
 				if (n %  8 == 0) cout << " ";
@@ -103,7 +103,7 @@ bool test(const char* msg, const std::basic_string<C>& istr,
 		if constexpr (is_same_v<T, char32_t>)
 			cout << "'" << to_std_string(c) << "'";
 		if constexpr (is_same_v<T, char>)
-			cout << "'" << std::string{ c } << "'";
+			cout << "'" << string{ c } << "'";
 		if constexpr (is_same_v<T, token<C>>)
 			cout << c.to_str();
 	};

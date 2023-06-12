@@ -14,6 +14,7 @@
 #include <string.h>
 #include <fstream>
 #include "parser_gen.h"
+
 using namespace std;
 using namespace idni;
 
@@ -23,14 +24,14 @@ ostream& help(ostream& os, char* cmd) {
 	return os;
 }
 
-int error(char* cmd, std::string msg, bool print_help = true) {
+int error(char* cmd, string msg, bool print_help = true) {
 	cerr << cmd << ": " << msg << endl;
 	if (print_help) help(cerr, cmd);
 	return 1;
 }
 
 int main(int argc, char** argv) {
-	std::string start_nt = "start", char_type = "char", terminal_type = "",
+	string start_nt = "start", char_type = "char", terminal_type = "",
 		decoder = "", encoder = "";
 	if (argc < 3) return error(argv[0], "requires at least 2 arguments");
 	if (argc > 7) encoder       = argv[7];
