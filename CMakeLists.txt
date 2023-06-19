@@ -53,7 +53,7 @@ set(PROJECT_SOURCES
 	src/parser.cpp
 )
 
-set(PROJECT_DEFINITIONS WITH_DEVHELPERS)
+set(PROJECT_DEFINITIONS WITH_DEVHELPERS MEASURE MEASURE_EACH_POS)
 
 include(idni-common)
 
@@ -71,7 +71,7 @@ endif()
 
 if(BUILD_TESTS)
 	add_subdirectory(tests)
-endif()	
+endif()
 
 if(BUILD_TOOLS)
 	add_subdirectory(tools)

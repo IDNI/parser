@@ -31,7 +31,7 @@ namespace idni {
 #define tdiff(start, end) ((double(end - start) / CLOCKS_PER_SEC) * 1000)
 #define emeasure_time_start(start, end) clock_t end, start = clock()
 #define emeasure_time_end(start, end) end = clock(), std::cout << std::fixed <<\
-	std::setprecision(2) << (start, end) << " ms"
+	std::setprecision(2) << tdiff(start, end) << " ms"
 
 typedef int32_t int_t;
 

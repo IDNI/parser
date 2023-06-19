@@ -363,7 +363,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 #if MEASURE_EACH_POS
 		if (new_pos) {
 			std::cout << in->pos() << " \tln: " << r << " col: "
-				<< (in->ttellg()-cb+1) << " :: ";
+				<< (n-cb+1) << " :: ";
 			emeasure_time_end(tsp, tep) << "\n";
 		}
 #endif
