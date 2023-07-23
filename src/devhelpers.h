@@ -147,7 +147,7 @@ bool to_tml_facts(std::ostream& ss, const typename parser<C, T>::pforest& f){
 	auto n_e = f.get_nodes_and_edges();
 	auto& n = n_e.first;
 	auto& e = n_e.second;
-	for (size_t i = 0; i < n.size()-1; ++i)
+	for (size_t i = 0; n.size() && i < n.size()-1; ++i)
 		ss << "node(" << i << " " <<
 			std::quoted(n[i].first.to_std_string()) << " " <<
 			n[i].second[0] << " " << n[i].second[1] << ").\n";
