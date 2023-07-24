@@ -303,16 +303,22 @@ private:
 	options o;
 	std::unique_ptr<input> in = 0;
 	std::vector<container_t> S;
-
+	//mapping from to position of end in S for items
+	std::unordered_map<size_t, std::vector<size_t>> fromS;
+	
 	// refcounter for the earley item
 	// default value is 0, which means it can be garbaged
 	// non-zero implies, its not to be collected
 	std::unordered_map<item, int_t, hasher_t> refi;
 	// items ready for collection
 	std::unordered_set<item, hasher_t> gcready;
+	std::vector<item> sorted_citem(std::pair<size_t, size_t> ntpos);
+	std::vector<item> rsorted_citem(std::pair<size_t, size_t> ntpos);
+	std::unordered_map<std::pair<size_t, size_t>, 
+									std::vector<item>, hasher_t> memo;
+	std::unordered_map<std::pair<size_t, size_t>, 
+									std::vector<item>, hasher_t> rmemo;
 
-	std::unordered_map<std::pair<size_t, size_t>, std::vector<item>,
-		hasher_t> sorted_citem, rsorted_citem;
 	// binarized temporary intermediate non-terminals
 	std::map<std::vector<lit<C, T>>, lit<C, T>> bin_tnt;
 	static std::basic_string<C> tnt_prefix() {
