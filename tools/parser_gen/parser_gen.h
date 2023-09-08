@@ -30,7 +30,7 @@ template <typename C = char, typename T = C>
 std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name, const std::string& tgf_filename,
 	const grammar<C, T>& g,
 	const std::string& char_type = "char",
-	const std::string& terminal_type = "",
+	const std::string& terminal_type = "char",
 	const std::string& decoder = "",
 	const std::string& encoder = "")
 {
@@ -41,6 +41,10 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name, con
 	std::string U = terminal_type == "char32_t" ? "U" : "";
 	std::vector<C> ts{ (C)0 };
 	grammar_inspector<C, T> gi(g);
+	// convert name to upper case and append __PARSER_GEN_H__ as a guard at the begining
+	std::string guard = name;
+	std::transform(guard.begin(), guard.end(), guard.begin(), ::toupper);
+
 	auto gen_ts = [&ts, &U]() {
 		std::stringstream os;
 		os << "\t\t";
@@ -138,6 +142,9 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name, con
 		"//\n"
 		"// from the grammar in file " << tgf_filename << ":\n" 
 		"//\n" << comment_grammar() << "//\n\n"
+		"//\n"
+		"#ifndef __" << guard << "_H__\n"
+		"#define __" << guard << "_H__\n"
 		"#include <string.h>\n"
 		"#include \"parser.h\"\n"
 		"struct " << name << " {\n"
@@ -168,7 +175,7 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name, con
 		"	typename idni::parser<" <<tn<< ">::perror_t "
 								"get_error()\n"
 		"		{ return p.get_error(); }\n"
-		"   enum nonterminal {\n" << gen_nts_enum_cte() << "   }  nttype = tau_parser:: empty_string;\n"
+		"   enum nonterminal {\n" << gen_nts_enum_cte() << "   };\n"
 		"	size_t id(const std::basic_string<"<<char_type<<">& "
 					"name) { return nts.get(name); }\n"
 		"private:\n"
@@ -210,7 +217,9 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name, con
 					tn<< ">{});\n" << ps <<
 		"		return q;\n"
 		"	}\n"
-		"};\n";
+		"};\n"
+		"#endif // __" << guard << "_H__\n";
+
 	return os;
 }
 

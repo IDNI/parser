@@ -30,7 +30,7 @@ int error(char* cmd, std::string msg, bool print_help = true) {
 }
 
 int main(int argc, char** argv) {
-	std::string start_nt = "start", char_type = "char", terminal_type = "",
+	std::string start_nt = "start", char_type = "char", terminal_type = "char",
 		decoder = "", encoder = "";
 	if (argc < 3) return error(argv[0], "requires at least 2 arguments");
 	if (argc > 7) encoder       = argv[7];
