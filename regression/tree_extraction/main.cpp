@@ -25,7 +25,7 @@ struct tree_extraction {
 	"cbf_head		=> cbf."
 	"cbf 			=> bf | chars."
 	"bf				=> '1' | '0'."
-	"start			=> cbf_rule | bf_rule."
+	"start			=> cbf_rule."
 	;
 
 	const string te_input = "something=0";

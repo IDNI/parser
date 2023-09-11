@@ -5,7 +5,7 @@
 struct tree_extraction {
 	tree_extraction() :
 		nts(load_nonterminals()), cc(load_cc()),
-		g(nts, load_prods(), nt(19), cc), p(g, load_opts()) {}
+		g(nts, load_prods(), nt(17), cc), p(g, load_opts()) {}
 	std::unique_ptr<typename idni::parser<char>::pforest> parse(
 		const char* data, size_t size = 0,
 		char eof = std::char_traits<char>::eof())
@@ -22,7 +22,7 @@ struct tree_extraction {
 	bool found() { return p.found(); }
 	typename idni::parser<char>::perror_t get_error()
 		{ return p.get_error(); }
-	size_t id(const std::basic_string<char>& name) { return nts.get(name); };
+	size_t id(const std::basic_string<char>& name) { return nts.get(name); }
 private:
 	std::vector<char> ts{
 		'\0', '=', '0', '1', 
@@ -41,7 +41,7 @@ private:
 		idni::nonterminals<char> nts{};
 		for (const auto& nt : {
 			"", "eof", "space", "digit", "xdigit", "alpha", "alnum", "punct", "printable", "chars", 
-			"chars_0", "chars_1", "cbf_rule", "cbf_head", "cbf", "dot", "bf", "bf_rule", "bf_head", "start", 
+			"chars_0", "chars_1", "cbf_rule", "cbf_head", "cbf", "dot", "bf", "start", 
 		}) nts.get(nt);
 		return nts;
 	}
@@ -81,18 +81,12 @@ private:
 		q(nt(14), (nt(9)));
 		// cbf => bf.
 		q(nt(14), (nt(16)));
-		// bf_rule => bf_head '=' bf dot.
-		q(nt(17), (nt(18)+t(1)+nt(16)+nt(15)));
-		// bf_head => bf.
-		q(nt(18), (nt(16)));
 		// bf => '0'.
 		q(nt(16), (t(2)));
 		// bf => '1'.
 		q(nt(16), (t(3)));
 		// start => cbf_rule.
-		q(nt(19), (nt(12)));
-		// start => bf_rule.
-		q(nt(19), (nt(17)));
+		q(nt(17), (nt(12)));
 		return q;
 	}
 };
