@@ -24,8 +24,6 @@ struct tree_extraction {
 	"cbf_rule 		=> cbf_head | chars '=' cbf dot."
 	"cbf_head		=> cbf."
 	"cbf 			=> bf | chars."
-	"bf_rule			=> bf_head '=' bf dot."
-	"bf_head			=> bf."
 	"bf				=> '1' | '0'."
 	"start			=> cbf_rule | bf_rule."
 	;
