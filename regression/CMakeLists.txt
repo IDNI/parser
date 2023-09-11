@@ -1,5 +1,9 @@
 set(EXAMPLES
 	tree_extraction
+	tree_extraction_tgf
+	
+	# TODO (HIGH) add test for missing nonterminal in a rule body
+	# TODO (HIGH) add test for missing nonterminal in a rule head
 )
 
 foreach(X IN LISTS EXAMPLES)
