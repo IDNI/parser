@@ -360,7 +360,7 @@ bool forest<NodeT>::remove_binarization(graph& g) {
 		if (name.find(prefix) != decltype(name)::npos)
 			s.insert(s.end(), kv.first);
 	}
-	std::cout<<"removing binarization if any " << s.size();
+	//std::cout<<"removing binarization if any " << s.size();
 	return replace_nodes(g, s);
 }
 
@@ -395,7 +395,7 @@ bool forest<NodeT>::replace_node(graph& g, const node& torepl,
 				for ( ; rpos < newrhs.size(); rpos++) {
 					//std::cout<< newrhs.at(rpos).first <<std::endl;
 					if (newrhs.at(rpos) == torepl) {
-						//std::cout<<"making change" << std::endl;
+						// std::cout<<"making change" << std::endl;
 						//erase the current torepl from rpos position
 						auto inspos = newrhs.erase(
 							newrhs.begin() + rpos);
@@ -423,8 +423,7 @@ bool forest<NodeT>::replace_node(graph& g, const node& torepl,
 					std::cout << v.first ;
 				std::cout << std::endl;
 				*/
-			}
-			
+			}	
 		}
 	return gchange;
 }
