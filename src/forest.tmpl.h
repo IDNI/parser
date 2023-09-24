@@ -336,11 +336,12 @@ bool forest<NodeT>::is_binarized() const {
 
 template <typename NodeT>
 bool forest<NodeT>::remove_recursive_nodes(graph& g) {
-	decltype(NodeT().first.t()) prefix []= { '_', 'R' };
+	//decltype(NodeT().first.t()) prefix []= { '_', 'R' };
 	//collect all prefix like nodes for replacement
+	std::string prefix = "_R";
 	std::vector<NodeT> s;
 	for (auto& kv : g) {
-		auto name = kv.first.first.to_string();
+		auto name = kv.first.first.to_std_string();
 		if (name.find(prefix) != decltype(name)::npos)
 			s.insert(s.end(), kv.first);
 	}
@@ -350,14 +351,16 @@ bool forest<NodeT>::remove_recursive_nodes(graph& g) {
 template <typename NodeT>
 bool forest<NodeT>::remove_binarization(graph& g) {
 	//better use parser::tnt_prefix()
-	decltype(NodeT().first.t()) prefix []= { '_','_','t','e','m','p' };
+	//decltype(NodeT().first.t()) prefix []= { '_','_','t','e','m','p' };
 	//collect all prefix like nodes for replacement
+	std::string prefix="__temp";
 	std::vector<NodeT> s;
 	for (auto& kv : g) {
-		auto name = kv.first.first.to_string();
+		auto name = kv.first.first.to_std_string();
 		if (name.find(prefix) != decltype(name)::npos)
 			s.insert(s.end(), kv.first);
 	}
+	std::cout<<"removing binarization if any " << s.size();
 	return replace_nodes(g, s);
 }
 
@@ -368,9 +371,6 @@ bool forest<NodeT>::replace_nodes(graph& g, std::vector<NodeT>& s) {
 		DBG(assert(g[n].size() == 1);)
 		if (replace_node(g, n, *(g[n].begin())))
 			changed = true, g.erase(n);
-#ifdef DEBUG
-		else std::cout << "Could not replace node";
-#endif
 	}
 	return changed;
 }
@@ -393,9 +393,9 @@ bool forest<NodeT>::replace_node(graph& g, const node& torepl,
 			for (bool change = true; change; ) {
 				size_t rpos = 0; change = false;
 				for ( ; rpos < newrhs.size(); rpos++) {
-				//	std::cout<< rhs_it->at(rpos).first <<std::endl;
+					//std::cout<< newrhs.at(rpos).first <<std::endl;
 					if (newrhs.at(rpos) == torepl) {
-						// std::cout<<"making change" << std::endl;
+						//std::cout<<"making change" << std::endl;
 						//erase the current torepl from rpos position
 						auto inspos = newrhs.erase(
 							newrhs.begin() + rpos);
@@ -403,27 +403,28 @@ bool forest<NodeT>::replace_node(graph& g, const node& torepl,
 						newrhs.insert(inspos,
 							repl.begin(),
 							repl.end());
+						/*
+						for (auto& v : newrhs)
+							std::cout << v.first ;
+						std::cout << std::endl;
+						std::cout<<"done making change\n";
+						*/
 						lchange = change = true; break;
 					}
 				}
-			}
-			/*
-			for (auto& v : newrhs)
-				std::cout << v.first ;
-			std::cout << std::endl;
-			*/
-			//std::cout<<"making change2" << std::endl;
+			}			
 			if (lchange) {
+				//std::cout<<"making change2" << std::endl;
 				rhs_it = kv.second.erase(rhs_it);
 				rhs_it = kv.second.insert(rhs_it, newrhs);
 				gchange = true;
+				/*std::cout<<"done making change2" << std::endl;
+				for (auto& v : *rhs_it)
+					std::cout << v.first ;
+				std::cout << std::endl;
+				*/
 			}
-			/*
-			for (auto& v : *rhs_it)
-				std::cout << v.first ;
-			std::cout << std::endl;
-			*/
-			//std::cout<<"done making change2" << std::endl;
+			
 		}
 	return gchange;
 }
@@ -446,16 +447,26 @@ std::set<std::pair<NodeT, std::set<std::vector<NodeT>>>>
 template <typename NodeT>
 size_t forest<NodeT>::count_trees(const node& root) const {
 	std::map<node, size_t> ndc;
-	auto cb_exit = [&ndc](const node& croot, auto& ambset) {
+	bool isoverflow = false;
+	auto cb_exit = [&ndc, &isoverflow](const node& croot, auto& ambset) {
 		for (auto& pack : ambset) {
 			size_t pkc = 1; // count of the pack
 			for (auto& sym : pack)
-				if (sym.first.nt()) pkc *= ndc[sym];
+				if (sym.first.nt() && ndc[sym] != 0) {
+					size_t x = pkc * ndc[sym];
+					if( pkc != 0 && x / pkc != ndc[sym]  ) {
+						MS(std::cout<<"Overflow\n");
+						isoverflow = true;
+						return; 
+					}
+					pkc = x;
+				}
 			ndc[croot] += pkc; // adding to curroot count
 		}
 	};
 	auto cb_no_revisit = [](const node&) { return false; };
 	traverse(root, no_enter, cb_exit, cb_no_revisit, no_ambig);
+	if(isoverflow) ndc[root] = 0; // mark it to be zero
 	return ndc[root];
 }
 

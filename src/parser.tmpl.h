@@ -176,7 +176,7 @@ template <typename C, typename T>
 std::vector<typename parser<C, T>::item> 
 parser<C, T>::sorted_citem(std::pair<size_t, size_t> ntpos) {
 	std::vector<item> items;
-	//if (memo.find(ntpos) != memo.end()) return memo[ntpos];
+	if (memo.find(ntpos) != memo.end()) return memo[ntpos];
 	for (size_t set :fromS[ntpos.second])
 	//for ( size_t set=0; set < S.size(); set++)
 	for (auto& i : S[set])
@@ -196,7 +196,7 @@ parser<C, T>::sorted_citem(std::pair<size_t, size_t> ntpos) {
 			if (l.n() == ntpos.first) 
 				items.push_back(i);
 		}
-	return /*memo.insert({ntpos, items}),*/ items;
+	return memo.insert({ntpos, items}), items;
 }
 template <typename C, typename T>
 std::vector<typename parser<C, T>::item> 
@@ -222,7 +222,7 @@ parser<C, T>::rsorted_citem(std::pair<size_t, size_t> ntpos) {
 			if (l.n() == ntpos.first) 
 				items.push_back(i);
 		}
-	return /*rmemo.insert({ntpos, items}), */ items;
+	return rmemo.insert({ntpos, items}), items;
 }
 
 template <typename C, typename T>
@@ -450,7 +450,6 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 	size_t count = 0;
 	for (size_t i = 0 ; i< S.size(); i++)
 		count += S[i].size();
-	MS(std::cout << "-----------";)
 	MS(std::cout << "\nGC: total input size = " << n;)
 	MS(std::cout << "\nGC: total remaining  = " << count;)
 	MS(std::cout << "\nGC: total collected  = " << gcnt;)
@@ -680,12 +679,13 @@ bool parser<C, T>::init_forest(pforest& f) {
 		for (const item& i : S[n]) count++, pre_process(i);
 	MS(emeasure_time_end(tspfo, tepfo) << " :: preprocess time, " <<
 						"size : "<< count << "\n";)
-	MS(std::cout << "memo sizes : " << memo.size() << " " <<
-						rmemo.size() << " \n";)
+	
 	// build forest
 	MS(emeasure_time_start(tsf, tef);)
 	ret = build_forest(f, root);
 	MS(emeasure_time_end(tsf, tef) <<" :: forest time\n";)
+	MS(std::cout << "memo sizes : " << memo.size() << " " <<
+						rmemo.size() << " \n";)
 	return ret;
 }
 // collects all possible variations of the given item's rhs while respecting the

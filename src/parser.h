@@ -294,8 +294,12 @@ public:
 		std::string to_str(info_lvl lv = INFO_ROOT_CAUSE);
 	};
 	perror_t get_error();
-	std::vector<item> back_track(const item& obj);
+	
+	static std::basic_string<C> tnt_prefix() {
+		static std::basic_string<C> pr = { '_','_','t','e','m','p' };
+		return pr; }
 private:
+	std::vector<item> back_track(const item& obj);
 	typedef std::unordered_set<parser<C, T>::item,
 		parser<C, T>::hasher_t> container_t;
 	typedef typename container_t::iterator container_iter;
@@ -321,9 +325,6 @@ private:
 
 	// binarized temporary intermediate non-terminals
 	std::map<std::vector<lit<C, T>>, lit<C, T>> bin_tnt;
-	static std::basic_string<C> tnt_prefix() {
-		static std::basic_string<C> pr = { '_','_','t','e','m','p' };
-		return pr; }
 	size_t tid; // id for temporary non-terminals
 	std::basic_string<C> get_fresh_tnt() {
 		std::basic_stringstream<C> ss;
