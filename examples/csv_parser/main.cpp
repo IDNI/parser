@@ -26,7 +26,7 @@ struct csv_parser {
 	"	start        => ws ( line el )*  ws . "
 	;
 	csv_parser() :
-		g(tgf<char>::from_string(nts, csv_tgf)), p(g, { true, true }) {}
+		g(tgf<char>::from_string(nts, csv_tgf)), p(g, { true, false  } ) {}
 	bool eval(const string& s) {
 		auto f = p.parse(s.c_str(), s.size());
 		if (!f || !p.found()) {
