@@ -16,7 +16,8 @@
 #include <iomanip>
 
 namespace idni {
-
+#define MEASURE
+#define DEBUG
 #ifdef DEBUG
 #define DBG(x) x
 #else

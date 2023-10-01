@@ -301,12 +301,14 @@ public:
 private:
 	std::vector<item> back_track(const item& obj);
 	typedef std::unordered_set<parser<C, T>::item,
-		parser<C, T>::hasher_t> container_t;
-	typedef typename container_t::iterator container_iter;
+		parser<C, T>::hasher_t> earley_set_t;
+	typedef typename earley_set_t::iterator earley_set_iter;
 	grammar<C, T>& g;
 	options o;
 	std::unique_ptr<input> in = 0;
-	std::vector<container_t> S;
+
+	std::vector<std::unordered_map<size_t, earley_set_t>> S;
+
 	//mapping from to position of end in S for items
 	std::unordered_map<size_t, std::vector<size_t>> fromS;
 	
@@ -316,12 +318,12 @@ private:
 	std::unordered_map<item, int_t, hasher_t> refi;
 	// items ready for collection
 	std::unordered_set<item, hasher_t> gcready;
-	std::vector<item> sorted_citem(std::pair<size_t, size_t> ntpos);
-	std::vector<item> rsorted_citem(std::pair<size_t, size_t> ntpos);
+	earley_set_t sorted_citem(std::pair<size_t, size_t> &&ntpos);
+	earley_set_t rsorted_citem(std::pair<size_t, size_t> &&ntpos);
 	std::unordered_map<std::pair<size_t, size_t>, 
-									std::vector<item>, hasher_t> memo;
+									earley_set_t, hasher_t> memo;
 	std::unordered_map<std::pair<size_t, size_t>, 
-									std::vector<item>, hasher_t> rmemo;
+									earley_set_t, hasher_t> rmemo;
 
 	// binarized temporary intermediate non-terminals
 	std::map<std::vector<lit<C, T>>, lit<C, T>> bin_tnt;
@@ -333,15 +335,15 @@ private:
 	}
 	lit<C, T> get_lit(const item& i) const;
 	lit<C, T> get_nt(const item& i) const;
-	std::pair<container_iter, bool> add(container_t& t, const item& i);
+	std::pair<earley_set_iter, bool> add(earley_set_t& t, const item& i);
 	bool nullable(const item& i) const;
-	void resolve_conjunctions(container_t& t) const;
-	void predict(const item& i, container_t& t);
+	void resolve_conjunctions(earley_set_t& t) const;
+	void predict(const item& i, earley_set_t& t);
 	void scan(const item& i, size_t n, T ch);
-	void scan_cc_function(const item& i, size_t n, T ch, container_t& c);
-	void complete(const item& i, container_t& t);
+	void scan_cc_function(const item& i, size_t n, T ch, earley_set_t& c);
+	void complete(const item& i, earley_set_t& t);
 	bool completed(const item& i) const;
-	void pre_process(const item& i);
+	bool pre_process(const item& i);
 	bool init_forest(pforest& f);
 	bool build_forest(pforest& f, const pnode& root);
 	bool binarize_comb(const item&, std::set<std::vector<pnode>>&);
