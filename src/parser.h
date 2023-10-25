@@ -204,13 +204,13 @@ public:
 	struct input {
 		using decoder_type =
 				std::function<std::vector<T>(input&)>;
-		input(const C* data, size_t length = 0,
+		input(const C* data, size_t size = 0, size_t max_length = 0,
 			decoder_type decoder = 0,
 			int_type e = std::char_traits<C>::eof());
-		input(std::basic_istream<C>& is, size_t length = 0,
+		input(std::basic_istream<C>& is, size_t max_length = 0,
 			decoder_type decoder = 0,
 			int_type e = std::char_traits<C>::eof());
-		input(int filedescriptor, size_t length = 0,
+		input(int filedescriptor, size_t max_length = 0,
 			decoder_type decoder = 0,
 			int_type e = std::char_traits<C>::eof());
 		~input();
@@ -233,9 +233,9 @@ public:
 		enum type { POINTER, STREAM, MMAP } itype = POINTER;//input type
 		int_type e = std::char_traits<C>::eof(); // end of a stream
 		decoder_type decoder = 0;
-		size_t max_l = 0;   // read up to max length of the input size
 		size_t n = 0;         // input position
-		size_t l = 0;         // input length
+		size_t l = 0;         // size of input data (0 for streams)
+		size_t max_l = 0;     // read up to max length of the input size
 		const C* d = 0;       // input data pointer if needed
 		std::basic_istream<C> s{};
 		std::vector<T> ts{};  // all collected terminals
@@ -249,14 +249,14 @@ public:
 	typedef pforest::graph pgraph;
 	typedef pforest::tree ptree;
 	typedef pforest::sptree psptree;
-	typedef std::map<std::pair<size_t, size_t>,std::set<item>> conjunctions;
 	parser(grammar<C, T>& g, const options& o = {});
 	std::unique_ptr<pforest> parse(const C* data, size_t size = 0,
+		size_t max_length = 0,
 		int_type eof = std::char_traits<C>::eof());
-	std::unique_ptr<pforest> parse(int filedescriptor, size_t size = 0,
+	std::unique_ptr<pforest> parse(int filedescriptor, size_t max_length=0,
 		int_type eof = std::char_traits<C>::eof());
 	std::unique_ptr<pforest> parse(std::basic_istream<C>& is,
-		size_t size = 0, int_type eof = std::char_traits<C>::eof());
+		size_t max_length=0, int_type eof = std::char_traits<C>::eof());
 	bool found();
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
 	std::ostream& print(std::ostream& os, const item& i) const;
@@ -269,7 +269,7 @@ public:
 		size_t operator()(const pnode& k) const;
 		size_t operator()(const item& k) const;
 	};
-	struct perror_t {
+	struct error {
 		enum info_lvl {
 			INFO_BASIC,
 			INFO_DETAILED,
@@ -290,11 +290,11 @@ public:
 
 		// list of expected token and respective productions
 		std::vector<exp_prod_t> expv;
-		perror_t() : loc(-1) {}
+		error() : loc(-1) {}
 		std::string to_str(info_lvl lv = INFO_ROOT_CAUSE);
 	};
-	perror_t get_error();
-	
+	error get_error();
+
 	static std::basic_string<C> tnt_prefix() {
 		static std::basic_string<C> pr = { '_','_','t','e','m','p' };
 		return pr; }
@@ -309,7 +309,7 @@ private:
 	std::vector<container_t> S;
 	//mapping from to position of end in S for items
 	std::unordered_map<size_t, std::vector<size_t>> fromS;
-	
+
 	// refcounter for the earley item
 	// default value is 0, which means it can be garbaged
 	// non-zero implies, its not to be collected
@@ -318,10 +318,10 @@ private:
 	std::unordered_set<item, hasher_t> gcready;
 	std::vector<item> sorted_citem(std::pair<size_t, size_t> ntpos);
 	std::vector<item> rsorted_citem(std::pair<size_t, size_t> ntpos);
-	std::unordered_map<std::pair<size_t, size_t>, 
-									std::vector<item>, hasher_t> memo;
-	std::unordered_map<std::pair<size_t, size_t>, 
-									std::vector<item>, hasher_t> rmemo;
+	std::unordered_map<std::pair<size_t, size_t>,
+					std::vector<item>, hasher_t> memo;
+	std::unordered_map<std::pair<size_t, size_t>,
+					std::vector<item>, hasher_t> rmemo;
 
 	// binarized temporary intermediate non-terminals
 	std::map<std::vector<lit<C, T>>, lit<C, T>> bin_tnt;
@@ -367,7 +367,7 @@ std::basic_string<T> terminals_to_str(
 	const typename parser<C, T>::pnode& r);
 template <typename C = char, typename T = C> // flattens terminals of a subforest into an int
 int_t terminals_to_int(const typename parser<C, T>::pforest& f,
-	const typename parser<C, T>::pnode& r);
+	const typename parser<C, T>::pnode& r, bool& error);
 
 template <typename C, typename T>
 bool operator==(const lit<C, T>& l, const prods<C, T>& p);

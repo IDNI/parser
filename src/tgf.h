@@ -271,7 +271,7 @@ private:
 		if (!p.found()) std::cerr << "There is an error in the grammar."
 						" Cannot recognize TGF.\n"
 				<< p.get_error().to_str();
-			//parser<C, T>::perror_t::info_lvl::INFO_DETAILED);
+			//parser<C, T>::error::info_lvl::INFO_DETAILED);
 			//DBG(p.print_data(std::cout << "PARSER DATA:\n") << "\n";)
 			//DBG(g.print_internal_grammar(cout << "TGF productions:\n") << endl;)
 		else {

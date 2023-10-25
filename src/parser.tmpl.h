@@ -34,21 +34,22 @@ bool parser<C, T>::item::operator==(const item& i) const {
 }
 //------------------------------------------------------------------------------
 template <typename C, typename T>
-parser<C, T>::input::input(const C* data, size_t length, decoder_type decoder,
-	int_type eof) : itype(POINTER), e(eof), decoder(decoder), max_l(length),
-	l(length), d(data), s({}) {}
+parser<C, T>::input::input(const C* data, size_t l, size_t max_l,
+	decoder_type decoder, int_type eof) :
+		itype(POINTER), e(eof), decoder(decoder),
+		l(l), max_l(max_l > l ? l : max_l), d(data), s({}) {}
 template <typename C, typename T>
-parser<C, T>::input::input(std::basic_istream<C>& is, size_t length,
+parser<C, T>::input::input(std::basic_istream<C>& is, size_t max_l,
 	decoder_type decoder, int_type eof) : itype(STREAM), e(eof),
-	decoder(decoder), max_l(length), l(0), d(0), s({})
+	decoder(decoder), l(0), max_l(max_l), d(0), s({})
 	{ s.rdbuf(is.rdbuf()); }
 template <typename C, typename T>
-parser<C, T>::input::input(int fd, size_t length, decoder_type decoder,
-	int_type eof) : itype(MMAP), e(eof), decoder(decoder), max_l(length),
-	l(length), d(0), s({})
+parser<C, T>::input::input(int fd, size_t max_l, decoder_type decoder,
+	int_type eof) : itype(MMAP), e(eof), decoder(decoder),
+	l(0), max_l(max_l), d(0), s({})
 {
 	if (fd != -1) {
-		max_l = lseek(fd, 0, SEEK_END);
+		l = lseek(fd, 0, SEEK_END);
 		if (l == 0 || l > max_l) l = max_l;
 		void* r = mmap(nullptr, l, PROT_READ, MAP_PRIVATE, fd, 0);
 		if (r == MAP_FAILED) d = 0, l = 0, max_l = 0;
@@ -67,14 +68,14 @@ void parser<C, T>::input::clear() { if (isstream()) s.clear(); }
 template <typename C, typename T>
 C parser<C, T>::input::cur() {
 	if (isstream()) return s.good() ? s.peek() : e;
-	return n < max_l ? d[n] : e;
+	return n < l && (max_l == 0 || n < max_l) ? d[n] : e;
 }
 template <typename C, typename T>
 bool parser<C, T>::input::next() {
 	C ch;
 	if (isstream())	return !s.good() ? false
 		: n = s.tellg(), s.get(ch), l = n + (ch == e ? 0 : 1), true;
-	return n < max_l ? ++n, true : false;
+	return n < l && (max_l == 0 || n < max_l) ? ++n, true : false;
 }
 template <typename C, typename T>
 size_t parser<C, T>::input::pos() { return n; }
@@ -84,8 +85,8 @@ bool parser<C, T>::input::eof() {
 }
 template <typename C, typename T>
 C parser<C, T>::input::at(size_t p) {
-	if (p >= l) return e;
 	if (isstream()) return s.seekg(p), s.get();
+	if (p >= l || p >= max_l) return e;
 	return d[p];
 }
 template <typename C, typename T>
@@ -173,7 +174,7 @@ void parser<C, T>::complete(const item& i, container_t& t) {
 	//gcready.insert(i);
 }
 template <typename C, typename T>
-std::vector<typename parser<C, T>::item> 
+std::vector<typename parser<C, T>::item>
 parser<C, T>::sorted_citem(std::pair<size_t, size_t> ntpos) {
 	std::vector<item> items;
 	if (memo.find(ntpos) != memo.end()) return memo[ntpos];
@@ -193,13 +194,13 @@ parser<C, T>::sorted_citem(std::pair<size_t, size_t> ntpos) {
 				bin_tnt.insert({ v, l });
 			}
 			else l = bin_tnt[v];
-			if (l.n() == ntpos.first) 
+			if (l.n() == ntpos.first)
 				items.push_back(i);
 		}
 	return memo.insert({ntpos, items}), items;
 }
 template <typename C, typename T>
-std::vector<typename parser<C, T>::item> 
+std::vector<typename parser<C, T>::item>
 parser<C, T>::rsorted_citem(std::pair<size_t, size_t> ntpos) {
 	std::vector<item> items;
 
@@ -210,7 +211,7 @@ parser<C, T>::rsorted_citem(std::pair<size_t, size_t> ntpos) {
 					items.push_back(i);
 		}
 		else if (o.binarize && i.dot >=2) {
-			
+
 			std::vector<lit<C, T>> v(g[i.prod][i.con].begin(),
 				g[i.prod][i.con].begin() + i.dot);
 			lit<C, T> l;
@@ -219,7 +220,7 @@ parser<C, T>::rsorted_citem(std::pair<size_t, size_t> ntpos) {
 				bin_tnt.insert({ v, l });
 			}
 			else l = bin_tnt[v];
-			if (l.n() == ntpos.first) 
+			if (l.n() == ntpos.first)
 				items.push_back(i);
 		}
 	return rmemo.insert({ntpos, items}), items;
@@ -337,24 +338,25 @@ void parser<C, T>::scan_cc_function(const item&i, size_t n, T ch,
 }
 template <typename C, typename T>
 std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
-	const C* data, size_t size, int_type eof)
+	const C* data, size_t size, size_t max_length, int_type eof)
 {
 	//DBG(std::cout << "CHAR* l: " << l << std::endl;)
-	in = std::make_unique<input>(data, size, o.chars_to_terminals, eof);
+	in = std::make_unique<input>(data, size, max_length,
+						o.chars_to_terminals, eof);
 	return _parse();
 }
 template <typename C, typename T>
 std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
-	int fd, size_t size, int_type eof)
+	int fd, size_t max_length, int_type eof)
 {
-	in = std::make_unique<input>(fd, size, o.chars_to_terminals, eof);
+	in = std::make_unique<input>(fd, max_length, o.chars_to_terminals, eof);
 	return _parse();
 }
 template <typename C, typename T>
 std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
-	std::basic_istream<C>& is, size_t size, int_type eof)
+	std::basic_istream<C>& is, size_t max_length, int_type eof)
 {
-	in = std::make_unique<input>(is, size, o.chars_to_terminals, eof);
+	in = std::make_unique<input>(is, max_length, o.chars_to_terminals, eof);
 	return _parse();
 }
 template <typename C, typename T>
@@ -369,8 +371,8 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 	tid = 0;
 	S.resize(1);
 	container_t t, c;
-	for (size_t p : g.prod_ids_of_literal(g.start_literal())) 
-		for (size_t c = 0; c != g[p].size(); ++c) 
+	for (size_t p : g.prod_ids_of_literal(g.start_literal()))
+		for (size_t c = 0; c != g[p].size(); ++c)
 			++refi[*add(t, {0, p, c, 0, 0}).first];
 #if MEASURE_EACH_POS
 	size_t r = 1, cb = 0; // row and cel beginning
@@ -392,7 +394,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 		}
 #endif
 		do {
-			for (const item& x : t) 
+			for (const item& x : t)
 				S[x.set].insert(x), fromS[x.from].push_back(x.set);
 			t.clear();
 			c.clear();
@@ -453,8 +455,8 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 	MS(std::cout << "\nGC: total input size = " << n;)
 	MS(std::cout << "\nGC: total remaining  = " << count;)
 	MS(std::cout << "\nGC: total collected  = " << gcnt;)
-	if (count + gcnt)
-		MS(std::cout << "\nGC: % = " << 100*gcnt/(count+gcnt) << std::endl);
+	MS(if (count + gcnt)
+		std::cout << "\nGC: % = " << 100*gcnt/(count+gcnt) << std::endl);
 
 	if (!o.incr_gen_forest) init_forest(*f);
 	else f->root(pnode(g.start_literal(), { 0, in->tpos() }));
@@ -524,7 +526,7 @@ bool parser<C, T>::found() {
 	return f;
 }
 template <typename C, typename T>
-std::string parser<C, T>::perror_t::to_str(info_lvl elvl) {
+std::string parser<C, T>::error::to_str(info_lvl elvl) {
 	std::stringstream ss;
 	auto s = to_std_string(unexp);
 	if (s.size() == 1) {
@@ -581,8 +583,8 @@ std::vector<typename parser<C, T>::item> parser<C, T>::back_track(
 	return ret;
 }
 template <typename C, typename T>
-typename parser<C, T>::perror_t parser<C, T>::get_error() {
-	perror_t err;
+typename parser<C, T>::error parser<C, T>::get_error() {
+	error err;
 	auto near_ctxt = [this](int_t from, int_t pos) {
 		std::vector<T> errctxt;
 		// using from as delimiter..
@@ -592,7 +594,7 @@ typename parser<C, T>::perror_t parser<C, T>::get_error() {
 	};
 	std::stringstream es;
 	auto item2_ept = [this, &es](const item& t ) {
-		typename perror_t::exp_prod_t ept;
+		typename error::exp_prod_t ept;
 		es.str(""), es << get_lit(t), ept.exp = es.str(),
 		es.str(""), es << get_nt(t),  ept.prod_nt = es.str(), es.str("");
 		if (g[t.prod][t.con].neg) es << "~( ";
@@ -636,7 +638,7 @@ typename parser<C, T>::perror_t parser<C, T>::get_error() {
 	return err;
 }
 template <typename C, typename T>
-void parser<C, T>::pre_process(const item& i) {
+void parser<C, T>::pre_process(const item& /*i*/) {
 	//sorted_citem[G[i.prod][0].n()][i.from].emplace_back(i);
 	return;
 	/*if (completed(i))
@@ -679,7 +681,7 @@ bool parser<C, T>::init_forest(pforest& f) {
 		for (const item& i : S[n]) count++, pre_process(i);
 	MS(emeasure_time_end(tspfo, tepfo) << " :: preprocess time, " <<
 						"size : "<< count << "\n";)
-	
+
 	// build forest
 	MS(emeasure_time_start(tsf, tef);)
 	ret = build_forest(f, root);
@@ -888,10 +890,14 @@ std::basic_string<T> terminals_to_str(
 template <typename C, typename T>
 int_t terminals_to_int(
 	const typename parser<C, T>::pforest& f,
-	const typename parser<C, T>::pnode& root)
+	const typename parser<C, T>::pnode& root, bool& error)
 {
 	//DBG(std::cout << "terminals_to_int: `" << to_std_string(terminals_to_str<C, T>(f, root)) << "`"<<std::endl;)
-	return stoi(to_std_string(terminals_to_str<C, T>(f, root)));
+	std::stringstream is(to_std_string(terminals_to_str<C, T>(f, root)));
+	int_t result = 0;
+	error = false;
+	if (!(is >> result)) error = true;
+	return result;
 }
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
 template <typename C, typename T>
