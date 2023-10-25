@@ -1,0 +1,18 @@
+@use_char_class digit, printable.
+
+integer    => [ '-' ] digit+.
+
+quote      => '\"'.
+stresc     => '\\' quote.
+strchar    => (printable & ~quote) | stresc.
+str        => quote [ strchar+ ] quote.
+
+nullvalue  => null.
+
+val        => integer | str | nullvalue.
+
+eol        => [ '\r' ] '\n'.
+row        => val { ',' val }.
+rows       => row { eol row }.
+
+start      => rows.

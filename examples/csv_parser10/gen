@@ -1,0 +1,3 @@
+#!/bin/sh
+
+../../build-Release/parser_gen csv_parser ./csv.tgf > ./csv_parser.generated.h
