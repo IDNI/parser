@@ -105,8 +105,7 @@ bool to_dot(std::ostream& ss, P& g, const std::string& inputstr,
 		return true;
 	}
 	else {
-		std::unordered_set<std::pair<size_t,size_t>,
-			typename parser<C, T>::hasher_t> edgedone;
+		std::set<std::pair<size_t,size_t>> edgedone;
 		edgedone.clear();
 		for (auto& it : g) {
 			auto key = keyfun(it.first);

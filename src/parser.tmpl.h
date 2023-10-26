@@ -396,9 +396,8 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 				S[x.set].insert(x), fromS[x.from].push_back(x.set);
 			t.clear();
 			c.clear();
-			const auto& cont = S[n];
+			const auto cont = S[n];
 			for (auto it = cont.begin(); it != cont.end(); ++it) {
-				//DBG(print(std::cout << "\nprocessing(" << proc++ << ") ", *it) << std::endl;)
 				if (completed(*it)) c.insert(*it);
 				else if (get_lit(*it).nt()) {
 					if (g.is_cc_fn(get_lit(*it).n()))
@@ -562,7 +561,7 @@ std::vector<typename parser<C, T>::item> parser<C, T>::back_track(
 	const item& obj)
 {
 	std::vector<item> ret;
-	std::unordered_set<item, hasher_t> exists;
+	std::set<item> exists;
 	item cur = obj;
 	while (true) {
 	//cerr<< S[cur.from].size() << " " << "(" << cur.from << " " << cur.set <<") ";
@@ -830,39 +829,6 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 			for (const pnode& nxt : aset) build_forest(f, nxt);
 	}
 	return true;
-}
-template <typename C, typename T>
-size_t parser<C, T>::hasher_t::hash_size_t(const size_t& val) const{
-	return std::hash<size_t>()(val) +
-		0x9e3779b9 + (val << 6) + (val >> 2);
-}
-template <typename C, typename T>
-size_t parser<C, T>::hasher_t::operator()(const std::pair<size_t, size_t>& k)
-	const
-{
-	size_t h = 0; // lets substitute with better if possible.
-	return h ^= hash_size_t(k.first), h ^= hash_size_t(k.second), h;
-}
-template <typename C, typename T>
-size_t parser<C, T>::hasher_t::operator()(const pnode& k) const {
-	// lets substitute with better if possible.
-	size_t h = 0;
-	h ^= hash_size_t(k.second[0]);
-	h ^= hash_size_t(k.second[1]);
-	h ^= hash_size_t(size_t(
-		k.first.nt() ? k.first.n() : k.first.t()));
-	return h;
-}
-template <typename C, typename T>
-size_t parser<C, T>::hasher_t::operator()(const item& k) const {
-	// lets substitute with better if possible.
-	size_t h = 0;
-	h ^= hash_size_t(k.set);
-	h ^= hash_size_t(k.from);
-	h ^= hash_size_t(k.prod);
-	h ^= hash_size_t(k.con);
-	h ^= hash_size_t(k.dot);
-	return h;
 }
 
 template <typename C, typename T>

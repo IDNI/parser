@@ -32,21 +32,6 @@ std::ostream& forest<NodeT>::print_data(std::ostream& os) const {
 	return os;
 }
 #endif
-template <typename NodeT>
-size_t forest<NodeT>::fhasher_t::hash_size_t(const size_t &val) const{
-	return std::hash<size_t>()(val) +
-		0x9e3779b9 + (val << 6) + (val >> 2);
-}
-template <typename NodeT>
-size_t forest<NodeT>::fhasher_t::operator()(const NodeT &k) const {
-	// lets substitute with better if possible.
-	size_t h = 0;
-	h ^= hash_size_t(k.second[0]);
-	h ^= hash_size_t(k.second[1]);
-	h ^= hash_size_t(size_t(
-		k.first.nt() ? k.first.n() : k.first.t()));
-	return h;
-}
 // a dfs based approach to detect cycles for
 // any traversable type
 template<typename NodeT>

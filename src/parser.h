@@ -263,12 +263,6 @@ public:
 	std::ostream& print_data(std::ostream& os) const;
 	std::ostream& print_S(std::ostream& os) const;
 #endif
-	struct hasher_t {
-		size_t hash_size_t(const size_t& val) const;
-		size_t operator()(const std::pair<size_t, size_t>& k) const;
-		size_t operator()(const pnode& k) const;
-		size_t operator()(const item& k) const;
-	};
 	struct perror_t {
 		enum info_lvl {
 			INFO_BASIC,
@@ -300,8 +294,7 @@ public:
 		return pr; }
 private:
 	std::vector<item> back_track(const item& obj);
-	typedef std::unordered_set<parser<C, T>::item,
-		parser<C, T>::hasher_t> container_t;
+	typedef std::set<item> container_t;
 	typedef typename container_t::iterator container_iter;
 	grammar<C, T>& g;
 	options o;
@@ -313,15 +306,15 @@ private:
 	// refcounter for the earley item
 	// default value is 0, which means it can be garbaged
 	// non-zero implies, its not to be collected
-	std::unordered_map<item, int_t, hasher_t> refi;
+	std::map<item, int_t> refi;
 	// items ready for collection
-	std::unordered_set<item, hasher_t> gcready;
+	std::set<item> gcready;
 	std::vector<item> sorted_citem(std::pair<size_t, size_t> ntpos);
 	std::vector<item> rsorted_citem(std::pair<size_t, size_t> ntpos);
-	std::unordered_map<std::pair<size_t, size_t>, 
-									std::vector<item>, hasher_t> memo;
-	std::unordered_map<std::pair<size_t, size_t>, 
-									std::vector<item>, hasher_t> rmemo;
+	std::map<std::pair<size_t, size_t>, 
+									std::vector<item>> memo;
+	std::map<std::pair<size_t, size_t>, 
+									std::vector<item>> rmemo;
 
 	// binarized temporary intermediate non-terminals
 	std::map<std::vector<lit<C, T>>, lit<C, T>> bin_tnt;

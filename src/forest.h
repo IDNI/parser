@@ -26,11 +26,8 @@ struct forest {
 	typedef NodeT node;
 	typedef std::vector<node> nodes;
 	typedef std::set<nodes> nodes_set;
-	struct fhasher_t{
-		size_t operator()(const node &k) const;
-		size_t hash_size_t(const size_t &val) const;
-	};
-	typedef std::unordered_map<node, nodes_set, fhasher_t> node_graph;
+
+	typedef std::map<node, nodes_set> node_graph;
 	typedef std::pair<node, node> node_edge;
 	typedef std::pair<size_t, size_t> edge;
 	typedef std::vector<edge> edges;
