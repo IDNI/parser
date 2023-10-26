@@ -568,7 +568,7 @@ bool grammar<C, T>::all_nulls(const lits<C, T>& a) const {
 	return true;
 }
 template <typename C, typename T>
-lit<C, T> grammar<C, T>::nt(size_t n) { return lit<C, T>(n,& nts); }
+lit<C, T> grammar<C, T>::nt(size_t n) { return lit<C, T>(n, &nts); }
 template <typename C, typename T>
 lit<C, T> grammar<C, T>::nt(const std::basic_string<C>& s) {
 	return nt(nts.get(s));
