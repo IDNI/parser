@@ -132,6 +132,10 @@ lit<C, T> parser<C, T>::get_lit(const item& i) const {
 template <typename C, typename T>
 lit<C, T> parser<C, T>::get_nt(const item& i) const { return g(i.prod); }
 template <typename C, typename T>
+bool parser<C, T>::nullable(const item& i) const {
+	return i.dot < g[i.prod][i.con].size() && g.nullable(get_lit(i));
+}
+template <typename C, typename T>
 std::pair<typename parser<C, T>::container_iter, bool>
 	parser<C, T>::add(container_t& t, const item& i)
 {
@@ -148,116 +152,26 @@ std::pair<typename parser<C, T>::container_iter, bool>
 	return {it, true} ;
 }
 template <typename C, typename T>
-bool parser<C, T>::nullable(const item& i) const {
-	return i.dot < g[i.prod][i.con].size() && g.nullable(get_lit(i));
-}
-template <typename C, typename T>
 bool parser<C, T>::completed(const item& i) const {
-	const auto& a = g[i.prod][i.con];
-	bool r = a.size() == i.dot;
-	return r;
+	return g[i.prod][i.con].size() == i.dot;
 }
 template <typename C, typename T>
 void parser<C, T>::complete(const item& i, container_t& t) {
 	//DBG(print(std::cout << "completing ", i) << std::endl;)
 	const container_t& cont = S[i.from];
-	for (auto it = cont.begin(); it != cont.end(); ++it)
-		if (g[it->prod][it->con].size() > it->dot &&
-			get_lit(*it) == get_nt(i))
-		{
-			add(t, item(i.set,it->prod,it->con,it->from,it->dot+1));
-			// whence the item is completed, then
-			// decrement the refcount for the one
-			// that predicted and inserted it
-			if (refi.count(*it) && refi[*it] > 0) --refi[*it];
-		}
+	for (auto it = cont.begin(); it != cont.end(); ++it) {
+		if (g[it->prod][it->con].size() <= it->dot ||
+			get_lit(*it) != get_nt(i)) continue;
+		if (g.conjunctive(it->prod) &&
+			it->dot == g.len(it->prod, it->con) &&
+			g[i.prod][i.con].neg) break;
+		add(t, item(i.set, it->prod, it->con, it->from, it->dot + 1));
+		// whence the item is completed, then
+		// decrement the refcount for the one
+		// that predicted and inserted it
+		if (refi.count(*it) && refi[*it] > 0) --refi[*it];
+	}
 	//gcready.insert(i);
-}
-template <typename C, typename T>
-std::vector<typename parser<C, T>::item>
-parser<C, T>::sorted_citem(std::pair<size_t, size_t> ntpos) {
-	std::vector<item> items;
-	if (memo.find(ntpos) != memo.end()) return memo[ntpos];
-	for (size_t set :fromS[ntpos.second])
-	//for ( size_t set=0; set < S.size(); set++)
-	for (auto& i : S[set])
-		if (completed(i)){
-			if (i.from == ntpos.second && g(i.prod).n() == ntpos.first)
-				items.push_back(i);
-		}
-		else if (o.binarize && i.dot >=2 && i.from == ntpos.second) {
-			std::vector<lit<C, T>> v(g[i.prod][i.con].begin(),
-				g[i.prod][i.con].begin() + i.dot);
-			lit<C, T> l;
-			if (bin_tnt.find(v) == bin_tnt.end()) {
-				l = g.nt(from_str<C>(get_fresh_tnt()));
-				bin_tnt.insert({ v, l });
-			}
-			else l = bin_tnt[v];
-			if (l.n() == ntpos.first)
-				items.push_back(i);
-		}
-	return memo.insert({ntpos, items}), items;
-}
-template <typename C, typename T>
-std::vector<typename parser<C, T>::item>
-parser<C, T>::rsorted_citem(std::pair<size_t, size_t> ntpos) {
-	std::vector<item> items;
-
-	if (rmemo.find(ntpos) != rmemo.end()) return rmemo[ntpos];
-	for (auto& i : S[ntpos.second])
-		if (completed(i)) {
-				if (g(i.prod).n() == ntpos.first)
-					items.push_back(i);
-		}
-		else if (o.binarize && i.dot >=2) {
-
-			std::vector<lit<C, T>> v(g[i.prod][i.con].begin(),
-				g[i.prod][i.con].begin() + i.dot);
-			lit<C, T> l;
-			if (bin_tnt.find(v) == bin_tnt.end()) {
-				l = g.nt(from_str<C>(get_fresh_tnt()));
-				bin_tnt.insert({ v, l });
-			}
-			else l = bin_tnt[v];
-			if (l.n() == ntpos.first)
-				items.push_back(i);
-		}
-	return rmemo.insert({ntpos, items}), items;
-}
-
-template <typename C, typename T>
-void parser<C, T>::resolve_conjunctions(container_t& t)	const {
-	//DBG(std::cout << "resolve conjunctions...\n";)
-	//DBG(print_S(std::cout) << std::endl;)
-	std::map<std::pair<size_t, size_t>,
-		std::set<std::pair<size_t, item>>> ps;
-	for (const item& x : t) if (g.conjunctive(x.prod) && completed(x)) {
-		if (ps.find({ x.prod, x.from }) == ps.end())
-			ps[{ x.prod, x.from }] = {};
-		ps[{ x.prod, x.from }].insert({ x.con, x });
-	}
-	for (const auto& p : ps) {
-		bool conj_failed = false;
-		for (size_t c = 0; c != g[p.first.first].size(); ++c) {
-			bool found = false;
-			for (const auto& x : p.second) {
-				//DBG(print(std::cout << "\tcheck p: " << p.first.first
-				//	<< " c: " << c << " x: " << x.first
-				//	<< " ",
-				//	x.second) << std::endl;)
-				if (x.first == c) { found = true; break; }
-			}
-			conj_failed = (g[p.first.first][c].neg && found) ||
-					(!g[p.first.first][c].neg && !found);
-			if (conj_failed) break;
-		}
-		if (conj_failed) for (const auto& x : p.second) {
-			//DBG(print(std::cout << "UNCOMPLETING: ", x.second) << std::endl;)
-			t.erase(x.second);
-		}
-	}
-	//DBG(std::cout << "... conjunctions resolved\n";)
 }
 template <typename C, typename T>
 void parser<C, T>::predict(const item& i, container_t& t) {
@@ -283,16 +197,16 @@ template <typename C, typename T>
 void parser<C, T>::scan(const item& i, size_t n, T ch) {
 	//DBG(print(std::cout << "scanning ", i) << " ch: " << to_std_string(ch) << std::endl;)
 	if (ch != get_lit(i).t()) {
-    	//when the item fails, decrement refcount of items that
- 		//predicted it i.e predicting items ( only the one) for
-        // which refc was incremented when this item was predicted
-        const container_t& cont = S[i.from];
-        for (auto it = cont.begin(); it != cont.end(); ++it)
-        if (!completed(*it) && get_lit(*it) == get_nt(i))
-            if (refi.count(*it) && refi[*it] > 0) --refi[*it];
-        //DBG(std::cout<< "GC: adding failing scan\n");
-        gcready.insert(i);
-        return;
+		//when the item fails, decrement refcount of items that
+		//predicted it i.e predicting items ( only the one) for
+		// which refc was incremented when this item was predicted
+		const container_t& cont = S[i.from];
+		for (auto it = cont.begin(); it != cont.end(); ++it)
+			if (!completed(*it) && get_lit(*it) == get_nt(i) &&
+				refi.count(*it) && refi[*it] > 0) --refi[*it];
+		//DBG(std::cout<< "GC: adding failing scan\n");
+		gcready.insert(i);
+		return;
 	}
 	// by this time, terminal is advanced over
 	// and new item j will be created.
@@ -302,12 +216,11 @@ void parser<C, T>::scan(const item& i, size_t n, T ch) {
 	item j(n + (ch == static_cast<T>(0) ? 0 : 1),
 		i.prod, i.con, i.from, i.dot + 1);
 	if (j.set >= S.size()) S.resize(j.set + 1);
+	//DBG(print(std::cout << "\tadding from scan: ", j) << std::endl;)
 	S[j.set].insert(j), fromS[j.from].push_back(j.set);
 }
 template <typename C, typename T>
-void parser<C, T>::scan_cc_function(const item&i, size_t n, T ch,
-	container_t& c)
-{
+void parser<C, T>::scan_cc_function(const item&i, size_t n, T ch) {
 	//DBG(print(std::cout << "scanning cc function ", i) << " s: `" << to_std_string(ch) << "`[" << (int_t) ch << "]" << std::endl;)
 	size_t p = 0; // character's prod rule
 	lit<C, T> l = get_lit(i);
@@ -315,22 +228,22 @@ void parser<C, T>::scan_cc_function(const item&i, size_t n, T ch,
 	//DBG(std::cout << "\tEOF: " << (eof ? "true" : "false") << "\n";)
 	if (g.is_eof_fn(l.n())) {
 		if (!eof) return;
-		p = g.add_char_class_production(l, ch);
+		auto eofprods = g.prod_ids_of_literal(l);
+		p = eofprods.size() == 1 ? *eofprods.begin()
+			: g.add_char_class_production(l, ch);
 	} else {
 		p = g.get_char_class_production(l, ch);
 		if (p == static_cast<size_t>(-1)) return;
 	}
 	if (!eof) n++;
+
 	item j(n, i.prod, i.con, i.from, i.dot + 1); // complete char fn
 	if (j.set >= S.size()) S.resize(j.set + 1);
+	S[j.set].insert(j), fromS[j.from].push_back(j.set);
 	//DBG(print(std::cout << "\tadding from cc scan j ", j) << " into S["<<j.set<<"]" << std::endl;)
-	//S[j.set].insert(j);
-	//if (completed(j)) c.insert(j); //complete(j, S[j.set]);
 	item k(j.set, p, 0, j.set - (eof ? 0 : 1), 1); // complete char functions's char
 	//DBG(print(std::cout << "\tadding from cc scan k ", k) << " into S["<<k.set<<"]" << std::endl;)
 	S[k.set].insert(k), fromS[k.from].push_back(k.set);
-	c.insert(k);
-	//if (completed(k)) c.insert(k); //complete(j, S[j.set]);
 	// i is scanned over and
 	// item k is completed so collectible.
 	if (!o.binarize) gcready.insert(i);
@@ -370,7 +283,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 	int gcnt = 0; // count of collected items
 	tid = 0;
 	S.resize(1);
-	container_t t, c;
+	container_t t;
 	for (size_t p : g.prod_ids_of_literal(g.start_literal()))
 		for (size_t c = 0; c != g[p].size(); ++c)
 			++refi[*add(t, {0, p, c, 0, 0}).first];
@@ -378,15 +291,23 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 	size_t r = 1, cb = 0; // row and cel beginning
 	clock_t tsp, tep;
 #endif
-	//DBG(size_t proc = 0;)
+#if DEBUG
+#	define DEBUG_PROCESSING true
+#endif
+#if DEBUG_PROCESSING
+	DBG(size_t proc = 0;)
+#endif
 	T ch = 0;
 	size_t n = 0, cn = -1;
 	bool new_pos = true;
 	do {
 		if ((new_pos = (cn != in->pos()))) cn = in->pos();
 		ch = in->tcur(), n = in->tpos();
-		if (n >= S.size()) S.resize(n+1);
-		//DBG(std::cout << "\ntpos: " << n << " ch: '" << to_std_string(ch) << "'" << std::endl;)
+		if (n >= S.size()) S.resize(n + 1);
+		//DBG(std::cout << "\n==========================================="
+		//	"=====================================\nPOS: '" << cn <<
+		//	"' TPOS: " << n << " CH: '" << to_std_string(ch) <<
+		//	"'\n" << std::endl;)
 #if MEASURE_EACH_POS
 		if (new_pos) {
 			if (in->cur() == (C)'\n') (cb = n), r++;
@@ -397,24 +318,23 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 			for (const item& x : t)
 				S[x.set].insert(x), fromS[x.from].push_back(x.set);
 			t.clear();
-			c.clear();
 			const auto& cont = S[n];
 			for (auto it = cont.begin(); it != cont.end(); ++it) {
-				//DBG(print(std::cout << "\nprocessing(" << proc++ << ") ", *it) << std::endl;)
-				if (completed(*it)) c.insert(*it);
+#if DEBUG_PROCESSING
+				DBG(print(std::cout << "\nprocessing(" << proc++ << ") S["<<n<<"]", *it) << std::endl;)
+#endif
+				if (completed(*it)) complete(*it, t);
 				else if (get_lit(*it).nt()) {
 					if (g.is_cc_fn(get_lit(*it).n()))
-						scan_cc_function(*it, n, ch, c);
+						scan_cc_function(*it, n, ch);
 					else predict(*it, t);
 				} else scan(*it, n, ch);
 			}
-			resolve_conjunctions(c);
-			for (auto& x : c) complete(x, t);
 		} while (!t.empty());
 #if MEASURE_EACH_POS
 		if (new_pos) {
 			std::cout << in->pos() << " \tln: " << r << " col: "
-				<< (n-cb+1) << " :: ";
+				<< (n - cb + 1) << " :: ";
 			emeasure_time_end(tsp, tep) << "\n";
 		}
 #endif
@@ -450,8 +370,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 	in->clear();
 	// remaining total items
 	size_t count = 0;
-	for (size_t i = 0 ; i< S.size(); i++)
-		count += S[i].size();
+	for (size_t i = 0; i < S.size(); i++) count += S[i].size();
 	MS(std::cout << "\nGC: total input size = " << n;)
 	MS(std::cout << "\nGC: total remaining  = " << count;)
 	MS(std::cout << "\nGC: total collected  = " << gcnt;)
@@ -525,6 +444,59 @@ bool parser<C, T>::found() {
 	//DBG(std::cout << "found? returning: " << f << std::endl;)
 	return f;
 }
+template <typename C, typename T>
+std::vector<typename parser<C, T>::item>
+parser<C, T>::sorted_citem(std::pair<size_t, size_t> ntpos) {
+	std::vector<item> items;
+	if (memo.find(ntpos) != memo.end()) return memo[ntpos];
+	for (size_t set :fromS[ntpos.second])
+	//for ( size_t set=0; set < S.size(); set++)
+	for (auto& i : S[set])
+		if (completed(i)){
+			if (i.from == ntpos.second && g(i.prod).n() == ntpos.first)
+				items.push_back(i);
+		}
+		else if (o.binarize && i.dot >=2 && i.from == ntpos.second) {
+			std::vector<lit<C, T>> v(g[i.prod][i.con].begin(),
+				g[i.prod][i.con].begin() + i.dot);
+			lit<C, T> l;
+			if (bin_tnt.find(v) == bin_tnt.end()) {
+				l = g.nt(from_str<C>(get_fresh_tnt()));
+				bin_tnt.insert({ v, l });
+			}
+			else l = bin_tnt[v];
+			if (l.n() == ntpos.first)
+				items.push_back(i);
+		}
+	return memo.insert({ntpos, items}), items;
+}
+template <typename C, typename T>
+std::vector<typename parser<C, T>::item>
+parser<C, T>::rsorted_citem(std::pair<size_t, size_t> ntpos) {
+	std::vector<item> items;
+
+	if (rmemo.find(ntpos) != rmemo.end()) return rmemo[ntpos];
+	for (auto& i : S[ntpos.second])
+		if (completed(i)) {
+				if (g(i.prod).n() == ntpos.first)
+					items.push_back(i);
+		}
+		else if (o.binarize && i.dot >=2) {
+
+			std::vector<lit<C, T>> v(g[i.prod][i.con].begin(),
+				g[i.prod][i.con].begin() + i.dot);
+			lit<C, T> l;
+			if (bin_tnt.find(v) == bin_tnt.end()) {
+				l = g.nt(from_str<C>(get_fresh_tnt()));
+				bin_tnt.insert({ v, l });
+			}
+			else l = bin_tnt[v];
+			if (l.n() == ntpos.first)
+				items.push_back(i);
+		}
+	return rmemo.insert({ntpos, items}), items;
+}
+//------------------------------------------------------------------------------
 template <typename C, typename T>
 std::string parser<C, T>::error::to_str(info_lvl elvl) {
 	std::stringstream ss;
@@ -917,10 +889,17 @@ std::ostream& parser<C, T>::print(std::ostream& os, const item& i) const {
 	return os;
 }
 template <typename C, typename T>
-std::ostream& parser<C, T>::print_S(std::ostream& os) const {
+std::ostream& parser<C, T>::print_S(std::ostream& os,
+	bool only_completed) const
+{
 	for (size_t n = 0; n != S.size(); ++n) {
 		os << "S["<<n<<"]:\n";
-		for (const item& x : S[n]) print(os << "\t", x) << "\n";
+		for (auto it = S[n].begin(); it != S[n].end(); it++) {
+			//os << "      " << it->first << "\n";
+			for (const item& x : it->second)
+				if (!only_completed || completed(x))
+					print(os << "\t", x) << "\n";
+		}
 	}
 	return os;
 }

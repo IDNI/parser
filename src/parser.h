@@ -261,7 +261,7 @@ public:
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
 	std::ostream& print(std::ostream& os, const item& i) const;
 	std::ostream& print_data(std::ostream& os) const;
-	std::ostream& print_S(std::ostream& os) const;
+	std::ostream& print_S(std::ostream& os, bool only_completed=false)const;
 #endif
 	struct hasher_t {
 		size_t hash_size_t(const size_t& val) const;
@@ -338,7 +338,7 @@ private:
 	void resolve_conjunctions(container_t& t) const;
 	void predict(const item& i, container_t& t);
 	void scan(const item& i, size_t n, T ch);
-	void scan_cc_function(const item& i, size_t n, T ch, container_t& c);
+	void scan_cc_function(const item& i, size_t n, T ch);
 	void complete(const item& i, container_t& t);
 	bool completed(const item& i) const;
 	void pre_process(const item& i);
