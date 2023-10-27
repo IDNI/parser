@@ -292,7 +292,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 	clock_t tsp, tep;
 #endif
 #if DEBUG
-#	define DEBUG_PROCESSING true
+#	define DEBUG_PROCESSING false
 #endif
 #if DEBUG_PROCESSING
 	DBG(size_t proc = 0;)
@@ -316,12 +316,13 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 #endif
 		do {
 			for (const item& x : t)
+				//print(std::cout << "adding from t into S[" << x.set << "]: ", x) << std::endl,
 				S[x.set].insert(x), fromS[x.from].push_back(x.set);
 			t.clear();
-			const auto& cont = S[n];
+			const auto cont = S[n];
 			for (auto it = cont.begin(); it != cont.end(); ++it) {
 #if DEBUG_PROCESSING
-				DBG(print(std::cout << "\nprocessing(" << proc++ << ") S["<<n<<"]", *it) << std::endl;)
+				DBG(print(std::cout << "\nprocessing(" << proc++ << ") S["<<n<<"] ", *it) << std::endl;)
 #endif
 				if (completed(*it)) complete(*it, t);
 				else if (get_lit(*it).nt()) {
@@ -381,8 +382,8 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 	else f->root(pnode(g.start_literal(), { 0, in->tpos() }));
 #if defined(DEBUG) && defined(WITH_DEVHELPERS)
 	bool nt = f->has_single_parse_tree();
-	std::cout << "forest has more than one parse tree:"
-		<< (!nt ? "true" : "false") << std::endl;
+	//std::cout << "forest has more than one parse tree:"
+	//	<< (!nt ? "true" : "false") << std::endl;
 	if (!nt) {
         /*
 		std::cout<<"# parsed forest contains more than one tree\n";
@@ -536,7 +537,7 @@ std::vector<typename parser<C, T>::item> parser<C, T>::back_track(
 	const item& obj)
 {
 	std::vector<item> ret;
-	std::unordered_set<item, hasher_t> exists;
+	std::set<item> exists;
 	item cur = obj;
 	while (true) {
 	//cerr<< S[cur.from].size() << " " << "(" << cur.from << " " << cur.set <<") ";
@@ -805,39 +806,6 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 	}
 	return true;
 }
-template <typename C, typename T>
-size_t parser<C, T>::hasher_t::hash_size_t(const size_t& val) const{
-	return std::hash<size_t>()(val) +
-		0x9e3779b9 + (val << 6) + (val >> 2);
-}
-template <typename C, typename T>
-size_t parser<C, T>::hasher_t::operator()(const std::pair<size_t, size_t>& k)
-	const
-{
-	size_t h = 0; // lets substitute with better if possible.
-	return h ^= hash_size_t(k.first), h ^= hash_size_t(k.second), h;
-}
-template <typename C, typename T>
-size_t parser<C, T>::hasher_t::operator()(const pnode& k) const {
-	// lets substitute with better if possible.
-	size_t h = 0;
-	h ^= hash_size_t(k.second[0]);
-	h ^= hash_size_t(k.second[1]);
-	h ^= hash_size_t(size_t(
-		k.first.nt() ? k.first.n() : k.first.t()));
-	return h;
-}
-template <typename C, typename T>
-size_t parser<C, T>::hasher_t::operator()(const item& k) const {
-	// lets substitute with better if possible.
-	size_t h = 0;
-	h ^= hash_size_t(k.set);
-	h ^= hash_size_t(k.from);
-	h ^= hash_size_t(k.prod);
-	h ^= hash_size_t(k.con);
-	h ^= hash_size_t(k.dot);
-	return h;
-}
 
 template <typename C, typename T>
 std::basic_ostream<T>& terminals_to_stream(std::basic_ostream<T>& os,
@@ -894,12 +862,8 @@ std::ostream& parser<C, T>::print_S(std::ostream& os,
 {
 	for (size_t n = 0; n != S.size(); ++n) {
 		os << "S["<<n<<"]:\n";
-		for (auto it = S[n].begin(); it != S[n].end(); it++) {
-			//os << "      " << it->first << "\n";
-			for (const item& x : it->second)
-				if (!only_completed || completed(x))
-					print(os << "\t", x) << "\n";
-		}
+		for (const item& x : S[n]) if (!only_completed || completed(x))
+			print(os << "\t", x) << "\n";
 	}
 	return os;
 }

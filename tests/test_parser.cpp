@@ -120,13 +120,17 @@ bool run_test_tgf(const char* g_tgf, const string input) {
 	//g.print_internal_grammar(cout << "grammar rules:\n") << endl;
 	if (g.size() == 0) return false;
 	parser<char> p(g, options<char>);
-	cout<< "Stress Started ..." << c << endl;
+	cout<< "\n Stress test Started ..."<<c <<endl;
 	auto f = p.parse(input.c_str(), input.size());
 	cout << "#found " << p.found() << "\n";
 	cout << "#count " << f->count_trees() << std::endl;
+	cout << "#ambiguous " << f->is_ambiguous() << endl;
+
 
 	if (testing::verbosity > 1) test_out(c++, g, input.size() > 100 ?
 				input.substr(0,100):input, *f);
+
+	cout<< "Stress test end ..." <<endl;
 
 	if (!p.found()) {
 		DBG(g.print_internal_grammar(cout << "grammar productions:\n") << endl;)
@@ -586,23 +590,23 @@ int main(int argc, char **argv)
 	run_test<char>(ps, nt, start, "b");
 	ps.clear();
 
-	TEST("tgf", "cbf_rule")
-	const char* g1 =
-		"@use_char_class alpha, alnum."
-		"chars    => alpha (alnum)*."
-		"cbf_rule => cbf_head | chars '=' cbf."
-		"cbf_head => cbf."
-		"cbf      => bf | chars."
-		"bf       => '1' | '0'."
-		"start    => cbf_rule."
-		;
-	run_test_tgf(g1, string("something=0"));
-
 /*******************************************************************************
 *       STRESS
 *******************************************************************************/
 
 	if (stress) {
+		TEST("stress", "cbf_rule")
+		const char* g1 =
+			"@use_char_class alpha, alnum."
+			"chars    => alpha (alnum)*."
+			"cbf_rule => cbf_head | chars '=' cbf."
+			"cbf_head => cbf."
+			"cbf      => bf | chars."
+			"bf       => '1' | '0'."
+			"start    => cbf_rule."
+			;
+		run_test_tgf(g1, string("something=0"));
+
 		TEST("stress", "grammar")
 		run_test_tgf(
 		"        start => A B C D E F G H A B C D E F G H start \n "
