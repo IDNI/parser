@@ -146,9 +146,9 @@ struct grammar {
 	bool is_eof_fn(const size_t& p) const;
 	std::ostream& print_production(std::ostream& os,
 		const production& p) const;
-#if defined(DEBUG) || defined(WITH_DEVHELPERS)
 	std::ostream& print_internal_grammar(std::ostream& os,
-		std::string prep = {}) const;
+		std::string prep = {}, bool print_ids = false) const;
+#if defined(DEBUG) || defined(WITH_DEVHELPERS)
 	std::ostream& print_data(std::ostream& os, std::string prep = {}) const;
 #endif
 	lit<C, T> nt(size_t n);
@@ -273,7 +273,7 @@ public:
 		size_t line;         // line of error
 		size_t col;          // column of error
 		std::vector<T> ctxt; // closest matching ctxt
-		T unexp;             // unexpected token
+		lit<C, T> unexp;     // unexpected literal
 		typedef struct _exp_prod {
 			std::string exp;
 			std::string prod_nt;

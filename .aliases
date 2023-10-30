@@ -1,0 +1,15 @@
+alias debug="clear; ./debug.sh"
+alias release="clear; ./release.sh"
+
+export TESTS="-DBUILD_TESTS=1"
+export TOOLS="-DBUILD_TOOLS=1"
+
+alias gdb-test="debug $TESTS; gdb --args ./build-Debug/test_parser"
+alias debug-test="debug $TESTS; ./build-Debug/test_parser"
+alias release-test="release $TESTS; ./build-Release/test_parser"
+alias test="./build-Release/test_parser"
+
+alias gdb-tgf="debug $TOOLS; gdb --args ./build-Debug/tgf"
+alias debug-tgf="debug $TOOLS; ./build-Debug/tgf"
+alias release-tgf="release $TOOLS; ./build-Release/tgf"
+alias tgf="./build-Release/tgf"

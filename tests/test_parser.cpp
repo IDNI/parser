@@ -14,6 +14,7 @@ typename parser<T>::options options;
 static bool opt_edge = true;
 static size_t c = 0;
 static size_t stop_after = SIZE_MAX;
+bool print_only_failed = false;
 // if true enables stress tests
 bool stress = false;
 
@@ -93,110 +94,119 @@ int test_out(int c, const typename grammar<T>::grammar& g,
 }
 
 template <typename T>
-void print_ambig_nodes(typename parser<T>::pforest& f) {
+void print_ambig_nodes(ostream& os, typename parser<T>::pforest& f) {
 	if (!f.is_ambiguous()) return;
-	std::cout << "ambiguous nodes:\n";
+	os << "\t# ambiguous nodes:\n";
 	for (auto& n : f.ambiguous_nodes()) {
-		std::cout << "\t `" << n.first.first << "` [" <<
-			n.first.second[0] << "," << n.first.second[1] << "]\n";
+		os << "\t `" << n.first.first << "` [" << n.first.second[0] <<
+			"," << n.first.second[1] << "]\n";
 		size_t d = 0;
 		for (auto ns : n.second) {
-			std::cout << "\t\t " << d++ << "\t";
-			for (auto nt : ns) std::cout <<	" `" << nt.first << "`["
-				<< nt.second[0] << "," << nt.second[1] << "] ";
-			std::cout << "\n";
+			os << "\t\t " << d++ << "\t";
+			for (auto nt : ns) os << " `" << nt.first << "`[" <<
+				nt.second[0] << "," << nt.second[1] << "] ";
+			os << "\n";
 		}
 	}
 }
 
-// run test from tgf
-bool run_test_tgf(const char* g_tgf, const string input) {
-	if (!testing::info()) return true;
-	bool expect_fail = false;
-
-	nonterminals<char> nts;
-	grammar<char> g = tgf<char>::from_string(nts, g_tgf);
-	//g.print_data(cout << "grammar data:\n") << endl;
-	//g.print_internal_grammar(cout << "grammar rules:\n") << endl;
-	if (g.size() == 0) return false;
-	parser<char> p(g, options<char>);
-	cout<< "\n Stress test Started ..."<<c <<endl;
-	auto f = p.parse(input.c_str(), input.size());
-	cout << "#found " << p.found() << "\n";
-	cout << "#count " << f->count_trees() << std::endl;
-	cout << "#ambiguous " << f->is_ambiguous() << endl;
-
-
-	if (testing::verbosity > 1) test_out(c++, g, input.size() > 100 ?
-				input.substr(0,100):input, *f);
-
-	cout<< "Stress test end ..." <<endl;
-
-	if (!p.found()) {
-		DBG(g.print_internal_grammar(cout << "grammar productions:\n") << endl;)
-		if (testing::verbosity > 0) cerr << p.get_error().to_str();
-		if (!expect_fail)
-			return cout<<"FAILED\n", testing::failed = true, false;
-	}
-	cout << "OK\n";
-	//f->print_data(cout << "FOREST:\n") << endl;
-	return /*test_out<char>(c++, g, input, *f),*/ true;
-}
+struct test_options {
+	string contains = "";
+	string error_expected = "";
+	bool dump = false;
+};
 
 // runs a test
 template <typename T>
-bool run_test(const prods<T>& ps, nonterminals<T>& nts,
-	const prods<T>& start, const basic_string<T>& input,
-	char_class_fns<T> cc = {}, string contains = "",
-	string error_expected = "", bool dump = false)
+bool run_test_(grammar<T>& g, parser<T>& p, const basic_string<T>& input,
+	test_options opts = {})
+//	string contains = "", string error_expected = "", bool dump = false)
 {
-	if (!testing::info()) return true;
-	bool expect_fail = error_expected.size() > 0;
-
-	grammar<T> g(nts, ps, start, cc);
-	parser<T> e(g, options<T>);
-
-	if (testing::verbosity == 0) dump = false;
-	else g.print_internal_grammar(cout << "\ngrammar productions:\n") <<
-		"\n\nparsing: `" << to_std_string(input) <<
-		"` [" << input.size() << "]" << endl;
-	auto f = e.parse(input.c_str(), input.size());
-	bool found = e.found();
+	stringstream ss;
+	if (!testing::info(ss)) return true;
+	bool expect_fail = opts.error_expected.size() > 0;
+	if (testing::verbosity == 0) opts.dump = false;
+	else {
+		ss <<"\n\n\t# parsing input " << quoted(to_std_string(input)) <<
+			" [" << input.size() << "]\n\n";
+		if (testing::verbosity > 1) g.print_internal_grammar(
+			ss << "\t# grammar productions:\n", "\t# ") << endl;
+	}
+	auto f = p.parse(input.c_str(), input.size());
+	bool found = p.found();
 	string msg{};
-	if (!found) msg = e.get_error()
-			.to_str(parser<T>::error::info_lvl::INFO_DETAILED);
+	if (!found) msg = p.get_error()
+			.to_str(parser<T>::error::info_lvl::INFO_BASIC);
 	bool contained = false;
-	if (found && (dump || contains.size())) {
-		auto cb_enter = [&dump, &contains, &contained](const auto& n) {
-			if (contains == n.first.to_std_string()) contained=true;
-			if (dump) cout << "entering: `" <<
-				n.first.to_std_string() << "`\n";
+	if (found && (opts.dump || opts.contains.size())) {
+		auto cb_enter = [&opts, &contained, &ss] (const auto& n) {
+			if (opts.contains == n.first.to_std_string())
+				contained = true;
+			if (opts.dump) ss << "\t#\t entering: \"" <<
+				n.first.to_std_string() << "\"\n";
 		};
-		auto cb_exit = [&dump](const auto& n, const auto&) {
-			if (dump) cout << "exiting: `" <<
-				n.first.to_std_string() << "`\n";
+		auto cb_exit = [&opts, &ss](const auto& n, const auto&) {
+			if (opts.dump) ss << "\t#\t exiting: \"" <<
+				n.first.to_std_string() << "\"\n";
 		};
 		f->traverse(cb_enter, cb_exit);
 	}
 	if (testing::verbosity > 0) {
-		cout << "\n";
-		cout << "#found " << found << "\n";
-		if (found)
-			cout << "#trees " << f->count_trees() << "\n",
-			cout << "#ambiguous " << f->is_ambiguous() << "\n";
-		cout << "#test number " << c << "\n";
-		cout << "#expect fail " << expect_fail << "\n";
-		cout << "#error expected '" << error_expected << "'\n" << endl;
-	} else if (found && testing::verbosity > 1)
-		test_out<T>(c++, g, input, *f), print_ambig_nodes<T>(*f);
-
-	if (expect_fail) found =
-		msg.find(error_expected) == decltype(error_expected)::npos;
+		ss << "\t# found: " << (found ? "yes => SUCCESS" : "no => FAIL");
+		if (expect_fail)
+			ss << " but expected FAIL => " <<
+				(found ? "FAIL" : "SUCCESS") << "\n\n",
+			ss << "\t# error_expected \"" <<
+					opts.error_expected <<"\"\n";
+		ss << "\n";
+		if (found) ss<<"\t# is_ambiguous " << (f->is_ambiguous()
+							? "yes" : "no") << "\n",
+			ss << "\t# count_trees " << f->count_trees() << "\n";
+	}
+	if (found && testing::verbosity > 1)
+		test_out<T>(c, g,
+			input.size() > 100 ? input.substr(0, 100) : input, *f),
+		print_ambig_nodes<T>(ss, *f);
+	if (expect_fail) found = msg.find(opts.error_expected) ==
+					decltype(opts.error_expected)::npos;
+	bool fail = false;
+	if ((found == expect_fail) ||
+		(found && opts.contains.size() && !contained))
+			fail = testing::failed = true;
+	ss << (testing::verbosity == 0 ? "\t" : "\n\t#") << " " <<
+		(fail ? "FAILED" : "OK") << "\n";
 	if (msg.size() && (!expect_fail || testing::verbosity > 0))
-		cout << "\nError message: '" << msg << "'\n";
-	if ((found == expect_fail) || (found && contains.size() && !contained))
-		return cout << "\tFAILED\n", testing::failed = true, false;
-	return cout << "\tOK", true;
+		ss << (testing::verbosity == 0 ? "" : "\n\t# error received \"")
+			<< msg << (testing::verbosity == 0 ? "" : "\"") << "\n";
+	c++;
+	if (!print_only_failed || fail) cout << ss.str();
+	return !fail;
+}
+
+// runs test from tgf
+template <typename T = char>
+bool run_test_tgf(const char* g_tgf, const basic_string<T>& input,
+	test_options opts = {})
+{
+	if (!testing::check()) return testing::info(cout), true;
+	nonterminals<T> nts;
+	grammar<T> g = tgf<T>::from_string(nts, g_tgf);
+	if (g.size() == 0)
+		return cout << "\t# FAILED\n", testing::failed = true, false;
+	parser<T> p(g, options<T>);
+	return run_test_<T>(g, p, input, opts);
+}
+
+// runs test from prods and cc
+template <typename T = char>
+bool run_test(const prods<T>& ps, nonterminals<T>& nts,
+	const prods<T>& start, const basic_string<T>& input,
+	char_class_fns<T> cc = {}, test_options opts = {})
+{
+	if (!testing::check()) return testing::info(cout), true;
+	grammar<T> g(nts, ps, start, cc);
+	parser<T> p(g, options<T>);
+	return run_test_<T>(g, p, input, opts);
 }
 
 void help(const string& opt) {
@@ -204,7 +214,9 @@ void help(const string& opt) {
 	cout <<
 "Valid options:\n" <<
 "	-help        -h         help (this text)\n" <<
-"	-print_all   -p         prints names of all tests (includes skipped)\n" <<
+"	-print_all   -p         prints names of all tests (includes skipped)\n"<<
+"	-print_lines -l         prints file and line of tests (if not skipped)\n"<<
+"	-only_failed -f         prints info only for failed tests\n" <<
 "	-verbose     -v         increase verbosity (up to 2)\n" <<
 "	-vv                     max verbosity (2)\n" <<
 "	-[enable|disable]_incrgen\n" <<
@@ -255,6 +267,10 @@ void process_args(int argc, char **argv) {
 			stress = true;
 		else if (opt == "-print_all" || opt == "-p")
 			testing::print_all = true;
+		else if (opt == "-print_lines" || opt == "-l")
+			testing::print_lines = true;
+		else if (opt == "-only_failed" || opt == "-f")
+			print_only_failed = true;
 		else if (opt == "-verbose" || opt == "-v")
 			testing::verbosity++;
 		else if (opt == "-vv") testing::verbosity += 2;
@@ -281,7 +297,7 @@ void process_args(int argc, char **argv) {
 		else if (opt == "-id") {
 			it++;
 			if (it == args.end()) missing(opt);
-			std::stringstream is(*it);
+			stringstream is(*it);
 			int_t result = 0;
 			if (!(is >> result) || result < 0) {
 				cerr<<"'"<<*it<<"' is not a positive number.\n";
@@ -346,15 +362,21 @@ int main(int argc, char **argv)
 	// unexpected
 	TEST("basic", "unexpected")
 	ps(start, a + b + c);
-	run_test<char>(ps, nt, start, "a", {},"","Unexpected end of file at 1:2 (2)");
-	run_test<char>(ps, nt, start, "d", {},"","Unexpected 'd' at 1:1 (1)");
-	run_test<char>(ps, nt, start, "ab", {},"","Unexpected end of file at 1:3 (3)");
 	run_test<char>(ps, nt, start, "abc");
-	run_test<char>(ps, nt, start, "abcd", {},"","Unexpected 'd' at 1:4 (4)");
-	run_test<char>(ps, nt, start, "abcde", {},"","Unexpected 'd' at 1:4 (4)");
-	run_test<char>(ps, nt, start, "abcabc", {},"","Unexpected 'a' at 1:4 (4)");
+	test_options o;
+	o.error_expected = "Unexpected end of file at 1:2 (2)";
+	run_test<char>(ps, nt, start, "a", {}, o);
+	o.error_expected = "Unexpected 'd' at 1:1 (1)";
+	run_test<char>(ps, nt, start, "d", {}, o);
+	o.error_expected = "Unexpected end of file at 1:3 (3)";
+	run_test<char>(ps, nt, start, "ab", {}, o);
+	o.error_expected = "Unexpected 'd' at 1:4 (4)";
+	run_test<char>(ps, nt, start, "abcd", {}, o);
+	o.error_expected = "Unexpected 'd' at 1:4 (4)";
+	run_test<char>(ps, nt, start, "abcde", {}, o);
+	o.error_expected = "Unexpected 'a' at 1:4 (4)";
+	run_test<char>(ps, nt, start, "abcabc", {}, o);
 	ps.clear();
-
 
 	TEST("basic", "terminal")
 	ps(start, a | one | plus | lf);
@@ -362,10 +384,14 @@ int main(int argc, char **argv)
 	run_test<char>(ps, nt, start, "1");
 	run_test<char>(ps, nt, start, "+");
 	run_test<char>(ps, nt, start, "\n");
-	run_test<char>(ps, nt, start, "b", {},"","Unexpected 'b' at 1:1 (1)");
-	run_test<char>(ps, nt, start, "0", {},"","Unexpected '0' at 1:1 (1)");
-	run_test<char>(ps, nt, start, "-", {},"","Unexpected '-' at 1:1 (1)");
-	run_test<char>(ps, nt, start, "\r",{},"","Unexpected '\\r' at 1:1 (1)");
+	o.error_expected = "Unexpected 'b' at 1:1 (1)";
+	run_test<char>(ps, nt, start, "b", {}, o);
+	o.error_expected = "Unexpected '0' at 1:1 (1)";
+	run_test<char>(ps, nt, start, "0", {}, o);
+	o.error_expected = "Unexpected '-' at 1:1 (1)";
+	run_test<char>(ps, nt, start, "-", {}, o);
+	o.error_expected = "Unexpected '\\r' at 1:1 (1)";
+	run_test<char>(ps, nt, start, "\r", {}, o);
 	ps.clear();
 
 	// string escaping
@@ -379,8 +405,8 @@ int main(int argc, char **argv)
 	run_test<char>(ps,nt,start, "\"\"");                         // 0
 	run_test<char>(ps,nt,start, "\"a\"");                        // 1
 	run_test<char>(ps,nt,start, "\"abc\"");                      // 2
-	run_test<char>(ps,nt,start, "\"a\"c\"", {}, "",
-			"Unexpected '\"' at 1:3 (3)");               // 3
+	o.error_expected = "Unexpected 'c' at 1:4 (4)";
+	run_test<char>(ps,nt,start, "\"a\"c\"", {}, o);              // 3
 	run_test<char>(ps,nt,start, "\"\\\"a\\\"c\\\"\"");           // 4
 	run_test<char>(ps,nt,start, "\"\\\"a\\\"a\\\"a\\\"a\\\"\""); // 5
 	ps.clear();
@@ -447,8 +473,10 @@ int main(int argc, char **argv)
 	TEST("papers", "escott_ex2p64")
 	ps(start, b | (start + start));
 	run_test<char>(ps, nt, start, "bbb");
-	run_test<char>(ps, nt, start, "bbba",{},"","Unexpected 'a' at 1:4 (4)");
-	run_test<char>(ps, nt, start, "a",   {},"","Unexpected 'a' at 1:1 (1)");
+	o.error_expected = "Unexpected 'a' at 1:4 (4)";
+	run_test<char>(ps, nt, start, "bbba", {}, o);
+	o.error_expected = "Unexpected 'a' at 1:1 (1)";
+	run_test<char>(ps, nt, start, "a",    {}, o);
 	ps.clear();
 
 	// infinite ambiguous grammar, advanced parsing pdf, pg 86
@@ -525,7 +553,8 @@ int main(int argc, char **argv)
 	TEST("boolean", "start")
 	ps(start, a & ~b);
 	run_test<char>(ps, nt, start, "a");
-	run_test<char>(ps, nt, start, "b", {}, "", "Unexpected 'b' at 1:1");
+	o.error_expected = "Unexpected 'b' at 1:1";
+	run_test<char>(ps, nt, start, "b", {}, o);
 	ps.clear();
 
 	// conjunction and negation with nonterminal
@@ -533,7 +562,8 @@ int main(int argc, char **argv)
 	ps(start, X & ~b);
 	ps(X,     a | b);
 	run_test<char>(ps, nt, start, "a");
-	run_test<char>(ps, nt, start, "b", {}, "", "Unexpected 'b' at 1:1");
+	o.error_expected = "Unexpected 'b' at 1:1";
+	run_test<char>(ps, nt, start, "b", {}, o);
 	ps.clear();
 
 	// conjunction + negation of nonterminals deeper in grammar
@@ -546,7 +576,8 @@ int main(int argc, char **argv)
 	ps(A,          a);
 	ps(B,          b);
 	run_test<char>(ps, nt, start, "b");
-	run_test<char>(ps, nt, start, "a", {}, "", "Unexpected 'a' at 1:1");
+	o.error_expected = "Unexpected 'a' at 1:1";
+	run_test<char>(ps, nt, start, "a", {}, o);
 	ps.clear();
 
 	// conjunction and negation of overlapping groups with parent nodes
@@ -556,8 +587,10 @@ int main(int argc, char **argv)
 	ps(X,          a | one);
 	ps(T,          Y);
 	ps(Y,          one);
-	run_test<char>(ps, nt, start, "a", {}, "X");
-	run_test<char>(ps, nt, start, "1", {}, "T");
+	o = {}, o.contains = "X";
+	run_test<char>(ps, nt, start, "a", {}, o);
+	o.contains = "T";
+	run_test<char>(ps, nt, start, "1", {}, o);
 	ps.clear();
 
 	// keyword vs identifier
@@ -566,8 +599,10 @@ int main(int argc, char **argv)
 	ps(identifier, chars & ~ keyword);
 	ps(chars,      alpha | (chars + alnum));
 	ps(keyword,    {"print"});
-	run_test<char>(ps, nt, start, "var123", cc, "identifier");
-	run_test<char>(ps, nt, start, "print",  cc, "keyword");
+	o.contains = "identifier";
+	run_test<char>(ps, nt, start, "var123", cc, o);
+	o.contains = "keyword";
+	run_test<char>(ps, nt, start, "print",  cc, o);
 	ps.clear();
 
 	// operator priority
@@ -595,6 +630,9 @@ int main(int argc, char **argv)
 *******************************************************************************/
 
 	if (stress) {
+		if (testing::verbosity > 0)
+			cout << "stress test started..." << c << endl;
+
 		TEST("stress", "cbf_rule")
 		const char* g1 =
 			"@use_char_class alpha, alnum."
@@ -622,10 +660,14 @@ int main(int argc, char **argv)
 		, string("a"));
 
 		TEST("stress", "input")
-		std::ifstream t("./tests/stress_test.txt");
-		std::stringstream input;
+		ifstream t("./tests/stress_test.txt");
+		stringstream input;
 		input << t.rdbuf();
-		run_test_tgf("start =>'(' start ')' start | null.",input.str());
+		run_test_tgf("start => '(' start ')' start | null.",
+			input.str());
+
+		if (testing::verbosity > 0)
+			cout << "stress test finished" << endl;
 	}
 
 	cout << endl;

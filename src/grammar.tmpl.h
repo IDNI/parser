@@ -591,19 +591,19 @@ std::ostream& grammar<C, T>::print_production(std::ostream& os,
 	}
 	return os << ".";
 }
-#if defined(DEBUG) || defined(WITH_DEVHELPERS)
 template <typename C, typename T>
 std::ostream& grammar<C, T>::print_internal_grammar(std::ostream& os,
-	std::string prep) const
+	std::string prep, bool print_ids) const
 {
 	for (size_t i = 0; i != G.size(); ++i) {
-		os << prep << i << ": ";
+		os << prep, print_ids ? os << i << ": " : os;
 		print_production(os, G[i]);
 		if (conjunctive(i)) os << "\t # conjunctive";
 		os << "\n";
 	}
 	return os;
 }
+#if defined(DEBUG) || defined(WITH_DEVHELPERS)
 template <typename C, typename T>
 std::ostream& grammar<C, T>::print_data(std::ostream& os, std::string prep)
 	const

@@ -18,14 +18,21 @@
 namespace idni {
 
 #ifdef DEBUG
-#define DBG(x) x
+#	define DBG(x) x
 #else
-#define DBG(x)
+#	define DBG(x)
 #endif
 #ifdef MEASURE
-#define MS(x) x
+#	define MS(x) x
 #else
-#define MS(x)
+#	define MS(x)
+#endif
+
+#define DEBUG_PARSING false
+#if DEBUG && DEBUG_PARSING
+#	define DBGP(x) x
+#else
+#	define DBGP(x)
 #endif
 
 #define tdiff(start, end) ((double(end - start) / CLOCKS_PER_SEC) * 1000)
