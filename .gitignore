@@ -2,7 +2,7 @@ build
 build-*
 *-config.cmake
 *.inc.h.bak*
-.vscode/settings.json
+.vscode
 forest*.dot
 graph*.dot
 tree*.dot
