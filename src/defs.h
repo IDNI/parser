@@ -30,7 +30,7 @@ namespace idni {
 
 #define DEBUG_PARSING false
 #if DEBUG && DEBUG_PARSING
-#	define DBGP(x) x
+#	define DBGP(x) if (debug) { x }
 #else
 #	define DBGP(x)
 #endif

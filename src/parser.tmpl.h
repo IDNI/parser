@@ -294,7 +294,9 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 	size_t r = 1, cb = 0; // row and cel beginning
 	clock_t tsp, tep;
 #endif
-	DBGP(size_t proc = 0;)
+#if DEBUG_PARSING
+	size_t proc = 0;
+#endif
 	T ch = 0;
 	size_t n = 0, cn = -1;
 	bool new_pos = true;
@@ -313,7 +315,9 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 		}
 #endif
 		do {
-			DBGP(size_t lproc = 0;)
+#if DEBUG_PARSING
+			size_t lproc = 0;
+#endif
 			for (const item& x : t)
 				//print(std::cout << "adding from t into S[" << x.set << "]: ", x) << std::endl,
 				S[x.set].insert(x),
@@ -814,7 +818,16 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 	}
 	return true;
 }
-
+template <typename C, typename T>
+std::basic_string<C> parser<C, T>::input::get() {
+	if (!isstream()) return std::basic_string<C>(d, l);
+	std::basic_stringstream<C> ss;
+	return ss << s.rdbuf(), clear(), ss.str();
+}
+template <typename C, typename T>
+std::basic_string<C> parser<C, T>::get_input() {
+	return in->get();
+}
 template <typename C, typename T>
 std::basic_ostream<T>& terminals_to_stream(std::basic_ostream<T>& os,
 	const typename parser<C, T>::pforest& f,

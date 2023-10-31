@@ -114,13 +114,13 @@ struct test_options {
 	string contains = "";
 	string error_expected = "";
 	bool dump = false;
+	bool ambiguity_fails = true;
 };
 
 // runs a test
 template <typename T>
 bool run_test_(grammar<T>& g, parser<T>& p, const basic_string<T>& input,
 	test_options opts = {})
-//	string contains = "", string error_expected = "", bool dump = false)
 {
 	stringstream ss;
 	if (!testing::info(ss)) return true;
@@ -137,6 +137,12 @@ bool run_test_(grammar<T>& g, parser<T>& p, const basic_string<T>& input,
 	string msg{};
 	if (!found) msg = p.get_error()
 			.to_str(parser<T>::error::info_lvl::INFO_BASIC);
+	bool ambiguity = f->is_ambiguous();
+	if (ambiguity && opts.ambiguity_fails) {
+		expect_fail = found = false;
+		msg = "Input with provided grammar is providing ambiguous "
+							"result.";
+	}
 	bool contained = false;
 	if (found && (opts.dump || opts.contains.size())) {
 		auto cb_enter = [&opts, &contained, &ss] (const auto& n) {
@@ -153,19 +159,24 @@ bool run_test_(grammar<T>& g, parser<T>& p, const basic_string<T>& input,
 	}
 	if (testing::verbosity > 0) {
 		ss << "\t# found: " << (found ? "yes => SUCCESS" : "no => FAIL");
+		if (ambiguity) ss << " because of ambiguity";
 		if (expect_fail)
 			ss << " but expected FAIL => " <<
 				(found ? "FAIL" : "SUCCESS") << "\n\n",
 			ss << "\t# error_expected \"" <<
 					opts.error_expected <<"\"\n";
 		ss << "\n";
-		if (found) ss<<"\t# is_ambiguous " << (f->is_ambiguous()
-							? "yes" : "no") << "\n",
+	}
+	if (found) {
+		if (testing::verbosity > 0)
+			ss << "\t# is_ambiguous " << (f->is_ambiguous()
+				? "yes" : "no") << "\n",
 			ss << "\t# count_trees " << f->count_trees() << "\n";
 	}
 	if (found && testing::verbosity > 1)
 		test_out<T>(c, g,
-			input.size() > 100 ? input.substr(0, 100) : input, *f),
+			input.size() > 100 ? input.substr(0, 100) : input, *f);
+	if (ambiguity && testing::verbosity > 0)
 		print_ambig_nodes<T>(ss, *f);
 	if (expect_fail) found = msg.find(opts.error_expected) ==
 					decltype(opts.error_expected)::npos;
@@ -331,12 +342,12 @@ int main(int argc, char **argv)
 	prods<> ps, start(nt("start")), nll(lit<>{}),
 		alnum(nt("alnum")), alpha(nt("alpha")), digit(nt("digit")),
 		chars(nt("chars")), expression(nt("expression")),
-		sum(nt("sum")),	mul(nt("mul")),
+		sum(nt("sum")),	mul(nt("mul")), nzdigit(nt("nzdigit")),
 		m1(nt("m1")), s1(nt("s1")), m2(nt("m2")), s2(nt("s2")),
 		identifier(nt("identifier")), keyword(nt("keyword")),
 		a('a'), b('b'), c('c'), n('n'), p('p'), m('m'),
 		A(nt("A")), B(nt("B")), T(nt("T")), X(nt("X")), Y(nt("Y")),
-		one('1'), PO(nt("PO")), IO(nt("IO")),
+		zero('0'), one('1'), PO(nt("PO")), IO(nt("IO")),
 		plus('+'), minus('-'), mult('*'),
 		cr('\r'), lf('\n'), eof(nt("eof")), eol(nt("eol")),
 		string_(nt("string")), string_char(nt("string_char")),
@@ -456,13 +467,14 @@ int main(int argc, char **argv)
 
 	TEST("recursion", "b")
 	ps(start, b | (start + start + start) | nll);
-	run_test<char>(ps, nt, start, "b");
+	o = {}, o.ambiguity_fails = false;
+	run_test<char>(ps, nt, start, "b", {}, o);
 	ps.clear();
 
 	TEST("recursion", "npnmn")
 	ps(start, n | (start + X + start));
 	ps(X,     p | m);
-	run_test<char>(ps, nt, start, "npnmn");
+	run_test<char>(ps, nt, start, "npnmn", {}, o);
 	ps.clear();
 
 /*******************************************************************************
@@ -472,7 +484,7 @@ int main(int argc, char **argv)
 	// Using Elizbeth Scott paper example 2, pg 64
 	TEST("papers", "escott_ex2p64")
 	ps(start, b | (start + start));
-	run_test<char>(ps, nt, start, "bbb");
+	run_test<char>(ps, nt, start, "bbb", {}, o);
 	o.error_expected = "Unexpected 'a' at 1:4 (4)";
 	run_test<char>(ps, nt, start, "bbba", {}, o);
 	o.error_expected = "Unexpected 'a' at 1:1 (1)";
@@ -483,20 +495,21 @@ int main(int argc, char **argv)
 	// will capture cycles
 	TEST("papers", "advparsing_p86")
 	ps(start, b | start);
-	run_test<char>(ps, nt, start, "b");
+	o.error_expected = "";
+	run_test<char>(ps, nt, start, "b", {}, o);
 	ps.clear();
 
 	// another ambigous grammar
 	TEST("papers", "advparsing")
 	ps(start, (a + X + X + c) | start);
 	ps(X,     (X + b) | nll);
-	run_test<char>(ps, nt, start, "abbc");
+	run_test<char>(ps, nt, start, "abbc", {}, o);
 	ps.clear();
 
 	// highly ambigous grammar, advanced parsing pdf, pg 89
 	TEST("papers", "advparsing_p89")
 	ps(start, (start + start) | a);
-	run_test<char>(ps, nt, start, "aaaaa");
+	run_test<char>(ps, nt, start, "aaaaa", {}, o);
 	ps.clear();
 
 	// using Elizabeth sott paper, example 3, pg 64.
@@ -505,7 +518,7 @@ int main(int argc, char **argv)
 	ps(A,     a | (B + A));
 	ps(B,     nll);
 	ps(T,     b + b + b);
-	run_test<char>(ps, nt, start, "abbb");
+	run_test<char>(ps, nt, start, "abbb", {}, o);
 	ps.clear();
 
 	// thesis van, figure 4.11
@@ -513,14 +526,14 @@ int main(int argc, char **argv)
 	ps(start, one | (start + IO + start) | PO + start);
 	ps(IO, plus | minus | mult);
 	ps(PO, minus);
-	run_test<char>(ps, nt, start, "1+1+1");
+	run_test<char>(ps, nt, start, "1+1+1", {}, o);
 	ps.clear();
 
 	// thesis van, 4.1 fig example
 	TEST("papers", "thesis_van_fig4.1")
 	ps(start,       plus + start | start + plus + start |
 			start + plus | one);
-	run_test<char>(ps, nt, start, "1+++1");
+	run_test<char>(ps, nt, start, "1+++1", {}, o);
 	ps.clear();
 
 /*******************************************************************************
@@ -535,13 +548,25 @@ int main(int argc, char **argv)
 	ps32(start32, prods<char32_t>{U"τ"} | U"ξεσκεπάζω" | U"žluťoučký"
 		| U"ᚠᛇᚻ᛫ᛒᛦᚦ᛫ᚠᚱᚩᚠᚢᚱ᛫ᚠᛁᚱᚪ᛫ᚷᛖᚻᚹᛦᛚᚳᚢᛗ" | (start32 + start32));
 	run_test<char32_t>(ps32, nt32, start32,
-		U"τžluťoučkýτᚠᛇᚻ᛫ᛒᛦᚦ᛫ᚠᚱᚩᚠᚢᚱ᛫ᚠᛁᚱᚪ᛫ᚷᛖᚻᚹᛦᛚᚳᚢᛗτξεσκεπάζωτ");
+		U"τžluťoučkýτᚠᛇᚻ᛫ᛒᛦᚦ᛫ᚠᚱᚩᚠᚢᚱ᛫ᚠᛁᚱᚪ᛫ᚷᛖᚻᚹᛦᛚᚳᚢᛗτξεσκεπάζωτ", {}, o);
 	ps32.clear();
 
 /*******************************************************************************
 *       BOOLEAN
 *******************************************************************************/
 
+	// nonzero digit
+	TEST("boolean", "nzdigit")
+	ps(start,      nzdigit + digits);
+	ps(digits,     (digit + digits) | nll);
+	ps(nzdigit,    digit & ~zero);
+	run_test<char>(ps, nt, start, "0", cc);
+	run_test<char>(ps, nt, start, "12", cc, o);
+	o = {}, o.error_expected = "Unexpected '1' at 1:2";
+	run_test<char>(ps, nt, start, "01", cc, o);
+	ps.clear();
+
+	// conjunction and negation in the starting rule
 	TEST("boolean", "ac_not_bc")
 	ps(start, (A + c) & ~(B + c));
 	ps(A,     a | c);

@@ -216,6 +216,7 @@ public:
 		~input();
 		inline bool isstream() const;
 		void clear(); // resets stream (if used) to reenable at()/tat()
+		std::basic_string<C> get(); // returns input data as a string
 		// source stream access
 		C cur();
 		size_t pos();
@@ -258,6 +259,7 @@ public:
 	std::unique_ptr<pforest> parse(std::basic_istream<C>& is,
 		size_t max_length=0, int_type eof = std::char_traits<C>::eof());
 	bool found();
+	std::basic_string<C> get_input();
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
 	std::ostream& print(std::ostream& os, const item& i) const;
 	std::ostream& print_data(std::ostream& os) const;
@@ -288,10 +290,13 @@ public:
 		std::string to_str(info_lvl lv = INFO_ROOT_CAUSE);
 	};
 	error get_error();
-
 	static std::basic_string<C> tnt_prefix() {
 		static std::basic_string<C> pr = { '_','_','t','e','m','p' };
-		return pr; }
+		return pr;
+	}
+#if DEBUG_PARSING
+	bool debug = true;
+#endif
 private:
 	std::vector<item> back_track(const item& obj);
 	typedef std::set<item> container_t;

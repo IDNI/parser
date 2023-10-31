@@ -128,6 +128,20 @@ ostream& help(ostream& os, command cmd = {}) {
 	return os << "\n";
 }
 
+ostream& info_new_line(ostream& os, size_t indent) {
+	os << "#";
+	for (int i = indent; i--; ) os << "\t";
+	os << " ";
+	return os;
+};
+
+void info(string msg, size_t indent = 0) {
+	info_new_line(cout, indent);
+	for (size_t i = 0; i != msg.size(); ++i)
+		if ((cout << msg[i], msg.at(i)) == '\n' && i != msg.size() - 1)
+			info_new_line(cout, indent);
+}
+
 int error(string msg, bool print_help = false) {
 	cerr << msg << endl;
 	if (print_help) help(cerr);
@@ -191,9 +205,18 @@ void init_commands() {
 	OPT(option("print-ambiguity", 'a',
 		true)),
 		DESC("prints ambiguity info, incl. ambig. nodes");
+	OPT(option("print-input", 'I',
+		false)),
+		DESC("prints input");
 	OPT(option("terminals", 't',
 		true)),
 		DESC("prints all parsed terminals serialized");
+	OPT(option("detailed-error", 'd',
+		false)),
+		DESC("parse error is more verbose");
+	OPT(option("root-cause-error", 'D',
+		false)),
+		DESC("parse error is more verbose");
 	OPT(option("print-graphs", 'p',
 		false)),
 		DESC("prints parsed graph");
@@ -248,18 +271,25 @@ int process_args(int argc_int, char** argv, command& cmdref, string& tgf_file) {
 #ifdef DEBUG
 	cout << "== DEBUG ==================================================================\n";
 	cout << "argc: " << argc << "\n";
-	cout << "argv:\n";
+	cout << "argv:";
 	for (size_t i = 0; i != static_cast<size_t>(argc); ++i)
-		cout << "\t" << i << " `" << argv[i] << "`\n";
+		cout << "\t" << i << ": `" << argv[i] << "`\n";
 	cout << "= /DEBUG ==================================================================\n\n";
 #endif
-
 	if (argc == 1) return error("no TGF file provided", true);
 	tgf_file = argv[1];
 	DBG(cout << "tgf_file: `" << tgf_file << "`\n";)
 
-	if (tgf_file == "--help" || tgf_file == "-h")
-		help(cout), exit(0);
+	auto is_help_opt = [](const string& opt) {
+		return opt == "--help" || opt == "-h";
+	};
+	if (is_help_opt(tgf_file)) help(cout), exit(0);
+
+	if (argc > 2 && is_help_opt(argv[2])) {
+		auto it = commands.find(tgf_file);
+		if (it != commands.end()) it->second.help(cout), exit(0);
+		return error("unknown command: " + tgf_file, true);
+	}
 
 	string arg_command = argc == 2 ? "show" : argv[2];
 	DBG(cout << "command " << arg_command << std::endl;)
@@ -283,7 +313,6 @@ int process_args(int argc_int, char** argv, command& cmdref, string& tgf_file) {
 			DBG(cout << "long_for " << opt[o] << ": " << n << endl;)
 			if (n.size() == 0 || !cmd.has(n)) return
 				error("invalid option: -" + opt[o]);
-			DBG(cout << "cmd " << n << endl;);
 			cur = &cmd[n];
 			DBG(cout << "cur->name() " << cur->name() << endl;);
 			if (cur->is_bool()) cur->set_value(true);
@@ -358,24 +387,26 @@ int gen(ostream& os, string tgf_file, string name = "my_parser",
 
 int parsed(std::unique_ptr<parser<char>::pforest> f, command& cmd) {
 	auto c = f->count_trees();
+	stringstream ss;
 	if (f->is_ambiguous() && c > 1 &&
 		cmd.get<bool>("print-ambiguity"))
 	{
-		cout << "ambiguity... number of trees: " << c << "\n";
+		ss << "\nambiguity... number of trees: " << c << "\n\n";
 		for (auto& n : f->ambiguous_nodes()) {
-			cout << "\t `" << n.first.first << "` [" <<
+			ss << "\t `" << n.first.first << "` [" <<
 				n.first.second[0] << "," <<
 				n.first.second[1] << "]\n";
 			size_t d = 0;
 			for (auto ns : n.second) {
-				cout << "\t\t " << d++ << "\t";
-				for (auto nt : ns) cout << " `" <<
+				ss << "\t\t " << d++ << "\t";
+				for (auto nt : ns) ss << " `" <<
 					nt.first << "`[" << nt.second[0]
 					<< "," << nt.second[1] << "] ";
-				cout << "\n";
+				ss << "\n";
 			}
 		}
-
+		ss << "\n";
+		info(ss.str()), ss = {};
 	}
 	struct {
 		bool graphs, facts, rules, terminals;
@@ -384,38 +415,38 @@ int parsed(std::unique_ptr<parser<char>::pforest> f, command& cmd) {
 		cmd.get<bool>("tml-rules"),
 		cmd.get<bool>("terminals"));
 	auto cb_next_g = [&f, &print](parser<char>::pgraph& g) {
+		stringstream ss;
 		f->remove_binarization(g);
 		f->remove_recursive_nodes(g);
 		if (print.graphs) {
 			static size_t c = 1;
-			cout << "parsed graph";
-			if (c++ > 1) cout << " " << c;
-			cout << ":";
-			g.extract_trees()->to_print(cout);
-			cout << "\n\n";
+			ss << "parsed graph";
+			if (c++ > 1) ss << " " << c;
+			ss << ":";
+			g.extract_trees()->to_print(ss);
+			ss << "\n\n";
+			info(ss.str()), ss = {};
 		}
 		if (print.rules) to_tml_rules<char, char, parser<char>::pgraph>(
-			cout << "TML rules:\n", g), cout << "\n";
+			ss << "TML rules:\n", g), ss << "\n", info(ss.str());
 		return true;
 	};
 	f->extract_graphs(f->root(), cb_next_g);
-
-	if (print.facts) to_tml_facts<char, char>(cout << "TML facts:\n", *f),
-		cout << "\n";
-
-	if (print.terminals) cout << "terminals parsed: \"" <<
+	if (print.facts) to_tml_facts<char, char>(ss << "TML facts:\n", *f);
+	if (print.terminals) ss << "terminals parsed: \"" <<
 		terminals_to_str(*f, f->root()) << "\"\n\n";
+	info(ss.str());
 	return 0;
 }
 
 int main(int argc, char** argv) {
-
+	stringstream ss;
 	init_commands();
 	command cmd;
 	string tgf_file;
 	int status = process_args(argc, argv, cmd, tgf_file);
 	//DBG(cout << "process_args status: " << status << "\n";)
-	DBG(cmd.print(cout << "command options:\t") << endl;)
+	DBG(cmd.print(cout << "command options:\n") << endl;)
 	if (status) return status;
 
 	if (cmd.get<bool>("help")) {
@@ -427,7 +458,8 @@ int main(int argc, char** argv) {
 		show(tgf_file,
 			cmd.get<string>("start"),
 			cmd.get<bool>("grammar"));
-	} else if (cmd.name() == "gen") {
+	}
+	else if (cmd.name() == "gen") {
 		gen(cout, tgf_file,
 			cmd.get<string>("name"),
 			cmd.get<string>("start"),
@@ -435,7 +467,8 @@ int main(int argc, char** argv) {
 			cmd.get<string>("terminal-type"),
 			cmd.get<string>("decoder"),
 			cmd.get<string>("encoder"));
-	} else if (cmd.name() == "parse") {
+	}
+	else if (cmd.name() == "parse") {
 		string infile = cmd.get<string>("input");
 		string inexp  = cmd.get<string>("input-expression");
 		if (infile.size() && inexp.size())
@@ -445,7 +478,8 @@ int main(int argc, char** argv) {
 		grammar g = tgf<char>::from_file(nts, tgf_file,
 						cmd.get<string>("start"));
 		if (cmd.get<bool>("grammar"))
-			g.print_internal_grammar(cout << "grammar:\n") << endl;
+			g.print_internal_grammar(ss << "\ngrammar:\n\n", "  ")
+				<< "\n", info(ss.str()), ss = {};
 		parser p(g);
 		std::unique_ptr<parser<char>::pforest> f;
 		if (infile.size())
@@ -460,7 +494,16 @@ int main(int argc, char** argv) {
 			}
 		else // string
 			f = p.parse(inexp.c_str(), inexp.size());
-		if (!p.found()) return error(p.get_error().to_str());
+		if (cmd.get<bool>("print-input"))
+			ss << "\ninput: \"" << p.get_input() << "\"\n",
+			info(ss.str());
+		using lvl = decltype(p)::error::info_lvl;
+		if (!p.found()) return error(p.get_error().to_str(
+			cmd.get<bool>("root-cause-error")
+				? lvl::INFO_ROOT_CAUSE
+				: cmd.get<bool>("detailed-error")
+					? lvl::INFO_DETAILED
+					: lvl::INFO_BASIC));
 		parsed(move(f), cmd);
 	}
 	return 0;

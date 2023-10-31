@@ -73,7 +73,12 @@ struct tgf {
 		ws(nt("ws")),
 		ws_comment(nt("ws_comment")),
 		ws_required(nt("ws_required")),
-		g(nts, setup_productions(), start, cc), p(g) { }
+		g(nts, setup_productions(), start, cc), p(g)
+	{
+#if DEBUG && DEBUG_PARSING
+		p.debug = false;
+#endif
+	}
 	static grammar<C, T> from_string(nonterminals<C, T>& nts_,
 		const std::basic_string<C>& s,
 		const std::basic_string<C>& start_nt = from_cstr<C>("start"))
