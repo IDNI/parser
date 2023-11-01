@@ -173,9 +173,37 @@ bool run_test_(grammar<T>& g, parser<T>& p, const basic_string<T>& input,
 				? "yes" : "no") << "\n",
 			ss << "\t# count_trees " << f->count_trees() << "\n";
 	}
-	if (found && testing::verbosity > 1)
-		test_out<T>(c, g,
-			input.size() > 100 ? input.substr(0, 100) : input, *f);
+	if (found && testing::verbosity > 1) {
+		struct {
+			bool graphs = false, facts = false, rules = false;
+		} print;
+		auto cb_next_g = [&f, &p, &print, &ss](parser<T>::pgraph& g) {
+			f->remove_binarization(g);
+			f->remove_recursive_nodes(g);
+			if (print.graphs) {
+				static size_t c = 1;
+				ss << "\n\t# parsed graph";
+				if (c++ > 1) ss << " " << c;
+				ss << ":\n\n";
+				g.extract_trees()->to_print(ss);
+				ss << "\n\n";
+			}
+			if (print.rules) to_tml_rules<T, T, typename
+				parser<T>::pgraph>(ss << "\n\t# TML rules:\n\n", g),
+				ss << "\n";
+			return true;
+		};
+		if (print.rules || print.graphs)
+			f->extract_graphs(f->root(), cb_next_g);
+		if (print.facts) to_tml_facts<T,T>(ss << "\n\t# TML facts:\n\n",
+			*f), ss << "\n";
+		ss << "\t# terminals parsed: `" << to_string(
+			terminals_to_str<T>(*f, f->root())) << "`\n";
+		if (testing::verbosity > 2) test_out<T>(c, g, input.size() > 100
+						? input.substr(0, 100) : input, *f);
+	}
+
+
 	if (ambiguity && testing::verbosity > 0)
 		print_ambig_nodes<T>(ss, *f);
 	if (expect_fail) found = msg.find(opts.error_expected) ==
@@ -228,8 +256,9 @@ void help(const string& opt) {
 "	-print_all   -p         prints names of all tests (includes skipped)\n"<<
 "	-print_lines -l         prints file and line of tests (if not skipped)\n"<<
 "	-only_failed -f         prints info only for failed tests\n" <<
-"	-verbose     -v         increase verbosity (up to 2)\n" <<
-"	-vv                     max verbosity (2)\n" <<
+"	-verbose     -v         increase verbosity\n" <<
+"	-vv                     increase verbosity +2\n" <<
+"	-vvv                    increase verbosity +3\n" <<
 "	-[enable|disable]_incrgen\n" <<
 "	              enable/disable incremental generation of forest\n" <<
 "	-[enable|disable]_binarization\n" <<
@@ -285,6 +314,7 @@ void process_args(int argc, char **argv) {
 		else if (opt == "-verbose" || opt == "-v")
 			testing::verbosity++;
 		else if (opt == "-vv") testing::verbosity += 2;
+		else if (opt == "-vvv") testing::verbosity += 3;
 		else if (opt == "-group") {
 			it++;
 			if (it == args.end()) missing(opt);
@@ -405,23 +435,6 @@ int main(int argc, char **argv)
 	run_test<char>(ps, nt, start, "\r", {}, o);
 	ps.clear();
 
-	// string escaping
-	TEST("basic", "string")
-	ps(char_, (a | b | c) & ~q_str);
-	ps(escape,      esc + q_str);
-	ps(string_char, char_ | escape);
-	ps(string_chars,  (string_char + string_chars) | nll);
-	ps(string_, q_str + string_chars + q_str);
-	ps(start, string_);
-	run_test<char>(ps,nt,start, "\"\"");                         // 0
-	run_test<char>(ps,nt,start, "\"a\"");                        // 1
-	run_test<char>(ps,nt,start, "\"abc\"");                      // 2
-	o.error_expected = "Unexpected 'c' at 1:4 (4)";
-	run_test<char>(ps,nt,start, "\"a\"c\"", {}, o);              // 3
-	run_test<char>(ps,nt,start, "\"\\\"a\\\"c\\\"\"");           // 4
-	run_test<char>(ps,nt,start, "\"\\\"a\\\"a\\\"a\\\"a\\\"\""); // 5
-	ps.clear();
-
 	// char classes
 	TEST("basic", "char_classes")
 	ps(start, digit | alpha);
@@ -462,28 +475,13 @@ int main(int argc, char **argv)
 	ps.clear();
 
 /*******************************************************************************
-*       RECURSION
-*******************************************************************************/
-
-	TEST("recursion", "b")
-	ps(start, b | (start + start + start) | nll);
-	o = {}, o.ambiguity_fails = false;
-	run_test<char>(ps, nt, start, "b", {}, o);
-	ps.clear();
-
-	TEST("recursion", "npnmn")
-	ps(start, n | (start + X + start));
-	ps(X,     p | m);
-	run_test<char>(ps, nt, start, "npnmn", {}, o);
-	ps.clear();
-
-/*******************************************************************************
 *       PAPERS
 *******************************************************************************/
 
 	// Using Elizbeth Scott paper example 2, pg 64
 	TEST("papers", "escott_ex2p64")
 	ps(start, b | (start + start));
+	o = {}, o.ambiguity_fails = false;
 	run_test<char>(ps, nt, start, "bbb", {}, o);
 	o.error_expected = "Unexpected 'a' at 1:4 (4)";
 	run_test<char>(ps, nt, start, "bbba", {}, o);
@@ -519,6 +517,17 @@ int main(int argc, char **argv)
 	ps(B,     nll);
 	ps(T,     b + b + b);
 	run_test<char>(ps, nt, start, "abbb", {}, o);
+	ps.clear();
+
+	TEST("papers", "recursion_b")
+	ps(start, b | (start + start + start) | nll);
+	run_test<char>(ps, nt, start, "b", {}, o);
+	ps.clear();
+
+	TEST("papers", "recursion_npnmn")
+	ps(start, n | (start + X + start));
+	ps(X,     p | m);
+	run_test<char>(ps, nt, start, "npnmn", {}, o);
 	ps.clear();
 
 	// thesis van, figure 4.11
@@ -557,13 +566,30 @@ int main(int argc, char **argv)
 
 	// nonzero digit
 	TEST("boolean", "nzdigit")
-	ps(start,      nzdigit + digits);
+	ps(start,      zero | (nzdigit + digits));
 	ps(digits,     (digit + digits) | nll);
 	ps(nzdigit,    digit & ~zero);
 	run_test<char>(ps, nt, start, "0", cc);
 	run_test<char>(ps, nt, start, "12", cc, o);
 	o = {}, o.error_expected = "Unexpected '1' at 1:2";
 	run_test<char>(ps, nt, start, "01", cc, o);
+	ps.clear();
+
+	// string escaping
+	TEST("boolean", "string")
+	ps(char_, (a | b | c) & ~(q_str | esc));
+	ps(escape,      esc + (q_str | esc));
+	ps(string_char, char_ | escape);
+	ps(string_chars,  (string_char + string_chars) | nll);
+	ps(string_, q_str + string_chars + q_str);
+	ps(start, string_);
+	run_test<char>(ps,nt,start, "\"\"");                         // 0
+	run_test<char>(ps,nt,start, "\"a\"");                        // 1
+	run_test<char>(ps,nt,start, "\"abc\"");                      // 2
+	run_test<char>(ps,nt,start, "\"\\\"a\\\"c\\\"\"");           // 3
+	run_test<char>(ps,nt,start, "\"\\\"a\\\"a\\\"a\\\"a\\\"\""); // 4
+	o.error_expected = "Unexpected 'c' at 1:3 (3)";
+	run_test<char>(ps,nt,start, "\"\"c\"", {}, o);               // 5
 	ps.clear();
 
 	// conjunction and negation in the starting rule

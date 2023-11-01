@@ -102,6 +102,7 @@ struct tgf {
 					<< "':" << strerror(errno) << std::endl,
 				grammar<C, T>(nts_);
 		//std::cout << "fd: " << fd << " l: " << l << std::endl;
+		//DBG(f.g.print_data(std::cout << "\n>>>\n\n") << "\n<<<" << std::endl;)
 		return f.transform(f.p.parse(fd), nts_, start_nt);
 	}
 private:

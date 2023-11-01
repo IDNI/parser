@@ -196,10 +196,12 @@ public:
 		encoder_type terminals_to_chars = 0;
 	};
 	struct item {
-		item(size_t set, size_t prod,size_t con,size_t from,size_t dot);
+		item(size_t set, size_t prod, size_t from,
+			std::vector<size_t> dot);
 		bool operator<(const item& i) const;
 		bool operator==(const item& i) const;
-		size_t set, prod, con, from, dot;
+		size_t set, prod, from;
+		std::vector<size_t> dot;
 	};
 	struct input {
 		using decoder_type =
@@ -261,7 +263,11 @@ public:
 	bool found();
 	std::basic_string<C> get_input();
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
+	typedef std::set<item> container_t;
+	typedef typename container_t::iterator container_iter;
 	std::ostream& print(std::ostream& os, const item& i) const;
+	std::ostream& print(std::ostream& os, const container_t& c,
+		bool only_completed = false) const;
 	std::ostream& print_data(std::ostream& os) const;
 	std::ostream& print_S(std::ostream& os, bool only_completed=false)const;
 #endif
@@ -299,8 +305,10 @@ public:
 #endif
 private:
 	std::vector<item> back_track(const item& obj);
+#if !DEBUG && !WITH_DEVHELPERS
 	typedef std::set<item> container_t;
 	typedef typename container_t::iterator container_iter;
+#endif
 	grammar<C, T>& g;
 	options o;
 	std::unique_ptr<input> in = 0;
@@ -329,14 +337,15 @@ private:
 		ss << tnt_prefix() << tid++;
 		return ss.str();
 	}
-	lit<C, T> get_lit(const item& i) const;
+	lit<C, T> get_lit(const item& i, size_t con) const;
 	lit<C, T> get_nt(const item& i) const;
 	std::pair<container_iter, bool> add(container_t& t, const item& i);
 	bool nullable(const item& i) const;
 	void resolve_conjunctions(container_t& t) const;
-	void predict(const item& i, container_t& t);
-	void scan(const item& i, size_t n, T ch);
-	void scan_cc_function(const item& i, size_t n, T ch);
+	void predict(const item& i, size_t c, container_t& t);
+	void scan(const item& i, size_t c, size_t n, T ch);
+	void scan_cc_function(const item& i, size_t c, size_t n, T ch,
+		container_t& t);
 	void complete(const item& i, container_t& t);
 	bool completed(const item& i) const;
 	void pre_process(const item& i);

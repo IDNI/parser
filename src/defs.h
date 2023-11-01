@@ -28,7 +28,9 @@ namespace idni {
 #	define MS(x)
 #endif
 
-#define DEBUG_PARSING false
+#ifdef DEBUG
+#	define DEBUG_PARSING false
+#endif
 #if DEBUG && DEBUG_PARSING
 #	define DBGP(x) if (debug) { x }
 #else
