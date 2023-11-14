@@ -363,8 +363,8 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 	//DBG(std::cout << "parse: `"<<to_std_string(s)<<"`["<<len<<"] g.start:"<<g.start<<"("<<g.start.nt()<<")"<<"\n";)
 	auto f = std::make_unique<pforest>();
 	//sorted_citem.clear(), rsorted_citem.clear();
-	S.clear(), bin_tnt.clear(), refi.clear(), gcready.clear();
-	memo.clear(), rmemo.clear();
+	S.clear(), fromS.clear(), bin_tnt.clear(), refi.clear(),
+		gcready.clear(), memo.clear(), rmemo.clear();
 	int gcnt = 0; // count of collected items
 	tid = 0;
 	S.resize(1);
