@@ -37,9 +37,7 @@ struct csv_parser {
 		stresc(nts("stresc")), strchar(nts("strchar")),
 		strchars(nts("strchars")), str(nts("string")),
 		val(nts("val")), nullvalue(nts("nullvalue")),
-		g(nts, rules(), start, cc), p(g) {
-			g.print_internal_grammar(cout);
-		}
+		g(nts, rules(), start, cc), p(g) {}
 	value parse(const char* data, size_t size,
 		bool& parse_error, bool& out_of_range)
 	{

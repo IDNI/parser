@@ -482,17 +482,24 @@ grammar<C, T>::grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
 	const prods<C, T>& start, const char_class_fns<T>& cc_fns)
 	: nts(nts), start(start.to_lit()), cc_fns(cc_fns)
 {
+	size_t neg_id = 0;
 	// load prods
-	for (const prod<C, T>& p : ps) // every disjunction has its own prod rule
-		for (const conjs<C, T>& c : p.second) {
-			G.emplace_back(p.first,
-				std::vector<lits<C, T>>{ c.begin(), c.end() });
-			if (c.size() > 1) conjunctives.insert(G.size()-1);
-		}
-
-	// cout << "conjunctive rules[" << conjunctives.size() << "]   ";
-	// for (const auto& d : conjunctives) cout << " " << d;
-	// cout << std::endl;
+	// every disjunction has its own prod rule
+	for (const prod<C, T>& p : ps) for (const conjs<C, T>& c : p.second) {
+		std::vector<lits<C, T>> new_conjs;
+		for (const lits<C, T>& l : c) if (l.neg) {
+			// create a negative rule for a negative conjunction
+			std::basic_stringstream<C> ss;
+			ss << from_cstr<C>("__neg_") << neg_id++;
+			auto l_nt = nts(ss.str());
+			lits<C, T> ot(l), nt({ l_nt });
+			nt.neg = true, ot.neg = false;
+			G.emplace_back(l_nt, std::vector<lits<C, T>>{{ ot }});
+			new_conjs.push_back(nt);
+		} else new_conjs.push_back(l);
+		G.emplace_back(p.first, new_conjs);
+		if (c.size() > 1) conjunctives.insert(G.size()-1);
+	}
 	// create ntsm: nt -> prod rule map
 	for (size_t n = 0; n != G.size(); ++n) ntsm[G[n].first].insert(n);
 	size_t k;
@@ -518,6 +525,10 @@ template <typename C, typename T>
 bool grammar<C, T>::nullable(lit<C, T> l) const {
 	return (!l.nt() && l.is_null()) ||
 		(l.nt() && (nullables.find(l.n()) != nullables.end()));
+}
+template <typename C, typename T>
+size_t grammar<C, T>::n_conjs(size_t p) const {
+	return G[p].second.size();
 }
 template <typename C, typename T>
 bool grammar<C, T>::conjunctive(size_t p) const {
@@ -578,7 +589,7 @@ template <typename C, typename T>
 std::ostream& grammar<C, T>::print_production(std::ostream& os,
 	const production& p) const
 {
-	os << p.first.to_std_string(from_cstr<C>("ε")) <<" =>";
+	os << p.first.to_std_string(from_cstr<C>("ε")) << " =>";
 	size_t j = 0;
 	for (const auto& c : p.second) {
 		if (j++ != 0) os << " &";

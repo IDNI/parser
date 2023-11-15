@@ -131,8 +131,10 @@ struct grammar {
 	size_t len(const size_t& p, const size_t& c) const;
 	// returns true if the literal is nullable
 	bool nullable(lit<C, T> l) const;
-	// returns true if the production has more then 1 conjunction
+	// returns true if the production rule has more then 1 conjunction
 	bool conjunctive(size_t p) const;
+	// returns number of conjunctions for a given production p
+	size_t n_conjs(size_t p) const;
 	// checks if the char class function returns true on the char ch
 	bool char_class_check(lit<C, T> l, T ch) const;
 	// does the same check as char_class_check and if the check is true then
@@ -196,12 +198,10 @@ public:
 		encoder_type terminals_to_chars = 0;
 	};
 	struct item {
-		item(size_t set, size_t prod, size_t from,
-			std::vector<size_t> dot);
+		item(size_t set, size_t prod,size_t con,size_t from,size_t dot);
 		bool operator<(const item& i) const;
 		bool operator==(const item& i) const;
-		size_t set, prod, from;
-		std::vector<size_t> dot;
+		size_t set, prod, con, from, dot;
 	};
 	struct input {
 		using decoder_type =
@@ -281,7 +281,7 @@ public:
 		size_t line;         // line of error
 		size_t col;          // column of error
 		std::vector<T> ctxt; // closest matching ctxt
-		lit<C, T> unexp;     // unexpected literal
+		lits<C, T> unexp;    // unexpected literal sequence
 		typedef struct _exp_prod {
 			std::string exp;
 			std::string prod_nt;
@@ -302,6 +302,7 @@ public:
 	}
 #if DEBUG_PARSING
 	bool debug = true;
+	std::pair<size_t, size_t> debug_at = { DEBUG_POS_FROM, DEBUG_POS_TO };
 #endif
 private:
 	std::vector<item> back_track(const item& obj);
@@ -313,6 +314,7 @@ private:
 	options o;
 	std::unique_ptr<input> in = 0;
 	std::vector<container_t> S;
+	std::vector<container_t> U; // uncompleted
 	//mapping from to position of end in S for items
 	std::unordered_map<size_t, std::vector<size_t>> fromS;
 
@@ -337,17 +339,21 @@ private:
 		ss << tnt_prefix() << tid++;
 		return ss.str();
 	}
-	lit<C, T> get_lit(const item& i, size_t con) const;
+	lit<C, T> get_lit(const item& i) const;
 	lit<C, T> get_nt(const item& i) const;
 	std::pair<container_iter, bool> add(container_t& t, const item& i);
 	bool nullable(const item& i) const;
-	void resolve_conjunctions(container_t& t) const;
-	void predict(const item& i, size_t c, container_t& t);
-	void scan(const item& i, size_t c, size_t n, T ch);
-	void scan_cc_function(const item& i, size_t c, size_t n, T ch,
-		container_t& t);
-	void complete(const item& i, container_t& t);
+	void resolve_conjunctions(container_t& c, container_t& t);
+	void predict(const item& i, container_t& t);
+	void scan(const item& i, size_t n, T ch);
+	void scan_cc_function(const item& i, size_t n, T ch, container_t& t);
+	void complete(const item& i, container_t& t, container_t& c,
+		bool conj_resolved = false);
 	bool completed(const item& i) const;
+	bool negative(const item& i) const;
+	// returns number of literals for a given item
+	size_t n_literals(const item& i) const;
+	std::pair<item, bool> get_conj(size_t set, size_t prod, size_t con) const;
 	void pre_process(const item& i);
 	bool init_forest(pforest& f);
 	bool build_forest(pforest& f, const pnode& root);
