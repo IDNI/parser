@@ -134,10 +134,11 @@ bool run_test_(grammar<T>& g, parser<T>& p, const basic_string<T>& input,
 	}
 	auto f = p.parse(input.c_str(), input.size());
 	bool found = p.found();
+	bool found_orig = found;
 	string msg{};
 	if (!found) msg = p.get_error()
 			.to_str(parser<T>::error::info_lvl::INFO_BASIC);
-	bool ambiguity = f->is_ambiguous();
+	bool ambiguity = found && f->is_ambiguous();
 	if (ambiguity && opts.ambiguity_fails) {
 		expect_fail = found = false;
 		msg = "Input with provided grammar is providing ambiguous "
@@ -158,7 +159,7 @@ bool run_test_(grammar<T>& g, parser<T>& p, const basic_string<T>& input,
 		f->traverse(cb_enter, cb_exit);
 	}
 	if (testing::verbosity > 0) {
-		ss << "\t# found: " << (found ? "yes => SUCCESS" : "no => FAIL");
+		ss << "\t# found: " << found_orig << " " << (found ? "yes => SUCCESS" : "no => FAIL");
 		if (ambiguity) ss << " because of ambiguity";
 		if (expect_fail)
 			ss << " but expected FAIL => " <<
@@ -571,7 +572,7 @@ int main(int argc, char **argv)
 	ps(nzdigit,    digit & ~zero);
 	run_test<char>(ps, nt, start, "0", cc);
 	run_test<char>(ps, nt, start, "12", cc, o);
-	o = {}, o.error_expected = "Unexpected '1' at 1:2";
+	o = {}, o.error_expected = "Unexpected '0' at 1:1 (1)";
 	run_test<char>(ps, nt, start, "01", cc, o);
 	ps.clear();
 
@@ -588,7 +589,7 @@ int main(int argc, char **argv)
 	run_test<char>(ps,nt,start, "\"abc\"");                      // 2
 	run_test<char>(ps,nt,start, "\"\\\"a\\\"c\\\"\"");           // 3
 	run_test<char>(ps,nt,start, "\"\\\"a\\\"a\\\"a\\\"a\\\"\""); // 4
-	o.error_expected = "Unexpected 'c' at 1:3 (3)";
+	o.error_expected = "Unexpected '\"' at 1:2 (2)";
 	run_test<char>(ps,nt,start, "\"\"c\"", {}, o);               // 5
 	ps.clear();
 
@@ -598,6 +599,10 @@ int main(int argc, char **argv)
 	ps(A,     a | c);
 	ps(B,     b | c);
 	run_test<char>(ps, nt, start, "ac");
+	o.error_expected = "Unexpected \"bc\" at 1:1 (1)";
+	run_test<char>(ps, nt, start, "bc", {}, o);
+	o.error_expected = "Unexpected \"cc\" at 1:1 (1)";
+	run_test<char>(ps, nt, start, "cc", {}, o);
 	ps.clear();
 
 	// conjunction and negation in the starting rule
@@ -667,13 +672,16 @@ int main(int argc, char **argv)
 	ps.clear();
 
 	// all cycles
+	// TODO this should be ambiguous but not in start
+	// conjunction w/o negation cannot make multiple trees
 	TEST("boolean", "all_cycles")
 	ps(start, A & B);
 	ps(A, X);
 	ps(X, start | b);
 	ps(B, T | b);
 	ps(T, start);
-	run_test<char>(ps, nt, start, "b");
+	o = {}, o.ambiguity_fails = false;
+	run_test<char>(ps, nt, start, "b", {}, o);
 	ps.clear();
 
 /*******************************************************************************

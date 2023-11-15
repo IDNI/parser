@@ -28,7 +28,7 @@ set(USED_CMAKE_GENERATOR
 )
 if(USED_CMAKE_GENERATOR MATCHES "Ninja")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
-endif()	
+endif()
 
 set(DEBUG_OPTIONS "-O0;-DDEBUG;-ggdb3")
 set(RELEASE_OPTIONS "-O3;-DNDEBUG")
@@ -71,13 +71,15 @@ function(target_setup target)
 			-Wno-parentheses-equality
 			-Wno-unqualified-std-cast-call
 			-Wno-unused-value
+			#-Werror
+			#-Wfatal-errors
 		)
 	else()
 		target_compile_options(${target} PRIVATE /W4)
 	endif()
 	target_compile_options(${target} PRIVATE "${COMPILE_OPTIONS}")
 	target_link_libraries(${target} ${CMAKE_THREAD_LIBS_INIT})
-	target_link_options(${target} PRIVATE "${LINK_OPTIONS}")	
+	target_link_options(${target} PRIVATE "${LINK_OPTIONS}")
 	target_include_directories(${target}
 		PRIVATE
 			${CMAKE_CURRENT_SOURCE_DIR}/src
