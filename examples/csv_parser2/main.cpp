@@ -36,7 +36,7 @@ int main() {
 	parser p(g);
 	string line;
 	while (getline(cin, line)) {
-		cout << "entered: \"" << line << "\"";
+		cout << "entered: `" << line << "`";
 		auto f = p.parse(line.c_str(), line.size());
 		if (p.found()) {
 			bool err;

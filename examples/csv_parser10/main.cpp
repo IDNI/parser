@@ -64,7 +64,7 @@ struct csv_reader {
 			// Since the nonterminals container is encapsulated in
 			// a generated parser, struct provides an id(string)
 			// method to get id of a nonterminal.
-			// We can then compare id's to
+			// We can then compare id's to nt id in n.firs.n()
 			auto id = n.first.n(); // shortcut to the id;
 			if      (id == p.id("row")) r.emplace_back();
 			else if (id == p.id("integer"))
@@ -83,7 +83,7 @@ struct csv_reader {
 ostream& operator<<(ostream& os, const csv_reader::value& v) {
 	if (holds_alternative<int_t>(v)) os << get<int_t>(v);
 	else if (holds_alternative<bool>(v)) os << "NULL";
-	else os << '"' << get<string>(v) << '"';
+	else os << get<string>(v);
 	return os;
 }
 
@@ -95,7 +95,7 @@ int main() {
 	csv_reader csv;
 	istreambuf_iterator<char> begin(cin), end;
 	string input(begin, end);
-	cout << "entered: \"" << input << "\"";
+	cout << "entered: `" << input << "`";
 	bool parse_error, out_of_range;
 	// call csv_reader's get_rows to parse the input and get rows w/ values
 	csv_reader::rows rs = csv.get_rows(input, parse_error, out_of_range);

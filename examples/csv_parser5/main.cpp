@@ -34,9 +34,10 @@ struct csv_parser {
 		start(nts("start")), digit(nts("digit")), digits(nts("digits")),
 		// create new nonterminals we will use
 		integer(nts("integer")), printable(nts("printable")),
-		stresc(nts("stresc")), strchar(nts("strchar")),
-		strchars(nts("strchars")), str(nts("string")),
 		val(nts("val")), nullvalue(nts("nullvalue")),
+		quoted(nts("quoted")), escaped(nts("escaped")),
+		unescaped(nts("unescaped")), strchar(nts("strchar")),
+		strchars(nts("strchars")), str(nts("string")),
 		g(nts, rules(), start, cc), p(g) {}
 	value parse(const char* data, size_t size,
 		bool& parse_error, bool& out_of_range)
@@ -55,8 +56,8 @@ private:
 	nonterminals<> nts{};
 	char_class_fns<> cc;
 	// add new nonterminals
-	prods<> start, digit, digits, integer, printable,
-		stresc, strchar, strchars, str,	val, nullvalue;
+	prods<> start, digit, digits, integer, printable, val, nullvalue,
+		quoted, escaped, unescaped, strchar, strchars, str;
 	grammar<> g;
 	parser<> p;
 	prods<> rules() {
@@ -66,15 +67,18 @@ private:
 		r(digits,     digit | (digits + digit));
 		// we rename the start in the previous part to integer
 		r(integer,    digits | (minus + digits));
+		// quoted are quote or esc
+		r(quoted,     quote | esc);
+		// unescaped character
+		r(unescaped,  printable & ~quoted);
 		// string quote escape
-		r(stresc,     esc + quote);
-		// define characters which can be contained in a string
-		// printable without a quote (") or string quote escape (\")
-		r(strchar,    (printable & ~quote) | stresc);
-		// strchars is a sequence os string characters
-		r(strchars,   strchar | (strchars + strchar));
+		r(escaped,    esc + quoted);
+		// string char is unescaped or escaped
+		r(strchar,    unescaped | escaped);
+		// strchars is a sequence of string characters or nothing
+		r(strchars,   (strchar + strchars) | nul);
 		// string is string characters in quotes but can be empty
-		r(str,        (quote + strchars + quote) | (quote + quote));
+		r(str,        quote + strchars + quote);
 		// null value matches if we match a null literal
 		r(nullvalue,  nul);
 		// value can be either integer, string (if not integer) or null
@@ -83,6 +87,7 @@ private:
 		r(start,      val);
 		return r;
 	}
+
 	// traverses the parsed forest and reads a parsed value from it.
 	value get_value(typename parser<>::pforest* f, bool& out_of_range) {
 		value v; // value we will return
@@ -113,7 +118,7 @@ int main() {
 	csv_parser p;
 	string line;
 	while (getline(cin, line)) {
-		cout << "entered: \"" << line << "\"";
+		cout << "entered: `" << line << "`";
 		bool parse_error, out_of_range;
 		// instad of getting just an int we now get a value
 		csv_parser::value v = p.parse(line.c_str(), line.size(),
@@ -128,7 +133,7 @@ int main() {
 			// holds_alternative<T> and get<T> to access the data
 			if (holds_alternative<int_t>(v)) cout << get<int_t>(v);
 			else if (holds_alternative<bool>(v)) cout << "NULL";
-			else cout << '"' << get<string>(v) << '"';
+			else cout << get<string>(v);
 			cout << '\n';
 		}
 	}

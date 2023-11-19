@@ -31,9 +31,10 @@ struct csv_parser {
 		cc(predefined_char_classes({ "digit", "printable" }, nts)),
 		start(nts("start")), digit(nts("digit")), digits(nts("digits")),
 		integer(nts("integer")), printable(nts("printable")),
-		stresc(nts("stresc")), strchar(nts("strchar")),
-		strchars(nts("strchars")), str(nts("string")),
 		val(nts("val")), nullvalue(nts("nullvalue")),
+		quoted(nts("quoted")), escaped(nts("escaped")),
+		unescaped(nts("unescaped")), strchar(nts("strchar")),
+		strchars(nts("strchars")), str(nts("string")),
 		row_(nts("row")), row_rest(nts("row_rest")),
 		// create new nonterminals we will use
 		eol(nts("eol")),
@@ -56,8 +57,8 @@ private:
 	nonterminals<> nts{};
 	char_class_fns<> cc;
 	// add new nonterminals
-	prods<> start, digit, digits, integer, printable,
-		stresc, strchar, strchars, str,	val, nullvalue,
+	prods<> start, digit, digits, integer, printable, val, nullvalue,
+		quoted, escaped, unescaped, strchar, strchars, str,
 		row_, row_rest, eol, rows_, rows_rest;
 	grammar<> g;
 	parser<> p;
@@ -67,10 +68,12 @@ private:
 			cr('\r'), nl('\n'), nul{ lit() };
 		r(digits,     digit | (digits + digit));
 		r(integer,    digits | (minus + digits));
-		r(stresc,     esc + quote);
-		r(strchar,    (printable & ~quote) | stresc);
-		r(strchars,   strchar | (strchars + strchar));
-		r(str,        (quote + strchars + quote) | (quote + quote));
+		r(quoted,     quote | esc);
+		r(unescaped,  printable & ~quoted);
+		r(escaped,    esc + quoted);
+		r(strchar,    unescaped | escaped);
+		r(strchars,   (strchar + strchars) | nul);
+		r(str,        quote + strchars + quote);
 		r(nullvalue,  nul);
 		r(val,        integer | str | nullvalue);
 		r(row_,       val + row_rest);
@@ -109,7 +112,7 @@ private:
 ostream& operator<<(ostream& os, const csv_parser::value& v) {
 	if (holds_alternative<int_t>(v)) os << get<int_t>(v);
 	else if (holds_alternative<bool>(v)) os << "NULL";
-	else os << '"' << get<string>(v) << '"';
+	else os << get<string>(v);
 	return os;
 }
 
@@ -121,7 +124,7 @@ int main() {
 	// instead of reading line by line, read the whole standard input
 	istreambuf_iterator<char> begin(cin), end;
 	string input(begin, end);
-	cout << "entered: \"" << input << "\"";
+	cout << "entered: `" << input << "`";
 	bool parse_error, out_of_range;
 	// instad of getting just a row we now get all the rows
 	csv_parser::rows rs = p.parse(input.c_str(), input.size(),

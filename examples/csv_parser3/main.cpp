@@ -70,7 +70,7 @@ int main() {
 	csv_parser p;
 	string line;
 	while (getline(cin, line)) {
-		cout << "entered: \"" << line << "\"";
+		cout << "entered: `" << line << "`";
 		// declare variables to get error information
 		bool parse_error, out_of_range;
 		// parse the line input and get the result into i

@@ -65,7 +65,7 @@ int main() {
 	csv_parser p;
 	string line;
 	while (getline(cin, line)) {
-		cout << "entered: \"" << line << "\"";
+		cout << "entered: `" << line << "`";
 		bool parse_error, out_of_range;
 		int_t i = p.parse(line.c_str(), line.size(),
 				parse_error, out_of_range);

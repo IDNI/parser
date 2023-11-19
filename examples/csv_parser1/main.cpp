@@ -45,7 +45,7 @@ int main() {
 	// read line by line from standard input until EOF
 	string line;
 	while (getline(cin, line)) { // and for each entered line do
-		cout << "entered: \"" << line << "\""; // print entered input
+		cout << "entered: `" << line << "`"; // print entered input
 		auto f = p.parse(line.c_str(), line.size()); // run parse
 		// if the parsing was successful
 		if (p.found()) {

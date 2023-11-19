@@ -28,14 +28,17 @@ struct csv_parser {
 	// contrary to C++ where operator+ is required to concatenate literals
 	const char* csv_tgf =
 	"	@use_char_class digit, printable. "
-	// new quote rule to name the literal and use it in other rules by name
+	// quote and esc to name the literal and use it in other rules by name
+	"	esc        => '\\'. "
 	"	quote      => '\"'. "
 	"	digits     => digit | (digits digit). "
 	"	integer    => digits | ('-' digits). "
-	"	stresc     => '\\' quote. "
-	"	strchar    => (printable & ~quote) | stresc. "
-	"	strchars   => strchar | (strchars strchar). "
-	"	str        => (quote strchars quote) | (quote quote). "
+	"	quoted     => quote | esc. "
+	"	unescaped  => printable & ~quoted. "
+	"	escaped    => esc quoted. "
+	"	strchar    => unescaped | escaped. "
+	"	strchars   => (strchar strchars) | null. "
+	"	str        => quote strchars quote. "
 	// null is a reserved word representing a null literal
 	"	nullvalue  => null. "
 	"	val        => integer | str | nullvalue. "
@@ -43,7 +46,7 @@ struct csv_parser {
 	//  to remove _ from row_ and rows_
 	"	row        => val row_rest. "
 	"	row_rest   => (',' val row_rest) | null. "
-	"	eol        => '\n' | \"\r\n\"). "
+	"	eol        => '\n' | \"\r\n\". "
 	"	rows       => row rows_rest. "
 	"	rows_rest  => (eol row rows_rest) | null. "
 	"	start      => rows. "
@@ -97,7 +100,7 @@ private:
 ostream& operator<<(ostream& os, const csv_parser::value& v) {
 	if (holds_alternative<int_t>(v)) os << get<int_t>(v);
 	else if (holds_alternative<bool>(v)) os << "NULL";
-	else os << '"' << get<string>(v) << '"';
+	else os <<get<string>(v);
 	return os;
 }
 
@@ -108,7 +111,7 @@ int main() {
 	csv_parser p;
 	istreambuf_iterator<char> begin(cin), end;
 	string input(begin, end);
-	cout << "entered: \"" << input << "\"";
+	cout << "entered: `" << input << "`";
 	bool parse_error, out_of_range;
 	csv_parser::rows rs = p.parse(input.c_str(), input.size(),
 					parse_error, out_of_range);

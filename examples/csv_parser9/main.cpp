@@ -25,21 +25,24 @@ using namespace idni;
 struct csv_parser {
 	const char* csv_tgf =
 	"	@use_char_class digit, printable. "
+	"	esc        => '\\'. "
 	"	quote      => '\"'. "
 	// replaced digits with digit+ for one or more occurances
 	"	integer    => ['-'] digit+. "
-	"	stresc     => '\\' quote. "
-	"	strchar    => (printable & ~quote) | stresc. "
-	// replaced strchars with strchar+ for one or more occurances
-	"	str        => quote [ strchar+ ] quote. "
+	"	quoted     => quote | esc. "
+	"	unescaped  => printable & ~quoted. "
+	"	escaped    => esc quoted. "
+	"	strchar    => unescaped | escaped. "
+	// replaced strchars with strchar* for 0 or any number of occurances
+	"	str        => quote (strchar*) quote. "
 	"	nullvalue  => null. "
 	"	val        => integer | str | nullvalue. "
 	// replaced row_rest with { ',' val } for 0-any occurances
-	"	row        => val { ',' val }. "
+	"	row        => val ( ',' val )*. "
 	"	eol        => [ '\r' ] '\n'. "
 	// replaced rows_rest with { eol row } for 0-any occurances
-	"	rows       => row { eol row }. "
-	"	start      => rows_. "
+	"	rows       => row ( eol row )*. "
+	"	start      => rows. "
 	;
 	typedef variant<bool, int_t, string> value;
 	typedef vector<value> row;
@@ -54,7 +57,8 @@ struct csv_parser {
 		return get_rows(f.get(), out_of_range);
 	}
 	ostream& print_error(ostream& os) {
-		return os << p.get_error().to_str() << '\n';
+		using lvl = decltype(p)::error::info_lvl;
+		return os << p.get_error().to_str(lvl::INFO_ROOT_CAUSE) << '\n';
 	}
 private:
 	nonterminals<> nts;
@@ -83,7 +87,7 @@ private:
 ostream& operator<<(ostream& os, const csv_parser::value& v) {
 	if (holds_alternative<int_t>(v)) os << get<int_t>(v);
 	else if (holds_alternative<bool>(v)) os << "NULL";
-	else os << '"' << get<string>(v) << '"';
+	else os << get<string>(v);
 	return os;
 }
 
@@ -94,7 +98,7 @@ int main() {
 	csv_parser p;
 	istreambuf_iterator<char> begin(cin), end;
 	string input(begin, end);
-	cout << "entered: \"" << input << "\"";
+	cout << "entered: `" << input << "`";
 	bool parse_error, out_of_range;
 	csv_parser::rows rs = p.parse(input.c_str(), input.size(),
 					parse_error, out_of_range);

@@ -3,16 +3,20 @@
 integer    => [ '-' ] digit+.
 
 quote      => '\"'.
-stresc     => '\\' quote.
-strchar    => (printable & ~quote) | stresc.
-str        => quote [ strchar+ ] quote.
+esc        => '\\'.
+
+quoted     => quote | esc.
+unescaped  => printable & ~quoted.
+escaped    => esc quoted.
+strchar    => unescaped | escaped.
+str        => quote (strchar*) quote.
 
 nullvalue  => null.
 
 val        => integer | str | nullvalue.
 
 eol        => [ '\r' ] '\n'.
-row        => val { ',' val }.
-rows       => row { eol row }.
+row        => val ( ',' val )*.
+rows       => row ( eol row )*.
 
 start      => rows.
