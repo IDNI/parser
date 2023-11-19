@@ -243,7 +243,6 @@ public:
 		std::basic_istream<C> s{};
 		std::vector<T> ts{};  // all collected terminals
 		size_t tp = 0;        // current terminal pos
-//		C c = e;
 	};
 	typedef forest<pnode> pforest;
 	typedef pforest::nodes pnodes;

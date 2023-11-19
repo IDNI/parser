@@ -139,6 +139,7 @@ template <typename C, typename T>
 std::pair<typename parser<C, T>::container_iter, bool>
 	parser<C, T>::add(container_t& t, const item& i)
 {
+	//DBGP(print(std::cout <<" +  trying to add\t\t\t", i) <<"\n";)
 	// do not add if uncompleted
 	if (U.size() < S.size()) U.resize(S.size());
 	auto& ucont = U[i.set];
@@ -234,6 +235,8 @@ void parser<C, T>::resolve_conjunctions(container_t& c, container_t& t) {
 			if (U.size() < S.size()) U.resize(S.size());
 			U[x.set].insert(x);
 			S[x.set].erase(x);
+			remove_if(fromS[x.from].begin(), fromS[x.from].end(),
+				[&x](size_t n) { return x.set == n; });
 			c.erase(x);
 		}
 	}
@@ -401,7 +404,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 	DBGP(g.print_internal_grammar(std::cout << "grammar: \n", "\t", true)
 		<< std::endl;)
 	auto f = std::make_unique<pforest>();
-	S.clear(), fromS.clear(), bin_tnt.clear(), refi.clear(),
+	S.clear(), U.clear(), fromS.clear(), bin_tnt.clear(), refi.clear(),
 		gcready.clear(), memo.clear(), rmemo.clear();
 	int gcnt = 0; // count of collected items
 	tid = 0;
@@ -450,7 +453,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 				fromS[x.from].push_back(x.set);
 			t.clear();
 			const auto cont = S[n];
-			DBGP(print(std::cout << "\nto process:\n", cont);)
+			//DBGP(print(std::cout << "\nto process:\n", cont);)
 			for (auto it = cont.begin(); it != cont.end(); ++it) {
 				DBGP(print(std::cout << "----------------------"
 					"-----------------\n... processing ("
@@ -463,10 +466,11 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 					else predict(*it, t);
 				} else scan(*it, n, ch);
 			}
-			DBGP(print_S(std::cout << "S loop:\n") << "\n";)
+			//DBGP(print_S(std::cout << "S loop:\n") << "\n";)
+			//DBGP(print(std::cout << "t loop:\n", t) << "\n";)
 			if (t.empty()) {
 				resolve_conjunctions(c, t);
-				DBGP(print(std::cout << "c after resolve:\n", c) << std::endl;)
+				//DBGP(print(std::cout << "c after resolve:\n", c) << std::endl;)
 				for (const auto& x : c) {
 					DBGP(print(std::cout << "complete after resolve\t\t", x) << "\n";)
 					complete(x, t, t, true);
