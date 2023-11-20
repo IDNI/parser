@@ -19,14 +19,14 @@ using namespace idni;
 struct csv_parser {
 	const char* csv_tgf =
 	"	@use_char_class space, digit. "
-	" 	el			=> '\n'. "
-	"	ws           => space*. "
-	"	integer      => digit+. "
-	"	line     => ws integer  (ws ',' ws integer ws)*  . "
-	"	start        => ws ( line el )*  ws . "
+	" 	el      => '\n'. "
+	"	ws      => space*. "
+	"	integer => digit+. "
+	"	line    => ws integer  (ws ',' ws integer ws)*  . "
+	"	start   => ws ( line el )*  ws . "
 	;
 	csv_parser() :
-		g(tgf<char>::from_string(nts, csv_tgf)), p(g, { true, false  } ) {}
+		g(tgf<char>::from_string(nts, csv_tgf)), p(g, { true, true }) {}
 	bool eval(const string& s) {
 		auto f = p.parse(s.c_str(), s.size());
 		if (!f || !p.found()) {

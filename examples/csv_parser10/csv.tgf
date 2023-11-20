@@ -1,0 +1,22 @@
+@use_char_class digit, printable.
+
+integer    => [ '-' ] digit+.
+
+quote      => '\"'.
+esc        => '\\'.
+
+escaping   => quote | esc.
+unescaped  => printable & ~escaping.
+escaped    => esc escaping.
+strchar    => unescaped | escaped.
+str        => quote (strchar*) quote.
+
+nullvalue  => null.
+
+val        => integer | str | nullvalue.
+
+eol        => [ '\r' ] '\n'.
+row        => val ( ',' val )*.
+rows       => row ( eol row )*.
+
+start      => rows.

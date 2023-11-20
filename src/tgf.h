@@ -73,7 +73,12 @@ struct tgf {
 		ws(nt("ws")),
 		ws_comment(nt("ws_comment")),
 		ws_required(nt("ws_required")),
-		g(nts, setup_productions(), start, cc), p(g) { }
+		g(nts, setup_productions(), start, cc), p(g)
+	{
+#if DEBUG && DEBUG_PARSING
+		p.debug = false;
+#endif
+	}
 	static grammar<C, T> from_string(nonterminals<C, T>& nts_,
 		const std::basic_string<C>& s,
 		const std::basic_string<C>& start_nt = from_cstr<C>("start"))
@@ -97,6 +102,7 @@ struct tgf {
 					<< "':" << strerror(errno) << std::endl,
 				grammar<C, T>(nts_);
 		//std::cout << "fd: " << fd << " l: " << l << std::endl;
+		//DBG(f.g.print_data(std::cout << "\n>>>\n\n") << "\n<<<" << std::endl;)
 		return f.transform(f.p.parse(fd), nts_, start_nt);
 	}
 private:
@@ -269,9 +275,9 @@ private:
 		};
 #endif
 		if (!p.found()) std::cerr << "There is an error in the grammar."
-						" Cannot recognize TGF.\n"
-				<< p.get_error().to_str();
-			//parser<C, T>::perror_t::info_lvl::INFO_DETAILED);
+			" Cannot recognize TGF.\n" << p.get_error().to_str(
+				parser<C, T>::error::info_lvl::INFO_DETAILED);
+			//parser<C, T>::error::info_lvl::INFO_DETAILED);
 			//DBG(p.print_data(std::cout << "PARSER DATA:\n") << "\n";)
 			//DBG(g.print_internal_grammar(cout << "TGF productions:\n") << endl;)
 		else {

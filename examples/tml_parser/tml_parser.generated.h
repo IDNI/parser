@@ -16,7 +16,7 @@ struct tml_parser {
 		char eof = std::char_traits<char>::eof())
 			{ return p.parse(is, size, eof); }
 	bool found() { return p.found(); }
-	typename idni::parser<char>::perror_t get_error()
+	typename idni::parser<char>::error get_error()
 		{ return p.get_error(); }
 private:
 	std::vector<char> ts{

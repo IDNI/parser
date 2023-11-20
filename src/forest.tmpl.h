@@ -314,7 +314,7 @@ bool forest<NodeT>::_traverse(const node_graph& g, const node& root,
 
 template <typename NodeT>
 bool forest<NodeT>::is_binarized() const {
-	for (auto& kv: this->g) for (auto& rhs: kv.second)
+	for (auto& kv : this->g) for (auto& rhs : kv.second)
 		if (rhs.size() > 2) return false;
 	return true;
 }
@@ -397,7 +397,7 @@ bool forest<NodeT>::replace_node(graph& g, const node& torepl,
 						lchange = change = true; break;
 					}
 				}
-			}			
+			}
 			if (lchange) {
 				//std::cout<<"making change2" << std::endl;
 				rhs_it = kv.second.erase(rhs_it);
@@ -408,7 +408,7 @@ bool forest<NodeT>::replace_node(graph& g, const node& torepl,
 					std::cout << v.first ;
 				std::cout << std::endl;
 				*/
-			}	
+			}
 		}
 	return gchange;
 }
@@ -441,7 +441,7 @@ size_t forest<NodeT>::count_trees(const node& root) const {
 					if( pkc != 0 && x / pkc != ndc[sym]  ) {
 						MS(std::cout<<"Overflow\n");
 						isoverflow = true;
-						return; 
+						return;
 					}
 					pkc = x;
 				}

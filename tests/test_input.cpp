@@ -85,7 +85,7 @@ bool test(const char* msg, const basic_string<C>& istr,
 	cout << "\"" << to_std_string(istr) << "\" " << msg << endl;
 	basic_istringstream<C> is(istr);
 	auto in = stream ? input_t(is, 0, decoder)
-			: input_t(istr.c_str(), istr.size(), decoder);
+			: input_t(istr.c_str(), istr.size(), 0, decoder);
 	size_t counter = 0;
 	auto terminal_out = [&counter](T c) {
 		size_t n = counter++;

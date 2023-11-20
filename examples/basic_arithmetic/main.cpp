@@ -31,7 +31,7 @@ struct basic_arithmetic {
 		if (!p.found()) {
 			return cerr << "\ninput text does not seem to be an "
 				"expression statement\n"<<p.get_error().to_str(
-					parser<char>::perror_t::info_lvl::
+					parser<char>::error::info_lvl::
 						INFO_DETAILED) << endl, false;
 		}
 		cout << evaluate_forest(*f) << endl;
@@ -70,8 +70,12 @@ private:
 		vector<int_t> x;  // intermediate evaluations (nested)
 		auto cb_enter = [&x, &f, this](const auto& n) {
 			//DBG(cout << "entering: `" << n.first.to_std_string() << "` ["<<n.second[0]<<","<<n.second[1]<<"]\n";)
-			if (n.first == integer)
-				x.push_back(terminals_to_int<char>(f, n));
+			if (n.first == integer) {
+				bool err;
+				auto i = terminals_to_int<char>(f, n, err);
+				if (err) cerr << "integer out of range\n";
+				else x.push_back(i);
+			}
 		};
 		auto cb_exit = [&x, this](const auto& n, const auto&) {
 			//DBG(cout << "exiting: `" << n.first.to_std_string() << "`\n";)

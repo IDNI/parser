@@ -148,9 +148,9 @@ bool to_tml_facts(std::ostream& ss, const typename parser<C, T>::pforest& f){
 	auto& e = n_e.second;
 	for (size_t i = 0; n.size() && i < n.size()-1; ++i)
 		ss << "node(" << i << " " <<
-			std::quoted(n[i].first.to_std_string()) << " " <<
+			/*std::quoted(*/n[i].first.to_std_string()/*)*/<< " " <<
 			n[i].second[0] << " " << n[i].second[1] << ").\n";
-	for (auto& x : e) ss << "edge(" << x.first << ", " << x.second <<").\n";
+	for (auto& x : e) ss << "edge(" << x.first << " " << x.second <<").\n";
 	return true;
 }
 template <typename C, typename T>

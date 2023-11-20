@@ -53,8 +53,12 @@ private:
 		vector<int_t> x;  // intermediate evaluations (nested)
 		auto cb_enter = [&x, &f, this](const auto& n) {
 			//DBG(cout << "entering: `" << n.first.to_std_string() << "` ["<<n.second[0]<<","<<n.second[1]<<"]\n";)
-			if (n.first.nt() && n.first.n() == id("integer"))
-				x.push_back(terminals_to_int<char>(f, n));
+			if (n.first.nt() && n.first.n() == id("integer")) {
+				bool err;
+				auto i = terminals_to_int<char>(f, n, err);
+				if (err) cerr << "integer out of range\n";
+				else x.push_back(i);
+			}
 		};
 		auto cb_exit = [&x, this](const auto& n, const auto&) {
 			//DBG(cout << "exiting: `" << n.first.to_std_string() << "`\n";)

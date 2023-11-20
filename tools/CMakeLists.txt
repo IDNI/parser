@@ -1,5 +1,5 @@
 set(TOOLS
-	parser_gen
+	tgf
 )
 
 foreach(X IN LISTS TOOLS)

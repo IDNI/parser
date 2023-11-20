@@ -15,15 +15,22 @@ option(MEASURE_EACH_POS
 	FALSE)
 option(WITH_DEVHELPERS "add to_dot, to_tml and to_tml_rules functions" FALSE)
 ################################################################################
-option(BUILD_TESTS "build library tests" TRUE)
-option(BUILD_STATIC_LIBRARY "build static library" TRUE)
-option(BUILD_SHARED_LIBRARY "build shared library" TRUE)
-option(BUILD_EXAMPLES "build examples" TRUE)
-option(BUILD_TOOLS "build library tools" TRUE)
+option(BUILD_STATIC_LIBRARY "build static library" FALSE)
+option(BUILD_SHARED_LIBRARY "build shared library" FALSE)
+option(BUILD_TESTS "build library tests" FALSE)
+option(BUILD_EXAMPLES "build examples" FALSE)
+option(BUILD_TOOLS "build library tools" FALSE)
 set(BUILD_EXECUTABLE FALSE)
 set(BUILD_SHARED_EXECUTABLE FALSE)
+if(NOT BUILD_STATIC_LIBRARY AND NOT BUILD_SHARED_LIBRARY AND
+	NOT BUILD_TESTS AND NOT BUILD_TOOLS AND NOT BUILD_EXAMPLES)
+		set(BUILD_STATIC_LIBRARY true)
+		set(BUILD_TESTS true)
+		set(BUILD_TOOLS true)
+		set(BUILD_EXAMPLES true)
+endif()
 if(BUILD_TESTS)
-	set(WITH_DEVHELPERS TRUE)
+	set(WITH_DEVHELPERS true)
 endif()
 ################################################################################
 message(STATUS "MEASURE: ${MEASURE}")
@@ -45,12 +52,14 @@ set(PROJECT_HEADERS
 	src/forest.h
 	src/parser.h
 	src/parser.tmpl.h
+	src/recoders.h
 	src/tgf.h
 )
 set(PROJECT_SOURCES
 	src/characters.cpp
 	src/charclasses.cpp
 	src/parser.cpp
+	src/recoders.cpp
 )
 
 set(PROJECT_DEFINITIONS WITH_DEVHELPERS MEASURE MEASURE_EACH_POS)

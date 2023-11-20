@@ -131,8 +131,10 @@ struct grammar {
 	size_t len(const size_t& p, const size_t& c) const;
 	// returns true if the literal is nullable
 	bool nullable(lit<C, T> l) const;
-	// returns true if the production has more then 1 conjunction
+	// returns true if the production rule has more then 1 conjunction
 	bool conjunctive(size_t p) const;
+	// returns number of conjunctions for a given production p
+	size_t n_conjs(size_t p) const;
 	// checks if the char class function returns true on the char ch
 	bool char_class_check(lit<C, T> l, T ch) const;
 	// does the same check as char_class_check and if the check is true then
@@ -146,9 +148,9 @@ struct grammar {
 	bool is_eof_fn(const size_t& p) const;
 	std::ostream& print_production(std::ostream& os,
 		const production& p) const;
-#if defined(DEBUG) || defined(WITH_DEVHELPERS)
 	std::ostream& print_internal_grammar(std::ostream& os,
-		std::string prep = {}) const;
+		std::string prep = {}, bool print_ids = false) const;
+#if defined(DEBUG) || defined(WITH_DEVHELPERS)
 	std::ostream& print_data(std::ostream& os, std::string prep = {}) const;
 #endif
 	lit<C, T> nt(size_t n);
@@ -204,18 +206,19 @@ public:
 	struct input {
 		using decoder_type =
 				std::function<std::vector<T>(input&)>;
-		input(const C* data, size_t length = 0,
+		input(const C* data, size_t size = 0, size_t max_length = 0,
 			decoder_type decoder = 0,
 			int_type e = std::char_traits<C>::eof());
-		input(std::basic_istream<C>& is, size_t length = 0,
+		input(std::basic_istream<C>& is, size_t max_length = 0,
 			decoder_type decoder = 0,
 			int_type e = std::char_traits<C>::eof());
-		input(int filedescriptor, size_t length = 0,
+		input(int filedescriptor, size_t max_length = 0,
 			decoder_type decoder = 0,
 			int_type e = std::char_traits<C>::eof());
 		~input();
 		inline bool isstream() const;
 		void clear(); // resets stream (if used) to reenable at()/tat()
+		std::basic_string<C> get(); // returns input data as a string
 		// source stream access
 		C cur();
 		size_t pos();
@@ -233,14 +236,13 @@ public:
 		enum type { POINTER, STREAM, MMAP } itype = POINTER;//input type
 		int_type e = std::char_traits<C>::eof(); // end of a stream
 		decoder_type decoder = 0;
-		size_t max_l = 0;   // read up to max length of the input size
 		size_t n = 0;         // input position
-		size_t l = 0;         // input length
+		size_t l = 0;         // size of input data (0 for streams)
+		size_t max_l = 0;     // read up to max length of the input size
 		const C* d = 0;       // input data pointer if needed
 		std::basic_istream<C> s{};
 		std::vector<T> ts{};  // all collected terminals
 		size_t tp = 0;        // current terminal pos
-//		C c = e;
 	};
 	typedef forest<pnode> pforest;
 	typedef pforest::nodes pnodes;
@@ -249,21 +251,26 @@ public:
 	typedef pforest::graph pgraph;
 	typedef pforest::tree ptree;
 	typedef pforest::sptree psptree;
-	typedef std::map<std::pair<size_t, size_t>,std::set<item>> conjunctions;
 	parser(grammar<C, T>& g, const options& o = {});
 	std::unique_ptr<pforest> parse(const C* data, size_t size = 0,
+		size_t max_length = 0,
 		int_type eof = std::char_traits<C>::eof());
-	std::unique_ptr<pforest> parse(int filedescriptor, size_t size = 0,
+	std::unique_ptr<pforest> parse(int filedescriptor, size_t max_length=0,
 		int_type eof = std::char_traits<C>::eof());
 	std::unique_ptr<pforest> parse(std::basic_istream<C>& is,
-		size_t size = 0, int_type eof = std::char_traits<C>::eof());
+		size_t max_length=0, int_type eof = std::char_traits<C>::eof());
 	bool found();
+	std::basic_string<C> get_input();
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
+	typedef std::set<item> container_t;
+	typedef typename container_t::iterator container_iter;
 	std::ostream& print(std::ostream& os, const item& i) const;
+	std::ostream& print(std::ostream& os, const container_t& c,
+		bool only_completed = false) const;
 	std::ostream& print_data(std::ostream& os) const;
-	std::ostream& print_S(std::ostream& os) const;
+	std::ostream& print_S(std::ostream& os, bool only_completed=false)const;
 #endif
-	struct perror_t {
+	struct error {
 		enum info_lvl {
 			INFO_BASIC,
 			INFO_DETAILED,
@@ -273,7 +280,7 @@ public:
 		size_t line;         // line of error
 		size_t col;          // column of error
 		std::vector<T> ctxt; // closest matching ctxt
-		T unexp;             // unexpected token
+		lits<C, T> unexp;    // unexpected literal sequence
 		typedef struct _exp_prod {
 			std::string exp;
 			std::string prod_nt;
@@ -284,25 +291,32 @@ public:
 
 		// list of expected token and respective productions
 		std::vector<exp_prod_t> expv;
-		perror_t() : loc(-1) {}
+		error() : loc(-1) {}
 		std::string to_str(info_lvl lv = INFO_ROOT_CAUSE);
 	};
-	perror_t get_error();
-	
+	error get_error();
 	static std::basic_string<C> tnt_prefix() {
 		static std::basic_string<C> pr = { '_','_','t','e','m','p' };
-		return pr; }
+		return pr;
+	}
+#if DEBUG_PARSING
+	bool debug = true;
+	std::pair<size_t, size_t> debug_at = { DEBUG_POS_FROM, DEBUG_POS_TO };
+#endif
 private:
 	std::vector<item> back_track(const item& obj);
+#if !DEBUG && !WITH_DEVHELPERS
 	typedef std::set<item> container_t;
 	typedef typename container_t::iterator container_iter;
+#endif
 	grammar<C, T>& g;
 	options o;
 	std::unique_ptr<input> in = 0;
 	std::vector<container_t> S;
+	std::vector<container_t> U; // uncompleted
 	//mapping from to position of end in S for items
 	std::unordered_map<size_t, std::vector<size_t>> fromS;
-	
+
 	// refcounter for the earley item
 	// default value is 0, which means it can be garbaged
 	// non-zero implies, its not to be collected
@@ -311,10 +325,10 @@ private:
 	std::set<item> gcready;
 	std::vector<item> sorted_citem(std::pair<size_t, size_t> ntpos);
 	std::vector<item> rsorted_citem(std::pair<size_t, size_t> ntpos);
-	std::map<std::pair<size_t, size_t>, 
-									std::vector<item>> memo;
-	std::map<std::pair<size_t, size_t>, 
-									std::vector<item>> rmemo;
+	std::map<std::pair<size_t, size_t>,
+					std::vector<item>> memo;
+	std::map<std::pair<size_t, size_t>,
+					std::vector<item>> rmemo;
 
 	// binarized temporary intermediate non-terminals
 	std::map<std::vector<lit<C, T>>, lit<C, T>> bin_tnt;
@@ -328,12 +342,17 @@ private:
 	lit<C, T> get_nt(const item& i) const;
 	std::pair<container_iter, bool> add(container_t& t, const item& i);
 	bool nullable(const item& i) const;
-	void resolve_conjunctions(container_t& t) const;
+	void resolve_conjunctions(container_t& c, container_t& t);
 	void predict(const item& i, container_t& t);
 	void scan(const item& i, size_t n, T ch);
-	void scan_cc_function(const item& i, size_t n, T ch, container_t& c);
-	void complete(const item& i, container_t& t);
+	void scan_cc_function(const item& i, size_t n, T ch, container_t& t);
+	void complete(const item& i, container_t& t, container_t& c,
+		bool conj_resolved = false);
 	bool completed(const item& i) const;
+	bool negative(const item& i) const;
+	// returns number of literals for a given item
+	size_t n_literals(const item& i) const;
+	std::pair<item, bool> get_conj(size_t set, size_t prod, size_t con) const;
 	void pre_process(const item& i);
 	bool init_forest(pforest& f);
 	bool build_forest(pforest& f, const pnode& root);
@@ -360,7 +379,7 @@ std::basic_string<T> terminals_to_str(
 	const typename parser<C, T>::pnode& r);
 template <typename C = char, typename T = C> // flattens terminals of a subforest into an int
 int_t terminals_to_int(const typename parser<C, T>::pforest& f,
-	const typename parser<C, T>::pnode& r);
+	const typename parser<C, T>::pnode& r, bool& error);
 
 template <typename C, typename T>
 bool operator==(const lit<C, T>& l, const prods<C, T>& p);

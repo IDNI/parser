@@ -18,14 +18,26 @@
 namespace idni {
 
 #ifdef DEBUG
-#define DBG(x) x
+#	define DBG(x) x
 #else
-#define DBG(x)
+#	define DBG(x)
 #endif
 #ifdef MEASURE
-#define MS(x) x
+#	define MS(x) x
 #else
-#define MS(x)
+#	define MS(x)
+#endif
+
+#ifdef DEBUG
+#	define DEBUG_PARSING false
+#endif
+#if DEBUG && DEBUG_PARSING
+#	define DBGP(x) if (debug) { x }
+//if DEBUG_POS_TO > 0 show debugging information only for a given position range
+#	define DEBUG_POS_FROM 0
+#	define DEBUG_POS_TO   0
+#else
+#	define DBGP(x)
 #endif
 
 #define tdiff(start, end) ((double(end - start) / CLOCKS_PER_SEC) * 1000)
@@ -34,6 +46,26 @@ namespace idni {
 	std::setprecision(2) << tdiff(start, end) << " ms"
 
 typedef int32_t int_t;
+
+// terminal colors
+// use: os << COLOR BLUE << "blue text" << COLOR CLEAR;
+// or:  os << COLOR BRIGHT AND WHITE << "bright and white text" << COLOR CLEAR;
+#define COLOR      "\033["
+#define BRIGHT     "1"
+#define UNDERLINED "4"
+#define FLASHING   "5"
+#define AND        ";"
+#define CLEAR      "0m"
+#define BLACK      "30m"
+#define RED        "31m"
+#define GREEN      "32m"
+#define YELLOW     "33m"
+#define BROWN      "33m"
+#define BLUE       "34m"
+#define PURPLE     "35m"
+#define CYAN       "36m"
+#define WHITE      "37m"
+#define GRAY       "37m"
 
 } // idni namespace
 #endif // __IDNI__PARSER__DEFS_H__
