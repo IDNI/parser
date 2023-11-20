@@ -11,10 +11,11 @@ It also provides a `tgf` tool which takes a grammar described in a TGF file and 
 
 ## Features
 
-- boolean (including conjunctive) grammars
+- Boolean (including conjunctive) grammars
 	- C++ structures with operators for [creating grammars programatically](docs/programatic_grammar.md)
 	- [TGF](docs/tgf.md) - Tau Grammar Form language for describing grammars in an EBNF-like format
 - Earley based parser with garbage collection producing parse forest containing all the parsed trees
+- scannerless (lexerless) parsing
 - forest traversal with callbacks and extraction of trees and graphs to deal with transformations and with ambiguity
 - `tgf` tool to test grammars in TGF file or to generate a C++ code representing a parser for a given TGF file.
 - predefined or custom classes of characters defined by a function (`<cctype>`-like functions)

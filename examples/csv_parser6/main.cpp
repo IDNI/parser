@@ -122,7 +122,7 @@ int main() {
 	while (getline(cin, line)) {
 		cout << "entered: `" << line << "`";
 		bool parse_error, out_of_range;
-		// instad of getting just an int we now get a value
+		// instad of getting just a value we now get a row of values
 		csv_parser::row r = p.parse(line.c_str(), line.size(),
 						parse_error, out_of_range);
 		if (parse_error) p.print_error(cerr);

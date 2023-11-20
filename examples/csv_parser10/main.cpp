@@ -28,13 +28,13 @@
 //
 //         tgf csv.tgf gen --name csv_parser > csv_parser.generated.h
 //
-// Generated parser has a simillar API as library's parser struct.
+// Generated parser has a similar API as library's parser struct.
 // Additionally it provides size_t id(const basic_string<C>&) method to get id
 // of a nonterminal.
 
 #include <limits>
 
-// include the generated header file instead of the generic parser
+// include the generated header file instead of using the generic parser
 #include "csv_parser.generated.h"
 
 using namespace std;

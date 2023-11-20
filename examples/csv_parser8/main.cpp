@@ -71,8 +71,8 @@ private:
 	nonterminals<> nts;
 	grammar<> g;
 	parser<> p;
-	// container for char class functions and nonterminals and rules method
-	// removed since it is covered by TGF
+	// container for char class functions and all prods removed since it is
+	// covered by TGF
 	rows get_rows(typename parser<>::pforest* f, bool& out_of_range) {
 		rows r;
 		out_of_range = false;

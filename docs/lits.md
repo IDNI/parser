@@ -9,7 +9,7 @@ template <typename C = char, typename T = C> struct lits;
 `lits` represents a sequence of literals to match an input to satisfy a part of a production rule.
 
 `lits` has the same API as `std::vector<lit<C, T>>`.
-As an addition it has a boolean `neg` attribute.
+As an addition it has a Boolean `neg` attribute.
 
 ## attribute
 

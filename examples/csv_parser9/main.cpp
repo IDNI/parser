@@ -33,14 +33,14 @@ struct csv_parser {
 	"	unescaped  => printable & ~escaping. "
 	"	escaped    => esc escaping. "
 	"	strchar    => unescaped | escaped. "
-	// replaced strchars with strchar* for 0 or any number of occurances
+	// replaced strchars with (strchar*) for 0 or any number of occurances
 	"	str        => quote (strchar*) quote. "
 	"	nullvalue  => null. "
 	"	val        => integer | str | nullvalue. "
-	// replaced row_rest with { ',' val } for 0-any occurances
+	// replaced row_rest with ( ',' val )* for 0-any occurances
 	"	row        => val ( ',' val )*. "
 	"	eol        => [ '\r' ] '\n'. "
-	// replaced rows_rest with { eol row } for 0-any occurances
+	// replaced rows_rest with ( eol row )* for 0-any occurances
 	"	rows       => row ( eol row )*. "
 	"	start      => rows. "
 	;
