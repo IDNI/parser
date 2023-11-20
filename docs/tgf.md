@@ -35,22 +35,66 @@ auto f = p.parse("hi");    // p.found() == true
      f = p.parse("table"); // p.found() == false
 ```
 
-## parser_gen tool
+## tgf tool
 
-This library provides a command line tool `parser_gen` which takes a TGF file and generates a parser in C++.
+This library provides a command line tool `tgf` which takes a TGF file and allows to do several things:
+- generates a parser in C++.
+- runs a parser for a given input string
+- displays information about a grammar
 
 ```
-parser_gen <struct name> <tgf file> [ <starting nonterminal> [ <input type>
-	[ <terminal type> [ <decoder function> [ <encoder function> ] ] ] ] ]
+tgf <tgf file> [ <command> [ <command options> ] ]
 ```
 
-- `<struct name>` - name of the generated parser struct
-- `<tgf file>` - grammar in a TGF file
-- `<starting nonterminal>` - name of a nonterminal rule which must be parsed over the whole input data.
-- `<input type>` - type of characters in an input data (templated type `C`)
-- `<terminal type>` - type of terminals (templated type `T`)
-- `<decoder function>` - string containing a C++ function for decoding input type into terminal type
-- `<encoder function>` - string containing a C++ function for encoding terminal type into input type
+where commands are:
+```
+	gen		generate a parser code
+	parse		parse an input string, file or stdin
+	show		show information about grammar / parser
+```
+
+options for `gen` command:
+```
+tgf <tgf file> gen [ <options> ]
+	--char-type        -C      type of input character
+	--decoder          -d      decoder function
+	--encoder          -e      encoder function
+	--help             -h      detailed information about options
+	--name             -n      name of the generated parser struct
+	--output           -o      output file
+	--start            -s      starting literal
+	--terminal-type    -T      type of terminal character
+```
+
+options for `parse` command:
+```
+tgf <tgf file> parse [ <options> ]
+        --char-type        -C      type of input character
+        --detailed-error   -d      parse error is more verbose
+        --grammar          -g      prints grammar
+        --help             -h      detailed information about options
+        --input            -i      parse input from file or STDIN if -
+        --input-expression -e      parse input from provided string
+        --print-ambiguity  -a      prints ambiguity info, incl. ambig. nodes
+        --print-graphs     -p      prints parsed graph
+        --print-input      -I      prints input
+        --root-cause-error -D      parse error is more verbose
+        --start            -s      starting literal
+        --terminal-type    -T      type of terminal character
+        --terminals        -t      prints all parsed terminals serialized
+        --tml-facts        -f      prints parsed graph in tml facts
+        --tml-rules        -r      prints parsed graph in tml rules
+```
+
+Options for `show` command:
+```
+tgf <tgf file> show [ <options> ]
+        --char-type        -C      type of input character
+        --grammar          -g      prints grammar
+        --help             -h      detailed information about options
+        --start            -s      starting literal
+        --terminal-type    -T      type of terminal character
+```
 
 For more information about decoder and encoder functions see [recoders](recoders.md)
 

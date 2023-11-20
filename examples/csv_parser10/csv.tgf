@@ -5,9 +5,9 @@ integer    => [ '-' ] digit+.
 quote      => '\"'.
 esc        => '\\'.
 
-quoted     => quote | esc.
-unescaped  => printable & ~quoted.
-escaped    => esc quoted.
+escaping   => quote | esc.
+unescaped  => printable & ~escaping.
+escaped    => esc escaping.
 strchar    => unescaped | escaped.
 str        => quote (strchar*) quote.
 

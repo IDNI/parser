@@ -40,7 +40,7 @@ private:
 	idni::nonterminals<char, char> load_nonterminals() const {
 		idni::nonterminals<char, char> nts{};
 		for (const auto& nt : {
-			"", "digit", "printable", "integer", "integer_0", "integer_1", "quote", "esc", "quoted", "unescaped", 
+			"", "digit", "printable", "integer", "integer_0", "integer_1", "quote", "esc", "escaping", "unescaped", 
 			"escaped", "strchar", "str", "str_2", "str_3", "nullvalue", "val", "eol", "eol_4", "row", 
 			"row_5", "row_6", "rows", "rows_7", "rows_8", "start", "__neg_0", 
 		}) nts.get(nt);
@@ -72,15 +72,15 @@ private:
 		q(nt(6), (t(2)));
 		// esc => '\\'.
 		q(nt(7), (t(3)));
-		// quoted => quote.
+		// escaping => quote.
 		q(nt(8), (nt(6)));
-		// quoted => esc.
+		// escaping => esc.
 		q(nt(8), (nt(7)));
-		// __neg_0 => quoted.
+		// __neg_0 => escaping.
 		q(nt(26), (nt(8)));
 		// unescaped => printable & ~( __neg_0 ).
 		q(nt(9), (nt(2)) & ~(nt(26)));
-		// escaped => esc quoted.
+		// escaped => esc escaping.
 		q(nt(10), (nt(7)+nt(8)));
 		// strchar => unescaped.
 		q(nt(11), (nt(9)));

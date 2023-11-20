@@ -35,7 +35,7 @@ struct csv_parser {
 		// create new nonterminals we will use
 		integer(nts("integer")), printable(nts("printable")),
 		val(nts("val")), nullvalue(nts("nullvalue")),
-		quoted(nts("quoted")), escaped(nts("escaped")),
+		escaping(nts("escaping")), escaped(nts("escaped")),
 		unescaped(nts("unescaped")), strchar(nts("strchar")),
 		strchars(nts("strchars")), str(nts("string")),
 		g(nts, rules(), start, cc), p(g) {}
@@ -57,7 +57,7 @@ private:
 	char_class_fns<> cc;
 	// add new nonterminals
 	prods<> start, digit, digits, integer, printable, val, nullvalue,
-		quoted, escaped, unescaped, strchar, strchars, str;
+		escaping, escaped, unescaped, strchar, strchars, str;
 	grammar<> g;
 	parser<> p;
 	prods<> rules() {
@@ -67,12 +67,12 @@ private:
 		r(digits,     digit | (digits + digit));
 		// we rename the start in the previous part to integer
 		r(integer,    digits | (minus + digits));
-		// quoted are quote or esc
-		r(quoted,     quote | esc);
-		// unescaped character
-		r(unescaped,  printable & ~quoted);
-		// string quote escape
-		r(escaped,    esc + quoted);
+		// we are escaping quote (") or esc (\)
+		r(escaping,   quote | esc);
+		// unescaped are all printable but not those we are escaping
+		r(unescaped,  printable & ~escaping);
+		// escaped is escape and what we are escaping
+		r(escaped,    esc + escaping);
 		// string char is unescaped or escaped
 		r(strchar,    unescaped | escaped);
 		// strchars is a sequence of string characters or nothing

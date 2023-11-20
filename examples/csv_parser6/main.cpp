@@ -31,7 +31,7 @@ struct csv_parser {
 		start(nts("start")), digit(nts("digit")), digits(nts("digits")),
 		integer(nts("integer")), printable(nts("printable")),
 		val(nts("val")), nullvalue(nts("nullvalue")),
-		quoted(nts("quoted")), escaped(nts("escaped")),
+		escaping(nts("escaping")), escaped(nts("escaped")),
 		unescaped(nts("unescaped")), strchar(nts("strchar")),
 		strchars(nts("strchars")), str(nts("string")),
 		// create new nonterminals we will use
@@ -55,7 +55,7 @@ private:
 	char_class_fns<> cc;
 	// add new nonterminals
 	prods<> start, digit, digits, integer, printable, val, nullvalue,
-		quoted, escaped, unescaped, strchar, strchars, str,
+		escaping, escaped, unescaped, strchar, strchars, str,
 		row_, row_rest;
 	grammar<> g;
 	parser<> p;
@@ -65,9 +65,9 @@ private:
 			nul{ lit() };
 		r(digits,     digit | (digits + digit));
 		r(integer,    digits | (minus + digits));
-		r(quoted,     quote | esc);
-		r(unescaped,  printable & ~quoted);
-		r(escaped,    esc + quoted);
+		r(escaping,   quote | esc);
+		r(unescaped,  printable & ~escaping);
+		r(escaped,    esc + escaping);
 		r(strchar,    unescaped | escaped);
 		r(strchars,   (strchar + strchars) | nul);
 		r(str,        quote + strchars + quote);

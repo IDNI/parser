@@ -6,7 +6,7 @@ This C++ parsing library was created because other available parsers were missin
 
 This library additionally provides a parser for TGF (Tau Grammar form), an EBNF-like language for describing boolean grammars.
 
-It also provides a `parser_gen` tool to generate parsers (in C++) which uses a grammar described in a TGF file.
+It also provides a `tgf` tool which takes a grammar described in a TGF file and it can help debug the grammar or generate C++ code of the parser.
 
 
 ## Features
@@ -16,7 +16,7 @@ It also provides a `parser_gen` tool to generate parsers (in C++) which uses a g
 	- [TGF](docs/tgf.md) - Tau Grammar Form language for describing grammars in an EBNF-like format
 - Earley based parser with garbage collection producing parse forest containing all the parsed trees
 - forest traversal with callbacks and extraction of trees and graphs to deal with transformations and with ambiguity
-- `parser_gen` tool to generate a C++ code representing a parser for a given TGF file.
+- `tgf` tool to test grammars in TGF file or to generate a C++ code representing a parser for a given TGF file.
 - predefined or custom classes of characters defined by a function (`<cctype>`-like functions)
 - optional [recoding](docs/recoders.md) of an input into another type which can can be used for lexing, reencoding or accessing binary data
 - [own UTF-8 support](docs/utf8.md)
@@ -117,4 +117,4 @@ Read comments since they are always related to a new or a changed code.
 - [part 7](examples/csv_parser7/main.cpp) - parse new line separated rows
 - [part 8](examples/csv_parser8/main.cpp) - replace programmatically created grammar with a grammar in TGF
 - [part 9](examples/csv_parser9/main.cpp) - using EBNF syntax in TGF
-- [part 10](examples/csv_parser10/main.cpp), [csv.tgf](examples/csv_parser10/csv.tgf) - using parser gen tool to generate a parser from a TGF file
+- [part 10](examples/csv_parser10/main.cpp), [csv.tgf](examples/csv_parser10/csv.tgf) - using tgf tool to generate a parser from a TGF file

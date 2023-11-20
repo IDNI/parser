@@ -13,21 +13,22 @@
 
 // CSV parser tutorial - part 10
 //
-// In this part we use a parser gen tool to generate a parser from a TGF file.
+// In this part we use a tgf tool to generate a parser from a TGF file.
 //
 // This is usefull when you want to avoid parsing TGF to read your grammar every
-// time you start your program. parser_gen converts TGF to a programatically
+// time you start your program. tgf tool converts TGF to a programatically
 // created grammar and wraps it into a parser struct.
 //
 // We have moved the TGF grammar from previous part into a separate csv.tgf file
 //
-// Now we can run the parser_gen tool with argument "csv_parser" to name the
-// struct and "csv.tgf" as a name of the tgf file.
+// Now we can run the tgf tool with "csv.tgf" filename as a first argument,
+// a command "gen" as a second argument and we can use the --name option with
+// argument "csv_parser" to name the struct.
 // And we redirect the output to a desired header file:
 //
-//         parser_gen csv_parser csv.tgf > csv_parser.generated.h
+//         tgf csv.tgf gen --name csv_parser > csv_parser.generated.h
 //
-// Generated parser has a simillar API as the generic parser.
+// Generated parser has a simillar API as library's parser struct.
 // Additionally it provides size_t id(const basic_string<C>&) method to get id
 // of a nonterminal.
 
@@ -40,12 +41,12 @@ using namespace std;
 using namespace idni;
 
 // Renamed csv_parser to csv_reader. csv_reader now uses csv_parser to parse
-// input and takes still it care of the traversal and extraction of the values.
+// input and it takes care of the traversal and extraction of values.
 struct csv_reader {
 	typedef variant<bool, int_t, string> value;
 	typedef vector<value> row;
 	typedef vector<row> rows;
-	// use csv_parser from the generated header file
+	// use csv_parser from the header file with a generated parser
 	csv_parser p;
 	ostream& print_error(ostream& os) {
 		return os << p.get_error().to_str() << '\n';
@@ -64,7 +65,7 @@ struct csv_reader {
 			// Since the nonterminals container is encapsulated in
 			// a generated parser, struct provides an id(string)
 			// method to get id of a nonterminal.
-			// We can then compare id's to nt id in n.firs.n()
+			// We can then compare id's to nt id in n.first.n()
 			auto id = n.first.n(); // shortcut to the id;
 			if      (id == p.id("row")) r.emplace_back();
 			else if (id == p.id("integer"))

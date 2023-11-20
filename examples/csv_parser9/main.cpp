@@ -29,9 +29,9 @@ struct csv_parser {
 	"	quote      => '\"'. "
 	// replaced digits with digit+ for one or more occurances
 	"	integer    => ['-'] digit+. "
-	"	quoted     => quote | esc. "
-	"	unescaped  => printable & ~quoted. "
-	"	escaped    => esc quoted. "
+	"	escaping   => quote | esc. "
+	"	unescaped  => printable & ~escaping. "
+	"	escaped    => esc escaping. "
 	"	strchar    => unescaped | escaped. "
 	// replaced strchars with strchar* for 0 or any number of occurances
 	"	str        => quote (strchar*) quote. "
