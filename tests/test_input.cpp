@@ -98,7 +98,7 @@ bool test(const char* msg, const basic_string<C>& istr,
 				if (n %  8 == 0) cout << " ";
 				if (n % 32 == 0) cout << "\n";
 			}
-			cout << c ? "1" : "0";
+			cout << (c ? "1" : "0");
 		} else if (n) cout << " ";
 		if constexpr (is_same_v<T, char32_t>)
 			cout << "'" << to_std_string(c) << "'";

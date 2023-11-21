@@ -61,16 +61,11 @@ function(target_setup target)
 		target_compile_options(${target} PRIVATE
 			-W -Wall -Wextra -Wpedantic
 			-Wformat=2
-			-Wno-variadic-macros
 			-Wcast-align
 			-Wstrict-aliasing=2
 			-Wstrict-overflow=5
 			-Wfloat-equal
 			-Wwrite-strings
-			-Wno-missing-braces
-			-Wno-parentheses-equality
-			-Wno-unqualified-std-cast-call
-			-Wno-unused-value
 			#-Werror
 			#-Wfatal-errors
 		)
