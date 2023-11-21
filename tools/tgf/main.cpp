@@ -122,9 +122,10 @@ ostream& help(ostream& os, command cmd = {}) {
 	if (cmd.name().size()) return
 		commands_default[cmd.name()].help(cout << "Command: ") << "\n";
 	os << "Commands:\n";
-	for (auto it : commands)
-		os << "\t" << it.first << "\t\t" << it.second.description() << "\n";
-	os << "\nCommand options:\n\t--help\t-h\tdetailed information about command\n";
+	for (auto it : commands) os << "\t" << it.first << "\t\t" <<
+						it.second.description() << "\n";
+	os << "\nCommand options:\n" <<
+		"\t--help\t-h\tdetailed information about command\n";
 	return os << "\n";
 }
 
@@ -269,12 +270,14 @@ int process_args(int argc_int, char** argv, command& cmdref, string& tgf_file) {
 	size_t argc(argc_int);
 
 #ifdef DEBUG
-	cout << "== DEBUG ==================================================================\n";
+	cout << "== DEBUG ====================================================="
+							"=============\n";
 	cout << "argc: " << argc << "\n";
 	cout << "argv:";
 	for (size_t i = 0; i != static_cast<size_t>(argc); ++i)
 		cout << "\t" << i << ": `" << argv[i] << "`\n";
-	cout << "= /DEBUG ==================================================================\n\n";
+	cout << "= /DEBUG ====================================================="
+							"=============\n\n";
 #endif
 	if (argc == 1) return error("no TGF file provided", true);
 	tgf_file = argv[1];
@@ -307,7 +310,8 @@ int process_args(int argc_int, char** argv, command& cmdref, string& tgf_file) {
 		bool isshort;
 		if (!opt_prefix(opt, isshort))
 			return error("invalid option: " + opt);
-		DBG(cout << "opt: " << opt << " isshort: " << PBOOL(isshort) << endl;)
+		DBG(cout << "opt: " << opt << " isshort: " << PBOOL(isshort)
+								<< endl;)
 		if (isshort) for (size_t o = 0; o != opt.size(); ++o) {
 			string n = cmd.long_for(opt[o]);
 			DBG(cout << "long_for " << opt[o] << ": " << n << endl;)
