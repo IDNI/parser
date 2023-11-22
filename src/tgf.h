@@ -207,9 +207,9 @@ private:
 				ps(nn, (p.back() + nn) | nul), p.back() = nn;
 			}
 			std::basic_string<C> get_new_name() {
-				std::stringstream ss("_R");
-				ss << p_head.to_std_string() << "_" << id++;
-				//cout << "new name: " << id << " " << to_std_string(ss.str()) << "\n";
+				std::stringstream ss;
+				ss << "_R" <<p_head.to_std_string()<< "_"<<id++;
+				//std::cout << "new name: " << id << " " << to_std_string(ss.str()) << "\n";
 				return from_str<C>(ss.str());
 			}
 #ifdef DEBUG

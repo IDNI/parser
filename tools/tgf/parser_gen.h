@@ -130,7 +130,7 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name,
 		return os.str();
 	};
 	const auto ps = gen_prods();
-	os <<	"// This file is generated from a file "<<tgf_filename<< "by \n"
+	os <<	"// This file is generated from a file "<<tgf_filename<<" by \n"
 		"//       https://github.com/IDNI/parser/tools/tgf\n"
 		"//\n"
 		"#ifndef __" <<guard<< "_H__\n"
