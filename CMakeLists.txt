@@ -45,7 +45,7 @@ message(STATUS "BUILD_TOOLS: ${BUILD_TOOLS}")
 
 # load common cmake settings and load functions
 # 		target_setup(), target_compile_definitions_if() and exclude()
-include(idni-common)
+include(parser-common)
 
 add_subdirectory(src)
 
