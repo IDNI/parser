@@ -1,7 +1,7 @@
 #include <sstream>
 #include <fstream>
 #include <utility>
-#include "../src/parser.h"
+#include "parser.h"
 
 #include "testing.h"
 

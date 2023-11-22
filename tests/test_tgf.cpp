@@ -1,4 +1,4 @@
-#include "../src/parser.h"
+#include "parser.h"
 using namespace std;
 using namespace idni;
 

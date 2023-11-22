@@ -30,29 +30,18 @@ if(USED_CMAKE_GENERATOR MATCHES "Ninja")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
 endif()
 
-set(DEBUG_OPTIONS "-O0;-DDEBUG;-ggdb3")
-set(RELEASE_OPTIONS "-O3;-DNDEBUG")
-set(COMPILE_OPTIONS
-	"$<IF:$<CONFIG:Debug>,${DEBUG_OPTIONS},${RELEASE_OPTIONS}>"
+set(PARSER_DEBUG_OPTIONS "-O0;-DDEBUG;-ggdb3")
+set(PARSER_RELEASE_OPTIONS "-O3;-DNDEBUG")
+set(PARSER_COMPILE_OPTIONS
+	"$<IF:$<CONFIG:Debug>,${PARSER_DEBUG_OPTIONS},${PARSER_RELEASE_OPTIONS}>"
 	"$<$<CONFIG:Release>:-flto=auto>"
 )
-set(LINK_OPTIONS "-flto=auto")
+set(PARSER_LINK_OPTIONS "-flto=auto")
 
 # target names
-set(OBJECT_LIB_NAME "${PROJECT_NAME}o")
-set(STATIC_LIB_NAME "${PROJECT_NAME}_static")
-set(SHARED_LIB_NAME "${PROJECT_NAME}")
-set(EXECUTABLE_NAME "${PROJECT_SHORT_NAME}")
-set(EXE_SHARED_NAME "${PROJECT_SHORT_NAME}_shared")
-
-
-# exclude target from all and default
-function(exclude target)
-	set_target_properties(${target} PROPERTIES
-		EXCLUDE_FROM_ALL 1
-		EXCLUDE_FROM_DEFAULT_BUILD 1)
-endfunction()
-
+set(PARSER_OBJECT_LIB_NAME "${PROJECT_NAME}o")
+set(PARSER_STATIC_LIB_NAME "${PROJECT_NAME}_static")
+set(PARSER_SHARED_LIB_NAME "${PROJECT_NAME}")
 
 # setups a target: sets COMPILE and LINK options, adds warnings, c++20 req...
 function(target_setup target)
@@ -72,61 +61,28 @@ function(target_setup target)
 	else()
 		target_compile_options(${target} PRIVATE /W4)
 	endif()
-	target_compile_options(${target} PRIVATE "${COMPILE_OPTIONS}")
+	target_compile_options(${target} PRIVATE "${PARSER_COMPILE_OPTIONS}")
 	target_link_libraries(${target} ${CMAKE_THREAD_LIBS_INIT})
-	target_link_options(${target} PRIVATE "${LINK_OPTIONS}")
-	target_include_directories(${target}
-		PRIVATE
-			${CMAKE_CURRENT_SOURCE_DIR}/src
-		PUBLIC
-			$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-			$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-	)
+	target_link_options(${target} PRIVATE "${PARSER_LINK_OPTIONS}")
 	set_target_properties(${target} PROPERTIES
 		ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 		LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 		RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
-		PUBLIC_HEADER            "${PROJECT_HEADERS}"
 	)
-	foreach(X IN LISTS PROJECT_DEFINITIONS)
+endfunction()
+
+# exclude target from all and default
+function(exclude target)
+	set_target_properties(${target} PROPERTIES
+		EXCLUDE_FROM_ALL 1
+		EXCLUDE_FROM_DEFAULT_BUILD 1)
+endfunction()
+
+# passes definitions if they exist
+function(target_compile_definitions_if target access project_definitions)
+	foreach(X IN LISTS project_definitions)
 		if(${X})
-			target_compile_definitions(${target} PRIVATE "-D${X}")
+			target_compile_definitions(${target} ${access} "-D${X}")
 		endif()
 	endforeach()
 endfunction()
-
-
-# object library
-################
-add_library(${OBJECT_LIB_NAME} OBJECT)
-target_sources(${OBJECT_LIB_NAME} PRIVATE ${PROJECT_SOURCES})
-target_setup(${OBJECT_LIB_NAME})
-target_compile_options(${OBJECT_LIB_NAME} PRIVATE -fPIC)
-if(EMSCRIPTEN_DIR)
-	target_compile_definitions(${OBJECT_LIB_NAME}
-		PRIVATE "-DEMSCRIPTEN_DIR=${EMSCRIPTEN_DIR}")
-endif()
-
-# shared library
-################
-add_library(${SHARED_LIB_NAME} SHARED)
-add_library(${namespace}::${PROJECT_SHORT_NAME} ALIAS ${SHARED_LIB_NAME})
-target_sources(${SHARED_LIB_NAME} PRIVATE ${PROJECT_SOURCES})
-target_setup(${SHARED_LIB_NAME})
-set_target_properties(${SHARED_LIB_NAME} PROPERTIES
-	EXPORT_NAME ${PROJECT_NAME}
-)
-if(NOT BUILD_SHARED_LIBRARY)
-	exclude(${SHARED_LIB_NAME})
-endif()
-
-
-# static library
-################
-add_library(${STATIC_LIB_NAME} STATIC)
-target_sources(${STATIC_LIB_NAME} PRIVATE ${PROJECT_SOURCES})
-target_setup(${STATIC_LIB_NAME})
-set_target_properties(${STATIC_LIB_NAME} PROPERTIES OUTPUT_NAME ${PROJECT_NAME})
-if(NOT BUILD_STATIC_LIBRARY)
-	exclude(${STATIC_LIB_NAME})
-endif()
