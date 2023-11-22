@@ -22,6 +22,6 @@ foreach(X IN LISTS EXAMPLES)
 	target_sources(${X} PRIVATE ${X}/main.cpp)
 	target_link_libraries(${X} ${PARSER_OBJECT_LIB_NAME})
 	target_include_directories(${X} PUBLIC
-		$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
 	)
 endforeach()

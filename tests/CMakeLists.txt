@@ -14,6 +14,6 @@ foreach(X IN LISTS TESTS)
 	target_compile_options(${N} PUBLIC "-Wno-parentheses")
 	target_link_libraries(${N} ${PARSER_OBJECT_LIB_NAME} ${TEST_FRAMEWORK})
 	target_include_directories(${N} PUBLIC
-		$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
 	)
 endforeach()
