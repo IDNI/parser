@@ -18,6 +18,11 @@
 #include <functional>
 #include <deque>
 #include "defs.h"
+
+#ifdef DEBUG
+#include <cassert>
+#endif
+
 namespace idni {
 
 template <typename NodeT>
