@@ -20,8 +20,7 @@ bool stress = false;
 
 // saves resulting forest and graphs into files with various formats
 template <typename T>
-int test_out(int c, const typename grammar<T>::grammar& g,
-	const basic_string<T>& inputstr,
+int test_out(int c, const grammar<T>& g, const basic_string<T>& inputstr,
 	typename parser<T>::pforest& f)
 {
 	stringstream ptd;
@@ -178,7 +177,7 @@ bool run_test_(grammar<T>& g, parser<T>& p, const basic_string<T>& input,
 		struct {
 			bool graphs = false, facts = false, rules = false;
 		} print;
-		auto cb_next_g = [&f, &p, &print, &ss](parser<T>::pgraph& g) {
+		auto cb_next_g = [&f, &print, &ss](parser<T>::pgraph& g) {
 			f->remove_binarization(g);
 			f->remove_recursive_nodes(g);
 			if (print.graphs) {
@@ -550,6 +549,7 @@ int main(int argc, char **argv)
 *       ENCODING
 *******************************************************************************/
 
+#ifndef WIN32
 	// char32_t parser with Unicode
 	TEST("encoding", "u32")
 	nonterminals<char32_t> nt32;
@@ -560,6 +560,7 @@ int main(int argc, char **argv)
 	run_test<char32_t>(ps32, nt32, start32,
 		U"τžluťoučkýτᚠᛇᚻ᛫ᛒᛦᚦ᛫ᚠᚱᚩᚠᚢᚱ᛫ᚠᛁᚱᚪ᛫ᚷᛖᚻᚹᛦᛚᚳᚢᛗτξεσκεπάζωτ", {}, o);
 	ps32.clear();
+#endif
 
 /*******************************************************************************
 *       BOOLEAN

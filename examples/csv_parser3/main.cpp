@@ -19,6 +19,13 @@
 
 #include "parser.h"
 
+#ifdef min
+#	undef min
+#endif
+#ifdef max
+#	undef max
+#endif
+
 using namespace std;
 using namespace idni;
 

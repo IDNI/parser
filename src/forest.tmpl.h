@@ -38,7 +38,7 @@ template<typename NodeT>
 template<typename TraversableT>
 bool forest<NodeT>::detect_cycle(TraversableT& gr) const {
 	std::map<NodeT, bool> inprog;
-	auto cb_enter = [&inprog, &gr](const auto& n) {
+	auto cb_enter = [&inprog](const auto& n) {
 		if (n.first.nt()) inprog[n] = true;
 	};
 	auto cb_revisit = [&inprog, &gr](const auto& n) {

@@ -37,6 +37,13 @@
 // include the generated header file instead of using the generic parser
 #include "csv_parser.generated.h"
 
+#ifdef min
+#	undef min
+#endif
+#ifdef max
+#	undef max
+#endif
+
 using namespace std;
 using namespace idni;
 

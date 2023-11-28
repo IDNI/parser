@@ -14,10 +14,16 @@
 // CSV parser tutorial - part 2
 //
 // In this part we show using a predefined character class function for digits.
-
 #include <limits>
 
 #include "parser.h"
+
+#ifdef min
+#	undef min
+#endif
+#ifdef max
+#	undef max
+#endif
 
 using namespace std;
 using namespace idni;
