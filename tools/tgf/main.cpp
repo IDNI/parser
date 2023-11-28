@@ -13,6 +13,7 @@
 #include <cassert>
 #include <string.h>
 #include <fstream>
+#include <algorithm>
 #include "parser_gen.h"
 
 #ifdef DEBUG
@@ -153,13 +154,13 @@ int error(string msg, bool print_help = false) {
 void init_commands() {
 	auto& cs = commands;
 	string lcmd = "", lopt = "";
-	auto CMD  = [&cs, &lcmd](const struct command& cmd) {
+	auto CMD  = [&](const struct command& cmd) {
 		lcmd = cmd.name(), cs[lcmd] = cmd; };
-	auto OPT  = [&cs, &lcmd, &lopt](const option& opt) {
+	auto OPT  = [&](const option& opt) {
 		lopt = opt.name(), cs[lcmd].add_option(opt); };
-	auto DESC = [&cs, &lcmd, &lopt](const string& d) {
+	auto DESC = [&](const string& d) {
 		cs[lcmd].opts_[lopt].desc(d); };
-	auto LAST = [&cs, &lcmd, &lopt]() {
+	auto LAST = [&]() {
 		return cs[lcmd].opts_[lopt]; };
 
 	// ---------------------------------------------------------------------
@@ -315,18 +316,26 @@ int process_args(int argc_int, char** argv, command& cmdref, string& tgf_file) {
 		if (isshort) for (size_t o = 0; o != opt.size(); ++o) {
 			string n = cmd.long_for(opt[o]);
 			DBG(cout << "long_for " << opt[o] << ": " << n << endl;)
-			if (n.size() == 0 || !cmd.has(n)) return
-				error("invalid option: -" + opt[o]);
+			if (n.size() == 0 || !cmd.has(n)) {
+				stringstream ss;
+				ss << "invalid option: -" << opt[o];
+				return error(ss.str());
+			}
 			cur = &cmd[n];
 			DBG(cout << "cur->name() " << cur->name() << endl;);
 			if (cur->is_bool()) cur->set_value(true);
-			else if (opt.size() > o + 1)
-				return error("missing argument for option: -" +
-							string{ opt[o] });
+			else if (opt.size() > o + 1) {
+				stringstream ss;
+				ss << "missing argument for option: -"<< opt[o];
+				return error(ss.str());
+			}
 		}
 		else { // long
-			if (!cmd.has(opt))
-				return error("invalid option: " + opt);
+			if (!cmd.has(opt)) {
+				stringstream ss;
+				ss << "invalid option: " << opt;
+				return error(ss.str());
+			}
 			cur = &cmd[opt];
 			if (cur->is_bool()) cur->set_value(true);
 		}
@@ -490,11 +499,7 @@ int main(int argc, char** argv) {
 			if (infile == "-") // stdin
 				f = p.parse(cin);
 			else { // file
-				int fd;
-				if ((fd = ::open(infile.c_str(), O_RDONLY))==-1)
-					return error("failed to open file " +
-						infile + "':" +strerror(errno));
-				f = p.parse(fd);
+				f = p.parse(infile, MMAP_READ);
 			}
 		else // string
 			f = p.parse(inexp.c_str(), inexp.size());
@@ -508,7 +513,7 @@ int main(int argc, char** argv) {
 				: cmd.get<bool>("detailed-error")
 					? lvl::INFO_DETAILED
 					: lvl::INFO_BASIC));
-		parsed(move(f), cmd);
+		parsed(std::move(f), cmd);
 	}
 	return 0;
 }

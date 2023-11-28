@@ -29,6 +29,10 @@ set(USED_CMAKE_GENERATOR
 if(USED_CMAKE_GENERATOR MATCHES "Ninja")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
 endif()
+if(MSVC)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --target=x86_64-w64-mingw32")
+endif()
+
 
 set(PARSER_DEBUG_OPTIONS "-O0;-DDEBUG;-ggdb3")
 set(PARSER_RELEASE_OPTIONS "-O3;-DNDEBUG")

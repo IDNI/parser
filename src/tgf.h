@@ -95,15 +95,15 @@ struct tgf {
 		const std::basic_string<C>& start_nt = from_cstr<C>("start"))
 	{
 		tgf<C, T> f;
-		int fd;
-		//std::cout << "parsing file: " << filename << std::endl;
-		if ((fd = ::open(filename.c_str(), O_RDONLY)) == -1)
-			return std::cerr << "Failed to open file '" << filename
-					<< "':" << strerror(errno) << std::endl,
-				grammar<C, T>(nts_);
+		// int fd;
+		// //std::cout << "parsing file: " << filename << std::endl;
+		// if ((fd = ::open(filename.c_str(), O_RDONLY)) == -1)
+		// 	return std::cerr << "Failed to open file '" << filename
+		// 			<< "':" << strerror(errno) << std::endl,
+		// 		grammar<C, T>(nts_);
 		//std::cout << "fd: " << fd << " l: " << l << std::endl;
 		//DBG(f.g.print_data(std::cout << "\n>>>\n\n") << "\n<<<" << std::endl;)
-		return f.transform(f.p.parse(fd), nts_, start_nt);
+		return f.transform(f.p.parse(filename, MMAP_READ), nts_, start_nt);
 	}
 private:
 	grammar<C, T> transform(
@@ -290,7 +290,7 @@ private:
 				size_t i = 0;
 				std::cerr << "ambiguity. number of trees: " <<
 								c << std::endl;
-				auto cb_next_graph = [&i, &f](
+				auto cb_next_graph = [&i](
 					typename parser<C, T>::pgraph& g)
 				{
 					std::stringstream ptd;

@@ -74,7 +74,7 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name,
 		os << "\n";
 		return os.str();
 	};
-	auto gen_nts = [&gi, &U]() {
+	auto gen_nts = [&gi]() {
 		std::stringstream os;
 		auto& x = gi.nts();
 		for (size_t n = 0; n != x.size(); ++n)
@@ -83,7 +83,7 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name,
 		os << "\n";
 		return os.str();
 	};
-	auto gen_cc_fns = [&gi, &U]() {
+	auto gen_cc_fns = [&gi]() {
 		std::stringstream os;
 		auto& x = gi.nts();
 		for (const auto& fn : gi.cc_fns().fns)
@@ -91,7 +91,7 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name,
 				<< to_std_string(x[fn.first]) << "\",\n";
 		return os.str();
 	};
-	auto gen_opts = [&tn, &decoder, &encoder, &terminal_type]() {
+	auto gen_opts = [&decoder, &encoder]() {
 		std::stringstream os;
 		if (decoder.size()) os << "\t\to.chars_to_terminals = "
 			<< decoder << ";\n";

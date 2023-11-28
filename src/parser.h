@@ -12,16 +12,16 @@
 // modified over time by the Author.
 #ifndef __IDNI__PARSER__PARSER_H__
 #define __IDNI__PARSER__PARSER_H__
+#include <array>
 #include <variant>
 #include <unordered_set>
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <unistd.h>
+#include <istream>
 #include <span>
 #include <cassert>
-#include <sys/mman.h>
-#include <sstream>
+#include "memory_map.h"
 #include "defs.h"
 #include "characters.h"
 #include "charclasses.h"
@@ -212,9 +212,14 @@ public:
 		input(std::basic_istream<C>& is, size_t max_length = 0,
 			decoder_type decoder = 0,
 			int_type e = std::char_traits<C>::eof());
+		input(const std::string& filename, mmap_mode m, size_t max_length = 0,
+			decoder_type decoder = 0,
+			int_type e = std::char_traits<C>::eof());
+#ifndef _WIN32
 		input(int filedescriptor, size_t max_length = 0,
 			decoder_type decoder = 0,
 			int_type e = std::char_traits<C>::eof());
+#endif
 		~input();
 		inline bool isstream() const;
 		void clear(); // resets stream (if used) to reenable at()/tat()
@@ -236,11 +241,12 @@ public:
 		enum type { POINTER, STREAM, MMAP } itype = POINTER;//input type
 		int_type e = std::char_traits<C>::eof(); // end of a stream
 		decoder_type decoder = 0;
+		memory_map mm{};
 		size_t n = 0;         // input position
 		size_t l = 0;         // size of input data (0 for streams)
 		size_t max_l = 0;     // read up to max length of the input size
 		const C* d = 0;       // input data pointer if needed
-		std::basic_istream<C> s{};
+		std::basic_istream<C> s;
 		std::vector<T> ts{};  // all collected terminals
 		size_t tp = 0;        // current terminal pos
 	};
@@ -255,10 +261,14 @@ public:
 	std::unique_ptr<pforest> parse(const C* data, size_t size = 0,
 		size_t max_length = 0,
 		int_type eof = std::char_traits<C>::eof());
-	std::unique_ptr<pforest> parse(int filedescriptor, size_t max_length=0,
-		int_type eof = std::char_traits<C>::eof());
 	std::unique_ptr<pforest> parse(std::basic_istream<C>& is,
 		size_t max_length=0, int_type eof = std::char_traits<C>::eof());
+	std::unique_ptr<pforest> parse(const std::string& fn, mmap_mode m,
+		size_t max_length=0, int_type eof = std::char_traits<C>::eof());
+#ifndef _WIN32
+	std::unique_ptr<pforest> parse(int filedescriptor, size_t max_length=0,
+		int_type eof = std::char_traits<C>::eof());
+#endif
 	bool found();
 	std::basic_string<C> get_input();
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)

@@ -589,7 +589,7 @@ template <typename C, typename T>
 std::ostream& grammar<C, T>::print_production(std::ostream& os,
 	const production& p) const
 {
-	os << p.first.to_std_string(from_cstr<C>("ε")) << " =>";
+	os << p.first.to_std_string(from_cstr<C>("null")) << " =>";
 	size_t j = 0;
 	for (const auto& c : p.second) {
 		if (j++ != 0) os << " &";
@@ -597,7 +597,7 @@ std::ostream& grammar<C, T>::print_production(std::ostream& os,
 		for (const auto& l : c) os << " " <<
 			(!l.nt() && !l.is_null()
 				? l.to_std_string()
-				: l.to_std_string(from_cstr<C>("ε")));
+				: l.to_std_string(from_cstr<C>("null")));
 		if (c.neg) os << " )";
 	}
 	return os << ".";

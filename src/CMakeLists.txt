@@ -27,7 +27,9 @@ set(PARSER_DEFINITIONS
 add_library(${PARSER_OBJECT_LIB_NAME} OBJECT)
 target_sources(${PARSER_OBJECT_LIB_NAME} PRIVATE ${PARSER_SOURCES})
 target_setup(${PARSER_OBJECT_LIB_NAME})
-target_compile_options(${PARSER_OBJECT_LIB_NAME} PRIVATE -fPIC)
+if(NOT WIN32)
+ 	target_compile_options(${PARSER_OBJECT_LIB_NAME} PRIVATE -fPIC)
+endif()
 target_compile_definitions_if(${PARSER_OBJECT_LIB_NAME} PRIVATE "${PARSER_DEFINITIONS}")
 target_include_directories(${PARSER_OBJECT_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
@@ -40,21 +42,20 @@ endif()
 
 # shared library
 ################
-add_library(${PARSER_SHARED_LIB_NAME} SHARED)
-add_library(${namespace}::${PROJECT_SHORT_NAME} ALIAS ${PARSER_SHARED_LIB_NAME})
-target_sources(${PARSER_SHARED_LIB_NAME} PRIVATE ${PARSER_SOURCES})
-target_setup(${PARSER_SHARED_LIB_NAME})
-target_compile_definitions_if(${PARSER_SHARED_LIB_NAME} PRIVATE "${PARSER_DEFINITIONS}")
-target_include_directories(${PARSER_SHARED_LIB_NAME} PUBLIC
-	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
-	$<INSTALL_INTERFACE:.>
-)
-set_target_properties(${PARSER_SHARED_LIB_NAME} PROPERTIES
-	EXPORT_NAME ${PROJECT_NAME}
-	PUBLIC_HEADER "${PARSER_HEADERS}"
-)
-if(NOT BUILD_SHARED_LIBRARY)
-	exclude(${PARSER_SHARED_LIB_NAME})
+if(BUILD_SHARED_LIBRARY)
+	add_library(${PARSER_SHARED_LIB_NAME} SHARED)
+	add_library(${namespace}::${PROJECT_SHORT_NAME} ALIAS ${PARSER_SHARED_LIB_NAME})
+	target_sources(${PARSER_SHARED_LIB_NAME} PRIVATE ${PARSER_SOURCES})
+	target_setup(${PARSER_SHARED_LIB_NAME})
+	target_compile_definitions_if(${PARSER_SHARED_LIB_NAME} PRIVATE "${PARSER_DEFINITIONS}")
+	target_include_directories(${PARSER_SHARED_LIB_NAME} PUBLIC
+		$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+		$<INSTALL_INTERFACE:.>
+	)
+	set_target_properties(${PARSER_SHARED_LIB_NAME} PROPERTIES
+		EXPORT_NAME ${PROJECT_NAME}
+		PUBLIC_HEADER "${PARSER_HEADERS}"
+	)
 endif()
 
 # static library

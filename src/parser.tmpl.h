@@ -36,13 +36,22 @@ bool parser<C, T>::item::operator==(const item& i) const {
 template <typename C, typename T>
 parser<C, T>::input::input(const C* data, size_t l, size_t max_l,
 	decoder_type decoder, int_type eof) :
-		itype(POINTER), e(eof), decoder(decoder),
-		l(l), max_l(max_l > l ? l : max_l), d(data), s({}) {}
+		itype(POINTER), e(eof), decoder(decoder), mm(),
+		l(l), max_l(max_l > l ? l : max_l), d(data), s(nullptr) {}
 template <typename C, typename T>
 parser<C, T>::input::input(std::basic_istream<C>& is, size_t max_l,
 	decoder_type decoder, int_type eof) : itype(STREAM), e(eof),
-	decoder(decoder), l(0), max_l(max_l), d(0), s({})
+	decoder(decoder), mm(), l(0), max_l(max_l), d(0), s(nullptr)
 	{ s.rdbuf(is.rdbuf()); }
+template <typename C, typename T>
+parser<C, T>::input::input(const std::string& filename, mmap_mode m,
+	size_t max_l, decoder_type decoder, int_type eof) : itype(MMAP),
+	e(eof), decoder(decoder), mm(filename, 0, m), l(mm.size()),
+	max_l(max_l), d(reinterpret_cast<const C*>(mm.data())), s(nullptr)
+{
+	if (mm.error) std::cerr << mm.error_message << std::endl;
+}
+#ifndef _WIN32
 template <typename C, typename T>
 parser<C, T>::input::input(int fd, size_t max_l, decoder_type decoder,
 	int_type eof) : itype(MMAP), e(eof), decoder(decoder),
@@ -57,9 +66,11 @@ parser<C, T>::input::input(int fd, size_t max_l, decoder_type decoder,
 		close(fd);
 	}
 }
+#endif
+
 template <typename C, typename T>
 parser<C, T>::input::~input() {
-	if (itype == MMAP && d != 0) munmap(const_cast<C*>(d), l);
+	//if (itype == MMAP && d != 0) munmap(const_cast<C*>(d), l);
 }
 template <typename C, typename T>
 bool parser<C, T>::input::isstream() const { return itype == STREAM; }
@@ -218,7 +229,7 @@ void parser<C, T>::resolve_conjunctions(container_t& c, container_t& t) {
 				if (x.con == con) { found = true; break; }
 				if (!neg) continue;
 				const auto& cont = S[x.set];
-				auto dbg =[&found](const std::string& /*DBG(msg)*/){
+				auto dbg =[](const std::string& /*DBG(msg)*/){
 					//DBG(std::cout << msg << "\n";)
 					return false;
 				};
@@ -235,8 +246,9 @@ void parser<C, T>::resolve_conjunctions(container_t& c, container_t& t) {
 			if (U.size() < S.size()) U.resize(S.size());
 			U[x.set].insert(x);
 			S[x.set].erase(x);
-			remove_if(fromS[x.from].begin(), fromS[x.from].end(),
-				[&x](size_t n) { return x.set == n; });
+			fromS[x.from].erase(remove_if(fromS[x.from].begin(),
+				fromS[x.from].end(),
+				[&x](size_t n) { return x.set == n; }));
 			c.erase(x);
 		}
 	}
@@ -383,18 +395,27 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
 }
 template <typename C, typename T>
 std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
-	int fd, size_t max_length, int_type eof)
-{
-	in = std::make_unique<input>(fd, max_length, o.chars_to_terminals, eof);
-	return _parse();
-}
-template <typename C, typename T>
-std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
 	std::basic_istream<C>& is, size_t max_length, int_type eof)
 {
 	in = std::make_unique<input>(is, max_length, o.chars_to_terminals, eof);
 	return _parse();
 }
+template <typename C, typename T>
+std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
+	const std::string& fn, mmap_mode m, size_t max_length, int_type eof)
+{
+	in = std::make_unique<input>(fn, m, max_length, o.chars_to_terminals, eof);
+	return _parse();
+}
+#ifndef _WIN32
+template <typename C, typename T>
+std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
+	int fd, size_t max_length, int_type eof)
+{
+	in = std::make_unique<input>(fd, max_length, o.chars_to_terminals, eof);
+	return _parse();
+}
+#endif
 template <typename C, typename T>
 std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 	MS(emeasure_time_start(tsr, ter);)
@@ -406,7 +427,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 	auto f = std::make_unique<pforest>();
 	S.clear(), U.clear(), fromS.clear(), bin_tnt.clear(), refi.clear(),
 		gcready.clear(), memo.clear(), rmemo.clear();
-	int gcnt = 0; // count of collected items
+	MS(int gcnt = 0;) // count of collected items
 	tid = 0;
 	S.resize(1);
 	container_t t, c;
@@ -505,7 +526,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 						// main container
 						S[rm.set].erase(rm);
 						refi.erase(rm);
-						gcnt++;
+						MS(gcnt++;)
 					}
 					else {
 						//DBG(assert(refi[rm] == 0));
@@ -1001,7 +1022,7 @@ std::basic_ostream<T>& terminals_to_stream(std::basic_ostream<T>& os,
 	auto cb_enter = [&os](const auto& n) {
 		if (!n.first.nt() && !n.first.is_null()) os << n.first.t();
 	};
-	auto ambig = [&os](const auto&, const auto& ns) {
+	auto ambig = [](const auto&, const auto& ns) {
 		return decltype(ns){ *ns.begin() };
 	};
 	f.traverse(root, cb_enter, f.no_exit, f.do_revisit, ambig);
