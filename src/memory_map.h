@@ -17,6 +17,8 @@
 #include <exception>
 #include <sstream>
 #include <iostream>
+#include <memory>
+#include <filesystem>
 #ifdef _WIN32
 #include <windows.h>
 #else
@@ -27,7 +29,7 @@
 #endif
 
 #ifdef _WIN32
-inline std::string temp_filename() {
+static inline std::string temp_filename() {
 	TCHAR name[MAX_PATH], path[MAX_PATH];
 	DWORD r = GetTempPath(MAX_PATH, path);
 	if (r > MAX_PATH || !r ||
@@ -35,11 +37,11 @@ inline std::string temp_filename() {
 	return std::string(name);
 }
 #else
-inline int temp_fileno() { return fileno(tmpfile()); }
-string filename(int fd) {
-        return filesystem::read_symlink(
-                        filesystem::path("/proc/self/fd") /
-                                to_string(fd));
+static inline int temp_fileno() { return fileno(tmpfile()); }
+static inline std::string filename(int fd) {
+        return std::filesystem::read_symlink(
+                        std::filesystem::path("/proc/self/fd") /
+                                std::to_string(fd));
 }
 #endif
 
@@ -261,7 +263,7 @@ public:
 		if (!p || !n) return;
 		mm->close();
 	}
-	bool operator==(const memory_map_allocator& t) const {                
+	bool operator==(const memory_map_allocator& t) const {
 		return fn == t.fn && m == t.m && mm == t.mm && nommap==t.nommap;
 	}
 	bool operator!=(const memory_map_allocator& t) const {
