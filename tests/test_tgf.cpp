@@ -124,5 +124,21 @@ int main() {
 	"	start  => 'a' 'b'+ 'c'. \n"
 	, "abbbc")) fail();
 
+	if (!run_test(
+	"	start  => '1' [ '0' ] '1'. \n"
+	, "11")) fail();
+
+	// test tabs in comments
+	if (!run_test(
+	"	#	comment	with	tabs	\n"
+	"	start  => '1'. \n"
+	, "1")) fail();
+
+	// test parsing of a TGF having a comment but no statements
+	nonterminals<char> nts;
+	tgf<char>::from_string(nts, "	# TGF only with ws and ws_comment \n");
+
+	cout << "test_tgf finished" << endl;
+
 	return failed ? 1 : 0;
 }

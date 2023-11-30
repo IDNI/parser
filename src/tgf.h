@@ -52,8 +52,9 @@ struct tgf {
 		optional(nt("optional")),
 		plus(nt("plus")),
 		printable(nt("printable")),
-		printable_chars(nt("printable_chars")),
-		printable_chars1(nt("printable_chars1")),
+		ws_char(nt("ws_char")),
+		ws_chars(nt("ws_chars")),
+		ws_chars1(nt("ws_chars1")),
 		production_(nt("production")),
 		production_sep(nt("production_sep")),
 		quoted_char(nt("quoted_char")),
@@ -354,8 +355,8 @@ private:
 		directive, directive_param,
 		directive_params, disjunction, eof, eol, expr1, expr2, expr3,
 		group, literal, literals, literals1, multi, nonliteral,
-		nonterminal, negation, optional, plus, printable,
-		printable_chars, printable_chars1, production_, production_sep,
+		nonterminal, negation, optional, plus, printable, ws_char,
+		ws_chars, ws_chars1, production_, production_sep,
 		quoted_char, quoted_char_esc, repeat, space, start,
 		statement, statements, statements1,
 		string_,
@@ -374,7 +375,7 @@ private:
 			lparen{'('}, lbracket{'['}, lbrace('{'), tilde{'~'},
 			hash{'#'}, cr{'\r'}, nl{'\n'}, quotes{'"'}, at{'@'},
 			apostrophe{'\''};
-		q(start,            (ws + statements + ws) | nul);
+		q(start,            (ws + statements + ws) | ws);
 		q(statements,       statement + statements1);
 		q(statements1,      (ws + statement + statements1) | nul);
 		q(statement,        directive | production_);
@@ -412,10 +413,10 @@ private:
 		q(chars,            (alpha + chars1) | (underscore + chars1));
 		q(chars1,           (alnum + chars1) | (underscore + chars1) |
 					nul);
-		q(printable_chars,  printable + printable_chars1);
-		q(printable_chars1, (printable + printable_chars1) | nul);
-		q(ws_comment,       (hash + eol) |
-					(hash + printable_chars + eol));
+		q(ws_char,          printable | '\t');
+		q(ws_chars,         ws_char + ws_chars1);
+		q(ws_chars1,        (ws_char + ws_chars1) | nul);
+		q(ws_comment,       (hash + eol) | (hash + ws_chars + eol));
 		q(ws_required,      (space + ws) | (ws_comment + ws));
 		q(ws,               ws_required | nul);
 		q(eol,              cr | nl | eof);
