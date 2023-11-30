@@ -157,36 +157,25 @@ void init_commands() {
 	auto CMD  = [&](const struct command& cmd) {
 		lcmd = cmd.name(), cs[lcmd] = cmd; };
 	auto OPT  = [&](const option& opt) {
-		lopt = opt.name(), cs[lcmd].add_option(opt); };
+		lopt = opt.name(), cs[lcmd].add_option(opt);
+		return cs[lcmd].opts_[lopt]; };
 	auto DESC = [&](const string& d) {
 		cs[lcmd].opts_[lopt].desc(d); };
-	auto LAST = [&]() {
-		return cs[lcmd].opts_[lopt]; };
 
 	// ---------------------------------------------------------------------
 
 	CMD(command("show",  "show information about grammar / parser"));
 
-	OPT(option("help",  'h',
-		false)),
+	auto help = OPT(option("help",  'h', false));
 		DESC("detailed information about options");
-	option help(LAST());
-	OPT(option("start", 's',
-		"start")),
+	auto start = OPT(option("start", 's', "start"));
 		DESC("starting literal");
-	option start(LAST());
-	OPT(option("grammar", 'g',
-		true)),
+	auto print_grammar = OPT(option("grammar", 'g', true));
 		DESC("prints grammar");
-	option print_grammar(LAST());
-	OPT(option("char-type", 'C',
-		"char")),
+	auto char_type = OPT(option("char-type", 'C', "char"));
 		DESC("type of input character");
-	option char_type(LAST());
-	OPT(option("terminal-type", 'T',
-		"char")),
+	auto terminal_type = OPT(option("terminal-type", 'T', "char"));
 		DESC("type of terminal character");
-	option terminal_type(LAST());
 
 	// ---------------------------------------------------------------------
 

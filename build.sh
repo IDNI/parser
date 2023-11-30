@@ -30,7 +30,7 @@ if [ -z $NINJA_BIN ]; then
 else
   echo "Using Ninja build system"
   cmake .. -G Ninja -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" ${@:2} \
-  	&& ninja
+  	&& ninja -j 5
 	STATUS=$?
 fi
 

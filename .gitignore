@@ -9,3 +9,4 @@ tree*.dot
 forest_facts*.tml
 graph_grammar_rules*.tml
 forest_grammar_rules*.tml
+.local

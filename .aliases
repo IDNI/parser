@@ -8,7 +8,7 @@ export EXAMPLES="-DBUILD_EXAMPLES=1"
 alias gdb-test="debug $TESTS && gdb --args ./build-Debug/test_parser"
 alias debug-test="debug $TESTS && ./build-Debug/test_parser"
 alias release-test="release $TESTS && ./build-Release/test_parser"
-alias test="./build-Release/test_parser"
+alias test_parser="./build-Release/test_parser"
 
 alias gdb-tgf="debug $TOOLS && gdb --args ./build-Debug/tgf"
 alias debug-tgf="debug $TOOLS && ./build-Debug/tgf"
