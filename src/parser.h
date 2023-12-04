@@ -257,7 +257,7 @@ public:
 	typedef pforest::graph pgraph;
 	typedef pforest::tree ptree;
 	typedef pforest::sptree psptree;
-	parser(grammar<C, T>& g, const options& o = {});
+	parser(grammar<C, T>& g, options o = {});
 	std::unique_ptr<pforest> parse(const C* data, size_t size = 0,
 		size_t max_length = 0,
 		int_type eof = std::char_traits<C>::eof());

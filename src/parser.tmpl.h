@@ -135,7 +135,7 @@ void parser<C, T>::input::decode() {
 }
 //------------------------------------------------------------------------------
 template <typename C, typename T>
-parser<C, T>::parser(grammar<C, T>& g, const options& o) : g(g), o(o) {}
+parser<C, T>::parser(grammar<C, T>& g, options o) : g(g), o(o) {}
 template <typename C, typename T>
 lit<C, T> parser<C, T>::get_lit(const item& i) const {
 	return g[i.prod][i.con][i.dot];
