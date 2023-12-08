@@ -103,12 +103,14 @@ template <typename C, typename T>
 std::string lit<C, T>::to_std_string(const std::basic_string<C>& nll) const {
 	return idni::to_std_string(to_string(nll));
 }
+
 template <typename C, typename T>
-bool lit<C, T>::operator<(const lit<C, T>& l) const {
-	if (nt() != l.nt()) return nt() < l.nt();
-	if (nt()) return n() == l.n() ? nts < l.nts : n() < l.n();
-	return t() < l.t();
+auto lit<C, T>::operator<=>(const lit<C, T>& l) const {
+	if (nt() != l.nt()) return nt() <=> l.nt();
+	if (nt()) return n() == l.n() ? nts <=> l.nts : n() <=> l.n();
+	return t() <=> l.t();
 }
+
 template <typename C, typename T>
 bool lit<C, T>::operator==(const lit<C, T>& l) const {
 	if (nt() != l.nt()) return false;

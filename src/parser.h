@@ -61,8 +61,12 @@ struct lit : public std::variant<size_t, T> {
 	size_t n() const;
 	T      t() const;
 	bool is_null() const;
-	bool operator<(const lit<C, T>& l) const;
+
+	// IDEA maybe we could use directly the default operator<=> for lit
+	auto operator<=>(const lit<C, T>& l) const;
+	// IDEA maybe we could use directly the default operator== for lit
 	bool operator==(const lit<C, T>& l) const;
+
 	//std::ostream& operator<<(std::ostream& os)
 	std::basic_string<C> to_string(const std::basic_string<C>& nll = {})
 		const;
@@ -291,14 +295,14 @@ private:
 	options o;
 	std::unique_ptr<input> in = 0;
 	std::vector<container_t> S;
-	
+
 	// refcounter for the earley item
 	// default value is 0, which means it can be garbaged
 	// non-zero implies, its not to be collected
 	std::unordered_map<item, int_t, hasher_t> refi;
 	// items ready for collection
 	std::unordered_set<item, hasher_t> gcready;
-	// store the current container items before 
+	// store the current container items before
 	// these are garbage collected in order for them to be
 	// found() to find the right start's completed item
 	// to indicate successful parsing.
@@ -308,9 +312,9 @@ private:
 		hasher_t> sorted_citem, rsorted_citem;
 	// binarized temporary intermediate non-terminals
 	std::map<std::vector<lit<C, T>>, lit<C, T>> bin_tnt;
-	static std::basic_string<C> tnt_prefix() { 
+	static std::basic_string<C> tnt_prefix() {
 		static std::basic_string<C> pr = {'_','_', 't', 'e', 'm', 'p' };
-		return pr; } 
+		return pr; }
 	size_t tid; // id for temporary non-terminals
 	std::basic_string<C> get_fresh_tnt() {
 		std::basic_stringstream<C> ss;
