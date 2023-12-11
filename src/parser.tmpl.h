@@ -172,6 +172,8 @@ void parser<C, T>::complete(const item& i, container_t& t) {
 		}
 	//gcready.insert(i);
 }
+
+/*
 template <typename C, typename T>
 std::vector<typename parser<C, T>::item> 
 parser<C, T>::sorted_citem(std::pair<size_t, size_t> ntpos) {
@@ -203,6 +205,8 @@ std::vector<typename parser<C, T>::item>
 parser<C, T>::rsorted_citem(std::pair<size_t, size_t> ntpos) {
 	std::vector<item> items;
 
+	MS(std::cout<<rmemo.size()<< " " << memo.size(););
+
 	if (rmemo.find(ntpos) != rmemo.end()) return rmemo[ntpos];
 	for (auto& i : S[ntpos.second])
 		if (completed(i)) {
@@ -224,6 +228,7 @@ parser<C, T>::rsorted_citem(std::pair<size_t, size_t> ntpos) {
 		}
 	return rmemo.insert({ntpos, items}), items;
 }
+*/
 
 template <typename C, typename T>
 void parser<C, T>::resolve_conjunctions(container_t& t)	const {
@@ -362,9 +367,9 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 	MS(emeasure_time_start(tsr, ter);)
 	//DBG(std::cout << "parse: `"<<to_std_string(s)<<"`["<<len<<"] g.start:"<<g.start<<"("<<g.start.nt()<<")"<<"\n";)
 	auto f = std::make_unique<pforest>();
-	//sorted_citem.clear(), rsorted_citem.clear();
+	sorted_citem.clear(), rsorted_citem.clear();
 	S.clear(), bin_tnt.clear(), refi.clear(), gcready.clear();
-	memo.clear(), rmemo.clear();
+	//memo.clear(), rmemo.clear(), fromS.clear();
 	int gcnt = 0; // count of collected items
 	tid = 0;
 	S.resize(1);
@@ -417,30 +422,31 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 #endif
 		if (o.incr_gen_forest) {
 			const auto& cont = S[n];
-			// for (auto it = cont.begin(); it != cont.end(); ++it)
-			//	pre_process(*it);
+			for (auto it = cont.begin(); it != cont.end(); ++it)
+				pre_process(*it);
 			for (auto it = cont.begin(); it != cont.end(); ++it)
 				if (completed(*it)) {
 					pnode curroot(get_nt(*it),
 						{ it->from, it->set });
 					build_forest(*f, curroot);
 				}
-			if (gcready.size())
-				for (auto& rm : gcready) {
-					if (refi[rm] == 0 &&
-						(rm.set + o.gc_lag) <= n)
-					{
-						// since the refi is zero, remove it from the
-						// main container
-						S[rm.set].erase(rm);
-						refi.erase(rm);
-						gcnt++;
-					}
-					else {
-						//DBG(assert(refi[rm] == 0));
-					}
-				//gcready.clear();
+		}
+		if (o.enable_gc ) {
+			for (auto& rm : gcready) {
+				if (refi[rm] == 0 &&
+					(rm.set + o.gc_lag) <= n)
+				{
+					// since the refi is zero, remove it from the
+					// main container
+					S[rm.set].erase(rm);
+					refi.erase(rm);
+					gcnt++;
 				}
+				else {
+					//DBG(assert(refi[rm] == 0));
+				}
+			//gcready.clear();
+			}
 		}
 	} while (in->tnext());
 	MS(emeasure_time_end(tsr, ter) <<" :: parse time\n";)
@@ -637,10 +643,9 @@ typename parser<C, T>::perror_t parser<C, T>::get_error() {
 template <typename C, typename T>
 void parser<C, T>::pre_process(const item& i) {
 	//sorted_citem[G[i.prod][0].n()][i.from].emplace_back(i);
-	return;
-	/*if (completed(i))
-		// sorted_citem[{ g(i.prod).n(), i.from }].emplace_back(i);
-		//rsorted_citem[{ g(i.prod).n(), i.set }].emplace_back(i);
+	if (completed(i))
+		sorted_citem[{ g(i.prod).n(), i.from }].emplace_back(&i),
+		rsorted_citem[{ g(i.prod).n(), i.set }].emplace_back(&i);
 	else if (o.binarize) {
 		// Precreating temporaries to help in binarisation later
 		// each temporary represents a partial rhs production with
@@ -656,17 +661,17 @@ void parser<C, T>::pre_process(const item& i) {
 			else l = bin_tnt[v];
 			//DBG(print(std::cout, i);)
 			//cout<< "\n" << d->get(tlit.n()) << v << std::endl;
-			//sorted_citem[{ l.n(), i.from }].emplace_back(i);
-			//rsorted_citem[{ l.n(), i.set }].emplace_back(i);
+			sorted_citem[{ l.n(), i.from }].emplace_back(&i);
+			rsorted_citem[{ l.n(), i.set }].emplace_back(&i);
 		}
-	}*/
+	}
 }
 template <typename C, typename T>
 bool parser<C, T>::init_forest(pforest& f) {
 	bool ret = false;
 	bin_tnt.clear();
-	//sorted_citem.clear();
-	//rsorted_citem.clear();
+	sorted_citem.clear();
+	rsorted_citem.clear();
 	tid = 0;
 	// set the start root node
 	pnode root(g.start_literal(), { 0, in->tpos() });
@@ -677,14 +682,15 @@ bool parser<C, T>::init_forest(pforest& f) {
 	for (size_t n = 0; n < in->tpos() + 1; n++)
 		for (const item& i : S[n]) count++, pre_process(i);
 	MS(emeasure_time_end(tspfo, tepfo) << " :: preprocess time, " <<
-						"size : "<< count << "\n";)
+						"size : "<< count << " " << sorted_citem.size() << " " <<
+						rsorted_citem.size() << "\n";)
 	
 	// build forest
 	MS(emeasure_time_start(tsf, tef);)
 	ret = build_forest(f, root);
 	MS(emeasure_time_end(tsf, tef) <<" :: forest time\n";)
-	MS(std::cout << "memo sizes : " << memo.size() << " " <<
-						rmemo.size() << " \n";)
+	//MS(std::cout << "memo sizes : " << memo.size() << " " <<
+	//					rmemo.size() << " \n";)
 	return ret;
 }
 // collects all possible variations of the given item's rhs while respecting the
@@ -723,8 +729,9 @@ void parser<C, T>::sbl_chd_forest(const item& eitem,
 		nxtl.second[0] = xfrom;
 
 		//auto& nxtl_froms = sorted_citem[nxtl.n()][xfrom];
-		auto nxtl_froms = sorted_citem({ nxtl.first.n(), xfrom });
-		for (auto& v : nxtl_froms) {
+		auto& nxtl_froms = sorted_citem[{ nxtl.first.n(), xfrom }];
+		for (auto &vp : nxtl_froms) {
+			auto &v = *vp;
 			// ignore beyond the span
 			if (v.set > eitem.set) continue;
 			// store current and recursively build for next nt
@@ -752,12 +759,14 @@ bool parser<C, T>::binarize_comb(const item& eitem,
 		else return false;
 		rcomb.emplace_back(right);
 	} else {
-		auto rightit = rsorted_citem({ right.first.n(), eitem.set });
-		for (auto& it : rightit)
+		auto &rightit = rsorted_citem[{ right.first.n(), eitem.set }];
+		for (auto& itp : rightit){
+			auto &it = *itp; 
 			if (eitem.from <= it.from)
 				right.second[1] = it.set,
 				right.second[0] = it.from,
 				rcomb.emplace_back(right);
+		}
 	}
 	// many literals in rhs
 	if (eitem.dot > 2) {
@@ -768,12 +777,15 @@ bool parser<C, T>::binarize_comb(const item& eitem,
 		//DBG(assert(bin_tnt.find(v) != bin_tnt.end());)
 		pnode left = { bin_tnt[v], {} };
 		//DBG(std::cout << "\n" << d->get(bin_tnt[v].n()) << std::endl);
-		auto leftit = sorted_citem({ left.first.n(), eitem.from });
+		auto &leftit = sorted_citem[{ left.first.n(), eitem.from }];
 		// doing left right optimization
-		for (auto& it : leftit) for (auto& rit : rcomb)
+		for (auto& itp : leftit) for (auto& rit : rcomb) {
+			auto& it = *itp;
+
 			if (it.set == rit.second[0]) left.second[0] = it.from,
 				left.second[1]=it.set,
 				ambset.insert({ left, rit });
+		}
 	}
 	// exact two literals in rhs
 	else if (eitem.dot == 2) {
@@ -791,12 +803,14 @@ bool parser<C, T>::binarize_comb(const item& eitem,
 					ambset.insert({ left, rit });
 		}
 		else {
-			auto leftit = sorted_citem({ l.n(), eitem.from });
-			for (auto& it : leftit)	for (auto& rit : rcomb)
+			auto &leftit = sorted_citem[{ l.n(), eitem.from }];
+			for (auto& itp : leftit)	for (auto& rit : rcomb) {
+				auto& it = *itp;
 				if (it.set == rit.second[0])
 					left.second[0] = it.from,
 					left.second[1] = it.set,
 					ambset.insert({ left, rit });
+			}
 		}
 	}
 	else {
@@ -813,9 +827,10 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 	if (!root.first.nt()) return false;
 	if (f.contains(root)) return false;
 	//auto& nxtset = sorted_citem[root.n()][root.second[0]];
-	auto nxtset = sorted_citem({ root.first.n(), root.second[0] });
+	auto& nxtset = sorted_citem[{ root.first.n(), root.second[0] }];
 	pnodes_set ambset;
-	for (const item& cur : nxtset) {
+	for (auto& curp : nxtset) {
+		auto& cur = *curp;
 		if (cur.set != root.second[1]) continue;
 		pnode cnode(completed(cur) ? g(cur.prod) : g.nt(root.first.n()),
 			{ cur.from, cur.set });
