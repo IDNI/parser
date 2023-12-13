@@ -187,6 +187,8 @@ public:
 		// build forest incrementally as soon any
 		// item is completed
 		bool incr_gen_forest = DEFAULT_INCR_GEN_FOREST;
+		// enable garbage collection
+		bool enable_gc = false;
 		// number of steps garbage collection lags behind
 		// parsing position n. should be greater than
 		// 0 and less than the size of the input
@@ -324,7 +326,7 @@ private:
 	std::unique_ptr<input> in = 0;
 	std::vector<container_t> S;
 	std::vector<container_t> U; // uncompleted
-	//mapping from to position of end in S for items
+		//mapping from to position of end in S for items
 	std::unordered_map<size_t, std::vector<size_t>> fromS;
 
 	// refcounter for the earley item
@@ -333,12 +335,9 @@ private:
 	std::map<item, int_t> refi;
 	// items ready for collection
 	std::set<item> gcready;
-	std::vector<item> sorted_citem(std::pair<size_t, size_t> ntpos);
-	std::vector<item> rsorted_citem(std::pair<size_t, size_t> ntpos);
-	std::map<std::pair<size_t, size_t>,
-					std::vector<item>> memo;
-	std::map<std::pair<size_t, size_t>,
-					std::vector<item>> rmemo;
+	std::map<std::pair<size_t, size_t>, std::vector<const item*> > 
+		sorted_citem, rsorted_citem;
+	
 
 	// binarized temporary intermediate non-terminals
 	std::map<std::vector<lit<C, T>>, lit<C, T>> bin_tnt;

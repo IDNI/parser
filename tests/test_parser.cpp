@@ -370,6 +370,13 @@ int main(int argc, char **argv)
 		input << t.rdbuf();
 		run_test_tgf("start => '(' start ')' start | null.",
 			input.str());
+		t.close();
+		
+		TEST("stress", "gram_long")
+		ifstream t1("./tests/stress_test1.txt");
+		stringstream gram;
+		gram << t1.rdbuf();
+		run_test_tgf(gram.str().c_str(), "");
 
 		if (testing::verbosity > 0)
 			cout << "stress test finished" << endl;
