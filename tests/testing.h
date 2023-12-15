@@ -360,6 +360,7 @@ void help(const std::string& opt) {
 "	              enable/disable incremental generation of forest\n" <<
 "	-[enable|disable]_binarization\n" <<
 "\t              enables binarization and leftright optimization of forest\n" <<
+"	-[enable|disable]_gc	enables garbage collection\n" <<
 "	-unique_node\n" <<
 "	              retrieves graphs from forest based on nodes, not edges\n"
 "	-stop_after_[1|5]\n" <<
@@ -376,6 +377,7 @@ void help(const std::string& opt) {
 void process_args(int argc, char **argv) {
 	bool binarize = false;
 	bool incr_gen = false;
+	bool enable_gc = false;
 
 	std::vector<std::string> args(argv + 1, argv + argc);
 
@@ -394,6 +396,10 @@ void process_args(int argc, char **argv) {
 			binarize = false;
 		else if (opt == "-disable_incrgen")
 			incr_gen = false;
+		else if (opt == "-enable_gc")
+			enable_gc = true;
+		else if (opt == "-disable_gc")
+			enable_gc = false;
 		else if (opt == "-unique_node")
 			opt_edge = false;
 		else if (opt == "-stop_after_1")
@@ -459,6 +465,7 @@ void process_args(int argc, char **argv) {
 	options<char>.binarize =        options<char32_t>.binarize = binarize;
 	options<char>.incr_gen_forest =	options<char32_t>.incr_gen_forest =
 								incr_gen;
+	options<char>.enable_gc = options<char32_t>.enable_gc = enable_gc;
 }
 
 } } // namespace idni::testing
