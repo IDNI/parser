@@ -59,8 +59,12 @@ struct lit : public std::variant<size_t, T> {
 	size_t n() const;
 	T      t() const;
 	bool is_null() const;
-	bool operator<(const lit<C, T>& l) const;
+
+	// IDEA maybe we could use directly the default operator<=> for lit
+	auto operator<=>(const lit<C, T>& l) const;
+	// IDEA maybe we could use directly the default operator== for lit
 	bool operator==(const lit<C, T>& l) const;
+
 	//std::ostream& operator<<(std::ostream& os)
 	std::vector<T> to_terminals() const;
 	std::basic_string<C> to_string(const std::basic_string<C>& nll={})const;
@@ -335,9 +339,9 @@ private:
 	std::map<item, int_t> refi;
 	// items ready for collection
 	std::set<item> gcready;
-	std::map<std::pair<size_t, size_t>, std::vector<const item*> > 
+	std::map<std::pair<size_t, size_t>, std::vector<const item*> >
 		sorted_citem, rsorted_citem;
-	
+
 
 	// binarized temporary intermediate non-terminals
 	std::map<std::vector<lit<C, T>>, lit<C, T>> bin_tnt;
