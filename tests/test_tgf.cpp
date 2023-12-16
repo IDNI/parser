@@ -16,8 +16,11 @@ int main(int argc, char **argv) {
 	nonterminals<char> nts;
 	tgf<char>::from_string(nts, "	# TGF only with ws and ws_comment \n");
 
-	TEST("basic", "rule")
+	TEST("basic", "char terminals")
 	run_test_tgf(" start => 'a'. ", "a");
+	run_test_tgf(" start => \"a\". ", "a");
+	run_test_tgf(" start => 'a' 'b'. ", "ab");
+	run_test_tgf(" start => \"ab\". ", "ab");
 
 	TEST("basic", "literals rule")
 	run_test_tgf(
