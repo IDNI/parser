@@ -810,6 +810,7 @@ typename parser<C, T>::error parser<C, T>::get_error() {
 }
 template <typename C, typename T>
 void parser<C, T>::pre_process(const item& i) {
+	//DBGP(print(std::cout << " *  preprocessing\t\t\t", i) << std::endl;)
 	//sorted_citem[G[i.prod][0].n()][i.from].emplace_back(i);
 	if (completed(i))
 		sorted_citem[{ g(i.prod).n(), i.from }].emplace_back(&i),
@@ -819,7 +820,7 @@ void parser<C, T>::pre_process(const item& i) {
 		// each temporary represents a partial rhs production with
 		// atleast 3 symbols
 		if (i.dot >= 2) {
-			std::vector<lit<C, T>> v(g[i.prod][i.con].begin(),
+						std::vector<lit<C, T>> v(g[i.prod][i.con].begin(),
 					g[i.prod][i.con].begin() + i.dot);
 			lit<C, T> l;
 			if (bin_tnt.find(v) == bin_tnt.end()) {
@@ -827,7 +828,7 @@ void parser<C, T>::pre_process(const item& i) {
 				bin_tnt.insert({ v, l });
 			}
 			else l = bin_tnt[v];
-			//DBG(print(std::cout, i);)
+						//DBG(print(std::cout, i);)
 			//cout<< "\n" << d->get(tlit.n()) << v << std::endl;
 			sorted_citem[{ l.n(), i.from }].emplace_back(&i);
 			rsorted_citem[{ l.n(), i.set }].emplace_back(&i);
@@ -858,7 +859,7 @@ bool parser<C, T>::init_forest(pforest& f) {
 	MS(emeasure_time_start(tsf, tef);)
 	ret = build_forest(f, root);
 	MS(emeasure_time_end(tsf, tef) <<" :: forest time\n";)
-	
+
 	return ret;
 }
 // collects all possible variations of the given item's rhs while respecting the
@@ -1061,7 +1062,7 @@ int_t terminals_to_int(
 template <typename C, typename T>
 std::ostream& parser<C, T>::print(std::ostream& os, const item& i) const {
 	os << (completed(i) ? COLOR BRIGHT AND GREEN
-		: i.dot == 0 ? COLOR BLACK : COLOR BRIGHT);
+		: i.dot == 0 ? COLOR BLACK : COLOR BRIGHT AND CLEAR);
 	os << "(G" << (i.prod < 10 ? " " : "") << i.prod;
 	if (g.conjunctive(i.prod)) os << "/" << i.con;
 	else os << "  ";
