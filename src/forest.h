@@ -95,67 +95,39 @@ struct forest {
 	nodes_and_edges get_nodes_and_edges() const;
 	graphv extract_graphs(const node& root, cb_next_graph_t cb_next_graph,
 		bool unique_edge = true) const;
-	std::function<void(const node&)> no_enter;
-	std::function<void(const node&, const nodes_set&)> no_exit;
-	std::function<bool(const node&)> no_revisit;
-	std::function<bool(const node&)> do_revisit;
-	std::function<nodes_set(const node&, const nodes_set&)> no_ambig;
-	forest() {
-		no_enter   = [](const node&) {};
-		no_exit    = [](const node&, const nodes_set&) {};
-		no_revisit = [](const node&) { return true; };
-		do_revisit = [](const node&) { return false; };
-		no_ambig   = [](const node&, const nodes_set& ns) { return ns;};
-	}
-	template <typename cb_enter_t, typename cb_exit_t,
-		typename cb_revisit_t, typename cb_ambig_t>
-	bool traverse(const node& root, cb_enter_t cb_enter, cb_exit_t cb_exit,
-		cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const;
 
-	template <typename cb_enter_t, typename cb_exit_t,
-		typename cb_revisit_t, typename cb_ambig_t>
+	typedef std::function<void(const node&)> enter_t;
+	typedef std::function<void(const node&, const nodes_set&)> exit_t;
+	typedef std::function<bool(const node&)> revisit_t;
+	typedef std::function<nodes_set(const node&, const nodes_set&)> ambig_t;
+	static inline enter_t no_enter = [](const node&) {};
+	static inline exit_t no_exit = [](const node&, const nodes_set&) {};
+	static inline revisit_t
+		no_revisit = [](const node&) { return true; },
+		do_revisit = [](const node&) { return false; };
+	static inline ambig_t
+		no_ambig = [](const node&, const nodes_set& ns) { return ns;};
+
+	template <typename cb_enter_t, typename cb_exit_t = exit_t,
+		typename cb_revisit_t = revisit_t, typename cb_ambig_t =ambig_t>
+	bool traverse(const node& root, cb_enter_t cb_enter,
+		cb_exit_t cb_exit = no_exit,
+		cb_revisit_t cb_revisit = no_revisit,
+		cb_ambig_t cb_ambig = no_ambig) const;
+	template <typename cb_enter_t, typename cb_exit_t = exit_t,
+		typename cb_revisit_t = revisit_t, typename cb_ambig_t =ambig_t>
 	bool traverse(const node_graph& gr, const node& root,
-		cb_enter_t cb_enter, cb_exit_t cb_exit,
-		cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const;
-	// traverse() with default parameters
-	template <typename cb_enter_t>
-	bool traverse(const node& root, cb_enter_t cb_enter) const {
-		return traverse(root, cb_enter, no_exit, no_revisit, no_ambig);
-	}
-	template <typename cb_enter_t, typename cb_exit_t>
-	bool traverse(const node& root, cb_enter_t cb_enter, cb_exit_t cb_exit)
-		const
-	{
-		return traverse(root, cb_enter, cb_exit, no_revisit, no_ambig);
-	}
-	template <typename cb_enter_t, typename cb_exit_t,typename cb_revisit_t>
-	bool traverse(const node& root, cb_enter_t cb_enter, cb_exit_t cb_exit,
-		cb_revisit_t cb_revisit) const
-	{
-		return traverse(root, cb_enter, cb_exit, cb_revisit, no_ambig);
-	}
-	template <typename cb_enter_t, typename cb_exit_t,
-		typename cb_revisit_t, typename cb_ambig_t>
-	bool traverse(cb_enter_t cb_enter, cb_exit_t cb_exit,
-		cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const
+		cb_enter_t cb_enter, cb_exit_t cb_exit = no_exit,
+		cb_revisit_t cb_revisit = no_revisit,
+		cb_ambig_t cb_ambig = no_ambig) const;
+	template <typename cb_enter_t, typename cb_exit_t = exit_t,
+		typename cb_revisit_t = revisit_t, typename cb_ambig_t =ambig_t>
+	bool traverse(cb_enter_t cb_enter,
+		cb_exit_t cb_exit = no_exit,
+		cb_revisit_t cb_revisit = no_revisit,
+		cb_ambig_t cb_ambig = no_ambig) const
 	{
 		return traverse(root(), cb_enter, cb_exit, cb_revisit,cb_ambig);
-	}
-	template <typename cb_enter_t>
-	bool traverse(cb_enter_t cb_enter) const {
-		return traverse(cb_enter, no_exit, no_revisit, no_ambig);
-	}
-	template <typename cb_enter_t, typename cb_exit_t>
-	bool traverse(cb_enter_t cb_enter, cb_exit_t cb_exit)
-		const
-	{
-		return traverse(cb_enter, cb_exit, no_revisit, no_ambig);
-	}
-	template <typename cb_enter_t, typename cb_exit_t,typename cb_revisit_t>
-	bool traverse(cb_enter_t cb_enter, cb_exit_t cb_exit,
-		cb_revisit_t cb_revisit) const
-	{
-		return traverse(cb_enter, cb_exit, cb_revisit, no_ambig);
 	}
 #ifdef DEBUG
 	std::ostream& print_data(std::ostream& os) const;
