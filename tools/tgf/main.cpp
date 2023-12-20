@@ -172,6 +172,8 @@ void init_commands() {
 		DESC("starting literal");
 	auto print_grammar = OPT(option("grammar", 'g', true));
 		DESC("prints grammar");
+	OPT(option("nullable-ambiguity", 'N', false));
+		DESC("report possible nullable ambiguity");
 	auto char_type = OPT(option("char-type", 'C', "char"));
 		DESC("type of input character");
 	auto terminal_type = OPT(option("terminal-type", 'T', "char"));
@@ -361,13 +363,18 @@ int process_args(int argc_int, char** argv, command& cmdref, string& tgf_file) {
 	return 0;
 }
 
-int show(string tgf_file, string start = "start", bool print_grammar = true) {
+int show(string tgf_file, string start = "start", bool print_grammar = true,
+	bool print_nullable_ambiguity = false)
+{
 	DBG(cout << "show " << tgf_file <<
 		" --start " << start <<
-		" --grammar " << PBOOL(print_grammar) << "\n";)
+		" --grammar " << PBOOL(print_grammar) <<
+		" --nullable-ambiguity " << PBOOL(print_nullable_ambiguity) <<
+		"\n";)
 	nonterminals<char> nts;
 	auto g = tgf<char>::from_file(nts, tgf_file, start);
 	if (print_grammar) g.print_internal_grammar(cout);
+	if (print_nullable_ambiguity) g.check_nullable_ambiguity(cout);
 	return 0;
 }
 
@@ -459,7 +466,8 @@ int main(int argc, char** argv) {
 	if (cmd.name() == "show") {
 		show(tgf_file,
 			cmd.get<string>("start"),
-			cmd.get<bool>("grammar"));
+			cmd.get<bool>("grammar"),
+			cmd.get<bool>("nullable-ambiguity"));
 	}
 	else if (cmd.name() == "gen") {
 		gen(cout, tgf_file,

@@ -201,6 +201,8 @@ bool run_test_(grammar<T>& g, parser<T>& p, const std::basic_string<T>& input,
 {
 	std::stringstream ss;
 	if (!info(ss)) return true;
+	g.check_nullable_ambiguity(ss << "\nCheck nullable_ambiguity...\n")
+		<< "\n";
 	bool expect_fail = opts.error_expected.size() > 0;
 	if (verbosity == 0) opts.dump = false;
 	else {

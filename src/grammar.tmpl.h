@@ -558,8 +558,12 @@ size_t grammar<C, T>::get_char_class_production(lit<C, T> l, T ch) {
 	} else return it->second;
 }
 template <typename C, typename T>
-const std::set<size_t>& grammar<C, T>::prod_ids_of_literal(const lit<C, T>& l) {
-	return ntsm[l];
+const std::set<size_t>& grammar<C, T>::prod_ids_of_literal(const lit<C, T>& l)
+	const
+{
+	static std::set<size_t> empty{};
+	if (!ntsm.contains(l)) return empty;
+	return ntsm.at(l);
 }
 template <typename C, typename T>
 const lit<C, T>& grammar<C, T>::start_literal() const { return start; }
@@ -582,6 +586,42 @@ lit<C, T> grammar<C, T>::nt(size_t n) { return lit<C, T>(n, &nts); }
 template <typename C, typename T>
 lit<C, T> grammar<C, T>::nt(const std::basic_string<C>& s) {
 	return nt(nts.get(s));
+}
+
+template <typename C, typename T>
+std::ostream& grammar<C, T>::check_nullable_ambiguity(std::ostream& os) const {
+	const auto report = [&os, this](const lit<C, T>& first,
+		const lit<C, T>& second, const production& p)
+	{
+		os << "Warning: possible ambiguity from a nullable literal: ("
+			<< first << ") neighbors (" << second
+			<< ") in production: ";
+		print_production(os, p);
+		os << "\n";
+	};
+	const auto first_nullable = [this](const lit<C, T>& l) {
+		if (!l.nt()) return false;
+		const auto& prods = prod_ids_of_literal(l);
+		for (const auto& p : prods) for (const auto& a : G[p].second)
+			if (nullable(a[0])) return true;
+		return false;
+	};
+	const auto last_nullable = [this](const lit<C, T>& l) {
+		if (!l.nt()) return false;
+		const auto& prods = prod_ids_of_literal(l);
+		for (const auto& p : prods) for (const auto& a : G[p].second)
+			if (nullable(a.back())) return true;
+		return false;
+	};
+	for (const auto& p : G) for (const auto& a : p.second) if (a.size() > 1)
+		for (size_t i = 1; i != a.size() - 1; ++i) {
+			const auto& last = a[i-1], curr = a[i];
+			if (last.nt() && curr.nt() &&
+				(nullable(last) || last_nullable(last)) &&
+				(nullable(curr) || first_nullable(curr)))
+					report(last, curr, p);
+		}
+	return os;
 }
 
 template <typename C, typename T>

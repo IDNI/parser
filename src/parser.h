@@ -146,10 +146,11 @@ struct grammar {
 	// returns id of the rule or (size_t)-1 if the check fails
 	size_t get_char_class_production(lit<C, T> l, T ch);
 	size_t add_char_class_production(lit<C, T> l, T ch);
-	const std::set<size_t>& prod_ids_of_literal(const lit<C, T>& l);
+	const std::set<size_t>& prod_ids_of_literal(const lit<C, T>& l) const;
 	const lit<C, T>& start_literal() const;
 	bool is_cc_fn(const size_t& p) const;
 	bool is_eof_fn(const size_t& p) const;
+	std::ostream& check_nullable_ambiguity(std::ostream& os) const;
 	std::ostream& print_production(std::ostream& os,
 		const production& p) const;
 	std::ostream& print_internal_grammar(std::ostream& os,

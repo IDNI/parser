@@ -20,6 +20,7 @@ int main(int argc, char **argv) {
 	run_test_tgf(" start => 'a'. ", "a");
 	run_test_tgf(" start => \"a\". ", "a");
 	run_test_tgf(" start => 'a' 'b'. ", "ab");
+	run_test_tgf(" start => \"a\" \"b\". ", "ab");
 	run_test_tgf(" start => \"ab\". ", "ab");
 
 	TEST("basic", "literals rule")
