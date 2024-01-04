@@ -129,8 +129,13 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name,
 		}
 		return os.str();
 	};
+	auto strip_file_path = [](const std::string& p) {
+		size_t n = p.find_last_of("/\\");
+		return n != std::string::npos ? p.substr(n + 1) : p;
+	};
 	const auto ps = gen_prods();
-	os <<	"// This file is generated from a file "<<tgf_filename<<" by \n"
+	os <<	"// This file is generated from a file " <<
+					strip_file_path(tgf_filename)<<" by\n"
 		"//       https://github.com/IDNI/parser/tools/tgf\n"
 		"//\n"
 		"#ifndef __" <<guard<< "_H__\n"
@@ -145,7 +150,7 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name,
 		"	std::unique_ptr<typename idni::parser<" <<tn<< ">"
 							"::pforest> parse(\n"
 		"		const "<<char_type<<"* data, size_t size = 0, "
-						"size_t max_l = 0, \n"
+						"size_t max_l = 0,\n"
 		"		" <<char_type<< " eof = std::char_traits<"
 						<<char_type<<">::eof())\n"
 		"		\t{ return p.parse(data, size, max_l, eof); }\n"
