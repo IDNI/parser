@@ -12,102 +12,38 @@
 // modified over time by the Author.
 #ifndef __IDNI__PARSER__TGF_H__
 #define __IDNI__PARSER__TGF_H__
-#include <fcntl.h>
-#include <cstring>
-#include "parser.h"
+#include "tgf_parser.generated.h"
 #include "devhelpers.h"
 
 namespace idni {
 
 template <typename C = char, typename T = C>
 struct tgf {
-	typedef typename parser<C, T>::pforest forest_t;
-	tgf() :
-		cc(predefined_char_classes<C, T>({ "eof", "alpha", "alnum",
-			"digit", "printable", "space" }, nts)),
-		alnum(nt("alnum")),
-		alpha(nt("alpha")),
-		char_(nt("char")),
-		char0(nt("char0")),
-		chars(nt("chars")),
-		chars1(nt("chars1")),
-		conjunction(nt("conjunction")),
-		directive(nt("directive")),
-		directive_param(nt("directive_param")),
-		directive_params(nt("directive_params")),
-		disjunction(nt("disjunction")),
-		eof(nt("eof")),
-		eol(nt("eol")),
-		expr1(nt("expr1")),
-		expr2(nt("expr2")),
-		expr3(nt("expr3")),
-		group(nt("group")),
-		literal(nt("literal")),
-		literals(nt("literals")),
-		literals1(nt("literals1")),
-		multi(nt("multi")),
-		nonliteral(nt("nonliteral")),
-		nonterminal(nt("nonterminal")),
-		negation(nt("negation")),
-		optional(nt("optional")),
-		plus(nt("plus")),
-		printable(nt("printable")),
-		ws_char(nt("ws_char")),
-		ws_chars(nt("ws_chars")),
-		ws_chars1(nt("ws_chars1")),
-		production_(nt("production")),
-		production_sep(nt("production_sep")),
-		quoted_char(nt("quoted_char")),
-		quoted_char_esc(nt("quoted_char_esc")),
-		repeat(nt("repeat")),
-		space(nt("space")),
-		start(nt("start")),
-		statement(nt("statement")),
-		statements(nt("statements")),
-		statements1(nt("statements1")),
-		string_(nt("string")),
-		string_char(nt("string_char")),
-		string_chars(nt("string_chars")),
-		string_chars1(nt("string_chars1")),
-		sym(nt("sym")),
-		terminal(nt("terminal")),
-		ws(nt("ws")),
-		ws_comment(nt("ws_comment")),
-		ws_required(nt("ws_required")),
-		g(nts, setup_productions(), start, cc), p(g)
-	{
-#if DEBUG && DEBUG_PARSING
-		p.debug = false;
-#endif
-	}
 	static grammar<C, T> from_string(nonterminals<C, T>& nts_,
 		const std::basic_string<C>& s,
 		const std::basic_string<C>& start_nt = from_cstr<C>("start"))
 	{
-		tgf<C, T> f;
+		tgf_parser p;
+#if DEBUG && DEBUG_PARSING
+		p.p.debug = false;
+#endif
 		//std::cout << "parsing: " << to_std_string(s) << std::endl;
 		//DBG(f.g.print_data(std::cout << "\n>>>\n\n") << "\n<<<" << std::endl;)
 		//return {nts_};
-		return f.transform(
-			f.p.parse(s.c_str(), s.size()), nts_, start_nt);
+		return transform(p, p.parse(s.c_str(), s.size()), nts_, start_nt);
 	}
 	static grammar<C, T> from_file(nonterminals<C, T>& nts_,
 		const std::string& filename,
 		const std::basic_string<C>& start_nt = from_cstr<C>("start"))
 	{
-		tgf<C, T> f;
-		// int fd;
-		// //std::cout << "parsing file: " << filename << std::endl;
-		// if ((fd = ::open(filename.c_str(), O_RDONLY)) == -1)
-		// 	return std::cerr << "Failed to open file '" << filename
-		// 			<< "':" << strerror(errno) << std::endl,
-		// 		grammar<C, T>(nts_);
-		//std::cout << "fd: " << fd << " l: " << l << std::endl;
-		//DBG(f.g.print_data(std::cout << "\n>>>\n\n") << "\n<<<" << std::endl;)
-		return f.transform(f.p.parse(filename, MMAP_READ), nts_, start_nt);
+		tgf_parser p;
+#if DEBUG && DEBUG_PARSING
+		p.p.debug = false;
+#endif
+		return transform(p, p.parse(filename, MMAP_READ), nts_, start_nt);
 	}
 private:
-	grammar<C, T> transform(
+	static grammar<C, T> transform(tgf_parser& p,
 		std::unique_ptr<typename parser<C, T>::pforest> f,
 		nonterminals<C, T>& nts_,
 		const std::basic_string<C>& start_nt = from_cstr<C>("start"))
@@ -222,51 +158,56 @@ private:
 			}
 #endif
 		} x(nts_);
-		auto cb_enter = [&f, &x, this](const auto& n) {
+		auto cb_enter = [&f, &x](const auto& n) {
 			const auto& l = n.first;
 			if (!l.nt()) return;
+			auto s = l.n();
 			//DBG(std::cout << "//entering: `" << l.to_std_string() << "`\n";)
-			if (l == sym) x.add_nonterminal(from_str<C>(
+			if (s == tgf_parser::sym) x.add_nonterminal(from_str<C>(
 				terminals_to_str<C, T>(*f, n)));
-			else if (l == directive) x.in_directive = true;
-			else if (l == directive_param)
+			else if (s == tgf_parser::directive) x.in_directive = true;
+			else if (s == tgf_parser::directive_param)
 				x.cc_names.push_back(to_std_string(from_str<C>(
 					terminals_to_str<C, T>(*f, n))));
-			else if (l == literals) x.push();
-			else if (l == group || l == optional || l == repeat)
-						x.pop();
-			else if (l == production_) x.new_production();
-			else if (l == string_ || l == quoted_char) {
+			else if (s == tgf_parser::literals) x.push();
+			else if (s == tgf_parser::group
+				|| s == tgf_parser::optional
+				|| s == tgf_parser::repeat) x.pop();
+			else if (s == tgf_parser::production) x.new_production();
+			else if (s == tgf_parser::terminal_string
+				|| s == tgf_parser::terminal_char) {
 				auto str = terminals_to_str<C, T>(*f, n);
 				str.erase(str.begin()), str.erase(str.end()-1);
 				//DBG(std::cout << "quoted_char?: " << (l == quoted_char)
 				//	<< " str.size(): " << str.size()
 				//	<< " str: `" << to_std_string(str)
 				//	<< "`" << std::endl;)
-				if (l == quoted_char) {
+				if (s == tgf_parser::terminal_char) {
 					if (str.size() > 1) switch (str[1]) {
-						case 'r':  str = U('\r'); break;
-						case 'n':  str = U('\n'); break;
-						case 't':  str = U('\t'); break;
+						case 'r':  str = from_cstr<C>("\r"); break;
+						case 'n':  str = from_cstr<C>("\n"); break;
+						case 't':  str = from_cstr<C>("\t"); break;
 						default: str = str[1];
 					}
 					x.add_terminal(str[0]);
 				} else x.add_terminals(str);
 			}
 		};
-		auto cb_exit = [&x, this](const auto& n, const auto&) {
+		auto cb_exit = [&x](const auto& n, const auto&) {
 			const auto& l = n.first;
 			if (!l.nt()) return;
+			auto s = l.n();
 			//DBG(std::cout << "\t// leaving: `" << l.to_std_string() << "`\n";)
-			if      (l == production_)         x.production();
-			else if (l == directive)           x.directive();
-			else if (l == negation)            x.negate();
-			else if (l == conjunction)         x.conjunction();
-			else if (l == disjunction)         x.disjunction();
-			else if (l == multi)               x.multi();
-			else if (l == group)               x.group();
-			else if (l == optional)            x.optional();
-			else if (l == plus || l == repeat) x.repeat();
+			if      (s == tgf_parser::production)  x.production();
+			else if (s == tgf_parser::directive)   x.directive();
+			else if (s == tgf_parser::negation)    x.negate();
+			else if (s == tgf_parser::conjunction) x.conjunction();
+			else if (s == tgf_parser::disjunction) x.disjunction();
+			else if (s == tgf_parser::multi)       x.multi();
+			else if (s == tgf_parser::group)       x.group();
+			else if (s == tgf_parser::optional)    x.optional();
+			else if (s == tgf_parser::plus
+				|| s == tgf_parser::repeat)    x.repeat();
 		};
 #ifdef DEBUG
 		auto cb_ambig = [](const auto& n, auto& ambset) {
@@ -275,13 +216,14 @@ private:
 			return ambset;
 		};
 #endif
-		if (!p.found()) std::cerr << "There is an error in the grammar."
+		if (!p.found()) {
+			std::cerr << "There is an error in the grammar."
 			" Cannot recognize TGF.\n" << p.get_error().to_str(
 				parser<C, T>::error::info_lvl::INFO_DETAILED);
 			//parser<C, T>::error::info_lvl::INFO_DETAILED);
-			//DBG(p.print_data(std::cout << "PARSER DATA:\n") << "\n";)
-			//DBG(g.print_internal_grammar(cout << "TGF productions:\n") << endl;)
-		else {
+			//DBG(p.p.print_data(std::cout << "PARSER DATA:\n") << "\n";)
+			//DBG(p.g.print_internal_grammar(std::cout << "TGF productions:\n") << std::endl;)
+		} else {
 			//DBG(cout << "TRAVERSE parsed TGF source and "
 			//			"generate productions\n";)
 			//auto c = f->has_single_parse_tree();
@@ -347,97 +289,6 @@ private:
 		}
 		return grammar<C, T>(
 			nts_, x.ps, prods<C, T>(x.nt(start_nt)), x.cc);
-	}
-	nonterminals<C, T> nts{};
-	char_class_fns<C> cc;
-	prods<C, T> nul{ lit<C, T>{} },
-		alnum, alpha, char_, char0, chars, chars1, conjunction,
-		directive, directive_param,
-		directive_params, disjunction, eof, eol, expr1, expr2, expr3,
-		group, literal, literals, literals1, multi, nonliteral,
-		nonterminal, negation, optional, plus, printable, ws_char,
-		ws_chars, ws_chars1, production_, production_sep,
-		quoted_char, quoted_char_esc, repeat, space, start,
-		statement, statements, statements1,
-		string_,
-		string_char, string_chars, string_chars1, sym, terminal, ws,
-		ws_comment, ws_required;
-	grammar<C, T> g;
-	parser<C, T> p;
-	forest<T> f;
-	std::basic_string<C> U(const char* s) { return from_cstr<C>(s); }
-	std::basic_string<C> U(const char  c) {
-		return from_str<C>(std::string{ c }); }
-	lit<C, T> nt(const std::string& s) {
-		return lit<C, T>{ nts.get(from_str<C>(s)), &nts }; };
-	prods<C, T> setup_productions() {
-		prods<C, T> q, sep{U("=>")}, underscore{'_'},
-			lparen{'('}, lbracket{'['}, lbrace('{'), tilde{'~'},
-			hash{'#'}, cr{'\r'}, nl{'\n'}, quotes{'"'}, at{'@'},
-			apostrophe{'\''};
-		q(start,            (ws + statements + ws) | ws);
-		q(statements,       statement + statements1);
-		q(statements1,      (ws + statement + statements1) | nul);
-		q(statement,        directive | production_);
-		q(directive,        at + U("use_char_class") + ws_required +
-					directive_params + ws + U('.'));
-		q(directive_params, directive_param |
-					(directive_param + ws + U(',') + ws +
-					directive_params));
-		q(directive_param,  prods<C, T>(U("eof")) | U("alnum") |
-					U("alpha") | U("blank") | U("cntrl") |
-					U("digit") | U("graph") | U("lower") |
-					U("printable") | U("punct") |
-					U("space") | U("upper") | U("xdigit"));
-		q(production_,      sym + ws + production_sep + ws + expr1 +
-					ws + U('.'));
-		q(production_sep,   sep);
-		q(expr1,            disjunction | expr2);
-		q(expr2,            conjunction | expr3);
-		q(expr3,            negation | literals);
-		q(disjunction,      expr1 + ws + U('|') + ws + expr2);
-		q(conjunction,      expr2 + ws + U('&') + ws + expr3);
-		q(negation,         tilde + ws + expr3);
-		q(group,            lparen   + ws + expr1 + ws + U(')'));
-		q(optional,         lbracket + ws + expr1 + ws + U(']'));
-		q(repeat,           lbrace   + ws + expr1 + ws + U('}'));
-		q(plus,             literal + ws + U('+'));
-		q(multi,            literal + ws + U('*'));
-		q(literals,         literal + literals1);
-		q(literals1,        (ws_required + literal + literals1) | nul);
-		q(literal,          terminal | nonterminal);
-		q(terminal,         quoted_char | string_);
-		q(nonterminal,      sym | nonliteral);
-		q(nonliteral,       group | optional | repeat | plus | multi);
-		q(sym,              chars);
-		q(chars,            (alpha + chars1) | (underscore + chars1));
-		q(chars1,           (alnum + chars1) | (underscore + chars1) |
-					nul);
-		q(ws_char,          printable | '\t');
-		q(ws_chars,         ws_char + ws_chars1);
-		q(ws_chars1,        (ws_char + ws_chars1) | nul);
-		q(ws_comment,       (hash + eol) | (hash + ws_chars + eol));
-		q(ws_required,      (space + ws) | (ws_comment + ws));
-		q(ws,               ws_required | nul);
-		q(eol,              cr | nl | eof);
-		q(string_,          quotes + string_chars + quotes);
-		q(string_chars,     string_char + string_chars1);
-		q(string_chars1,    (string_char + string_chars1) | nul);
-		q(string_char,      char0 | apostrophe | U("\\\""));
-		q(quoted_char,      (apostrophe + char_ + apostrophe) |
-					quoted_char_esc);
-		q(quoted_char_esc,  apostrophe + U('\\') +
-					char_ + apostrophe);
-		q(char_,            char0 | U("\\'") | U('"') | U("`"));
-		q(char0,            alnum | space | U('!') | U('#') | U('$') |
-					U('%') | U('&') | U('(') | U(')') |
-					U('*') | U('+') | U(',') | U('-') |
-					U('.') | U('/') | U(':') | U(';') |
-					U('<') | U('=') | U('>') | U('?') |
-					U('@') | U('[') | U('\\')| U(']') |
-					U('^') | U('_') | U('{') | U('|') |
-					U('}') | U('~'));
-		return q;
 	}
 };
 

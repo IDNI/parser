@@ -1,0 +1,53 @@
+@use_char_class eof, alnum, alpha, space, printable.
+
+# TGF grammar
+start                  => (ws statement)* ws.
+statement              => directive | production.
+
+# directive
+directive              => "@use_char_class" ws_required directive_params ws '.'.
+directive_params       => directive_param (ws ',' ws directive_param)*.
+directive_param        => "eof"   | "alnum" | "alpha" | "blank"
+			| "cntrl" | "digit" | "graph" | "lower" | "printable"
+			| "punct" | "space" | "upper" | "xdigit".
+
+# production
+production             => sym ws "=>" ws expr1 ws '.'.
+expr1                  => disjunction | expr2.
+expr2                  => conjunction | expr3.
+expr3                  => negation | literals.
+disjunction            => expr1 ws '|' ws expr2.
+conjunction            => expr2 ws '&' ws expr3.
+negation               => '~' ws expr3.
+
+# literals
+literals               => literal (ws_required literal)*.
+literal                => terminal | nonterminal.
+terminal               => terminal_char | terminal_string.
+nonterminal            => sym | nonliteral.
+sym                    => sym_start (sym_rest)*.
+sym_start              => alpha | '_'.
+sym_rest               => alnum | '_'.
+
+# EBNF operators
+nonliteral             => group | optional | repeat | plus | multi.
+group                  => '(' ws expr1 ws ')'.
+optional               => '[' ws expr1 ws ']'.
+repeat                 => '{' ws expr1 ws '}'.
+plus                   => literal ws '+'.
+multi                  => literal ws '*'.
+
+# terminal char and string
+terminal_char          => "'" (unescaped_c | escaped_c) "'".
+unescaped_c            => printable & ~( "'" | '\\' ).
+escaped_c              => '\\' ("'" | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't').
+terminal_string        => '"' (unescaped_s | escaped_s)* '"'.
+unescaped_s            => printable & ~( '"' | '\\' ).
+escaped_s              => '\\' ('"' | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't').
+
+# whitespace
+ws                     => ws_required | null.
+ws_required            => space ws | ws_comment ws.
+ws_comment             => '#' (ws_char)* eol.
+ws_char                => printable | '\t'.
+eol                    => '\r' | '\n' | eof.
