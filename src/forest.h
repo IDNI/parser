@@ -96,6 +96,8 @@ struct forest {
 	graphv extract_graphs(const node& root, cb_next_graph_t cb_next_graph,
 		bool unique_edge = true) const;
 
+	sptree get_tree() const;
+
 	typedef std::function<void(const node&)> enter_t;
 	typedef std::function<void(const node&, const nodes_set&)> exit_t;
 	typedef std::function<bool(const node&)> revisit_t;

@@ -32,6 +32,23 @@ std::ostream& forest<NodeT>::print_data(std::ostream& os) const {
 	return os;
 }
 #endif
+
+// get a first parse tree from the forest
+// be sure the forest has only a single tree
+// check if has_single_parse_tree() is true or is_ambiguous() is false first
+// or ambiguous_nodes() is empty
+template <typename NodeT>
+forest<NodeT>::sptree forest<NodeT>::get_tree() const {
+	forest<NodeT>::sptree t;
+	extract_graphs(root(), [this, &t] (auto& g) {
+		remove_recursive_nodes(g);
+		remove_binarization(g);
+		t = g.extract_trees();
+		return false;
+	});
+	return t;
+}
+
 // a dfs based approach to detect cycles for
 // any traversable type
 template<typename NodeT>
@@ -455,4 +472,4 @@ size_t forest<NodeT>::count_trees(const node& root) const {
 }
 
 } // idni namespace
-#endif // __IDNI__PARSER__FOREST_H__
+#endif // __IDNI__PARSER__FOREST_TMPL_H__
