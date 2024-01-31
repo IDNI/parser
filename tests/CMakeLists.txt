@@ -2,6 +2,7 @@ set(TESTS
 	input
 	parser
 	tgf
+	cli
 )
 
 foreach(X IN LISTS TESTS)
@@ -17,3 +18,8 @@ foreach(X IN LISTS TESTS)
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
 	)
 endforeach()
+
+# add required sources to test_cli
+target_sources("test_cli" PRIVATE
+	"${CMAKE_CURRENT_SOURCE_DIR}/../tools/cli.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/../tools/tgf/tgf_cli.cpp")

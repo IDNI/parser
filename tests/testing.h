@@ -19,7 +19,7 @@
 #include <utility>
 #include "parser.h"
 
-namespace idni { namespace testing {
+namespace idni::testing {
 
 struct test_options {
 	std::string contains = "";
@@ -87,8 +87,11 @@ bool check() {
 						test_name) != tests_bl.end(),
 		in_i_wl = std::find(ids_wl.begin(), ids_wl.end(),
 						test_id) != ids_wl.end();
-	return run = (!g_wl || in_g_wl) && (!t_wl || in_t_wl) &&
+	run = (!g_wl || in_g_wl) && (!t_wl || in_t_wl) &&
 		(!i_wl || in_i_wl) && (!in_g_bl && !in_t_bl);
+	//DBG(std::cout << "run: " << run << " " << test_group << " " <<
+	//	test_name << " " << test_id << "\n";)
+	return run;
 }
 
 // prints test info (group / name / id) and decides if the test is skipped
@@ -472,5 +475,5 @@ void process_args(int argc, char **argv) {
 	options<char>.enable_gc = options<char32_t>.enable_gc = enable_gc;
 }
 
-} } // namespace idni::testing
+} // namespace idni::testing
 #endif // __IDNI__TESTING_H__
