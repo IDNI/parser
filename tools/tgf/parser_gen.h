@@ -12,6 +12,7 @@
 // modified over time by the Author.
 #ifndef __IDNI__PARSER__PARSER_GEN_H__
 #define __IDNI__PARSER__PARSER_GEN_H__
+#include <filesystem>
 #include "parser.h"
 namespace idni {
 
@@ -129,13 +130,16 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name,
 		}
 		return os.str();
 	};
-	auto strip_file_path = [](const std::string& p) {
-		size_t n = p.find_last_of("/\\");
-		return n != std::string::npos ? p.substr(n + 1) : p;
+	auto strip_pwd = [](const std::string& p) {
+		auto pwd = std::filesystem::current_path().string();
+		if (pwd.back() != '/') pwd += '/';
+		if (p.compare(0, pwd.size(), pwd) == 0)
+			return p.substr(pwd.size());
+		return p;
 	};
 	const auto ps = gen_prods();
 	os <<	"// This file is generated from a file " <<
-					strip_file_path(tgf_filename)<<" by\n"
+					strip_pwd(tgf_filename)<<" by\n"
 		"//       https://github.com/IDNI/parser/tools/tgf\n"
 		"//\n"
 		"#ifndef __" <<guard<< "_H__\n"
