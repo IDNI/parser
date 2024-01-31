@@ -2,7 +2,7 @@
 
 integer    => [ '-' ] digit+.
 
-quote      => '\"'.
+quote      => '"'.
 esc        => '\\'.
 
 escaping   => quote | esc.
