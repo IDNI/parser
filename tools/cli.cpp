@@ -286,8 +286,11 @@ int cli::process_arg(int& arg, int argc, options& opts) {
 	}
 	// option argument if any
 	++arg;
-	DBG(cout << "arg: " << arg << " argc: " << argc
-		<< " args[arg]: " << args_[arg] << endl;)
+#ifdef DEBUG
+	cout << "arg: " << arg << " argc: " << argc;
+	if (arg < argc) cout << " args[arg]: " << args_[arg];
+	cout << "\n";
+#endif // DEBUG
 	if (arg >= argc || is_opt_prefix(args_[arg])) { // no option argument
 		DBG(cout << "no option argument?\n";)
 		if (!cur->is_bool()) return error(

@@ -1034,7 +1034,7 @@ std::basic_ostream<T>& terminals_to_stream(std::basic_ostream<T>& os,
 	auto ambig = [](const auto&, const auto& ns) {
 		return decltype(ns){ *ns.begin() };
 	};
-	f.traverse(root, cb_enter, f.no_exit, f.do_revisit, ambig);
+	f.traverse(root, cb_enter, NO_EXIT, DO_REVISIT, ambig);
 	return os;
 }
 template <typename C, typename T>

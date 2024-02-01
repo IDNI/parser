@@ -268,7 +268,7 @@ private:
 			}
 			f->traverse(cb_enter, cb_exit
 #ifdef DEBUG
-				, f->no_revisit, cb_ambig
+				, NO_REVISIT, cb_ambig
 #endif
 				);
 			//if (!c) {

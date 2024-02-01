@@ -24,6 +24,12 @@
 #include <cassert>
 #endif
 
+#define NO_ENTER   [](const auto&) {}
+#define NO_EXIT    [](const auto&, const auto&) {}
+#define NO_REVISIT [](const auto&) { return false; }
+#define DO_REVISIT [](const auto&) { return true; }
+#define NO_AMBIG   [](const auto&, const auto& ns) { return ns; }
+
 namespace idni {
 
 template <typename NodeT>
@@ -102,32 +108,25 @@ struct forest {
 	typedef std::function<void(const node&, const nodes_set&)> exit_t;
 	typedef std::function<bool(const node&)> revisit_t;
 	typedef std::function<nodes_set(const node&, const nodes_set&)> ambig_t;
-	static inline enter_t no_enter = [](const node&) {};
-	static inline exit_t no_exit = [](const node&, const nodes_set&) {};
-	static inline revisit_t
-		no_revisit = [](const node&) { return true; },
-		do_revisit = [](const node&) { return false; };
-	static inline ambig_t
-		no_ambig = [](const node&, const nodes_set& ns) { return ns;};
 
 	template <typename cb_enter_t, typename cb_exit_t = exit_t,
 		typename cb_revisit_t = revisit_t, typename cb_ambig_t =ambig_t>
 	bool traverse(const node& root, cb_enter_t cb_enter,
-		cb_exit_t cb_exit = no_exit,
-		cb_revisit_t cb_revisit = no_revisit,
-		cb_ambig_t cb_ambig = no_ambig) const;
+		cb_exit_t cb_exit = NO_EXIT,
+		cb_revisit_t cb_revisit = NO_REVISIT,
+		cb_ambig_t cb_ambig = NO_AMBIG) const;
 	template <typename cb_enter_t, typename cb_exit_t = exit_t,
 		typename cb_revisit_t = revisit_t, typename cb_ambig_t =ambig_t>
 	bool traverse(const node_graph& gr, const node& root,
-		cb_enter_t cb_enter, cb_exit_t cb_exit = no_exit,
-		cb_revisit_t cb_revisit = no_revisit,
-		cb_ambig_t cb_ambig = no_ambig) const;
+		cb_enter_t cb_enter, cb_exit_t cb_exit = NO_EXIT,
+		cb_revisit_t cb_revisit = NO_REVISIT,
+		cb_ambig_t cb_ambig = NO_AMBIG) const;
 	template <typename cb_enter_t, typename cb_exit_t = exit_t,
 		typename cb_revisit_t = revisit_t, typename cb_ambig_t =ambig_t>
 	bool traverse(cb_enter_t cb_enter,
-		cb_exit_t cb_exit = no_exit,
-		cb_revisit_t cb_revisit = no_revisit,
-		cb_ambig_t cb_ambig = no_ambig) const
+		cb_exit_t cb_exit = NO_EXIT,
+		cb_revisit_t cb_revisit = NO_REVISIT,
+		cb_ambig_t cb_ambig = NO_AMBIG) const
 	{
 		return traverse(root(), cb_enter, cb_exit, cb_revisit,cb_ambig);
 	}

@@ -66,7 +66,7 @@ bool forest<NodeT>::detect_cycle(TraversableT& gr) const {
 		if (n.first.nt()) inprog[n] = false;
 	};
 	gr.cycles.clear();
-	return traverse(gr, gr.root, cb_enter, cb_exit, cb_revisit, no_ambig);
+	return traverse(gr, gr.root, cb_enter, cb_exit, cb_revisit);
 }
 
 template<typename NodeT>
@@ -465,8 +465,7 @@ size_t forest<NodeT>::count_trees(const node& root) const {
 			ndc[croot] += pkc; // adding to curroot count
 		}
 	};
-	auto cb_no_revisit = [](const node&) { return false; };
-	traverse(root, no_enter, cb_exit, cb_no_revisit, no_ambig);
+	traverse(root, NO_ENTER, cb_exit);
 	if(isoverflow) ndc[root] = 0; // mark it to be zero
 	return ndc[root];
 }
