@@ -249,7 +249,7 @@ ostream& cli::help(ostream& os, command cmd) const {
 // if it is an invalid option, returns 1
 // if it is a command, returns 2
 int cli::process_arg(int& arg, int argc, options& opts) {
-	DBG(std::cout << "process_arg: " << arg << " argc: " << argc << " args[arg]: " << args_[arg] << "\n";)
+	//DBG(std::cout << "process_arg: " << arg << " argc: " << argc << " args[arg]: " << args_[arg] << "\n";)
 	option* cur = 0;
 	string opt(args_[arg]);
 	bool isshort;
@@ -259,20 +259,17 @@ int cli::process_arg(int& arg, int argc, options& opts) {
 		// otherwise invalid option
 		return error("Invalid command: " + opt, true);
 	}
-	DBG(cout << "opt: " << opt << " isshort: "
-		<< PBOOL(isshort) << endl;)
+	//DBG(cout << "opt: " << opt << " isshort: " << PBOOL(isshort) << endl;)
 	if (isshort) for (size_t o = 0; o != opt.size(); ++o) {
 		string n = long_for(opt[o], opts);
-		DBG(cout << "long_for " << opt[o] << ": "
-			<< n << "\n";)
+		//DBG(cout << "long_for " << opt[o] << ": " << n << "\n";)
 		if (n.size() == 0 || !cmd_.has(n)) {
 			stringstream ss;
 			ss << "Invalid option: -" << opt[o];
 			return error(ss.str(), true);
 		}
 		cur = &cmd_[n];
-		DBG(cout << "cur->name() " << cur->name()
-			<< "\n";);
+		//DBG(cout << "cur->name() " << cur->name() << "\n";);
 		if (cur->is_bool()) cur->set(true);
 		else if (opt.size() > o + 1) {
 			stringstream ss;
@@ -292,19 +289,19 @@ int cli::process_arg(int& arg, int argc, options& opts) {
 	}
 	// option argument if any
 	++arg;
-#ifdef DEBUG
-	cout << "arg: " << arg << " argc: " << argc;
-	if (arg < argc) cout << " args[arg]: " << args_[arg];
-	cout << "\n";
-#endif // DEBUG
+//#ifdef DEBUG
+//	cout << "arg: " << arg << " argc: " << argc;
+//	if (arg < argc) cout << " args[arg]: " << args_[arg];
+//	cout << "\n";
+//#endif // DEBUG
 	if (arg >= argc || is_opt_prefix(args_[arg])) { // no option argument
-		DBG(cout << "no option argument?\n";)
+		//DBG(cout << "no option argument?\n";)
 		if (!cur->is_bool()) return error(
 			"Missing argument for option: --"+cur->name());
 		return 0;
 	} else {
 		string v = args_[arg];
-		DBG(cout << "v: " << v << "\n";)
+		//DBG(cout << "v: " << v << "\n";)
 		if (cur->is_string()) cur->set(v);
 		else if (cur->is_bool())
 			cur->set(is_true_value(v));
@@ -317,9 +314,8 @@ int cli::process_arg(int& arg, int argc, options& opts) {
 					"number: " + v);
 			cur->set(n);
 		}
-		DBG(if (cur->is_string()) cout <<
-			"cur->get_string(): " << cur->get<string>()
-				<< "\n";)
+		//DBG(if (cur->is_string()) cout
+		//	<< "cur->get_string(): " << cur->get<string>() << "\n";)
 	}
 	++arg;
 	return 0;
@@ -329,38 +325,34 @@ int cli::process_arg(int& arg, int argc, options& opts) {
 int cli::process_args() {
 	int argc(args_.size());
 
-#ifdef DEBUG
-	cout << "== DEBUG ========================================"
-		"==========================\n";
-	cout << "argc: " << argc << "\n";
-	cout << "argv:";
-	for (int i = 0; i != argc; ++i)
-		cout << "\t" << i << ": `" << args_[i] << "`\n";
-	cout << "= /DEBUG ========================================"
-		"==========================\n\n";
-#endif
-	//auto get_opt = [&](const string& n) -> option& {
-	//	if (!cmd_.has(n)) return cur = 0, cmd_["help"];
-	//	return cur = &cmd_[n];
-	//};
+//#ifdef DEBUG
+//	cout << "== DEBUG ========================================"
+//		"==========================\n";
+//	cout << "argc: " << argc << "\n";
+//	cout << "argv:";
+//	for (int i = 0; i != argc; ++i)
+//		cout << "\t" << i << ": `" << args_[i] << "`\n";
+//	cout << "= /DEBUG ========================================"
+//		"==========================\n\n";
+//#endif
 
 	status_ = 0;
 	// get CLI options
 	int arg = 1;
 	for ( ; arg < argc; )
 		if ((status_ = process_arg(arg, argc, options_)) != 0) break;
-	DBG(cout << "status: " << status_ << endl;)
+	//DBG(cout << "status: " << status_ << endl;)
 	if (status_ == 1) return status_; // invalid command/option
 
-	DBG(cout << "options: " << "\n";)
-	DBG(for (auto& o : options_) o.second.print(cout << "\t") << "\n";)
+	//DBG(cout << "options: " << "\n";)
+	//DBG(for (auto& o : options_) o.second.print(cout << "\t") << "\n";)
 
 	// get command
 	status_ = 0;
-	DBG(cout << "status: " << status_ << endl;)
+	//DBG(cout << "status: " << status_ << endl;)
 
 	std::string cmdarg = (arg >= argc) ? default_command_ : args_[arg];
-	DBG(std::cout << "cmdarg: " << cmdarg << "\n";)
+	//DBG(std::cout << "cmdarg: " << cmdarg << "\n";)
 	if (cmdarg.size()) {
 		if (commands_.find(cmdarg) == commands_.end()) return status_
 				= error("Unknown command: " + cmdarg, true);
@@ -370,9 +362,9 @@ int cli::process_args() {
 		for ( ; arg < argc; )
 			if ((status_ = process_arg(arg, argc, cmd_.opts_)) != 0)
 				break;
-		DBG(cout << "status: " << status_ << endl;)
+		//DBG(cout << "status: " << status_ << endl;)
 
-		DBG(cmd_.print(cout << "command:\n") << endl;)
+		//DBG(cmd_.print(cout << "command:\n") << endl;)
 		if (status_) return 1; // invalid option
 		cmd_.ok_ = true;
 	}

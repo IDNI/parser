@@ -135,11 +135,11 @@ cli::commands tgf_commands() {
 int show(const string& tgf_file, const string start = "start",
 	bool print_grammar = true, bool print_nullable_ambiguity = false)
 {
-	DBG(cout << tgf_file << " show" <<
-		" --start " << start <<
-		" --grammar " << PBOOL(print_grammar) <<
-		" --nullable-ambiguity " << PBOOL(print_nullable_ambiguity) <<
-		"\n";)
+	//DBG(cout << tgf_file << " show" <<
+	//	" --start " << start <<
+	//	" --grammar " << PBOOL(print_grammar) <<
+	//	" --nullable-ambiguity " << PBOOL(print_nullable_ambiguity) <<
+	//	"\n";)
 	nonterminals<char> nts;
 	auto g = tgf<char>::from_file(nts, tgf_file, start);
 	if (print_grammar) g.print_internal_grammar(cout);
@@ -152,13 +152,13 @@ int gen(ostream& os, const string& tgf_file, const string name = "my_parser",
 	const string terminal_type = "char", const string decoder = "",
 	const string encoder = "")
 {
-	DBG(cout << tgf_file << " gen" <<
-		" --name " << name <<
-		" --char-type " << char_type <<
-		" --terminal-type " << terminal_type <<
-		" --start " << start <<
-		" --decoder \"" << decoder << "\"" <<
-		" --encoder \"" << encoder << "\"\n";)
+	//DBG(cout << tgf_file << " gen" <<
+	//	" --name " << name <<
+	//	" --char-type " << char_type <<
+	//	" --terminal-type " << terminal_type <<
+	//	" --start " << start <<
+	//	" --decoder \"" << decoder << "\"" <<
+	//	" --encoder \"" << encoder << "\"\n";)
 	generate_parser_cpp_from_file<char>(os, name, tgf_file, start,
 		char_type, terminal_type, decoder, encoder);
 	return 0;
@@ -222,16 +222,16 @@ int parsed(std::unique_ptr<parser<char>::pforest> f, const cli& cl,
 
 int tgf_run(int argc, char** argv) {
 
-#ifdef DEBUG
-	cout << "== DEBUG ====================================================="
-							"=============\n";
-	cout << "argc: " << argc << "\n";
-	cout << "argv:";
-	for (size_t i = 0; i != static_cast<size_t>(argc); ++i)
-		cout << "\t" << i << ": `" << argv[i] << "`\n";
-	cout << "= /DEBUG ====================================================="
-							"=============\n\n";
-#endif
+//#ifdef DEBUG
+//	cout << "== DEBUG ====================================================="
+//							"=============\n";
+//	cout << "argc: " << argc << "\n";
+//	cout << "argv:";
+//	for (size_t i = 0; i != static_cast<size_t>(argc); ++i)
+//		cout << "\t" << i << ": `" << argv[i] << "`\n";
+//	cout << "= /DEBUG ====================================================="
+//							"=============\n\n";
+//#endif
 
 	auto cmds = tgf_commands();
 	auto options = tgf_options();
