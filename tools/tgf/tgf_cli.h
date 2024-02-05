@@ -12,7 +12,7 @@
 // modified over time by the Author.
 #ifndef __IDNI_TGF_CLI_H__
 #define __IDNI_TGF_CLI_H__
-#include "../cli.h"
+#include "../../src/cli.h"
 
 namespace idni {
 
