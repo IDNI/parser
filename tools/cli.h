@@ -34,9 +34,9 @@ struct cli {
 		// with a default value denoting also option value's type
 		option(const std::string& name, char short_, value dflt_value);
 		// add a description to the option
-		option& desc(const std::string& d);
+		option& set_description(const std::string& d);
 		// getters
-		const std::string& desc() const;
+		const std::string& description() const;
 		const std::string& name() const;
 		char short_name() const;
 		// returns true if name matches string n
@@ -68,13 +68,13 @@ struct cli {
 		command() {};
 		command(const std::string& name, const std::string& desc = "",
 			options opts = {});
-		command& desc(const std::string& d);
+		command& set_description(const std::string& d);
 		command& add_option(const option& o);
 
 		bool ok() const;
 
 		const std::string& name() const;
-		const std::string& desc() const;
+		const std::string& description() const;
 		bool has(const std::string& n) const;
 		option& operator[](const std::string& n);
 		option& operator[](char c);
@@ -118,12 +118,15 @@ struct cli {
 	std::ostream& info(std::ostream& os, const std::string& msg,
 		size_t indent = 0) const;
 	std::ostream& info(const std::string& msg, size_t indent = 0) const;
+
+	// prints error message and help if print_help is true
 	int error(std::ostream& os, const std::string& msg,
 		bool print_help = false) const;
 	int error(const std::string& msg, bool print_help = false) const;
 
 	// prints help
 	std::ostream& help(std::ostream& os, command cmd = {}) const;
+	std::ostream& help(command cmd = {}) const;
 
 	int process_args();
 	int status() const;

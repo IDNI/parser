@@ -69,8 +69,8 @@ ostream& info_new_line(ostream& os, size_t indent) {
 };
 
 ostream& print_options(ostream& os, const cli::options& opts) {
-	for (auto& [_, opt] : opts) os << "\t--" << opt.name()
-		<< "\t-" << opt.short_name() << "\t" << opt.desc() << "\n";
+	for (auto& [_, opt] : opts) os << "\t--" << opt.name() << "\t-"
+		<< opt.short_name() << "\t" << opt.description() << "\n";
 	return os;
 }
 
@@ -87,9 +87,11 @@ cli::option::option() {}
 cli::option::option(const string& name, char short_, value dflt_value)
 	: name_(name), short_(short_), value_(dflt_value) {}
 
-cli::option& cli::option::desc(const string& d) { return desc_ = d, *this; }
+cli::option& cli::option::set_description(const string& d) {
+	return desc_ = d, *this;
+}
 
-const string& cli::option::desc()          const { return desc_; }
+const string& cli::option::description()   const { return desc_; }
 const string& cli::option::name()          const { return name_; }
 char cli::option::short_name()             const { return short_; }
 bool cli::option::matches(const string& n) const { return name_  == n; }
@@ -128,7 +130,7 @@ ostream& cli::option::print(ostream& os) const {
 
 cli::command::command(const string& name, const string& desc, options opts)
 	: name_(name), desc_(desc), opts_(opts) {}
-cli::command& cli::command::desc(const string& desc) {
+cli::command& cli::command::set_description(const string& desc) {
 	return desc_ = desc, *this;
 }
 cli::command& cli::command::add_option(const option& o) {
@@ -138,7 +140,7 @@ cli::command& cli::command::add_option(const option& o) {
 bool cli::command::ok() const { return ok_; }
 
 const string& cli::command::name() const { return name_; }
-const string& cli::command::desc() const { return desc_; }
+const string& cli::command::description() const { return desc_; }
 bool cli::command::has(const string& n) const {
 	return opts_.find(n) != opts_.end(); }
 cli::option& cli::command::operator[](const string& n) { return opts_[n]; }
@@ -148,7 +150,7 @@ cli::option& cli::command::operator[](char c) {
 ostream& cli::command::help(ostream& os) const {
 	os << name();
 	if (opts_.size()) os << " [ options ]";
-	os << "\n" << desc() << "\n\n";
+	os << "\n" << description() << "\n\n";
 	return print_options(os << "Command options:\n", opts_);
 }
 
@@ -215,6 +217,10 @@ int cli::error(const string& msg, bool print_help) const {
 	return error(*err_, msg, print_help);
 }
 
+ostream& cli::help(command cmd) const {
+	return help(*out_, cmd);
+}
+
 ostream& cli::help(ostream& os, command cmd) const {
 	auto print_header = [this](ostream& os) -> ostream& {
 		return help_header_.size() ? os << help_header_ : os << name_;
@@ -222,7 +228,7 @@ ostream& cli::help(ostream& os, command cmd) const {
 	if (cmd.ok()) return commands_default_.at(cmd.name())
 					.help(print_header(os << "\n")) << "\n";
 	print_header(os);
-	if (options_.size()) os << "[ options ] ";
+	if (options_.size()) os << " [ options ] ";
 	if (commands_.size()) {
 		if (default_command_.size()) os << "[ ";
 		os << "<command> [ <command options> ] ";
@@ -234,7 +240,7 @@ ostream& cli::help(ostream& os, command cmd) const {
 	if (commands_.size()) {
 		os << "Commands:\n";
 		for (auto it : commands_) os << "\t" << it.first
-					<< "\t\t" << it.second.desc() << "\n";
+				<< "\t\t" << it.second.description() << "\n";
 	}
 	return os << "\n";
 }

@@ -30,7 +30,7 @@ namespace idni {
 cli::options tgf_options() {
 	cli::options os;
 	os["help"] = cli::option("help", 'h', false)
-		.desc("detailed information about options");
+		.set_description("detailed information about options");
 	return os;
 }
 
@@ -45,7 +45,7 @@ cli::commands tgf_commands() {
 		lopt = opt.name(), cs[lcmd].add_option(opt);
 		return cs[lcmd][lopt]; };
 	auto DESC = [&](const string& d) {
-		cs[lcmd][lopt].desc(d); };
+		cs[lcmd][lopt].set_description(d); };
 
 	// ---------------------------------------------------------------------
 
@@ -261,13 +261,13 @@ int tgf_run(int argc, char** argv) {
 	auto cmd  = cl.get_processed_command();
 
 	// if --help/-h option is true, print help end exit
-	if (opts["help"].get<bool>()) return cl.help(cout), 0;
+	if (opts["help"].get<bool>()) return cl.help(), 0;
 
 	// error if command is invalid
 	if (!cmd.ok()) return cl.error("invalid command", true);
 
 	// if cmd's --help/-h option is true, print cmd's help and exit
-	if (cmd.get<bool>("help")) return cl.help(cout, cmd), 0;
+	if (cmd.get<bool>("help")) return cl.help(cmd), 0;
 
 	// error if TGF file is not provided or does not exist
 	if (!provided) return cl.error("no TGF file specified", true);
