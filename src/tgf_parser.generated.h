@@ -1,4 +1,4 @@
-// This file is generated from a file tgf.tgf by
+// This file is generated from a file src/tgf.tgf by
 //       https://github.com/IDNI/parser/tools/tgf
 //
 #ifndef __TGF_PARSER_H__
@@ -6,30 +6,36 @@
 #include <string.h>
 #include "parser.h"
 struct tgf_parser {
+	using char_type     = char;
+	using terminal_type = char;
+	using traits_type   = std::char_traits<char_type>;
+	using int_type      = typename traits_type::int_type;
+	using symbol_type   = idni::lit<char_type, terminal_type>;
+	using location_type = std::array<size_t, 2>;
+	using node_type     = std::pair<symbol_type, location_type>;
+	using parser_type   = idni::parser<char_type, terminal_type>;
+	using options       = parser_type::options;
+	using parse_options = parser_type::parse_options;
+	using forest_type   = parser_type::pforest;
+	using input_type    = parser_type::input;
+	using decoder_type  = parser_type::input::decoder_type;
+	using encoder_type  = std::function<std::basic_string<char_type>(
+			const std::vector<terminal_type>&)>;
 	tgf_parser() :
 		nts(load_nonterminals()), cc(load_cc()),
 		g(nts, load_prods(), nt(6), cc), p(g, load_opts()) {}
-	std::unique_ptr<typename idni::parser<char, char>::pforest> parse(
-		const char* data, size_t size = 0, size_t max_l = 0,
-		char eof = std::char_traits<char>::eof())
-			{ return p.parse(data, size, max_l, eof); }
-	std::unique_ptr<typename idni::parser<char, char>::pforest> parse(
-		std::basic_istream<char>& is, size_t max_l = 0,
-		char eof = std::char_traits<char>::eof())
-			{ return p.parse(is, max_l, eof); }
-	std::unique_ptr<typename idni::parser<char, char>::pforest> parse(
-		std::string fn, mmap_mode m, size_t max_l = 0,
-		char eof = std::char_traits<char>::eof())
-			{ return p.parse(fn, m, max_l, eof); }
+	std::unique_ptr<forest_type> parse(const char_type* data, size_t size=0,
+		parse_options po = {}) { return p.parse(data, size, po); }
+	std::unique_ptr<forest_type> parse(std::basic_istream<char_type>& is,
+		parse_options po = {}) { return p.parse(is, po); }
+	std::unique_ptr<forest_type> parse(std::string fn, mmap_mode m,
+		parse_options po = {}) { return p.parse(fn, m, po); }
 #ifndef WIN32
-	std::unique_ptr<typename idni::parser<char, char>::pforest> parse(
-		int fd, size_t max_l = 0,
-		char eof = std::char_traits<char>::eof())
-			{ return p.parse(fd, max_l, eof); }
+	std::unique_ptr<forest_type> parse(int fd, parse_options po = {})
+		{ return p.parse(fd, po); }
 #endif //WIN32
 	bool found() { return p.found(); }
-	typename idni::parser<char, char>::error get_error()
-		{ return p.get_error(); }
+	typename parser_type::error get_error() { return p.get_error(); }
 	enum nonterminal {
 		nul, eof, alnum, alpha, space, printable, start, ws, statement, _Rstart_0, 
 		_Rstart_1, directive, production, ws_required, directive_params, directive_param, _Rdirective_params_2, _Rdirective_params_3, sym, expr1, 
@@ -39,27 +45,30 @@ struct tgf_parser {
 		_Rterminal_string_11, _Rterminal_string_12, _Runescaped_s_13, _Rescaped_s_14, ws_comment, ws_char, _Rws_comment_15, _Rws_comment_16, eol, __neg_0, 
 		__neg_1, 
 	};
-	size_t id(const std::basic_string<char>& name) { return nts.get(name); }
+	size_t id(const std::basic_string<char_type>& name) {
+		return nts.get(name);
+	}
 private:
-	std::vector<char> ts{
+	std::vector<terminal_type> ts{
 		'\0', '@', 'u', 's', 'e', '_', 'c', 'h', 'a', 
 		'r', 'l', '.', ',', 'n', 'm', 'p', 'b', 'k', 't', 
 		'd', 'i', 'g', 'o', 'f', 'w', 'x', '=', '>', '|', 
 		'&', '~', '(', ')', '[', ']', '{', '}', '+', '*', 
 		'\'', '\\', '/', '"', '#', '\t', '\n', '\r', 
 	};
-	idni::nonterminals<char, char> nts{};
-	idni::char_class_fns<char> cc;
-	idni::grammar<char, char> g;
-	idni::parser<char, char> p;
-	idni::prods<char, char> t(size_t tid) {
-		return idni::prods<char, char>(ts[tid]);
+	idni::nonterminals<char_type, terminal_type> nts{};
+	idni::char_class_fns<terminal_type> cc;
+	idni::grammar<char_type, terminal_type> g;
+	parser_type p;
+	idni::prods<char_type, terminal_type> t(size_t tid) {
+		return idni::prods<char_type, terminal_type>(ts[tid]);
 	}
-	idni::prods<char, char> nt(size_t ntid) {
-		return idni::prods<char, char>(idni::lit<char, char>(ntid, &nts));
+	idni::prods<char_type, terminal_type> nt(size_t ntid) {
+		return idni::prods<char_type, terminal_type>(
+			symbol_type(ntid, &nts));
 	}
-	idni::nonterminals<char, char> load_nonterminals() const {
-		idni::nonterminals<char, char> nts{};
+	idni::nonterminals<char_type, terminal_type> load_nonterminals() const {
+		idni::nonterminals<char_type, terminal_type> nts{};
 		for (const auto& nt : {
 			"", "eof", "alnum", "alpha", "space", "printable", "start", "ws", "statement", "_Rstart_0", 
 			"_Rstart_1", "directive", "production", "ws_required", "directive_params", "directive_param", "_Rdirective_params_2", "_Rdirective_params_3", "sym", "expr1", 
@@ -71,8 +80,8 @@ private:
 		}) nts.get(nt);
 		return nts;
 	}
-	idni::char_class_fns<char> load_cc() {
-		return idni::predefined_char_classes<char, char>({
+	idni::char_class_fns<terminal_type> load_cc() {
+		return idni::predefined_char_classes<char_type, terminal_type>({
 			"eof",
 			"alnum",
 			"alpha",
@@ -80,12 +89,13 @@ private:
 			"printable",
 		}, nts);
 	}
-	idni::parser<char, char>::options load_opts() {
-		idni::parser<char, char>::options o;
+	options load_opts() {
+		options o;
 		return o;
 	}
-	idni::prods<char, char> load_prods() {
-		idni::prods<char, char> q, nul(idni::lit<char, char>{});
+	idni::prods<char_type, terminal_type> load_prods() {
+		idni::prods<char_type, terminal_type> q,
+			nul(symbol_type{});
 		// _Rstart_0 => ws statement.
 		q(nt(9), (nt(7)+nt(8)));
 		// _Rstart_1 => null.
