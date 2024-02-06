@@ -38,7 +38,7 @@ std::ostream& forest<NodeT>::print_data(std::ostream& os) const {
 // check if has_single_parse_tree() is true or is_ambiguous() is false first
 // or ambiguous_nodes() is empty
 template <typename NodeT>
-forest<NodeT>::sptree forest<NodeT>::get_tree() const {
+forest<NodeT>::sptree forest<NodeT>::get_tree() {
 	forest<NodeT>::sptree t;
 	extract_graphs(root(), [this, &t] (auto& g) {
 		remove_recursive_nodes(g);
