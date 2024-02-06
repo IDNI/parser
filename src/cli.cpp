@@ -226,7 +226,7 @@ ostream& cli::help(ostream& os, command cmd) const {
 		return help_header_.size() ? os << help_header_ : os << name_;
 	};
 	if (cmd.ok()) return cmds_default_.at(cmd.name())
-					.help(print_header(os << "\n")) << "\n";
+					.help(print_header(os) << " ") << "\n";
 	print_header(os);
 	if (opts_.size()) os << " [ options ] ";
 	if (cmds_.size()) {
@@ -263,13 +263,13 @@ int cli::process_arg(int& arg, bool& has_cmd, options& opts) {
 	if (isshort) for (size_t o = 0; o != opt.size(); ++o) {
 		string n = long_for(opt[o], opts);
 		//DBG(cout << "long_for " << opt[o] << ": " << n << "\n";)
-		if (n.size() == 0) {
+		if (n.size() == 0 || opts.find(n) == opts.end()) {
 			if (!has_cmd) return 3;
 			stringstream ss;
 			ss << "Invalid option: -" << opt[o];
 			return error(ss.str(), true);
 		}
-		cur = &cmd_[n];
+		cur = &opts[n];
 		//DBG(cout << "cur->name() " << cur->name() << "\n";);
 		if (cur->is_bool()) cur->set(true);
 		else if (opt.size() > o + 1) {
@@ -289,8 +289,8 @@ int cli::process_arg(int& arg, bool& has_cmd, options& opts) {
 		cur = &opts[opt];
 		if (cur->is_bool()) cur->set(true);
 	}
-	// option argument if any
 	++arg;
+	// option argument if any
 //#ifdef DEBUG
 //	cout << "arg: " << arg << " argc: " << argc;
 //	if (arg < argc) cout << " args[arg]: " << args_[arg];
