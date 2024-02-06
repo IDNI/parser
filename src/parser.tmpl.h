@@ -388,37 +388,42 @@ void parser<C, T>::scan_cc_function(const item& i, size_t n, T ch,
 }
 template <typename C, typename T>
 std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
-	const C* data, size_t size, size_t max_length, int_type eof)
+	const C* data, size_t size, parse_options po)
 {
-	in = std::make_unique<input>(data, size, max_length,
-						o.chars_to_terminals, eof);
-	return _parse();
+	in = std::make_unique<input>(data, size,
+		po.max_length, o.chars_to_terminals, po.eof);
+	return _parse(po.start);
 }
 template <typename C, typename T>
 std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
-	std::basic_istream<C>& is, size_t max_length, int_type eof)
+	std::basic_istream<C>& is, parse_options po)
 {
-	in = std::make_unique<input>(is, max_length, o.chars_to_terminals, eof);
-	return _parse();
+	in = std::make_unique<input>(is,
+		po.max_length, o.chars_to_terminals, po.eof);
+	return _parse(po.start);
 }
 template <typename C, typename T>
 std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
-	const std::string& fn, mmap_mode m, size_t max_length, int_type eof)
+	const std::string& fn, mmap_mode m, parse_options po)
 {
-	in = std::make_unique<input>(fn, m, max_length, o.chars_to_terminals, eof);
-	return _parse();
+	in = std::make_unique<input>(fn, m,
+		po.max_length, o.chars_to_terminals, po.eof);
+	return _parse(po.start);
 }
 #ifndef _WIN32
 template <typename C, typename T>
 std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
-	int fd, size_t max_length, int_type eof)
+	int fd, parse_options po)
 {
-	in = std::make_unique<input>(fd, max_length, o.chars_to_terminals, eof);
-	return _parse();
+	in = std::make_unique<input>(fd,
+		po.max_length, o.chars_to_terminals, po.eof);
+	return _parse(po.start);
 }
 #endif
 template <typename C, typename T>
-std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
+std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
+	int_t start)
+{
 	MS(emeasure_time_start(tsr, ter);)
 	//DBGP(std::cout << "parse: `" << to_std_string(s) << "`[" << len <<
 	//	"] g.start:" << g.start << "(" << g.start.nt() << ")" << "\n";)
@@ -431,8 +436,10 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 	MS(int gcnt = 0;) // count of collected items
 	tid = 0;
 	S.resize(1);
+	lit<C, T> start_lit = start!=-1 ? g.nt(start)
+					: g.start_literal();
 	container_t t, c;
-	for (size_t p : g.prod_ids_of_literal(g.start_literal()))
+	for (size_t p : g.prod_ids_of_literal(start_lit))
 		for (size_t c = 0; c != g.n_conjs(p); ++c)
 			++refi[*add(t, { 0, p, c, 0, 0 }).first];
 #if MEASURE_EACH_POS
@@ -445,7 +452,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 	T ch = 0;
 	size_t n = 0, cn = -1;
 	bool new_pos = true;
-	//DBGP(print(std::cout << "\ninitial t:\n", t);)
+	DBGP(print(std::cout << "\ninitial t:\n", t);)
 	do {
 		if ((new_pos = (cn != in->pos()))) cn = in->pos();
 		ch = in->tcur(), n = in->tpos();
@@ -545,8 +552,8 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 	MS(if (count + gcnt)
 		std::cout << "\nGC: % = " << 100*gcnt/(count+gcnt) <<std::endl);
 
-	if (!o.incr_gen_forest) init_forest(*f);
-	else f->root(pnode(g.start_literal(), { 0, in->tpos() }));
+	if (!o.incr_gen_forest) init_forest(*f, start_lit);
+	else f->root(pnode(start_lit, { 0, in->tpos() }));
 #if defined(DEBUG) && defined(WITH_DEVHELPERS)
 	bool nt = f->has_single_parse_tree();
 	//std::cout << "forest has more than one parse tree:"
@@ -581,10 +588,12 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse() {
 	return f;
 }
 template <typename C, typename T>
-bool parser<C, T>::found() {
-	DBGP(print(std::cout << "Slast:\n", S[in->tpos()]) << std::endl;)
+bool parser<C, T>::found(int_t start) {
+	//DBGP(print(std::cout << "Slast:\n", S[in->tpos()]) << std::endl;)
 	bool f = false;
-	for (size_t n : g.prod_ids_of_literal(g.start_literal())) {
+	for (size_t n : g.prod_ids_of_literal(start != -1 ? g.nt(start)
+							: g.start_literal()))
+	{
 		f = true;
 		item all(in->tpos(), n, 0, 0, 0);
 		for (size_t c = 0; c != g.n_conjs(n); ++c) {
@@ -837,14 +846,14 @@ void parser<C, T>::pre_process(const item& i) {
 	}
 }
 template <typename C, typename T>
-bool parser<C, T>::init_forest(pforest& f) {
+bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit) {
 	bool ret = false;
 	bin_tnt.clear();
 	sorted_citem.clear();
 	rsorted_citem.clear();
 	tid = 0;
 	// set the start root node
-	pnode root(g.start_literal(), { 0, in->tpos() });
+	pnode root(start_lit, { 0, in->tpos() });
 	f.root(root);
 	// preprocess parser items for faster retrieval
 	MS(emeasure_time_start(tspfo, tepfo);)

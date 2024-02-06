@@ -78,6 +78,7 @@ int main(int argc, char **argv)
 	run_test<char>(ps, nt, start, "-", {}, o);
 	o.error_expected = "Unexpected '\\r' at 1:1 (1)";
 	run_test<char>(ps, nt, start, "\r", {}, o);
+	o.error_expected = "";
 	ps.clear();
 
 	// char classes
@@ -118,6 +119,37 @@ int main(int argc, char **argv)
 	run_test<char>(ps, nt, start, "a\r", cc);  // 6
 	run_test<char>(ps, nt, start, "a",   cc);  // 7
 	ps.clear();
+
+	TEST("basic", "custom start")
+	ps(start, number | identifier);
+	ps(identifier, alpha + chars);
+	ps(chars, (alnum + chars) | nll);
+	ps(number, digits);
+	ps(digits, digit | (digit + digits));
+	run_test<char>(ps, nt, start, "12", cc, o); //  0
+	run_test<char>(ps, nt, start, "x1", cc, o); //  1
+	run_test<char>(ps, nt, start, "pi", cc, o); //  2
+	o.start = nt.get("number");
+	o.dump = true;
+	run_test<char>(ps, nt, start, "12", cc, o); //  3
+	o.start = nt.get("digits");
+	run_test<char>(ps, nt, start, "12", cc, o); //  4
+	o.start = nt.get("identifier");
+	run_test<char>(ps, nt, start, "x1", cc, o); //  5
+	run_test<char>(ps, nt, start, "pi", cc, o); //  6
+	o.start = nt.get("chars");
+	run_test<char>(ps, nt, start, "x1", cc, o); //  7
+	run_test<char>(ps, nt, start, "pi", cc, o); //  8
+	// following does not work because char classes are not ordinary prods
+	//o.start = nt.get("digit");
+	//run_test<char>(ps, nt, start, "1", cc, o);  //  9
+	//run_test<char>(ps, nt, start, "2", cc, o);  // 10
+	//o.start = nt.get("alnum");
+	//run_test<char>(ps, nt, start, "x", cc, o);  // 11
+	//run_test<char>(ps, nt, start, "1", cc, o);  // 12
+	o.start = -1;
+	ps.clear();
+
 
 /*******************************************************************************
 *       PAPERS
@@ -371,7 +403,7 @@ int main(int argc, char **argv)
 		run_test_tgf("start => '(' start ')' start | null.",
 			input.str());
 		t.close();
-		
+
 		TEST("stress", "gram_long")
 		ifstream t1("./tests/stress_test1.txt");
 		stringstream gram;

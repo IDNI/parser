@@ -185,25 +185,6 @@ public:
 	using encoder_type  = std::function<
 				std::basic_string<C>(const std::vector<T>&)>;
 	typedef typename std::pair<lit<C, T>, std::array<size_t, 2>> pnode;
-	struct options {
-		// applying binarization to ensure every forest node
-		// has atmost 2 or less children nodes
-		bool binarize = DEFAULT_BINARIZE;
-		// build forest incrementally as soon any
-		// item is completed
-		bool incr_gen_forest = DEFAULT_INCR_GEN_FOREST;
-		// enable garbage collection
-		bool enable_gc = false;
-		// number of steps garbage collection lags behind
-		// parsing position n. should be greater than
-		// 0 and less than the size of the input
-		// for any collection activity. We cannot use
-		// % since in the streaming case, we do not know
-		// exact size in advance
-		size_t gc_lag = 1;
-		decoder_type chars_to_terminals = 0;
-		encoder_type terminals_to_chars = 0;
-	};
 	struct item {
 		item(size_t set, size_t prod,size_t con,size_t from,size_t dot);
 		bool operator<(const item& i) const;
@@ -264,19 +245,48 @@ public:
 	typedef pforest::graph pgraph;
 	typedef pforest::tree ptree;
 	typedef pforest::sptree psptree;
+
+	// parser options for constructor
+	struct options {
+		// applying binarization to ensure every forest node
+		// has atmost 2 or less children nodes
+		bool binarize = DEFAULT_BINARIZE;
+		// build forest incrementally as soon any
+		// item is completed
+		bool incr_gen_forest = DEFAULT_INCR_GEN_FOREST;
+		// enable garbage collection
+		bool enable_gc = false;
+		// number of steps garbage collection lags behind
+		// parsing position n. should be greater than
+		// 0 and less than the size of the input
+		// for any collection activity. We cannot use
+		// % since in the streaming case, we do not know
+		// exact size in advance
+		size_t gc_lag = 1;
+		decoder_type chars_to_terminals = 0;
+		encoder_type terminals_to_chars = 0;
+	};
+	// constructor
 	parser(grammar<C, T>& g, options o = {});
+
+	// parse options for parse() call
+	struct parse_options {
+		size_t max_length = 0; // read up to max length of the input size
+		int_t start = -1; // start non-terminal, -1 if default
+		C eof = std::char_traits<C>::eof(); // end of a stream
+	};
+	// parse call
 	std::unique_ptr<pforest> parse(const C* data, size_t size = 0,
-		size_t max_length = 0,
-		int_type eof = std::char_traits<C>::eof());
+		parse_options po = {});
 	std::unique_ptr<pforest> parse(std::basic_istream<C>& is,
-		size_t max_length=0, int_type eof = std::char_traits<C>::eof());
+		parse_options po = {});
 	std::unique_ptr<pforest> parse(const std::string& fn, mmap_mode m,
-		size_t max_length=0, int_type eof = std::char_traits<C>::eof());
+		parse_options po = {});
 #ifndef _WIN32
-	std::unique_ptr<pforest> parse(int filedescriptor, size_t max_length=0,
-		int_type eof = std::char_traits<C>::eof());
+	std::unique_ptr<pforest> parse(int filedescriptor,
+		parse_options po = {});
 #endif
-	bool found();
+	bool found(int_t start = -1);
 	std::basic_string<C> get_input();
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
 	typedef std::set<item> container_t;
@@ -343,7 +353,6 @@ private:
 	std::map<std::pair<size_t, size_t>, std::vector<const item*> >
 		sorted_citem, rsorted_citem;
 
-
 	// binarized temporary intermediate non-terminals
 	std::map<std::vector<lit<C, T>>, lit<C, T>> bin_tnt;
 	size_t tid; // id for temporary non-terminals
@@ -368,12 +377,12 @@ private:
 	size_t n_literals(const item& i) const;
 	std::pair<item, bool> get_conj(size_t set, size_t prod, size_t con) const;
 	void pre_process(const item& i);
-	bool init_forest(pforest& f);
+	bool init_forest(pforest& f, const lit<C, T>& start_lit);
 	bool build_forest(pforest& f, const pnode& root);
 	bool binarize_comb(const item&, std::set<std::vector<pnode>>&);
 	void sbl_chd_forest(const item&,
 		std::vector<pnode>&, size_t, std::set<std::vector<pnode>>&);
-	std::unique_ptr<pforest> _parse();
+	std::unique_ptr<pforest> _parse(int_t start = -1);
 #ifdef DEBUG
 	template <typename CharU>
 	friend std::ostream& operator<<(std::ostream& os, lit<C, T>& l);

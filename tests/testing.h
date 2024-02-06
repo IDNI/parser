@@ -26,6 +26,7 @@ struct test_options {
 	std::string error_expected = "";
 	bool dump = false;
 	bool ambiguity_fails = true;
+	int_t start = -1;
 };
 
 template <typename T = char>
@@ -217,16 +218,17 @@ bool run_test_(grammar<T>& g, parser<T>& p, const std::basic_string<T>& input,
 			ss << "\t# grammar productions:\n", "\t# ") <<std::endl;
 	}
 	emeasure_time_start(start_p, end_p);
-	auto f = p.parse(input.c_str(), input.size());
+	auto f = p.parse(input.c_str(), input.size(), { .start = opts.start });
 	if (measure) {
 		ss << "\nelapsed parsing: ";
 		emeasure_time_end_to(start_p, end_p, ss) << "\t";
 	}
-	bool found = p.found();
+	bool found = p.found(opts.start);
 	bool found_orig = found;
 	std::string msg{};
 	if (!found) msg = p.get_error()
 			.to_str(parser<T>::error::info_lvl::INFO_BASIC);
+	//if (!found and opts.dump) p.print_S(ss << "\t# S:\n") << "\n";
 	bool ambiguity = found && f->is_ambiguous();
 	if (ambiguity && opts.ambiguity_fails) {
 		expect_fail = found = false;
