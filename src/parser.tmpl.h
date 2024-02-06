@@ -118,7 +118,8 @@ template <typename C, typename T>
 size_t parser<C, T>::input::tpos() { return tp; }
 template <typename C, typename T>
 T parser<C, T>::input::tat(size_t p) {
-	if constexpr (std::is_same_v<C, T>) if (!decoder) return d[p];
+	if (!decoder) return at(p);
+	if constexpr (std::is_same_v<C, T>) return d[p];
 	return ts[p];
 }
 template <typename C, typename T>
