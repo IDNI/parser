@@ -114,12 +114,12 @@ struct cli {
 	// get command with populated values from args
 	command get_processed_command();
 
-	// helpers for printing info and errors
+	// helpers for printing info
 	std::ostream& info(std::ostream& os, const std::string& msg,
 		size_t indent = 0) const;
 	std::ostream& info(const std::string& msg, size_t indent = 0) const;
 
-	// prints error message and help if print_help is true
+	// helpers for printing error message and help if print_help is true
 	int error(std::ostream& os, const std::string& msg,
 		bool print_help = false) const;
 	int error(const std::string& msg, bool print_help = false) const;
@@ -128,7 +128,14 @@ struct cli {
 	std::ostream& help(std::ostream& os, command cmd = {}) const;
 	std::ostream& help(command cmd = {}) const;
 
+	// processes arguments and populates options and commands
+	// returns 0 if ok, 1 if error, 2 if not processed
+	// it can be called by user or it is called automatically
+	// when called get_processed_options() or get_processed_command()
+	// if it wasn't called before
 	int process_args();
+
+	// returns the status of the last process_args call
 	int status() const;
 
 private:
@@ -136,16 +143,16 @@ private:
 	std::string desc_ = "";
 	std::vector<std::string> args_{};
 	bool processed_ = false;
-	commands commands_{}, commands_default_{};
-	std::string default_command_ = "";
-	options options_{}, options_default_{};
+	commands cmds_{}, cmds_default_{};
+	std::string dflt_cmd_ = "";
+	options opts_{}, opts_default_{};
 	std::string help_header_ = "";
 	int status_ = 2; // 0 ok, 1 error, 2 not processed
 
 	std::ostream* out_ = &std::cout;
 	std::ostream* err_ = &std::cerr;
 
-	int process_arg(int& arg, int argc, options& opts);
+	int process_arg(int& arg, bool& has_cmd, options& opts);
 };
 
 template <typename T> T cli::option::get() const {

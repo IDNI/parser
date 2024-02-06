@@ -51,31 +51,31 @@ bool run_test(const test_options& o, const test_expected& exp) {
 		return string("");
 	};
 
-#ifdef DEBUG
-	// print out test_options
-	cout << "\n=== DEBUG ===\ntest_options:" << "\n";
-	cout << "  name: " << o.name << "\n";
-	cout << "  args: ";
-	for (auto& arg : o.args) cout << arg << " ";
-	cout << "\n";
-	cout << "  cmds: ";
-	for (auto& [name, cmd] : o.cmds) cout << name << " ";
-	cout << "\n";
-	cout << "  dflt_cmd: " << o.dflt_cmd << "\n";
-	cout << "  opts: ";
-	for (auto& [name, opt] : o.opts) cout << "--" << name << " ";
-	cout << "\n";
-	cout << "  desc: " << o.desc << "\n";
-	cout << "  help_header: " << o.help_header << "\n";
-	// print out test_expected
-	cout << "test_expected:" << "\n";
-	cout << "  status: " << exp.status << "\n";
-	cout << "  cmd_name: " << exp.cmd_name << "\n";
-	cout << "  options: ";
-	for (auto& [name, value] : exp.options)
-		cout << name << ": " << value2str(value) << " ";
-	cout << "\n=== DEBUG ===\n";
-#endif // DEBUG
+	if (testing::verbosity > 0) {
+		// print out test_options
+		os << "\ntest_options:" << "\n";
+		os << "  name: " << o.name << "\n";
+		os << "  args: ";
+		for (auto& arg : o.args) os << arg << " ";
+		os << "\n";
+		os << "  cmds: ";
+		for (auto& [name, cmd] : o.cmds) os << name << " ";
+		os << "\n";
+		os << "  dflt_cmd: " << o.dflt_cmd << "\n";
+		os << "  opts: ";
+		for (auto& [name, opt] : o.opts) os << "--" << name << " ";
+		os << "\n";
+		os << "  desc: " << o.desc << "\n";
+		os << "  help_header: " << o.help_header << "\n";
+		// print out test_expected
+		os << "test_expected:" << "\n";
+		os << "  status: " << exp.status << "\n";
+		os << "  cmd_name: " << exp.cmd_name << "\n";
+		os << "  options: ";
+		for (auto& [name, value] : exp.options)
+			os << name << ": " << value2str(value) << " ";
+		os << "\n\n";
+	}
 
 	cli cl(o.name, o.args, o.cmds, o.dflt_cmd, o.opts);
 	if (o.desc.size())        cl.set_description(o.desc);
@@ -213,6 +213,16 @@ int main(int argc, char** argv) {
 	TEST("command options", "gen command with invalid option")
 	o2.args = { "cmd", "gen", "--invalid" };
 	run_test(o2, { .status = 1, .cmd_name = "gen" });
+
+	TEST("command options", "default command with valid option")
+	o2.args = { "cmd", "--grammar" };
+	run_test(o2, { .status = 0, .cmd_name = "show", .cmd_options = {
+		{ "grammar", true }
+	}});
+
+	TEST("command options", "default command with invalid option")
+	o2.args = { "cmd", "--invalid" };
+	run_test(o2, { .status = 1, .cmd_name = "show" });
 
 	TEST("command options", "gen command with name and help")
 	o2.args = { "cmd", "gen", "--name", "my_other_parser", "--help" };

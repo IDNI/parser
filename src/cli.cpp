@@ -161,9 +161,9 @@ ostream& cli::command::print(ostream& os) const {
 
 cli::cli(const string& name, vector<string> args, commands cmds,
 	string dflt_cmd, options opts) :
-		name_(name), args_(args), commands_(cmds),
-		commands_default_(commands_), default_command_(dflt_cmd),
-		options_(opts), options_default_(options_) {}
+		name_(name), args_(args), cmds_(cmds),
+		cmds_default_(cmds_), dflt_cmd_(dflt_cmd),
+		opts_(opts), opts_default_(opts_) {}
 
 cli::cli(const string& name, int argc, char** argv, commands cmds,
 	const string dflt_cmd, options opts) :
@@ -172,13 +172,13 @@ cli::cli(const string& name, int argc, char** argv, commands cmds,
 cli& cli::set_args(const vector<string>& args) {
 	return args_ = args, processed_ = false, *this; }
 cli& cli::set_commands(const commands& cmds) {
-	return commands_default_ = commands_ = cmds,
+	return cmds_default_ = cmds_ = cmds,
 		status_ = 2, processed_= false, *this; }
 cli& cli::set_options(const options& opts) {
-	return options_default_ = options_ = opts,
+	return opts_default_ = opts_ = opts,
 		status_ = 2, processed_ = false, *this; }
 cli& cli::set_default_command(const string& cmd_name) {
-	return default_command_ = cmd_name,
+	return dflt_cmd_ = cmd_name,
 		status_ = 2, processed_ = false, *this; }
 cli& cli::set_description(const string& desc) {
 	return desc_ = desc, status_ = 2, processed_ = false, *this; }
@@ -189,7 +189,7 @@ cli& cli::set_error_stream(ostream& os) { return err_ = &os, *this; }
 
 cli::options cli::get_processed_options() {
 	if (!processed_) status_ = process_args();
-	return options_;
+	return opts_;
 }
 cli::command cli::get_processed_command() {
 	if (!processed_) status_ = process_args();
@@ -225,45 +225,46 @@ ostream& cli::help(ostream& os, command cmd) const {
 	auto print_header = [this](ostream& os) -> ostream& {
 		return help_header_.size() ? os << help_header_ : os << name_;
 	};
-	if (cmd.ok()) return commands_default_.at(cmd.name())
+	if (cmd.ok()) return cmds_default_.at(cmd.name())
 					.help(print_header(os << "\n")) << "\n";
 	print_header(os);
-	if (options_.size()) os << " [ options ] ";
-	if (commands_.size()) {
-		if (default_command_.size()) os << "[ ";
+	if (opts_.size()) os << " [ options ] ";
+	if (cmds_.size()) {
+		if (dflt_cmd_.size()) os << "[ ";
 		os << "<command> [ <command options> ] ";
-		if (default_command_.size()) os << "]";
+		if (dflt_cmd_.size()) os << "]";
 	}
 	os << "\n";
 	if (desc_.size()) os << desc_ << "\n";
-	if (options_.size()) print_options(os << "\nOptions:\n", options_);
-	if (commands_.size()) {
+	if (opts_.size()) print_options(os << "\nOptions:\n", opts_);
+	if (cmds_.size()) {
 		os << "Commands:\n";
-		for (auto it : commands_) os << "\t" << it.first
+		for (auto it : cmds_) os << "\t" << it.first
 				<< "\t\t" << it.second.description() << "\n";
 	}
 	return os << "\n";
 }
 
 // processes an option argument and returns 0 if successful
-// if it is an invalid option, returns 1
+// if it is a known error returns 1
 // if it is a command, returns 2
-int cli::process_arg(int& arg, int argc, options& opts) {
-	//DBG(std::cout << "process_arg: " << arg << " argc: " << argc << " args[arg]: " << args_[arg] << "\n";)
-	option* cur = 0;
+// if it is invalid option and we dont have a command returns 3
+// if it is invalid option and we have a command returns 1
+int cli::process_arg(int& arg, bool& has_cmd, options& opts) {
+	//DBG(std::cout << "process_arg: " << arg << " args[arg]: " << args_[arg] << "\n";)
+	cli::option* cur = 0;
 	string opt(args_[arg]);
 	bool isshort;
-	if (!opt_prefix(opt, isshort)) {
-		// if command return 2 as we are done with CLI options
-		if (commands_.find(opt) != commands_.end()) return 2;
-		// otherwise invalid option
+	// if its command return 2 as we are done with CLI options
+	if (cmds_.find(opt) != cmds_.end()) return has_cmd = true, 2;
+	if (!opt_prefix(opt, isshort))
 		return error("Invalid command: " + opt, true);
-	}
 	//DBG(cout << "opt: " << opt << " isshort: " << PBOOL(isshort) << endl;)
 	if (isshort) for (size_t o = 0; o != opt.size(); ++o) {
 		string n = long_for(opt[o], opts);
 		//DBG(cout << "long_for " << opt[o] << ": " << n << "\n";)
-		if (n.size() == 0 || !cmd_.has(n)) {
+		if (n.size() == 0) {
+			if (!has_cmd) return 3;
 			stringstream ss;
 			ss << "Invalid option: -" << opt[o];
 			return error(ss.str(), true);
@@ -280,6 +281,7 @@ int cli::process_arg(int& arg, int argc, options& opts) {
 	}
 	else { // long
 		if (opts.find(opt) == opts.end()) {
+			if (!has_cmd) return 3;
 			stringstream ss;
 			ss << "Invalid option: " << opt;
 			return error(ss.str(), true);
@@ -294,7 +296,7 @@ int cli::process_arg(int& arg, int argc, options& opts) {
 //	if (arg < argc) cout << " args[arg]: " << args_[arg];
 //	cout << "\n";
 //#endif // DEBUG
-	if (arg >= argc || is_opt_prefix(args_[arg])) { // no option argument
+	if (arg >= int(args_.size()) || is_opt_prefix(args_[arg])) { // no option argument
 		//DBG(cout << "no option argument?\n";)
 		if (!cur->is_bool()) return error(
 			"Missing argument for option: --"+cur->name());
@@ -336,36 +338,40 @@ int cli::process_args() {
 //		"==========================\n\n";
 //#endif
 
+	bool has_cmd = false;
 	status_ = 0;
 	// get CLI options
 	int arg = 1;
 	for ( ; arg < argc; )
-		if ((status_ = process_arg(arg, argc, options_)) != 0) break;
+		if ((status_ = process_arg(arg, has_cmd, opts_)) != 0) break;
 	//DBG(cout << "status: " << status_ << endl;)
-	if (status_ == 1) return status_; // invalid command/option
-
-	//DBG(cout << "options: " << "\n";)
-	//DBG(for (auto& o : options_) o.second.print(cout << "\t") << "\n";)
+	if (status_ == 1) return status_;
+	if (status_ == 3 && dflt_cmd_ == "")
+		return error("Invalid option: " + args_[arg], true);
 
 	// get command
+	std::string cmdarg = status_ == 2 ? args_[arg++]
+		: (status_ == 3 || status_ == 0) ? dflt_cmd_
+			: "";
 	status_ = 0;
-	//DBG(cout << "status: " << status_ << endl;)
-
-	std::string cmdarg = (arg >= argc) ? default_command_ : args_[arg];
 	//DBG(std::cout << "cmdarg: " << cmdarg << "\n";)
-	if (cmdarg.size()) {
-		if (commands_.find(cmdarg) == commands_.end()) return status_
-				= error("Unknown command: " + cmdarg, true);
-		cmd_ = commands_[cmdarg];
-		if (arg < argc) ++arg;
-		// get command's options
-		for ( ; arg < argc; )
-			if ((status_ = process_arg(arg, argc, cmd_.opts_)) != 0)
-				break;
-		//DBG(cout << "status: " << status_ << endl;)
 
+	// if command, get its options
+	if (cmdarg.size()) {
+		if (cmds_.find(cmdarg) == cmds_.end()) return status_
+				= error("Unknown command: " + cmdarg, true);
+		cmd_ = cmds_[cmdarg];
+		has_cmd = true;
+		// get command's options
+		for ( ; arg < argc; ) if ((status_
+			= process_arg(arg, has_cmd, cmd_.opts_)) != 0) break;
+		//DBG(cout << "status: " << status_ << endl;)
+		if (status_) {
+			stringstream ss;
+			ss << "Invalid option: " << args_[arg];
+			return error(ss.str(), true);
+		}
 		//DBG(cmd_.print(cout << "command:\n") << endl;)
-		if (status_) return 1; // invalid option
 		cmd_.ok_ = true;
 	}
 
