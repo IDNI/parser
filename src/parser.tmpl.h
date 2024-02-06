@@ -97,7 +97,7 @@ bool parser<C, T>::input::eof() {
 template <typename C, typename T>
 C parser<C, T>::input::at(size_t p) {
 	if (isstream()) return s.seekg(p), s.get();
-	if (p >= l || p >= max_l) return e;
+	if (p >= l || (max_l != 0 && p >= max_l)) return e;
 	return d[p];
 }
 template <typename C, typename T>
@@ -119,7 +119,7 @@ size_t parser<C, T>::input::tpos() { return tp; }
 template <typename C, typename T>
 T parser<C, T>::input::tat(size_t p) {
 	if (!decoder) return at(p);
-	if constexpr (std::is_same_v<C, T>) return d[p];
+	if (p >= ts.size()) return T();
 	return ts[p];
 }
 template <typename C, typename T>
