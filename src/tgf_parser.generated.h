@@ -34,7 +34,7 @@ struct tgf_parser {
 	std::unique_ptr<forest_type> parse(int fd, parse_options po = {})
 		{ return p.parse(fd, po); }
 #endif //WIN32
-	bool found() { return p.found(); }
+	bool found(int start = -1) { return p.found(start); }
 	typename parser_type::error get_error() { return p.get_error(); }
 	enum nonterminal {
 		nul, eof, alnum, alpha, space, printable, start, ws, statement, _Rstart_0, 

@@ -178,7 +178,7 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name,
 		"	std::unique_ptr<forest_type> parse(int fd, parse_options po = {})\n"
 		"		{ return p.parse(fd, po); }\n"
 		"#endif //WIN32\n"
-		"	bool found() { return p.found(); }\n"
+		"	bool found(int start = -1) { return p.found(start); }\n"
 		"	typename parser_type::error get_error() { return p.get_error(); }\n"
 		"	enum nonterminal {" << gen_nts_enum_cte() <<
 								"	};\n"
