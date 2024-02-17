@@ -25,5 +25,6 @@ int main() {
 	const size_t v1[] = {T::get(0, 0, {})};
 	const size_t v2[] = {T::get(2, 1, v1), T::get(3, 1, v1)};
 	print<size_t>(T::get(1, 2, v2));
+	htree<size_t>::gc();
 	return 0;
 }
