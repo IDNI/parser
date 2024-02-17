@@ -11,7 +11,7 @@ const size_t* get_vec(size_t n) { return &V[n + 1]; }
 
 size_t get_vec(const size_t n, const size_t* v) {
 	static size_t sz = sizeof(size_t);
-	size_t h = 0;
+	size_t h = (n << 32);
 	for (size_t k = 0; k != n; ++k) h ^= v[k];
 	const size_t k = V.size();
 	if (auto it = M.find(h); it == M.end()) M[h].push_back(k);

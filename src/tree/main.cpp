@@ -3,11 +3,10 @@
 using namespace std;
 
 template<typename T> void print(size_t n) {
-	auto d = tree<T>::get(n);
-	cout << d.t << '(';
-	for (size_t k = 0; k != d.len; ++k) {
-		print<size_t>(d.n[k]);
-		cout << (k == d.len - 1 ? ')' : ',');
+	cout << tree<T>::data(n) << '(';
+	for (size_t k = 0; k != tree<T>::rank(n); ++k) {
+		print<size_t>(tree<T>::next(n)[k]);
+		cout << (k == tree<T>::rank(n) - 1 ? ')' : ',');
 	}
 }
 

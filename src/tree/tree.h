@@ -22,13 +22,7 @@ template<typename T> struct tree {
 		V.push_back(t);
 		return V.size() - 1;
 	}
-	struct data {
-		const T& t;
-		const size_t len, *n;
-		data(const T& t, size_t len, const size_t* n) :
-			t(t), len(len), n(n) {}
-	};
-	inline static data get(size_t n) {
-		return data(V[n].t, get_vec_len(V[n].n), get_vec(V[n].n));
-	}
+	inline static const T& data(size_t n) { return V[n].t; }
+	inline static const size_t rank(size_t n) {return get_vec_len(V[n].n);}
+	inline static const size_t* next(size_t n) { return get_vec(V[n].n); }
 };
