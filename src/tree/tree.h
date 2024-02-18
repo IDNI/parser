@@ -53,16 +53,19 @@ template<typename T> struct htree {
 	static void gc() {
 		std::set<size_t> ts, vs;
 		for (const auto& x : M) mark_all(x.first, ts, vs);
+		std::vector<size_t> t = gc_vec(vs);
+		vs.clear();
 		tree<T>::M.clear();
 		std::vector<tree<T>> v;
+		size_t n = 0;
 		for (size_t x : ts) {
 			if (auto it = M.find(x); it != M.end())
 				it->second.lock()->t = v.size();
-			tree<T>::M.emplace(tree<T>::V[x], v.size());
-			v.push_back(tree<T>::V[x]);
+			tree y(tree<T>::V[x].t, t[n++]);
+			tree<T>::M.emplace(y, v.size());
+			v.push_back(y);
 		}
 		tree<T>::V = move(v);
-		gc_vec(vs);
 	}
 private:
 	htree(size_t t) : t(t) { }

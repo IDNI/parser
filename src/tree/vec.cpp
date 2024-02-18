@@ -25,8 +25,12 @@ size_t get_vec(const size_t n, const size_t* v) {
 	return V.push_back(n), V.insert(V.end(), v, &v[n]), k;
 }
 
-void gc_vec(const set<size_t>& s) {
+vector<size_t> gc_vec(const set<size_t>& s) {
+	vector<size_t> r(s.begin(), s.end());
+	for (size_t n = 1; n < r.size(); ++n) r[n] += V[r[n-1]];
+	map<size_t, size_t> m;
 	vector<size_t> v = move(V);
 	M.clear();
 	for (size_t x : s) get_vec(v[x], &v[x + 1]);
+	return r;
 }
