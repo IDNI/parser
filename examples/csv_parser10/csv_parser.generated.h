@@ -24,17 +24,17 @@ struct csv_parser {
 	csv_parser() :
 		nts(load_nonterminals()), cc(load_cc()),
 		g(nts, load_prods(), nt(25), cc), p(g, load_opts()) {}
-	std::unique_ptr<forest_type> parse(const char_type* data, size_t size=0,
+	std::unique_ptr<forest_type> parse(const char_type* data, size_t size,
 		parse_options po = {}) { return p.parse(data, size, po); }
 	std::unique_ptr<forest_type> parse(std::basic_istream<char_type>& is,
 		parse_options po = {}) { return p.parse(is, po); }
-	std::unique_ptr<forest_type> parse(std::string fn, mmap_mode m,
-		parse_options po = {}) { return p.parse(fn, m, po); }
+	std::unique_ptr<forest_type> parse(const std::string& fn,
+		parse_options po = {}) { return p.parse(fn, po); }
 #ifndef WIN32
 	std::unique_ptr<forest_type> parse(int fd, parse_options po = {})
 		{ return p.parse(fd, po); }
 #endif //WIN32
-	bool found() { return p.found(); }
+	bool found(int start = -1) { return p.found(start); }
 	typename parser_type::error get_error() { return p.get_error(); }
 	enum nonterminal {
 		nul, digit, printable, integer, _Rinteger_0, _Rinteger_1, quote, esc, escaping, unescaped, 
@@ -43,6 +43,9 @@ struct csv_parser {
 	};
 	size_t id(const std::basic_string<char_type>& name) {
 		return nts.get(name);
+	}
+	const std::basic_string<char_type>& name(size_t id) {
+		return nts.get(id);
 	}
 private:
 	std::vector<terminal_type> ts{

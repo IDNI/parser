@@ -309,7 +309,7 @@ int tgf_run(int argc, char** argv) {
 			if (infile == "-") // stdin
 				f = p.parse(cin);
 			else { // file
-				f = p.parse(infile, MMAP_READ);
+				f = p.parse(infile);
 			}
 		else // string
 			f = p.parse(inexp.c_str(), inexp.size());

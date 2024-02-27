@@ -44,9 +44,9 @@ parser<C, T>::input::input(std::basic_istream<C>& is, size_t max_l,
 	decoder(decoder), mm(), l(0), max_l(max_l), d(0), s(nullptr)
 	{ s.rdbuf(is.rdbuf()); }
 template <typename C, typename T>
-parser<C, T>::input::input(const std::string& filename, mmap_mode m,
-	size_t max_l, decoder_type decoder, int_type eof) : itype(MMAP),
-	e(eof), decoder(decoder), mm(filename, 0, m), l(mm.size()),
+parser<C, T>::input::input(const std::string& filename, size_t max_l,
+	decoder_type decoder, int_type eof) : itype(MMAP), e(eof),
+	decoder(decoder), mm(filename, 0, MMAP_READ), l(mm.size()),
 	max_l(max_l), d(reinterpret_cast<const C*>(mm.data())), s(nullptr)
 {
 	if (mm.error) std::cerr << mm.error_message << std::endl;
@@ -404,9 +404,9 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
 }
 template <typename C, typename T>
 std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
-	const std::string& fn, mmap_mode m, parse_options po)
+	const std::string& fn, parse_options po)
 {
-	in = std::make_unique<input>(fn, m,
+	in = std::make_unique<input>(fn,
 		po.max_length, o.chars_to_terminals, po.eof);
 	return _parse(po.start);
 }

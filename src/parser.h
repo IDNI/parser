@@ -194,13 +194,13 @@ public:
 	struct input {
 		using decoder_type =
 				std::function<std::vector<T>(input&)>;
-		input(const C* data, size_t size = 0, size_t max_length = 0,
+		input(const C* data, size_t size, size_t max_length = 0,
 			decoder_type decoder = 0,
 			int_type e = std::char_traits<C>::eof());
 		input(std::basic_istream<C>& is, size_t max_length = 0,
 			decoder_type decoder = 0,
 			int_type e = std::char_traits<C>::eof());
-		input(const std::string& filename, mmap_mode m, size_t max_length = 0,
+		input(const std::string& filename, size_t max_length = 0,
 			decoder_type decoder = 0,
 			int_type e = std::char_traits<C>::eof());
 #ifndef _WIN32
@@ -276,11 +276,11 @@ public:
 		C eof = std::char_traits<C>::eof(); // end of a stream
 	};
 	// parse call
-	std::unique_ptr<pforest> parse(const C* data, size_t size = 0,
+	std::unique_ptr<pforest> parse(const C* data, size_t size,
 		parse_options po = {});
 	std::unique_ptr<pforest> parse(std::basic_istream<C>& is,
 		parse_options po = {});
-	std::unique_ptr<pforest> parse(const std::string& fn, mmap_mode m,
+	std::unique_ptr<pforest> parse(const std::string& fn,
 		parse_options po = {});
 #ifndef _WIN32
 	std::unique_ptr<pforest> parse(int filedescriptor,

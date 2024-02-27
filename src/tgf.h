@@ -40,7 +40,7 @@ struct tgf {
 #if DEBUG && DEBUG_PARSING
 		p.p.debug = false;
 #endif
-		return transform(p, p.parse(filename, MMAP_READ), nts_, start_nt);
+		return transform(p, p.parse(filename), nts_, start_nt);
 	}
 private:
 	static grammar<C, T> transform(tgf_parser& p,
