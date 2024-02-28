@@ -1,27 +1,27 @@
 @use_char_class eof, alnum, alpha, space, printable.
 
 # TGF grammar
-start                  => (ws statement)* ws.
+start                  => (_ statement)* _.
 statement              => directive | production.
 
 # directive
-directive              => "@use_char_class" ws_required directive_params ws '.'.
-directive_params       => directive_param (ws ',' ws directive_param)*.
+directive              => "@use_char_class" __ directive_params _ '.'.
+directive_params       => directive_param (_ ',' _ directive_param)*.
 directive_param        => "eof"   | "alnum" | "alpha" | "blank"
 			| "cntrl" | "digit" | "graph" | "lower" | "printable"
 			| "punct" | "space" | "upper" | "xdigit".
 
 # production
-production             => sym ws "=>" ws expr1 ws '.'.
+production             => sym _ "=>" _ expr1 _ '.'.
 expr1                  => disjunction | expr2.
 expr2                  => conjunction | expr3.
 expr3                  => negation | literals.
-disjunction            => expr1 ws '|' ws expr2.
-conjunction            => expr2 ws '&' ws expr3.
-negation               => '~' ws expr3.
+disjunction            => expr1 _ '|' _ expr2.
+conjunction            => expr2 _ '&' _ expr3.
+negation               => '~' _ expr3.
 
 # literals
-literals               => literal (ws_required literal)*.
+literals               => literal (__ literal)*.
 literal                => terminal | nonterminal.
 terminal               => terminal_char | terminal_string.
 nonterminal            => sym | nonliteral.
@@ -31,11 +31,11 @@ sym_rest               => alnum | '_'.
 
 # EBNF operators
 nonliteral             => group | optional | repeat | plus | multi.
-group                  => '(' ws expr1 ws ')'.
-optional               => '[' ws expr1 ws ']'.
-repeat                 => '{' ws expr1 ws '}'.
-plus                   => literal ws '+'.
-multi                  => literal ws '*'.
+group                  => '(' _ expr1 _ ')'.
+optional               => '[' _ expr1 _ ']'.
+repeat                 => '{' _ expr1 _ '}'.
+plus                   => literal _ '+'.
+multi                  => literal _ '*'.
 
 # terminal char and string
 terminal_char          => "'" (unescaped_c | escaped_c) "'".
@@ -45,9 +45,6 @@ terminal_string        => '"' (unescaped_s | escaped_s)* '"'.
 unescaped_s            => printable & ~( '"' | '\\' ).
 escaped_s              => '\\' ('"' | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't').
 
-# whitespace
-ws                     => ws_required | null.
-ws_required            => space ws | ws_comment ws.
-ws_comment             => '#' (ws_char)* eol.
-ws_char                => printable | '\t'.
-eol                    => '\r' | '\n' | eof.
+_                      => [ __ ].               # optional whitespace
+__                     => (space | comment) _.  # whitespace (includes comments)
+comment                => '#' (printable | '\t')* ('\r' | '\n' | eof).

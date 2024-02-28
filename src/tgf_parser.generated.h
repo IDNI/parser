@@ -37,13 +37,13 @@ struct tgf_parser {
 	bool found(int start = -1) { return p.found(start); }
 	typename parser_type::error get_error() { return p.get_error(); }
 	enum nonterminal {
-		nul, eof, alnum, alpha, space, printable, start, ws, statement, _Rstart_0, 
-		_Rstart_1, directive, production, ws_required, directive_params, directive_param, _Rdirective_params_2, _Rdirective_params_3, sym, expr1, 
+		nul, eof, alnum, alpha, space, printable, start, _, statement, _Rstart_0, 
+		_Rstart_1, directive, production, __, directive_params, directive_param, _Rdirective_params_2, _Rdirective_params_3, sym, expr1, 
 		disjunction, expr2, conjunction, expr3, negation, literals, literal, _Rliterals_4, _Rliterals_5, terminal, 
 		nonterminal, terminal_char, terminal_string, nonliteral, sym_start, sym_rest, _Rsym_6, _Rsym_7, group, optional, 
 		repeat, plus, multi, unescaped_c, escaped_c, _Rterminal_char_8, _Runescaped_c_9, _Rescaped_c_10, unescaped_s, escaped_s, 
-		_Rterminal_string_11, _Rterminal_string_12, _Runescaped_s_13, _Rescaped_s_14, ws_comment, ws_char, _Rws_comment_15, _Rws_comment_16, eol, __neg_0, 
-		__neg_1, 
+		_Rterminal_string_11, _Rterminal_string_12, _Runescaped_s_13, _Rescaped_s_14, _R__15, comment, _R___16, _Rcomment_17, _Rcomment_18, _Rcomment_19, 
+		__neg_0, __neg_1, 
 	};
 	size_t id(const std::basic_string<char_type>& name) {
 		return nts.get(name);
@@ -57,7 +57,7 @@ private:
 		'r', 'l', '.', ',', 'n', 'm', 'p', 'b', 'k', 't', 
 		'd', 'i', 'g', 'o', 'f', 'w', 'x', '=', '>', '|', 
 		'&', '~', '(', ')', '[', ']', '{', '}', '+', '*', 
-		'\'', '\\', '/', '"', '#', '\t', '\n', '\r', 
+		'\'', '\\', '/', '"', '\t', '\n', '\r', '#', 
 	};
 	idni::nonterminals<char_type, terminal_type> nts{};
 	idni::char_class_fns<terminal_type> cc;
@@ -73,13 +73,13 @@ private:
 	idni::nonterminals<char_type, terminal_type> load_nonterminals() const {
 		idni::nonterminals<char_type, terminal_type> nts{};
 		for (const auto& nt : {
-			"", "eof", "alnum", "alpha", "space", "printable", "start", "ws", "statement", "_Rstart_0", 
-			"_Rstart_1", "directive", "production", "ws_required", "directive_params", "directive_param", "_Rdirective_params_2", "_Rdirective_params_3", "sym", "expr1", 
+			"", "eof", "alnum", "alpha", "space", "printable", "start", "_", "statement", "_Rstart_0", 
+			"_Rstart_1", "directive", "production", "__", "directive_params", "directive_param", "_Rdirective_params_2", "_Rdirective_params_3", "sym", "expr1", 
 			"disjunction", "expr2", "conjunction", "expr3", "negation", "literals", "literal", "_Rliterals_4", "_Rliterals_5", "terminal", 
 			"nonterminal", "terminal_char", "terminal_string", "nonliteral", "sym_start", "sym_rest", "_Rsym_6", "_Rsym_7", "group", "optional", 
 			"repeat", "plus", "multi", "unescaped_c", "escaped_c", "_Rterminal_char_8", "_Runescaped_c_9", "_Rescaped_c_10", "unescaped_s", "escaped_s", 
-			"_Rterminal_string_11", "_Rterminal_string_12", "_Runescaped_s_13", "_Rescaped_s_14", "ws_comment", "ws_char", "_Rws_comment_15", "_Rws_comment_16", "eol", "__neg_0", 
-			"__neg_1", 
+			"_Rterminal_string_11", "_Rterminal_string_12", "_Runescaped_s_13", "_Rescaped_s_14", "_R__15", "comment", "_R___16", "_Rcomment_17", "_Rcomment_18", "_Rcomment_19", 
+			"__neg_0", "__neg_1", 
 		}) nts.get(nt);
 		return nts;
 	}
@@ -99,21 +99,21 @@ private:
 	idni::prods<char_type, terminal_type> load_prods() {
 		idni::prods<char_type, terminal_type> q,
 			nul(symbol_type{});
-		// _Rstart_0 => ws statement.
+		// _Rstart_0 => _ statement.
 		q(nt(9), (nt(7)+nt(8)));
 		// _Rstart_1 => null.
 		q(nt(10), (nul));
 		// _Rstart_1 => _Rstart_0 _Rstart_1.
 		q(nt(10), (nt(9)+nt(10)));
-		// start => _Rstart_1 ws.
+		// start => _Rstart_1 _.
 		q(nt(6), (nt(10)+nt(7)));
 		// statement => directive.
 		q(nt(8), (nt(11)));
 		// statement => production.
 		q(nt(8), (nt(12)));
-		// directive => '@' 'u' 's' 'e' '_' 'c' 'h' 'a' 'r' '_' 'c' 'l' 'a' 's' 's' ws_required directive_params ws '.'.
+		// directive => '@' 'u' 's' 'e' '_' 'c' 'h' 'a' 'r' '_' 'c' 'l' 'a' 's' 's' __ directive_params _ '.'.
 		q(nt(11), (t(1)+t(2)+t(3)+t(4)+t(5)+t(6)+t(7)+t(8)+t(9)+t(5)+t(6)+t(10)+t(8)+t(3)+t(3)+nt(13)+nt(14)+nt(7)+t(11)));
-		// _Rdirective_params_2 => ws ',' ws directive_param.
+		// _Rdirective_params_2 => _ ',' _ directive_param.
 		q(nt(16), (nt(7)+t(12)+nt(7)+nt(15)));
 		// _Rdirective_params_3 => null.
 		q(nt(17), (nul));
@@ -147,7 +147,7 @@ private:
 		q(nt(15), (t(2)+t(15)+t(15)+t(4)+t(9)));
 		// directive_param => 'x' 'd' 'i' 'g' 'i' 't'.
 		q(nt(15), (t(25)+t(19)+t(20)+t(21)+t(20)+t(18)));
-		// production => sym ws '=' '>' ws expr1 ws '.'.
+		// production => sym _ '=' '>' _ expr1 _ '.'.
 		q(nt(12), (nt(18)+nt(7)+t(26)+t(27)+nt(7)+nt(19)+nt(7)+t(11)));
 		// expr1 => disjunction.
 		q(nt(19), (nt(20)));
@@ -161,13 +161,13 @@ private:
 		q(nt(23), (nt(24)));
 		// expr3 => literals.
 		q(nt(23), (nt(25)));
-		// disjunction => expr1 ws '|' ws expr2.
+		// disjunction => expr1 _ '|' _ expr2.
 		q(nt(20), (nt(19)+nt(7)+t(28)+nt(7)+nt(21)));
-		// conjunction => expr2 ws '&' ws expr3.
+		// conjunction => expr2 _ '&' _ expr3.
 		q(nt(22), (nt(21)+nt(7)+t(29)+nt(7)+nt(23)));
-		// negation => '~' ws expr3.
+		// negation => '~' _ expr3.
 		q(nt(24), (t(30)+nt(7)+nt(23)));
-		// _Rliterals_4 => ws_required literal.
+		// _Rliterals_4 => __ literal.
 		q(nt(27), (nt(13)+nt(26)));
 		// _Rliterals_5 => null.
 		q(nt(28), (nul));
@@ -213,15 +213,15 @@ private:
 		q(nt(33), (nt(41)));
 		// nonliteral => multi.
 		q(nt(33), (nt(42)));
-		// group => '(' ws expr1 ws ')'.
+		// group => '(' _ expr1 _ ')'.
 		q(nt(38), (t(31)+nt(7)+nt(19)+nt(7)+t(32)));
-		// optional => '[' ws expr1 ws ']'.
+		// optional => '[' _ expr1 _ ']'.
 		q(nt(39), (t(33)+nt(7)+nt(19)+nt(7)+t(34)));
-		// repeat => '{' ws expr1 ws '}'.
+		// repeat => '{' _ expr1 _ '}'.
 		q(nt(40), (t(35)+nt(7)+nt(19)+nt(7)+t(36)));
-		// plus => literal ws '+'.
+		// plus => literal _ '+'.
 		q(nt(41), (nt(26)+nt(7)+t(37)));
-		// multi => literal ws '*'.
+		// multi => literal _ '*'.
 		q(nt(42), (nt(26)+nt(7)+t(38)));
 		// _Rterminal_char_8 => unescaped_c.
 		q(nt(45), (nt(43)));
@@ -234,9 +234,9 @@ private:
 		// _Runescaped_c_9 => '\\'.
 		q(nt(46), (t(40)));
 		// __neg_0 => _Runescaped_c_9.
-		q(nt(59), (nt(46)));
+		q(nt(60), (nt(46)));
 		// unescaped_c => printable & ~( __neg_0 ).
-		q(nt(43), (nt(5)) & ~(nt(59)));
+		q(nt(43), (nt(5)) & ~(nt(60)));
 		// _Rescaped_c_10 => '\''.
 		q(nt(47), (t(39)));
 		// _Rescaped_c_10 => '/'.
@@ -270,9 +270,9 @@ private:
 		// _Runescaped_s_13 => '\\'.
 		q(nt(52), (t(40)));
 		// __neg_1 => _Runescaped_s_13.
-		q(nt(60), (nt(52)));
+		q(nt(61), (nt(52)));
 		// unescaped_s => printable & ~( __neg_1 ).
-		q(nt(48), (nt(5)) & ~(nt(60)));
+		q(nt(48), (nt(5)) & ~(nt(61)));
 		// _Rescaped_s_14 => '"'.
 		q(nt(53), (t(42)));
 		// _Rescaped_s_14 => '/'.
@@ -291,32 +291,34 @@ private:
 		q(nt(53), (t(18)));
 		// escaped_s => '\\' _Rescaped_s_14.
 		q(nt(49), (t(40)+nt(53)));
-		// ws => null.
-		q(nt(7), (nul));
-		// ws => ws_required.
-		q(nt(7), (nt(13)));
-		// ws_required => space ws.
-		q(nt(13), (nt(4)+nt(7)));
-		// ws_required => ws_comment ws.
-		q(nt(13), (nt(54)+nt(7)));
-		// _Rws_comment_15 => ws_char.
+		// _R__15 => null.
+		q(nt(54), (nul));
+		// _R__15 => __.
+		q(nt(54), (nt(13)));
+		// _ => _R__15.
+		q(nt(7), (nt(54)));
+		// _R___16 => space.
+		q(nt(56), (nt(4)));
+		// _R___16 => comment.
 		q(nt(56), (nt(55)));
-		// _Rws_comment_16 => null.
-		q(nt(57), (nul));
-		// _Rws_comment_16 => _Rws_comment_15 _Rws_comment_16.
-		q(nt(57), (nt(56)+nt(57)));
-		// ws_comment => '#' _Rws_comment_16 eol.
-		q(nt(54), (t(43)+nt(57)+nt(58)));
-		// ws_char => '\t'.
-		q(nt(55), (t(44)));
-		// ws_char => printable.
-		q(nt(55), (nt(5)));
-		// eol => '\n'.
-		q(nt(58), (t(45)));
-		// eol => '\r'.
-		q(nt(58), (t(46)));
-		// eol => eof.
-		q(nt(58), (nt(1)));
+		// __ => _R___16 _.
+		q(nt(13), (nt(56)+nt(7)));
+		// _Rcomment_17 => '\t'.
+		q(nt(57), (t(43)));
+		// _Rcomment_17 => printable.
+		q(nt(57), (nt(5)));
+		// _Rcomment_18 => null.
+		q(nt(58), (nul));
+		// _Rcomment_18 => _Rcomment_17 _Rcomment_18.
+		q(nt(58), (nt(57)+nt(58)));
+		// _Rcomment_19 => '\n'.
+		q(nt(59), (t(44)));
+		// _Rcomment_19 => '\r'.
+		q(nt(59), (t(45)));
+		// _Rcomment_19 => eof.
+		q(nt(59), (nt(1)));
+		// comment => '#' _Rcomment_18 _Rcomment_19.
+		q(nt(55), (t(46)+nt(58)+nt(59)));
 		return q;
 	}
 };
