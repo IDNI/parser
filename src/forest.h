@@ -103,6 +103,7 @@ struct forest {
 		bool unique_edge = true) const;
 
 	sptree get_tree();
+	sptree get_tree(const node& n);
 
 	typedef std::function<void(const node&)> enter_t;
 	typedef std::function<void(const node&, const nodes_set&)> exit_t;

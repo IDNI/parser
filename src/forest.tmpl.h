@@ -33,20 +33,24 @@ std::ostream& forest<NodeT>::print_data(std::ostream& os) const {
 }
 #endif
 
-// get a first parse tree from the forest
+// get a first parse tree from the forest optionally provide root of the tree.
 // be sure the forest has only a single tree
 // check if has_single_parse_tree() is true or is_ambiguous() is false first
 // or ambiguous_nodes() is empty
 template <typename NodeT>
-forest<NodeT>::sptree forest<NodeT>::get_tree() {
+forest<NodeT>::sptree forest<NodeT>::get_tree(const NodeT& n) {
 	forest<NodeT>::sptree t;
-	extract_graphs(root(), [this, &t] (auto& g) {
+	extract_graphs(n, [this, &t] (auto& g) {
 		remove_recursive_nodes(g);
 		remove_binarization(g);
 		t = g.extract_trees();
 		return false;
 	});
 	return t;
+}
+template <typename NodeT>
+forest<NodeT>::sptree forest<NodeT>::get_tree() {
+	return get_tree(root());
 }
 
 // a dfs based approach to detect cycles for
