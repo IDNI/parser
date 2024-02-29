@@ -380,6 +380,7 @@ private:
 	bool init_forest(pforest& f, const lit<C, T>& start_lit);
 	bool build_forest(pforest& f, const pnode& root);
 	bool binarize_comb(const item&, std::set<std::vector<pnode>>&);
+	size_t last_prod;
 	void sbl_chd_forest(const item&,
 		std::vector<pnode>&, size_t, std::set<std::vector<pnode>>&);
 	std::unique_ptr<pforest> _parse(int_t start = -1);

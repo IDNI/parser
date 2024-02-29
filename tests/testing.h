@@ -112,7 +112,7 @@ int test_out(int c, const grammar<T>& g, const std::basic_string<T>& inputstr,
 	std::stringstream ptd;
 	std::stringstream ssf;
 
-	g.print_internal_grammar(ssf, "\\l");
+	g.print_internal_grammar(ssf, "\\l", true);
 	std::string s = ssf.str();
 	ssf.str({});
 
