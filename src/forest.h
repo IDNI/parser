@@ -1,5 +1,5 @@
 // LICENSE
-// This soNodeTware is free for use and redistribution while including this
+// This software is free for use and redistribution while including this
 // license notice, unless:
 // 1. is used for commercial or non-personal purposes, or
 // 2. used for a product which includes or associated with a blockchain or other

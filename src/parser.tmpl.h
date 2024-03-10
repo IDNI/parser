@@ -13,8 +13,13 @@
 #ifndef __IDNI__PARSER__PARSER_TMPL_H__
 #define __IDNI__PARSER__PARSER_TMPL_H__
 #include "parser.h"
+#include "term_colors.h"
 
 namespace idni {
+
+using namespace idni::term;
+
+static inline term::colors TC;
 
 template <typename C, typename T>
 parser<C, T>::item::item(size_t set, size_t prod, size_t con, size_t from,
@@ -198,8 +203,8 @@ bool parser<C, T>::negative(const item& i) const {
 template <typename C, typename T>
 void parser<C, T>::resolve_conjunctions(container_t& c, container_t& t) {
 	if (c.size() == 0) return;
-	DBGP(std::cout << COLOR BLUE << "resolve conjunctions...\n"
-		<< COLOR CLEAR;)
+	DBGP(std::cout << TC.BLUE() << "resolve conjunctions...\n"
+		<< TC.CLEAR();)
 	std::map<std::pair<size_t, size_t>, std::set<item>> ps;
 	// reorder by prod/from
 	for (const item& x : c) ps[{ x.prod, x.from }].insert(x);
@@ -261,14 +266,14 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 {
 	DBGP(std::cout << "    completing\n";)
 	if (!conj_resolved && g.conjunctive(i.prod)) {
-		DBGP(print(std::cout <<	COLOR YELLOW <<
-		 	" +  adding to c1 \t\t\t", i) << COLOR CLEAR << "\n";)
+		DBGP(print(std::cout <<	TC.YELLOW() <<
+		 	" +  adding to c1 \t\t\t", i) << TC.CLEAR() << "\n";)
 		c.insert(i);
 		return;
 	} else {
 		if (add(t, i).second) {
-			DBGP(print(std::cout << COLOR PURPLE <<
-				" +  adding to t1 \t\t\t", i) << COLOR CLEAR <<
+			DBGP(print(std::cout << TC.MAGENTA() <<
+				" +  adding to t1 \t\t\t", i) << TC.CLEAR() <<
 				"\n";)
 		}
 		// whence the item is completed, then
@@ -284,16 +289,16 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 		DBGP(print(std::cout << " ?  checking \t\t\t\t", *it) << "\n";)
 		item j(*it); ++j.dot, j.set = i.set;
 		if (!negative(j) && completed(j) && g.conjunctive(j.prod)) {
-			DBGP(print(std::cout << COLOR YELLOW <<
-				" +  adding to c2 \t\t\t", j) << COLOR CLEAR <<
+			DBGP(print(std::cout << TC.YELLOW() <<
+				" +  adding to c2 \t\t\t", j) << TC.CLEAR() <<
 				"\n";)
 			c.insert(j);
 			continue;
 		}
 		//DBGP(std::cout << "neg: " << g[it->prod][it->con].neg << "\n";)
 		if (add(t, j).second) {
-			DBGP(print(std::cout << COLOR PURPLE <<
-				" +  adding to t2 \t\t\t", j) << COLOR CLEAR <<
+			DBGP(print(std::cout << TC.MAGENTA() <<
+				" +  adding to t2 \t\t\t", j) << TC.CLEAR() <<
 				"\n";)
 		}
 		// whence the item is completed, then
@@ -461,10 +466,10 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
 		if (debug_at.second > 0) debug =
 			debug_at.first <= n && n <= debug_at.second;
 #endif
-		DBGP(std::cout << "\n" << COLOR RED << "=================="
+		DBGP(std::cout << "\n" << TC.RED() << "=================="
 			"======================================================"
 			"========\nPOS: '" << cn << "' TPOS: " << n << " CH: '"
-			<< to_std_string(ch) << "'" << COLOR CLEAR <<std::endl;)
+			<< to_std_string(ch) << "'" << TC.CLEAR() <<std::endl;)
 #if MEASURE_EACH_POS
 		if (new_pos) {
 			if (in->cur() == (C)'\n') (cb = n), r++;
@@ -1071,8 +1076,8 @@ int_t terminals_to_int(
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
 template <typename C, typename T>
 std::ostream& parser<C, T>::print(std::ostream& os, const item& i) const {
-	os << (completed(i) ? COLOR BRIGHT AND GREEN
-		: i.dot == 0 ? COLOR BLACK : COLOR BRIGHT AND CLEAR);
+	os << (completed(i) ? TC(color::BRIGHT, color::GREEN)
+		: i.dot == 0 ? TC.BLACK() : TC(color::BRIGHT, color::CLEAR));
 	os << "(G" << (i.prod < 10 ? " " : "") << i.prod;
 	if (g.conjunctive(i.prod)) os << "/" << i.con;
 	else os << "  ";
@@ -1086,7 +1091,7 @@ std::ostream& parser<C, T>::print(std::ostream& os, const item& i) const {
 	}
 	if (x.neg) os << ") ";
 	if (i.dot == x.size()) os << "•";
-	os << COLOR CLEAR;
+	os << TC.CLEAR();
 	return os;
 }
 template <typename C, typename T>
