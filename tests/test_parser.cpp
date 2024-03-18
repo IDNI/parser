@@ -16,8 +16,7 @@ int main(int argc, char **argv)
 
 	prods<> ps, start(nt("start")), nll(lit<>{}),
 		alnum(nt("alnum")), alpha(nt("alpha")), digit(nt("digit")),
-		chars(nt("chars")), expression(nt("expression")), space(nt("space")),
-		spaces(nt("spaces")),
+		chars(nt("chars")), expression(nt("expression")),
 		sum(nt("sum")),	mul(nt("mul")), nzdigit(nt("nzdigit")),
 		m1(nt("m1")), s1(nt("s1")), m2(nt("m2")), s2(nt("s2")),
 		identifier(nt("identifier")), keyword(nt("keyword")),

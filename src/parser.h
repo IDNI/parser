@@ -265,6 +265,7 @@ public:
 		size_t gc_lag = 1;
 		decoder_type chars_to_terminals = 0;
 		encoder_type terminals_to_chars = 0;
+		bool auto_disambiguate = true;
 	};
 	// constructor
 	parser(grammar<C, T>& g, options o = {});
@@ -380,7 +381,6 @@ private:
 	bool init_forest(pforest& f, const lit<C, T>& start_lit);
 	bool build_forest(pforest& f, const pnode& root);
 	bool binarize_comb(const item&, std::set<std::vector<pnode>>&);
-	size_t last_prod;
 	void sbl_chd_forest(const item&,
 		std::vector<pnode>&, size_t, std::set<std::vector<pnode>>&);
 	std::unique_ptr<pforest> _parse(int_t start = -1);
