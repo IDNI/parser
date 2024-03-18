@@ -452,8 +452,7 @@ std::set<std::pair<NodeT, std::set<std::vector<NodeT>>>>
 template <typename NodeT>
 size_t forest<NodeT>::count_trees(const node& root) const {
 	std::map<node, size_t> ndc;
-	bool isoverflow = false;
-	auto cb_exit = [&ndc, &isoverflow](const node& croot, auto& ambset) {
+	auto cb_exit = [&ndc](const node& croot, auto& ambset) {
 		for (auto& pack : ambset) {
 			size_t pkc = 1; // count of the pack
 			for (auto& sym : pack)
@@ -461,7 +460,7 @@ size_t forest<NodeT>::count_trees(const node& root) const {
 					size_t x = pkc * ndc[sym];
 					if( pkc != 0 && x / pkc != ndc[sym]  ) {
 						MS(std::cout<<"Overflow\n");
-						isoverflow = true;
+						ndc[croot]=SIZE_MAX;
 						return;
 					}
 					pkc = x;
@@ -470,7 +469,6 @@ size_t forest<NodeT>::count_trees(const node& root) const {
 		}
 	};
 	traverse(root, NO_ENTER, cb_exit);
-	if(isoverflow) ndc[root] = 0; // mark it to be zero
 	return ndc[root];
 }
 

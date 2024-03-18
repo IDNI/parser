@@ -20,7 +20,7 @@ int main(int argc, char **argv)
 		sum(nt("sum")),	mul(nt("mul")), nzdigit(nt("nzdigit")),
 		m1(nt("m1")), s1(nt("s1")), m2(nt("m2")), s2(nt("s2")),
 		identifier(nt("identifier")), keyword(nt("keyword")),
-		a('a'), b('b'), c('c'), n('n'), p('p'), m('m'),
+		a('a'), b('b'), c('c'), n('n'), p('p'), m('m'), e('e'),
 		A(nt("A")), B(nt("B")), T(nt("T")), X(nt("X")), Y(nt("Y")),
 		zero('0'), one('1'), PO(nt("PO")), IO(nt("IO")),
 		plus('+'), minus('-'), mult('*'),
@@ -202,9 +202,11 @@ int main(int argc, char **argv)
 	ps.clear();
 
 	TEST("papers", "recursion_npnmn")
-	ps(start, n | (start + X + start));
-	ps(X,     p | m);
-	run_test<char>(ps, nt, start, "npnmn", {}, o);
+	ps(start, n);
+	ps(start,  start + p + start);
+	ps(start, start + m + start );
+	ps(start, start + e + start);
+	run_test<char>(ps, nt, start, "npnmnen", {}, o);
 	ps.clear();
 
 	// thesis van, figure 4.11
@@ -220,6 +222,16 @@ int main(int argc, char **argv)
 	ps(start,       plus + start | start + plus + start |
 			start + plus | one);
 	run_test<char>(ps, nt, start, "1+++1", {}, o);
+	ps.clear();
+
+/*******************************************************************************
+*       DISAMBIGUATION
+*******************************************************************************/
+	// 
+	TEST("disambig", "same")
+	ps(start, start + plus +start );
+	ps(start, one);
+	run_test<char>(ps, nt, start, "1+1+1", {}, o);
 	ps.clear();
 
 /*******************************************************************************
