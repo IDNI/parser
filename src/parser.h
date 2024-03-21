@@ -21,6 +21,7 @@
 #include <istream>
 #include <span>
 #include <cassert>
+#include <algorithm>
 #include "memory_map.h"
 #include "defs.h"
 #include "characters.h"
@@ -266,6 +267,7 @@ public:
 		decoder_type chars_to_terminals = 0;
 		encoder_type terminals_to_chars = 0;
 		bool auto_disambiguate = true;
+		std::vector<std::string> nodisambg_list = {};
 	};
 	// constructor
 	parser(grammar<C, T>& g, options o = {});

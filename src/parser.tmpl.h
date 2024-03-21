@@ -1009,25 +1009,33 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 	pnodes_set ambset, cambset;
 	std::set<pnode> snodes;
 	size_t last_p = SIZE_MAX;
+	auto check_allowed = [this] (const pnode &cnode) {
+		if(o.auto_disambiguate == false) return false;
+		for (auto &nt : o.nodisambg_list)
+			if (cnode.first.to_std_string() == nt) return false;
+		return true;
+	};
+
 	for (auto& curp : nxtset) {
 		auto& cur = *curp;
 		if (cur.set != root.second[1]) continue;
 		pnode cnode(completed(cur) /*&& !negative(cur)*/
 			? g(cur.prod) : g.nt(root.first.n()),
-			{ cur.from, cur.set });
+			{ cur.from, cur.set });		
 		cambset.clear();
+		bool allowed_disambg = check_allowed(cnode);
 		if (o.binarize) binarize_comb(cur, 
-						o.auto_disambiguate ? cambset : ambset);
+						allowed_disambg ? cambset : ambset);
 		else {
 			pnodes nxtlits;
 			//std::cout << "\n" << cur.prod << " " << last_p << " " << ambset.size();
 			sbl_chd_forest(cur, nxtlits, cur.from, 
-						o.auto_disambiguate ? cambset : ambset);
+						allowed_disambg ? cambset : ambset);
 		}
 
 		// resolve ambiguity across productions, due to different earley items
 		// with different prod id
-		if( o.auto_disambiguate ) {
+		if( allowed_disambg) {
 			if(cambset.size()) { // any new sub forest
 				if( ambset.size() == 0) // first time if
 					last_p = cur.prod, ambset = cambset;
@@ -1041,7 +1049,7 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 		//std::cout << "\n A " << cur.prod << " " << last_p << " " << ambset.size();
 	}
 
-	if( o.auto_disambiguate) {
+	if( snodes.size() && check_allowed(*snodes.begin())) {
 		
 		// resolve ambiguity if WITHIN production, where same production with same symbols 
 		// of different individual span
@@ -1066,7 +1074,6 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 			k++;
 			idxs.clear();
 			idxs.insert(idxs.begin(),gi.begin(),gi.end());
-			std::cout<<k;
 		}
 		while( k < int(ambset.size()) && gi.size() > 1 );
 
@@ -1082,7 +1089,8 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 	//std::cout << gi.size() << std::endl;
 	}
 	
-	for (auto& aset : o.auto_disambiguate? cambset : ambset)
+	for (auto& aset : (snodes.size() && check_allowed(*snodes.begin()))
+			? cambset : ambset)
 		for (const pnode& nxt : aset) build_forest(f, nxt);
 
 	return true;

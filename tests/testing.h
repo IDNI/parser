@@ -370,7 +370,8 @@ void help(const std::string& opt) {
 "	-[enable|disable]_binarization\n" <<
 "\t              enables binarization and leftright optimization of forest\n" <<
 "	-[enable|disable]_gc	enables garbage collection\n" <<
-"	-[enable|disable]_autodisambg enable/disable auto disambiguation" <<
+"	-[enable|disable]_autodisambg enable/disable auto disambiguation\n" <<
+"	-[no_disambg nt1,nt2..ntn] disables disambiguation for specified non-terminals\n"
 "	-unique_node\n" <<
 "	              retrieves graphs from forest based on nodes, not edges\n"
 "	-stop_after_[1|5]\n" <<
@@ -465,8 +466,17 @@ void process_args(int argc, char **argv) {
 		}
 		else if (opt == "-enable_autodisambg") auto_disambg = true;
 		else if ( opt == "-disable_autodisambg") auto_disambg = false;
+		else if ( opt == "-no_disambg" ) {
+			++it;
+			if( it == args.end()) missing(opt); 
+			std::stringstream ss(*it);
+			std::string nt;
+			while(getline(ss, nt, ',')){
+				options<char>.nodisambg_list.push_back(nt),
+				options<char32_t>.nodisambg_list.push_back(nt);
+			}
+		}
 		else if (opt == "-help" || opt == "-h") help(""), exit(0);
-
 		else help(opt), exit(1);
 	}
 	if (verbosity > 0) {
