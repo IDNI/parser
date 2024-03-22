@@ -317,6 +317,11 @@ int tgf_run(int argc, char** argv) {
 #define TC_STATUS_START  TC(color::MAGENTA, color::BG_LIGHT_GRAY, color::BRIGHT)
 #define TC_STATUS_FILE   TC(color::BLUE,    color::BG_LIGHT_GRAY)
 #define TC_PROMPT        TC(color::WHITE,   color::BRIGHT)
+#define TC_NT            TC.YELLOW()
+#define TC_NT_ID         TC.DARK_GRAY()
+#define TC_T             TC(color::BLUE,    color::BRIGHT)
+#define TC_NULL          TC.DARK_GRAY()
+#define TC_RANGE         TC.DARK_GRAY()
 
 // tgf_repl_evaluator impl
 
@@ -330,6 +335,29 @@ void tgf_repl_evaluator::reprompt() {
 		<< TC_STATUS << " ]" << TC.CLEAR() << " ";
 	ss << TC_PROMPT << "tgf>" << TC.CLEAR() << " ";
 	if (r) r->prompt(ss.str());
+}
+
+ostream& tgf_repl_evaluator::pretty_print(ostream& os,
+	const parser_type::psptree& n, std::set<size_t> skip = {},
+	bool nulls = false, size_t l = 0)
+{
+	auto& value = n->value;
+	if (skip.size() && n->value.first.nt() &&
+		skip.find(n->value.first.n()) != skip.end())
+			return os;
+	if (!nulls && n->value.first.is_null()) return os;
+	os << "\n";
+	for (size_t t = 0; t < l; t++) os << "\t";
+	if (n->value.first.nt())
+		os << TC_NT << value.first << TC.CLEAR() << TC_NT_ID
+			<< "(" << value.first.n() << ")" << TC.CLEAR();
+	else if (value.first.is_null())
+		os << TC_NULL << "null" << TC.CLEAR();
+	else os << TC_T << value.first << TC.CLEAR();
+	os << TC_RANGE << "[" << value.second[0] << ", "
+		<< value.second[1] << "]" << TC.CLEAR();
+	for (auto& d : n->child) pretty_print(os, d, skip, nulls, l + 1);
+	return os;
 }
 
 tgf_repl_evaluator::tgf_repl_evaluator(const string& tgf_file)
@@ -377,16 +405,13 @@ void tgf_repl_evaluator::parsed(unique_ptr<parser_type::pforest> f) {
 	struct {
 		bool graphs, facts, rules, terminals;
 	} print(opt.print_graphs, opt.tml_facts, opt.tml_rules, true);
-	auto cb_next_g = [&f, &print](parser_type::pgraph& g) {
+	auto cb_next_g = [&f, &print, this](parser_type::pgraph& g) {
 		stringstream ss;
 		f->remove_binarization(g);
 		f->remove_recursive_nodes(g);
 		if (print.graphs) {
-			static size_t c = 1;
-			ss << "parsed graph";
-			if (c++ > 1) ss << " " << c;
-			ss << ":";
-			g.extract_trees()->to_print(ss);
+			auto t = g.extract_trees();
+			pretty_print(ss, t);
 			ss << "\n\n";
 			cout << ss.str(), ss = {};
 		}

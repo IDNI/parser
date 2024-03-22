@@ -70,6 +70,9 @@ struct tgf_repl_evaluator {
 	void update_bool_opt_cmd(const sp_node_type& n,
 		const std::function<bool(bool&)>& update_fn);
 
+	std::ostream& pretty_print(std::ostream& os,
+		const parser_type::psptree& n, std::set<size_t> skip,
+		bool nulls, size_t l);
 	repl<tgf_repl_evaluator>* r = 0;
 	std::shared_ptr<nonterminals<char>> nts;
 	std::shared_ptr<grammar<char>> g;
