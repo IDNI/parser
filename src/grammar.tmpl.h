@@ -653,6 +653,38 @@ std::ostream& grammar<C, T>::print_internal_grammar(std::ostream& os,
 	}
 	return os;
 }
+template <typename C, typename T>
+std::ostream& grammar<C, T>::print_internal_grammar_for(std::ostream& os,
+	const std::string& nt, std::string prep, bool print_ids) const
+{
+	auto root = nts(nt);
+	std::set<size_t> ids;
+	std::set<size_t> to_visit = prod_ids_of_literal(root);
+	auto not_visited = [&ids](size_t i) {
+		return ids.find(i) == ids.end();
+	};
+	while (to_visit.size()) {
+		std::set<size_t> next_to_visit;
+		for (auto p : to_visit) {
+			if (!not_visited(p)) continue;
+			ids.insert(p);
+			for (auto pb : G[p].second) for (auto l : pb) {
+				if (l.nt() && not_visited(l.n())) {
+					auto pids = prod_ids_of_literal(l);
+					next_to_visit.insert(pids.begin(), pids.end());
+				}
+			}
+		}
+		to_visit = next_to_visit;
+	}
+	for (size_t i : ids) {
+		os << prep, print_ids ? os << "G" << i << ": " : os;
+		print_production(os, G[i]);
+		if (conjunctive(i)) os << "\t # conjunctive";
+		os << "\n";
+	}
+	return os;
+}
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
 template <typename C, typename T>
 std::ostream& grammar<C, T>::print_data(std::ostream& os, std::string prep)

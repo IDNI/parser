@@ -155,6 +155,9 @@ struct grammar {
 		const production& p) const;
 	std::ostream& print_internal_grammar(std::ostream& os,
 		std::string prep = {}, bool print_ids = false) const;
+	std::ostream& print_internal_grammar_for(std::ostream& os,
+		const std::string& nt,	std::string prep = {},
+		bool print_ids = false) const;
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
 	std::ostream& print_data(std::ostream& os, std::string prep = {}) const;
 #endif
