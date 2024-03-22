@@ -624,30 +624,39 @@ std::ostream& grammar<C, T>::check_nullable_ambiguity(std::ostream& os) const {
 	return os;
 }
 
+#include "parser_term_color_macros.h" // load color macros
 template <typename C, typename T>
 std::ostream& grammar<C, T>::print_production(std::ostream& os,
-	const production& p) const
+	const production& p, const term::colors& TC) const
 {
-	os << p.first.to_std_string(from_cstr<C>("null")) << " =>";
+	os << TC_NT << p.first.to_std_string(from_cstr<C>("null")) << TC_DEFAULT
+		<< " =>";
 	size_t j = 0;
 	for (const auto& c : p.second) {
 		if (j++ != 0) os << " &";
-		if (c.neg) os << " ~(";
-		for (const auto& l : c) os << " " <<
-			(!l.nt() && !l.is_null()
-				? l.to_std_string()
-				: l.to_std_string(from_cstr<C>("null")));
-		if (c.neg) os << " )";
+		std::string tc_neg{};
+		if (c.neg) tc_neg = TC_NEG, os << " " << tc_neg << "~(";
+		for (const auto& l : c) {
+			os << " ";
+			if (l.nt())
+				os << TC_NT << l.to_std_string() << TC_DEFAULT;
+			else if (l.is_null())
+				os << TC_NULL << "null" << TC_DEFAULT;
+			else os << TC_T << l.to_std_string() << TC.CLEAR()
+				<< tc_neg;
+		}
+		if (c.neg) os << tc_neg << " )" << TC.CLEAR();
 	}
 	return os << ".";
 }
+#include "parser_term_color_macros.h" // undef color macros
 template <typename C, typename T>
 std::ostream& grammar<C, T>::print_internal_grammar(std::ostream& os,
-	std::string prep, bool print_ids) const
+	std::string prep, bool print_ids, const term::colors& TC) const
 {
 	for (size_t i = 0; i != G.size(); ++i) {
 		os << prep, print_ids ? os << "G" << i << ": " : os;
-		print_production(os, G[i]);
+		print_production(os, G[i], TC);
 		if (conjunctive(i)) os << "\t # conjunctive";
 		os << "\n";
 	}
@@ -655,7 +664,8 @@ std::ostream& grammar<C, T>::print_internal_grammar(std::ostream& os,
 }
 template <typename C, typename T>
 std::ostream& grammar<C, T>::print_internal_grammar_for(std::ostream& os,
-	const std::string& nt, std::string prep, bool print_ids) const
+	const std::string& nt, std::string prep, bool print_ids,
+	const term::colors& TC) const
 {
 	auto root = nts(nt);
 	std::set<size_t> ids;
@@ -679,7 +689,7 @@ std::ostream& grammar<C, T>::print_internal_grammar_for(std::ostream& os,
 	}
 	for (size_t i : ids) {
 		os << prep, print_ids ? os << "G" << i << ": " : os;
-		print_production(os, G[i]);
+		print_production(os, G[i], TC);
 		if (conjunctive(i)) os << "\t # conjunctive";
 		os << "\n";
 	}

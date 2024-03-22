@@ -19,6 +19,7 @@
 
 #include "tgf_cli.h"
 #include "parser_gen.h"
+#include "parser_term_color_macros.h"
 
 #define PBOOL(bval) (( bval ) ? "true" : "false")
 
@@ -152,7 +153,8 @@ cli::commands tgf_commands() {
 //
 
 int show(const string& tgf_file, const string start = "start",
-	bool print_grammar = true, bool print_nullable_ambiguity = false)
+	bool print_grammar = true, bool print_nullable_ambiguity = false,
+	bool colors = true)
 {
 	//DBG(cout << tgf_file << " show" <<
 	//	" --start " << start <<
@@ -161,7 +163,8 @@ int show(const string& tgf_file, const string start = "start",
 	//	"\n";)
 	nonterminals<char> nts;
 	auto g = tgf<char>::from_file(nts, tgf_file, start);
-	if (print_grammar) g.print_internal_grammar(cout);
+	if (print_grammar)
+		g.print_internal_grammar(cout, {}, true, term::colors(colors));
 	if (print_nullable_ambiguity) g.check_nullable_ambiguity(cout);
 	return 0;
 }
@@ -311,17 +314,6 @@ int tgf_run(int argc, char** argv) {
 	}
 	return 0;
 }
-
-// terminal color presets
-#define TC_STATUS        TC.BG_LIGHT_GRAY()
-#define TC_STATUS_START  TC(color::MAGENTA, color::BG_LIGHT_GRAY, color::BRIGHT)
-#define TC_STATUS_FILE   TC(color::BLUE,    color::BG_LIGHT_GRAY)
-#define TC_PROMPT        TC(color::WHITE,   color::BRIGHT)
-#define TC_NT            TC.YELLOW()
-#define TC_NT_ID         TC.DARK_GRAY()
-#define TC_T             TC(color::BLUE,    color::BRIGHT)
-#define TC_NULL          TC.DARK_GRAY()
-#define TC_RANGE         TC.DARK_GRAY()
 
 // tgf_repl_evaluator impl
 
@@ -744,7 +736,7 @@ int tgf_repl_evaluator::eval(const tgf_repl_parser::sp_rw_node_type& s) {
 		auto n = s | tgf_repl_parser::symbol;
 		std::string start = n.has_value() ? get_string(n.value()) : opt.start;
 		g->print_internal_grammar_for(cout << "\ngrammar for \""
-		 	<< opt.start << "\":\n", start, "  ", true);
+		 	<< opt.start << "\":\n", start, "  ", true, TC);
 		break;
 	}
 	case tgf_repl_parser::grammar_cmd: {

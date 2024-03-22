@@ -27,6 +27,7 @@
 #include "characters.h"
 #include "charclasses.h"
 #include "forest.h"
+#include "term_colors.h"
 
 #define DEFAULT_BINARIZE false
 #define DEFAULT_INCR_GEN_FOREST false
@@ -153,12 +154,14 @@ struct grammar {
 	bool is_eof_fn(const size_t& p) const;
 	std::ostream& check_nullable_ambiguity(std::ostream& os) const;
 	std::ostream& print_production(std::ostream& os,
-		const production& p) const;
+		const production& p, const term::colors& TC = {false}) const;
 	std::ostream& print_internal_grammar(std::ostream& os,
-		std::string prep = {}, bool print_ids = false) const;
+		std::string prep = {}, bool print_ids = false,
+		const term::colors& TC = {false}) const;
 	std::ostream& print_internal_grammar_for(std::ostream& os,
 		const std::string& nt,	std::string prep = {},
-		bool print_ids = false) const;
+		bool print_ids = false,
+		const term::colors& TC = {false}) const;
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
 	std::ostream& print_data(std::ostream& os, std::string prep = {}) const;
 #endif
