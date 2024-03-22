@@ -312,13 +312,23 @@ int tgf_run(int argc, char** argv) {
 	return 0;
 }
 
+// terminal color presets
+#define TC_STATUS        TC.BG_LIGHT_GRAY()
+#define TC_STATUS_START  TC(color::MAGENTA, color::BG_LIGHT_GRAY, color::BRIGHT)
+#define TC_STATUS_FILE   TC(color::BLUE,    color::BG_LIGHT_GRAY)
+#define TC_PROMPT        TC(color::WHITE,   color::BRIGHT)
+
 // tgf_repl_evaluator impl
 
 void tgf_repl_evaluator::reprompt() {
 	stringstream ss;
 	if (opt.status)
-		ss << "[ " << tgf_file << " " << opt.start << " ] ";
-	ss << "tgf> ";
+		ss << TC_STATUS << "[ "
+		<< TC_STATUS_FILE  << "\"" << tgf_file << "\"" << TC.CLEAR()
+		<< TC_STATUS << " "
+		<< TC_STATUS_START << opt.start << TC.CLEAR()
+		<< TC_STATUS << " ]" << TC.CLEAR() << " ";
+	ss << TC_PROMPT << "tgf>" << TC.CLEAR() << " ";
 	if (r) r->prompt(ss.str());
 }
 
@@ -335,7 +345,7 @@ tgf_repl_evaluator::tgf_repl_evaluator(const string& tgf_file, options opt)
 			tgf<char>::from_file(*nts, tgf_file, opt.start))),
 		p(make_shared<parser_type>(*g))
 {
-	//_repl_evaluator::TC.set(opt.colors);
+	TC.set(opt.colors);
 }
 
 void tgf_repl_evaluator::set_repl(repl<tgf_repl_evaluator>& r_) {
@@ -502,8 +512,8 @@ void tgf_repl_evaluator::set_cmd(const tgf_repl_parser::sp_rw_node_type& n) {
 		set_bool_value(opt.debug, vt); } },
 	{ tgf_repl_parser::status_opt,          [this, &vt]() {
 		set_bool_value(opt.status, vt); } },
-	//{ tgf_repl_parser::colors_opt,          [this, &vt]() {
-	//	_repl_evaluator::TC.set(set_bool_value(opt.colors, vt)); } },
+	{ tgf_repl_parser::colors_opt,          [this, &vt]() {
+		TC.set(set_bool_value(opt.colors, vt)); } },
 	{ tgf_repl_parser::print_ambiguity_opt, [this, &vt]() {
 		set_bool_value(opt.print_ambiguity, vt); } },
 	{ tgf_repl_parser::print_graphs_opt, [this, &vt]() {
@@ -543,7 +553,7 @@ void tgf_repl_evaluator::update_bool_opt_cmd(
 	switch (option_type) {
 	case tgf_repl_parser::debug_opt:           update_fn(opt.debug); break;
 	case tgf_repl_parser::status_opt:          update_fn(opt.status); break;
-	//case tgf_repl_parser::colors_opt: TC.set(toggle(opt.colors)); break;
+	case tgf_repl_parser::colors_opt:   TC.set(update_fn(opt.colors)); break;
 	case tgf_repl_parser::print_ambiguity_opt: update_fn(opt.print_ambiguity); break;
 	case tgf_repl_parser::print_graphs_opt:    update_fn(opt.print_graphs); break;
 	case tgf_repl_parser::print_rules_opt:     update_fn(opt.tml_rules); break;

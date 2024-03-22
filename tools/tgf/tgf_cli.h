@@ -17,7 +17,7 @@
 
 #include "cli.h"
 #include "repl.h"
-//#include "terminal_color.h"
+#include "term_colors.h"
 #include "tgf_repl_parser.generated.h"
 
 namespace idni {
@@ -74,6 +74,7 @@ struct tgf_repl_evaluator {
 	std::shared_ptr<nonterminals<char>> nts;
 	std::shared_ptr<grammar<char>> g;
 	std::shared_ptr<parser<char>> p;
+	term::colors TC;
 };
 
 } // namespace idni
