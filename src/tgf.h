@@ -23,7 +23,7 @@ struct tgf {
 		const std::basic_string<C>& s,
 		const std::basic_string<C>& start_nt = from_cstr<C>("start"))
 	{
-		tgf_parser p;
+		auto& p = parser_instance<tgf_parsing::tgf_parser>();
 #if DEBUG && DEBUG_PARSING
 		p.p.debug = false;
 #endif
@@ -36,18 +36,19 @@ struct tgf {
 		const std::string& filename,
 		const std::basic_string<C>& start_nt = from_cstr<C>("start"))
 	{
-		tgf_parser p;
+		auto& p = parser_instance<tgf_parsing::tgf_parser>();
 #if DEBUG && DEBUG_PARSING
 		p.p.debug = false;
 #endif
 		return transform(p, p.parse(filename), nts_, start_nt);
 	}
 private:
-	static grammar<C, T> transform(tgf_parser& p,
+	static grammar<C, T> transform(tgf_parsing::tgf_parser& p,
 		std::unique_ptr<typename parser<C, T>::pforest> f,
 		nonterminals<C, T>& nts_,
 		const std::basic_string<C>& start_nt = from_cstr<C>("start"))
 	{
+		using namespace tgf_parsing;
 		struct context {
 			prods<C, T> ps{}, nul{ lit<C, T>{} };
 			lit<C, T> p_head{};

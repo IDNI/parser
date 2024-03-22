@@ -1,10 +1,17 @@
-// This file is generated from a file src/tgf.tgf by
+// This file is generated from a file ./src/tgf.tgf by
 //       https://github.com/IDNI/parser/tools/tgf
 //
 #ifndef __TGF_PARSER_H__
 #define __TGF_PARSER_H__
+
 #include <string.h>
+#include <ranges>
+
 #include "parser.h"
+#include "rewriting.h"
+
+namespace tgf_parsing {
+
 struct tgf_parser {
 	using char_type     = char;
 	using terminal_type = char;
@@ -21,6 +28,9 @@ struct tgf_parser {
 	using decoder_type  = parser_type::input::decoder_type;
 	using encoder_type  = std::function<std::basic_string<char_type>(
 			const std::vector<terminal_type>&)>;
+	using rw_symbol_type  = std::variant<symbol_type, size_t>;
+	using rw_node_type    = idni::rewriter::node<rw_symbol_type>;
+	using sp_rw_node_type = idni::rewriter::sp_node<rw_symbol_type>;
 	tgf_parser() :
 		nts(load_nonterminals()), cc(load_cc()),
 		g(nts, load_prods(), nt(6), cc), p(g, load_opts()) {}
@@ -37,13 +47,13 @@ struct tgf_parser {
 	bool found(int start = -1) { return p.found(start); }
 	typename parser_type::error get_error() { return p.get_error(); }
 	enum nonterminal {
-		nul, eof, alnum, alpha, space, printable, start, _, statement, _Rstart_0, 
-		_Rstart_1, directive, production, __, directive_params, directive_param, _Rdirective_params_2, _Rdirective_params_3, sym, expr1, 
-		disjunction, expr2, conjunction, expr3, negation, literals, literal, _Rliterals_4, _Rliterals_5, terminal, 
-		nonterminal, terminal_char, terminal_string, nonliteral, sym_start, sym_rest, _Rsym_6, _Rsym_7, group, optional, 
-		repeat, plus, multi, unescaped_c, escaped_c, _Rterminal_char_8, _Runescaped_c_9, _Rescaped_c_10, unescaped_s, escaped_s, 
-		_Rterminal_string_11, _Rterminal_string_12, _Runescaped_s_13, _Rescaped_s_14, _R__15, comment, _R___16, _Rcomment_17, _Rcomment_18, _Rcomment_19, 
-		__neg_0, __neg_1, 
+		nul, eof, alnum, alpha, space, printable, start, _, statement, _Rstart_0,
+		_Rstart_1, directive, production, __, directive_params, directive_param, _Rdirective_params_2, _Rdirective_params_3, sym, expr1,
+		disjunction, expr2, conjunction, expr3, negation, literals, literal, _Rliterals_4, _Rliterals_5, terminal,
+		nonterminal_, terminal_char, terminal_string, nonliteral, sym_start, sym_rest, _Rsym_6, _Rsym_7, group, optional,
+		repeat, plus, multi, unescaped_c, escaped_c, _Rterminal_char_8, _Runescaped_c_9, _Rescaped_c_10, unescaped_s, escaped_s,
+		_Rterminal_string_11, _Rterminal_string_12, _Runescaped_s_13, _Rescaped_s_14, _R__15, comment, _R___16, _Rcomment_17, _Rcomment_18, _Rcomment_19,
+		__neg_0, __neg_1,
 	};
 	size_t id(const std::basic_string<char_type>& name) {
 		return nts.get(name);
@@ -53,11 +63,11 @@ struct tgf_parser {
 	}
 private:
 	std::vector<terminal_type> ts{
-		'\0', '@', 'u', 's', 'e', '_', 'c', 'h', 'a', 
-		'r', 'l', '.', ',', 'n', 'm', 'p', 'b', 'k', 't', 
-		'd', 'i', 'g', 'o', 'f', 'w', 'x', '=', '>', '|', 
-		'&', '~', '(', ')', '[', ']', '{', '}', '+', '*', 
-		'\'', '\\', '/', '"', '\t', '\n', '\r', '#', 
+		'\0', '@', 'u', 's', 'e', '_', 'c', 'h', 'a',
+		'r', 'l', '.', ',', 'n', 'm', 'p', 'b', 'k', 't',
+		'd', 'i', 'g', 'o', 'f', 'w', 'x', '=', '>', '|',
+		'&', '~', '(', ')', '[', ']', '{', '}', '+', '*',
+		'\'', '\\', '/', '"', '\t', '\n', '\r', '#',
 	};
 	idni::nonterminals<char_type, terminal_type> nts{};
 	idni::char_class_fns<terminal_type> cc;
@@ -73,13 +83,13 @@ private:
 	idni::nonterminals<char_type, terminal_type> load_nonterminals() const {
 		idni::nonterminals<char_type, terminal_type> nts{};
 		for (const auto& nt : {
-			"", "eof", "alnum", "alpha", "space", "printable", "start", "_", "statement", "_Rstart_0", 
-			"_Rstart_1", "directive", "production", "__", "directive_params", "directive_param", "_Rdirective_params_2", "_Rdirective_params_3", "sym", "expr1", 
-			"disjunction", "expr2", "conjunction", "expr3", "negation", "literals", "literal", "_Rliterals_4", "_Rliterals_5", "terminal", 
-			"nonterminal", "terminal_char", "terminal_string", "nonliteral", "sym_start", "sym_rest", "_Rsym_6", "_Rsym_7", "group", "optional", 
-			"repeat", "plus", "multi", "unescaped_c", "escaped_c", "_Rterminal_char_8", "_Runescaped_c_9", "_Rescaped_c_10", "unescaped_s", "escaped_s", 
-			"_Rterminal_string_11", "_Rterminal_string_12", "_Runescaped_s_13", "_Rescaped_s_14", "_R__15", "comment", "_R___16", "_Rcomment_17", "_Rcomment_18", "_Rcomment_19", 
-			"__neg_0", "__neg_1", 
+			"", "eof", "alnum", "alpha", "space", "printable", "start", "_", "statement", "_Rstart_0",
+			"_Rstart_1", "directive", "production", "__", "directive_params", "directive_param", "_Rdirective_params_2", "_Rdirective_params_3", "sym", "expr1",
+			"disjunction", "expr2", "conjunction", "expr3", "negation", "literals", "literal", "_Rliterals_4", "_Rliterals_5", "terminal",
+			"nonterminal_", "terminal_char", "terminal_string", "nonliteral", "sym_start", "sym_rest", "_Rsym_6", "_Rsym_7", "group", "optional",
+			"repeat", "plus", "multi", "unescaped_c", "escaped_c", "_Rterminal_char_8", "_Runescaped_c_9", "_Rescaped_c_10", "unescaped_s", "escaped_s",
+			"_Rterminal_string_11", "_Rterminal_string_12", "_Runescaped_s_13", "_Rescaped_s_14", "_R__15", "comment", "_R___16", "_Rcomment_17", "_Rcomment_18", "_Rcomment_19",
+			"__neg_0", "__neg_1",
 		}) nts.get(nt);
 		return nts;
 	}
@@ -177,15 +187,15 @@ private:
 		q(nt(25), (nt(26)+nt(28)));
 		// literal => terminal.
 		q(nt(26), (nt(29)));
-		// literal => nonterminal.
+		// literal => nonterminal_.
 		q(nt(26), (nt(30)));
 		// terminal => terminal_char.
 		q(nt(29), (nt(31)));
 		// terminal => terminal_string.
 		q(nt(29), (nt(32)));
-		// nonterminal => sym.
+		// nonterminal_ => sym.
 		q(nt(30), (nt(18)));
-		// nonterminal => nonliteral.
+		// nonterminal_ => nonliteral.
 		q(nt(30), (nt(33)));
 		// _Rsym_6 => sym_rest.
 		q(nt(36), (nt(35)));
@@ -322,4 +332,191 @@ private:
 		return q;
 	}
 };
+
+using sp_node_type = tgf_parser::sp_rw_node_type;
+using rw_symbol_type = tgf_parser::rw_symbol_type;
+using symbol_type = tgf_parser::symbol_type;
+using nonterminal_type = tgf_parser::nonterminal;
+
+static inline bool is_non_terminal_node(const sp_node_type& n) {
+	return std::holds_alternative<symbol_type>(n->value)
+		&& get<symbol_type>(n->value).nt();
+};
+
+static inline std::function<bool(const sp_node_type&)> is_non_terminal_node() {
+	return [](const sp_node_type& n) { return is_non_terminal_node(n); };
+}
+
+static inline bool is_non_terminal(const nonterminal_type nt, const sp_node_type& n) {
+	return is_non_terminal_node(n)
+		&& std::get<symbol_type>(n->value).n() == nt;
+}
+
+static inline std::function<bool(const sp_node_type&)> is_non_terminal(
+	const nonterminal_type nt)
+{
+	return [nt](const sp_node_type& n) { return is_non_terminal(nt, n); };
+}
+
+static inline std::optional<sp_node_type> operator|(const sp_node_type& n,
+	const nonterminal_type nt)
+{
+	auto v = n->child
+		| std::ranges::views::filter(is_non_terminal(nt))
+		| std::ranges::views::take(1);
+	return v.empty() ? std::optional<sp_node_type>()
+		: std::optional<sp_node_type>(v.front());
+}
+
+static inline std::optional<sp_node_type> operator|(const std::optional<sp_node_type>& n,
+	const nonterminal_type nt)
+{
+	return n ? n.value() | nt : n;
+}
+
+static inline std::vector<sp_node_type> operator||(const sp_node_type& n,
+	const nonterminal_type nt)
+{
+	std::vector<sp_node_type> nv;
+	nv.reserve(n->child.size());
+	for (const auto& c : n->child | std::ranges::views::filter(
+					is_non_terminal(nt))) nv.push_back(c);
+	return nv;
+}
+
+static inline std::vector<sp_node_type> operator||(const std::optional<sp_node_type>& n,
+	const nonterminal_type nt)
+{
+	if (n) return n.value() || nt;
+	return {};
+}
+
+static const auto only_child_extractor = [](const sp_node_type& n)
+	-> std::optional<sp_node_type>
+{
+	if (n->child.size() != 1) return std::optional<sp_node_type>();
+	return std::optional<sp_node_type>(n->child[0]);
+};
+using only_child_extractor_t = decltype(only_child_extractor);
+
+static inline std::vector<sp_node_type> operator||(const std::vector<sp_node_type>& v,
+	const only_child_extractor_t e)
+{
+	std::vector<sp_node_type> nv;
+	for (const auto& n : v | std::ranges::views::transform(e))
+		if (n.has_value()) nv.push_back(n.value());
+	return nv;
+}
+
+static inline std::optional<sp_node_type> operator|(const std::optional<sp_node_type>& o,
+	const only_child_extractor_t e)
+{
+	return o.has_value() ? e(o.value()) : std::optional<sp_node_type>();
+}
+
+static inline std::optional<sp_node_type> operator|(const sp_node_type& o,
+	const only_child_extractor_t e)
+{
+	return e(o);
+}
+
+static const auto terminal_extractor = [](const sp_node_type& n)
+	-> std::optional<char>
+{
+	if (std::holds_alternative<symbol_type>(n->value)) {
+		auto& v = std::get<symbol_type>(n->value);
+		if (!v.nt() && !v.is_null()) return std::optional<char>(v.t());
+	}
+	return std::optional<char>();
+};
+
+using terminal_extractor_t = decltype(terminal_extractor);
+
+static inline std::optional<char> operator|(const std::optional<sp_node_type>& o,
+	const terminal_extractor_t e)
+{
+	return o.has_value() ? e(o.value()) : std::optional<char>();
+}
+
+static const auto non_terminal_extractor = [](const sp_node_type& n)
+	-> std::optional<size_t>
+{
+	if (std::holds_alternative<symbol_type>(n->value)) {
+		auto& v = std::get<symbol_type>(n->value);
+		if (v.nt()) return std::optional<char>(v.n());
+	}
+	return std::optional<size_t>();
+};
+
+using non_terminal_extractor_t = decltype(non_terminal_extractor);
+
+static inline std::optional<size_t> operator|(const std::optional<sp_node_type>& o,
+	const non_terminal_extractor_t e)
+{
+	return o.has_value() ? e(o.value()) : std::optional<size_t>();
+}
+
+static inline std::optional<size_t> operator|(const sp_node_type& o,
+	const non_terminal_extractor_t e)
+{
+	return e(o);
+}
+
+static const auto size_t_extractor = [](const sp_node_type& n)
+	-> std::optional<size_t>
+{
+	if (std::holds_alternative<size_t>(n->value))
+		return std::optional<size_t>(std::get<size_t>(n->value));
+	return std::optional<size_t>();
+};
+using size_t_extractor_t = decltype(size_t_extractor);
+
+static inline std::optional<size_t> operator|(const std::optional<sp_node_type>& o,
+	const size_t_extractor_t e)
+{
+	return o.has_value() ? e(o.value()) : std::optional<size_t>();
+}
+
+static inline std::optional<size_t> operator|(const sp_node_type& o,
+	const size_t_extractor_t e)
+{
+	return e(o);
+}
+
+// is not a whitespace predicate
+static const auto not_whitespace_predicate = [](const sp_node_type& n) {
+	if (std::holds_alternative<symbol_type>(n->value)) {
+		auto& v = std::get<symbol_type>(n->value);
+		return !v.nt() || (v.n() != tgf_parser::_ &&
+				v.n() != tgf_parser::__);
+	}
+	return true;
+};
+
+using not_whitespace_predicate_t = decltype(not_whitespace_predicate);
+
+template <typename extractor_t>
+struct stringify {
+	stringify(const extractor_t& extractor,
+		std::basic_stringstream<char>& stream)
+		: stream(stream), extractor(extractor) {}
+	sp_node_type operator()(const sp_node_type& n) {
+		if (auto str = extractor(n); str) stream << str.value();
+		return n;
+	}
+	std::basic_stringstream<char>& stream;
+	const extractor_t& extractor;
+};
+
+template <typename extractor_t, typename predicate_t>
+std::string make_string_with_skip(const extractor_t& extractor,
+	predicate_t& skip, const sp_node_type& n)
+{
+	std::basic_stringstream<char> ss;
+	stringify<extractor_t> sy(extractor, ss);
+	idni::rewriter::post_order_tree_traverser<
+		stringify<extractor_t>, predicate_t, sp_node_type>(sy, skip)(n);
+	return ss.str();
+}
+} // tgf_parsing namespace
 #endif // __TGF_PARSER_H__

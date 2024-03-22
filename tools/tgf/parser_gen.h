@@ -27,21 +27,29 @@ struct grammar_inspector { // provides access to private grammar members
 	const char_class_fns<C>& cc_fns() { return g.cc_fns; }
 };
 
+struct parser_gen_options {
+	std::string ns            = "generated_parser_ns";
+	std::string name          = "generated_parser";
+	std::string char_type     = "char";
+	std::string terminal_type = "char";
+	std::string decoder       = "";
+	std::string encoder       = "";
+	bool traversals           = true;
+	std::vector<std::string> rewriter_node_types = {};
+};
+
 template <typename C = char, typename T = C>
-std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name,
+std::ostream& generate_parser_cpp(std::ostream& os,
 	const std::string& tgf_filename,
 	const grammar<C, T>& g,
-	const std::string& char_type = "char",
-	const std::string& terminal_type = "char",
-	const std::string& decoder = "",
-	const std::string& encoder = "")
+	parser_gen_options opt = {})
 {
 	if (g.size() == 0) return os;
-	std::string U = terminal_type == "char32_t" ? "U" : "";
+	std::string U = opt.terminal_type == "char32_t" ? "U" : "";
 	std::vector<C> ts{ (C)0 };
 	grammar_inspector<C, T> gi(g);
 	// convert name to upper case and append __PARSER_GEN_H__ as a guard at the begining
-	std::string guard = name;
+	std::string guard = opt.name;
 	std::transform(guard.begin(), guard.end(), guard.begin(), ::toupper);
 
 	auto gen_ts = [&ts, &U]() {
@@ -89,12 +97,12 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name,
 				<< to_std_string(x[fn.first]) << "\",\n";
 		return os.str();
 	};
-	auto gen_opts = [&decoder, &encoder]() {
+	auto gen_opts = [&opt]() {
 		std::stringstream os;
-		if (decoder.size()) os << "\t\to.chars_to_terminals = "
-			<< decoder << ";\n";
-		if (encoder.size()) os << "\t\to.terminals_to_chars = "
-			<< encoder << ";\n";
+		if (opt.decoder.size()) os << "\t\to.chars_to_terminals = "
+			<< opt.decoder << ";\n";
+		if (opt.encoder.size()) os << "\t\to.terminals_to_chars = "
+			<< opt.encoder << ";\n";
 		return os.str();
 	};
 	auto gen_prods = [&g, &gi, &ts]() {
@@ -134,6 +142,204 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name,
 			return p.substr(pwd.size());
 		return p;
 	};
+	auto rw_symbol_type = [&opt]() {
+		std::stringstream os;
+		os << "	using rw_symbol_type  = std::variant<symbol_type";
+		for (const auto& t : opt.rewriter_node_types) os << ", " << t;
+		os << ">;\n";
+		return os.str();
+	};
+	auto gen_traversals = [&opt]() {
+		std::stringstream os;
+		if (!opt.traversals) return std::string{};
+		os << "\n"
+		"using sp_node_type = " <<opt.name<< "::sp_rw_node_type;\n"
+		"using rw_symbol_type = " <<opt.name<< "::rw_symbol_type;\n"
+		"using symbol_type = " <<opt.name<< "::symbol_type;\n"
+		"using nonterminal_type = " <<opt.name<< "::nonterminal;\n"
+		"\n"
+		"bool is_non_terminal_node(const sp_node_type& n) {\n"
+		"	return std::holds_alternative<symbol_type>(n->value)\n"
+		"		&& get<symbol_type>(n->value).nt();\n"
+		"};\n"
+		"\n"
+		"std::function<bool(const sp_node_type&)> is_non_terminal_node() {\n"
+		"	return [](const sp_node_type& n) { return is_non_terminal_node(n); };\n"
+		"}\n"
+		"\n"
+		"bool is_non_terminal(const nonterminal_type nt, const sp_node_type& n) {\n"
+		"	return is_non_terminal_node(n)\n"
+		"		&& std::get<symbol_type>(n->value).n() == nt;\n"
+		"}\n"
+		"\n"
+		"std::function<bool(const sp_node_type&)> is_non_terminal(\n"
+		"	const nonterminal_type nt)\n"
+		"{\n"
+		"	return [nt](const sp_node_type& n) { return is_non_terminal(nt, n); };\n"
+		"}\n"
+		"\n"
+		"std::optional<sp_node_type> operator|(const sp_node_type& n,\n"
+		"	const nonterminal_type nt)\n"
+		"{\n"
+		"	auto v = n->child\n"
+		"		| std::ranges::views::filter(is_non_terminal(nt))\n"
+		"		| std::ranges::views::take(1);\n"
+		"	return v.empty() ? std::optional<sp_node_type>()\n"
+		"		: std::optional<sp_node_type>(v.front());\n"
+		"}\n"
+		"\n"
+		"std::optional<sp_node_type> operator|(const std::optional<sp_node_type>& n,\n"
+		"	const nonterminal_type nt)\n"
+		"{\n"
+		"	return n ? n.value() | nt : n;\n"
+		"}\n"
+		"\n"
+		"std::vector<sp_node_type> operator||(const sp_node_type& n,\n"
+		"	const nonterminal_type nt)\n"
+		"{\n"
+		"	std::vector<sp_node_type> nv;\n"
+		"	nv.reserve(n->child.size());\n"
+		"	for (const auto& c : n->child | std::ranges::views::filter(\n"
+		"					is_non_terminal(nt))) nv.push_back(c);\n"
+		"	return nv;\n"
+		"}\n"
+		"\n"
+		"std::vector<sp_node_type> operator||(const std::optional<sp_node_type>& n,\n"
+		"	const nonterminal_type nt)\n"
+		"{\n"
+		"	if (n) return n.value() || nt;\n"
+		"	return {};\n"
+		"}\n"
+		"\n"
+		"static const auto only_child_extractor = [](const sp_node_type& n)\n"
+		"	-> std::optional<sp_node_type>\n"
+		"{\n"
+		"	if (n->child.size() != 1) return std::optional<sp_node_type>();\n"
+		"	return std::optional<sp_node_type>(n->child[0]);\n"
+		"};\n"
+		"using only_child_extractor_t = decltype(only_child_extractor);\n"
+		"\n"
+		"std::vector<sp_node_type> operator||(const std::vector<sp_node_type>& v,\n"
+		"	const only_child_extractor_t e)\n"
+		"{\n"
+		"	std::vector<sp_node_type> nv;\n"
+		"	for (const auto& n : v | std::ranges::views::transform(e))\n"
+		"		if (n.has_value()) nv.push_back(n.value());\n"
+		"	return nv;\n"
+		"}\n"
+		"\n"
+		"std::optional<sp_node_type> operator|(const std::optional<sp_node_type>& o,\n"
+		"	const only_child_extractor_t e)\n"
+		"{\n"
+		"	return o.has_value() ? e(o.value()) : std::optional<sp_node_type>();\n"
+		"}\n"
+		"\n"
+		"std::optional<sp_node_type> operator|(const sp_node_type& o,\n"
+		"	const only_child_extractor_t e)\n"
+		"{\n"
+		"	return e(o);\n"
+		"}\n"
+		"\n"
+		"static const auto terminal_extractor = [](const sp_node_type& n)\n"
+		"	-> std::optional<char>\n"
+		"{\n"
+		"	if (std::holds_alternative<symbol_type>(n->value)) {\n"
+		"		auto& v = std::get<symbol_type>(n->value);\n"
+		"		if (!v.nt() && !v.is_null()) return std::optional<char>(v.t());\n"
+		"	}\n"
+		"	return std::optional<char>();\n"
+		"};\n"
+		"\n"
+		"using terminal_extractor_t = decltype(terminal_extractor);\n"
+		"\n"
+		"std::optional<char> operator|(const std::optional<sp_node_type>& o,\n"
+		"	const terminal_extractor_t e)\n"
+		"{\n"
+		"	return o.has_value() ? e(o.value()) : std::optional<char>();\n"
+		"}\n"
+		"\n"
+		"static const auto non_terminal_extractor = [](const sp_node_type& n)\n"
+		"	-> std::optional<size_t>\n"
+		"{\n"
+		"	if (std::holds_alternative<symbol_type>(n->value)) {\n"
+		"		auto& v = std::get<symbol_type>(n->value);\n"
+		"		if (v.nt()) return std::optional<char>(v.n());\n"
+		"	}\n"
+		"	return std::optional<size_t>();\n"
+		"};\n"
+		"\n"
+		"using non_terminal_extractor_t = decltype(non_terminal_extractor);\n"
+		"\n"
+		"std::optional<size_t> operator|(const std::optional<sp_node_type>& o,\n"
+		"	const non_terminal_extractor_t e)\n"
+		"{\n"
+		"	return o.has_value() ? e(o.value()) : std::optional<size_t>();\n"
+		"}\n"
+		"\n"
+		"std::optional<size_t> operator|(const sp_node_type& o,\n"
+		"	const non_terminal_extractor_t e)\n"
+		"{\n"
+		"	return e(o);\n"
+		"}\n"
+		"\n"
+		"static const auto size_t_extractor = [](const sp_node_type& n)\n"
+		"	-> std::optional<size_t>\n"
+		"{\n"
+		"	if (std::holds_alternative<size_t>(n->value))\n"
+		"		return std::optional<size_t>(std::get<size_t>(n->value));\n"
+		"	return std::optional<size_t>();\n"
+		"};\n"
+		"using size_t_extractor_t = decltype(size_t_extractor);\n"
+		"\n"
+		"std::optional<size_t> operator|(const std::optional<sp_node_type>& o,\n"
+		"	const size_t_extractor_t e)\n"
+		"{\n"
+		"	return o.has_value() ? e(o.value()) : std::optional<size_t>();\n"
+		"}\n"
+		"\n"
+		"std::optional<size_t> operator|(const sp_node_type& o,\n"
+		"	const size_t_extractor_t e)\n"
+		"{\n"
+		"	return e(o);\n"
+		"}\n"
+		"\n"
+		"// is not a whitespace predicate\n"
+		"static const auto not_whitespace_predicate = [](const sp_node_type& n) {\n"
+		"	if (std::holds_alternative<symbol_type>(n->value)) {\n"
+		"		auto& v = std::get<symbol_type>(n->value);\n"
+		"		return !v.nt() || (v.n() != " <<opt.name<< "::_ &&\n"
+		"				v.n() != " <<opt.name<< "::__);\n"
+		"	}\n"
+		"	return true;\n"
+		"};\n"
+		"\n"
+		"using not_whitespace_predicate_t = decltype(not_whitespace_predicate);\n"
+		"\n"
+		"template <typename extractor_t>\n"
+		"struct stringify {\n"
+		"	stringify(const extractor_t& extractor,\n"
+		"		std::basic_stringstream<char>& stream)\n"
+		"		: stream(stream), extractor(extractor) {}\n"
+		"	sp_node_type operator()(const sp_node_type& n) {\n"
+		"		if (auto str = extractor(n); str) stream << str.value();\n"
+		"		return n;\n"
+		"	}\n"
+		"	std::basic_stringstream<char>& stream;\n"
+		"	const extractor_t& extractor;\n"
+		"};\n"
+		"\n"
+		"template <typename extractor_t, typename predicate_t>\n"
+		"std::string make_string_with_skip(const extractor_t& extractor,\n"
+		"	predicate_t& skip, const sp_node_type& n)\n"
+		"{\n"
+		"	std::basic_stringstream<char> ss;\n"
+		"	stringify<extractor_t> sy(extractor, ss);\n"
+		"	idni::rewriter::post_order_tree_traverser<\n"
+		"		stringify<extractor_t>, predicate_t, sp_node_type>(sy, skip)(n);\n"
+		"	return ss.str();\n"
+		"}\n";
+		return os.str();
+	};
 	const auto ps = gen_prods();
 	os <<	"// This file is generated from a file " <<
 					strip_pwd(tgf_filename)<<" by\n"
@@ -141,11 +347,18 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name,
 		"//\n"
 		"#ifndef __" <<guard<< "_H__\n"
 		"#define __" <<guard<< "_H__\n"
+		"\n"
 		"#include <string.h>\n"
+		"#include <ranges>\n"
+		"\n"
 		"#include \"parser.h\"\n"
-		"struct " <<name<< " {\n"
-		"	using char_type     = "<<char_type<<";\n"
-		"	using terminal_type = "<<terminal_type<<";\n"
+		"#include \"rewriting.h\"\n"
+		"\n"
+		"namespace " <<opt.ns<< " {\n"
+		"\n"
+		"struct " <<opt.name<< " {\n"
+		"	using char_type     = "<<opt.char_type<<";\n"
+		"	using terminal_type = "<<opt.terminal_type<<";\n"
 		"	using traits_type   = std::char_traits<char_type>;\n"
 		"	using int_type      = typename traits_type::int_type;\n"
 		"	using symbol_type   ="
@@ -164,7 +377,10 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name,
 		"	using encoder_type  = "
 				"std::function<std::basic_string<char_type>(\n"
 		"			const std::vector<terminal_type>&)>;\n"
-		"	" <<name<< "() :\n"
+		<< rw_symbol_type() <<
+		"	using rw_node_type    = idni::rewriter::node<rw_symbol_type>;\n"
+		"	using sp_rw_node_type = idni::rewriter::sp_node<rw_symbol_type>;\n"
+		"	" <<opt.name<< "() :\n"
 		"		nts(load_nonterminals()), cc(load_cc()),\n"
 		"		g(nts, load_prods(), nt(" <<gi.start().n()<<
 				"), cc), p(g, load_opts()) {}\n"
@@ -228,39 +444,33 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name,
 		"		return q;\n"
 		"	}\n"
 		"};\n"
+		<< gen_traversals() <<
+		"} // " <<opt.ns<< " namespace\n"
 		"#endif // __" << guard << "_H__\n";
 	return os;
 }
 
 template <typename C = char, typename T = C>
 std::ostream& generate_parser_cpp_from_string(std::ostream& os,
-	const std::string& name,
+	const std::string& tgf_filename,
 	const std::basic_string<C>& grammar_tgf,
 	const std::basic_string<C>& start_nt = from_cstr<C>("start"),
-	const std::string& char_type = "char",
-	const std::string& terminal_type = "",
-	const std::string& decoder = "",
-	const std::string& encoder = "")
+	parser_gen_options opt = {})
 {
 	nonterminals<C, T> nts;
-	return generate_parser_cpp(os, name,
-		tgf<C, T>::from_string(nts, grammar_tgf, start_nt),
-		char_type, terminal_type, decoder, encoder);
+	return generate_parser_cpp(os, tgf_filename,
+		tgf<C, T>::from_string(nts, grammar_tgf, start_nt), opt);
 }
 
 template <typename C = char, typename T = C>
-void generate_parser_cpp_from_file(std::ostream& os, const std::string& name,
+void generate_parser_cpp_from_file(std::ostream& os,
 	const std::string& tgf_filename,
 	const std::basic_string<C>& start_nt = from_cstr<C>("start"),
-	const std::string& char_type = "char",
-	const std::string& terminal_type = "",
-	const std::string& decoder = "",
-	const std::string& encoder = "")
+	parser_gen_options opt = {})
 {
 	nonterminals<C, T> nts;
-	generate_parser_cpp(os, name, tgf_filename,
-		tgf<C, T>::from_file(nts, tgf_filename, start_nt),
-		char_type, terminal_type, decoder, encoder);
+	generate_parser_cpp(os, tgf_filename,
+		tgf<C, T>::from_file(nts, tgf_filename, start_nt), opt);
 }
 
 } // idni namespace
