@@ -229,7 +229,7 @@ int main(int argc, char **argv)
 *******************************************************************************/
 	// 
 	TEST("disambig", "same")
-	ps(start, start + plus +start );
+	ps(start, start + plus + start );
 	ps(start, one);
 	run_test<char>(ps, nt, start, "1+1+1", {}, o);
 	ps.clear();
