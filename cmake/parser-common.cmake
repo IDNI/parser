@@ -42,6 +42,11 @@ set(PARSER_COMPILE_OPTIONS
 )
 set(PARSER_LINK_OPTIONS "-flto=auto")
 
+include(git-defs) # for ${GIT_DEFINITIONS}
+function(target_git_definitions target)
+	target_compile_definitions(${target} PRIVATE ${GIT_DEFINITIONS})
+endfunction()
+
 # target names
 set(PARSER_OBJECT_LIB_NAME "${PROJECT_NAME}o")
 set(PARSER_STATIC_LIB_NAME "${PROJECT_NAME}_static")
@@ -68,6 +73,7 @@ function(target_setup target)
 	target_compile_options(${target} PRIVATE "${PARSER_COMPILE_OPTIONS}")
 	target_link_libraries(${target} ${CMAKE_THREAD_LIBS_INIT})
 	target_link_options(${target} PRIVATE "${PARSER_LINK_OPTIONS}")
+	target_git_definitions(${target})
 	set_target_properties(${target} PROPERTIES
 		ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 		LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"

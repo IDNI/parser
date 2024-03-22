@@ -48,5 +48,18 @@ namespace idni {
 
 typedef int32_t int_t;
 
+//-----------------------------------------------------------------------------
+
+// GIT_* macros are populated at compile time by -D or they're set to "n/a"
+#ifndef GIT_DESCRIBED
+#define GIT_DESCRIBED   "n/a"
+#endif
+#ifndef GIT_COMMIT_HASH
+#define GIT_COMMIT_HASH "n/a"
+#endif
+#ifndef GIT_BRANCH
+#define GIT_BRANCH      "n/a"
+#endif
+
 } // idni namespace
 #endif // __IDNI__PARSER__DEFS_H__
