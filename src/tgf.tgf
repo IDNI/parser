@@ -22,9 +22,9 @@ negation               => '~' _ expr3.
 
 # literals
 literals               => literal (__ literal)*.
-literal                => terminal | nonterminal.
+literal                => terminal | nonterminal_.
 terminal               => terminal_char | terminal_string.
-nonterminal            => sym | nonliteral.
+nonterminal_           => sym | nonliteral.
 sym                    => sym_start (sym_rest)*.
 sym_start              => alpha | '_'.
 sym_rest               => alnum | '_'.

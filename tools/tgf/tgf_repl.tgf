@@ -1,0 +1,94 @@
+@use_char_class eof, alnum, alpha, space, printable.
+
+# TGF grammar
+start                  => _ [ statement (_ '.' _ statement)* [_ '.'] _ ].
+
+# common rules
+_                      => [ __ ].               # optional whitespace
+__                     => (space | comment) _.  # whitespace (includes comments)
+comment                => '#' (printable | '\t')* ('\r' | '\n' | eof).
+
+quoted_string          => '"' (unescaped_s | escaped_s)* '"'.
+unescaped_s            => printable & ~( '"' | '\\' ).
+escaped_s              => '\\' ('"' | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't').
+
+filename               => quoted_string.
+symbol                 => (alnum | '_')+.
+
+parse_input_char       => printable | '\t'.
+parse_input            => parse_input_char*.
+
+# statement
+statement              => grammar_cmd | internal_grammar_cmd | start_cmd
+                        | reload_cmd | file_cmd
+                        | help | version | quit
+                        | get | set | toggle | enable | disable.
+statement              => parse_cmd.
+
+parse_cmd              => parse_input.
+grammar_cmd            => grammar_sym. # [ __ symbol ].
+internal_grammar_cmd   => internal_grammar_sym [ __ symbol ].
+start_cmd              => start_sym [ __ symbol ].
+reload_cmd             => reload_sym.
+file_cmd               => file_sym __ filename.
+help                   => help_sym [ __ cmd_symbol ].
+version                => version_sym.
+quit                   => quit_sym.
+get                    => get_sym  [ __ option ].
+set                    => set_sym    __ option (__ | _ '=' _) option_value.
+toggle                 => toggle_sym __ bool_option.
+enable                 => enable_sym    bool_option.
+disable                => disable_sym   bool_option.
+
+# symbols
+get_sym                => "get".
+set_sym                => "set".
+toggle_sym             => "toggle".
+grammar_sym            => "g" | "grammar".
+internal_grammar_sym   => "i" | "ig" | "internal-grammar".
+parse_sym              => "p" | "parse".
+start_sym              => "s" | "start".
+reload_sym             => "r" | "reload".
+file_sym               => "f" | "file".
+help_sym               => "h" | "help".
+version_sym            => "v" | "version".
+quit_sym               => "q" | "quit" | "e" | "exit".
+get_sym                => "get".
+set_sym                => "set".
+toggle_sym             => "tog" | "toggle".
+enable_sym             => "+" | "en"  __ | "on"  __ | "enable"  __.
+disable_sym            => "-" | "dis" __ | "off" __ | "disable" __.
+
+cmd_symbol             => grammar_sym | internal_grammar_sym
+                        | parse_sym | start_sym | reload_sym | file_sym
+                        | help_sym | quit_sym
+                        | get_sym | set_sym
+                        | toggle_sym | enable_sym | disable_sym.
+
+# options
+option                 => bool_option | error_verbosity_opt.
+bool_option            => status_opt | colors_opt | print_ambiguity_opt
+                        | print_graphs_opt | print_rules_opt | print_facts_opt
+                        | debug_opt.
+
+# option name symbols
+debug_opt              => "d" | "debug".
+status_opt             => "s" | "status".
+colors_opt             => "c" | "color" | "colors".
+print_ambiguity_opt    => "a" | "ambiguity" | "print-ambiguity".
+print_graphs_opt       => "g" | "graphs" | "print-graphs".
+print_rules_opt        => "r" | "rules" | "print-rules".
+print_facts_opt        => "f" | "facts" | "print-facts".
+error_verbosity_opt    => "e" | "error-verbosity".
+
+# option values symbols
+option_value           => option_value_true | option_value_false
+                        | error_verbosity.
+# boolean option values
+option_value_true      => "t" | "true"  | "on"  | "1" | "y" | "yes".
+option_value_false     => "f" | "false" | "off" | "0" | "n" | "no".
+# error verbosity values
+error_verbosity        => basic_sym | detailed_sym | root_cause_sym.
+basic_sym              => "b" | "basic".
+detailed_sym           => "d" | "detailed".
+root_cause_sym         => "r" | "rc" | "root-cause".
