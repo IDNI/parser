@@ -887,7 +887,7 @@ void parser<C, T>::sbl_chd_forest(const item& eitem,
 	//check if we have reached the end of the rhs of prod
 	if (g.len(eitem.prod, eitem.con) <= curchd.size())  {
 		// match the end of the span we are searching in.
-		if (curchd.back().second[1] == eitem.set) 
+		if (curchd.back().second[1] == eitem.set)
 			ambset.insert(curchd);
 		return;
 	}
@@ -1010,7 +1010,7 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 	if (f.contains(root)) return false;
 	//auto& nxtset = sorted_citem[root.n()][root.second[0]];
 	auto &nxtset = sorted_citem[{ root.first.n(), root.second[0] }];
-	
+
 	pnodes_set ambset, cambset;
 	std::set<pnode> snodes;
 	size_t last_p = SIZE_MAX;
@@ -1021,12 +1021,12 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 			? g(cur.prod) : g.nt(root.first.n()),
 			{ cur.from, cur.set });
 		cambset.clear();
-		if (o.binarize) binarize_comb(cur, 
+		if (o.binarize) binarize_comb(cur,
 						o.auto_disambiguate ? cambset : ambset);
 		else {
 			pnodes nxtlits;
 			//std::cout << "\n" << cur.prod << " " << last_p << " " << ambset.size();
-			sbl_chd_forest(cur, nxtlits, cur.from, 
+			sbl_chd_forest(cur, nxtlits, cur.from,
 						o.auto_disambiguate ? cambset : ambset);
 		}
 
@@ -1037,20 +1037,20 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 				if( ambset.size() == 0) // first time if
 					last_p = cur.prod, ambset = cambset;
 				else if ( cur.prod < last_p) // get the smallest one
-					ambset.clear(), last_p = cur.prod, ambset = cambset;	
+					ambset.clear(), last_p = cur.prod, ambset = cambset;
 			}
-			
+
 			snodes.insert(cnode);
-		}		
+		}
 		f[cnode] = ambset;
 		//std::cout << "\n A " << cur.prod << " " << last_p << " " << ambset.size();
 	}
 
 	if( o.auto_disambiguate) {
-		
-		// resolve ambiguity if WITHIN production, where same production with same symbols 
+
+		// resolve ambiguity if WITHIN production, where same production with same symbols
 		// of different individual span
-		std::vector<int> gi; 
+		std::vector<int> gi;
 		int gspan = -1;
 		int k = 0;
 		std::vector<int> idxs;
@@ -1066,12 +1066,12 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 				int span = lt.second[1] - lt.second[0];
 				if (gspan == span) gi.push_back(k);
 				if (gspan < span ) gspan = span, gi.clear(), gi.push_back(k);
-				
+
 			}
 			k++;
 			idxs.clear();
 			idxs.insert(idxs.begin(),gi.begin(),gi.end());
-			std::cout<<k;
+			//DBG(std::cout<<k;)
 		}
 		while( k < int(ambset.size()) && gi.size() > 1 );
 
@@ -1080,13 +1080,13 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 			cambset.insert(*next(ambset.begin(), gi[0]));
 
 	//std::cout <<" camb "<< cambset.size() << std::endl;
-		if(snodes.size()) { 
+		if(snodes.size()) {
 			DBG( assert(snodes.size() == 1));
 			f[*snodes.begin()] = cambset;
 		}
 	//std::cout << gi.size() << std::endl;
 	}
-	
+
 	for (auto& aset : o.auto_disambiguate? cambset : ambset)
 		for (const pnode& nxt : aset) build_forest(f, nxt);
 
