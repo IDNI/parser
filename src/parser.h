@@ -268,6 +268,7 @@ public:
 		size_t gc_lag = 1;
 		decoder_type chars_to_terminals = 0;
 		encoder_type terminals_to_chars = 0;
+		bool auto_disambiguate = true;
 	};
 	// constructor
 	parser(grammar<C, T>& g, options o = {});

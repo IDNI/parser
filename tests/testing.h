@@ -112,7 +112,7 @@ int test_out(int c, const grammar<T>& g, const std::basic_string<T>& inputstr,
 	std::stringstream ptd;
 	std::stringstream ssf;
 
-	g.print_internal_grammar(ssf, "\\l");
+	g.print_internal_grammar(ssf, "\\l", true);
 	std::string s = ssf.str();
 	ssf.str({});
 
@@ -370,6 +370,7 @@ void help(const std::string& opt) {
 "	-[enable|disable]_binarization\n" <<
 "\t              enables binarization and leftright optimization of forest\n" <<
 "	-[enable|disable]_gc	enables garbage collection\n" <<
+"	-[enable|disable]_autodisambg enable/disable auto disambiguation" <<
 "	-unique_node\n" <<
 "	              retrieves graphs from forest based on nodes, not edges\n"
 "	-stop_after_[1|5]\n" <<
@@ -387,6 +388,7 @@ void process_args(int argc, char **argv) {
 	bool binarize = false;
 	bool incr_gen = false;
 	bool enable_gc = false;
+	bool auto_disambg = false;
 
 	std::vector<std::string> args(argv + 1, argv + argc);
 
@@ -461,7 +463,10 @@ void process_args(int argc, char **argv) {
 			}
 			id(result);
 		}
+		else if (opt == "-enable_autodisambg") auto_disambg = true;
+		else if ( opt == "-disable_autodisambg") auto_disambg = false;
 		else if (opt == "-help" || opt == "-h") help(""), exit(0);
+
 		else help(opt), exit(1);
 	}
 	if (verbosity > 0) {
@@ -475,6 +480,8 @@ void process_args(int argc, char **argv) {
 	options<char>.incr_gen_forest =	options<char32_t>.incr_gen_forest =
 								incr_gen;
 	options<char>.enable_gc = options<char32_t>.enable_gc = enable_gc;
+	options<char>.auto_disambiguate = options<char32_t>.auto_disambiguate = 
+								auto_disambg;
 }
 
 } // namespace idni::testing
