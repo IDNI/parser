@@ -1,4 +1,4 @@
-// This file is generated from a file ./tools/tgf/tgf_repl.tgf by
+// This file is generated from a file tools/tgf/tgf_repl.tgf by
 //       https://github.com/IDNI/parser/tools/tgf
 //
 #ifndef __TGF_REPL_PARSER_H__
@@ -507,27 +507,27 @@ using rw_symbol_type = tgf_repl_parser::rw_symbol_type;
 using symbol_type = tgf_repl_parser::symbol_type;
 using nonterminal_type = tgf_repl_parser::nonterminal;
 
-bool is_non_terminal_node(const sp_node_type& n) {
+static inline bool is_non_terminal_node(const sp_node_type& n) {
 	return std::holds_alternative<symbol_type>(n->value)
 		&& get<symbol_type>(n->value).nt();
 };
 
-std::function<bool(const sp_node_type&)> is_non_terminal_node() {
+static inline std::function<bool(const sp_node_type&)> is_non_terminal_node() {
 	return [](const sp_node_type& n) { return is_non_terminal_node(n); };
 }
 
-bool is_non_terminal(const nonterminal_type nt, const sp_node_type& n) {
+static inline bool is_non_terminal(const nonterminal_type nt, const sp_node_type& n) {
 	return is_non_terminal_node(n)
 		&& std::get<symbol_type>(n->value).n() == nt;
 }
 
-std::function<bool(const sp_node_type&)> is_non_terminal(
+static inline std::function<bool(const sp_node_type&)> is_non_terminal(
 	const nonterminal_type nt)
 {
 	return [nt](const sp_node_type& n) { return is_non_terminal(nt, n); };
 }
 
-std::optional<sp_node_type> operator|(const sp_node_type& n,
+static inline std::optional<sp_node_type> operator|(const sp_node_type& n,
 	const nonterminal_type nt)
 {
 	auto v = n->child
@@ -537,13 +537,13 @@ std::optional<sp_node_type> operator|(const sp_node_type& n,
 		: std::optional<sp_node_type>(v.front());
 }
 
-std::optional<sp_node_type> operator|(const std::optional<sp_node_type>& n,
+static inline std::optional<sp_node_type> operator|(const std::optional<sp_node_type>& n,
 	const nonterminal_type nt)
 {
 	return n ? n.value() | nt : n;
 }
 
-std::vector<sp_node_type> operator||(const sp_node_type& n,
+static inline std::vector<sp_node_type> operator||(const sp_node_type& n,
 	const nonterminal_type nt)
 {
 	std::vector<sp_node_type> nv;
@@ -553,7 +553,7 @@ std::vector<sp_node_type> operator||(const sp_node_type& n,
 	return nv;
 }
 
-std::vector<sp_node_type> operator||(const std::optional<sp_node_type>& n,
+static inline std::vector<sp_node_type> operator||(const std::optional<sp_node_type>& n,
 	const nonterminal_type nt)
 {
 	if (n) return n.value() || nt;
@@ -568,7 +568,7 @@ static const auto only_child_extractor = [](const sp_node_type& n)
 };
 using only_child_extractor_t = decltype(only_child_extractor);
 
-std::vector<sp_node_type> operator||(const std::vector<sp_node_type>& v,
+static inline std::vector<sp_node_type> operator||(const std::vector<sp_node_type>& v,
 	const only_child_extractor_t e)
 {
 	std::vector<sp_node_type> nv;
@@ -577,13 +577,13 @@ std::vector<sp_node_type> operator||(const std::vector<sp_node_type>& v,
 	return nv;
 }
 
-std::optional<sp_node_type> operator|(const std::optional<sp_node_type>& o,
+static inline std::optional<sp_node_type> operator|(const std::optional<sp_node_type>& o,
 	const only_child_extractor_t e)
 {
 	return o.has_value() ? e(o.value()) : std::optional<sp_node_type>();
 }
 
-std::optional<sp_node_type> operator|(const sp_node_type& o,
+static inline std::optional<sp_node_type> operator|(const sp_node_type& o,
 	const only_child_extractor_t e)
 {
 	return e(o);
@@ -601,7 +601,7 @@ static const auto terminal_extractor = [](const sp_node_type& n)
 
 using terminal_extractor_t = decltype(terminal_extractor);
 
-std::optional<char> operator|(const std::optional<sp_node_type>& o,
+static inline std::optional<char> operator|(const std::optional<sp_node_type>& o,
 	const terminal_extractor_t e)
 {
 	return o.has_value() ? e(o.value()) : std::optional<char>();
@@ -619,13 +619,13 @@ static const auto non_terminal_extractor = [](const sp_node_type& n)
 
 using non_terminal_extractor_t = decltype(non_terminal_extractor);
 
-std::optional<size_t> operator|(const std::optional<sp_node_type>& o,
+static inline std::optional<size_t> operator|(const std::optional<sp_node_type>& o,
 	const non_terminal_extractor_t e)
 {
 	return o.has_value() ? e(o.value()) : std::optional<size_t>();
 }
 
-std::optional<size_t> operator|(const sp_node_type& o,
+static inline std::optional<size_t> operator|(const sp_node_type& o,
 	const non_terminal_extractor_t e)
 {
 	return e(o);
@@ -640,13 +640,13 @@ static const auto size_t_extractor = [](const sp_node_type& n)
 };
 using size_t_extractor_t = decltype(size_t_extractor);
 
-std::optional<size_t> operator|(const std::optional<sp_node_type>& o,
+static inline std::optional<size_t> operator|(const std::optional<sp_node_type>& o,
 	const size_t_extractor_t e)
 {
 	return o.has_value() ? e(o.value()) : std::optional<size_t>();
 }
 
-std::optional<size_t> operator|(const sp_node_type& o,
+static inline std::optional<size_t> operator|(const sp_node_type& o,
 	const size_t_extractor_t e)
 {
 	return e(o);

@@ -1,4 +1,4 @@
-// This file is generated from a file ./src/tgf.tgf by
+// This file is generated from a file src/tgf.tgf by
 //       https://github.com/IDNI/parser/tools/tgf
 //
 #ifndef __TGF_PARSER_H__
@@ -47,13 +47,13 @@ struct tgf_parser {
 	bool found(int start = -1) { return p.found(start); }
 	typename parser_type::error get_error() { return p.get_error(); }
 	enum nonterminal {
-		nul, eof, alnum, alpha, space, printable, start, _, statement, _Rstart_0,
-		_Rstart_1, directive, production, __, directive_params, directive_param, _Rdirective_params_2, _Rdirective_params_3, sym, expr1,
-		disjunction, expr2, conjunction, expr3, negation, literals, literal, _Rliterals_4, _Rliterals_5, terminal,
-		nonterminal_, terminal_char, terminal_string, nonliteral, sym_start, sym_rest, _Rsym_6, _Rsym_7, group, optional,
-		repeat, plus, multi, unescaped_c, escaped_c, _Rterminal_char_8, _Runescaped_c_9, _Rescaped_c_10, unescaped_s, escaped_s,
-		_Rterminal_string_11, _Rterminal_string_12, _Runescaped_s_13, _Rescaped_s_14, _R__15, comment, _R___16, _Rcomment_17, _Rcomment_18, _Rcomment_19,
-		__neg_0, __neg_1,
+		nul, eof, alnum, alpha, space, printable, start, _, statement, _Rstart_0, 
+		_Rstart_1, directive, production, __, directive_params, directive_param, _Rdirective_params_2, _Rdirective_params_3, sym, expr1, 
+		disjunction, expr2, conjunction, expr3, negation, literals, literal, _Rliterals_4, _Rliterals_5, terminal, 
+		nonterminal_, terminal_char, terminal_string, nonliteral, sym_start, sym_rest, _Rsym_6, _Rsym_7, group, optional, 
+		repeat, plus, multi, unescaped_c, escaped_c, _Rterminal_char_8, _Runescaped_c_9, _Rescaped_c_10, unescaped_s, escaped_s, 
+		_Rterminal_string_11, _Rterminal_string_12, _Runescaped_s_13, _Rescaped_s_14, _R__15, comment, _R___16, _Rcomment_17, _Rcomment_18, _Rcomment_19, 
+		__neg_0, __neg_1, 
 	};
 	size_t id(const std::basic_string<char_type>& name) {
 		return nts.get(name);
@@ -63,11 +63,11 @@ struct tgf_parser {
 	}
 private:
 	std::vector<terminal_type> ts{
-		'\0', '@', 'u', 's', 'e', '_', 'c', 'h', 'a',
-		'r', 'l', '.', ',', 'n', 'm', 'p', 'b', 'k', 't',
-		'd', 'i', 'g', 'o', 'f', 'w', 'x', '=', '>', '|',
-		'&', '~', '(', ')', '[', ']', '{', '}', '+', '*',
-		'\'', '\\', '/', '"', '\t', '\n', '\r', '#',
+		'\0', '@', 'u', 's', 'e', '_', 'c', 'h', 'a', 
+		'r', 'l', '.', ',', 'n', 'm', 'p', 'b', 'k', 't', 
+		'd', 'i', 'g', 'o', 'f', 'w', 'x', '=', '>', '|', 
+		'&', '~', '(', ')', '[', ']', '{', '}', '+', '*', 
+		'\'', '\\', '/', '"', '\t', '\n', '\r', '#', 
 	};
 	idni::nonterminals<char_type, terminal_type> nts{};
 	idni::char_class_fns<terminal_type> cc;
@@ -83,13 +83,13 @@ private:
 	idni::nonterminals<char_type, terminal_type> load_nonterminals() const {
 		idni::nonterminals<char_type, terminal_type> nts{};
 		for (const auto& nt : {
-			"", "eof", "alnum", "alpha", "space", "printable", "start", "_", "statement", "_Rstart_0",
-			"_Rstart_1", "directive", "production", "__", "directive_params", "directive_param", "_Rdirective_params_2", "_Rdirective_params_3", "sym", "expr1",
-			"disjunction", "expr2", "conjunction", "expr3", "negation", "literals", "literal", "_Rliterals_4", "_Rliterals_5", "terminal",
-			"nonterminal_", "terminal_char", "terminal_string", "nonliteral", "sym_start", "sym_rest", "_Rsym_6", "_Rsym_7", "group", "optional",
-			"repeat", "plus", "multi", "unescaped_c", "escaped_c", "_Rterminal_char_8", "_Runescaped_c_9", "_Rescaped_c_10", "unescaped_s", "escaped_s",
-			"_Rterminal_string_11", "_Rterminal_string_12", "_Runescaped_s_13", "_Rescaped_s_14", "_R__15", "comment", "_R___16", "_Rcomment_17", "_Rcomment_18", "_Rcomment_19",
-			"__neg_0", "__neg_1",
+			"", "eof", "alnum", "alpha", "space", "printable", "start", "_", "statement", "_Rstart_0", 
+			"_Rstart_1", "directive", "production", "__", "directive_params", "directive_param", "_Rdirective_params_2", "_Rdirective_params_3", "sym", "expr1", 
+			"disjunction", "expr2", "conjunction", "expr3", "negation", "literals", "literal", "_Rliterals_4", "_Rliterals_5", "terminal", 
+			"nonterminal_", "terminal_char", "terminal_string", "nonliteral", "sym_start", "sym_rest", "_Rsym_6", "_Rsym_7", "group", "optional", 
+			"repeat", "plus", "multi", "unescaped_c", "escaped_c", "_Rterminal_char_8", "_Runescaped_c_9", "_Rescaped_c_10", "unescaped_s", "escaped_s", 
+			"_Rterminal_string_11", "_Rterminal_string_12", "_Runescaped_s_13", "_Rescaped_s_14", "_R__15", "comment", "_R___16", "_Rcomment_17", "_Rcomment_18", "_Rcomment_19", 
+			"__neg_0", "__neg_1", 
 		}) nts.get(nt);
 		return nts;
 	}
