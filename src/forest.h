@@ -50,11 +50,22 @@ struct forest {
 	struct tree {
 		node value;
 		std::vector<std::shared_ptr<struct tree>> child;
-		std::ostream& to_print(std::ostream& os, size_t l = 0) {
+		std::ostream& to_print(std::ostream& os, size_t l = 0,
+			std::set<size_t> skip = {}, bool nulls = false)
+		{
+			if (skip.size() && value.first.nt() &&
+				skip.find(value.first.n()) != skip.end())
+					return os;
+			if (!nulls && value.first.is_null()) return os;
 			os << "\n";
-			for (size_t t = 0; t < l; t++) os << " ";
-			os << value.first;
-			for (auto& d : child) d->to_print(os, l + 1);
+			for (size_t t = 0; t < l; t++) os << "\t";
+			if (value.first.nt()) os << value.first
+				<< "(" << value.first.n() << ")";
+			else if (value.first.is_null()) os << "null";
+			else os << value.first;
+			os << "[" << value.second[0] << ", "
+				<< value.second[1] << "]";
+			for (auto& d : child) d->to_print(os, l + 1, skip);
 			return os;
 		}
 	};
