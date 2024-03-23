@@ -12,6 +12,7 @@
 // modified over time by the Author.
 #ifndef __IDNI__PARSER__GRAMMAR_TMPL_H__
 #define __IDNI__PARSER__GRAMMAR_TMPL_H__
+#include <queue>
 #include "parser.h"
 
 namespace idni {
@@ -630,7 +631,7 @@ std::ostream& grammar<C, T>::print_production(std::ostream& os,
 	const production& p, const term::colors& TC) const
 {
 	os << TC_NT << p.first.to_std_string(from_cstr<C>("null")) << TC_DEFAULT
-		<< " =>";
+		<< TC_NT_ID << "(" <<p.first.n()<< ")" << TC_DEFAULT << " =>";
 	size_t j = 0;
 	for (const auto& c : p.second) {
 		if (j++ != 0) os << " &";
@@ -639,7 +640,8 @@ std::ostream& grammar<C, T>::print_production(std::ostream& os,
 		for (const auto& l : c) {
 			os << " ";
 			if (l.nt())
-				os << TC_NT << l.to_std_string() << TC_DEFAULT;
+				os << TC_NT << l.to_std_string() << TC_DEFAULT
+				<< TC_NT_ID << "(" <<l.n()<< ")" << TC_DEFAULT;
 			else if (l.is_null())
 				os << TC_NULL << "null" << TC_DEFAULT;
 			else os << TC_T << l.to_std_string() << TC.CLEAR()
@@ -662,32 +664,47 @@ std::ostream& grammar<C, T>::print_internal_grammar(std::ostream& os,
 	}
 	return os;
 }
+
+template <typename C, typename T>
+std::set<size_t> grammar<C, T>::reachable_productions(const lit<C, T>& l) const{
+	std::set<size_t> ids;
+	std::queue<lit<C, T>> q;
+	q.push(l);
+	while (!q.empty()) {
+		lit<C, T> x = q.front();
+		q.pop();
+		if (x.nt()) {
+			const auto& prods = prod_ids_of_literal(x);
+			for (const auto& p : prods) {
+				if (ids.find(p) != ids.end()) continue;
+				ids.insert(p);
+				for (const auto& a : G[p].second)
+					for (const auto& y : a) if (y.nt()) q.push(y);
+			}
+		}
+	}
+	return ids;
+}
+
+template <typename C, typename T>
+std::set<size_t> grammar<C, T>::unreachable_productions(const lit<C, T>& l)
+	const
+{
+	std::set<size_t> ids = reachable_productions(l);
+	std::set<size_t> all;
+	for (size_t i = 0; i != G.size(); ++i) all.insert(i);
+	std::set<size_t> diff;
+	std::set_difference(all.begin(), all.end(), ids.begin(), ids.end(),
+		std::inserter(diff, diff.begin()));
+	return diff;
+}
+
 template <typename C, typename T>
 std::ostream& grammar<C, T>::print_internal_grammar_for(std::ostream& os,
 	const std::string& nt, std::string prep, bool print_ids,
 	const term::colors& TC) const
 {
-	auto root = nts(nt);
-	std::set<size_t> ids;
-	std::set<size_t> to_visit = prod_ids_of_literal(root);
-	auto not_visited = [&ids](size_t i) {
-		return ids.find(i) == ids.end();
-	};
-	while (to_visit.size()) {
-		std::set<size_t> next_to_visit;
-		for (auto p : to_visit) {
-			if (!not_visited(p)) continue;
-			ids.insert(p);
-			for (auto pb : G[p].second) for (auto l : pb) {
-				if (l.nt() && not_visited(l.n())) {
-					auto pids = prod_ids_of_literal(l);
-					next_to_visit.insert(pids.begin(), pids.end());
-				}
-			}
-		}
-		to_visit = next_to_visit;
-	}
-	for (size_t i : ids) {
+	for (size_t i : reachable_productions(nts(nt))) {
 		os << prep, print_ids ? os << "G" << i << ": " : os;
 		print_production(os, G[i], TC);
 		if (conjunctive(i)) os << "\t # conjunctive";

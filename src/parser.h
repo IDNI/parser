@@ -152,6 +152,8 @@ struct grammar {
 	const lit<C, T>& start_literal() const;
 	bool is_cc_fn(const size_t& p) const;
 	bool is_eof_fn(const size_t& p) const;
+	std::set<size_t> reachable_productions(const lit<C, T>& l) const;
+	std::set<size_t> unreachable_productions(const lit<C, T>& l) const;
 	std::ostream& check_nullable_ambiguity(std::ostream& os) const;
 	std::ostream& print_production(std::ostream& os,
 		const production& p, const term::colors& TC = {false}) const;
