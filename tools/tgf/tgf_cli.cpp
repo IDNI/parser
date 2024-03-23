@@ -338,7 +338,6 @@ ostream& tgf_repl_evaluator::pretty_print(ostream& os,
 		skip.find(n->value.first.n()) != skip.end())
 			return os;
 	if (!nulls && n->value.first.is_null()) return os;
-	os << "\n";
 	for (size_t t = 0; t < l; t++) os << "\t";
 	if (n->value.first.nt())
 		os << TC_NT << value.first << TC.CLEAR() << TC_NT_ID
@@ -347,7 +346,7 @@ ostream& tgf_repl_evaluator::pretty_print(ostream& os,
 		os << TC_NULL << "null" << TC.CLEAR();
 	else os << TC_T << value.first << TC.CLEAR();
 	os << TC_RANGE << "[" << value.second[0] << ", "
-		<< value.second[1] << "]" << TC.CLEAR();
+		<< value.second[1] << "]" << TC.CLEAR() << "\n";
 	for (auto& d : n->child) pretty_print(os, d, skip, nulls, l + 1);
 	return os;
 }
@@ -397,24 +396,20 @@ void tgf_repl_evaluator::parsed(unique_ptr<parser_type::pforest> f) {
 	struct {
 		bool graphs, facts, rules, terminals;
 	} print(opt.print_graphs, opt.tml_facts, opt.tml_rules, true);
-	auto cb_next_g = [&f, &print, this](parser_type::pgraph& g) {
-		stringstream ss;
+	if (print.terminals) ss << "parsed terminals: "
+		<< TC_T << terminals_to_str(*f, f->root()) << TC_CLEARED_DEFAULT
+		<< "\n";
+	auto cb_next_g = [&f, &print, &ss, this](parser_type::pgraph& g) {
 		f->remove_binarization(g);
 		f->remove_recursive_nodes(g);
-		if (print.graphs) {
-			auto t = g.extract_trees();
-			pretty_print(ss, t);
-			ss << "\n\n";
-			cout << ss.str(), ss = {};
-		}
-		if (print.rules) to_tml_rules<char, char, parser_type::pgraph>(
-			ss << "TML rules:\n", g), ss << "\n", cout << ss.str();
+		if (print.graphs) pretty_print(ss << "parsed graph:\n",
+			g.extract_trees(), {}, false, 1);
+		if (print.rules)  to_tml_rules<char, char, parser_type::pgraph>(
+			ss << "TML rules:\n", g), ss << "\n";
 		return true;
 	};
 	f->extract_graphs(f->root(), cb_next_g);
 	if (print.facts) to_tml_facts<char, char>(ss << "TML facts:\n", *f);
-	if (print.terminals) ss << "terminals parsed: \"" <<
-		terminals_to_str(*f, f->root()) << "\"\n\n";
 	cout << ss.str();
 }
 
@@ -718,25 +713,29 @@ int tgf_repl_evaluator::eval(const tgf_repl_parser::sp_rw_node_type& s) {
 	case tgf_repl_parser::file_cmd: {
 		auto n = s | tgf_repl_parser::filename;
 		auto filename = unquote(get_string(n.value()));
-		if (filename.size()) reload(filename);
-		else cout << "error: no filename provided\n";
+		DBG(assert(filename.size());)
+		reload(filename);
 		break;
 	}
 	case tgf_repl_parser::start_cmd: {
 		auto n = s | tgf_repl_parser::symbol;
-		if (!n.has_value()) { cout << "start: " << opt.start << "\n"; break; }
-		auto start = get_string(n.value());
-		if (start.size()) {
-			opt.start = start;
-			cout << "start symbol set: " << opt.start << "\n";
-		} else cout << "error: no start provided\n";
+		string start;
+		if (n.has_value() && (start = get_string(n.value())).size())
+			cout << "start symbol set: " << TC_NT
+				<< (opt.start = start) << TC_DEFAULT << "\n";
+		else
+			cout << "start symbol: " << TC_NT << opt.start
+				<< TC_DEFAULT << "\n";
 		break;
 	}
 	case tgf_repl_parser::internal_grammar_cmd: {
 		auto n = s | tgf_repl_parser::symbol;
-		std::string start = n.has_value() ? get_string(n.value()) : opt.start;
-		g->print_internal_grammar_for(cout << "\ngrammar for \""
-		 	<< opt.start << "\":\n", start, "  ", true, TC);
+		std::string start = n.has_value() ? get_string(n.value())
+			: opt.start;
+		g->print_internal_grammar_for(cout
+			<< "\ninternal grammar for symbol "
+		 	<< TC_NT << start << TC_DEFAULT << ":\n",
+			start, "  ", true, TC);
 		break;
 	}
 	case tgf_repl_parser::grammar_cmd: {
@@ -748,6 +747,22 @@ int tgf_repl_evaluator::eval(const tgf_repl_parser::sp_rw_node_type& s) {
 			cout << "\n";
 		}
 		else cout << "error: could not open file: " << tgf_file << "\n";
+		break;
+	}
+	case tgf_repl_parser::unreachable_cmd: {
+		auto n = s | tgf_repl_parser::symbol;
+		std::string start = n.has_value() ? get_string(n.value())
+							: opt.start;
+		auto unreachable = g->unreachable_productions(g->nt(start));
+		if (unreachable.size()) {
+			cout << "unreachable production rules for symbol: "
+				<< TC_NT << start << TC_DEFAULT << "\n";
+			for (auto& p : unreachable) g->print_production(
+				cout << "  G" << p << ": ",
+				{ (*g)(p), (*g)[p] }, TC) << "\n";
+		}
+		else cout << "all production rules reachable for symbol: "
+			<< TC_NT << start << TC_DEFAULT << "\n";
 		break;
 	}
 	case tgf_repl_parser::parse_cmd: {

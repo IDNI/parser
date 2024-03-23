@@ -50,12 +50,12 @@ struct tgf_repl_parser {
 		nul, eof, alnum, alpha, space, printable, start, _, statement, _Rstart_0, 
 		_Rstart_1, _Rstart_2, _Rstart_3, __, _R__4, comment, _R___5, _Rcomment_6, _Rcomment_7, _Rcomment_8, 
 		quoted_string, unescaped_s, escaped_s, _Rquoted_string_9, _Rquoted_string_10, _Runescaped_s_11, _Rescaped_s_12, filename, symbol, _Rsymbol_13, 
-		_Rsymbol_14, parse_input_char, parse_input, _Rparse_input_15, grammar_cmd, internal_grammar_cmd, start_cmd, reload_cmd, file_cmd, help, 
-		version, quit, get, set, toggle, enable, disable, parse_cmd, grammar_sym, internal_grammar_sym, 
-		_Rinternal_grammar_cmd_16, start_sym, _Rstart_cmd_17, reload_sym, file_sym, help_sym, cmd_symbol, _Rhelp_18, version_sym, quit_sym, 
-		get_sym, option, _Rget_19, set_sym, _Rset_20, option_value, toggle_sym, bool_option, enable_sym, disable_sym, 
-		parse_sym, error_verbosity_opt, status_opt, colors_opt, print_ambiguity_opt, print_graphs_opt, print_rules_opt, print_facts_opt, debug_opt, option_value_true, 
-		option_value_false, error_verbosity, basic_sym, detailed_sym, root_cause_sym, __neg_0, 
+		_Rsymbol_14, parse_input_char, parse_input, _Rparse_input_15, grammar_cmd, internal_grammar_cmd, start_cmd, unreachable_cmd, reload_cmd, file_cmd, 
+		help, version, quit, get, set, toggle, enable, disable, parse_cmd, grammar_sym, 
+		internal_grammar_sym, _Rinternal_grammar_cmd_16, start_sym, _Rstart_cmd_17, unreachable_sym, _Runreachable_cmd_18, reload_sym, file_sym, help_sym, cmd_symbol, 
+		_Rhelp_19, version_sym, quit_sym, get_sym, option, _Rget_20, set_sym, _Rset_21, option_value, toggle_sym, 
+		bool_option, enable_sym, disable_sym, parse_sym, error_verbosity_opt, status_opt, colors_opt, print_ambiguity_opt, print_graphs_opt, print_rules_opt, 
+		print_facts_opt, debug_opt, option_value_true, option_value_false, error_verbosity, basic_sym, detailed_sym, root_cause_sym, __neg_0, 
 	};
 	size_t id(const std::basic_string<char_type>& name) {
 		return nts.get(name);
@@ -67,8 +67,8 @@ private:
 	std::vector<terminal_type> ts{
 		'\0', '.', '\t', '\n', '\r', '#', '"', '\\', '/', 
 		'b', 'f', 'n', 'r', 't', '_', '=', 'g', 'e', 's', 
-		'o', 'l', 'a', 'm', 'i', '-', 'p', 'd', 'h', 'v', 
-		'x', 'q', 'u', '+', 'c', 'y', '1', '0', 
+		'o', 'l', 'a', 'm', 'i', '-', 'u', 'c', 'h', 'p', 
+		'd', 'v', 'x', 'q', '+', 'y', '1', '0', 
 	};
 	idni::nonterminals<char_type, terminal_type> nts{};
 	idni::char_class_fns<terminal_type> cc;
@@ -87,12 +87,12 @@ private:
 			"", "eof", "alnum", "alpha", "space", "printable", "start", "_", "statement", "_Rstart_0", 
 			"_Rstart_1", "_Rstart_2", "_Rstart_3", "__", "_R__4", "comment", "_R___5", "_Rcomment_6", "_Rcomment_7", "_Rcomment_8", 
 			"quoted_string", "unescaped_s", "escaped_s", "_Rquoted_string_9", "_Rquoted_string_10", "_Runescaped_s_11", "_Rescaped_s_12", "filename", "symbol", "_Rsymbol_13", 
-			"_Rsymbol_14", "parse_input_char", "parse_input", "_Rparse_input_15", "grammar_cmd", "internal_grammar_cmd", "start_cmd", "reload_cmd", "file_cmd", "help", 
-			"version", "quit", "get", "set", "toggle", "enable", "disable", "parse_cmd", "grammar_sym", "internal_grammar_sym", 
-			"_Rinternal_grammar_cmd_16", "start_sym", "_Rstart_cmd_17", "reload_sym", "file_sym", "help_sym", "cmd_symbol", "_Rhelp_18", "version_sym", "quit_sym", 
-			"get_sym", "option", "_Rget_19", "set_sym", "_Rset_20", "option_value", "toggle_sym", "bool_option", "enable_sym", "disable_sym", 
-			"parse_sym", "error_verbosity_opt", "status_opt", "colors_opt", "print_ambiguity_opt", "print_graphs_opt", "print_rules_opt", "print_facts_opt", "debug_opt", "option_value_true", 
-			"option_value_false", "error_verbosity", "basic_sym", "detailed_sym", "root_cause_sym", "__neg_0", 
+			"_Rsymbol_14", "parse_input_char", "parse_input", "_Rparse_input_15", "grammar_cmd", "internal_grammar_cmd", "start_cmd", "unreachable_cmd", "reload_cmd", "file_cmd", 
+			"help", "version", "quit", "get", "set", "toggle", "enable", "disable", "parse_cmd", "grammar_sym", 
+			"internal_grammar_sym", "_Rinternal_grammar_cmd_16", "start_sym", "_Rstart_cmd_17", "unreachable_sym", "_Runreachable_cmd_18", "reload_sym", "file_sym", "help_sym", "cmd_symbol", 
+			"_Rhelp_19", "version_sym", "quit_sym", "get_sym", "option", "_Rget_20", "set_sym", "_Rset_21", "option_value", "toggle_sym", 
+			"bool_option", "enable_sym", "disable_sym", "parse_sym", "error_verbosity_opt", "status_opt", "colors_opt", "print_ambiguity_opt", "print_graphs_opt", "print_rules_opt", 
+			"print_facts_opt", "debug_opt", "option_value_true", "option_value_false", "error_verbosity", "basic_sym", "detailed_sym", "root_cause_sym", "__neg_0", 
 		}) nts.get(nt);
 		return nts;
 	}
@@ -171,9 +171,9 @@ private:
 		// _Runescaped_s_11 => '\\'.
 		q(nt(25), (t(7)));
 		// __neg_0 => _Runescaped_s_11.
-		q(nt(85), (nt(25)));
+		q(nt(88), (nt(25)));
 		// unescaped_s => printable & ~( __neg_0 ).
-		q(nt(21), (nt(5)) & ~(nt(85)));
+		q(nt(21), (nt(5)) & ~(nt(88)));
 		// _Rescaped_s_12 => '"'.
 		q(nt(26), (t(6)));
 		// _Rescaped_s_12 => '/'.
@@ -220,284 +220,296 @@ private:
 		q(nt(8), (nt(35)));
 		// statement => start_cmd.
 		q(nt(8), (nt(36)));
-		// statement => reload_cmd.
+		// statement => unreachable_cmd.
 		q(nt(8), (nt(37)));
-		// statement => file_cmd.
+		// statement => reload_cmd.
 		q(nt(8), (nt(38)));
-		// statement => help.
+		// statement => file_cmd.
 		q(nt(8), (nt(39)));
-		// statement => version.
+		// statement => help.
 		q(nt(8), (nt(40)));
-		// statement => quit.
+		// statement => version.
 		q(nt(8), (nt(41)));
-		// statement => get.
+		// statement => quit.
 		q(nt(8), (nt(42)));
-		// statement => set.
+		// statement => get.
 		q(nt(8), (nt(43)));
-		// statement => toggle.
+		// statement => set.
 		q(nt(8), (nt(44)));
-		// statement => enable.
+		// statement => toggle.
 		q(nt(8), (nt(45)));
-		// statement => disable.
+		// statement => enable.
 		q(nt(8), (nt(46)));
-		// statement => parse_cmd.
+		// statement => disable.
 		q(nt(8), (nt(47)));
+		// statement => parse_cmd.
+		q(nt(8), (nt(48)));
 		// parse_cmd => parse_input.
-		q(nt(47), (nt(32)));
+		q(nt(48), (nt(32)));
 		// grammar_cmd => grammar_sym.
-		q(nt(34), (nt(48)));
+		q(nt(34), (nt(49)));
 		// _Rinternal_grammar_cmd_16 => null.
-		q(nt(50), (nul));
+		q(nt(51), (nul));
 		// _Rinternal_grammar_cmd_16 => __ symbol.
-		q(nt(50), (nt(13)+nt(28)));
+		q(nt(51), (nt(13)+nt(28)));
 		// internal_grammar_cmd => internal_grammar_sym _Rinternal_grammar_cmd_16.
-		q(nt(35), (nt(49)+nt(50)));
+		q(nt(35), (nt(50)+nt(51)));
 		// _Rstart_cmd_17 => null.
-		q(nt(52), (nul));
+		q(nt(53), (nul));
 		// _Rstart_cmd_17 => __ symbol.
-		q(nt(52), (nt(13)+nt(28)));
+		q(nt(53), (nt(13)+nt(28)));
 		// start_cmd => start_sym _Rstart_cmd_17.
-		q(nt(36), (nt(51)+nt(52)));
+		q(nt(36), (nt(52)+nt(53)));
+		// _Runreachable_cmd_18 => null.
+		q(nt(55), (nul));
+		// _Runreachable_cmd_18 => __ symbol.
+		q(nt(55), (nt(13)+nt(28)));
+		// unreachable_cmd => unreachable_sym _Runreachable_cmd_18.
+		q(nt(37), (nt(54)+nt(55)));
 		// reload_cmd => reload_sym.
-		q(nt(37), (nt(53)));
+		q(nt(38), (nt(56)));
 		// file_cmd => file_sym __ filename.
-		q(nt(38), (nt(54)+nt(13)+nt(27)));
-		// _Rhelp_18 => null.
-		q(nt(57), (nul));
-		// _Rhelp_18 => __ cmd_symbol.
-		q(nt(57), (nt(13)+nt(56)));
-		// help => help_sym _Rhelp_18.
-		q(nt(39), (nt(55)+nt(57)));
+		q(nt(39), (nt(57)+nt(13)+nt(27)));
+		// _Rhelp_19 => null.
+		q(nt(60), (nul));
+		// _Rhelp_19 => __ cmd_symbol.
+		q(nt(60), (nt(13)+nt(59)));
+		// help => help_sym _Rhelp_19.
+		q(nt(40), (nt(58)+nt(60)));
 		// version => version_sym.
-		q(nt(40), (nt(58)));
+		q(nt(41), (nt(61)));
 		// quit => quit_sym.
-		q(nt(41), (nt(59)));
-		// _Rget_19 => null.
-		q(nt(62), (nul));
-		// _Rget_19 => __ option.
-		q(nt(62), (nt(13)+nt(61)));
-		// get => get_sym _Rget_19.
-		q(nt(42), (nt(60)+nt(62)));
-		// _Rset_20 => _ '=' _.
-		q(nt(64), (nt(7)+t(15)+nt(7)));
-		// _Rset_20 => __.
-		q(nt(64), (nt(13)));
-		// set => set_sym __ option _Rset_20 option_value.
-		q(nt(43), (nt(63)+nt(13)+nt(61)+nt(64)+nt(65)));
+		q(nt(42), (nt(62)));
+		// _Rget_20 => null.
+		q(nt(65), (nul));
+		// _Rget_20 => __ option.
+		q(nt(65), (nt(13)+nt(64)));
+		// get => get_sym _Rget_20.
+		q(nt(43), (nt(63)+nt(65)));
+		// _Rset_21 => _ '=' _.
+		q(nt(67), (nt(7)+t(15)+nt(7)));
+		// _Rset_21 => __.
+		q(nt(67), (nt(13)));
+		// set => set_sym __ option _Rset_21 option_value.
+		q(nt(44), (nt(66)+nt(13)+nt(64)+nt(67)+nt(68)));
 		// toggle => toggle_sym __ bool_option.
-		q(nt(44), (nt(66)+nt(13)+nt(67)));
+		q(nt(45), (nt(69)+nt(13)+nt(70)));
 		// enable => enable_sym bool_option.
-		q(nt(45), (nt(68)+nt(67)));
+		q(nt(46), (nt(71)+nt(70)));
 		// disable => disable_sym bool_option.
-		q(nt(46), (nt(69)+nt(67)));
+		q(nt(47), (nt(72)+nt(70)));
 		// get_sym => 'g' 'e' 't'.
-		q(nt(60), (t(16)+t(17)+t(13)));
+		q(nt(63), (t(16)+t(17)+t(13)));
 		// set_sym => 's' 'e' 't'.
-		q(nt(63), (t(18)+t(17)+t(13)));
+		q(nt(66), (t(18)+t(17)+t(13)));
 		// toggle_sym => 't' 'o' 'g' 'g' 'l' 'e'.
-		q(nt(66), (t(13)+t(19)+t(16)+t(16)+t(20)+t(17)));
+		q(nt(69), (t(13)+t(19)+t(16)+t(16)+t(20)+t(17)));
 		// grammar_sym => 'g'.
-		q(nt(48), (t(16)));
+		q(nt(49), (t(16)));
 		// grammar_sym => 'g' 'r' 'a' 'm' 'm' 'a' 'r'.
-		q(nt(48), (t(16)+t(12)+t(21)+t(22)+t(22)+t(21)+t(12)));
+		q(nt(49), (t(16)+t(12)+t(21)+t(22)+t(22)+t(21)+t(12)));
 		// internal_grammar_sym => 'i'.
-		q(nt(49), (t(23)));
+		q(nt(50), (t(23)));
 		// internal_grammar_sym => 'i' 'g'.
-		q(nt(49), (t(23)+t(16)));
+		q(nt(50), (t(23)+t(16)));
 		// internal_grammar_sym => 'i' 'n' 't' 'e' 'r' 'n' 'a' 'l' '-' 'g' 'r' 'a' 'm' 'm' 'a' 'r'.
-		q(nt(49), (t(23)+t(11)+t(13)+t(17)+t(12)+t(11)+t(21)+t(20)+t(24)+t(16)+t(12)+t(21)+t(22)+t(22)+t(21)+t(12)));
+		q(nt(50), (t(23)+t(11)+t(13)+t(17)+t(12)+t(11)+t(21)+t(20)+t(24)+t(16)+t(12)+t(21)+t(22)+t(22)+t(21)+t(12)));
+		// unreachable_sym => 'u'.
+		q(nt(54), (t(25)));
+		// unreachable_sym => 'u' 'n' 'r' 'e' 'a' 'c' 'h' 'a' 'b' 'l' 'e'.
+		q(nt(54), (t(25)+t(11)+t(12)+t(17)+t(21)+t(26)+t(27)+t(21)+t(9)+t(20)+t(17)));
 		// parse_sym => 'p'.
-		q(nt(70), (t(25)));
+		q(nt(73), (t(28)));
 		// parse_sym => 'p' 'a' 'r' 's' 'e'.
-		q(nt(70), (t(25)+t(21)+t(12)+t(18)+t(17)));
+		q(nt(73), (t(28)+t(21)+t(12)+t(18)+t(17)));
 		// start_sym => 's'.
-		q(nt(51), (t(18)));
+		q(nt(52), (t(18)));
 		// start_sym => 's' 't' 'a' 'r' 't'.
-		q(nt(51), (t(18)+t(13)+t(21)+t(12)+t(13)));
+		q(nt(52), (t(18)+t(13)+t(21)+t(12)+t(13)));
 		// reload_sym => 'r'.
-		q(nt(53), (t(12)));
+		q(nt(56), (t(12)));
 		// reload_sym => 'r' 'e' 'l' 'o' 'a' 'd'.
-		q(nt(53), (t(12)+t(17)+t(20)+t(19)+t(21)+t(26)));
+		q(nt(56), (t(12)+t(17)+t(20)+t(19)+t(21)+t(29)));
 		// file_sym => 'f'.
-		q(nt(54), (t(10)));
+		q(nt(57), (t(10)));
 		// file_sym => 'f' 'i' 'l' 'e'.
-		q(nt(54), (t(10)+t(23)+t(20)+t(17)));
+		q(nt(57), (t(10)+t(23)+t(20)+t(17)));
 		// help_sym => 'h'.
-		q(nt(55), (t(27)));
+		q(nt(58), (t(27)));
 		// help_sym => 'h' 'e' 'l' 'p'.
-		q(nt(55), (t(27)+t(17)+t(20)+t(25)));
+		q(nt(58), (t(27)+t(17)+t(20)+t(28)));
 		// version_sym => 'v'.
-		q(nt(58), (t(28)));
+		q(nt(61), (t(30)));
 		// version_sym => 'v' 'e' 'r' 's' 'i' 'o' 'n'.
-		q(nt(58), (t(28)+t(17)+t(12)+t(18)+t(23)+t(19)+t(11)));
+		q(nt(61), (t(30)+t(17)+t(12)+t(18)+t(23)+t(19)+t(11)));
 		// quit_sym => 'e'.
-		q(nt(59), (t(17)));
+		q(nt(62), (t(17)));
 		// quit_sym => 'e' 'x' 'i' 't'.
-		q(nt(59), (t(17)+t(29)+t(23)+t(13)));
+		q(nt(62), (t(17)+t(31)+t(23)+t(13)));
 		// quit_sym => 'q'.
-		q(nt(59), (t(30)));
+		q(nt(62), (t(32)));
 		// quit_sym => 'q' 'u' 'i' 't'.
-		q(nt(59), (t(30)+t(31)+t(23)+t(13)));
+		q(nt(62), (t(32)+t(25)+t(23)+t(13)));
 		// get_sym => 'g' 'e' 't'.
-		q(nt(60), (t(16)+t(17)+t(13)));
+		q(nt(63), (t(16)+t(17)+t(13)));
 		// set_sym => 's' 'e' 't'.
-		q(nt(63), (t(18)+t(17)+t(13)));
+		q(nt(66), (t(18)+t(17)+t(13)));
 		// toggle_sym => 't' 'o' 'g'.
-		q(nt(66), (t(13)+t(19)+t(16)));
+		q(nt(69), (t(13)+t(19)+t(16)));
 		// toggle_sym => 't' 'o' 'g' 'g' 'l' 'e'.
-		q(nt(66), (t(13)+t(19)+t(16)+t(16)+t(20)+t(17)));
+		q(nt(69), (t(13)+t(19)+t(16)+t(16)+t(20)+t(17)));
 		// enable_sym => '+'.
-		q(nt(68), (t(32)));
+		q(nt(71), (t(33)));
 		// enable_sym => 'e' 'n' 'a' 'b' 'l' 'e' __.
-		q(nt(68), (t(17)+t(11)+t(21)+t(9)+t(20)+t(17)+nt(13)));
+		q(nt(71), (t(17)+t(11)+t(21)+t(9)+t(20)+t(17)+nt(13)));
 		// enable_sym => 'e' 'n' __.
-		q(nt(68), (t(17)+t(11)+nt(13)));
+		q(nt(71), (t(17)+t(11)+nt(13)));
 		// enable_sym => 'o' 'n' __.
-		q(nt(68), (t(19)+t(11)+nt(13)));
+		q(nt(71), (t(19)+t(11)+nt(13)));
 		// disable_sym => '-'.
-		q(nt(69), (t(24)));
+		q(nt(72), (t(24)));
 		// disable_sym => 'd' 'i' 's' 'a' 'b' 'l' 'e' __.
-		q(nt(69), (t(26)+t(23)+t(18)+t(21)+t(9)+t(20)+t(17)+nt(13)));
+		q(nt(72), (t(29)+t(23)+t(18)+t(21)+t(9)+t(20)+t(17)+nt(13)));
 		// disable_sym => 'd' 'i' 's' __.
-		q(nt(69), (t(26)+t(23)+t(18)+nt(13)));
+		q(nt(72), (t(29)+t(23)+t(18)+nt(13)));
 		// disable_sym => 'o' 'f' 'f' __.
-		q(nt(69), (t(19)+t(10)+t(10)+nt(13)));
+		q(nt(72), (t(19)+t(10)+t(10)+nt(13)));
 		// cmd_symbol => grammar_sym.
-		q(nt(56), (nt(48)));
+		q(nt(59), (nt(49)));
 		// cmd_symbol => internal_grammar_sym.
-		q(nt(56), (nt(49)));
+		q(nt(59), (nt(50)));
 		// cmd_symbol => start_sym.
-		q(nt(56), (nt(51)));
+		q(nt(59), (nt(52)));
 		// cmd_symbol => reload_sym.
-		q(nt(56), (nt(53)));
+		q(nt(59), (nt(56)));
 		// cmd_symbol => file_sym.
-		q(nt(56), (nt(54)));
+		q(nt(59), (nt(57)));
 		// cmd_symbol => help_sym.
-		q(nt(56), (nt(55)));
+		q(nt(59), (nt(58)));
 		// cmd_symbol => quit_sym.
-		q(nt(56), (nt(59)));
+		q(nt(59), (nt(62)));
 		// cmd_symbol => get_sym.
-		q(nt(56), (nt(60)));
+		q(nt(59), (nt(63)));
 		// cmd_symbol => set_sym.
-		q(nt(56), (nt(63)));
+		q(nt(59), (nt(66)));
 		// cmd_symbol => toggle_sym.
-		q(nt(56), (nt(66)));
+		q(nt(59), (nt(69)));
 		// cmd_symbol => enable_sym.
-		q(nt(56), (nt(68)));
+		q(nt(59), (nt(71)));
 		// cmd_symbol => disable_sym.
-		q(nt(56), (nt(69)));
+		q(nt(59), (nt(72)));
 		// cmd_symbol => parse_sym.
-		q(nt(56), (nt(70)));
+		q(nt(59), (nt(73)));
 		// option => bool_option.
-		q(nt(61), (nt(67)));
+		q(nt(64), (nt(70)));
 		// option => error_verbosity_opt.
-		q(nt(61), (nt(71)));
+		q(nt(64), (nt(74)));
 		// bool_option => status_opt.
-		q(nt(67), (nt(72)));
+		q(nt(70), (nt(75)));
 		// bool_option => colors_opt.
-		q(nt(67), (nt(73)));
+		q(nt(70), (nt(76)));
 		// bool_option => print_ambiguity_opt.
-		q(nt(67), (nt(74)));
+		q(nt(70), (nt(77)));
 		// bool_option => print_graphs_opt.
-		q(nt(67), (nt(75)));
+		q(nt(70), (nt(78)));
 		// bool_option => print_rules_opt.
-		q(nt(67), (nt(76)));
+		q(nt(70), (nt(79)));
 		// bool_option => print_facts_opt.
-		q(nt(67), (nt(77)));
+		q(nt(70), (nt(80)));
 		// bool_option => debug_opt.
-		q(nt(67), (nt(78)));
+		q(nt(70), (nt(81)));
 		// debug_opt => 'd'.
-		q(nt(78), (t(26)));
+		q(nt(81), (t(29)));
 		// debug_opt => 'd' 'e' 'b' 'u' 'g'.
-		q(nt(78), (t(26)+t(17)+t(9)+t(31)+t(16)));
+		q(nt(81), (t(29)+t(17)+t(9)+t(25)+t(16)));
 		// status_opt => 's'.
-		q(nt(72), (t(18)));
+		q(nt(75), (t(18)));
 		// status_opt => 's' 't' 'a' 't' 'u' 's'.
-		q(nt(72), (t(18)+t(13)+t(21)+t(13)+t(31)+t(18)));
+		q(nt(75), (t(18)+t(13)+t(21)+t(13)+t(25)+t(18)));
 		// colors_opt => 'c'.
-		q(nt(73), (t(33)));
+		q(nt(76), (t(26)));
 		// colors_opt => 'c' 'o' 'l' 'o' 'r'.
-		q(nt(73), (t(33)+t(19)+t(20)+t(19)+t(12)));
+		q(nt(76), (t(26)+t(19)+t(20)+t(19)+t(12)));
 		// colors_opt => 'c' 'o' 'l' 'o' 'r' 's'.
-		q(nt(73), (t(33)+t(19)+t(20)+t(19)+t(12)+t(18)));
+		q(nt(76), (t(26)+t(19)+t(20)+t(19)+t(12)+t(18)));
 		// print_ambiguity_opt => 'a'.
-		q(nt(74), (t(21)));
+		q(nt(77), (t(21)));
 		// print_ambiguity_opt => 'a' 'm' 'b' 'i' 'g' 'u' 'i' 't' 'y'.
-		q(nt(74), (t(21)+t(22)+t(9)+t(23)+t(16)+t(31)+t(23)+t(13)+t(34)));
+		q(nt(77), (t(21)+t(22)+t(9)+t(23)+t(16)+t(25)+t(23)+t(13)+t(34)));
 		// print_ambiguity_opt => 'p' 'r' 'i' 'n' 't' '-' 'a' 'm' 'b' 'i' 'g' 'u' 'i' 't' 'y'.
-		q(nt(74), (t(25)+t(12)+t(23)+t(11)+t(13)+t(24)+t(21)+t(22)+t(9)+t(23)+t(16)+t(31)+t(23)+t(13)+t(34)));
+		q(nt(77), (t(28)+t(12)+t(23)+t(11)+t(13)+t(24)+t(21)+t(22)+t(9)+t(23)+t(16)+t(25)+t(23)+t(13)+t(34)));
 		// print_graphs_opt => 'g'.
-		q(nt(75), (t(16)));
+		q(nt(78), (t(16)));
 		// print_graphs_opt => 'g' 'r' 'a' 'p' 'h' 's'.
-		q(nt(75), (t(16)+t(12)+t(21)+t(25)+t(27)+t(18)));
+		q(nt(78), (t(16)+t(12)+t(21)+t(28)+t(27)+t(18)));
 		// print_graphs_opt => 'p' 'r' 'i' 'n' 't' '-' 'g' 'r' 'a' 'p' 'h' 's'.
-		q(nt(75), (t(25)+t(12)+t(23)+t(11)+t(13)+t(24)+t(16)+t(12)+t(21)+t(25)+t(27)+t(18)));
+		q(nt(78), (t(28)+t(12)+t(23)+t(11)+t(13)+t(24)+t(16)+t(12)+t(21)+t(28)+t(27)+t(18)));
 		// print_rules_opt => 'p' 'r' 'i' 'n' 't' '-' 'r' 'u' 'l' 'e' 's'.
-		q(nt(76), (t(25)+t(12)+t(23)+t(11)+t(13)+t(24)+t(12)+t(31)+t(20)+t(17)+t(18)));
+		q(nt(79), (t(28)+t(12)+t(23)+t(11)+t(13)+t(24)+t(12)+t(25)+t(20)+t(17)+t(18)));
 		// print_rules_opt => 'r'.
-		q(nt(76), (t(12)));
+		q(nt(79), (t(12)));
 		// print_rules_opt => 'r' 'u' 'l' 'e' 's'.
-		q(nt(76), (t(12)+t(31)+t(20)+t(17)+t(18)));
+		q(nt(79), (t(12)+t(25)+t(20)+t(17)+t(18)));
 		// print_facts_opt => 'f'.
-		q(nt(77), (t(10)));
-		// print_facts_opt => 'f' 'a' 'c' 't' 's'.
-		q(nt(77), (t(10)+t(21)+t(33)+t(13)+t(18)));
-		// print_facts_opt => 'p' 'r' 'i' 'n' 't' '-' 'f' 'a' 'c' 't' 's'.
-		q(nt(77), (t(25)+t(12)+t(23)+t(11)+t(13)+t(24)+t(10)+t(21)+t(33)+t(13)+t(18)));
-		// error_verbosity_opt => 'e'.
-		q(nt(71), (t(17)));
-		// error_verbosity_opt => 'e' 'r' 'r' 'o' 'r' '-' 'v' 'e' 'r' 'b' 'o' 's' 'i' 't' 'y'.
-		q(nt(71), (t(17)+t(12)+t(12)+t(19)+t(12)+t(24)+t(28)+t(17)+t(12)+t(9)+t(19)+t(18)+t(23)+t(13)+t(34)));
-		// option_value => option_value_true.
-		q(nt(65), (nt(79)));
-		// option_value => option_value_false.
-		q(nt(65), (nt(80)));
-		// option_value => error_verbosity.
-		q(nt(65), (nt(81)));
-		// option_value_true => '1'.
-		q(nt(79), (t(35)));
-		// option_value_true => 'o' 'n'.
-		q(nt(79), (t(19)+t(11)));
-		// option_value_true => 't'.
-		q(nt(79), (t(13)));
-		// option_value_true => 't' 'r' 'u' 'e'.
-		q(nt(79), (t(13)+t(12)+t(31)+t(17)));
-		// option_value_true => 'y'.
-		q(nt(79), (t(34)));
-		// option_value_true => 'y' 'e' 's'.
-		q(nt(79), (t(34)+t(17)+t(18)));
-		// option_value_false => '0'.
-		q(nt(80), (t(36)));
-		// option_value_false => 'f'.
 		q(nt(80), (t(10)));
+		// print_facts_opt => 'f' 'a' 'c' 't' 's'.
+		q(nt(80), (t(10)+t(21)+t(26)+t(13)+t(18)));
+		// print_facts_opt => 'p' 'r' 'i' 'n' 't' '-' 'f' 'a' 'c' 't' 's'.
+		q(nt(80), (t(28)+t(12)+t(23)+t(11)+t(13)+t(24)+t(10)+t(21)+t(26)+t(13)+t(18)));
+		// error_verbosity_opt => 'e'.
+		q(nt(74), (t(17)));
+		// error_verbosity_opt => 'e' 'r' 'r' 'o' 'r' '-' 'v' 'e' 'r' 'b' 'o' 's' 'i' 't' 'y'.
+		q(nt(74), (t(17)+t(12)+t(12)+t(19)+t(12)+t(24)+t(30)+t(17)+t(12)+t(9)+t(19)+t(18)+t(23)+t(13)+t(34)));
+		// option_value => option_value_true.
+		q(nt(68), (nt(82)));
+		// option_value => option_value_false.
+		q(nt(68), (nt(83)));
+		// option_value => error_verbosity.
+		q(nt(68), (nt(84)));
+		// option_value_true => '1'.
+		q(nt(82), (t(35)));
+		// option_value_true => 'o' 'n'.
+		q(nt(82), (t(19)+t(11)));
+		// option_value_true => 't'.
+		q(nt(82), (t(13)));
+		// option_value_true => 't' 'r' 'u' 'e'.
+		q(nt(82), (t(13)+t(12)+t(25)+t(17)));
+		// option_value_true => 'y'.
+		q(nt(82), (t(34)));
+		// option_value_true => 'y' 'e' 's'.
+		q(nt(82), (t(34)+t(17)+t(18)));
+		// option_value_false => '0'.
+		q(nt(83), (t(36)));
+		// option_value_false => 'f'.
+		q(nt(83), (t(10)));
 		// option_value_false => 'f' 'a' 'l' 's' 'e'.
-		q(nt(80), (t(10)+t(21)+t(20)+t(18)+t(17)));
+		q(nt(83), (t(10)+t(21)+t(20)+t(18)+t(17)));
 		// option_value_false => 'n'.
-		q(nt(80), (t(11)));
+		q(nt(83), (t(11)));
 		// option_value_false => 'n' 'o'.
-		q(nt(80), (t(11)+t(19)));
+		q(nt(83), (t(11)+t(19)));
 		// option_value_false => 'o' 'f' 'f'.
-		q(nt(80), (t(19)+t(10)+t(10)));
+		q(nt(83), (t(19)+t(10)+t(10)));
 		// error_verbosity => basic_sym.
-		q(nt(81), (nt(82)));
+		q(nt(84), (nt(85)));
 		// error_verbosity => detailed_sym.
-		q(nt(81), (nt(83)));
+		q(nt(84), (nt(86)));
 		// error_verbosity => root_cause_sym.
-		q(nt(81), (nt(84)));
+		q(nt(84), (nt(87)));
 		// basic_sym => 'b'.
-		q(nt(82), (t(9)));
+		q(nt(85), (t(9)));
 		// basic_sym => 'b' 'a' 's' 'i' 'c'.
-		q(nt(82), (t(9)+t(21)+t(18)+t(23)+t(33)));
+		q(nt(85), (t(9)+t(21)+t(18)+t(23)+t(26)));
 		// detailed_sym => 'd'.
-		q(nt(83), (t(26)));
+		q(nt(86), (t(29)));
 		// detailed_sym => 'd' 'e' 't' 'a' 'i' 'l' 'e' 'd'.
-		q(nt(83), (t(26)+t(17)+t(13)+t(21)+t(23)+t(20)+t(17)+t(26)));
+		q(nt(86), (t(29)+t(17)+t(13)+t(21)+t(23)+t(20)+t(17)+t(29)));
 		// root_cause_sym => 'r'.
-		q(nt(84), (t(12)));
+		q(nt(87), (t(12)));
 		// root_cause_sym => 'r' 'c'.
-		q(nt(84), (t(12)+t(33)));
+		q(nt(87), (t(12)+t(26)));
 		// root_cause_sym => 'r' 'o' 'o' 't' '-' 'c' 'a' 'u' 's' 'e'.
-		q(nt(84), (t(12)+t(19)+t(19)+t(13)+t(24)+t(33)+t(21)+t(31)+t(18)+t(17)));
+		q(nt(87), (t(12)+t(19)+t(19)+t(13)+t(24)+t(26)+t(21)+t(25)+t(18)+t(17)));
 		return q;
 	}
 };
@@ -516,7 +528,8 @@ static inline std::function<bool(const sp_node_type&)> is_non_terminal_node() {
 	return [](const sp_node_type& n) { return is_non_terminal_node(n); };
 }
 
-static inline bool is_non_terminal(const nonterminal_type nt, const sp_node_type& n) {
+static inline bool is_non_terminal(const nonterminal_type nt,
+	const sp_node_type& n) {
 	return is_non_terminal_node(n)
 		&& std::get<symbol_type>(n->value).n() == nt;
 }
@@ -537,7 +550,8 @@ static inline std::optional<sp_node_type> operator|(const sp_node_type& n,
 		: std::optional<sp_node_type>(v.front());
 }
 
-static inline std::optional<sp_node_type> operator|(const std::optional<sp_node_type>& n,
+static inline std::optional<sp_node_type> operator|(
+	const std::optional<sp_node_type>& n,
 	const nonterminal_type nt)
 {
 	return n ? n.value() | nt : n;
@@ -553,11 +567,38 @@ static inline std::vector<sp_node_type> operator||(const sp_node_type& n,
 	return nv;
 }
 
-static inline std::vector<sp_node_type> operator||(const std::optional<sp_node_type>& n,
+static inline std::vector<sp_node_type> operator||(
+	const std::optional<sp_node_type>& n,
 	const nonterminal_type nt)
 {
 	if (n) return n.value() || nt;
 	return {};
+}
+
+static inline std::vector<sp_node_type> get_nodes(const nonterminal_type nt,
+	const sp_node_type& n)
+{
+	return n || nt;
+}
+
+template <nonterminal_type nt>
+std::vector<sp_node_type> get_nodes(const sp_node_type& n) {
+	return n || nt;
+}
+
+static inline auto get_nodes(const nonterminal_type nt) {
+	return [nt](const sp_node_type& n) { return get_nodes(nt, n); };
+}
+
+static inline std::vector<sp_node_type> operator||(
+	const std::vector<sp_node_type>& v,
+	const nonterminal_type nt) {
+	std::vector<sp_node_type> nv; nv.reserve(v.size());
+	for (const auto& n: v
+			| std::ranges::views::transform(get_nodes(nt))
+			| std::ranges::views::join)
+		nv.push_back(n);
+	return nv;
 }
 
 static const auto only_child_extractor = [](const sp_node_type& n)
@@ -568,7 +609,8 @@ static const auto only_child_extractor = [](const sp_node_type& n)
 };
 using only_child_extractor_t = decltype(only_child_extractor);
 
-static inline std::vector<sp_node_type> operator||(const std::vector<sp_node_type>& v,
+static inline std::vector<sp_node_type> operator||(
+	const std::vector<sp_node_type>& v,
 	const only_child_extractor_t e)
 {
 	std::vector<sp_node_type> nv;
@@ -577,7 +619,8 @@ static inline std::vector<sp_node_type> operator||(const std::vector<sp_node_typ
 	return nv;
 }
 
-static inline std::optional<sp_node_type> operator|(const std::optional<sp_node_type>& o,
+static inline std::optional<sp_node_type> operator|(
+	const std::optional<sp_node_type>& o,
 	const only_child_extractor_t e)
 {
 	return o.has_value() ? e(o.value()) : std::optional<sp_node_type>();
@@ -601,7 +644,8 @@ static const auto terminal_extractor = [](const sp_node_type& n)
 
 using terminal_extractor_t = decltype(terminal_extractor);
 
-static inline std::optional<char> operator|(const std::optional<sp_node_type>& o,
+static inline std::optional<char> operator|(
+	const std::optional<sp_node_type>& o,
 	const terminal_extractor_t e)
 {
 	return o.has_value() ? e(o.value()) : std::optional<char>();
@@ -619,7 +663,8 @@ static const auto non_terminal_extractor = [](const sp_node_type& n)
 
 using non_terminal_extractor_t = decltype(non_terminal_extractor);
 
-static inline std::optional<size_t> operator|(const std::optional<sp_node_type>& o,
+static inline std::optional<size_t> operator|(
+	const std::optional<sp_node_type>& o,
 	const non_terminal_extractor_t e)
 {
 	return o.has_value() ? e(o.value()) : std::optional<size_t>();
@@ -640,7 +685,8 @@ static const auto size_t_extractor = [](const sp_node_type& n)
 };
 using size_t_extractor_t = decltype(size_t_extractor);
 
-static inline std::optional<size_t> operator|(const std::optional<sp_node_type>& o,
+static inline std::optional<size_t> operator|(
+	const std::optional<sp_node_type>& o,
 	const size_t_extractor_t e)
 {
 	return o.has_value() ? e(o.value()) : std::optional<size_t>();

@@ -14,23 +14,24 @@
 
 #define __IDNI_PARSER_TERM_COLOR_PRESETS_H__
 // terminal color presets
-#define TC_DEFAULT       TC.DEFAULT()
-#define TC_BG_DEFAULT    TC.BG_DEFAULT()
-#define TC_STATUS        TC.BG_LIGHT_GRAY()
-#define TC_STATUS_START  TC(term::color::MAGENTA, term::color::BG_LIGHT_GRAY, term::color::BRIGHT)
-#define TC_STATUS_FILE   TC(term::color::BLUE,    term::color::BG_LIGHT_GRAY)
-#define TC_PROMPT        TC(term::color::WHITE,   term::color::BRIGHT)
-#define TC_NT            TC.YELLOW()
-#define TC_NT_ID         TC.DARK_GRAY()
-#define TC_T             TC(term::color::CYAN,    term::color::BRIGHT)
-#define TC_NULL          TC.DARK_GRAY()
-#define TC_RANGE         TC.DARK_GRAY()
-#define TC_NEG           TC.RED()
-
+#define TC_DEFAULT         TC.DEFAULT()
+#define TC_CLEARED_DEFAULT (TC.CLEAR() + TC_DEFAULT)
+#define TC_BG_DEFAULT      TC.BG_DEFAULT()
+#define TC_STATUS          TC.BG_LIGHT_GRAY()
+#define TC_STATUS_START    TC(term::color::MAGENTA, term::color::BG_LIGHT_GRAY, term::color::BRIGHT)
+#define TC_STATUS_FILE     TC(term::color::BLUE,    term::color::BG_LIGHT_GRAY)
+#define TC_PROMPT          TC(term::color::WHITE,   term::color::BRIGHT)
+#define TC_NT              TC.YELLOW()
+#define TC_NT_ID           TC.DARK_GRAY()
+#define TC_T               TC(term::color::CYAN,    term::color::BRIGHT)
+#define TC_NULL            TC.DARK_GRAY()
+#define TC_RANGE           TC.DARK_GRAY()
+#define TC_NEG             TC.RED()
 #else
 
 #undef __IDNI_PARSER_TERM_COLOR_PRESETS_H__
 // terminal color presets
+#undef TC_CLEARED_DEFAULT
 #undef TC_DEFAULT
 #undef TC_BG_DEFAULT
 #undef TC_STATUS

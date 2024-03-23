@@ -20,6 +20,7 @@ parse_input            => parse_input_char*.
 
 # statement
 statement              => grammar_cmd | internal_grammar_cmd | start_cmd
+                        | unreachable_cmd
                         | reload_cmd | file_cmd
                         | help | version | quit
                         | get | set | toggle | enable | disable.
@@ -29,6 +30,7 @@ parse_cmd              => parse_input.
 grammar_cmd            => grammar_sym. # [ __ symbol ].
 internal_grammar_cmd   => internal_grammar_sym [ __ symbol ].
 start_cmd              => start_sym [ __ symbol ].
+unreachable_cmd        => unreachable_sym [ __ symbol ].
 reload_cmd             => reload_sym.
 file_cmd               => file_sym __ filename.
 help                   => help_sym [ __ cmd_symbol ].
@@ -46,6 +48,7 @@ set_sym                => "set".
 toggle_sym             => "toggle".
 grammar_sym            => "g" | "grammar".
 internal_grammar_sym   => "i" | "ig" | "internal-grammar".
+unreachable_sym        => "u" | "unreachable".
 parse_sym              => "p" | "parse".
 start_sym              => "s" | "start".
 reload_sym             => "r" | "reload".
