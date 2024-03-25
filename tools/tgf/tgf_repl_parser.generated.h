@@ -380,6 +380,8 @@ private:
 		q(nt(59), (nt(50)));
 		// cmd_symbol => start_sym.
 		q(nt(59), (nt(52)));
+		// cmd_symbol => unreachable_sym.
+		q(nt(59), (nt(54)));
 		// cmd_symbol => reload_sym.
 		q(nt(59), (nt(56)));
 		// cmd_symbol => file_sym.
@@ -528,8 +530,7 @@ static inline std::function<bool(const sp_node_type&)> is_non_terminal_node() {
 	return [](const sp_node_type& n) { return is_non_terminal_node(n); };
 }
 
-static inline bool is_non_terminal(const nonterminal_type nt,
-	const sp_node_type& n) {
+static inline bool is_non_terminal(const nonterminal_type nt, const sp_node_type& n) {
 	return is_non_terminal_node(n)
 		&& std::get<symbol_type>(n->value).n() == nt;
 }
@@ -550,8 +551,7 @@ static inline std::optional<sp_node_type> operator|(const sp_node_type& n,
 		: std::optional<sp_node_type>(v.front());
 }
 
-static inline std::optional<sp_node_type> operator|(
-	const std::optional<sp_node_type>& n,
+static inline std::optional<sp_node_type> operator|(const std::optional<sp_node_type>& n,
 	const nonterminal_type nt)
 {
 	return n ? n.value() | nt : n;
@@ -567,38 +567,11 @@ static inline std::vector<sp_node_type> operator||(const sp_node_type& n,
 	return nv;
 }
 
-static inline std::vector<sp_node_type> operator||(
-	const std::optional<sp_node_type>& n,
+static inline std::vector<sp_node_type> operator||(const std::optional<sp_node_type>& n,
 	const nonterminal_type nt)
 {
 	if (n) return n.value() || nt;
 	return {};
-}
-
-static inline std::vector<sp_node_type> get_nodes(const nonterminal_type nt,
-	const sp_node_type& n)
-{
-	return n || nt;
-}
-
-template <nonterminal_type nt>
-std::vector<sp_node_type> get_nodes(const sp_node_type& n) {
-	return n || nt;
-}
-
-static inline auto get_nodes(const nonterminal_type nt) {
-	return [nt](const sp_node_type& n) { return get_nodes(nt, n); };
-}
-
-static inline std::vector<sp_node_type> operator||(
-	const std::vector<sp_node_type>& v,
-	const nonterminal_type nt) {
-	std::vector<sp_node_type> nv; nv.reserve(v.size());
-	for (const auto& n: v
-			| std::ranges::views::transform(get_nodes(nt))
-			| std::ranges::views::join)
-		nv.push_back(n);
-	return nv;
 }
 
 static const auto only_child_extractor = [](const sp_node_type& n)
@@ -609,8 +582,7 @@ static const auto only_child_extractor = [](const sp_node_type& n)
 };
 using only_child_extractor_t = decltype(only_child_extractor);
 
-static inline std::vector<sp_node_type> operator||(
-	const std::vector<sp_node_type>& v,
+static inline std::vector<sp_node_type> operator||(const std::vector<sp_node_type>& v,
 	const only_child_extractor_t e)
 {
 	std::vector<sp_node_type> nv;
@@ -619,8 +591,7 @@ static inline std::vector<sp_node_type> operator||(
 	return nv;
 }
 
-static inline std::optional<sp_node_type> operator|(
-	const std::optional<sp_node_type>& o,
+static inline std::optional<sp_node_type> operator|(const std::optional<sp_node_type>& o,
 	const only_child_extractor_t e)
 {
 	return o.has_value() ? e(o.value()) : std::optional<sp_node_type>();
@@ -644,8 +615,7 @@ static const auto terminal_extractor = [](const sp_node_type& n)
 
 using terminal_extractor_t = decltype(terminal_extractor);
 
-static inline std::optional<char> operator|(
-	const std::optional<sp_node_type>& o,
+static inline std::optional<char> operator|(const std::optional<sp_node_type>& o,
 	const terminal_extractor_t e)
 {
 	return o.has_value() ? e(o.value()) : std::optional<char>();
@@ -663,8 +633,7 @@ static const auto non_terminal_extractor = [](const sp_node_type& n)
 
 using non_terminal_extractor_t = decltype(non_terminal_extractor);
 
-static inline std::optional<size_t> operator|(
-	const std::optional<sp_node_type>& o,
+static inline std::optional<size_t> operator|(const std::optional<sp_node_type>& o,
 	const non_terminal_extractor_t e)
 {
 	return o.has_value() ? e(o.value()) : std::optional<size_t>();
@@ -685,8 +654,7 @@ static const auto size_t_extractor = [](const sp_node_type& n)
 };
 using size_t_extractor_t = decltype(size_t_extractor);
 
-static inline std::optional<size_t> operator|(
-	const std::optional<sp_node_type>& o,
+static inline std::optional<size_t> operator|(const std::optional<sp_node_type>& o,
 	const size_t_extractor_t e)
 {
 	return o.has_value() ? e(o.value()) : std::optional<size_t>();

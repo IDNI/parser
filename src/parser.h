@@ -156,7 +156,8 @@ struct grammar {
 	std::set<size_t> unreachable_productions(const lit<C, T>& l) const;
 	std::ostream& check_nullable_ambiguity(std::ostream& os) const;
 	std::ostream& print_production(std::ostream& os,
-		const production& p, const term::colors& TC = {false}) const;
+		size_t p, bool print_ids = false,
+		const term::colors& TC = {false}) const;
 	std::ostream& print_internal_grammar(std::ostream& os,
 		std::string prep = {}, bool print_ids = false,
 		const term::colors& TC = {false}) const;

@@ -62,8 +62,9 @@ toggle_sym             => "tog" | "toggle".
 enable_sym             => "+" | "en"  __ | "on"  __ | "enable"  __.
 disable_sym            => "-" | "dis" __ | "off" __ | "disable" __.
 
-cmd_symbol             => grammar_sym | internal_grammar_sym
-                        | parse_sym | start_sym | reload_sym | file_sym
+cmd_symbol             => grammar_sym | internal_grammar_sym | unreachable_sym
+			| start_sym | parse_sym
+			| reload_sym | file_sym
                         | help_sym | quit_sym
                         | get_sym | set_sym
                         | toggle_sym | enable_sym | disable_sym.

@@ -113,8 +113,9 @@ std::ostream& generate_parser_cpp(std::ostream& os,
 			ts.push_back(l.t());
 			return ts.size() - 1;
 		};
-		for (const auto& p : gi.G()) {
-			g.print_production(os << "\t\t// ", p) << "\n";
+		for (size_t i = 0; i != gi.G().size(); ++i) {
+			const auto& p = gi.G()[i];
+			g.print_production(os << "\t\t// ", i) << "\n";
 			os << "\t\tq(nt(" << p.first.n() << "), ";
 			bool first_c = true;
 			for (const auto& c : p.second) {

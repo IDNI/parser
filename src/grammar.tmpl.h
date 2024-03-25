@@ -592,7 +592,7 @@ lit<C, T> grammar<C, T>::nt(const std::basic_string<C>& s) {
 template <typename C, typename T>
 std::ostream& grammar<C, T>::check_nullable_ambiguity(std::ostream& os) const {
 	const auto report = [&os, this](const lit<C, T>& first,
-		const lit<C, T>& second, const production& p)
+		const lit<C, T>& second, size_t p)
 	{
 		os << "Warning: possible ambiguity from a nullable literal: ("
 			<< first << ") neighbors (" << second
@@ -614,8 +614,8 @@ std::ostream& grammar<C, T>::check_nullable_ambiguity(std::ostream& os) const {
 			if (nullable(a.back())) return true;
 		return false;
 	};
-	for (const auto& p : G) for (const auto& a : p.second) if (a.size() > 1)
-		for (size_t i = 1; i != a.size() - 1; ++i) {
+	for (size_t p = 0; p != G.size(); ++p) for (const auto& a : G[p].second)
+		if (a.size() > 1) for (size_t i = 1; i != a.size() - 1; ++i) {
 			const auto& last = a[i-1], curr = a[i];
 			if (last.nt() && curr.nt() &&
 				(nullable(last) || last_nullable(last)) &&
@@ -628,12 +628,24 @@ std::ostream& grammar<C, T>::check_nullable_ambiguity(std::ostream& os) const {
 #include "parser_term_color_macros.h" // load color macros
 template <typename C, typename T>
 std::ostream& grammar<C, T>::print_production(std::ostream& os,
-	const production& p, const term::colors& TC) const
+	const size_t p, bool print_ids, const term::colors& TC) const
 {
-	os << TC_NT << p.first.to_std_string(from_cstr<C>("null")) << TC_DEFAULT
-		<< TC_NT_ID << "(" <<p.first.n()<< ")" << TC_DEFAULT << " =>";
+	const int ID_SIZE   = 6;
+	const int HEAD_SIZE = 20;
+	std::stringstream ss;
+	if (print_ids) ss << "G" << p << ":";
+	std::string id = ss.str();
+	os << id;
+	for (size_t i = 0; i < ID_SIZE - id.size(); ++i) os << " ";
+	std::string head = G[p].first.to_std_string();
+	ss = {}, ss << "(" << G[p].first.n()<< ")";
+	std::string head_id = ss.str();
+	os << TC_NT << head << TC_DEFAULT << TC_NT_ID << head_id << TC_DEFAULT;
+	int len = HEAD_SIZE-head.size()-head_id.size();
+	for (int i = 0; i < len; ++i) os <<" ";
+	os << " =>";
 	size_t j = 0;
-	for (const auto& c : p.second) {
+	for (const auto& c : G[p].second) {
 		if (j++ != 0) os << " &";
 		std::string tc_neg{};
 		if (c.neg) tc_neg = TC_NEG, os << " " << tc_neg << "~(";
@@ -649,21 +661,29 @@ std::ostream& grammar<C, T>::print_production(std::ostream& os,
 		}
 		if (c.neg) os << tc_neg << " )" << TC.CLEAR();
 	}
-	return os << ".";
+	os << ".";
+	if (conjunctive(p)) os << "\t "<< TC_NULL<<"# conjunctive" <<TC_DEFAULT;
+	return os;
 }
-#include "parser_term_color_macros.h" // undef color macros
 template <typename C, typename T>
 std::ostream& grammar<C, T>::print_internal_grammar(std::ostream& os,
 	std::string prep, bool print_ids, const term::colors& TC) const
 {
-	for (size_t i = 0; i != G.size(); ++i) {
-		os << prep, print_ids ? os << "G" << i << ": " : os;
-		print_production(os, G[i], TC);
-		if (conjunctive(i)) os << "\t # conjunctive";
-		os << "\n";
-	}
+	for (size_t i = 0; i != G.size(); ++i)
+		print_production(os << prep, i, print_ids, TC) << "\n";
 	return os;
 }
+
+template <typename C, typename T>
+std::ostream& grammar<C, T>::print_internal_grammar_for(std::ostream& os,
+	const std::string& nt, std::string prep, bool print_ids,
+	const term::colors& TC) const
+{
+	for (size_t i : reachable_productions(nts(nt)))
+		print_production(os << prep, i, print_ids, TC) << "\n";
+	return os;
+}
+#include "parser_term_color_macros.h" // undef color macros
 
 template <typename C, typename T>
 std::set<size_t> grammar<C, T>::reachable_productions(const lit<C, T>& l) const{
@@ -699,19 +719,6 @@ std::set<size_t> grammar<C, T>::unreachable_productions(const lit<C, T>& l)
 	return diff;
 }
 
-template <typename C, typename T>
-std::ostream& grammar<C, T>::print_internal_grammar_for(std::ostream& os,
-	const std::string& nt, std::string prep, bool print_ids,
-	const term::colors& TC) const
-{
-	for (size_t i : reachable_productions(nts(nt))) {
-		os << prep, print_ids ? os << "G" << i << ": " : os;
-		print_production(os, G[i], TC);
-		if (conjunctive(i)) os << "\t # conjunctive";
-		os << "\n";
-	}
-	return os;
-}
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
 template <typename C, typename T>
 std::ostream& grammar<C, T>::print_data(std::ostream& os, std::string prep)

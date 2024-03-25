@@ -610,6 +610,7 @@ void help(size_t nt = tgf_repl_parser::help_sym) {
 		<< "  grammar or n                 show TGF grammar\n"
 		<< "  internal-grammar or ig or i  show TGF grammar\n"
 		<< "  start or s                   show or change start symbol\n"
+		<< "  unreachable or u             show unreachable productions\n"
 		<< "\n"
 		<< "parsing commands:\n"
 		<< "  parse                        parse input\n"
@@ -678,6 +679,12 @@ void help(size_t nt = tgf_repl_parser::help_sym) {
 		<< "short: ig or i\n"
 		<< "\tprints the internal grammar\n"
 		<< "\tif start symbol provided prints the internal sub-grammar\n";
+		break;
+	case tgf_repl_parser::unreachable_sym: cout
+		<< "command: unreachable [<symbol>]\n"
+		<< "short: u\n"
+		<< "\tprints unreachable production rules for provided symbol\n"
+		<< "\tif no symbol provided prints unreachable rules for start symbol\n";
 		break;
 	case tgf_repl_parser::parse_sym: cout
 		<< "command: parse <input>\n"
@@ -758,8 +765,7 @@ int tgf_repl_evaluator::eval(const tgf_repl_parser::sp_rw_node_type& s) {
 			cout << "unreachable production rules for symbol: "
 				<< TC_NT << start << TC_DEFAULT << "\n";
 			for (auto& p : unreachable) g->print_production(
-				cout << "  G" << p << ": ",
-				{ (*g)(p), (*g)[p] }, TC) << "\n";
+				cout << "  ", p, true, TC) << "\n";
 		}
 		else cout << "all production rules reachable for symbol: "
 			<< TC_NT << start << TC_DEFAULT << "\n";
