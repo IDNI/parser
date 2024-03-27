@@ -3,6 +3,7 @@
 # TGF grammar
 start                  => (_ statement)* _.
 statement              => directive | production.
+start_statement	       => _ statement _.
 
 # directive
 directive              => "@use_char_class" __ directive_params _ '.'.

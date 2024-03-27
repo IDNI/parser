@@ -24,9 +24,16 @@
 #define PBOOL(bval) (( bval ) ? "true" : "false")
 
 using namespace std;
-using namespace tgf_repl_parsing;
 
 namespace idni {
+
+using node_variant_t = std::variant<tgf_repl_parser::symbol_type>;
+using sp_node_t = idni::rewriter::sp_node<node_variant_t>;
+using parser_t = tgf_repl_parser;
+using traverser_t = traverser<node_variant_t, parser_t>;
+const auto& get_only_child = only_child_extractor<node_variant_t, parser_t>;
+const auto& get_terminals = terminal_extractor<node_variant_t, parser_t>;
+const auto& get_nonterminal = nonterminal_extractor<node_variant_t, parser_t>;
 
 // configure CLI options and descriptions
 //
@@ -113,21 +120,30 @@ cli::commands tgf_commands() {
 	OPT(start);
 	//OPT(char_type);
 	//OPT(terminal_type);
+	OPT(cli::option("name", 'n',
+		"")),
+		DESC("name of the generated parser struct");
+	OPT(cli::option("output-dir", 'O',
+		"")),
+		DESC("output directory for output files");
+	OPT(cli::option("output", 'o',
+		"")),
+		DESC("output file for parser");
+	OPT(cli::option("auto-disambiguate", 'a',
+		true)),
+		DESC("enables auto-disambiguation");
+	OPT(cli::option("nodisambig-list", 'A',
+		"")),
+		DESC("comma separated list of non-disambiguation nodes");
 	OPT(cli::option("namespace", 'N',
 		"")),
-		DESC("namespace for the generated code");
-	OPT(cli::option("name", 'n',
-		"my_parser")),
-		DESC("name of the generated parser struct");
+		DESC("namespace for the generated parser code");
 	OPT(cli::option("decoder", 'd',
 		"")),
 		DESC("decoder function");
 	OPT(cli::option("encoder", 'e',
 		"")),
 		DESC("encoder function");
-	OPT(cli::option("output", 'o',
-		"-")),
-		DESC("output file");
 
 	// ---------------------------------------------------------------------
 
@@ -166,28 +182,6 @@ int show(const string& tgf_file, const string start = "start",
 	if (print_grammar)
 		g.print_internal_grammar(cout, {}, true, term::colors(colors));
 	if (print_nullable_ambiguity) g.check_nullable_ambiguity(cout);
-	return 0;
-}
-
-int gen(ostream& os, const string& tgf_file,
-	string ns = "", const string& name = "my_parser",
-	const string& start = "start", const string& char_type = "char",
-	const string& terminal_type = "char", const string& decoder = "",
-	const string& encoder = "", bool traversals = true,
-	const vector<string>& rewriter_node_types = {})
-{
-	if (ns == "") ns = name + "_ns";
-	generate_parser_cpp_from_file<char>(os, tgf_file, start,
-		parser_gen_options{
-			.ns                  = ns,
-			.name                = name,
-			.char_type           = char_type,
-			.terminal_type       = terminal_type,
-			.decoder             = decoder,
-			.encoder             = encoder,
-			.traversals          = traversals,
-			.rewriter_node_types = rewriter_node_types
-		});
 	return 0;
 }
 
@@ -280,16 +274,24 @@ int tgf_run(int argc, char** argv) {
 	if (cmd.name() == "grammar") re.eval("internal-grammar");
 
 	else if (cmd.name() == "gen") {
-		gen(cout, tgf_file,
-			cmd.get<string>("namespace"),
-			cmd.get<string>("name"),
-			cmd.get<string>("start"),
-			"char", //cmd.get<string>("char-type"),
-			"char", //cmd.get<string>("terminal-type"),
-			cmd.get<string>("decoder"),
-			cmd.get<string>("encoder"),
-			true,
-			{ "size_t" });
+		std::vector<std::string> nodisambig_list;
+		for (auto&& s : cmd.get<string>("nodisambig-list")
+			| std::views::split(',')) nodisambig_list
+					.emplace_back(s.begin(), s.end());
+		generate_parser_cpp_from_file<char>(tgf_file,
+			cmd.get<string>("start"), parser_gen_options
+		{
+			.output_dir          = cmd.get<string>("output-dir"),
+			.output              = cmd.get<string>("output"),
+			.name                = cmd.get<string>("name"),
+			.ns                  = cmd.get<string>("namespace"),
+			.char_type           = "char",
+			.terminal_type       = "char",
+			.decoder             = cmd.get<string>("decoder"),
+			.encoder             = cmd.get<string>("encoder"),
+			.auto_disambiguate   = cmd.get<bool>("auto-disambiguate"),
+			.nodisambig_list     = nodisambig_list
+		});
 	}
 
 	else if (cmd.name() == "parse") {
@@ -453,14 +455,13 @@ void tgf_repl_evaluator::reload() {
 	reload(tgf_file);
 }
 
-size_t get_opt(const tgf_repl_parser::sp_rw_node_type& n) {
-	auto bool_opt = n | tgf_repl_parser::bool_option;
-	return ((bool_opt.has_value() ? bool_opt.value() : n)
-		| only_child_extractor
-		| non_terminal_extractor).value();
+size_t get_opt(traverser_t t) {
+	traverser_t bool_opt = t | tgf_repl_parser::bool_option;
+	if (!bool_opt.has_value()) t = bool_opt;
+	return t | get_only_child | get_nonterminal;
 }
 
-void tgf_repl_evaluator::get_cmd(const tgf_repl_parser::sp_rw_node_type& n) {
+void tgf_repl_evaluator::get_cmd(const traverser_t& n) {
 	using lvl = parser_type::error::info_lvl;
 	static auto pbool = [] (bool b) { return b ? "on" : "off"; };
 	static auto pverb = [] (lvl v) {
@@ -491,7 +492,7 @@ void tgf_repl_evaluator::get_cmd(const tgf_repl_parser::sp_rw_node_type& n) {
 	auto option = n | tgf_repl_parser::option;
 	if (!option.has_value()) option = n | tgf_repl_parser::bool_option;
 	if (!option.has_value()) { for (auto& [_, v] : printers) v(); return; }
-	printers[get_opt(option.value())]();
+	printers[get_opt(option)]();
 }
 
 bool set_bool_value(bool& val, const size_t& vt) {
@@ -507,18 +508,14 @@ std::string unquote(const string& q) {
 	return iss >> quoted(u), u;
 };
 
-std::string get_string(const tgf_repl_parser::sp_rw_node_type& n) {
-	return make_string_with_skip<
-		terminal_extractor_t,
-		not_whitespace_predicate_t>(terminal_extractor,
-			not_whitespace_predicate, n);
+std::string get_string(const traverser_t& n) {
+	return n | get_terminals;
 }
 
-void tgf_repl_evaluator::set_cmd(const tgf_repl_parser::sp_rw_node_type& n) {
+void tgf_repl_evaluator::set_cmd(const traverser_t& n) {
 	auto option = n | tgf_repl_parser::option;
 	auto v  = n | tgf_repl_parser::option_value;
-	auto vt = (v | only_child_extractor
-		| non_terminal_extractor).value();
+	auto vt = v | get_only_child | get_nonterminal;
 	static std::map<size_t,	std::function<void()>> setters = {
 	{ tgf_repl_parser::debug_opt,          [this, &vt]() {
 		set_bool_value(opt.debug, vt); } },
@@ -538,8 +535,7 @@ void tgf_repl_evaluator::set_cmd(const tgf_repl_parser::sp_rw_node_type& n) {
 		auto vrb = v | tgf_repl_parser::error_verbosity;
 		if (!vrb.has_value()) {
 			cout << "error: invalid error verbosity value\n"; return; }
-		auto vrb_type = (vrb | only_child_extractor
-			| non_terminal_extractor).value();
+		auto vrb_type = vrb | get_only_child | get_nonterminal;
 		using lvl = tgf_repl_parser::parser_type::error::info_lvl;
 		switch (vrb_type) {
 		case tgf_repl_parser::basic_sym:
@@ -551,17 +547,16 @@ void tgf_repl_evaluator::set_cmd(const tgf_repl_parser::sp_rw_node_type& n) {
 		default: cout << "error: invalid error verbosity value\n"; return;
 		}
 	}}};
-	setters[get_opt(option.value())]();
+	setters[get_opt(option)]();
 	get_cmd(n);
 }
 
 void tgf_repl_evaluator::update_bool_opt_cmd(
-	const tgf_repl_parser::sp_rw_node_type& n,
+	const traverser_t& n,
 	const std::function<bool(bool&)>& update_fn)
 {
-	auto option_type = (n | tgf_repl_parser::bool_option
-		| only_child_extractor
-		| non_terminal_extractor).value();
+	auto option_type = n | tgf_repl_parser::bool_option
+		| get_only_child | get_nonterminal;
 	switch (option_type) {
 	case tgf_repl_parser::debug_opt:           update_fn(opt.debug); break;
 	case tgf_repl_parser::status_opt:          update_fn(opt.status); break;
@@ -694,15 +689,13 @@ void help(size_t nt = tgf_repl_parser::help_sym) {
 	}
 }
 
-int tgf_repl_evaluator::eval(const tgf_repl_parser::sp_rw_node_type& s) {
-	auto x = s | non_terminal_extractor;
-	//cout << "type: " << x.value() << "\n";
-	switch (x.value()) {
+int tgf_repl_evaluator::eval(const traverser_t& s) {
+	switch (s | get_nonterminal) {
 	case tgf_repl_parser::help: {
 		auto optarg = s | tgf_repl_parser::cmd_symbol
-			| only_child_extractor
-			| non_terminal_extractor;
-		if (optarg.has_value()) help(optarg.value());
+			| get_only_child
+			| get_nonterminal;
+		if (optarg) help(optarg);
 		else help();
 		break;
 	}
@@ -777,6 +770,7 @@ int tgf_repl_evaluator::eval(const tgf_repl_parser::sp_rw_node_type& s) {
 		parse(input.c_str(), input.size());
 		break;
 	}
+	default: cout << "error: unknown command\n"; break;
 	}
 	return 0;
 }
@@ -826,11 +820,19 @@ int tgf_repl_evaluator::eval(const string& src) {
 		char dummy; // as a dummy transformer
 		auto source = idni::rewriter::make_node_from_forest<
 			tgf_repl_parser, char, tgf_repl_parser::node_type,
-			tgf_repl_parser::rw_symbol_type>(dummy, f.get());
-		auto statements = source || tgf_repl_parser::statement;
-		for (const auto& statement : statements)
-			if ((quit = eval((statement | only_child_extractor)
-				.value()))) return quit;
+			node_variant_t>(dummy, f.get());
+		auto t  = traverser_t(source);
+		//std::cout << "t.has_value(): " << t.has_value() << "\n";
+		//std::cout << "t.size(): " << t.values().size() << "\n";
+		auto ts = t | get_terminals;
+		//std::cout << "parsed terminals: " << ts << "\n";
+		auto statements = t || tgf_repl_parser::statement;
+		//std::cout << "statements.has_value(): " << statements.has_value() << "\n";
+		//std::cout << "statements.size(): " << statements.values().size() << "\n";
+
+		for (const auto& statement : statements())
+			if ((quit = eval(statement | get_only_child)))
+				return quit;
 	}
 	if (quit == 0) reprompt();
 	return quit;

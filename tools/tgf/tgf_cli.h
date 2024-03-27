@@ -19,6 +19,7 @@
 #include "repl.h"
 #include "term_colors.h"
 #include "tgf_repl_parser.generated.h"
+#include "traverser.h"
 
 namespace idni {
 
@@ -29,10 +30,14 @@ cli::options tgf_options();
 cli::commands tgf_commands();
 
 struct tgf_repl_evaluator {
-	using nonterminals_type = nonterminals<char>;
-	using grammar_type = grammar<char>;
-	using parser_type = parser<char>;
-	using sp_node_type = tgf_repl_parsing::sp_node_type;
+	using parser_type = tgf_repl_parser::parser_type;
+	using nonterminals_type = nonterminals<
+		parser_type::char_type, parser_type::terminal_type>;
+	using grammar_type = grammar<
+		parser_type::char_type, parser_type::terminal_type>;
+	using node_variant_t = std::variant<tgf_repl_parser::symbol_type>;
+	using sp_node_type = idni::rewriter::sp_node<node_variant_t>;
+	using traverser_t = traverser<node_variant_t, tgf_repl_parser>;
 
 	std::string tgf_file;
 	struct options {
@@ -54,7 +59,7 @@ struct tgf_repl_evaluator {
 	void set_repl(repl<tgf_repl_evaluator>& r_);
 	void reprompt();
 
-	int eval(const sp_node_type& n);
+	int eval(const traverser_t& n);
 	int eval(const std::string& src);
 
 	void parse(const char* input, size_t size);
@@ -65,18 +70,18 @@ struct tgf_repl_evaluator {
 	void reload();
 	void reload(const std::string& new_tgf_file);
 
-	void get_cmd(const sp_node_type& n);
-	void set_cmd(const sp_node_type& n);
-	void update_bool_opt_cmd(const sp_node_type& n,
+	void get_cmd(const traverser_t& n);
+	void set_cmd(const traverser_t& n);
+	void update_bool_opt_cmd(const traverser_t& n,
 		const std::function<bool(bool&)>& update_fn);
 
 	std::ostream& pretty_print(std::ostream& os,
 		const parser_type::psptree& n, std::set<size_t> skip,
 		bool nulls, size_t l);
 	repl<tgf_repl_evaluator>* r = 0;
-	std::shared_ptr<nonterminals<char>> nts;
-	std::shared_ptr<grammar<char>> g;
-	std::shared_ptr<parser<char>> p;
+	std::shared_ptr<nonterminals_type> nts;
+	std::shared_ptr<grammar_type> g;
+	std::shared_ptr<parser_type> p;
 	term::colors TC;
 };
 
