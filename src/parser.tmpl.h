@@ -1015,8 +1015,8 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 	std::set<pnode> snodes;
 	size_t last_p = SIZE_MAX;
 	auto check_allowed = [this] (const pnode &cnode) {
-		if(o.auto_disambiguate == false) return false;
-		for (auto &nt : o.nodisambg_list)
+		if(g.opt.auto_disambiguate == false) return false;
+		for (auto &nt : g.opt.nodisambig_list)
 			if (cnode.first.to_std_string() == nt) return false;
 		return true;
 	};

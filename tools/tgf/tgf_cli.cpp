@@ -20,6 +20,7 @@
 #include "tgf_cli.h"
 #include "parser_gen.h"
 #include "parser_term_color_macros.h"
+#include "parser_instance.h"
 
 #define PBOOL(bval) (( bval ) ? "true" : "false")
 
@@ -289,8 +290,8 @@ int tgf_run(int argc, char** argv) {
 			.terminal_type       = "char",
 			.decoder             = cmd.get<string>("decoder"),
 			.encoder             = cmd.get<string>("encoder"),
-			.auto_disambiguate   = cmd.get<bool>("auto-disambiguate"),
-			.nodisambig_list     = nodisambig_list
+			//.auto_disambiguate   = cmd.get<bool>("auto-disambiguate"),
+			//.nodisambig_list     = nodisambig_list
 		});
 	}
 
@@ -457,7 +458,11 @@ void tgf_repl_evaluator::reload() {
 
 size_t get_opt(traverser_t t) {
 	traverser_t bool_opt = t | tgf_repl_parser::bool_option;
-	if (!bool_opt.has_value()) t = bool_opt;
+	if (bool_opt.has_value()) t = bool_opt;
+	else {
+		traverser_t list_opt = t | tgf_repl_parser::list_option;
+		if (list_opt.has_value()) t = list_opt;
+	}
 	return t | get_only_child | get_nonterminal;
 }
 
@@ -466,31 +471,43 @@ void tgf_repl_evaluator::get_cmd(const traverser_t& n) {
 	static auto pbool = [] (bool b) { return b ? "on" : "off"; };
 	static auto pverb = [] (lvl v) {
 		switch (v) {
-		case lvl::INFO_BASIC: return "basic";
-		case lvl::INFO_DETAILED: return "detailed";
+		case lvl::INFO_BASIC:      return "basic";
+		case lvl::INFO_DETAILED:   return "detailed";
 		case lvl::INFO_ROOT_CAUSE: return "root-cause";
 		default: return "unknown";
 		}
 	};
+	static auto plist = [] (const std::set<std::string>& l) {
+		if (l.empty()) return std::string("(empty)");
+		std::stringstream ss;
+		bool first = true;
+		for (auto& s : l) ss << (first ? first = false, "" : ", ") << s;
+		return ss.str();
+	};
 	static std::map<size_t,	std::function<void()>> printers = {
 	{ tgf_repl_parser::debug_opt,   [this]() { cout <<
-		"show debug:      " << pbool(opt.debug) << "\n"; } },
+		"show debug:        " << pbool(opt.debug) << "\n"; } },
 	{ tgf_repl_parser::status_opt,   [this]() { cout <<
-		"show status:     " << pbool(opt.status) << "\n"; } },
+		"show status:       " << pbool(opt.status) << "\n"; } },
 	{ tgf_repl_parser::colors_opt,   [this]() { cout <<
-		"colors:          " << pbool(opt.colors) << "\n"; } },
+		"colors:            " << pbool(opt.colors) << "\n"; } },
 	{ tgf_repl_parser::print_ambiguity_opt, [this]() { cout <<
-		"print-ambiguity: " << pbool(opt.print_ambiguity) << "\n"; } },
+		"print-ambiguity:   " << pbool(opt.print_ambiguity) << "\n"; } },
 	{ tgf_repl_parser::print_graphs_opt, [this]() { cout <<
-		"print-graphs:    " << pbool(opt.print_graphs) << "\n"; } },
+		"print-graphs:      " << pbool(opt.print_graphs) << "\n"; } },
 	{ tgf_repl_parser::print_rules_opt, [this]() { cout <<
-		"print-rules:     " << pbool(opt.tml_rules) << "\n"; } },
+		"print-rules:       " << pbool(opt.tml_rules) << "\n"; } },
 	{ tgf_repl_parser::print_facts_opt, [this]() { cout <<
-		"print-facts:     " << pbool(opt.tml_facts) << "\n"; } },
+		"print-facts:       " << pbool(opt.tml_facts) << "\n"; } },
+	{ tgf_repl_parser::auto_disambiguate_opt, [this]() { cout <<
+		"auto-disambiguate: " << pbool(g->opt.auto_disambiguate) << "\n"; } },
+	{ tgf_repl_parser::nodisambig_list_opt, [this]() { cout <<
+		"nodisambig-list:   " << plist(g->opt.nodisambig_list) << "\n"; } },
 	{ tgf_repl_parser::error_verbosity_opt, [this]() { cout <<
-		"error-verbosity: " << pverb(opt.error_verbosity) << "\n"; } }};
+		"error-verbosity:   " << pverb(opt.error_verbosity) << "\n"; } }};
 	auto option = n | tgf_repl_parser::option;
 	if (!option.has_value()) option = n | tgf_repl_parser::bool_option;
+	if (!option.has_value()) option = n | tgf_repl_parser::list_option;
 	if (!option.has_value()) { for (auto& [_, v] : printers) v(); return; }
 	printers[get_opt(option)]();
 }
@@ -498,7 +515,8 @@ void tgf_repl_evaluator::get_cmd(const traverser_t& n) {
 bool set_bool_value(bool& val, const size_t& vt) {
 	if      (vt == tgf_repl_parser::option_value_true) val = true;
 	else if (vt == tgf_repl_parser::option_value_false) val = false;
-	else cout << "error: invalid bool value\n";
+	else cout << "error: invalid bool value: " << vt << " = " <<
+		parser_instance<tgf_repl_parser>().name(vt) << "\n";
 	return val;
 };
 
@@ -507,10 +525,6 @@ std::string unquote(const string& q) {
 	string u;
 	return iss >> quoted(u), u;
 };
-
-std::string get_string(const traverser_t& n) {
-	return n | get_terminals;
-}
 
 void tgf_repl_evaluator::set_cmd(const traverser_t& n) {
 	auto option = n | tgf_repl_parser::option;
@@ -531,6 +545,15 @@ void tgf_repl_evaluator::set_cmd(const traverser_t& n) {
 		set_bool_value(opt.tml_rules, vt); } },
 	{ tgf_repl_parser::print_facts_opt, [this, &vt]() {
 		set_bool_value(opt.tml_facts, vt); } },
+	{ tgf_repl_parser::auto_disambiguate_opt, [this, &vt]() {
+		set_bool_value(g->opt.auto_disambiguate, vt); } },
+	{ tgf_repl_parser::nodisambig_list_opt, [this, &v]() {
+		g->opt.nodisambig_list.clear();
+		for (const auto& s : (v
+			| tgf_repl_parser::symbol_list
+			|| tgf_repl_parser::symbol).traversers())
+				g->opt.nodisambig_list.insert(s | get_terminals);
+	} },
 	{ tgf_repl_parser::error_verbosity, [this, &v]() {
 		auto vrb = v | tgf_repl_parser::error_verbosity;
 		if (!vrb.has_value()) {
@@ -551,6 +574,33 @@ void tgf_repl_evaluator::set_cmd(const traverser_t& n) {
 	get_cmd(n);
 }
 
+void tgf_repl_evaluator::add_cmd(const traverser_t& n) {
+	auto option = n | tgf_repl_parser::list_option;
+	auto add = [](auto& s, auto& l) { l.insert(s | get_terminals); };
+	static std::map<size_t, std::function<void()>> adders = {
+	{ tgf_repl_parser::nodisambig_list_opt, [this, &n, &add]() {
+		auto v  = n | tgf_repl_parser::symbol_list;
+		for (const auto& s : (v
+			|| tgf_repl_parser::symbol).traversers())
+				add(s, g->opt.nodisambig_list);
+	}}};
+	adders[get_opt(option)]();
+	get_cmd(n);
+}
+
+void tgf_repl_evaluator::del_cmd(const traverser_t& n) {
+	auto option = n | tgf_repl_parser::list_option;
+	auto del = [](auto& s, auto& l) { l.erase(s | get_terminals); };
+	static std::map<size_t,	std::function<void()>> deleters = {
+	{ tgf_repl_parser::nodisambig_list_opt, [this, &n, &del]() {
+		for (const auto& s : (n | tgf_repl_parser::symbol_list
+			|| tgf_repl_parser::symbol).traversers())
+				del(s, g->opt.nodisambig_list);
+	}}};
+	deleters[get_opt(option)]();
+	get_cmd(n);
+}
+
 void tgf_repl_evaluator::update_bool_opt_cmd(
 	const traverser_t& n,
 	const std::function<bool(bool&)>& update_fn)
@@ -558,13 +608,14 @@ void tgf_repl_evaluator::update_bool_opt_cmd(
 	auto option_type = n | tgf_repl_parser::bool_option
 		| get_only_child | get_nonterminal;
 	switch (option_type) {
-	case tgf_repl_parser::debug_opt:           update_fn(opt.debug); break;
-	case tgf_repl_parser::status_opt:          update_fn(opt.status); break;
-	case tgf_repl_parser::colors_opt:   TC.set(update_fn(opt.colors)); break;
-	case tgf_repl_parser::print_ambiguity_opt: update_fn(opt.print_ambiguity); break;
-	case tgf_repl_parser::print_graphs_opt:    update_fn(opt.print_graphs); break;
-	case tgf_repl_parser::print_rules_opt:     update_fn(opt.tml_rules); break;
-	case tgf_repl_parser::print_facts_opt:     update_fn(opt.tml_facts); break;
+	case tgf_repl_parser::debug_opt:             update_fn(opt.debug); break;
+	case tgf_repl_parser::status_opt:            update_fn(opt.status); break;
+	case tgf_repl_parser::colors_opt:     TC.set(update_fn(opt.colors)); break;
+	case tgf_repl_parser::print_ambiguity_opt:   update_fn(opt.print_ambiguity); break;
+	case tgf_repl_parser::print_graphs_opt:      update_fn(opt.print_graphs); break;
+	case tgf_repl_parser::print_rules_opt:       update_fn(opt.tml_rules); break;
+	case tgf_repl_parser::print_facts_opt:       update_fn(opt.tml_facts); break;
+	case tgf_repl_parser::auto_disambiguate_opt: update_fn(g->opt.auto_disambiguate); break;
 	default: cout << ": unknown bool option\n"; break;
 	}
 	get_cmd(n);
@@ -581,11 +632,15 @@ void help(size_t nt = tgf_repl_parser::help_sym) {
 		"  print-graphs           prints parsed graphs               on/off\n"
 		"  print-rules            prints parsed forest as TML rules  on/off\n"
 		"  print-facts            prints parsed forest as TML facts  on/off\n";
+	static const std::string list_options =
+		"  nodisambig-list        list of nodes to keep ambiguous    symbol1, symbol2...\n";
 	static const std::string all_available_options = std::string{} +
-		"Available options:\n" + bool_options +
-		"  error-verbosity        basic/detailed/root-cause\n";
+		"Available options:\n" + bool_options + list_options +
+		"  error-verbosity        parse errors verbosity             basic/detailed/root-cause\n";
 	static const std::string bool_available_options = std::string{} +
 		"Available options:\n" + bool_options;
+	static const std::string list_available_options = std::string{} +
+		"Available options:\n" + list_options;
 	switch (nt) {
 	case tgf_repl_parser::help_sym: cout
 		<< "tgf commands:\n"
@@ -600,6 +655,8 @@ void help(size_t nt = tgf_repl_parser::help_sym) {
 		<< "  toggle                       toggle option's value\n"
 		<< "  enable                       set option's value to on\n"
 		<< "  disable                      set option's value to off\n"
+		<< "  add                          add value to the list\n"
+		<< "  delete                       remove value from the list\n"
 		<< "\n"
 		<< "grammar commands:\n"
 		<< "  grammar or n                 show TGF grammar\n"
@@ -641,17 +698,30 @@ void help(size_t nt = tgf_repl_parser::help_sym) {
 		break;
 	case tgf_repl_parser::enable_sym: cout
 		<< "command: enable <option>\n"
-		<< "short: en, on, or +\n"
+		<< "short: en\n"
 		<< "\tsets the value of the given option to on\n"
 		<< "\n"
 		<< bool_available_options;
 		break;
 	case tgf_repl_parser::disable_sym: cout
 		<< "command: disable <option>\n"
-		<< "short: dis, off, or -\n"
+		<< "short: dis\n"
 		<< "\tsets the value of the given option to off\n"
 		<< "\n"
 		<< bool_available_options;
+		break;
+	case tgf_repl_parser::add_sym: cout
+		<< "command: add <option> <value>\n"
+		<< "\tadds the value to the given option list\n"
+		<< "\n"
+		<< list_available_options;
+		break;
+	case tgf_repl_parser::del_sym: cout
+		<< "command: delete <option> <value>\n"
+		<< "or: del, remove, rem or rm\n"
+		<< "\tremoves the value from the given option list\n"
+		<< "\n"
+		<< list_available_options;
 		break;
 	case tgf_repl_parser::file_sym: cout
 		<< "command: file \"TGF filepath\"\n"
@@ -683,7 +753,7 @@ void help(size_t nt = tgf_repl_parser::help_sym) {
 		break;
 	case tgf_repl_parser::parse_sym: cout
 		<< "command: parse <input>\n"
-		<< "or just: <input>\n"
+		<< "short: p\n"
 		<< "\tparse the given input\n";
 		break;
 	}
@@ -708,11 +778,13 @@ int tgf_repl_evaluator::eval(const traverser_t& s) {
 		update_bool_opt_cmd(s, [](bool& b){ return b = true; }); break;
 	case tgf_repl_parser::disable:
 		update_bool_opt_cmd(s, [](bool& b){ return b = false; }); break;
+	case tgf_repl_parser::add:           add_cmd(s); break;
+	case tgf_repl_parser::del:           del_cmd(s); break;
 	case tgf_repl_parser::quit: return cout << "Quit.\n", 1;
 	case tgf_repl_parser::reload_cmd: reload(); break;
 	case tgf_repl_parser::file_cmd: {
 		auto n = s | tgf_repl_parser::filename;
-		auto filename = unquote(get_string(n.value()));
+		auto filename = unquote(n | get_terminals);
 		DBG(assert(filename.size());)
 		reload(filename);
 		break;
@@ -720,7 +792,7 @@ int tgf_repl_evaluator::eval(const traverser_t& s) {
 	case tgf_repl_parser::start_cmd: {
 		auto n = s | tgf_repl_parser::symbol;
 		string start;
-		if (n.has_value() && (start = get_string(n.value())).size())
+		if (n.has_value() && (start = n | get_terminals).size())
 			cout << "start symbol set: " << TC_NT
 				<< (opt.start = start) << TC_DEFAULT << "\n";
 		else
@@ -730,8 +802,8 @@ int tgf_repl_evaluator::eval(const traverser_t& s) {
 	}
 	case tgf_repl_parser::internal_grammar_cmd: {
 		auto n = s | tgf_repl_parser::symbol;
-		std::string start = n.has_value() ? get_string(n.value())
-			: opt.start;
+		std::string start = n.has_value() ? n | get_terminals
+							: opt.start;
 		g->print_internal_grammar_for(cout
 			<< "\ninternal grammar for symbol "
 		 	<< TC_NT << start << TC_DEFAULT << ":\n",
@@ -751,7 +823,7 @@ int tgf_repl_evaluator::eval(const traverser_t& s) {
 	}
 	case tgf_repl_parser::unreachable_cmd: {
 		auto n = s | tgf_repl_parser::symbol;
-		std::string start = n.has_value() ? get_string(n.value())
+		std::string start = n.has_value() ? n | get_terminals
 							: opt.start;
 		auto unreachable = g->unreachable_productions(g->nt(start));
 		if (unreachable.size()) {
@@ -765,8 +837,7 @@ int tgf_repl_evaluator::eval(const traverser_t& s) {
 		break;
 	}
 	case tgf_repl_parser::parse_cmd: {
-		auto input = get_string((s | tgf_repl_parser::parse_input)
-			.value());
+		auto input = s | tgf_repl_parser::parse_input | get_terminals;
 		parse(input.c_str(), input.size());
 		break;
 	}

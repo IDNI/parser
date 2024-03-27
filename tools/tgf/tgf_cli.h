@@ -72,6 +72,8 @@ struct tgf_repl_evaluator {
 
 	void get_cmd(const traverser_t& n);
 	void set_cmd(const traverser_t& n);
+	void add_cmd(const traverser_t& n);
+	void del_cmd(const traverser_t& n);
 	void update_bool_opt_cmd(const traverser_t& n,
 		const std::function<bool(bool&)>& update_fn);
 

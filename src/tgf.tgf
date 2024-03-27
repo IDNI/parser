@@ -1,16 +1,34 @@
-@use_char_class eof, alnum, alpha, space, printable.
+@use char class eof, alnum, alpha, space, printable.
 
 # TGF grammar
 start                  => (_ statement)* _.
 statement              => directive | production.
 start_statement	       => _ statement _.
 
-# directive
-directive              => "@use_char_class" __ directive_params _ '.'.
-directive_params       => directive_param (_ ',' _ directive_param)*.
-directive_param        => "eof"   | "alnum" | "alpha" | "blank"
-			| "cntrl" | "digit" | "graph" | "lower" | "printable"
-			| "punct" | "space" | "upper" | "xdigit".
+directive              => '@' (use_directive | boolean_directive
+                                             | nodisambig_directive).
+
+use_directive          => "use" __ use_from __ use_param (_ ',' _ use_param)* _ '.'.
+# TODO keep "@use_char_class" for backward compatibility (consider to remove)
+use_directive          => "use_char_class"  __ use_param (_ ',' _ use_param)* _ '.'.
+use_from               => use_from_char_class.
+use_from_char_class    => "cc" | "ccfn" | "cc_fn" | "char" __ "class".
+use_param              => char_class_name.
+char_class_name        => "eof"   | "alnum" | "alpha" | "blank"
+                        | "cntrl" | "digit" | "graph" | "lower" | "printable"
+                        | "punct" | "space" | "upper" | "xdigit".
+
+boolean_directive      => [ boolean_action __ ] boolean_directive_name.
+boolean_directive_name => disambiguation_sym.
+boolean_action         => enable_sym | disable_sym.
+enable_sym             => "enable".
+disable_sym            => "disable".
+disambiguation_sym     => [ "auto" [ '-' ] ] (
+                              "disambiguation" | "disambiguate" | "disambig").
+
+nodisambig_directive   => nodisambig_sym _ sym (_ ',' _ sym)* '.'.
+nodisambig_sym         => ("no" [n] | "dont") [ '-' | '_' ]
+                          "disamb" [ "ig" [ "uate" ] ] [ ('-' | '_') "list" ].
 
 # production
 production             => sym _ "=>" _ expr1 _ '.'.

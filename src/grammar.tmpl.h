@@ -478,9 +478,14 @@ char_class_fns<T> predefined_char_classes(
 }
 //-----------------------------------------------------------------------------
 template <typename C, typename T>
+grammar<C, T>::grammar(nonterminals<C, T>& nts,
+	typename grammar<C, T>::options opt)
+	: opt(opt), nts(nts), start(nts.get("start")) { }
+template <typename C, typename T>
 grammar<C, T>::grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
-	const prods<C, T>& start, const char_class_fns<T>& cc_fns)
-	: nts(nts), start(start.to_lit()), cc_fns(cc_fns)
+	const prods<C, T>& start, const char_class_fns<T>& cc_fns,
+	typename grammar<C, T>::options opt)
+	: opt(opt), nts(nts), start(start.to_lit()), cc_fns(cc_fns)
 {
 	size_t neg_id = 0;
 	// load prods

@@ -1,4 +1,4 @@
-@use_char_class eof, alnum, alpha, space, printable.
+@use char class eof, alnum, alpha, space, printable.
 
 # TGF grammar
 start                  => _ [ statement (_ '.' _ statement)* [_ '.'] _ ].
@@ -13,7 +13,7 @@ unescaped_s            => printable & ~( '"' | '\\' ).
 escaped_s              => '\\' ('"' | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't').
 
 filename               => quoted_string.
-symbol                 => (alnum | '_')+.
+symbol                 => (alpha | '_') (alnum | '_')*.
 
 parse_input_char       => printable | '\t'.
 parse_input            => parse_input_char*.
@@ -23,10 +23,10 @@ statement              => grammar_cmd | internal_grammar_cmd | start_cmd
                         | unreachable_cmd
                         | reload_cmd | file_cmd
                         | help | version | quit
-                        | get | set | toggle | enable | disable.
+                        | get | set | toggle | enable | disable | add | del.
 statement              => parse_cmd.
 
-parse_cmd              => parse_input.
+parse_cmd              => parse_sym __ parse_input.
 grammar_cmd            => grammar_sym. # [ __ symbol ].
 internal_grammar_cmd   => internal_grammar_sym [ __ symbol ].
 start_cmd              => start_sym [ __ symbol ].
@@ -36,6 +36,8 @@ file_cmd               => file_sym __ filename.
 help                   => help_sym [ __ cmd_symbol ].
 version                => version_sym.
 quit                   => quit_sym.
+add                    => add_sym    __ list_option __ symbol_list.
+del                    => del_sym    __ list_option __ symbol_list.
 get                    => get_sym  [ __ option ].
 set                    => set_sym    __ option (__ | _ '=' _) option_value.
 toggle                 => toggle_sym __ bool_option.
@@ -59,21 +61,24 @@ quit_sym               => "q" | "quit" | "e" | "exit".
 get_sym                => "get".
 set_sym                => "set".
 toggle_sym             => "tog" | "toggle".
-enable_sym             => "+" | "en"  __ | "on"  __ | "enable"  __.
-disable_sym            => "-" | "dis" __ | "off" __ | "disable" __.
+add_sym                => "add".
+del_sym                => "del" | "delete" | "rm" | "rem" | "remove".
+enable_sym             => "en"  __ | "enable"  __.
+disable_sym            => "dis" __ |"disable" __.
 
 cmd_symbol             => grammar_sym | internal_grammar_sym | unreachable_sym
 			| start_sym | parse_sym
 			| reload_sym | file_sym
                         | help_sym | quit_sym
-                        | get_sym | set_sym
+                        | get_sym | set_sym | add_sym | del_sym
                         | toggle_sym | enable_sym | disable_sym.
 
 # options
-option                 => bool_option | error_verbosity_opt.
+option                 => bool_option | error_verbosity_opt | list_option.
 bool_option            => status_opt | colors_opt | print_ambiguity_opt
                         | print_graphs_opt | print_rules_opt | print_facts_opt
-                        | debug_opt.
+                        | debug_opt | auto_disambiguate_opt.
+list_option            => nodisambig_list_opt.
 
 # option name symbols
 debug_opt              => "d" | "debug".
@@ -83,11 +88,14 @@ print_ambiguity_opt    => "a" | "ambiguity" | "print-ambiguity".
 print_graphs_opt       => "g" | "graphs" | "print-graphs".
 print_rules_opt        => "r" | "rules" | "print-rules".
 print_facts_opt        => "f" | "facts" | "print-facts".
+auto_disambiguate_opt  => "ad" | "auto-disambiguate".
 error_verbosity_opt    => "e" | "error-verbosity".
+nodisambig_list_opt    => "nd" | "ndl" | "nodisambig-list".
 
 # option values symbols
 option_value           => option_value_true | option_value_false
                         | error_verbosity.
+option_value           => symbol_list.
 # boolean option values
 option_value_true      => "t" | "true"  | "on"  | "1" | "y" | "yes".
 option_value_false     => "f" | "false" | "off" | "0" | "n" | "no".
@@ -96,3 +104,5 @@ error_verbosity        => basic_sym | detailed_sym | root_cause_sym.
 basic_sym              => "b" | "basic".
 detailed_sym           => "d" | "detailed".
 root_cause_sym         => "r" | "rc" | "root-cause".
+# symbol list
+symbol_list            => symbol (_ ',' _ symbol)*.

@@ -127,8 +127,8 @@ end:
 int main(int argc, char** argv) {
 	testing::process_args(argc, argv);
 
-	test_options o2{	"test", {}, tgf_commands(), "show", tgf_options() };
-	test_options o{ "test", {}, {}, "", {
+	test_options o2{ "test", {}, tgf_commands(), "repl", tgf_options() };
+	test_options o { "test", {}, {}, "", {
 		{ "bool",   { "bool",   'b', false } },
 		{ "int",    { "int",    'i', -1 } },
 		{ "string", { "string", 's', "" } },
@@ -184,19 +184,21 @@ int main(int argc, char** argv) {
 
 	TEST("commands", "default")
 	o2.args = { "cmd" };
-	run_test(o2, { .status = 0, .cmd_name = "show" });
+	run_test(o2, { .status = 0, .cmd_name = "repl" });
 
 	TEST("commands", "invalid")
 	o2.args = { "cmd", "invalid" };
 	run_test(o2, { .status = 1 });
 
 	TEST("commands", "valid")
-	o2.args = { "cmd", "show" };
-	run_test(o2, { .status = 0, .cmd_name = "show" });
+	o2.args = { "cmd", "grammar" };
+	run_test(o2, { .status = 0, .cmd_name = "grammar" });
 	o2.args = { "cmd", "gen" };
 	run_test(o2, { .status = 0, .cmd_name = "gen" });
 	o2.args = { "cmd", "parse" };
 	run_test(o2, { .status = 0, .cmd_name = "parse" });
+	o2.args = { "cmd", "repl" };
+	run_test(o2, { .status = 0, .cmd_name = "repl" });
 
 	TEST("command options", "gen with default options")
 	o2.args = { "cmd", "gen" };
@@ -215,9 +217,9 @@ int main(int argc, char** argv) {
 	run_test(o2, { .status = 1, .cmd_name = "gen" });
 
 	TEST("command options", "default command with valid option")
-	o2.args = { "cmd", "--grammar" };
-	run_test(o2, { .status = 0, .cmd_name = "show", .cmd_options = {
-		{ "grammar", true }
+	o2.args = { "cmd", "-N" };
+	run_test(o2, { .status = 0, .cmd_name = "repl", .cmd_options = {
+		{ "nullable-ambiguity", true }
 	}});
 
 	TEST("command options", "default command with invalid option")

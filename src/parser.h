@@ -124,9 +124,14 @@ template <typename C = char, typename T = C>
 struct grammar {
 	friend struct grammar_inspector<C, T>;
 	typedef std::pair<lit<C, T>, std::vector<lits<C, T>>> production;
-	grammar(nonterminals<C, T>& nts) : nts(nts) {}
+	struct options {
+		bool auto_disambiguate = true;
+		std::set<std::string> nodisambig_list = {};
+	} opt;
+	grammar(nonterminals<C, T>& nts, options opt = {});
 	grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
-		const prods<C, T>& start, const char_class_fns<T>& cc_fns);
+		const prods<C, T>& start, const char_class_fns<T>& cc_fns,
+		options opt = {});
 	// returns number of productions (every disjunction has a prod rule)
 	size_t size() const;
 	// returns head of the prod rule - literal
@@ -275,8 +280,6 @@ public:
 		size_t gc_lag = 1;
 		decoder_type chars_to_terminals = 0;
 		encoder_type terminals_to_chars = 0;
-		bool auto_disambiguate = true;
-		std::vector<std::string> nodisambg_list = {};
 	};
 	// constructor
 	parser(grammar<C, T>& g, options o = {});

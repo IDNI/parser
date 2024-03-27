@@ -36,8 +36,6 @@ struct parser_gen_options {
 	std::string terminal_type                    = "char";
 	std::string decoder                          = "";
 	std::string encoder                          = "";
-	bool auto_disambiguate                       = true;
-	std::vector<std::string> nodisambig_list     = {};
 };
 
 template <typename C = char, typename T = C>
@@ -129,21 +127,26 @@ void generate_parser_cpp(const std::string& tgf_filename,
 				<< to_std_string(x[fn.first]) << "\",\n";
 		return os.str();
 	};
+	auto gen_grammar_opts = [&g]() {
+		std::stringstream os;
+		os << "\t\to.auto_disambiguate = " << (g.opt.auto_disambiguate
+			? "true" : "false") << ";\n";
+		if (g.opt.nodisambig_list.size()) {
+			os << "\t\to.nodisambig_list = {";
+			size_t i = 0;
+			for (const auto& s : g.opt.nodisambig_list)
+				os << (i++ ? ", " : "") << "\n\t\t\t\""
+					<< s << "\"";
+			os << "\n\t\t};\n";
+		}
+		return os.str();
+	};
 	auto gen_opts = [&opt]() {
 		std::stringstream os;
 		if (opt.decoder.size()) os << "\t\to.chars_to_terminals = "
 			<< opt.decoder << ";\n";
 		if (opt.encoder.size()) os << "\t\to.terminals_to_chars = "
 			<< opt.encoder << ";\n";
-		os << "\t\to.auto_disambiguate = " << (opt.auto_disambiguate
-			? "true" : "false") << ";\n";
-		if (opt.nodisambig_list.size()) {
-			os << "\t\to.nodisambig_list = {";
-			for (size_t i = 0; i != opt.nodisambig_list.size(); ++i)
-				os << (i ? ", " : "") << "\n\t\t\t\""
-					<< opt.nodisambig_list[i] << "\"";
-			os << "\n\t\t};\n";
-		}
 		return os.str();
 	};
 	auto gen_prods = [&g, &gi, &ts]() {
@@ -191,30 +194,33 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		"\n";
 	if (opt.ns.size()) os << "namespace " <<opt.ns<< " {\n\n";
 	os <<	"struct " <<opt.name<< " {\n"
-		"	using char_type     = "<<opt.char_type<<";\n"
-		"	using terminal_type = "<<opt.terminal_type<<";\n"
-		"	using traits_type   = std::char_traits<char_type>;\n"
-		"	using int_type      = typename traits_type::int_type;\n"
-		"	using symbol_type   ="
+		"	using char_type       = "<<opt.char_type<<";\n"
+		"	using terminal_type   = "<<opt.terminal_type<<";\n"
+		"	using traits_type     = std::char_traits<char_type>;\n"
+		"	using int_type        = typename traits_type::int_type;\n"
+		"	using grammar_type    = idni::grammar<char_type, terminal_type>;\n"
+		"	using grammar_options = grammar_type::options;\n"
+		"	using symbol_type     ="
 				" idni::lit<char_type, terminal_type>;\n"
-		"	using location_type = std::array<size_t, 2>;\n"
-		"	using node_type     ="
+		"	using location_type   = std::array<size_t, 2>;\n"
+		"	using node_type       ="
 				" std::pair<symbol_type, location_type>;\n"
-		"	using parser_type   ="
+		"	using parser_type     ="
 				" idni::parser<char_type, terminal_type>;\n"
-		"	using options       = parser_type::options;\n"
-		"	using parse_options = parser_type::parse_options;\n"
-		"	using forest_type   = parser_type::pforest;\n"
-		"	using input_type    = parser_type::input;\n"
-		"	using decoder_type  ="
+		"	using options         = parser_type::options;\n"
+		"	using parse_options   = parser_type::parse_options;\n"
+		"	using forest_type     = parser_type::pforest;\n"
+		"	using input_type      = parser_type::input;\n"
+		"	using decoder_type    ="
 				" parser_type::input::decoder_type;\n"
-		"	using encoder_type  = "
+		"	using encoder_type    = "
 				"std::function<std::basic_string<char_type>(\n"
 		"			const std::vector<terminal_type>&)>;\n"
 		"	" <<opt.name<< "() :\n"
 		"		nts(load_nonterminals()), cc(load_cc()),\n"
 		"		g(nts, load_prods(), nt(" <<gi.start().n()<<
-				"), cc), p(g, load_opts()) {}\n"
+				"), cc, load_grammar_opts()),\n"
+		"		p(g, load_opts()) {}\n"
 		"	std::unique_ptr<forest_type> parse(const char_type* data, size_t size,\n"
 		"		parse_options po = {}) { return p.parse(data, size, po); }\n"
 		"	std::unique_ptr<forest_type> parse(std::basic_istream<char_type>& is,\n"
@@ -262,6 +268,11 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		"		return idni::predefined_char_classes<char_type, terminal_type>({\n" <<
 					gen_cc_fns() <<
 		"		}, nts);\n"
+		"	}\n"
+		"	grammar_type::options load_grammar_opts() {\n"
+		"		grammar_type::options o;\n" <<
+					gen_grammar_opts() <<
+		"		return o;\n"
 		"	}\n"
 		"	options load_opts() {\n"
 		"		options o;\n" <<

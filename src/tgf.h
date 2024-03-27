@@ -27,9 +27,13 @@ struct tgf {
 		prods<C, T> ps{}, nul{ lit<C, T>{} };
 		lit<C, T> p_head{};
 		std::vector<prods<C, T>> p{};
-		std::vector<std::string> cc_names{};
+		std::set<std::string> cc_names{};
 		bool head = true;       // first sym in rule is head
 		bool in_directive = false;
+		bool in_boolean_directive = false;
+		bool in_nodisambig_directive = false;
+		bool boolean_directive_enable = true;
+		grammar<C, T>::options gopts;
 		nonterminals<C, T>& nts;
 		char_class_fns<C> cc;
 		builder(nonterminals<C, T>& nts) : nts(nts) {}
@@ -56,7 +60,10 @@ struct tgf {
 			//DBG(std::cout << "add_terminals: " << to_std_string(s) << std::endl;)
 			for (const auto& ch : s) add_terminal(ch);
 		}
-		void directive() { in_directive = false; }
+		void directive() {
+			in_directive = in_boolean_directive =
+				in_nodisambig_directive = false;
+		}
 		void push() {
 			//DBG(std::cout << "push" << "\n";)
 			p.push_back({});
@@ -67,7 +74,9 @@ struct tgf {
 		}
 		void new_production() {
 			if (cc_names.size()) cc =
-				predefined_char_classes(cc_names, nts),
+				predefined_char_classes(std::vector<
+					std::string>(cc_names.begin(),
+						cc_names.end()), nts),
 				cc_names.clear();
 		}
 		void disjunction() {
@@ -145,9 +154,29 @@ struct tgf {
 				if (s == tgf_parser::sym) add_nonterminal(from_str<C>(
 					terminals_to_str<C, T>(*f, n)));
 				else if (s == tgf_parser::directive) in_directive = true;
-				else if (s == tgf_parser::directive_param)
-					cc_names.push_back(to_std_string(from_str<C>(
-						terminals_to_str<C, T>(*f, n))));
+				else if (s == tgf_parser::nodisambig_directive)
+					in_nodisambig_directive = true;
+				else if (s == tgf_parser::sym) {
+					if (in_nodisambig_directive)
+						gopts.nodisambig_list.insert(
+							to_std_string(from_str<C>(
+								terminals_to_str<C, T>(*f, n))));
+				}
+				else if (s == tgf_parser::boolean_directive)
+					boolean_directive_enable =
+						in_boolean_directive = true;
+				else if (s == tgf_parser::disable_sym) {
+					if (in_boolean_directive)
+						boolean_directive_enable = false;
+				}
+				else if (s == tgf_parser::disambiguation_sym)
+					gopts.auto_disambiguate =
+						boolean_directive_enable;
+				else if (s == tgf_parser::char_class_name) {
+					auto name = to_std_string(from_str<C>(
+						terminals_to_str<C, T>(*f, n)));
+					cc_names.insert(name);
+				}
 				else if (s == tgf_parser::literals) push();
 				else if (s == tgf_parser::group
 					|| s == tgf_parser::optional
@@ -199,7 +228,7 @@ struct tgf {
 			if (!found) {
 				std::cerr << "There is an error in the grammar."
 				" Cannot recognize TGF.\n" << p.get_error().to_str(
-					parser<C, T>::error::info_lvl::INFO_DETAILED);
+					parser<C, T>::error::info_lvl::INFO_ROOT_CAUSE);
 				//parser<C, T>::error::info_lvl::INFO_DETAILED);
 				//DBG(p.p.print_data(std::cout << "PARSER DATA:\n") << "\n";)
 				//DBG(p.g.print_internal_grammar(std::cout << "TGF productions:\n") << std::endl;)
@@ -279,8 +308,12 @@ struct tgf {
 		grammar<C, T> g(const std::basic_string<C>& start_nt =
 							from_cstr<C>("start"))
 		{
+			if (cc_names.size())
+				cc = predefined_char_classes(std::vector<
+					std::string>(cc_names.begin(),
+						cc_names.end()), nts);
 			return grammar<C, T>(
-				nts, ps, prods<C, T>(nt(start_nt)), cc);
+				nts, ps, prods<C, T>(nt(start_nt)), cc, gopts);
 		}
 	};
 	static grammar<C, T> from_string(nonterminals<C, T>& nts_,
