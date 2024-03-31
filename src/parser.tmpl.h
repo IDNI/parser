@@ -427,7 +427,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
 #endif
 template <typename C, typename T>
 std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
-	int_t start)
+	size_t start)
 {
 	MS(emeasure_time_start(tsr, ter);)
 	//DBGP(std::cout << "parse: `" << to_std_string(s) << "`[" << len <<
@@ -441,8 +441,8 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
 	MS(int gcnt = 0;) // count of collected items
 	tid = 0;
 	S.resize(1);
-	lit<C, T> start_lit = start!=-1 ? g.nt(start)
-					: g.start_literal();
+	lit<C, T> start_lit = start != SIZE_MAX ? g.nt(start)
+						: g.start_literal();
 	container_t t, c;
 	for (size_t p : g.prod_ids_of_literal(start_lit))
 		for (size_t c = 0; c != g.n_conjs(p); ++c)
@@ -593,10 +593,10 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
 	return f;
 }
 template <typename C, typename T>
-bool parser<C, T>::found(int_t start) {
+bool parser<C, T>::found(size_t start) {
 	//DBGP(print(std::cout << "Slast:\n", S[in->tpos()]) << std::endl;)
 	bool f = false;
-	for (size_t n : g.prod_ids_of_literal(start != -1 ? g.nt(start)
+	for (size_t n : g.prod_ids_of_literal(start != SIZE_MAX ? g.nt(start)
 							: g.start_literal()))
 	{
 		f = true;

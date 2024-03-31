@@ -30,7 +30,7 @@ parser_t& parser_instance() {
 #ifdef SHOW_GRAMMAR_ERRORS
 template <typename parser_t>
 void check_parser_result(const std::string& source,
-	const typename parser_t::forest_type* f, int start = -1)
+	const typename parser_t::forest_type* f, size_t start = SIZE_MAX)
 {
 	auto& p = parser_instance<parser_t>();
 	if (!f || !p.found(start))

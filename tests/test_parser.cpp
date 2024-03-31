@@ -159,7 +159,7 @@ int main(int argc, char **argv)
 	//o.start = nt.get("alnum");
 	//run_test<char>(ps, nt, start, "x", cc, o);  // 11
 	//run_test<char>(ps, nt, start, "1", cc, o);  // 12
-	o.start = -1;
+	o.start = SIZE_MAX;
 	ps.clear();
 
 

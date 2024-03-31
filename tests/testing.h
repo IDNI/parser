@@ -26,7 +26,7 @@ struct test_options {
 	std::string error_expected = "";
 	bool dump = false;
 	bool ambiguity_fails = true;
-	int_t start = -1;
+	size_t start = SIZE_MAX;
 };
 
 template <typename T = char>

@@ -418,27 +418,21 @@ void tgf_repl_evaluator::parsed(unique_ptr<parser_type::pforest> f) {
 
 void tgf_repl_evaluator::parse(const char* input, size_t size) {
 	//cout << "parsing: " << input << "\n";
-	parser_type::parse_options po{
-		.start = static_cast<int>(nts->get(opt.start))
-	};
+	parser_type::parse_options po{ .start = nts->get(opt.start) };
 	auto f = p->parse(input, size, po);
 	if (p->found(po.start)) parsed(std::move(f));
 	else cout << p->get_error().to_str(opt.error_verbosity) << endl;
 }
 
 void tgf_repl_evaluator::parse(istream& instream) {
-	parser_type::parse_options po{
-		.start = static_cast<int>(nts->get(opt.start))
-	};
+	parser_type::parse_options po{ .start = nts->get(opt.start) };
 	auto f = p->parse(instream, po);
 	if (p->found(po.start)) parsed(std::move(f));
 	else cout << p->get_error().to_str(opt.error_verbosity) << endl;
 }
 
 void tgf_repl_evaluator::parse(const string& infile) {
-	parser_type::parse_options po{
-		.start = static_cast<int>(nts->get(opt.start))
-	};
+	parser_type::parse_options po{ .start = nts->get(opt.start) };
 	auto f = p->parse(infile, po);
 	if (p->found(po.start)) parsed(std::move(f));
 	else cout << p->get_error().to_str(opt.error_verbosity) << endl;

@@ -287,7 +287,7 @@ public:
 	// parse options for parse() call
 	struct parse_options {
 		size_t max_length = 0; // read up to max length of the input size
-		int_t start = -1; // start non-terminal, -1 if default
+		size_t start = SIZE_MAX; // start non-terminal, SIZE_MAX = use default
 		C eof = std::char_traits<C>::eof(); // end of a stream
 	};
 	// parse call
@@ -301,7 +301,7 @@ public:
 	std::unique_ptr<pforest> parse(int filedescriptor,
 		parse_options po = {});
 #endif
-	bool found(int_t start = -1);
+	bool found(size_t start = SIZE_MAX);
 	std::basic_string<C> get_input();
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
 	typedef std::set<item> container_t;
@@ -397,7 +397,7 @@ private:
 	bool binarize_comb(const item&, std::set<std::vector<pnode>>&);
 	void sbl_chd_forest(const item&,
 		std::vector<pnode>&, size_t, std::set<std::vector<pnode>>&);
-	std::unique_ptr<pforest> _parse(int_t start = -1);
+	std::unique_ptr<pforest> _parse(size_t start = SIZE_MAX);
 #ifdef DEBUG
 	template <typename CharU>
 	friend std::ostream& operator<<(std::ostream& os, lit<C, T>& l);
