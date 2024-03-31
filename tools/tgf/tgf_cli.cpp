@@ -396,23 +396,20 @@ void tgf_repl_evaluator::parsed(unique_ptr<parser_type::pforest> f) {
 		ss << "\n";
 		cout << ss.str(), ss = {};
 	}
-	struct {
-		bool graphs, facts, rules, terminals;
-	} print(opt.print_graphs, opt.tml_facts, opt.tml_rules, true);
-	if (print.terminals) ss << "parsed terminals: "
+	if (opt.print_terminals) ss << "parsed terminals: "
 		<< TC_T << terminals_to_str(*f, f->root()) << TC_CLEARED_DEFAULT
 		<< "\n";
-	auto cb_next_g = [&f, &print, &ss, this](parser_type::pgraph& g) {
+	auto cb_next_g = [&f, &ss, this](parser_type::pgraph& g) {
 		f->remove_binarization(g);
 		f->remove_recursive_nodes(g);
-		if (print.graphs) pretty_print(ss << "parsed graph:\n",
+		if (opt.print_graphs) pretty_print(ss << "parsed graph:\n",
 			g.extract_trees(), {}, false, 1);
-		if (print.rules)  to_tml_rules<char, char, parser_type::pgraph>(
+		if (opt.tml_rules)  to_tml_rules<char, char, parser_type::pgraph>(
 			ss << "TML rules:\n", g), ss << "\n";
 		return true;
 	};
 	f->extract_graphs(f->root(), cb_next_g);
-	if (print.facts) to_tml_facts<char, char>(ss << "TML facts:\n", *f);
+	if (opt.tml_facts) to_tml_facts<char, char>(ss << "TML facts:\n", *f);
 	cout << ss.str();
 }
 
@@ -485,10 +482,12 @@ void tgf_repl_evaluator::get_cmd(const traverser_t& n) {
 		"show status:       " << pbool(opt.status) << "\n"; } },
 	{ tgf_repl_parser::colors_opt,   [this]() { cout <<
 		"colors:            " << pbool(opt.colors) << "\n"; } },
-	{ tgf_repl_parser::print_ambiguity_opt, [this]() { cout <<
-		"print-ambiguity:   " << pbool(opt.print_ambiguity) << "\n"; } },
+	{ tgf_repl_parser::print_terminals_opt, [this]() { cout <<
+		"print-terminals:   " << pbool(opt.print_terminals) << "\n"; } },
 	{ tgf_repl_parser::print_graphs_opt, [this]() { cout <<
 		"print-graphs:      " << pbool(opt.print_graphs) << "\n"; } },
+	{ tgf_repl_parser::print_ambiguity_opt, [this]() { cout <<
+		"print-ambiguity:   " << pbool(opt.print_ambiguity) << "\n"; } },
 	{ tgf_repl_parser::print_rules_opt, [this]() { cout <<
 		"print-rules:       " << pbool(opt.tml_rules) << "\n"; } },
 	{ tgf_repl_parser::print_facts_opt, [this]() { cout <<
@@ -531,10 +530,12 @@ void tgf_repl_evaluator::set_cmd(const traverser_t& n) {
 		set_bool_value(opt.status, vt); } },
 	{ tgf_repl_parser::colors_opt,          [this, &vt]() {
 		TC.set(set_bool_value(opt.colors, vt)); } },
-	{ tgf_repl_parser::print_ambiguity_opt, [this, &vt]() {
-		set_bool_value(opt.print_ambiguity, vt); } },
+	{ tgf_repl_parser::print_terminals_opt, [this, &vt]() {
+		set_bool_value(opt.print_terminals, vt); } },
 	{ tgf_repl_parser::print_graphs_opt, [this, &vt]() {
 		set_bool_value(opt.print_graphs, vt); } },
+	{ tgf_repl_parser::print_ambiguity_opt, [this, &vt]() {
+		set_bool_value(opt.print_ambiguity, vt); } },
 	{ tgf_repl_parser::print_rules_opt, [this, &vt]() {
 		set_bool_value(opt.tml_rules, vt); } },
 	{ tgf_repl_parser::print_facts_opt, [this, &vt]() {
@@ -605,8 +606,9 @@ void tgf_repl_evaluator::update_bool_opt_cmd(
 	case tgf_repl_parser::debug_opt:             update_fn(opt.debug); break;
 	case tgf_repl_parser::status_opt:            update_fn(opt.status); break;
 	case tgf_repl_parser::colors_opt:     TC.set(update_fn(opt.colors)); break;
-	case tgf_repl_parser::print_ambiguity_opt:   update_fn(opt.print_ambiguity); break;
+	case tgf_repl_parser::print_terminals_opt:   update_fn(opt.print_terminals); break;
 	case tgf_repl_parser::print_graphs_opt:      update_fn(opt.print_graphs); break;
+	case tgf_repl_parser::print_ambiguity_opt:   update_fn(opt.print_ambiguity); break;
 	case tgf_repl_parser::print_rules_opt:       update_fn(opt.tml_rules); break;
 	case tgf_repl_parser::print_facts_opt:       update_fn(opt.tml_facts); break;
 	case tgf_repl_parser::auto_disambiguate_opt: update_fn(g->opt.auto_disambiguate); break;
@@ -623,6 +625,7 @@ void help(size_t nt = tgf_repl_parser::help_sym) {
 		"  status                 show status                        on/off\n"
 		"  colors                 use term colors                    on/off\n"
 		"  print-ambiguity        prints ambiguous nodes             on/off\n"
+		"  print-terminals        prints parsed terminals            on/off\n"
 		"  print-graphs           prints parsed graphs               on/off\n"
 		"  print-rules            prints parsed forest as TML rules  on/off\n"
 		"  print-facts            prints parsed forest as TML facts  on/off\n";

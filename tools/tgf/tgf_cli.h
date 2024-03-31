@@ -43,8 +43,9 @@ struct tgf_repl_evaluator {
 	struct options {
 		bool status          = true;
 		bool colors          = true;
-		bool print_ambiguity = true;
+		bool print_terminals = true;
 		bool print_graphs    = true;
+		bool print_ambiguity = true;
 		bool tml_rules       = false;
 		bool tml_facts       = false;
 		std::string start{"start"};
