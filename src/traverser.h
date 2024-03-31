@@ -16,6 +16,8 @@
 #include "parser.h"
 #include "rewriting.h"
 
+namespace idni {
+
 template <typename node_variant_t, typename parser_t>
 struct traverser;
 
@@ -47,7 +49,7 @@ struct traverser {
 	const std::vector<node_t>& values() const { return values_; }
 	std::vector<traverser<node_variant_t, parser_t>> traversers() const {
 		std::vector<traverser<node_variant_t, parser_t>> tv;
-		for (const auto& v : values_) tv.push_back(traverser(v));
+		for (const auto& v : values_) tv.emplace_back(v);
 		return tv;
 	}
 	std::vector<traverser<node_variant_t, parser_t>> operator()() const {
@@ -171,4 +173,5 @@ const auto nonterminal_extractor = extractor<node_variant_t, parser_t,
 		return none;
 	});
 
+} // idni namespace
 #endif // __IDNI__PARSER__TRAVERSER_H__
