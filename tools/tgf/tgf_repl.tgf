@@ -19,20 +19,20 @@ parse_input_char       => printable | '\t'.
 parse_input            => parse_input_char*.
 
 # statement
-statement              => grammar_cmd | internal_grammar_cmd | start_cmd
-                        | unreachable_cmd
-                        | reload_cmd | file_cmd
+statement              => grammar_cmd | internal_grammar_cmd | unreachable_cmd
+                        | reload_cmd | load_cmd | start_cmd
                         | help | version | quit
-                        | get | set | toggle | enable | disable | add | del.
-statement              => parse_cmd.
+                        | get | set | toggle | enable | disable | add | del
+                        | parse_file_cmd | parse_cmd.
 
 parse_cmd              => parse_sym __ parse_input.
+parse_file_cmd         => parse_file_sym __ filename.
 grammar_cmd            => grammar_sym. # [ __ symbol ].
 internal_grammar_cmd   => internal_grammar_sym [ __ symbol ].
 start_cmd              => start_sym [ __ symbol ].
 unreachable_cmd        => unreachable_sym [ __ symbol ].
 reload_cmd             => reload_sym.
-file_cmd               => file_sym __ filename.
+load_cmd               => load_sym __ filename.
 help                   => help_sym [ __ cmd_symbol ].
 version                => version_sym.
 quit                   => quit_sym.
@@ -52,9 +52,10 @@ grammar_sym            => "g" | "grammar".
 internal_grammar_sym   => "i" | "ig" | "internal-grammar".
 unreachable_sym        => "u" | "unreachable".
 parse_sym              => "p" | "parse".
+parse_file_sym         => "f" | "pf" | "parse file".
 start_sym              => "s" | "start".
 reload_sym             => "r" | "reload".
-file_sym               => "f" | "file".
+load_sym               => "l" | "load".
 help_sym               => "h" | "help".
 version_sym            => "v" | "version".
 quit_sym               => "q" | "quit" | "e" | "exit".
@@ -64,12 +65,12 @@ toggle_sym             => "tog" | "toggle".
 add_sym                => "add".
 del_sym                => "del" | "delete" | "rm" | "rem" | "remove".
 enable_sym             => "en"  __ | "enable"  __.
-disable_sym            => "dis" __ |"disable" __.
+disable_sym            => "dis" __ | "disable" __.
 
 cmd_symbol             => grammar_sym | internal_grammar_sym | unreachable_sym
-			| start_sym | parse_sym
-			| reload_sym | file_sym
-                        | help_sym | quit_sym
+			| start_sym | parse_sym | parse_file_sym
+			| load_sym | reload_sym
+                        | help_sym | quit_sym | version_sym
                         | get_sym | set_sym | add_sym | del_sym
                         | toggle_sym | enable_sym | disable_sym.
 

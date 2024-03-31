@@ -660,6 +660,7 @@ void help(size_t nt = tgf_repl_parser::help_sym) {
 		<< "\n"
 		<< "parsing commands:\n"
 		<< "  parse                        parse input\n"
+		<< "  parse file or pf or f        parse input file\n"
 		<< "\n";
 		break;
 	case tgf_repl_parser::version_sym: cout
@@ -717,7 +718,7 @@ void help(size_t nt = tgf_repl_parser::help_sym) {
 		<< "\n"
 		<< list_available_options;
 		break;
-	case tgf_repl_parser::file_sym: cout
+	case tgf_repl_parser::load_sym: cout
 		<< "command: file \"TGF filepath\"\n"
 		<< "short: f\n"
 		<< "\tload a TGF file from drive\n";
@@ -750,6 +751,11 @@ void help(size_t nt = tgf_repl_parser::help_sym) {
 		<< "short: p\n"
 		<< "\tparse the given input\n";
 		break;
+	case tgf_repl_parser::parse_file_sym: cout
+		<< "command: parse file \"<input file>\"\n"
+		<< "short: pf or f\n"
+		<< "\tparse the given input file\n";
+		break;
 	}
 }
 
@@ -776,7 +782,7 @@ int tgf_repl_evaluator::eval(const traverser_t& s) {
 	case tgf_repl_parser::del:           del_cmd(s); break;
 	case tgf_repl_parser::quit: return cout << "Quit.\n", 1;
 	case tgf_repl_parser::reload_cmd: reload(); break;
-	case tgf_repl_parser::file_cmd: {
+	case tgf_repl_parser::load_cmd: {
 		auto n = s | tgf_repl_parser::filename;
 		auto filename = unquote(n | get_terminals);
 		DBG(assert(filename.size());)
@@ -833,6 +839,13 @@ int tgf_repl_evaluator::eval(const traverser_t& s) {
 	case tgf_repl_parser::parse_cmd: {
 		auto input = s | tgf_repl_parser::parse_input | get_terminals;
 		parse(input.c_str(), input.size());
+		break;
+	}
+	case tgf_repl_parser::parse_file_cmd: {
+		auto n = s | tgf_repl_parser::filename;
+		auto filename = unquote(n | get_terminals);
+		DBG(assert(filename.size());)
+		parse(filename);
 		break;
 	}
 	default: cout << "error: unknown command\n"; break;
