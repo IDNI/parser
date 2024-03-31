@@ -158,6 +158,8 @@ cli::commands tgf_commands() {
 	OPT(tml_rules);
 	OPT(tml_facts);
 	OPT(error_verbosity);
+	OPT(cli::option("evaluate", 'e', ""));
+		DESC("run repl command with input to evaluate and quit");
 	OPT(cli::option("nullable-ambiguity", 'N', false));
 		DESC("report possible nullable ambiguity");
 	//OPT(char_type);
@@ -267,6 +269,8 @@ int tgf_run(int argc, char** argv) {
 	tgf_repl_evaluator re(tgf_file, tgf_repl_opt);
 
 	if (cmd.name() == "repl") {
+		if (cmd.get<string>("evaluate").size())
+			return re.eval(cmd.get<string>("evaluate"));
 		repl<decltype(re)> r(re, "tgf> ", ".tgf_history");
 		re.set_repl(r);
 		return r.run();
@@ -378,7 +382,7 @@ void tgf_repl_evaluator::set_repl(repl<tgf_repl_evaluator>& r_) {
 void tgf_repl_evaluator::parsed(unique_ptr<parser_type::pforest> f) {
 	auto c = f->count_trees();
 	stringstream ss;
-	if (f->is_ambiguous() && c > 1 && opt.print_ambiguity) {
+	if (opt.print_ambiguity && f->is_ambiguous() && c > 1) {
 		ss << "\nambiguity... number of trees: " << c << "\n\n";
 		for (auto& n : f->ambiguous_nodes()) {
 			ss << "\t `" << n.first.first << "` [" <<
@@ -402,34 +406,48 @@ void tgf_repl_evaluator::parsed(unique_ptr<parser_type::pforest> f) {
 	auto cb_next_g = [&f, &ss, this](parser_type::pgraph& g) {
 		f->remove_binarization(g);
 		f->remove_recursive_nodes(g);
+		auto t = g.extract_trees();
 		if (opt.print_graphs) pretty_print(ss << "parsed graph:\n",
-			g.extract_trees(), {}, false, 1);
-		if (opt.tml_rules)  to_tml_rules<char, char, parser_type::pgraph>(
+			t, {}, false, 1);
+		if (opt.tml_rules) to_tml_rules<char, char, parser_type::pgraph>(
 			ss << "TML rules:\n", g), ss << "\n";
 		return true;
 	};
-	f->extract_graphs(f->root(), cb_next_g);
+	if (opt.print_graphs || opt.tml_rules)
+		f->extract_graphs(f->root(), cb_next_g);
 	if (opt.tml_facts) to_tml_facts<char, char>(ss << "TML facts:\n", *f);
 	cout << ss.str();
 }
 
+tgf_repl_evaluator::parser_type::parse_options
+	tgf_repl_evaluator::get_parse_options() const
+{
+	return parser_type::parse_options{
+		.start = nts->get(opt.start),
+		.measure = opt.measure,
+		.measure_each_pos = opt.measure_each_pos,
+		.measure_forest = opt.measure_forest,
+		.measure_preprocess = opt.measure_preprocess
+	};
+}
+
 void tgf_repl_evaluator::parse(const char* input, size_t size) {
 	//cout << "parsing: " << input << "\n";
-	parser_type::parse_options po{ .start = nts->get(opt.start) };
+	auto po = get_parse_options();
 	auto f = p->parse(input, size, po);
 	if (p->found(po.start)) parsed(std::move(f));
 	else cout << p->get_error().to_str(opt.error_verbosity) << endl;
 }
 
 void tgf_repl_evaluator::parse(istream& instream) {
-	parser_type::parse_options po{ .start = nts->get(opt.start) };
+	auto po = get_parse_options();
 	auto f = p->parse(instream, po);
 	if (p->found(po.start)) parsed(std::move(f));
 	else cout << p->get_error().to_str(opt.error_verbosity) << endl;
 }
 
 void tgf_repl_evaluator::parse(const string& infile) {
-	parser_type::parse_options po{ .start = nts->get(opt.start) };
+	auto po = get_parse_options();
 	auto f = p->parse(infile, po);
 	if (p->found(po.start)) parsed(std::move(f));
 	else cout << p->get_error().to_str(opt.error_verbosity) << endl;
@@ -477,27 +495,35 @@ void tgf_repl_evaluator::get_cmd(const traverser_t& n) {
 	};
 	static std::map<size_t,	std::function<void()>> printers = {
 	{ tgf_repl_parser::debug_opt,   [this]() { cout <<
-		"show debug:        " << pbool(opt.debug) << "\n"; } },
+		"show debug:         " << pbool(opt.debug) << "\n"; } },
 	{ tgf_repl_parser::status_opt,   [this]() { cout <<
-		"show status:       " << pbool(opt.status) << "\n"; } },
+		"show status:        " << pbool(opt.status) << "\n"; } },
 	{ tgf_repl_parser::colors_opt,   [this]() { cout <<
-		"colors:            " << pbool(opt.colors) << "\n"; } },
+		"colors:             " << pbool(opt.colors) << "\n"; } },
+	{ tgf_repl_parser::measure_parsing_opt, [this]() { cout <<
+		"measure-parsing:    " << pbool(opt.measure) << "\n"; } },
+	{ tgf_repl_parser::measure_each_pos_opt, [this]() { cout <<
+		"measure-each:       " << pbool(opt.measure_each_pos) << "\n"; } },
+	{ tgf_repl_parser::measure_forest_opt, [this]() { cout <<
+		"measure-forest:     " << pbool(opt.measure_forest) << "\n"; } },
+	{ tgf_repl_parser::measure_preprocess_opt, [this]() { cout <<
+		"measure-preprocess: " << pbool(opt.measure_preprocess) << "\n"; } },
 	{ tgf_repl_parser::print_terminals_opt, [this]() { cout <<
-		"print-terminals:   " << pbool(opt.print_terminals) << "\n"; } },
+		"print-terminals:    " << pbool(opt.print_terminals) << "\n"; } },
 	{ tgf_repl_parser::print_graphs_opt, [this]() { cout <<
-		"print-graphs:      " << pbool(opt.print_graphs) << "\n"; } },
+		"print-graphs:       " << pbool(opt.print_graphs) << "\n"; } },
 	{ tgf_repl_parser::print_ambiguity_opt, [this]() { cout <<
-		"print-ambiguity:   " << pbool(opt.print_ambiguity) << "\n"; } },
+		"print-ambiguity:    " << pbool(opt.print_ambiguity) << "\n"; } },
 	{ tgf_repl_parser::print_rules_opt, [this]() { cout <<
-		"print-rules:       " << pbool(opt.tml_rules) << "\n"; } },
+		"print-rules:        " << pbool(opt.tml_rules) << "\n"; } },
 	{ tgf_repl_parser::print_facts_opt, [this]() { cout <<
-		"print-facts:       " << pbool(opt.tml_facts) << "\n"; } },
+		"print-facts:        " << pbool(opt.tml_facts) << "\n"; } },
 	{ tgf_repl_parser::auto_disambiguate_opt, [this]() { cout <<
-		"auto-disambiguate: " << pbool(g->opt.auto_disambiguate) << "\n"; } },
+		"auto-disambiguate:  " << pbool(g->opt.auto_disambiguate) << "\n"; } },
 	{ tgf_repl_parser::nodisambig_list_opt, [this]() { cout <<
-		"nodisambig-list:   " << plist(g->opt.nodisambig_list) << "\n"; } },
+		"nodisambig-list:    " << plist(g->opt.nodisambig_list) << "\n"; } },
 	{ tgf_repl_parser::error_verbosity_opt, [this]() { cout <<
-		"error-verbosity:   " << pverb(opt.error_verbosity) << "\n"; } }};
+		"error-verbosity:    " << pverb(opt.error_verbosity) << "\n"; } }};
 	auto option = n | tgf_repl_parser::option;
 	if (!option.has_value()) option = n | tgf_repl_parser::bool_option;
 	if (!option.has_value()) option = n | tgf_repl_parser::list_option;
@@ -523,33 +549,41 @@ void tgf_repl_evaluator::set_cmd(const traverser_t& n) {
 	auto option = n | tgf_repl_parser::option;
 	auto v  = n | tgf_repl_parser::option_value;
 	auto vt = v | get_only_child | get_nonterminal;
-	static std::map<size_t,	std::function<void()>> setters = {
-	{ tgf_repl_parser::debug_opt,          [this, &vt]() {
-		set_bool_value(opt.debug, vt); } },
-	{ tgf_repl_parser::status_opt,          [this, &vt]() {
-		set_bool_value(opt.status, vt); } },
-	{ tgf_repl_parser::colors_opt,          [this, &vt]() {
-		TC.set(set_bool_value(opt.colors, vt)); } },
-	{ tgf_repl_parser::print_terminals_opt, [this, &vt]() {
-		set_bool_value(opt.print_terminals, vt); } },
-	{ tgf_repl_parser::print_graphs_opt, [this, &vt]() {
-		set_bool_value(opt.print_graphs, vt); } },
-	{ tgf_repl_parser::print_ambiguity_opt, [this, &vt]() {
-		set_bool_value(opt.print_ambiguity, vt); } },
-	{ tgf_repl_parser::print_rules_opt, [this, &vt]() {
-		set_bool_value(opt.tml_rules, vt); } },
-	{ tgf_repl_parser::print_facts_opt, [this, &vt]() {
-		set_bool_value(opt.tml_facts, vt); } },
-	{ tgf_repl_parser::auto_disambiguate_opt, [this, &vt]() {
-		set_bool_value(g->opt.auto_disambiguate, vt); } },
-	{ tgf_repl_parser::nodisambig_list_opt, [this, &v]() {
+	switch (get_opt(option)) {
+	case tgf_repl_parser::debug_opt:
+		set_bool_value(opt.debug, vt); break;
+	case tgf_repl_parser::status_opt:
+		set_bool_value(opt.status, vt); break;
+	case tgf_repl_parser::colors_opt:
+		TC.set(set_bool_value(opt.colors, vt)); break;
+	case tgf_repl_parser::print_terminals_opt:
+		set_bool_value(opt.print_terminals, vt); break;
+	case tgf_repl_parser::print_graphs_opt:
+		set_bool_value(opt.print_graphs, vt); break;
+	case tgf_repl_parser::print_ambiguity_opt:
+		set_bool_value(opt.print_ambiguity, vt); break;
+	case tgf_repl_parser::print_rules_opt:
+		set_bool_value(opt.tml_rules, vt); break;
+	case tgf_repl_parser::print_facts_opt:
+		set_bool_value(opt.tml_facts, vt); break;
+	case tgf_repl_parser::measure_parsing_opt:
+		set_bool_value(opt.measure, vt); break;
+	case tgf_repl_parser::measure_each_pos_opt:
+		set_bool_value(opt.measure_each_pos, vt); break;
+	case tgf_repl_parser::measure_forest_opt:
+		set_bool_value(opt.measure_forest, vt); break;
+	case tgf_repl_parser::measure_preprocess_opt:
+		set_bool_value(opt.measure_preprocess, vt); break;
+	case tgf_repl_parser::auto_disambiguate_opt:
+		set_bool_value(g->opt.auto_disambiguate, vt); break;
+	case tgf_repl_parser::nodisambig_list_opt:
 		g->opt.nodisambig_list.clear();
 		for (const auto& s : (v
 			| tgf_repl_parser::symbol_list
 			|| tgf_repl_parser::symbol).traversers())
 				g->opt.nodisambig_list.insert(s | get_terminals);
-	} },
-	{ tgf_repl_parser::error_verbosity, [this, &v]() {
+		break;
+	case tgf_repl_parser::error_verbosity: {
 		auto vrb = v | tgf_repl_parser::error_verbosity;
 		if (!vrb.has_value()) {
 			cout << "error: invalid error verbosity value\n"; return; }
@@ -564,35 +598,34 @@ void tgf_repl_evaluator::set_cmd(const traverser_t& n) {
 			opt.error_verbosity = lvl::INFO_ROOT_CAUSE; break;
 		default: cout << "error: invalid error verbosity value\n"; return;
 		}
-	}}};
-	setters[get_opt(option)]();
+		break;
+	}
+	};
 	get_cmd(n);
 }
 
 void tgf_repl_evaluator::add_cmd(const traverser_t& n) {
 	auto option = n | tgf_repl_parser::list_option;
 	auto add = [](auto& s, auto& l) { l.insert(s | get_terminals); };
-	static std::map<size_t, std::function<void()>> adders = {
-	{ tgf_repl_parser::nodisambig_list_opt, [this, &n, &add]() {
-		auto v  = n | tgf_repl_parser::symbol_list;
-		for (const auto& s : (v
+	switch (get_opt(option)) {
+	case tgf_repl_parser::nodisambig_list_opt:
+		for (const auto& s : (n | tgf_repl_parser::symbol_list
 			|| tgf_repl_parser::symbol).traversers())
 				add(s, g->opt.nodisambig_list);
-	}}};
-	adders[get_opt(option)]();
+		break;
+	};
 	get_cmd(n);
 }
 
 void tgf_repl_evaluator::del_cmd(const traverser_t& n) {
 	auto option = n | tgf_repl_parser::list_option;
 	auto del = [](auto& s, auto& l) { l.erase(s | get_terminals); };
-	static std::map<size_t,	std::function<void()>> deleters = {
-	{ tgf_repl_parser::nodisambig_list_opt, [this, &n, &del]() {
+	switch (get_opt(option)) {
+	case tgf_repl_parser::nodisambig_list_opt:
 		for (const auto& s : (n | tgf_repl_parser::symbol_list
 			|| tgf_repl_parser::symbol).traversers())
 				del(s, g->opt.nodisambig_list);
-	}}};
-	deleters[get_opt(option)]();
+	};
 	get_cmd(n);
 }
 
@@ -611,6 +644,10 @@ void tgf_repl_evaluator::update_bool_opt_cmd(
 	case tgf_repl_parser::print_ambiguity_opt:   update_fn(opt.print_ambiguity); break;
 	case tgf_repl_parser::print_rules_opt:       update_fn(opt.tml_rules); break;
 	case tgf_repl_parser::print_facts_opt:       update_fn(opt.tml_facts); break;
+	case tgf_repl_parser::measure_parsing_opt:   update_fn(opt.measure); break;
+	case tgf_repl_parser::measure_each_pos_opt:  update_fn(opt.measure_each_pos); break;
+	case tgf_repl_parser::measure_forest_opt:    update_fn(opt.measure_forest); break;
+	case tgf_repl_parser::measure_preprocess_opt:update_fn(opt.measure_preprocess); break;
 	case tgf_repl_parser::auto_disambiguate_opt: update_fn(g->opt.auto_disambiguate); break;
 	default: cout << ": unknown bool option\n"; break;
 	}
@@ -628,7 +665,11 @@ void help(size_t nt = tgf_repl_parser::help_sym) {
 		"  print-terminals        prints parsed terminals            on/off\n"
 		"  print-graphs           prints parsed graphs               on/off\n"
 		"  print-rules            prints parsed forest as TML rules  on/off\n"
-		"  print-facts            prints parsed forest as TML facts  on/off\n";
+		"  print-facts            prints parsed forest as TML facts  on/off\n"
+		"  measure-parsing        measures parsing time              on/off\n"
+		"  measure-each-pos       measures parsing time of each pos  on/off\n"
+		"  measure-forest         measures forest building time      on/off\n"
+		"  measure-preprocess     measures forest preprocess time    on/off\n";
 	static const std::string list_options =
 		"  nodisambig-list        list of nodes to keep ambiguous    symbol1, symbol2...\n";
 	static const std::string all_available_options = std::string{} +

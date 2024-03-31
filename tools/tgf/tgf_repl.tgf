@@ -79,20 +79,26 @@ option                 => bool_option | error_verbosity_opt | list_option.
 bool_option            => status_opt | colors_opt | print_ambiguity_opt
                         | print_graphs_opt | print_rules_opt | print_facts_opt
 			| print_terminals_opt
+			| measure_parsing_opt | measure_each_pos_opt
+			| measure_forest_opt | measure_preprocess_opt
                         | debug_opt | auto_disambiguate_opt.
 list_option            => nodisambig_list_opt.
 
 # option name symbols
-debug_opt              => "d" | "debug".
-status_opt             => "s" | "status".
-colors_opt             => "c" | "color" | "colors".
-print_ambiguity_opt    => "a" | "ambiguity" | "print-ambiguity".
-print_terminals_opt    => "t" | "terminals" | "print-terminals".
-print_graphs_opt       => "g" | "graphs" | "print-graphs".
-print_rules_opt        => "r" | "rules" | "print-rules".
-print_facts_opt        => "f" | "facts" | "print-facts".
+debug_opt              => "d"  | "debug".
+status_opt             => "s"  | "status".
+colors_opt             => "c"  | "color" | "colors".
+print_ambiguity_opt    => "a"  | "ambiguity" | "print-ambiguity".
+print_terminals_opt    => "t"  | "terminals" | "print-terminals".
+print_graphs_opt       => "g"  | "graphs" | "print-graphs".
+print_rules_opt        => "r"  | "rules" | "print-rules".
+print_facts_opt        => "f"  | "facts" | "print-facts".
+measure_parsing_opt    => "m"  | "measure" | "measure-parsing".
+measure_each_pos_opt   => "me" | "measure-each" | "mep" | "measure-each-pos".
+measure_forest_opt     => "mf" | "measure-forest".
+measure_preprocess_opt => "mp" | "measure-preprocess".
 auto_disambiguate_opt  => "ad" | "auto-disambiguate".
-error_verbosity_opt    => "e" | "error-verbosity".
+error_verbosity_opt    => "e"  | "error-verbosity".
 nodisambig_list_opt    => "nd" | "ndl" | "nodisambig-list".
 
 # option values symbols

@@ -289,6 +289,10 @@ public:
 		size_t max_length = 0; // read up to max length of the input size
 		size_t start = SIZE_MAX; // start non-terminal, SIZE_MAX = use default
 		C eof = std::char_traits<C>::eof(); // end of a stream
+		bool measure = false; // measure time taken for parsing
+		bool measure_each_pos = false;
+		bool measure_forest = false;
+		bool measure_preprocess = false;
 	};
 	// parse call
 	std::unique_ptr<pforest> parse(const C* data, size_t size,
@@ -392,12 +396,13 @@ private:
 	size_t n_literals(const item& i) const;
 	std::pair<item, bool> get_conj(size_t set, size_t prod, size_t con) const;
 	void pre_process(const item& i);
-	bool init_forest(pforest& f, const lit<C, T>& start_lit);
+	bool init_forest(pforest& f, const lit<C, T>& start_lit,
+		const parse_options& po);
 	bool build_forest(pforest& f, const pnode& root);
 	bool binarize_comb(const item&, std::set<std::vector<pnode>>&);
 	void sbl_chd_forest(const item&,
 		std::vector<pnode>&, size_t, std::set<std::vector<pnode>>&);
-	std::unique_ptr<pforest> _parse(size_t start = SIZE_MAX);
+	std::unique_ptr<pforest> _parse(const parse_options& po);
 #ifdef DEBUG
 	template <typename CharU>
 	friend std::ostream& operator<<(std::ostream& os, lit<C, T>& l);

@@ -14,6 +14,7 @@
 #define __IDNI__PARSER__PARSER_TMPL_H__
 #include "parser.h"
 #include "term_colors.h"
+#include "measure.h"
 
 namespace idni {
 
@@ -397,7 +398,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
 {
 	in = std::make_unique<input>(data, size,
 		po.max_length, o.chars_to_terminals, po.eof);
-	return _parse(po.start);
+	return _parse(po);
 }
 template <typename C, typename T>
 std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
@@ -405,7 +406,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
 {
 	in = std::make_unique<input>(is,
 		po.max_length, o.chars_to_terminals, po.eof);
-	return _parse(po.start);
+	return _parse(po);
 }
 template <typename C, typename T>
 std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
@@ -413,7 +414,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
 {
 	in = std::make_unique<input>(fn,
 		po.max_length, o.chars_to_terminals, po.eof);
-	return _parse(po.start);
+	return _parse(po);
 }
 #ifndef _WIN32
 template <typename C, typename T>
@@ -422,17 +423,16 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
 {
 	in = std::make_unique<input>(fd,
 		po.max_length, o.chars_to_terminals, po.eof);
-	return _parse(po.start);
+	return _parse(po);
 }
 #endif
 template <typename C, typename T>
 std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
-	size_t start)
+	const parse_options& po)
 {
-	MS(emeasure_time_start(tsr, ter);)
+	measure measure_parsing("parsing", po.measure);
 	//DBGP(std::cout << "parse: `" << to_std_string(s) << "`[" << len <<
 	//	"] g.start:" << g.start << "(" << g.start.nt() << ")" << "\n";)
-
 	DBGP(g.print_internal_grammar(std::cout << "grammar: \n", "\t", true)
 		<< std::endl;)
 	auto f = std::make_unique<pforest>();
@@ -441,16 +441,14 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
 	MS(int gcnt = 0;) // count of collected items
 	tid = 0;
 	S.resize(1);
-	lit<C, T> start_lit = start != SIZE_MAX ? g.nt(start)
-						: g.start_literal();
+	lit<C, T> start_lit = po.start != SIZE_MAX ? g.nt(po.start)
+							: g.start_literal();
 	container_t t, c;
 	for (size_t p : g.prod_ids_of_literal(start_lit))
 		for (size_t c = 0; c != g.n_conjs(p); ++c)
 			++refi[*add(t, { 0, p, c, 0, 0 }).first];
-#if MEASURE_EACH_POS
 	size_t r = 1, cb = 0; // row and cel beginning
-	clock_t tsp, tep;
-#endif
+	measure measure_each_pos("current character parsing");
 #if DEBUG_PARSING
 	size_t proc = 0;
 #endif
@@ -470,12 +468,12 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
 			"======================================================"
 			"========\nPOS: '" << cn << "' TPOS: " << n << " CH: '"
 			<< to_std_string(ch) << "'" << TC.CLEAR() <<std::endl;)
-#if MEASURE_EACH_POS
-		if (new_pos) {
+//#if MEASURE_EACH_POS
+		if (po.measure_each_pos && new_pos) {
 			if (in->cur() == (C)'\n') (cb = n), r++;
-			tsp = clock();
+			measure_each_pos.start();
 		}
-#endif
+//#endif
 		do {
 #if DEBUG_PARSING
 			size_t lproc = 0;
@@ -513,13 +511,11 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
 			}
 			//DBGP(if (!t.empty()) print(std::cout << "t not empty:\n", t) << "\n";)
 		} while (!t.empty());
-#if MEASURE_EACH_POS
-		if (new_pos) {
+		if (po.measure_each_pos && new_pos) {
 			std::cout << in->pos() << " \tln: " << r << " col: "
 				<< (n - cb + 1) << " :: ";
-			emeasure_time_end(tsp, tep) << "\n";
+			measure_each_pos.stop();
 		}
-#endif
 		if (o.incr_gen_forest) {
 			const auto& cont = S[n];
 			for (auto it = cont.begin(); it != cont.end(); ++it)
@@ -531,7 +527,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
 					build_forest(*f, curroot);
 				}
 		}
-		if( o.enable_gc) {
+		if (o.enable_gc) {
 			for (auto& rm : gcready) {
 				if (refi[rm] == 0 &&
 					(rm.set + o.gc_lag) <= n)
@@ -546,7 +542,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
 		}
 		DBGP(print_S(std::cout << "\n") << "\n";)
 	} while (in->tnext());
-	MS(emeasure_time_end(tsr, ter) <<" :: parse time\n";)
+	measure_parsing.stop();
 	in->clear();
 	// remaining total items
 	size_t count = 0;
@@ -557,39 +553,8 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
 	MS(if (count + gcnt)
 		std::cout << "\nGC: % = " << 100*gcnt/(count+gcnt) <<std::endl);
 
-	if (!o.incr_gen_forest) init_forest(*f, start_lit);
+	if (!o.incr_gen_forest) init_forest(*f, start_lit, po);
 	else f->root(pnode(start_lit, { 0, in->tpos() }));
-#if defined(DEBUG) && defined(WITH_DEVHELPERS)
-	bool nt = f->has_single_parse_tree();
-	//std::cout << "forest has more than one parse tree:"
-	//	<< (!nt ? "true" : "false") << std::endl;
-	if (!nt) {
-        /*
-		std::cout<<"# parsed forest contains more than one tree\n";
-		static int_t c = 0;
-		std::stringstream ssf, ptd;
-		ssf<<"parse_rules"<<++c<<".tml";
-		std::ofstream file2(ssf.str());
-		to_tml_rules<C, T>(ptd, f->g);
-		file2 << ptd.str();
-		file2.close();
-		size_t i = 0;
-		auto cb_next_graph = [&](parser<C, T>::pforest::graph& g){
-			ssf.str({});
-			ptd.str({});
-			ssf<<"parse_rules"<<c<<"_"<<i++<<".tml";
-			std::ofstream filet(ssf.str());
-			to_tml_rules<C, T>(ptd, g);
-			filet << ptd.str();
-			filet.close();
-			// get parse tree
-			g.extract_trees();
-			return true;
-		};
-		f->extract_graphs(f->root(), cb_next_graph);
-        */
-	}
-#endif
 	return f;
 }
 template <typename C, typename T>
@@ -851,7 +816,9 @@ void parser<C, T>::pre_process(const item& i) {
 	}
 }
 template <typename C, typename T>
-bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit) {
+bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
+	const parse_options& po)
+{
 	bool ret = false;
 	bin_tnt.clear();
 	sorted_citem.clear();
@@ -861,19 +828,18 @@ bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit) {
 	pnode root(start_lit, { 0, in->tpos() });
 	f.root(root);
 	// preprocess parser items for faster retrieval
-	MS(emeasure_time_start(tspfo, tepfo);)
+	measure measure_preprocess("preprocess", po.measure_preprocess);
 	int count = 0;
 	for (size_t n = 0; n < in->tpos() + 1; n++)
 		for (const item& i : S[n]) count++, pre_process(i);
-	MS(emeasure_time_end(tspfo, tepfo) << " :: preprocess time, " <<
-						"size : "<< count << "\n";)
+	if (po.measure_preprocess) measure_preprocess.stop();
+	MS(std::cout << "preprocess size: " count << "\n";)
 	MS(std::cout << "sorted sizes : " << sorted_citem.size() << " " <<
 						rsorted_citem.size() << " \n";)
 
 	// build forest
-	MS(emeasure_time_start(tsf, tef);)
+	measure measure_forest("forest building", po.measure_forest);
 	ret = build_forest(f, root);
-	MS(emeasure_time_end(tsf, tef) <<" :: forest time\n";)
 
 	return ret;
 }

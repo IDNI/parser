@@ -41,13 +41,17 @@ struct tgf_repl_evaluator {
 
 	std::string tgf_file;
 	struct options {
-		bool status          = true;
-		bool colors          = true;
-		bool print_terminals = true;
-		bool print_graphs    = true;
-		bool print_ambiguity = true;
-		bool tml_rules       = false;
-		bool tml_facts       = false;
+		bool status             = true;
+		bool colors             = true;
+		bool print_terminals    = true;
+		bool print_graphs       = true;
+		bool print_ambiguity    = true;
+		bool tml_rules          = false;
+		bool tml_facts          = false;
+		bool measure            = false;
+		bool measure_each_pos   = false;
+		bool measure_forest     = false;
+		bool measure_preprocess = false;
 		std::string start{"start"};
 		parser_type::error::info_lvl error_verbosity =
 			parser_type::error::info_lvl::INFO_BASIC;
@@ -78,6 +82,7 @@ struct tgf_repl_evaluator {
 	void update_bool_opt_cmd(const traverser_t& n,
 		const std::function<bool(bool&)>& update_fn);
 
+	parser_type::parse_options get_parse_options() const;
 	std::ostream& pretty_print(std::ostream& os,
 		const parser_type::psptree& n, std::set<size_t> skip,
 		bool nulls, size_t l);
