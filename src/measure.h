@@ -15,6 +15,7 @@
 #include <string>
 #include <iostream>
 #include <iomanip>
+namespace idni {
 struct measure {
 	std::string label_;
 	bool silent_ = false;
@@ -48,4 +49,5 @@ struct measure {
 	}
 	~measure() { stop(); }
 };
+} // idni namespace
 #endif // __IDNI__PARSER__MEASURE_H__
