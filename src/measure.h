@@ -36,17 +36,15 @@ struct measure {
 	}
 	double unpause() {
 		if (!started_) return start(), 0;
-		start_time_ = clock();
-		return 0;
+		return start_time_ = clock(), 0;
 	}
 	double stop() {
 		if (!started_) return 0;
-		double ms = pause() + ms_;
+		pause();
 		if (!silent_) std::cout << std::fixed << std::setprecision(2)
 			<< label_ << (label_.size() ? "::" : "") << "time: "
-			<< ms << " ms\n";
-		started_ = false;
-		return ms;
+			<< ms_ << " ms\n";
+		return started_ = false, ms_;
 	}
 	~measure() { stop(); }
 };
