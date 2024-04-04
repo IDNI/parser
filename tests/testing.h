@@ -26,11 +26,13 @@ struct test_options {
 	std::string error_expected = "";
 	bool dump = false;
 	bool ambiguity_fails = true;
-	int_t start = -1;
+	size_t start = SIZE_MAX;
 };
 
 template <typename T = char>
 typename parser<T>::options options;
+template <typename T = char>
+typename grammar<T>::options grammar_options;
 
 static bool opt_edge = true;
 static size_t c = 0;
@@ -347,7 +349,7 @@ bool run_test(const prods<T>& ps, nonterminals<T>& nts,
 	char_class_fns<T> cc = {}, test_options opts = {})
 {
 	if (!check()) return info(std::cout), true;
-	grammar<T> g(nts, ps, start, cc);
+	grammar<T> g(nts, ps, start, cc, grammar_options<T>);
 	parser<T> p(g, options<T>);
 	return run_test_<T>(g, p, input, opts);
 }
@@ -464,16 +466,18 @@ void process_args(int argc, char **argv) {
 			}
 			id(result);
 		}
-		else if (opt == "-enable_autodisambg") auto_disambg = true;
-		else if ( opt == "-disable_autodisambg") auto_disambg = false;
-		else if ( opt == "-no_disambg" ) {
+		else if (opt == "-enable_autodisambg")  auto_disambg = true;
+		else if (opt == "-disable_autodisambg") auto_disambg = false;
+		else if (opt == "-no_disambg") {
 			++it;
-			if( it == args.end()) missing(opt); 
+			if( it == args.end()) missing(opt);
 			std::stringstream ss(*it);
 			std::string nt;
-			while(getline(ss, nt, ',')){
-				options<char>.nodisambg_list.push_back(nt),
-				options<char32_t>.nodisambg_list.push_back(nt);
+			while(getline(ss, nt, ',')) {
+				grammar_options<char>.nodisambig_list
+					.insert(nt),
+				grammar_options<char32_t>.nodisambig_list
+					.insert(nt);
 			}
 		}
 		else if (opt == "-help" || opt == "-h") help(""), exit(0);
@@ -486,12 +490,14 @@ void process_args(int argc, char **argv) {
 		std::cout << std::endl;
 	}
 
-	options<char>.binarize =        options<char32_t>.binarize = binarize;
-	options<char>.incr_gen_forest =	options<char32_t>.incr_gen_forest =
-								incr_gen;
-	options<char>.enable_gc = options<char32_t>.enable_gc = enable_gc;
-	options<char>.auto_disambiguate = options<char32_t>.auto_disambiguate = 
-								auto_disambg;
+	options<char>.binarize =
+		options<char32_t>.binarize = binarize;
+	options<char>.incr_gen_forest =
+		options<char32_t>.incr_gen_forest = incr_gen;
+	options<char>.enable_gc =
+		options<char32_t>.enable_gc = enable_gc;
+	grammar_options<char>.auto_disambiguate =
+		grammar_options<char32_t>.auto_disambiguate = auto_disambg;
 }
 
 } // namespace idni::testing

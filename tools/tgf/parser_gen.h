@@ -27,22 +27,60 @@ struct grammar_inspector { // provides access to private grammar members
 	const char_class_fns<C>& cc_fns() { return g.cc_fns; }
 };
 
+struct parser_gen_options {
+	std::string output_dir                       = "";
+	std::string output                           = "";
+	std::string name                             = "";
+	std::string ns                               = "";
+	std::string char_type                        = "char";
+	std::string terminal_type                    = "char";
+	std::string decoder                          = "";
+	std::string encoder                          = "";
+};
+
 template <typename C = char, typename T = C>
-std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name,
-	const std::string& tgf_filename,
-	const grammar<C, T>& g,
-	const std::string& char_type = "char",
-	const std::string& terminal_type = "char",
-	const std::string& decoder = "",
-	const std::string& encoder = "")
+void generate_parser_cpp(const std::string& tgf_filename,
+	const grammar<C, T>& g, parser_gen_options opt = {})
 {
-	if (g.size() == 0) return os;
-	std::string U = terminal_type == "char32_t" ? "U" : "";
+	if (g.size() == 0) return;
+
+	auto strip_pwd = [](const std::string& p) {
+		auto pwd = std::filesystem::current_path().string();
+		if (pwd.back() != '/') pwd += '/';
+		if (p.compare(0, pwd.size(), pwd) == 0)
+			return p.substr(pwd.size());
+		return p;
+	};
+	auto strip_path = [](const std::string& p) {
+		auto pos = p.rfind('/');
+		return (pos == std::string::npos) ? p : p.substr(pos + 1);
+	};
+	auto strip_filename = [](const std::string& p) {
+		auto pos = p.rfind('/');
+		return (pos == std::string::npos) ? "" : p.substr(0, pos);
+	};
+	auto strip_ext = [](const std::string& p) {
+		auto pos = p.rfind('.');
+		return (pos == std::string::npos) ? p : p.substr(0, pos);
+	};
+
+	std::string tgf_filename_stripped = strip_pwd(tgf_filename);
+	std::string basename = strip_ext(strip_path(tgf_filename_stripped));
+	if (opt.name.size() == 0) opt.name = basename + "_parser";
+	if (opt.output_dir.size() == 0) opt.output_dir = strip_filename(tgf_filename);
+	if (opt.output_dir.size() && opt.output_dir.back() != '/')
+		opt.output_dir += '/';
+	if (opt.output.size() == 0) opt.output = opt.name + ".generated.h";
+
+	std::ofstream os(opt.output_dir + opt.output);
+
+	// convert name to upper case and append __PARSER_GEN_H__ as a guard at the begining
+	std::string guard = opt.name;
+	std::transform(guard.begin(), guard.end(), guard.begin(), ::toupper);
+
+	std::string U = opt.terminal_type == "char32_t" ? "U" : "";
 	std::vector<C> ts{ (C)0 };
 	grammar_inspector<C, T> gi(g);
-	// convert name to upper case and append __PARSER_GEN_H__ as a guard at the begining
-	std::string guard = name;
-	std::transform(guard.begin(), guard.end(), guard.begin(), ::toupper);
 
 	auto gen_ts = [&ts, &U]() {
 		std::stringstream os;
@@ -89,12 +127,26 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name,
 				<< to_std_string(x[fn.first]) << "\",\n";
 		return os.str();
 	};
-	auto gen_opts = [&decoder, &encoder]() {
+	auto gen_grammar_opts = [&g]() {
 		std::stringstream os;
-		if (decoder.size()) os << "\t\to.chars_to_terminals = "
-			<< decoder << ";\n";
-		if (encoder.size()) os << "\t\to.terminals_to_chars = "
-			<< encoder << ";\n";
+		os << "\t\to.auto_disambiguate = " << (g.opt.auto_disambiguate
+			? "true" : "false") << ";\n";
+		if (g.opt.nodisambig_list.size()) {
+			os << "\t\to.nodisambig_list = {";
+			size_t i = 0;
+			for (const auto& s : g.opt.nodisambig_list)
+				os << (i++ ? ", " : "") << "\n\t\t\t\""
+					<< s << "\"";
+			os << "\n\t\t};\n";
+		}
+		return os.str();
+	};
+	auto gen_opts = [&opt]() {
+		std::stringstream os;
+		if (opt.decoder.size()) os << "\t\to.chars_to_terminals = "
+			<< opt.decoder << ";\n";
+		if (opt.encoder.size()) os << "\t\to.terminals_to_chars = "
+			<< opt.encoder << ";\n";
 		return os.str();
 	};
 	auto gen_prods = [&g, &gi, &ts]() {
@@ -105,8 +157,9 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name,
 			ts.push_back(l.t());
 			return ts.size() - 1;
 		};
-		for (const auto& p : gi.G()) {
-			g.print_production(os << "\t\t// ", p) << "\n";
+		for (size_t i = 0; i != gi.G().size(); ++i) {
+			const auto& p = gi.G()[i];
+			g.print_production(os << "\t\t// ", i) << "\n";
 			os << "\t\tq(nt(" << p.first.n() << "), ";
 			bool first_c = true;
 			for (const auto& c : p.second) {
@@ -127,47 +180,47 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name,
 		}
 		return os.str();
 	};
-	auto strip_pwd = [](const std::string& p) {
-		auto pwd = std::filesystem::current_path().string();
-		if (pwd.back() != '/') pwd += '/';
-		if (p.compare(0, pwd.size(), pwd) == 0)
-			return p.substr(pwd.size());
-		return p;
-	};
 	const auto ps = gen_prods();
 	os <<	"// This file is generated from a file " <<
-					strip_pwd(tgf_filename)<<" by\n"
+					tgf_filename_stripped << " by\n"
 		"//       https://github.com/IDNI/parser/tools/tgf\n"
 		"//\n"
 		"#ifndef __" <<guard<< "_H__\n"
 		"#define __" <<guard<< "_H__\n"
+		"\n"
 		"#include <string.h>\n"
+		"\n"
 		"#include \"parser.h\"\n"
-		"struct " <<name<< " {\n"
-		"	using char_type     = "<<char_type<<";\n"
-		"	using terminal_type = "<<terminal_type<<";\n"
-		"	using traits_type   = std::char_traits<char_type>;\n"
-		"	using int_type      = typename traits_type::int_type;\n"
-		"	using symbol_type   ="
+		"\n";
+	if (opt.ns.size()) os << "namespace " <<opt.ns<< " {\n\n";
+	os <<	"struct " <<opt.name<< " {\n"
+		"	using char_type       = "<<opt.char_type<<";\n"
+		"	using terminal_type   = "<<opt.terminal_type<<";\n"
+		"	using traits_type     = std::char_traits<char_type>;\n"
+		"	using int_type        = typename traits_type::int_type;\n"
+		"	using grammar_type    = idni::grammar<char_type, terminal_type>;\n"
+		"	using grammar_options = grammar_type::options;\n"
+		"	using symbol_type     ="
 				" idni::lit<char_type, terminal_type>;\n"
-		"	using location_type = std::array<size_t, 2>;\n"
-		"	using node_type     ="
+		"	using location_type   = std::array<size_t, 2>;\n"
+		"	using node_type       ="
 				" std::pair<symbol_type, location_type>;\n"
-		"	using parser_type   ="
+		"	using parser_type     ="
 				" idni::parser<char_type, terminal_type>;\n"
-		"	using options       = parser_type::options;\n"
-		"	using parse_options = parser_type::parse_options;\n"
-		"	using forest_type   = parser_type::pforest;\n"
-		"	using input_type    = parser_type::input;\n"
-		"	using decoder_type  ="
+		"	using options         = parser_type::options;\n"
+		"	using parse_options   = parser_type::parse_options;\n"
+		"	using forest_type     = parser_type::pforest;\n"
+		"	using input_type      = parser_type::input;\n"
+		"	using decoder_type    ="
 				" parser_type::input::decoder_type;\n"
-		"	using encoder_type  = "
+		"	using encoder_type    = "
 				"std::function<std::basic_string<char_type>(\n"
 		"			const std::vector<terminal_type>&)>;\n"
-		"	" <<name<< "() :\n"
+		"	" <<opt.name<< "() :\n"
 		"		nts(load_nonterminals()), cc(load_cc()),\n"
 		"		g(nts, load_prods(), nt(" <<gi.start().n()<<
-				"), cc), p(g, load_opts()) {}\n"
+				"), cc, load_grammar_opts()),\n"
+		"		p(g, load_opts()) {}\n"
 		"	std::unique_ptr<forest_type> parse(const char_type* data, size_t size,\n"
 		"		parse_options po = {}) { return p.parse(data, size, po); }\n"
 		"	std::unique_ptr<forest_type> parse(std::basic_istream<char_type>& is,\n"
@@ -178,7 +231,7 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name,
 		"	std::unique_ptr<forest_type> parse(int fd, parse_options po = {})\n"
 		"		{ return p.parse(fd, po); }\n"
 		"#endif //WIN32\n"
-		"	bool found(int start = -1) { return p.found(start); }\n"
+		"	bool found(size_t start = SIZE_MAX) { return p.found(start); }\n"
 		"	typename parser_type::error get_error() { return p.get_error(); }\n"
 		"	enum nonterminal {" << gen_nts_enum_cte() <<
 								"	};\n"
@@ -216,6 +269,11 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name,
 					gen_cc_fns() <<
 		"		}, nts);\n"
 		"	}\n"
+		"	grammar_type::options load_grammar_opts() {\n"
+		"		grammar_type::options o;\n" <<
+					gen_grammar_opts() <<
+		"		return o;\n"
+		"	}\n"
 		"	options load_opts() {\n"
 		"		options o;\n" <<
 					gen_opts() <<
@@ -228,39 +286,30 @@ std::ostream& generate_parser_cpp(std::ostream& os, const std::string& name,
 		"		return q;\n"
 		"	}\n"
 		"};\n"
-		"#endif // __" << guard << "_H__\n";
-	return os;
+		"\n";
+	if (opt.ns.size()) os << "\n} // " <<opt.ns<< " namespace\n";
+	os <<	"#endif // __" << guard << "_H__\n";
 }
 
 template <typename C = char, typename T = C>
-std::ostream& generate_parser_cpp_from_string(std::ostream& os,
-	const std::string& name,
+void generate_parser_cpp_from_string(const std::string& tgf_filename,
 	const std::basic_string<C>& grammar_tgf,
 	const std::basic_string<C>& start_nt = from_cstr<C>("start"),
-	const std::string& char_type = "char",
-	const std::string& terminal_type = "",
-	const std::string& decoder = "",
-	const std::string& encoder = "")
+	parser_gen_options opt = {})
 {
 	nonterminals<C, T> nts;
-	return generate_parser_cpp(os, name,
-		tgf<C, T>::from_string(nts, grammar_tgf, start_nt),
-		char_type, terminal_type, decoder, encoder);
+	generate_parser_cpp(tgf_filename,
+		tgf<C, T>::from_string(nts, grammar_tgf, start_nt), opt);
 }
 
 template <typename C = char, typename T = C>
-void generate_parser_cpp_from_file(std::ostream& os, const std::string& name,
-	const std::string& tgf_filename,
+void generate_parser_cpp_from_file(const std::string& tgf_filename,
 	const std::basic_string<C>& start_nt = from_cstr<C>("start"),
-	const std::string& char_type = "char",
-	const std::string& terminal_type = "",
-	const std::string& decoder = "",
-	const std::string& encoder = "")
+	parser_gen_options opt = {})
 {
 	nonterminals<C, T> nts;
-	generate_parser_cpp(os, name, tgf_filename,
-		tgf<C, T>::from_file(nts, tgf_filename, start_nt),
-		char_type, terminal_type, decoder, encoder);
+	generate_parser_cpp(tgf_filename,
+		tgf<C, T>::from_file(nts, tgf_filename, start_nt), opt);
 }
 
 } // idni namespace

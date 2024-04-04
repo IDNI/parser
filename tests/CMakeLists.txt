@@ -1,4 +1,5 @@
 set(TESTS
+	term_colors
 	input
 	parser
 	tgf

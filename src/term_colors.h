@@ -66,65 +66,65 @@ struct colors {
 	bool set(bool e) { return enabled = e; }
 
 	// escape controls COLOR = start, AND = separator, EOC = end of color
-	std::string COLOR()            { return (*this)[color::COLOR]; }
-	std::string AND()              { return (*this)[color::AND]; }
-	std::string EOC()              { return (*this)[color::EOC]; }
+	std::string COLOR()            const { return (*this)[color::COLOR]; }
+	std::string AND()              const { return (*this)[color::AND]; }
+	std::string EOC()              const { return (*this)[color::EOC]; }
 
 	// clear/reset all color settings
-	std::string CLEAR()            { return (*this)(color::CLEAR); }
+	std::string CLEAR()            const { return (*this)(color::CLEAR); }
 	// set modifiers
-	std::string BRIGHT()           { return (*this)(color::BRIGHT); }
-	std::string DIM()              { return (*this)(color::DIM); }
-	std::string UNDERLINED()       { return (*this)(color::UNDERLINED); }
-	std::string BLINK()            { return (*this)(color::BLINK); }
-	std::string REVERSE()          { return (*this)(color::REVERSE); }
-	std::string HIDDEN()           { return (*this)(color::HIDDEN); }
+	std::string BRIGHT()           const { return (*this)(color::BRIGHT); }
+	std::string DIM()              const { return (*this)(color::DIM); }
+	std::string UNDERLINED()       const { return (*this)(color::UNDERLINED); }
+	std::string BLINK()            const { return (*this)(color::BLINK); }
+	std::string REVERSE()          const { return (*this)(color::REVERSE); }
+	std::string HIDDEN()           const { return (*this)(color::HIDDEN); }
 	// clear modifiers
-	std::string CLEAR_BRIGHT()     { return (*this)(color::CLEAR_BRIGHT); }
-	std::string CLEAR_DIM()        { return (*this)(color::CLEAR_DIM); }
-	std::string CLEAR_UNDERLINED() { return (*this)(color::CLEAR_UNDERLINED); }
-	std::string CLEAR_BLINK()      { return (*this)(color::CLEAR_BLINK); }
-	std::string CLEAR_REVERSE()    { return (*this)(color::CLEAR_REVERSE); }
-	std::string CLEAR_HIDDEN()     { return (*this)(color::CLEAR_HIDDEN); }
+	std::string CLEAR_BRIGHT()     const { return (*this)(color::CLEAR_BRIGHT); }
+	std::string CLEAR_DIM()        const { return (*this)(color::CLEAR_DIM); }
+	std::string CLEAR_UNDERLINED() const { return (*this)(color::CLEAR_UNDERLINED); }
+	std::string CLEAR_BLINK()      const { return (*this)(color::CLEAR_BLINK); }
+	std::string CLEAR_REVERSE()    const { return (*this)(color::CLEAR_REVERSE); }
+	std::string CLEAR_HIDDEN()     const { return (*this)(color::CLEAR_HIDDEN); }
 	// foregrounds
-	std::string DEFAULT()          { return (*this)(color::DEFAULT); }
-	std::string BLACK()            { return (*this)(color::BLACK); }
-	std::string RED()              { return (*this)(color::RED); }
-	std::string GREEN()            { return (*this)(color::GREEN); }
-	std::string YELLOW()           { return (*this)(color::YELLOW); }
-	std::string BLUE()             { return (*this)(color::BLUE); }
-	std::string MAGENTA()          { return (*this)(color::MAGENTA); }
-	std::string CYAN()             { return (*this)(color::CYAN); }
-	std::string LIGHT_GRAY()       { return (*this)(color::LIGHT_GRAY); }
-	std::string DARK_GRAY()        { return (*this)(color::DARK_GRAY); }
-	std::string LIGHT_RED()        { return (*this)(color::LIGHT_RED); }
-	std::string LIGHT_GREEN()      { return (*this)(color::LIGHT_GREEN); }
-	std::string LIGHT_YELLOW()     { return (*this)(color::LIGHT_YELLOW); }
-	std::string LIGHT_BLUE()       { return (*this)(color::LIGHT_BLUE); }
-	std::string LIGHT_MAGENTA()    { return (*this)(color::LIGHT_MAGENTA); }
-	std::string LIGHT_CYAN()       { return (*this)(color::LIGHT_CYAN); }
-	std::string WHITE()            { return (*this)(color::WHITE); }
+	std::string DEFAULT()          const { return (*this)(color::DEFAULT); }
+	std::string BLACK()            const { return (*this)(color::BLACK); }
+	std::string RED()              const { return (*this)(color::RED); }
+	std::string GREEN()            const { return (*this)(color::GREEN); }
+	std::string YELLOW()           const { return (*this)(color::YELLOW); }
+	std::string BLUE()             const { return (*this)(color::BLUE); }
+	std::string MAGENTA()          const { return (*this)(color::MAGENTA); }
+	std::string CYAN()             const { return (*this)(color::CYAN); }
+	std::string LIGHT_GRAY()       const { return (*this)(color::LIGHT_GRAY); }
+	std::string DARK_GRAY()        const { return (*this)(color::DARK_GRAY); }
+	std::string LIGHT_RED()        const { return (*this)(color::LIGHT_RED); }
+	std::string LIGHT_GREEN()      const { return (*this)(color::LIGHT_GREEN); }
+	std::string LIGHT_YELLOW()     const { return (*this)(color::LIGHT_YELLOW); }
+	std::string LIGHT_BLUE()       const { return (*this)(color::LIGHT_BLUE); }
+	std::string LIGHT_MAGENTA()    const { return (*this)(color::LIGHT_MAGENTA); }
+	std::string LIGHT_CYAN()       const { return (*this)(color::LIGHT_CYAN); }
+	std::string WHITE()            const { return (*this)(color::WHITE); }
 	// backgrounds
-	std::string BG_DEFAULT()       { return (*this)(color::BG_DEFAULT); }
-	std::string BG_BLACK()         { return (*this)(color::BG_BLACK); }
-	std::string BG_RED()           { return (*this)(color::BG_RED); }
-	std::string BG_GREEN()         { return (*this)(color::BG_GREEN); }
-	std::string BG_YELLOW()        { return (*this)(color::BG_YELLOW); }
-	std::string BG_BLUE()          { return (*this)(color::BG_BLUE); }
-	std::string BG_MAGENTA()       { return (*this)(color::BG_MAGENTA); }
-	std::string BG_CYAN()          { return (*this)(color::BG_CYAN); }
-	std::string BG_LIGHT_GRAY()    { return (*this)(color::BG_LIGHT_GRAY); }
-	std::string BG_DARK_GRAY()     { return (*this)(color::BG_DARK_GRAY); }
-	std::string BG_LIGHT_RED()     { return (*this)(color::BG_LIGHT_RED); }
-	std::string BG_LIGHT_GREEN()   { return (*this)(color::BG_LIGHT_GREEN); }
-	std::string BG_LIGHT_YELLOW()  { return (*this)(color::BG_LIGHT_YELLOW); }
-	std::string BG_LIGHT_BLUE()    { return (*this)(color::BG_LIGHT_BLUE); }
-	std::string BG_LIGHT_MAGENTA() { return (*this)(color::BG_LIGHT_MAGENTA); }
-	std::string BG_LIGHT_CYAN()    { return (*this)(color::BG_LIGHT_CYAN); }
-	std::string BG_WHITE()         { return (*this)(color::BG_WHITE); }
+	std::string BG_DEFAULT()       const { return (*this)(color::BG_DEFAULT); }
+	std::string BG_BLACK()         const { return (*this)(color::BG_BLACK); }
+	std::string BG_RED()           const { return (*this)(color::BG_RED); }
+	std::string BG_GREEN()         const { return (*this)(color::BG_GREEN); }
+	std::string BG_YELLOW()        const { return (*this)(color::BG_YELLOW); }
+	std::string BG_BLUE()          const { return (*this)(color::BG_BLUE); }
+	std::string BG_MAGENTA()       const { return (*this)(color::BG_MAGENTA); }
+	std::string BG_CYAN()          const { return (*this)(color::BG_CYAN); }
+	std::string BG_LIGHT_GRAY()    const { return (*this)(color::BG_LIGHT_GRAY); }
+	std::string BG_DARK_GRAY()     const { return (*this)(color::BG_DARK_GRAY); }
+	std::string BG_LIGHT_RED()     const { return (*this)(color::BG_LIGHT_RED); }
+	std::string BG_LIGHT_GREEN()   const { return (*this)(color::BG_LIGHT_GREEN); }
+	std::string BG_LIGHT_YELLOW()  const { return (*this)(color::BG_LIGHT_YELLOW); }
+	std::string BG_LIGHT_BLUE()    const { return (*this)(color::BG_LIGHT_BLUE); }
+	std::string BG_LIGHT_MAGENTA() const { return (*this)(color::BG_LIGHT_MAGENTA); }
+	std::string BG_LIGHT_CYAN()    const { return (*this)(color::BG_LIGHT_CYAN); }
+	std::string BG_WHITE()         const { return (*this)(color::BG_WHITE); }
 
 	// return the code for the color or empty string if colors disabled
-	const std::string& operator[](color c) {
+	const std::string& operator[](color c) const {
 		static const std::vector<std::string> color_code{
 			"\x1b[", ";", "m", "0",
 			"1", "2", "4",
@@ -136,7 +136,7 @@ struct colors {
 			"90", "91", "92", "93",
 			"94", "95", "96", "97",
 			"40", "41", "42", "43",
-			"44", "45", "46", "47", "49"
+			"44", "45", "46", "47", "49",
 			"100", "101", "102", "103",
 			"104", "105", "106", "107"
 		};
@@ -145,10 +145,10 @@ struct colors {
 	}
 	// return the whole color code or empty string if colors disabled
 	template<typename... Colors>
-	std::string operator()(Colors... colors) {
+	std::string operator()(Colors... colors) const {
 		bool first = true;
 		std::stringstream ss; ss << COLOR();
-		auto add = [this, &ss, &first](const auto& c) {
+		const auto add = [this, &ss, &first](const auto& c) {
 			if (!first) ss << AND(); else first = false;
 			ss << (*this)[c];
 		};

@@ -12,6 +12,7 @@
 // modified over time by the Author.
 #ifndef __IDNI__PARSER__GRAMMAR_TMPL_H__
 #define __IDNI__PARSER__GRAMMAR_TMPL_H__
+#include <queue>
 #include "parser.h"
 
 namespace idni {
@@ -477,9 +478,14 @@ char_class_fns<T> predefined_char_classes(
 }
 //-----------------------------------------------------------------------------
 template <typename C, typename T>
+grammar<C, T>::grammar(nonterminals<C, T>& nts,
+	typename grammar<C, T>::options opt)
+	: opt(opt), nts(nts), start(nts.get("start")) { }
+template <typename C, typename T>
 grammar<C, T>::grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
-	const prods<C, T>& start, const char_class_fns<T>& cc_fns)
-	: nts(nts), start(start.to_lit()), cc_fns(cc_fns)
+	const prods<C, T>& start, const char_class_fns<T>& cc_fns,
+	typename grammar<C, T>::options opt)
+	: opt(opt), nts(nts), start(start.to_lit()), cc_fns(cc_fns)
 {
 	size_t neg_id = 0;
 	// load prods
@@ -591,7 +597,7 @@ lit<C, T> grammar<C, T>::nt(const std::basic_string<C>& s) {
 template <typename C, typename T>
 std::ostream& grammar<C, T>::check_nullable_ambiguity(std::ostream& os) const {
 	const auto report = [&os, this](const lit<C, T>& first,
-		const lit<C, T>& second, const production& p)
+		const lit<C, T>& second, size_t p)
 	{
 		os << "Warning: possible ambiguity from a nullable literal: ("
 			<< first << ") neighbors (" << second
@@ -613,8 +619,8 @@ std::ostream& grammar<C, T>::check_nullable_ambiguity(std::ostream& os) const {
 			if (nullable(a.back())) return true;
 		return false;
 	};
-	for (const auto& p : G) for (const auto& a : p.second) if (a.size() > 1)
-		for (size_t i = 1; i != a.size() - 1; ++i) {
+	for (size_t p = 0; p != G.size(); ++p) for (const auto& a : G[p].second)
+		if (a.size() > 1) for (size_t i = 1; i != a.size() - 1; ++i) {
 			const auto& last = a[i-1], curr = a[i];
 			if (last.nt() && curr.nt() &&
 				(nullable(last) || last_nullable(last)) &&
@@ -624,67 +630,100 @@ std::ostream& grammar<C, T>::check_nullable_ambiguity(std::ostream& os) const {
 	return os;
 }
 
+#include "parser_term_color_macros.h" // load color macros
 template <typename C, typename T>
 std::ostream& grammar<C, T>::print_production(std::ostream& os,
-	const production& p) const
+	const size_t p, bool print_ids, const term::colors& TC) const
 {
-	os << p.first.to_std_string(from_cstr<C>("null")) << " =>";
+	const int ID_SIZE   = 6;
+	const int HEAD_SIZE = 20;
+	std::stringstream ss;
+	if (print_ids) ss << "G" << p << ":";
+	std::string id = ss.str();
+	os << id;
+	for (size_t i = 0; i < ID_SIZE - id.size(); ++i) os << " ";
+	std::string head = G[p].first.to_std_string();
+	ss = {}, ss << "(" << G[p].first.n()<< ")";
+	std::string head_id = ss.str();
+	os << TC_NT << head << TC_DEFAULT << TC_NT_ID << head_id << TC_DEFAULT;
+	int len = HEAD_SIZE-head.size()-head_id.size();
+	for (int i = 0; i < len; ++i) os <<" ";
+	os << " =>";
 	size_t j = 0;
-	for (const auto& c : p.second) {
+	for (const auto& c : G[p].second) {
 		if (j++ != 0) os << " &";
-		if (c.neg) os << " ~(";
-		for (const auto& l : c) os << " " <<
-			(!l.nt() && !l.is_null()
-				? l.to_std_string()
-				: l.to_std_string(from_cstr<C>("null")));
-		if (c.neg) os << " )";
+		std::string tc_neg{};
+		if (c.neg) tc_neg = TC_NEG, os << " " << tc_neg << "~(";
+		for (const auto& l : c) {
+			os << " ";
+			if (l.nt())
+				os << TC_NT << l.to_std_string() << TC_DEFAULT
+				<< TC_NT_ID << "(" <<l.n()<< ")" << TC_DEFAULT;
+			else if (l.is_null())
+				os << TC_NULL << "null" << TC_DEFAULT;
+			else os << TC_T << l.to_std_string() << TC.CLEAR()
+				<< tc_neg;
+		}
+		if (c.neg) os << tc_neg << " )" << TC.CLEAR();
 	}
-	return os << ".";
+	os << ".";
+	if (conjunctive(p)) os << "\t "<< TC_NULL<<"# conjunctive" <<TC_DEFAULT;
+	return os;
 }
 template <typename C, typename T>
 std::ostream& grammar<C, T>::print_internal_grammar(std::ostream& os,
-	std::string prep, bool print_ids) const
+	std::string prep, bool print_ids, const term::colors& TC) const
 {
-	for (size_t i = 0; i != G.size(); ++i) {
-		os << prep, print_ids ? os << "G" << i << ": " : os;
-		print_production(os, G[i]);
-		if (conjunctive(i)) os << "\t # conjunctive";
-		os << "\n";
-	}
+	for (size_t i = 0; i != G.size(); ++i)
+		print_production(os << prep, i, print_ids, TC) << "\n";
 	return os;
 }
+
 template <typename C, typename T>
 std::ostream& grammar<C, T>::print_internal_grammar_for(std::ostream& os,
-	const std::string& nt, std::string prep, bool print_ids) const
+	const std::string& nt, std::string prep, bool print_ids,
+	const term::colors& TC) const
 {
-	auto root = nts(nt);
-	std::set<size_t> ids;
-	std::set<size_t> to_visit = prod_ids_of_literal(root);
-	auto not_visited = [&ids](size_t i) {
-		return ids.find(i) == ids.end();
-	};
-	while (to_visit.size()) {
-		std::set<size_t> next_to_visit;
-		for (auto p : to_visit) {
-			if (!not_visited(p)) continue;
-			ids.insert(p);
-			for (auto pb : G[p].second) for (auto l : pb) {
-				if (l.nt() && not_visited(l.n())) {
-					auto pids = prod_ids_of_literal(l);
-					next_to_visit.insert(pids.begin(), pids.end());
-				}
-			}
-		}
-		to_visit = next_to_visit;
-	}
-	for (size_t i : ids) {
-		os << prep, print_ids ? os << "G" << i << ": " : os;
-		print_production(os, G[i]);
-		if (conjunctive(i)) os << "\t # conjunctive";
-		os << "\n";
-	}
+	for (size_t i : reachable_productions(nts(nt)))
+		print_production(os << prep, i, print_ids, TC) << "\n";
 	return os;
 }
+#include "parser_term_color_macros.h" // undef color macros
+
+template <typename C, typename T>
+std::set<size_t> grammar<C, T>::reachable_productions(const lit<C, T>& l) const{
+	std::set<size_t> ids;
+	std::queue<lit<C, T>> q;
+	q.push(l);
+	while (!q.empty()) {
+		lit<C, T> x = q.front();
+		q.pop();
+		if (x.nt()) {
+			const auto& prods = prod_ids_of_literal(x);
+			for (const auto& p : prods) {
+				if (ids.find(p) != ids.end()) continue;
+				ids.insert(p);
+				for (const auto& a : G[p].second)
+					for (const auto& y : a) if (y.nt()) q.push(y);
+			}
+		}
+	}
+	return ids;
+}
+
+template <typename C, typename T>
+std::set<size_t> grammar<C, T>::unreachable_productions(const lit<C, T>& l)
+	const
+{
+	std::set<size_t> ids = reachable_productions(l);
+	std::set<size_t> all;
+	for (size_t i = 0; i != G.size(); ++i) all.insert(i);
+	std::set<size_t> diff;
+	std::set_difference(all.begin(), all.end(), ids.begin(), ids.end(),
+		std::inserter(diff, diff.begin()));
+	return diff;
+}
+
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
 template <typename C, typename T>
 std::ostream& grammar<C, T>::print_data(std::ostream& os, std::string prep)

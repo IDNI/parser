@@ -10,10 +10,5 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#include "tgf_cli.h"
-
-using namespace idni;
-
-int main(int argc, char** argv) {
-	return tgf_run(argc, argv);
-}
+namespace idni { int tgf_run(int argc, char** argv); }
+int main(int argc, char** argv) { return idni::tgf_run(argc, argv); }

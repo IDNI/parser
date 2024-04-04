@@ -27,6 +27,7 @@
 #include "characters.h"
 #include "charclasses.h"
 #include "forest.h"
+#include "term_colors.h"
 
 #define DEFAULT_BINARIZE false
 #define DEFAULT_INCR_GEN_FOREST false
@@ -123,9 +124,14 @@ template <typename C = char, typename T = C>
 struct grammar {
 	friend struct grammar_inspector<C, T>;
 	typedef std::pair<lit<C, T>, std::vector<lits<C, T>>> production;
-	grammar(nonterminals<C, T>& nts) : nts(nts) {}
+	struct options {
+		bool auto_disambiguate = true;
+		std::set<std::string> nodisambig_list = {};
+	} opt;
+	grammar(nonterminals<C, T>& nts, options opt = {});
 	grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
-		const prods<C, T>& start, const char_class_fns<T>& cc_fns);
+		const prods<C, T>& start, const char_class_fns<T>& cc_fns,
+		options opt = {});
 	// returns number of productions (every disjunction has a prod rule)
 	size_t size() const;
 	// returns head of the prod rule - literal
@@ -151,14 +157,19 @@ struct grammar {
 	const lit<C, T>& start_literal() const;
 	bool is_cc_fn(const size_t& p) const;
 	bool is_eof_fn(const size_t& p) const;
+	std::set<size_t> reachable_productions(const lit<C, T>& l) const;
+	std::set<size_t> unreachable_productions(const lit<C, T>& l) const;
 	std::ostream& check_nullable_ambiguity(std::ostream& os) const;
 	std::ostream& print_production(std::ostream& os,
-		const production& p) const;
+		size_t p, bool print_ids = false,
+		const term::colors& TC = {false}) const;
 	std::ostream& print_internal_grammar(std::ostream& os,
-		std::string prep = {}, bool print_ids = false) const;
+		std::string prep = {}, bool print_ids = false,
+		const term::colors& TC = {false}) const;
 	std::ostream& print_internal_grammar_for(std::ostream& os,
 		const std::string& nt,	std::string prep = {},
-		bool print_ids = false) const;
+		bool print_ids = false,
+		const term::colors& TC = {false}) const;
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
 	std::ostream& print_data(std::ostream& os, std::string prep = {}) const;
 #endif
@@ -269,8 +280,6 @@ public:
 		size_t gc_lag = 1;
 		decoder_type chars_to_terminals = 0;
 		encoder_type terminals_to_chars = 0;
-		bool auto_disambiguate = true;
-		std::vector<std::string> nodisambg_list = {};
 	};
 	// constructor
 	parser(grammar<C, T>& g, options o = {});
@@ -278,8 +287,12 @@ public:
 	// parse options for parse() call
 	struct parse_options {
 		size_t max_length = 0; // read up to max length of the input size
-		int_t start = -1; // start non-terminal, -1 if default
+		size_t start = SIZE_MAX; // start non-terminal, SIZE_MAX = use default
 		C eof = std::char_traits<C>::eof(); // end of a stream
+		bool measure = false; // measure time taken for parsing
+		bool measure_each_pos = false;
+		bool measure_forest = false;
+		bool measure_preprocess = false;
 	};
 	// parse call
 	std::unique_ptr<pforest> parse(const C* data, size_t size,
@@ -292,7 +305,7 @@ public:
 	std::unique_ptr<pforest> parse(int filedescriptor,
 		parse_options po = {});
 #endif
-	bool found(int_t start = -1);
+	bool found(size_t start = SIZE_MAX);
 	std::basic_string<C> get_input();
 #if defined(DEBUG) || defined(WITH_DEVHELPERS)
 	typedef std::set<item> container_t;
@@ -383,12 +396,13 @@ private:
 	size_t n_literals(const item& i) const;
 	std::pair<item, bool> get_conj(size_t set, size_t prod, size_t con) const;
 	void pre_process(const item& i);
-	bool init_forest(pforest& f, const lit<C, T>& start_lit);
+	bool init_forest(pforest& f, const lit<C, T>& start_lit,
+		const parse_options& po);
 	bool build_forest(pforest& f, const pnode& root);
 	bool binarize_comb(const item&, std::set<std::vector<pnode>>&);
 	void sbl_chd_forest(const item&,
 		std::vector<pnode>&, size_t, std::set<std::vector<pnode>>&);
-	std::unique_ptr<pforest> _parse(int_t start = -1);
+	std::unique_ptr<pforest> _parse(const parse_options& po);
 #ifdef DEBUG
 	template <typename CharU>
 	friend std::ostream& operator<<(std::ostream& os, lit<C, T>& l);

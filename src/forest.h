@@ -65,7 +65,8 @@ struct forest {
 			else os << value.first;
 			os << "[" << value.second[0] << ", "
 				<< value.second[1] << "]";
-			for (auto& d : child) d->to_print(os, l + 1, skip);
+			for (auto& d : child)
+				d->to_print(os, l + 1, skip, nulls);
 			return os;
 		}
 	};
