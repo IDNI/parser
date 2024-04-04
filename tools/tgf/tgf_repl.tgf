@@ -45,9 +45,6 @@ enable                 => enable_sym    bool_option.
 disable                => disable_sym   bool_option.
 
 # symbols
-get_sym                => "get".
-set_sym                => "set".
-toggle_sym             => "toggle".
 grammar_sym            => "g" | "grammar".
 internal_grammar_sym   => "i" | "ig" | "internal-grammar".
 unreachable_sym        => "u" | "unreachable".
@@ -104,7 +101,7 @@ nodisambig_list_opt    => "nd" | "ndl" | "nodisambig-list".
 # option values symbols
 option_value           => option_value_true | option_value_false.
 option_value           => error_verbosity.
-option_value           => (symbol_list & ~error_verbosity).
+option_value           => symbol_list.
 # boolean option values
 option_value_true      => "t" | "true"  | "on"  | "1" | "y" | "yes".
 option_value_false     => "f" | "false" | "off" | "0" | "n" | "no".
