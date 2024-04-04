@@ -102,9 +102,9 @@ error_verbosity_opt    => "e"  | "error-verbosity".
 nodisambig_list_opt    => "nd" | "ndl" | "nodisambig-list".
 
 # option values symbols
-option_value           => option_value_true | option_value_false
-                        | error_verbosity.
-option_value           => symbol_list.
+option_value           => option_value_true | option_value_false.
+option_value           => error_verbosity.
+option_value           => (symbol_list & ~error_verbosity).
 # boolean option values
 option_value_true      => "t" | "true"  | "on"  | "1" | "y" | "yes".
 option_value_false     => "f" | "false" | "off" | "0" | "n" | "no".

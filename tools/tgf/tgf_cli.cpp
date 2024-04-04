@@ -583,7 +583,7 @@ void tgf_repl_evaluator::set_cmd(const traverser_t& n) {
 			|| tgf_repl_parser::symbol).traversers())
 				g->opt.nodisambig_list.insert(s | get_terminals);
 		break;
-	case tgf_repl_parser::error_verbosity: {
+	case tgf_repl_parser::error_verbosity_opt: {
 		auto vrb = v | tgf_repl_parser::error_verbosity;
 		if (!vrb.has_value()) {
 			cout << "error: invalid error verbosity value\n"; return; }
@@ -925,7 +925,7 @@ int tgf_repl_evaluator::eval(const string& src) {
 			cout << ss.str(), ss = {};
 		}
 		if (opt.debug) {
-			auto cb_next_g = [&f, this](parser_type::pgraph& g) {
+			auto cb_next_g = [&f](parser_type::pgraph& g) {
 				stringstream ss;
 				f->remove_binarization(g);
 				f->remove_recursive_nodes(g);
@@ -939,7 +939,7 @@ int tgf_repl_evaluator::eval(const string& src) {
 			f->extract_graphs(f->root(), cb_next_g);
 			//g->print_internal_grammar(cout << "\ngrammar:\n\n", "  ");
 		}
-		char dummy; // as a dummy transformer
+		char dummy = '\0'; // as a dummy transformer
 		auto source = idni::rewriter::make_node_from_forest<
 			tgf_repl_parser, char, tgf_repl_parser::node_type,
 			node_variant_t>(dummy, f.get());

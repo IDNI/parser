@@ -1006,12 +1006,16 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 
 		// resolve ambiguity across productions, due to different earley items
 		// with different prod id
-		if( allowed_disambg) {
-			if(cambset.size()) { // any new sub forest
-				if( ambset.size() == 0) // first time if
+		if (allowed_disambg) {
+			if (cambset.size()) { // any new sub forest
+				if (ambset.size() == 0) // first time if
 					last_p = cur.prod, ambset = cambset;
-				else if ( cur.prod < last_p) // get the smallest one
-					ambset.clear(), last_p = cur.prod, ambset = cambset;
+				else {
+					// get the smallest one
+					if (last_p <= cur.prod) ambset.clear(),
+						last_p = cur.prod,
+						ambset = cambset;
+				}
 			}
 
 			snodes.insert(cnode);
@@ -1116,7 +1120,7 @@ template <typename C, typename T>
 std::ostream& parser<C, T>::print(std::ostream& os, const item& i) const {
 	os << (completed(i) ? TC(color::BRIGHT, color::GREEN)
 		: i.dot == 0 ? TC.BLACK() : TC(color::BRIGHT, color::CLEAR));
-	os << "(G" << (i.prod < 10 ? " " : "") << i.prod;
+	os << "(G" << (10 >= i.prod ? " " : "") << i.prod;
 	if (g.conjunctive(i.prod)) os << "/" << i.con;
 	else os << "  ";
 	os << "• " << i.dot << " [" << i.from << ", " << i.set << "]):\t " << std::flush;
