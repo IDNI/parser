@@ -887,7 +887,7 @@ void parser<C, T>::sbl_chd_forest(const item& eitem,
 	//check if we have reached the end of the rhs of prod
 	if (g.len(eitem.prod, eitem.con) <= curchd.size())  {
 		// match the end of the span we are searching in.
-		if (curchd.back().second[1] == eitem.set)
+		if (curchd.back().second[1] == eitem.set) 
 			ambset.insert(curchd);
 		return;
 	}
@@ -1010,22 +1010,94 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 	if (f.contains(root)) return false;
 	//auto& nxtset = sorted_citem[root.n()][root.second[0]];
 	auto &nxtset = sorted_citem[{ root.first.n(), root.second[0] }];
-	pnodes_set ambset;
+	
+	pnodes_set ambset, cambset;
+	std::set<pnode> snodes;
+	size_t last_p = SIZE_MAX;
+	auto check_allowed = [this] (const pnode &cnode) {
+		if(o.auto_disambiguate == false) return false;
+		for (auto &nt : o.nodisambg_list)
+			if (cnode.first.to_std_string() == nt) return false;
+		return true;
+	};
+
 	for (auto& curp : nxtset) {
 		auto& cur = *curp;
 		if (cur.set != root.second[1]) continue;
 		pnode cnode(completed(cur) /*&& !negative(cur)*/
 			? g(cur.prod) : g.nt(root.first.n()),
-			{ cur.from, cur.set });
-		if (o.binarize) binarize_comb(cur, ambset);
+			{ cur.from, cur.set });		
+		cambset.clear();
+		bool allowed_disambg = check_allowed(cnode);
+		if (o.binarize) binarize_comb(cur, 
+						allowed_disambg ? cambset : ambset);
 		else {
 			pnodes nxtlits;
-			sbl_chd_forest(cur, nxtlits, cur.from, ambset);
+			//std::cout << "\n" << cur.prod << " " << last_p << " " << ambset.size();
+			sbl_chd_forest(cur, nxtlits, cur.from, 
+						allowed_disambg ? cambset : ambset);
 		}
+
+		// resolve ambiguity across productions, due to different earley items
+		// with different prod id
+		if( allowed_disambg) {
+			if(cambset.size()) { // any new sub forest
+				if( ambset.size() == 0) // first time if
+					last_p = cur.prod, ambset = cambset;
+				else if ( cur.prod < last_p) // get the smallest one
+					ambset.clear(), last_p = cur.prod, ambset = cambset;	
+			}
+			
+			snodes.insert(cnode);
+		}		
 		f[cnode] = ambset;
-		for (auto& aset : ambset)
-			for (const pnode& nxt : aset) build_forest(f, nxt);
+		//std::cout << "\n A " << cur.prod << " " << last_p << " " << ambset.size();
 	}
+
+	if( snodes.size() && check_allowed(*snodes.begin())) {
+		
+		// resolve ambiguity if WITHIN production, where same production with same symbols 
+		// of different individual span
+		std::vector<int> gi; 
+		int gspan = -1;
+		int k = 0;
+		std::vector<int> idxs;
+		for(size_t i = 0; i <ambset.size(); i++)
+			idxs.push_back(i);
+
+		//choose the one with the first smallest span
+		do {
+			gi.clear();
+			for (auto packidx : idxs) {
+				auto apack = *next(ambset.begin(), packidx);
+				pnode lt = apack[k];
+				int span = lt.second[1] - lt.second[0];
+				if (gspan == span) gi.push_back(k);
+				if (gspan < span ) gspan = span, gi.clear(), gi.push_back(k);
+				
+			}
+			k++;
+			idxs.clear();
+			idxs.insert(idxs.begin(),gi.begin(),gi.end());
+		}
+		while( k < int(ambset.size()) && gi.size() > 1 );
+
+		cambset.clear();
+		if(ambset.size())
+			cambset.insert(*next(ambset.begin(), gi[0]));
+
+	//std::cout <<" camb "<< cambset.size() << std::endl;
+		if(snodes.size()) { 
+			DBG( assert(snodes.size() == 1));
+			f[*snodes.begin()] = cambset;
+		}
+	//std::cout << gi.size() << std::endl;
+	}
+	
+	for (auto& aset : (snodes.size() && check_allowed(*snodes.begin()))
+			? cambset : ambset)
+		for (const pnode& nxt : aset) build_forest(f, nxt);
+
 	return true;
 }
 template <typename C, typename T>
