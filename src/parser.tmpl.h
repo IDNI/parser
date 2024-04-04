@@ -981,7 +981,7 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 	std::set<pnode> snodes;
 	size_t last_p = SIZE_MAX;
 	auto check_allowed = [this] (const pnode &cnode) {
-		if(g.opt.auto_disambiguate == false) return false;
+		if (g.opt.auto_disambiguate == false) return false;
 		for (auto &nt : g.opt.nodisambig_list)
 			if (cnode.first.to_std_string() == nt) return false;
 		return true;
@@ -1012,7 +1012,7 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 					last_p = cur.prod, ambset = cambset;
 				else {
 					// get the smallest one
-					if (last_p <= cur.prod) ambset.clear(),
+					if (last_p > cur.prod) ambset.clear(),
 						last_p = cur.prod,
 						ambset = cambset;
 				}
@@ -1024,7 +1024,7 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 		//std::cout << "\n A " << cur.prod << " " << last_p << " " << ambset.size();
 	}
 
-	if( snodes.size() && check_allowed(*snodes.begin())) {
+	if (snodes.size() && check_allowed(*snodes.begin())) {
 
 		// resolve ambiguity if WITHIN production, where same production with same symbols
 		// of different individual span
@@ -1032,7 +1032,7 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 		int gspan = -1;
 		int k = 0;
 		std::vector<int> idxs;
-		for(size_t i = 0; i <ambset.size(); i++)
+		for(size_t i = 0; i < ambset.size(); i++)
 			idxs.push_back(i);
 
 		//choose the one with the first smallest span
@@ -1043,22 +1043,23 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 				pnode lt = apack[k];
 				int span = lt.second[1] - lt.second[0];
 				if (gspan == span) gi.push_back(k);
-				if (gspan < span ) gspan = span, gi.clear(), gi.push_back(k);
+				if (gspan < span) gspan = span,
+						gi.clear(), gi.push_back(k);
 
 			}
 			k++;
 			idxs.clear();
 			idxs.insert(idxs.begin(),gi.begin(),gi.end());
 		}
-		while( k < int(ambset.size()) && gi.size() > 1 );
+		while (k < int(ambset.size()) && gi.size() > 1);
 
 		cambset.clear();
-		if(ambset.size())
+		if (ambset.size())
 			cambset.insert(*next(ambset.begin(), gi[0]));
 
 	//std::cout <<" camb "<< cambset.size() << std::endl;
-		if(snodes.size()) {
-			DBG( assert(snodes.size() == 1));
+		if (snodes.size()) {
+			DBG(assert(snodes.size() == 1));
 			f[*snodes.begin()] = cambset;
 		}
 	//std::cout << gi.size() << std::endl;
