@@ -177,7 +177,7 @@ struct tgf {
 						terminals_to_str<C, T>(*f, n)));
 					cc_names.insert(name);
 				}
-				else if (s == tgf_parser::literals) push();
+				else if (s == tgf_parser::lit) push();
 				else if (s == tgf_parser::group
 					|| s == tgf_parser::optional
 					|| s == tgf_parser::repeat) pop();

@@ -241,6 +241,9 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		"	const std::basic_string<char_type>& name(size_t id) {\n"
 		"		return nts.get(id);\n"
 		"	}\n"
+		"	symbol_type literal(const nonterminal& nt) {\n"
+		"		return symbol_type(nt, &nts);\n"
+		"	}\n"
 		"private:\n"
 		"	std::vector<terminal_type> ts{\n" <<
 				gen_ts() <<
