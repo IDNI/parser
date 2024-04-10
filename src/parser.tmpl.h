@@ -983,7 +983,8 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 	auto check_allowed = [this] (const pnode &cnode) {
 		if (g.opt.auto_disambiguate == false) return false;
 		for (auto &nt : g.opt.nodisambig_list)
-			if (cnode.first.to_std_string() == nt) return false;
+			if (cnode.first.nt() && cnode.first.n() == nt)
+				return false;
 		return true;
 	};
 

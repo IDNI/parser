@@ -1,9 +1,8 @@
 @use char class eof, alnum, alpha, space, printable.
 
-#@start start
-#@trim __, _.
-#@inline char classes.
-#@inline source0, sym, digits, chars, charvar, bf_parenthesis.
+@trim __, _.
+@inline char classes.
+@inline digits, chars, charvar.
 
 # TGF grammar
 start                  => (_ statement)* _.
@@ -71,9 +70,7 @@ start_dir              => "start" __ sym.
 # trim nonterminals and its children from parsed tree
 trim_dir               => "trim" __ sym (_ ',' _ sym)*.
 trim_terminals_dir     => "trim" sep "all" sep "terminals".
-trim_children_dir      => "trim" sep "children" __ trim_arg (_ ',' _ trim_arg)*.
-trim_arg	       => sym | all_terminals_sym.
-all_terminals_sym      => "all" sep "terminals".
+trim_children_dir      => "trim" sep "children" __ sym (_ ',' _ sym)*.
 
 # inline nonterminals by their children
 inline_dir             => "inline" __ inline_arg (_ ',' _ inline_arg)*.

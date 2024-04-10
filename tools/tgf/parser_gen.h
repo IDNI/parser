@@ -131,15 +131,35 @@ void generate_parser_cpp(const std::string& tgf_filename,
 	};
 	auto gen_grammar_opts = [&g]() {
 		std::stringstream os;
-		os << "\t\to.auto_disambiguate = " << (g.opt.auto_disambiguate
-			? "true" : "false") << ";\n";
-		if (g.opt.nodisambig_list.size()) {
-			os << "\t\to.nodisambig_list = {";
+		std::array<const char*, 2> pbool = { "false", "true" };
+		auto plist = [](std::ostream& os,
+			const std::set<size_t>& list) -> std::ostream&
+		{
 			size_t i = 0;
-			for (const auto& s : g.opt.nodisambig_list)
-				os << (i++ ? ", " : "") << "\n\t\t\t\""
-					<< s << "\"";
-			os << "\n\t\t};\n";
+			for (const auto& s : list) os << (i++ ? ", " : "") << s;
+			return os;
+		};
+		os << "\t\to.trim_terminals = "
+			<< pbool[g.opt.trim_terminals] << ";\n";
+		os << "\t\to.inline_char_classes = "
+			<< pbool[g.opt.inline_char_classes] << ";\n";
+		os << "\t\to.auto_disambiguate = "
+			<< pbool[g.opt.auto_disambiguate] << ";\n";
+		if (g.opt.nodisambig_list.size()) {
+			os << "\t\to.nodisambig_list = { ";
+			plist(os, g.opt.nodisambig_list) << " };\n";
+		}
+		if (g.opt.to_trim.size()) {
+			os << "\t\to.to_trim = { ";
+			plist(os, g.opt.to_trim) << " };\n";
+		}
+		if (g.opt.to_trim_children.size()) {
+			os << "\t\to.to_trim_children = { ";
+			plist(os, g.opt.to_trim_children) << " };\n";
+		}
+		if (g.opt.to_inline.size()) {
+			os << "\t\to.to_inline = { ";
+			plist(os, g.opt.to_inline) << " };\n";
 		}
 		return os.str();
 	};
@@ -212,6 +232,7 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		"	using options         = parser_type::options;\n"
 		"	using parse_options   = parser_type::parse_options;\n"
 		"	using forest_type     = parser_type::pforest;\n"
+		"	using sptree_type     = parser_type::psptree;\n"
 		"	using input_type      = parser_type::input;\n"
 		"	using decoder_type    ="
 				" parser_type::input::decoder_type;\n"
@@ -232,6 +253,28 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		"#ifndef WIN32\n"
 		"	std::unique_ptr<forest_type> parse(int fd, parse_options po = {})\n"
 		"		{ return p.parse(fd, po); }\n"
+		"#endif //WIN32\n"
+		"	sptree_type parse_and_shape(forest_type* f) {\n"
+		"		idni::tree_shaping_options opt;\n"
+		"		opt.to_trim = g.opt.to_trim;\n"
+		"		opt.to_trim_children = g.opt.to_trim_children;\n"
+		"		opt.trim_terminals = g.opt.trim_terminals;\n"
+		"		opt.to_inline = g.opt.to_inline;\n"
+		"		opt.inline_char_classes = g.opt.inline_char_classes;\n"
+		"		return f->get_shaped_tree(opt);\n"
+		"	}\n"
+		"	sptree_type parse_and_shape(const char_type* data, size_t size,\n"
+		"		parse_options po = {}) {\n"
+		"			return parse_and_shape(p.parse(data, size, po).get()); }\n"
+		"	sptree_type parse_and_shape(std::basic_istream<char_type>& is,\n"
+		"		parse_options po = {}) {\n"
+		"				return parse_and_shape(p.parse(is, po).get()); }\n"
+		"	sptree_type parse_and_shape(const std::string& fn,\n"
+		"		parse_options po = {}) {\n"
+		"				return parse_and_shape(p.parse(fn, po).get()); }\n"
+		"#ifndef WIN32\n"
+		"	sptree_type parse_and_shape(int fd, parse_options po = {})\n"
+		"		{ return parse_and_shape(p.parse(fd, po).get()); }\n"
 		"#endif //WIN32\n"
 		"	bool found(size_t start = SIZE_MAX) { return p.found(start); }\n"
 		"	typename parser_type::error get_error() { return p.get_error(); }\n"

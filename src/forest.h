@@ -32,6 +32,14 @@
 
 namespace idni {
 
+struct tree_shaping_options {
+	std::set<size_t> to_trim{};
+	std::set<size_t> to_trim_children{};
+	bool trim_terminals = false;
+	std::set<size_t> to_inline{};
+	bool inline_char_classes = false;
+};
+
 template <typename NodeT>
 struct forest {
 	typedef NodeT node;
@@ -116,14 +124,18 @@ struct forest {
 
 	sptree get_tree();
 	sptree get_tree(const node& n);
-	sptree get_shaped_tree();
-	sptree get_shaped_tree(const node& n);
+	sptree get_shaped_tree(const tree_shaping_options opts = {});
+	sptree get_shaped_tree(const node& n,
+		const tree_shaping_options opts = {});
 
 private:
 	void _get_shaped_tree_children(std::set<NodeT>& done,
+		const tree_shaping_options& opts,
 		const std::vector<NodeT>& nodes,
 		std::vector<typename forest<NodeT>::sptree>& child);
-	sptree _get_shaped_tree(std::set<NodeT>& done, const node& n);
+	sptree _get_shaped_tree(std::set<NodeT>& done,
+		const tree_shaping_options& opts,
+		const node& n);
 
 public:
 	typedef std::function<void(const node&)> enter_t;

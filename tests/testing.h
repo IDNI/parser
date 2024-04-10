@@ -34,6 +34,8 @@ typename parser<T>::options options;
 template <typename T = char>
 typename grammar<T>::options grammar_options;
 
+std::set<std::string> nodisambig_list;
+
 static bool opt_edge = true;
 static size_t c = 0;
 static size_t stop_after = SIZE_MAX;
@@ -335,6 +337,13 @@ bool run_test_tgf(const char* g_tgf, const std::basic_string<T>& input,
 	}
 	if (g.size() == 0)
 		return std::cout << "\t# FAILED\n", failed = true, false;
+	auto str2ntids = [&nts](const std::set<std::string>& list) {
+		std::set<size_t> r;
+		for (const auto& s : list) r.insert(nts.get(s));
+		return r;
+	};
+	if (nodisambig_list.size())
+		g.opt.nodisambig_list = str2ntids(nodisambig_list);
 	parser<T> p(g, options<T>);
 	bool success = run_test_<T>(g, p, input, opts);
 	if (!print_only_failed || !success) std::cout << ss.str();
@@ -352,6 +361,13 @@ bool run_test(const prods<T>& ps, nonterminals<T>& nts,
 	char_class_fns<T> cc = {}, test_options opts = {})
 {
 	if (!check()) return info(std::cout), true;
+	auto str2ntids = [&nts](const std::set<std::string>& list) {
+		std::set<size_t> r;
+		for (const auto& s : list) r.insert(nts.get(from_str<T>(s)));
+		return r;
+	};
+	if (nodisambig_list.size())
+		grammar_options<T>.nodisambig_list = str2ntids(nodisambig_list);
 	grammar<T> g(nts, ps, start, cc, grammar_options<T>);
 	parser<T> p(g, options<T>);
 	return run_test_<T>(g, p, input, opts);
@@ -473,15 +489,10 @@ void process_args(int argc, char **argv) {
 		else if (opt == "-disable_autodisambg") auto_disambg = false;
 		else if (opt == "-no_disambg") {
 			++it;
-			if( it == args.end()) missing(opt);
+			if (it == args.end()) missing(opt);
 			std::stringstream ss(*it);
 			std::string nt;
-			while(getline(ss, nt, ',')) {
-				grammar_options<char>.nodisambig_list
-					.insert(nt),
-				grammar_options<char32_t>.nodisambig_list
-					.insert(nt);
-			}
+			while(getline(ss, nt, ',')) nodisambig_list.insert(nt);
 		}
 		else if (opt == "-help" || opt == "-h") help(""), exit(0);
 		else help(opt), exit(1);

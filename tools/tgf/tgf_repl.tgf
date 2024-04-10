@@ -1,5 +1,8 @@
 @use char class eof, alnum, alpha, space, printable.
 
+@trim _, __.
+@inline char classes, parse_input_char.
+
 # TGF grammar
 start                  => _ [ statement (_ '.' _ statement)* [_ '.'] _ ].
 
@@ -78,8 +81,10 @@ bool_option            => status_opt | colors_opt | print_ambiguity_opt
 			| print_terminals_opt
 			| measure_parsing_opt | measure_each_pos_opt
 			| measure_forest_opt | measure_preprocess_opt
-                        | debug_opt | auto_disambiguate_opt.
-list_option            => nodisambig_list_opt.
+                        | debug_opt | auto_disambiguate_opt
+			| trim_terminals_opt | inline_cc_opt.
+list_option            => nodisambig_list_opt
+                        | trim_opt | trim_children_opt | inline_opt.
 
 # option name symbols
 debug_opt              => "d"  | "debug".
@@ -97,6 +102,11 @@ measure_preprocess_opt => "mp" | "measure-preprocess".
 auto_disambiguate_opt  => "ad" | "auto-disambiguate".
 error_verbosity_opt    => "e"  | "error-verbosity".
 nodisambig_list_opt    => "nd" | "ndl" | "nodisambig-list".
+trim_terminals_opt     => "tt" | "trim-terminals".
+trim_opt               => "trim".
+trim_children_opt      => "tc" | "trim-children".
+inline_cc_opt          => "icc" | "inline-cc" | "inline-char-classes".
+inline_opt             => "i" | "inline".
 
 # option values symbols
 option_value           => option_value_true | option_value_false.

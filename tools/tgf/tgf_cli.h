@@ -41,6 +41,7 @@ struct tgf_repl_evaluator {
 
 	std::string tgf_file;
 	struct options {
+		bool debug              = false;
 		bool status             = true;
 		bool colors             = true;
 		bool print_terminals    = true;
@@ -55,7 +56,10 @@ struct tgf_repl_evaluator {
 		std::string start{"start"};
 		parser_type::error::info_lvl error_verbosity =
 			parser_type::error::info_lvl::INFO_BASIC;
-		bool debug           = false;
+		std::set<std::string> nodisambig_list{};
+		std::set<std::string> to_trim{};
+		std::set<std::string> to_trim_children{};
+		std::set<std::string> to_inline{};
 	} opt;
 
 	tgf_repl_evaluator(const std::string& tgf_file);
@@ -81,6 +85,8 @@ struct tgf_repl_evaluator {
 	void del_cmd(const traverser_t& n);
 	void update_bool_opt_cmd(const traverser_t& n,
 		const std::function<bool(bool&)>& update_fn);
+
+	void update_opts_by_grammar_opts();
 
 	parser_type::parse_options get_parse_options() const;
 	std::ostream& pretty_print(std::ostream& os,

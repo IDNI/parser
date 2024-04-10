@@ -361,7 +361,10 @@ tgf_repl_evaluator::tgf_repl_evaluator(const string& tgf_file)
 	: tgf_file(tgf_file), nts(shared_ptr<nonterminals_type>()),
 		g(make_shared<grammar_type>(
 			tgf<char>::from_file(*nts, tgf_file))),
-		p(make_shared<parser_type>(*g)) {}
+		p(make_shared<parser_type>(*g))
+{
+	update_opts_by_grammar_opts();
+}
 
 tgf_repl_evaluator::tgf_repl_evaluator(const string& tgf_file, options opt)
 	: tgf_file(tgf_file), opt(opt),
@@ -371,6 +374,18 @@ tgf_repl_evaluator::tgf_repl_evaluator(const string& tgf_file, options opt)
 		p(make_shared<parser_type>(*g))
 {
 	TC.set(opt.colors);
+	update_opts_by_grammar_opts();
+}
+
+void tgf_repl_evaluator::update_opts_by_grammar_opts() {
+	auto ntids2strs = [this] (const set<size_t>& ntids) {
+		set<string> r;
+		for (const auto& id : ntids) r.insert(nts->get(id));
+		return r;
+	};
+	opt.to_trim          = ntids2strs(g->opt.to_trim);
+	opt.to_trim_children = ntids2strs(g->opt.to_trim_children);
+	opt.to_inline        = ntids2strs(g->opt.to_inline);
 }
 
 void tgf_repl_evaluator::set_repl(repl<tgf_repl_evaluator>& r_) {
@@ -414,8 +429,27 @@ void tgf_repl_evaluator::parsed(unique_ptr<parser_type::pforest> f) {
 	};
 	if (opt.tml_rules) f->extract_graphs(f->root(), cb_next_g);
 	if (opt.tml_facts) to_tml_facts<char, char>(ss << "TML facts:\n", *f);
-	if (opt.print_graphs) pretty_print(ss << "parsed graph:\n",
-		f->get_shaped_tree(), {}, false, 1);
+	if (opt.print_graphs) {
+		auto str2ntids = [this](const set<string>& list) {
+			set<size_t> r;
+			for (const auto& s : list) r.insert(nts->get(s));
+			return r;
+		};
+		tree_shaping_options sopt;
+		sopt.trim_terminals = g->opt.trim_terminals;
+		sopt.inline_char_classes = g->opt.inline_char_classes;
+		if (opt.to_trim.size())
+			sopt.to_trim          = str2ntids(opt.to_trim);
+		else sopt.to_trim = g->opt.to_trim;
+		if (opt.to_trim.size())
+			sopt.to_trim_children = str2ntids(opt.to_trim_children);
+		else sopt.to_trim_children = g->opt.to_trim_children;
+		if (opt.to_inline.size())
+			sopt.to_inline        = str2ntids(opt.to_inline);
+		else sopt.to_inline = g->opt.to_inline;
+		pretty_print(ss << "parsed graph:\n",
+			f->get_shaped_tree(sopt), {}, false, 1);
+	}
 	cout << ss.str();
 }
 
@@ -495,35 +529,45 @@ void tgf_repl_evaluator::get_cmd(const traverser_t& n) {
 	};
 	static std::map<size_t,	std::function<void()>> printers = {
 	{ tgf_repl_parser::debug_opt,   [this]() { cout <<
-		"show debug:         " << pbool(opt.debug) << "\n"; } },
+		"show debug:          " << pbool(opt.debug) << "\n"; } },
 	{ tgf_repl_parser::status_opt,   [this]() { cout <<
-		"show status:        " << pbool(opt.status) << "\n"; } },
+		"show status:         " << pbool(opt.status) << "\n"; } },
 	{ tgf_repl_parser::colors_opt,   [this]() { cout <<
-		"colors:             " << pbool(opt.colors) << "\n"; } },
+		"colors:              " << pbool(opt.colors) << "\n"; } },
 	{ tgf_repl_parser::measure_parsing_opt, [this]() { cout <<
-		"measure-parsing:    " << pbool(opt.measure) << "\n"; } },
+		"measure-parsing:     " << pbool(opt.measure) << "\n"; } },
 	{ tgf_repl_parser::measure_each_pos_opt, [this]() { cout <<
-		"measure-each:       " << pbool(opt.measure_each_pos) << "\n"; } },
+		"measure-each:        " << pbool(opt.measure_each_pos) << "\n"; } },
 	{ tgf_repl_parser::measure_forest_opt, [this]() { cout <<
-		"measure-forest:     " << pbool(opt.measure_forest) << "\n"; } },
+		"measure-forest:      " << pbool(opt.measure_forest) << "\n"; } },
 	{ tgf_repl_parser::measure_preprocess_opt, [this]() { cout <<
-		"measure-preprocess: " << pbool(opt.measure_preprocess) << "\n"; } },
+		"measure-preprocess:  " << pbool(opt.measure_preprocess) << "\n"; } },
 	{ tgf_repl_parser::print_terminals_opt, [this]() { cout <<
-		"print-terminals:    " << pbool(opt.print_terminals) << "\n"; } },
+		"print-terminals:     " << pbool(opt.print_terminals) << "\n"; } },
 	{ tgf_repl_parser::print_graphs_opt, [this]() { cout <<
-		"print-graphs:       " << pbool(opt.print_graphs) << "\n"; } },
+		"print-graphs:        " << pbool(opt.print_graphs) << "\n"; } },
 	{ tgf_repl_parser::print_ambiguity_opt, [this]() { cout <<
-		"print-ambiguity:    " << pbool(opt.print_ambiguity) << "\n"; } },
+		"print-ambiguity:     " << pbool(opt.print_ambiguity) << "\n"; } },
 	{ tgf_repl_parser::print_rules_opt, [this]() { cout <<
-		"print-rules:        " << pbool(opt.tml_rules) << "\n"; } },
+		"print-rules:         " << pbool(opt.tml_rules) << "\n"; } },
 	{ tgf_repl_parser::print_facts_opt, [this]() { cout <<
-		"print-facts:        " << pbool(opt.tml_facts) << "\n"; } },
+		"print-facts:         " << pbool(opt.tml_facts) << "\n"; } },
+	{ tgf_repl_parser::trim_terminals_opt, [this]() { cout <<
+		"trim-terminals:      " << pbool(g->opt.trim_terminals) << "\n"; } },
+	{ tgf_repl_parser::inline_cc_opt, [this]() { cout <<
+		"inline-char-classes: " << pbool(g->opt.inline_char_classes) << "\n"; } },
+	{ tgf_repl_parser::trim_opt, [this]() { cout <<
+		"trim:                " << plist(opt.to_trim) << "\n"; } },
+	{ tgf_repl_parser::trim_children_opt, [this]() { cout <<
+		"trim-children:       " << plist(opt.to_trim_children) << "\n"; } },
+	{ tgf_repl_parser::inline_opt, [this]() { cout <<
+		"inline:              " << plist(opt.to_inline) << "\n"; } },
 	{ tgf_repl_parser::auto_disambiguate_opt, [this]() { cout <<
-		"auto-disambiguate:  " << pbool(g->opt.auto_disambiguate) << "\n"; } },
+		"auto-disambiguate:   " << pbool(g->opt.auto_disambiguate) << "\n"; } },
 	{ tgf_repl_parser::nodisambig_list_opt, [this]() { cout <<
-		"nodisambig-list:    " << plist(g->opt.nodisambig_list) << "\n"; } },
+		"nodisambig-list:     " << plist(opt.nodisambig_list) << "\n"; } },
 	{ tgf_repl_parser::error_verbosity_opt, [this]() { cout <<
-		"error-verbosity:    " << pverb(opt.error_verbosity) << "\n"; } }};
+		"error-verbosity:     " << pverb(opt.error_verbosity) << "\n"; } }};
 	auto option = n | tgf_repl_parser::option;
 	if (!option.has_value()) option = n | tgf_repl_parser::bool_option;
 	if (!option.has_value()) option = n | tgf_repl_parser::list_option;
@@ -574,6 +618,31 @@ void tgf_repl_evaluator::set_cmd(const traverser_t& n) {
 		set_bool_value(opt.measure_forest, vt); break;
 	case tgf_repl_parser::measure_preprocess_opt:
 		set_bool_value(opt.measure_preprocess, vt); break;
+	case tgf_repl_parser::trim_terminals_opt:
+		set_bool_value(g->opt.trim_terminals, vt); break;
+	case tgf_repl_parser::inline_cc_opt:
+		set_bool_value(g->opt.inline_char_classes, vt); break;
+	case tgf_repl_parser::trim_opt:
+		opt.to_trim.clear();
+		for (const auto& s : (v
+			| tgf_repl_parser::symbol_list
+			|| tgf_repl_parser::symbol).traversers())
+				opt.to_trim.insert(s | get_terminals);
+		break;
+	case tgf_repl_parser::trim_children_opt:
+		opt.to_trim_children.clear();
+		for (const auto& s : (v
+			| tgf_repl_parser::symbol_list
+			|| tgf_repl_parser::symbol).traversers())
+				opt.to_trim_children.insert(s | get_terminals);
+		break;
+	case tgf_repl_parser::inline_opt:
+		opt.to_inline.clear();
+		for (const auto& s : (v
+			| tgf_repl_parser::symbol_list
+			|| tgf_repl_parser::symbol).traversers())
+				opt.to_inline.insert(s | get_terminals);
+		break;
 	case tgf_repl_parser::auto_disambiguate_opt:
 		set_bool_value(g->opt.auto_disambiguate, vt); break;
 	case tgf_repl_parser::nodisambig_list_opt:
@@ -581,7 +650,7 @@ void tgf_repl_evaluator::set_cmd(const traverser_t& n) {
 		for (const auto& s : (v
 			| tgf_repl_parser::symbol_list
 			|| tgf_repl_parser::symbol).traversers())
-				g->opt.nodisambig_list.insert(s | get_terminals);
+				opt.nodisambig_list.insert(s | get_terminals);
 		break;
 	case tgf_repl_parser::error_verbosity_opt: {
 		auto vrb = v | tgf_repl_parser::error_verbosity;
@@ -605,27 +674,28 @@ void tgf_repl_evaluator::set_cmd(const traverser_t& n) {
 }
 
 void tgf_repl_evaluator::add_cmd(const traverser_t& n) {
-	auto option = n | tgf_repl_parser::list_option;
-	auto add = [](auto& s, auto& l) { l.insert(s | get_terminals); };
-	switch (get_opt(option)) {
-	case tgf_repl_parser::nodisambig_list_opt:
-		for (const auto& s : (n | tgf_repl_parser::symbol_list
-			|| tgf_repl_parser::symbol).traversers())
-				add(s, g->opt.nodisambig_list);
-		break;
-	};
+	auto nt = static_cast<tgf_repl_parser::nonterminal>(
+		get_opt(n | tgf_repl_parser::list_option));
+	set<string> empty{};
+	auto& l(nt == tgf_repl_parser::nodisambig_list_opt ? opt.nodisambig_list :
+		nt == tgf_repl_parser::trim_opt            ? opt.to_trim :
+		nt == tgf_repl_parser::trim_children_opt   ? opt.to_trim_children :
+		nt == tgf_repl_parser::inline_opt          ? opt.to_inline : empty);
+	for (const auto& s : (n | tgf_repl_parser::symbol_list
+		|| tgf_repl_parser::symbol).traversers()) l.insert(s | get_terminals);
 	get_cmd(n);
 }
 
 void tgf_repl_evaluator::del_cmd(const traverser_t& n) {
-	auto option = n | tgf_repl_parser::list_option;
-	auto del = [](auto& s, auto& l) { l.erase(s | get_terminals); };
-	switch (get_opt(option)) {
-	case tgf_repl_parser::nodisambig_list_opt:
-		for (const auto& s : (n | tgf_repl_parser::symbol_list
-			|| tgf_repl_parser::symbol).traversers())
-				del(s, g->opt.nodisambig_list);
-	};
+	auto nt = static_cast<tgf_repl_parser::nonterminal>(
+		get_opt(n | tgf_repl_parser::list_option));
+	set<string> empty{};
+	auto& l(nt == tgf_repl_parser::nodisambig_list_opt ? opt.nodisambig_list :
+		nt == tgf_repl_parser::trim_opt            ? opt.to_trim :
+		nt == tgf_repl_parser::trim_children_opt   ? opt.to_trim_children :
+		nt == tgf_repl_parser::inline_opt          ? opt.to_inline : empty);
+	for (const auto& s : (n | tgf_repl_parser::symbol_list
+		|| tgf_repl_parser::symbol).traversers()) l.erase(s | get_terminals);
 	get_cmd(n);
 }
 
@@ -649,6 +719,8 @@ void tgf_repl_evaluator::update_bool_opt_cmd(
 	case tgf_repl_parser::measure_forest_opt:    update_fn(opt.measure_forest); break;
 	case tgf_repl_parser::measure_preprocess_opt:update_fn(opt.measure_preprocess); break;
 	case tgf_repl_parser::auto_disambiguate_opt: update_fn(g->opt.auto_disambiguate); break;
+	case tgf_repl_parser::trim_terminals_opt:    update_fn(g->opt.trim_terminals); break;
+	case tgf_repl_parser::inline_cc_opt:         update_fn(g->opt.inline_char_classes); break;
 	default: cout << ": unknown bool option\n"; break;
 	}
 	get_cmd(n);
@@ -669,9 +741,14 @@ void help(size_t nt = tgf_repl_parser::help_sym) {
 		"  measure-parsing        measures parsing time              on/off\n"
 		"  measure-each-pos       measures parsing time of each pos  on/off\n"
 		"  measure-forest         measures forest building time      on/off\n"
-		"  measure-preprocess     measures forest preprocess time    on/off\n";
+		"  measure-preprocess     measures forest preprocess time    on/off\n"
+		"  trim-terminals         trim terminals                     on/off\n"
+		"  inline-char-classes    inline character classes           on/off\n";
 	static const std::string list_options =
-		"  nodisambig-list        list of nodes to keep ambiguous    symbol1, symbol2...\n";
+		"  nodisambig-list        list of nodes to keep ambiguous    symbol1, symbol2...\n"
+		"  trim                   list of nodes to trim              symbol1, symbol2...\n"
+		"  trim-children          list of nodes to trim children     symbol1, symbol2...\n"
+		"  inline                 list of nodes to inline            symbol1, symbol2...\n";
 	static const std::string all_available_options = std::string{} +
 		"Available options:\n" + bool_options + list_options +
 		"  error-verbosity        parse errors verbosity             basic/detailed/root-cause\n";

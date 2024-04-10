@@ -150,10 +150,14 @@ private:
 		static constexpr const auto& get_nonterminal =
 			traverser_t::get_nonterminal_extractor();
 		prods_t ps, nul{ lit_t{} };
-		std::vector<std::string> cc_names{};
-		char_class_fns<T> cc;
 		nonterminals<C, T>& nts;
+		// set by @start ...
 		prods_t start = nul;
+		// char class names coming from @use char class ...
+		std::vector<std::string> cc_names{};
+		// grammar options
+		grammar<C, T>::options opt{};
+		char_class_fns<T> cc;
 		grammar_builder(nonterminals<C, T>& nts) : nts(nts) {}
 		grammar_builder(nonterminals<C, T>& nts, const traverser_t& t)
 			: nts(nts) { build(t); }
@@ -180,13 +184,26 @@ private:
 			return 0;
 		}
 		grammar<C, T> g() {
+			//std::cout << "opt.trim_terminals: " << opt.trim_terminals << "\n";
+			//std::cout << "opt.inline_char_classes: " << opt.inline_char_classes << "\n";
+			//std::cout << "opt.to_trim: ";
+			//for (auto& n : opt.to_trim) std::cout << n << " ";
+			//std::cout << "\n";
+			//std::cout << "opt.to_trim_children: ";
+			//for (auto& n : opt.to_trim_children) std::cout << n << " ";
+			//std::cout << "\n";
+			//std::cout << "opt.to_inline: ";
+			//for (auto& n : opt.to_inline) std::cout << n << " ";
+			//std::cout << "\n";
 			return grammar<C, T>(nts, ps, start == nul
-				? prods_t(nts("start")) : start,
-				cc);
+				? prods_t(nts("start")) : start, cc, opt);
 		}
 	private:
 		size_t id = 0;
 		void directive(const traverser_t& t) {
+			auto node2nt = [this](const traverser_t& t) -> size_t {
+				return nts.get(t | get_terminals);
+			};
 			//print_node(std::cout << "directive: ", t.value()) << "\n";
 			auto d = t | tgf_parser::directive_body | get_only_child;
 			auto nt = d | get_nonterminal;
@@ -203,10 +220,40 @@ private:
 				}
 				break;
 			case tgf_parser::start_dir:
-				start = prods_t(nts(d | tgf_parser::sym
-							| get_terminals));
+				start = prods_t(node2nt(d | tgf_parser::sym));
 				break;
-			default: assert(false);
+			case tgf_parser::trim_terminals_dir:
+				opt.trim_terminals = true;
+				break;
+			case tgf_parser::trim_dir:
+				for (auto& n : (d || tgf_parser::sym)())
+					opt.to_trim.insert(node2nt(n));
+				break;
+			case tgf_parser::trim_children_dir:
+				for (auto& n : (d || tgf_parser::sym)())
+					opt.to_trim_children.insert(node2nt(n));
+				break;
+			case tgf_parser::inline_dir:
+				for (auto& n : (d || tgf_parser::inline_arg)())
+					if ((n | get_only_child
+						| get_nonterminal) ==
+						tgf_parser::char_classes_sym)
+						opt.inline_char_classes = true;
+					else opt.to_inline.insert(node2nt(n));
+				break;
+			case tgf_parser::boolean_dir: {
+				auto action = d | tgf_parser::boolean_action;
+				opt.auto_disambiguate = !action.has_value()
+					|| (action | get_only_child
+						| get_nonterminal) ==
+							tgf_parser::enable_sym;
+				break;
+			}
+			case tgf_parser::nodisambig_dir:
+				for (auto& n : (d || tgf_parser::sym)())
+					opt.nodisambig_list.insert(node2nt(n));
+				break;
+			default: return;
 			}
 		}
 		void production(const traverser_t& t) {

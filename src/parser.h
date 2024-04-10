@@ -125,8 +125,15 @@ struct grammar {
 	friend struct grammar_inspector<C, T>;
 	typedef std::pair<lit<C, T>, std::vector<lits<C, T>>> production;
 	struct options {
-		bool auto_disambiguate = true;
-		std::set<std::string> nodisambig_list = {};
+		std::set<size_t> to_trim{};
+		// nonterminal ids which children to trim by shaping coming from @trim children ...
+		std::set<size_t> to_trim_children{};
+		bool trim_terminals = false; // @trim all terminals.
+		// nonterminal ids to inline by shaping coming from @inline ...
+		std::set<size_t> to_inline{};
+		bool inline_char_classes = false; // @inline char classes.
+		bool auto_disambiguate = true; // @enable/disable disambig.
+		std::set<size_t> nodisambig_list{}; // @nodisambig nonterminal ids.
 	} opt;
 	grammar(nonterminals<C, T>& nts, options opt = {});
 	grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
