@@ -35,6 +35,59 @@ template <typename node_variant_t, typename parser_t>
 using filter = extractor<node_variant_t, parser_t>;
 
 template <typename node_variant_t, typename parser_t>
+const auto only_child_extractor = extractor<node_variant_t, parser_t>(
+	[](const traverser<node_variant_t, parser_t>& t) {
+		using node_t = idni::rewriter::sp_node<node_variant_t>;
+		if (!t.has_value())
+			return traverser<node_variant_t, parser_t>();
+		std::vector<node_t> nv;
+		for (const auto& n : t.values())
+			if (n->child.size() == 1)
+				nv.push_back(n->child.front());
+		return traverser<node_variant_t, parser_t>(nv);
+	});
+
+template <typename node_variant_t, typename parser_t>
+const auto terminal_extractor = extractor<node_variant_t, parser_t,std::string>(
+	[](const traverser<node_variant_t, parser_t>& t) {
+		using node_t = idni::rewriter::sp_node<node_variant_t>;
+		using symbol_t = typename parser_t::symbol_type;
+		if (!t.has_value()) return std::string();
+		std::vector<char> nv;
+		std::function<void(const node_t&)> extract_terminal;
+		extract_terminal = [&nv, &extract_terminal](const node_t& n) {
+			if (std::holds_alternative<symbol_t>(n->value)) {
+				auto& l = std::get<symbol_t>(n->value);
+				if (!l.nt() && !l.is_null())
+					nv.push_back(l.t());
+			}
+			for (const auto& c : n->child) extract_terminal(c);
+		};
+		for (const auto& v : t.values()) extract_terminal(v);
+		return std::string(nv.begin(), nv.end());
+	});
+
+template <typename node_variant_t, typename parser_t>
+const auto nonterminal_extractor = extractor<node_variant_t, parser_t,
+						typename parser_t::nonterminal>(
+	[](const traverser<node_variant_t, parser_t>& t) {
+		using symbol_t = typename parser_t::symbol_type;
+		using nonterminal_t = typename parser_t::nonterminal;
+		static nonterminal_t none = static_cast<nonterminal_t>(0);
+		if (!t.has_value()) return none;
+		if (t.values().size() > 1) {
+			std::cout << "cannot use nonterminal_extractor on "
+							"multiple nodes.\n";
+			return none;
+		}
+		if (std::holds_alternative<symbol_t>(t.value()->value)) {
+			auto& l = std::get<symbol_t>(t.value()->value);
+			if (l.nt()) return static_cast<nonterminal_t>(l.n());
+		}
+		return none;
+	});
+
+template <typename node_variant_t, typename parser_t>
 struct traverser {
 	using node_t        = idni::rewriter::sp_node<node_variant_t>;
 	using symbol_t      = typename parser_t::symbol_type;
@@ -65,7 +118,8 @@ struct traverser {
 	bool is_non_terminal_node() const {
 		if (!has_value_) return false;
 		if (values_.size() > 1) {
-			std::cout << "cannot use is_non_terminal_node on multiple nodes.\n";
+			std::cout << "cannot use is_non_terminal_node on "
+						"multiple nodes.\n";
 			return false;
 		}
 		return is_non_terminal_node(values_.front());
@@ -82,7 +136,8 @@ struct traverser {
 	traverser operator|(const nonterminal_t& nt) const {
 		if (!has_value_) return *this;
 		if (values_.size() > 1) {
-			std::cout << "cannot use operator| on multiple nodes. use operator|| instead.\n";
+			std::cout << "cannot use operator| on multiple nodes. "
+						"use operator|| instead.\n";
 			return *this;
 		}
 		auto v = values_[0]->child
@@ -105,73 +160,43 @@ struct traverser {
 		return nv.empty() ? traverser() : traverser(nv);
 	}
 	template <typename result_t>
-	result_t operator|(const extractor<node_variant_t, parser_t, result_t>& e) const {
+	result_t operator|(
+		const extractor<node_variant_t, parser_t, result_t>& e) const
+	{
 		if (!has_value_) return result_t();
 		if (values_.size() > 1) {
-			std::cout << "cannot use operator| on multiple nodes. use operator|| instead.\n";
+			std::cout << "cannot use operator| on multiple nodes. "
+						"use operator|| instead.\n";
 			return result_t();
 		}
 		return e(*this);
 	}
 	template <typename result_t>
-	result_t operator||(const extractor<node_variant_t, parser_t, result_t>& e) const {
+	result_t operator||(
+		const extractor<node_variant_t, parser_t, result_t>& e) const
+	{
 		if (!has_value_) return result_t();
 		return e(*this);
+	}
+	static constexpr const extractor<node_variant_t, parser_t>&
+		get_only_child_extractor()
+	{
+		return only_child_extractor<node_variant_t, parser_t>;
+	}
+	static constexpr const extractor<node_variant_t, parser_t, std::string>&
+		get_terminal_extractor()
+	{
+		return terminal_extractor<node_variant_t, parser_t>;
+	}
+	static constexpr const extractor<node_variant_t, parser_t,
+		typename parser_t::nonterminal>& get_nonterminal_extractor()
+	{
+		return nonterminal_extractor<node_variant_t, parser_t>;
 	}
 private:
 	bool has_value_ = true;
 	std::vector<node_t> values_{};
 };
-
-template <typename node_variant_t, typename parser_t>
-const auto only_child_extractor = extractor<node_variant_t, parser_t>(
-	[](const traverser<node_variant_t, parser_t>& t) {
-		using node_t = idni::rewriter::sp_node<node_variant_t>;
-		if (!t.has_value()) return traverser<node_variant_t, parser_t>();
-		std::vector<node_t> nv;
-		for (const auto& n : t.values()) {
-			if (n->child.size() == 1) nv.push_back(n->child.front());
-		}
-		return traverser<node_variant_t, parser_t>(nv);
-	});
-
-template <typename node_variant_t, typename parser_t>
-const auto terminal_extractor = extractor<node_variant_t, parser_t, std::string>(
-	[](const traverser<node_variant_t, parser_t>& t) {
-		using node_t = idni::rewriter::sp_node<node_variant_t>;
-		using symbol_t = typename parser_t::symbol_type;
-		if (!t.has_value()) return std::string();
-		std::vector<char> nv;
-		std::function<void(const node_t&)> extract_terminal;
-		extract_terminal = [&nv, &extract_terminal](const node_t& n) {
-			if (std::holds_alternative<symbol_t>(n->value)) {
-				auto& l = std::get<symbol_t>(n->value);
-				if (!l.nt() && !l.is_null()) nv.push_back(l.t());
-			}
-			for (const auto& c : n->child) extract_terminal(c);
-		};
-		for (const auto& v : t.values()) extract_terminal(v);
-		return std::string(nv.begin(), nv.end());
-	});
-
-template <typename node_variant_t, typename parser_t>
-const auto nonterminal_extractor = extractor<node_variant_t, parser_t,
-						typename parser_t::nonterminal>(
-	[](const traverser<node_variant_t, parser_t>& t) {
-		using symbol_t = typename parser_t::symbol_type;
-		using nonterminal_t = typename parser_t::nonterminal;
-		static nonterminal_t none = static_cast<nonterminal_t>(0);
-		if (!t.has_value()) return none;
-		if (t.values().size() > 1) {
-			std::cout << "cannot use nonterminal_extractor on multiple nodes.\n";
-			return none;
-		}
-		if (std::holds_alternative<symbol_t>(t.value()->value)) {
-			auto& l = std::get<symbol_t>(t.value()->value);
-			if (l.nt()) return static_cast<nonterminal_t>(l.n());
-		}
-		return none;
-	});
 
 } // idni namespace
 #endif // __IDNI__PARSER__TRAVERSER_H__
