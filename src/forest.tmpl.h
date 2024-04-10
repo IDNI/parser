@@ -87,7 +87,7 @@ void forest<NodeT>::_get_shaped_tree_children(std::set<NodeT>& done,
 		if (matches_inline_prefix(chd)) {
 			auto it = g.find(chd);
 			if (it != g.end()) for (const auto& cnodes : it->second)
-				_get_shape_tree_children(done, cnodes, child);
+				_get_shaped_tree_children(done, cnodes, child);
 		} else if (!chd.first.is_null())
 			child.push_back(_get_shaped_tree(done, chd));
 	}
@@ -104,7 +104,7 @@ forest<NodeT>::sptree forest<NodeT>::_get_shaped_tree(std::set<NodeT>& done,
 	if (n.first.nt()) {
 		auto it = g.find(n);
 		if (it == g.end()) {
-			std::cout << "Not existing node " << n.first.to_std_string() << std::endl;
+			//std::cout << "Not existing node " << n.first.to_std_string() << std::endl;
 			return NULL;
 		}
 		auto& nts = *n.first.nts;
@@ -122,10 +122,12 @@ forest<NodeT>::sptree forest<NodeT>::_get_shaped_tree(std::set<NodeT>& done,
 			//std::cout << "Ambigous node " << n.first.to_std_string() << std::endl;
 			for (auto& nodes : pack) {
 				sptree tc = std::make_shared<tree>(n);
-				_get_children(done, nodes, tc->child);
+				_get_shaped_tree_children(
+					done, nodes, tc->child);
 				t->child.push_back(tc);
 			}
-		} else for (auto& nodes : pack) _get_shape_tree_children(done, nodes, t->child);
+		} else for (auto& nodes : pack)
+			_get_shaped_tree_children(done, nodes, t->child);
 	}
 	//std::cout << "returning tree for " << n.first.to_std_string() << " children size = " << t->child.size() << std::endl;
 	return t;
