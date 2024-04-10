@@ -407,15 +407,16 @@ void tgf_repl_evaluator::parsed(unique_ptr<parser_type::pforest> f) {
 		f->remove_binarization(g);
 		f->remove_recursive_nodes(g);
 		auto t = g.extract_trees();
-		if (opt.print_graphs) pretty_print(ss << "parsed graph:\n",
-			t, {}, false, 1);
+		//if (opt.print_graphs) pretty_print(ss << "parsed graph:\n",
+		//	t, {}, false, 1);
 		if (opt.tml_rules) to_tml_rules<char, char, parser_type::pgraph>(
 			ss << "TML rules:\n", g), ss << "\n";
 		return true;
 	};
-	if (opt.print_graphs || opt.tml_rules)
-		f->extract_graphs(f->root(), cb_next_g);
+	if (opt.tml_rules) f->extract_graphs(f->root(), cb_next_g);
 	if (opt.tml_facts) to_tml_facts<char, char>(ss << "TML facts:\n", *f);
+	if (opt.print_graphs) pretty_print(ss << "parsed graph:\n",
+		f->get_shaped_tree(), {}, false, 1);
 	cout << ss.str();
 }
 
@@ -901,7 +902,7 @@ int tgf_repl_evaluator::eval(const string& src) {
 	static tgf_repl_parser rp;
 	int quit = 0;
 	auto f = rp.parse(src.c_str(), src.size());
-	if (!rp.found()) cout << rp.get_error().to_str() << "\n";
+	if (!rp.found()) cout << "tgf: " << rp.get_error().to_str() << "\n";
 	else if (f) {
 
 		auto c = f->count_trees();
