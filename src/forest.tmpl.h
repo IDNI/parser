@@ -53,6 +53,94 @@ forest<NodeT>::sptree forest<NodeT>::get_tree() {
 	return get_tree(root());
 }
 
+template <typename NodeT>
+void forest<NodeT>::_get_shaped_tree_children(std::set<NodeT>& done,
+	const std::vector<NodeT>& nodes,
+	std::vector<typename forest<NodeT>::sptree>& child)
+{
+	auto matches_inline_prefix = [](const NodeT& n) {
+		static const std::vector<std::string> prefixes = {
+			"_R", // ebnf prefix
+			"__bin"  // binarization prefix
+			//"__neg"  // negation prefix
+		};
+		if (n.first.nt()) {
+			auto s = n.first.to_std_string();
+			for (auto& prefix : prefixes)
+				if (s.find(prefix) != decltype(s)::npos)
+					return true;
+		}
+		return false;
+	};
+	auto trimmable = [](const NodeT& n) {
+		static const std::vector<std::string> trim_syms = {
+			"__",  // whitespace
+			"_"    // optional whitespace
+		};
+		if (n.first.nt()) for (auto& sym : trim_syms)
+			if (n.first.to_std_string() == sym) return true;
+		return false;
+	};
+	for (auto& chd : nodes)
+		if (done.find(chd) == done.end() && !trimmable(chd))
+	{
+		if (matches_inline_prefix(chd)) {
+			auto it = g.find(chd);
+			if (it != g.end()) for (const auto& cnodes : it->second)
+				_get_shape_tree_children(done, cnodes, child);
+		} else if (!chd.first.is_null())
+			child.push_back(_get_shaped_tree(done, chd));
+	}
+};
+
+template <typename NodeT>
+forest<NodeT>::sptree forest<NodeT>::_get_shaped_tree(std::set<NodeT>& done,
+	const NodeT& n)
+{
+	//std::cout << "getting tree for " << n.first.to_std_string() << std::endl;
+	forest<NodeT>::sptree t = std::make_shared<tree>(n);
+	nodes_set pack;
+	done.insert(n);
+	if (n.first.nt()) {
+		auto it = g.find(n);
+		if (it == g.end()) {
+			std::cout << "Not existing node " << n.first.to_std_string() << std::endl;
+			return NULL;
+		}
+		auto& nts = *n.first.nts;
+		pack = it->second;
+		if (pack.size() > 1) {
+			// move ambiguous children sets each into its separate child
+			// copy them also a value of amb. node
+			// and replace value of amb. node with nt: __AMB_<ID>
+			static size_t id = 0;
+			std::stringstream ss;
+			ss << "__AMB_" << id++;
+			auto x = t->value;
+			x.first = nts(ss.str());
+			t = std::make_shared<tree>(x);
+			//std::cout << "Ambigous node " << n.first.to_std_string() << std::endl;
+			for (auto& nodes : pack) {
+				sptree tc = std::make_shared<tree>(n);
+				_get_children(done, nodes, tc->child);
+				t->child.push_back(tc);
+			}
+		} else for (auto& nodes : pack) _get_shape_tree_children(done, nodes, t->child);
+	}
+	//std::cout << "returning tree for " << n.first.to_std_string() << " children size = " << t->child.size() << std::endl;
+	return t;
+}
+
+template <typename NodeT>
+forest<NodeT>::sptree forest<NodeT>::get_shaped_tree(const NodeT& n) {
+	std::set<node> done;
+	return _get_shaped_tree(done, n);
+}
+template <typename NodeT>
+forest<NodeT>::sptree forest<NodeT>::get_shaped_tree() {
+	return get_shaped_tree(root());
+}
+
 // a dfs based approach to detect cycles for
 // any traversable type
 template<typename NodeT>

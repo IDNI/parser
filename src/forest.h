@@ -116,7 +116,16 @@ struct forest {
 
 	sptree get_tree();
 	sptree get_tree(const node& n);
+	sptree get_shaped_tree();
+	sptree get_shaped_tree(const node& n);
 
+private:
+	void _get_shaped_tree_children(std::set<NodeT>& done,
+		const std::vector<NodeT>& nodes,
+		std::vector<typename forest<NodeT>::sptree>& child);
+	sptree _get_shaped_tree(std::set<NodeT>& done, const node& n);
+
+public:
 	typedef std::function<void(const node&)> enter_t;
 	typedef std::function<void(const node&, const nodes_set&)> exit_t;
 	typedef std::function<bool(const node&)> revisit_t;
