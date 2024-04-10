@@ -431,6 +431,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
 	const parse_options& po)
 {
 	measure measure_parsing("parsing", po.measure);
+	debug = po.debug;
 	//DBGP(std::cout << "parse: `" << to_std_string(s) << "`[" << len <<
 	//	"] g.start:" << g.start << "(" << g.start.nt() << ")" << "\n";)
 	DBGP(g.print_internal_grammar(std::cout << "grammar: \n", "\t", true)
@@ -449,9 +450,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
 			++refi[*add(t, { 0, p, c, 0, 0 }).first];
 	size_t r = 1, cb = 0; // row and cel beginning
 	measure measure_each_pos("current character parsing");
-#if DEBUG_PARSING
 	size_t proc = 0;
-#endif
 	T ch = 0;
 	size_t n = 0, cn = -1;
 	bool new_pos = true;
@@ -460,24 +459,19 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
 		if ((new_pos = (cn != in->pos()))) cn = in->pos();
 		ch = in->tcur(), n = in->tpos();
 		if (n >= S.size()) S.resize(n + 1);
-#if DEBUG_PARSING
-		if (debug_at.second > 0) debug =
+		if (debug && debug_at.second > 0) debug =
 			debug_at.first <= n && n <= debug_at.second;
-#endif
 		DBGP(std::cout << "\n" << TC.RED() << "=================="
 			"======================================================"
 			"========\nPOS: '" << cn << "' TPOS: " << n << " CH: '"
 			<< to_std_string(ch) << "'" << TC.CLEAR() <<std::endl;)
-//#if MEASURE_EACH_POS
 		if (po.measure_each_pos && new_pos) {
 			if (in->cur() == (C)'\n') (cb = n), r++;
 			measure_each_pos.start();
 		}
-//#endif
+
 		do {
-#if DEBUG_PARSING
 			size_t lproc = 0;
-#endif
 			//DBGP(print(std::cout << "t:\n", t);)
 			for (const item& x : t)
 				//print(std::cout << "adding from t into S[" << x.set << "]: ", x) << std::endl,
@@ -511,11 +505,13 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
 			}
 			//DBGP(if (!t.empty()) print(std::cout << "t not empty:\n", t) << "\n";)
 		} while (!t.empty());
+
 		if (po.measure_each_pos && new_pos) {
 			std::cout << in->pos() << " \tln: " << r << " col: "
 				<< (n - cb + 1) << " :: ";
 			measure_each_pos.stop();
 		}
+
 		if (o.incr_gen_forest) {
 			const auto& cont = S[n];
 			for (auto it = cont.begin(); it != cont.end(); ++it)
@@ -527,6 +523,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
 					build_forest(*f, curroot);
 				}
 		}
+
 		if (o.enable_gc) {
 			for (auto& rm : gcready) {
 				if (refi[rm] == 0 &&
@@ -540,8 +537,10 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
 				}
 			}
 		}
-		DBGP(print_S(std::cout << "\n") << "\n";)
+		//DBGP(print_S(std::cout << "\n") << "\n";)
+
 	} while (in->tnext());
+
 	measure_parsing.stop();
 	in->clear();
 	// remaining total items
@@ -555,6 +554,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
 
 	if (!o.incr_gen_forest) init_forest(*f, start_lit, po);
 	else f->root(pnode(start_lit, { 0, in->tpos() }));
+	if (debug) debug = false;
 	return f;
 }
 template <typename C, typename T>
@@ -1116,7 +1116,7 @@ int_t terminals_to_int(
 	if (!(is >> result)) error = true;
 	return result;
 }
-#if defined(DEBUG) || defined(WITH_DEVHELPERS)
+
 template <typename C, typename T>
 std::ostream& parser<C, T>::print(std::ostream& os, const item& i) const {
 	os << (completed(i) ? TC(color::BRIGHT, color::GREEN)
@@ -1173,7 +1173,6 @@ std::ostream& parser<C, T>::print_data(std::ostream& os) const {
 	}
 	return os;
 }
-#endif // DEBUG
 
 } // idni namespace
 #endif // __IDNI__PARSER__PARSER_TMPL_H__

@@ -220,7 +220,10 @@ bool run_test_(grammar<T>& g, parser<T>& p, const std::basic_string<T>& input,
 			ss << "\t# grammar productions:\n", "\t# ") <<std::endl;
 	}
 	emeasure_time_start(start_p, end_p);
-	auto f = p.parse(input.c_str(), input.size(), { .start = opts.start });
+	auto f = p.parse(input.c_str(), input.size(), {
+		.start = opts.start,
+		.debug = false
+	});
 	if (measure) {
 		ss << "\nelapsed parsing: ";
 		emeasure_time_end_to(start_p, end_p, ss) << "\t";

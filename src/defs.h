@@ -28,17 +28,10 @@ namespace idni {
 #	define MS(x)
 #endif
 
-#ifdef DEBUG
-#	define DEBUG_PARSING false
-#endif
-#if DEBUG && DEBUG_PARSING
-#	define DBGP(x) if (debug) { x }
+#define DBGP(x) if (debug) { x }
+#define DEBUG_POS_FROM 0
+#define DEBUG_POS_TO   0
 //if DEBUG_POS_TO > 0 show debugging information only for a given position range
-#	define DEBUG_POS_FROM 0
-#	define DEBUG_POS_TO   0
-#else
-#	define DBGP(x)
-#endif
 
 #define tdiff(start, end) ((double(end - start) / CLOCKS_PER_SEC) * 1000)
 #define emeasure_time_start(start, end) clock_t end, start = clock()

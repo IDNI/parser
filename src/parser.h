@@ -293,6 +293,7 @@ public:
 		bool measure_each_pos = false;
 		bool measure_forest = false;
 		bool measure_preprocess = false;
+		bool debug = false;
 	};
 	// parse call
 	std::unique_ptr<pforest> parse(const C* data, size_t size,
@@ -307,15 +308,15 @@ public:
 #endif
 	bool found(size_t start = SIZE_MAX);
 	std::basic_string<C> get_input();
-#if defined(DEBUG) || defined(WITH_DEVHELPERS)
+private:
 	typedef std::set<item> container_t;
 	typedef typename container_t::iterator container_iter;
+public:
 	std::ostream& print(std::ostream& os, const item& i) const;
 	std::ostream& print(std::ostream& os, const container_t& c,
 		bool only_completed = false) const;
 	std::ostream& print_data(std::ostream& os) const;
 	std::ostream& print_S(std::ostream& os, bool only_completed=false)const;
-#endif
 	struct error {
 		enum info_lvl {
 			INFO_BASIC,
@@ -345,16 +346,10 @@ public:
 		static std::basic_string<C> pr = { '_','_','t','e','m','p' };
 		return pr;
 	}
-#if DEBUG_PARSING
-	bool debug = true;
+	bool debug = false;
 	std::pair<size_t, size_t> debug_at = { DEBUG_POS_FROM, DEBUG_POS_TO };
-#endif
 private:
 	std::vector<item> back_track(const item& obj);
-#if !DEBUG && !WITH_DEVHELPERS
-	typedef std::set<item> container_t;
-	typedef typename container_t::iterator container_iter;
-#endif
 	grammar<C, T>& g;
 	options o;
 	std::unique_ptr<input> in = 0;
