@@ -36,6 +36,8 @@ struct parser_gen_options {
 	std::string terminal_type                    = "char";
 	std::string decoder                          = "";
 	std::string encoder                          = "";
+	bool auto_disambiguate                       = true;
+	std::vector<std::string> nodisambig_list     = {};
 };
 
 template <typename C = char, typename T = C>
@@ -297,22 +299,20 @@ void generate_parser_cpp(const std::string& tgf_filename,
 template <typename C = char, typename T = C>
 void generate_parser_cpp_from_string(const std::string& tgf_filename,
 	const std::basic_string<C>& grammar_tgf,
-	const std::basic_string<C>& start_nt = from_cstr<C>("start"),
 	parser_gen_options opt = {})
 {
 	nonterminals<C, T> nts;
 	generate_parser_cpp(tgf_filename,
-		tgf<C, T>::from_string(nts, grammar_tgf, start_nt), opt);
+		tgf<C, T>::from_string(nts, grammar_tgf), opt);
 }
 
 template <typename C = char, typename T = C>
 void generate_parser_cpp_from_file(const std::string& tgf_filename,
-	const std::basic_string<C>& start_nt = from_cstr<C>("start"),
 	parser_gen_options opt = {})
 {
 	nonterminals<C, T> nts;
 	generate_parser_cpp(tgf_filename,
-		tgf<C, T>::from_file(nts, tgf_filename, start_nt), opt);
+		tgf<C, T>::from_file(nts, tgf_filename), opt);
 }
 
 } // idni namespace

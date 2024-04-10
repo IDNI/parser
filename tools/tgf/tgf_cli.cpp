@@ -181,9 +181,9 @@ int show(const string& tgf_file, const string start = "start",
 	//	" --nullable-ambiguity " << PBOOL(print_nullable_ambiguity) <<
 	//	"\n";)
 	nonterminals<char> nts;
-	auto g = tgf<char>::from_file(nts, tgf_file, start);
-	if (print_grammar)
-		g.print_internal_grammar(cout, {}, true, term::colors(colors));
+	auto g = tgf<char>::from_file(nts, tgf_file);
+	if (print_grammar) g.print_internal_grammar_for(
+		cout, start, {}, true, term::colors(colors));
 	if (print_nullable_ambiguity) g.check_nullable_ambiguity(cout);
 	return 0;
 }
@@ -283,8 +283,7 @@ int tgf_run(int argc, char** argv) {
 		for (auto&& s : cmd.get<string>("nodisambig-list")
 			| std::views::split(',')) nodisambig_list
 					.emplace_back(s.begin(), s.end());
-		generate_parser_cpp_from_file<char>(tgf_file,
-			cmd.get<string>("start"), parser_gen_options
+		generate_parser_cpp_from_file<char>(tgf_file, parser_gen_options
 		{
 			.output_dir          = cmd.get<string>("output-dir"),
 			.output              = cmd.get<string>("output"),
@@ -294,8 +293,8 @@ int tgf_run(int argc, char** argv) {
 			.terminal_type       = "char",
 			.decoder             = cmd.get<string>("decoder"),
 			.encoder             = cmd.get<string>("encoder"),
-			//.auto_disambiguate   = cmd.get<bool>("auto-disambiguate"),
-			//.nodisambig_list     = nodisambig_list
+			.auto_disambiguate   = cmd.get<bool>("auto-disambiguate"),
+			.nodisambig_list     = nodisambig_list
 		});
 	}
 
@@ -361,14 +360,14 @@ ostream& tgf_repl_evaluator::pretty_print(ostream& os,
 tgf_repl_evaluator::tgf_repl_evaluator(const string& tgf_file)
 	: tgf_file(tgf_file), nts(shared_ptr<nonterminals_type>()),
 		g(make_shared<grammar_type>(
-			tgf<char>::from_file(*nts, tgf_file, opt.start))),
+			tgf<char>::from_file(*nts, tgf_file))),
 		p(make_shared<parser_type>(*g)) {}
 
 tgf_repl_evaluator::tgf_repl_evaluator(const string& tgf_file, options opt)
 	: tgf_file(tgf_file), opt(opt),
 		nts(make_shared<nonterminals_type>()),
 		g(make_shared<grammar_type>(
-			tgf<char>::from_file(*nts, tgf_file, opt.start))),
+			tgf<char>::from_file(*nts, tgf_file))),
 		p(make_shared<parser_type>(*g))
 {
 	TC.set(opt.colors);
@@ -457,7 +456,7 @@ void tgf_repl_evaluator::parse(const string& infile) {
 void tgf_repl_evaluator::reload(const string& new_tgf_file) {
 	if (tgf_file != new_tgf_file) tgf_file = new_tgf_file;
 	nts = make_shared<nonterminals_type>();
-	g = make_shared<grammar_type>(tgf<char>::from_file(*nts, tgf_file, opt.start));
+	g = make_shared<grammar_type>(tgf<char>::from_file(*nts, tgf_file));
 	p = make_shared<parser_type>(*g);
 	cout << "loaded: " << tgf_file << "\n";
 }

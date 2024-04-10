@@ -12,6 +12,10 @@
 // modified over time by the Author.
 #ifndef __IDNI__PARSER__TGF_H__
 #define __IDNI__PARSER__TGF_H__
+#include <fstream>
+#include <streambuf>
+
+#include "parser_instance.h"
 #include "tgf_parser.generated.h"
 #include "traverser.h"
 #include "devhelpers.h"
@@ -43,19 +47,76 @@ struct tgf {
 	using prods_t        = prods<C, T>;
 
 	static grammar<C, T> from_string(nonterminals<C, T>& nts_,
-		const std::basic_string<C>& s,
-		const std::basic_string<C>& start_nt = from_cstr<C>("start"))
+		const std::basic_string<C>& s)
 	{
-		auto& p = parser_instance<tgf_parser>();
-		return from_forest(nts_, p.parse(s.c_str(), s.size()),start_nt);
+		grammar_builder b(nts_);
+		auto c = s.c_str();
+		size_t last = 0;
+		auto l = s.size();
+		//std::cout << "parsing: " << to_std_string(s) << std::endl;
+		bool in_string = false;
+		//DBG(f.g.print_data(std::cout << "\n>>>\n\n") << "\n<<<" << std::endl;)
+		bool in_comment = false;
+		bool in_char = false;
+		bool in_escape = false;
+
+		auto escape = [&in_escape](char c) {
+			bool ret = in_escape;
+			if (in_escape) in_escape = false;
+			if (ret) return ret;
+			return in_escape = (c == '\\');
+		};
+		for (size_t i = 0; i != l; ++i) {
+			//std::cout << "i: " << i << " c[i]: '" << c[i]
+			//	<< "' string: " << in_string
+			//	<< " comment: " << in_comment
+			//	<< " char: " << in_char
+			//	<< " escape: " << in_escape << std::endl;
+			if (in_comment) {
+				if (c[i] == '\n') in_comment = false;
+			}
+			else if (in_string) {
+				if (escape(c[i])) continue;
+				if (c[i] == '"') in_string = false;
+			}
+			else if (in_char) {
+				if (escape(c[i])) continue;
+				if (c[i] == '\'') in_char = false;
+			}
+			else if (c[i] == '\'') in_char = true;
+			else if (c[i] == '"') in_string = true;
+			else if (c[i] == '#') in_comment = true;
+			else if (c[i] == '.') {
+				const char* nc = c + last;
+				//std::cout << "last: " << last << " " << c[last] << std::endl;
+				//std::cout << "i:    " << i << " " << c[i] << std::endl;
+				size_t nl = i - last + 1;
+				//std::cout << "nl:   " << nl << std::endl;
+				//std::cout << "nc:   {";
+				//for (size_t j = 0; j < nl; ++j) {
+				//	std::cout << nc[j];
+				//}
+				//std::cout << "}\n";
+				last = i + 1;
+				int ret = b.parse(nc, nl);
+				//std::cout << "ret:   " << ret << std::endl;
+				if (ret == 1) break;
+			}
+		}
+		return b.g();
 	}
 
 	static grammar<C, T> from_file(nonterminals<C, T>& nts_,
-		const std::string& filename,
-		const std::basic_string<C>& start_nt = from_cstr<C>("start"))
+		const std::string& filename)
 	{
-		auto& p = parser_instance<tgf_parser>();
-		return from_forest(nts_, p.parse(filename), start_nt);
+		std::ifstream ifs(filename);
+		if (!ifs) {
+			std::cerr << "cannot open file: " << filename << std::endl;
+			return grammar<C, T>(nts_);
+		}
+		return from_string(nts_, std::string(
+				std::istreambuf_iterator<C>(ifs),
+				std::istreambuf_iterator<C>()));
 	}
 
 	static grammar<C, T> from_forest(nonterminals<C, T>& nts_,
@@ -63,7 +124,6 @@ struct tgf {
 		const std::basic_string<C>& start_nt = from_cstr<C>("start"))
 	{
 		auto& p = parser_instance<tgf_parser>();
-		//std::cout << "start_nt: `" << start_nt << "`("<<p.id(start_nt)<<")\n";
 		if (!p.found(p.id(start_nt))) return std::cout << "TGF: "
 			<< p.get_error().to_str() << "\n", grammar<C, T>(nts_);
 		if (!f) return std::cout << "No parse forest\n",
@@ -71,22 +131,14 @@ struct tgf {
 		auto n_trees = f->count_trees();
 		if (f->is_ambiguous() && n_trees > 1) std::cout
 			<< "\nambiguity... number of trees: " << n_trees <<"\n";
-		char dummy; // as a dummy transformer
+		char dummy = '\0'; // as a dummy transformer
 		auto source = idni::rewriter::make_node_from_forest<
 			tgf_parser, char, tgf_parser::node_type,
 			node_variant_t>(dummy, f.get());
 		//print_node(std::cout << "source: `", source) << "`\n";
 		traverser_t t(source);
-		grammar_builder x(nts_, t);
-
-		//auto y = f->get_tree();
-		//std::cout << "Tree: " << y->value.first.to_std_string() << std::endl;
-		//y->to_print(std::cout, 0, {}, false);
-		//print_node(std::cout << "source: ", source) << "\n"//;
-
-		//std::cout << "TGF prods parsed: " << x.ps << std::endl;
-
-		return x.g();
+		grammar_builder b(nts_, t);
+		return b.g();
 	}
 
 private:
@@ -102,15 +154,30 @@ private:
 		char_class_fns<T> cc;
 		nonterminals<C, T>& nts;
 		prods_t start = nul;
+		grammar_builder(nonterminals<C, T>& nts) : nts(nts) {}
 		grammar_builder(nonterminals<C, T>& nts, const traverser_t& t)
-			: nts(nts)
-		{
+			: nts(nts) { build(t); }
+		void build(const traverser_t& t) {
 			auto statements  = t || tgf_parser::statement;
 			auto directives  = statements || tgf_parser::directive;
 			for (const auto& d : directives()) directive(d);
 			cc = predefined_char_classes<C, T>(cc_names, nts);
 			auto productions = statements || tgf_parser::production;
 			for (const auto& pr : productions()) production(pr);
+		}
+		int parse(const char* s, size_t l) {
+			auto& p = parser_instance<tgf_parser>();
+			static tgf_parser::parse_options po{
+				.start = tgf_parser::start_statement };
+			auto f = p.parse(s, l, po);
+			if (!p.found(po.start) || !f) return 1;
+			char dummy = '\0';
+			auto source = idni::rewriter::make_node_from_forest<
+				tgf_parser, char, tgf_parser::node_type,
+				node_variant_t>(dummy, f.get());
+			//print_node(std::cout << "source: `", source) << "`\n";
+			build(traverser_t(source));
+			return 0;
 		}
 		grammar<C, T> g() {
 			return grammar<C, T>(nts, ps, start == nul
