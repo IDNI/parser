@@ -60,9 +60,9 @@ void forest<NodeT>::_get_shaped_tree_children(std::set<NodeT>& done,
 {
 	auto matches_inline_prefix = [](const NodeT& n) {
 		static const std::vector<std::string> prefixes = {
-			"_R", // ebnf prefix
-			"__bin"  // binarization prefix
-			//"__neg"  // negation prefix
+			"__E_", // ebnf prefix
+			"__B_"  // binarization prefix
+			//"__N_"  // negation prefix
 		};
 		if (n.first.nt()) {
 			auto s = n.first.to_std_string();
@@ -432,7 +432,7 @@ template <typename NodeT>
 bool forest<NodeT>::remove_recursive_nodes(graph& g) {
 	//decltype(NodeT().first.t()) prefix []= { '_', 'R' };
 	//collect all prefix like nodes for replacement
-	std::string prefix = "_R";
+	std::string prefix = "__E_";
 	std::vector<NodeT> s;
 	for (auto& kv : g) {
 		auto name = kv.first.first.to_std_string();
@@ -447,7 +447,7 @@ bool forest<NodeT>::remove_binarization(graph& g) {
 	//better use parser::tnt_prefix()
 	//decltype(NodeT().first.t()) prefix []= { '_','_','t','e','m','p' };
 	//collect all prefix like nodes for replacement
-	std::string prefix="__temp";
+	std::string prefix="__B_";
 	std::vector<NodeT> s;
 	for (auto& kv : g) {
 		auto name = kv.first.first.to_std_string();

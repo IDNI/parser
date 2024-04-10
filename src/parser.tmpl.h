@@ -753,7 +753,7 @@ typename parser<C, T>::error parser<C, T>::get_error() {
 			} else {
 				//ignoring empty string, completed and nts
 				if (completed(t) && (get_nt(t).to_std_string()
-						.rfind("__neg_", 0) == 0))
+						.rfind("__N_", 0) == 0))
 				{
 					err.unexp = {};
 					for (size_t i = t.from; i < t.set; ++i)

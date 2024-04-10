@@ -343,7 +343,7 @@ public:
 	};
 	error get_error();
 	static std::basic_string<C> tnt_prefix() {
-		static std::basic_string<C> pr = { '_','_','t','e','m','p' };
+		static std::basic_string<C> pr = { '_','_','B','_' };
 		return pr;
 	}
 	bool debug = false;

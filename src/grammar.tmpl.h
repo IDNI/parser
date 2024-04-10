@@ -495,7 +495,7 @@ grammar<C, T>::grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
 		for (const lits<C, T>& l : c) if (l.neg) {
 			// create a negative rule for a negative conjunction
 			std::basic_stringstream<C> ss;
-			ss << from_cstr<C>("__neg_") << neg_id++;
+			ss << from_cstr<C>("__N_") << neg_id++;
 			auto l_nt = nts(ss.str());
 			lits<C, T> ot(l), nt({ l_nt });
 			nt.neg = true, ot.neg = false;
