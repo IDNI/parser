@@ -25,11 +25,24 @@
 #include <optional>
 #include <variant>
 #include <compare>
-//#include <boost/log/trivial.hpp>
 
 #include "forest.h"
 #include "parser_instance.h"
 #include "parser.h"
+
+// use boost log if available otherwise use std::cout
+#ifdef BOOST_LOG_TRIVIAL
+#	define LOG_INFO BOOST_LOG_TRIVIAL(debug)
+#	define LOG_END  ""
+#	define LOG_REWRITING true
+#else
+#	define LOG_INFO std::cout
+#	define LOG_END  "\n"
+#	ifndef DEBUG
+#		define LOG_REWRITING true
+#	endif
+#endif
+
 
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //
@@ -846,13 +859,14 @@ node_t apply_with_skip(const rule<node_t>& r, const node_t& n, is_ignore_t& i, i
 		matcher {p, u, i, c, sk};
 	auto nn = apply(s, n, matcher);
 
+#ifdef LOG_REWRITING
 	if (nn != n) {
-		std::cout << "(R) " << p << " = " << s;
-		std::cout << "(F) " << nn;
+		LOG_INFO << "(R) " << p << " = " << s << LOG_END;
+		LOG_INFO << "(F) " << nn << LOG_END;
 		//DBG(print_sp_tau_node_tree(std::cout << "old node: ", n));
 		//DBG(print_sp_tau_node_tree(std::cout << "new node: ", nn));
 	}
-
+#endif
 	return nn;
 }
 
@@ -867,11 +881,12 @@ node_t apply_with_skip_if(const rule<node_t>& r, const node_t& n, is_ignore_t& i
 		matcher {p, u, i, c, sk, predicate};
 	auto nn = apply(s, n, matcher);
 
+#ifdef LOG_REWRITING
 	if (nn != n) {
-		std::cout << "(R) " << p << " = " << s;
-		std::cout << "(F) " << nn;
+		LOG_INFO << "(R) " << p << " = " << s << LOG_END;
+		LOG_INFO << "(F) " << nn << LOG_END;
 	}
-
+#endif
 	return nn;
 }
 
@@ -998,4 +1013,7 @@ std::ostream& operator<<(std::ostream& stream, const idni::rewriter::rule<node_t
 	return stream << r.first << " := " << r.second << ".";
 }
 
+#undef LOG_INFO
+#undef LOG_END
+#undef LOG_REWRITING
 #endif // __IDNI__REWRITING_H__
