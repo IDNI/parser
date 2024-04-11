@@ -934,7 +934,8 @@ template<typename parser_t, typename transformer_t, typename parse_symbol_t,
 sp_node<symbol_t> make_node_from_string(const transformer_t& transformer,
 	const std::string source, idni::parser<>::parse_options options = {}) {
 	auto f = parser_instance<parser_t>().parse(source.c_str(), source.size(), options);
-	check_parser_result<parser_t>(source, f.get(), options.start);
+	if (check_parser_result<parser_t>(source, f.get(), options.start))
+		return 0;
 	return make_node_from_forest<
 			parser_t,
 			transformer_t,
@@ -947,10 +948,11 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& transformer,
 template<typename parser_t, typename transformer_t, typename parse_symbol_t,
 	typename symbol_t>
 sp_node<symbol_t> make_node_from_stream(const transformer_t& transformer,
-	std::istream& is)
+	std::istream& is, idni::parser<>::parse_options options = {})
 {
-	auto f = parser_instance<parser_t>().parse(is);
-	check_parser_result<parser_t>("<@stdin>", f.get());
+	auto f = parser_instance<parser_t>().parse(is, options);
+	if (check_parser_result<parser_t>("<@stdin>", f.get(), options.start))
+		return 0;
 	return make_node_from_forest<
 			parser_t,
 			transformer_t,
@@ -963,10 +965,11 @@ sp_node<symbol_t> make_node_from_stream(const transformer_t& transformer,
 template<typename parser_t, typename transformer_t, typename parse_symbol_t,
 	typename symbol_t>
 sp_node<symbol_t> make_node_from_file(const transformer_t& transformer,
-	const std::string& filename)
+	const std::string& filename, idni::parser<>::parse_options options = {})
 {
-	auto f = parser_instance<parser_t>().parse(filename);
-	check_parser_result<parser_t>(std::string("<")+filename+">", f.get());
+	auto f = parser_instance<parser_t>().parse(filename, options);
+	if (check_parser_result<parser_t>(std::string("<")+filename+">",
+		f.get(), options.start)) return 0;
 	return make_node_from_forest<parser_t, transformer_t,
 		parse_symbol_t, symbol_t>(transformer, f.get());
 }

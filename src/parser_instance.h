@@ -29,13 +29,16 @@ parser_t& parser_instance() {
 #define SHOW_GRAMMAR_ERRORS
 #ifdef SHOW_GRAMMAR_ERRORS
 template <typename parser_t>
-void check_parser_result(const std::string& source,
+int check_parser_result(const std::string& source,
 	const typename parser_t::forest_type* f, size_t start = SIZE_MAX)
 {
 	auto& p = parser_instance<parser_t>();
-	if (!f || !p.found(start))
-		std::cout << "# source: `" << source << "`\n"
-	 		<< p.get_error().to_str();
+	if (!f || !p.found(start)) {
+		using lvl = typename parser_t::parser_type::error::info_lvl;
+		//p.p.print_data(std::cout << "# data:\n") << "\n";
+		return std::cout << "\n# source: `" << source << "`\n"
+	 		<< p.get_error().to_str(lvl::INFO_DETAILED), 1;
+	}
 // show ambiguous nodes
 #ifdef DEBUG
 	else if (f->is_ambiguous()) {
@@ -59,6 +62,7 @@ void check_parser_result(const std::string& source,
 		}
 	}
 #endif // DEBUG
+	return 0;
 }
 #else
 template <typename parser_t>

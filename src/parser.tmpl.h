@@ -464,7 +464,8 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
 		DBGP(std::cout << "\n" << TC.RED() << "=================="
 			"======================================================"
 			"========\nPOS: '" << cn << "' TPOS: " << n << " CH: '"
-			<< to_std_string(ch) << "'" << TC.CLEAR() <<std::endl;)
+			<< to_std_string(ch) << "' (" << ((int) ch) << ") "
+			<< TC.CLEAR() <<std::endl;)
 		if (po.measure_each_pos && new_pos) {
 			if (in->cur() == (C)'\n') (cb = n), r++;
 			measure_each_pos.start();

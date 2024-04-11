@@ -38,7 +38,6 @@ struct repl {
 		std::string history_file = ".history")
 		: re_(re), prompt_(prompt), history_file_(history_file)
 	{
-		re.r = this;
 		// save terminal state and set terminal to raw mode
 		tcgetattr(STDIN_FILENO, &orig_attrs_);
 		raw_attrs_ = orig_attrs_;
@@ -53,6 +52,7 @@ struct repl {
 		std::string s;
 		while (std::getline(hf, s)) if (s.size()) history_.push_back(s);
 		hpos_ = history_.size();
+		re.r = this;
 	}
 	~repl() {
 		// return terminal to its original state

@@ -457,11 +457,12 @@ tgf_repl_evaluator::parser_type::parse_options
 	tgf_repl_evaluator::get_parse_options() const
 {
 	return parser_type::parse_options{
-		.start = nts->get(opt.start),
-		.measure = opt.measure,
-		.measure_each_pos = opt.measure_each_pos,
-		.measure_forest = opt.measure_forest,
-		.measure_preprocess = opt.measure_preprocess
+		.start              = nts->get(opt.start),
+		.measure            = opt.measure,
+		.measure_each_pos   = opt.measure_each_pos,
+		.measure_forest     = opt.measure_forest,
+		.measure_preprocess = opt.measure_preprocess,
+		.debug              = opt.debug
 	};
 }
 
