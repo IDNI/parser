@@ -154,8 +154,6 @@ private:
 		q(nt(12), (nt(6)+t(1)+nt(6)+nt(11)));
 		//       __E___E_start_0_2(13) => null.
 		q(nt(13), (nul));
-		//       __E___E_start_0_2(13) => __E___E_start_0_1(12).
-		q(nt(13), (nt(12)));
 		//       __E___E_start_0_2(13) => __E___E_start_0_1(12) __E___E_start_0_2(13).
 		q(nt(13), (nt(12)+nt(13)));
 		//       __E___E_start_0_3(14) => _(6) '.'.
@@ -186,8 +184,6 @@ private:
 		q(nt(18), (t(2)));
 		//       __E_comment_7(19)    => null.
 		q(nt(19), (nul));
-		//       __E_comment_7(19)    => __E_comment_6(18).
-		q(nt(19), (nt(18)));
 		//       __E_comment_7(19)    => __E_comment_6(18) __E_comment_7(19).
 		q(nt(19), (nt(18)+nt(19)));
 		//       __E_comment_8(20)    => '\r'.
@@ -204,8 +200,6 @@ private:
 		q(nt(22), (nt(24)));
 		//       __E_quoted_string_10(25) => null.
 		q(nt(25), (nul));
-		//       __E_quoted_string_10(25) => __E_quoted_string_9(22).
-		q(nt(25), (nt(22)));
 		//       __E_quoted_string_10(25) => __E_quoted_string_9(22) __E_quoted_string_10(25).
 		q(nt(25), (nt(22)+nt(25)));
 		//       quoted_string(21)    => '"' __E_quoted_string_10(25) '"'.
@@ -248,8 +242,6 @@ private:
 		q(nt(31), (t(14)));
 		//       __E_symbol_15(32)    => null.
 		q(nt(32), (nul));
-		//       __E_symbol_15(32)    => __E_symbol_14(31).
-		q(nt(32), (nt(31)));
 		//       __E_symbol_15(32)    => __E_symbol_14(31) __E_symbol_15(32).
 		q(nt(32), (nt(31)+nt(32)));
 		//       symbol(29)           => __E_symbol_13(30) __E_symbol_15(32).
@@ -260,8 +252,6 @@ private:
 		q(nt(8), (t(2)));
 		//       __E_parse_input_16(34) => null.
 		q(nt(34), (nul));
-		//       __E_parse_input_16(34) => parse_input_char(8).
-		q(nt(34), (nt(8)));
 		//       __E_parse_input_16(34) => parse_input_char(8) __E_parse_input_16(34).
 		q(nt(34), (nt(8)+nt(34)));
 		//       parse_input(33)      => __E_parse_input_16(34).
@@ -678,8 +668,6 @@ private:
 		q(nt(109), (nt(6)+t(37)+nt(6)+nt(29)));
 		//       __E_symbol_list_24(110) => null.
 		q(nt(110), (nul));
-		//       __E_symbol_list_24(110) => __E_symbol_list_23(109).
-		q(nt(110), (nt(109)));
 		//       __E_symbol_list_24(110) => __E_symbol_list_23(109) __E_symbol_list_24(110).
 		q(nt(110), (nt(109)+nt(110)));
 		//       symbol_list(71)      => symbol(29) __E_symbol_list_24(110).

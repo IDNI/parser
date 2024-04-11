@@ -153,8 +153,6 @@ private:
 		q(nt(12), (nt(7)+nt(13)));
 		//       __E_start_1(14)      => null.
 		q(nt(14), (nul));
-		//       __E_start_1(14)      => __E_start_0(12).
-		q(nt(14), (nt(12)));
 		//       __E_start_1(14)      => __E_start_0(12) __E_start_1(14).
 		q(nt(14), (nt(12)+nt(14)));
 		//       start(11)            => __E_start_1(14) _(7).
@@ -183,8 +181,6 @@ private:
 		q(nt(21), (t(1)));
 		//       __E_comment_5(22)    => null.
 		q(nt(22), (nul));
-		//       __E_comment_5(22)    => __E_comment_4(21).
-		q(nt(22), (nt(21)));
 		//       __E_comment_5(22)    => __E_comment_4(21) __E_comment_5(22).
 		q(nt(22), (nt(21)+nt(22)));
 		//       __E_comment_6(23)    => '\r'.
@@ -241,8 +237,6 @@ private:
 		q(nt(30), (t(8)+nt(32)));
 		//       __E_terminal_string_11(35) => null.
 		q(nt(35), (nul));
-		//       __E_terminal_string_11(35) => terminal_string_char(34).
-		q(nt(35), (nt(34)));
 		//       __E_terminal_string_11(35) => terminal_string_char(34) __E_terminal_string_11(35).
 		q(nt(35), (nt(34)+nt(35)));
 		//       terminal_string(33)  => '"' __E_terminal_string_11(35) '"'.
@@ -291,8 +285,6 @@ private:
 		q(nt(43), (t(6)));
 		//       __E_sym_16(44)       => null.
 		q(nt(44), (nul));
-		//       __E_sym_16(44)       => __E_sym_15(43).
-		q(nt(44), (nt(43)));
 		//       __E_sym_16(44)       => __E_sym_15(43) __E_sym_16(44).
 		q(nt(44), (nt(43)+nt(44)));
 		//       sym(41)              => __E_sym_14(42) __E_sym_16(44).
@@ -303,8 +295,6 @@ private:
 		q(nt(47), (nt(7)+t(19)+nt(7)+nt(46)));
 		//       __E_alternation_18(48) => null.
 		q(nt(48), (nul));
-		//       __E_alternation_18(48) => __E_alternation_17(47).
-		q(nt(48), (nt(47)));
 		//       __E_alternation_18(48) => __E_alternation_17(47) __E_alternation_18(48).
 		q(nt(48), (nt(47)+nt(48)));
 		//       alternation(45)      => conjunction(46) __E_alternation_18(48).
@@ -313,8 +303,6 @@ private:
 		q(nt(50), (nt(7)+t(20)+nt(7)+nt(49)));
 		//       __E_conjunction_20(51) => null.
 		q(nt(51), (nul));
-		//       __E_conjunction_20(51) => __E_conjunction_19(50).
-		q(nt(51), (nt(50)));
 		//       __E_conjunction_20(51) => __E_conjunction_19(50) __E_conjunction_20(51).
 		q(nt(51), (nt(50)+nt(51)));
 		//       conjunction(46)      => concatenation(49) __E_conjunction_20(51).
@@ -323,8 +311,6 @@ private:
 		q(nt(53), (nt(6)+nt(52)));
 		//       __E_concatenation_22(54) => null.
 		q(nt(54), (nul));
-		//       __E_concatenation_22(54) => __E_concatenation_21(53).
-		q(nt(54), (nt(53)));
 		//       __E_concatenation_22(54) => __E_concatenation_21(53) __E_concatenation_22(54).
 		q(nt(54), (nt(53)+nt(54)));
 		//       concatenation(49)    => factor(52) __E_concatenation_22(54).
@@ -387,8 +373,6 @@ private:
 		q(nt(72), (nt(7)+t(34)+nt(7)+nt(41)));
 		//       __E_trim_dir_24(73)  => null.
 		q(nt(73), (nul));
-		//       __E_trim_dir_24(73)  => __E_trim_dir_23(72).
-		q(nt(73), (nt(72)));
 		//       __E_trim_dir_24(73)  => __E_trim_dir_23(72) __E_trim_dir_24(73).
 		q(nt(73), (nt(72)+nt(73)));
 		//       trim_dir(68)         => 't' 'r' 'i' 'm' __(6) sym(41) __E_trim_dir_24(73).
@@ -399,8 +383,6 @@ private:
 		q(nt(75), (nt(7)+t(34)+nt(7)+nt(41)));
 		//       __E_trim_children_dir_26(76) => null.
 		q(nt(76), (nul));
-		//       __E_trim_children_dir_26(76) => __E_trim_children_dir_25(75).
-		q(nt(76), (nt(75)));
 		//       __E_trim_children_dir_26(76) => __E_trim_children_dir_25(75) __E_trim_children_dir_26(76).
 		q(nt(76), (nt(75)+nt(76)));
 		//       trim_children_dir(66) => 't' 'r' 'i' 'm' sep(24) 'c' 'h' 'i' 'l' 'd' 'r' 'e' 'n' __(6) sym(41) __E_trim_children_dir_26(76).
@@ -409,8 +391,6 @@ private:
 		q(nt(78), (nt(7)+t(34)+nt(7)+nt(77)));
 		//       __E_inline_dir_28(79) => null.
 		q(nt(79), (nul));
-		//       __E_inline_dir_28(79) => __E_inline_dir_27(78).
-		q(nt(79), (nt(78)));
 		//       __E_inline_dir_28(79) => __E_inline_dir_27(78) __E_inline_dir_28(79).
 		q(nt(79), (nt(78)+nt(79)));
 		//       inline_dir(65)       => 'i' 'n' 'l' 'i' 'n' 'e' __(6) inline_arg(77) __E_inline_dir_28(79).
@@ -429,8 +409,6 @@ private:
 		q(nt(84), (nt(7)+t(34)+nt(7)+nt(83)));
 		//       __E_use_dir_31(85)   => null.
 		q(nt(85), (nul));
-		//       __E_use_dir_31(85)   => __E_use_dir_30(84).
-		q(nt(85), (nt(84)));
 		//       __E_use_dir_31(85)   => __E_use_dir_30(84) __E_use_dir_31(85).
 		q(nt(85), (nt(84)+nt(85)));
 		//       use_dir(69)          => 'u' 's' 'e' __(6) use_from(82) __(6) use_param(83) __E_use_dir_31(85).
@@ -439,8 +417,6 @@ private:
 		q(nt(86), (nt(7)+t(34)+nt(7)+nt(83)));
 		//       __E_use_dir_33(87)   => null.
 		q(nt(87), (nul));
-		//       __E_use_dir_33(87)   => __E_use_dir_32(86).
-		q(nt(87), (nt(86)));
 		//       __E_use_dir_33(87)   => __E_use_dir_32(86) __E_use_dir_33(87).
 		q(nt(87), (nt(86)+nt(87)));
 		//       use_dir(69)          => 'u' 's' 'e' '_' 'c' 'h' 'a' 'r' '_' 'c' 'l' 'a' 's' 's' __(6) use_param(83) __E_use_dir_33(87).
@@ -515,8 +491,6 @@ private:
 		q(nt(101), (nt(7)+t(34)+nt(7)+nt(41)));
 		//       __E_nodisambig_dir_40(102) => null.
 		q(nt(102), (nul));
-		//       __E_nodisambig_dir_40(102) => __E_nodisambig_dir_39(101).
-		q(nt(102), (nt(101)));
 		//       __E_nodisambig_dir_40(102) => __E_nodisambig_dir_39(101) __E_nodisambig_dir_40(102).
 		q(nt(102), (nt(101)+nt(102)));
 		//       nodisambig_dir(71)   => nodisambig_sym(100) _(7) sym(41) __E_nodisambig_dir_40(102).

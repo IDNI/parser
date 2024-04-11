@@ -278,7 +278,7 @@ private:
 		}
 		prods_t none_or_repeat(const prods_t& sym, const prods_t& t) {
 			auto nn = get_new_name(sym);
-			return ps(nn, t | (t + nn) | nul), nn;
+			return ps(nn, (t + nn) | nul), nn;
 		}
 		prods_t group(const prods_t& sym, const traverser_t& t) {
 			auto nn = get_new_name(sym);
