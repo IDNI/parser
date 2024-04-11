@@ -134,6 +134,7 @@ struct grammar {
 		bool inline_char_classes = false; // @inline char classes.
 		bool auto_disambiguate = true; // @enable/disable disambig.
 		std::set<size_t> nodisambig_list{}; // @nodisambig nonterminal ids.
+		bool transform_negation = true; // false to disable negation transformation
 	} opt;
 	grammar(nonterminals<C, T>& nts, options opt = {});
 	grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,

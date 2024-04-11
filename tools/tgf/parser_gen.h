@@ -318,13 +318,14 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		"		}, nts);\n"
 		"	}\n"
 		"	grammar_type::options load_grammar_opts() {\n"
-		"		grammar_type::options o;\n" <<
-					gen_grammar_opts() <<
+		"		grammar_type::options o;\n"
+		"		o.transform_negation = false;\n" <<
+				gen_grammar_opts() <<
 		"		return o;\n"
 		"	}\n"
 		"	options load_opts() {\n"
 		"		options o;\n" <<
-					gen_opts() <<
+				gen_opts() <<
 		"		return o;\n"
 		"	}\n"
 		"	idni::prods<char_type, terminal_type> load_prods() {\n"
