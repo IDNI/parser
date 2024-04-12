@@ -104,8 +104,10 @@ void forest<NodeT>::_get_shaped_tree_children(const tree_shaping_options& opts,
 					_get_shaped_tree_children(
 						opts, cnodes, child);
 			}
-		} else if (!chd.first.is_null())
-			child.push_back(get_shaped_tree(chd, opts));
+		} else if (!chd.first.is_null()) {
+			auto x = get_shaped_tree(chd, opts);
+			if (x) child.push_back(x);
+		}
 	}
 };
 
