@@ -127,17 +127,6 @@ struct forest {
 	sptree get_shaped_tree(const tree_shaping_options opts = {});
 	sptree get_shaped_tree(const node& n,
 		const tree_shaping_options opts = {});
-
-private:
-	void _get_shaped_tree_children(std::set<NodeT>& done,
-		const tree_shaping_options& opts,
-		const std::vector<NodeT>& nodes,
-		std::vector<typename forest<NodeT>::sptree>& child);
-	sptree _get_shaped_tree(std::set<NodeT>& done,
-		const tree_shaping_options& opts,
-		const node& n);
-
-public:
 	typedef std::function<void(const node&)> enter_t;
 	typedef std::function<void(const node&, const nodes_set&)> exit_t;
 	typedef std::function<bool(const node&)> revisit_t;
@@ -179,6 +168,9 @@ private:
 	bool _extract_graph_uniq_node(std::set<node>& done,
 		std::vector<node>& todo, graphv& graphs, size_t gid,
 		cb_next_graph_t g, bool& no_stop) const;
+	void _get_shaped_tree_children(const tree_shaping_options& opts,
+		const std::vector<NodeT>& nodes,
+		std::vector<typename forest<NodeT>::sptree>& child);
 	/// replace each node with its immediate children,
 	/// assuming its only one pack (unambigous)
 	/// the caller to ensure the right order to avoid cyclic

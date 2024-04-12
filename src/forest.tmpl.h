@@ -54,8 +54,7 @@ forest<NodeT>::sptree forest<NodeT>::get_tree() {
 }
 
 template <typename NodeT>
-void forest<NodeT>::_get_shaped_tree_children(std::set<NodeT>& done,
-	const tree_shaping_options& opts,
+void forest<NodeT>::_get_shaped_tree_children(const tree_shaping_options& opts,
 	const std::vector<NodeT>& nodes,
 	std::vector<typename forest<NodeT>::sptree>& child)
 {
@@ -90,7 +89,7 @@ void forest<NodeT>::_get_shaped_tree_children(std::set<NodeT>& done,
 			n.first.to_std_string()) != list.end();
 	};
 	for (auto& chd : nodes)
-		if (done.find(chd) == done.end() && !one_of(chd, opts.to_trim)
+		if (!one_of(chd, opts.to_trim)
 			&& (!opts.trim_terminals || chd.first.nt()))
 	{
 		if (matches_inline_prefix(chd) || one_of(chd, opts.to_inline)
@@ -101,23 +100,22 @@ void forest<NodeT>::_get_shaped_tree_children(std::set<NodeT>& done,
 			if (it != g.end()) {
 				if (one_of(chd, opts.to_trim_children)) continue;
 				for (const auto& cnodes : it->second)
+					//std::cout << "getting children for inlined " << chd.first.to_std_string() << std::endl,
 					_get_shaped_tree_children(
-						done, opts, cnodes, child);
+						opts, cnodes, child);
 			}
 		} else if (!chd.first.is_null())
-			child.push_back(_get_shaped_tree(done, opts, chd));
+			child.push_back(get_shaped_tree(chd, opts));
 	}
 };
 
 template <typename NodeT>
-forest<NodeT>::sptree forest<NodeT>::_get_shaped_tree(std::set<NodeT>& done,
-	const tree_shaping_options& opts,
-	const NodeT& n)
+forest<NodeT>::sptree forest<NodeT>::get_shaped_tree(const NodeT& n,
+	const tree_shaping_options opts)
 {
 	//std::cout << "getting tree for " << n.first.to_std_string() << std::endl;
 	forest<NodeT>::sptree t = std::make_shared<tree>(n);
 	nodes_set pack;
-	done.insert(n);
 	auto one_of = [](const NodeT& n, const std::set<size_t>& list) {
 		if (n.first.nt()) for (auto& nt : list)
 			if (n.first.n() == nt) return true;
@@ -144,22 +142,18 @@ forest<NodeT>::sptree forest<NodeT>::_get_shaped_tree(std::set<NodeT>& done,
 			//std::cout << "Ambigous node " << n.first.to_std_string() << std::endl;
 			for (auto& nodes : pack) {
 				sptree tc = std::make_shared<tree>(n);
+				//std::cout << "getting children for AMBIGUOUS "
+				//	<< n.first.to_std_string() << std::endl;
 				_get_shaped_tree_children(
-					done, opts, nodes, tc->child);
+					opts, nodes, tc->child);
 				t->child.push_back(tc);
 			}
 		} else for (auto& nodes : pack)
-			_get_shaped_tree_children(done, opts, nodes, t->child);
+			//std::cout << "getting children for " << n.first.to_std_string() << std::endl,
+			_get_shaped_tree_children(opts, nodes, t->child);
 	}
 	//std::cout << "returning tree for " << n.first.to_std_string() << " children size = " << t->child.size() << std::endl;
 	return t;
-}
-
-template <typename NodeT>
-forest<NodeT>::sptree forest<NodeT>::get_shaped_tree(const NodeT& n,
-	const tree_shaping_options opts) {
-	std::set<node> done;
-	return _get_shaped_tree(done, opts, n);
 }
 template <typename NodeT>
 forest<NodeT>::sptree forest<NodeT>::get_shaped_tree(
