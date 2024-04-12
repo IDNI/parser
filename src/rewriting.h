@@ -38,7 +38,7 @@
 #else
 #	define LOG_INFO std::cout
 #	define LOG_END  "\n"
-#	ifndef DEBUG
+#	ifdef DEBUG
 #		define LOG_REWRITING true
 #	endif
 #endif
@@ -87,13 +87,13 @@ using sp_node = std::shared_ptr<node<symbol_t>>;
 
 // node factory method
 template <typename symbol_t>
-sp_node<symbol_t> make_node(const symbol_t& s, const std::vector<sp_node<symbol_t>>& ns) {
+sp_node<symbol_t> make_node(const symbol_t& s,
+	const std::vector<sp_node<symbol_t>>& ns) {
 	static std::map<node<symbol_t>, sp_node<symbol_t>> cache;
 	node<symbol_t> key{s, ns};
-	if (auto it = cache.find(key); it != cache.end()) {
-		return it->second;
-	}
-	return cache.emplace(key, std::make_shared<node<symbol_t>>(s, ns)).first->second;
+	if (auto it = cache.find(key); it != cache.end()) return it->second;
+	return cache.emplace(key, std::make_shared<node<symbol_t>>(s, ns))
+			.first->second;
 }
 
 // simple function objects to be used as default values for the traversers.
@@ -137,7 +137,9 @@ struct post_order_traverser {
 	predicate_t& query;
 
 private:
-	output_node_t traverse(const input_node_t& n, std::set<input_node_t>& visited) {
+	output_node_t traverse(const input_node_t& n,
+		std::set<input_node_t>& visited)
+	{
 		// we traverse the children of the node in post-order, i.e. we visit
 		// the children first and then the node itself.
 		for (const auto& c : n->child)
@@ -180,7 +182,9 @@ struct post_order_query_traverser {
 private:
 	std::optional<output_node_t> found;
 
-	output_node_t traverse(const input_node_t& n, std::set<input_node_t>& visited) {
+	output_node_t traverse(const input_node_t& n,
+		std::set<input_node_t>& visited)
+	{
 		// we traverse the children of the node in post-order, i.e. we visit
 		// the children first and then the node itself.
 		if (found) return found.value();
@@ -194,10 +198,12 @@ private:
 				// thus we can safely add the node to the visited set after
 				// visiting it.
 				visited.insert(c);
-				if (!found) found = query(c) ? wrapped(c) : std::optional<output_node_t>{};
+				if (!found) found = query(c) ? wrapped(c)
+					: std::optional<output_node_t>{};
 			}
 		// finally we apply the wrapped visitor to the node if it is present.
-		if (!found) found = query(n) ? wrapped(n) : std::optional<output_node_t>{};
+		if (!found) found = query(n) ? wrapped(n)
+					: std::optional<output_node_t>{};
 		return found ? found.value() : wrapped(n);
 	}
 };
@@ -308,7 +314,8 @@ struct replace_node_transformer {
 // given transformer. It only works with post order traversals.
 template <typename node_t>
 struct replace_transformer {
-	replace_transformer(std::map<node_t, node_t>& changes) : changes(changes) {}
+	replace_transformer(std::map<node_t, node_t>& changes)
+		: changes(changes) {}
 
 	node_t operator()(const node_t& n) {
 		auto it = changes.find(n);
@@ -340,8 +347,8 @@ struct select_top_predicate {
 		if (!query(n)) return true;
 		// we return false to avoid visiting the children of the node
 		// since we are only interested in the top nodes.
-		if (std::find(selected.begin(), selected.end(), n) == selected.end())
-			selected.push_back(n);
+		if (std::find(selected.begin(), selected.end(), n)
+				== selected.end()) selected.push_back(n);
 		return false;
 	}
 
@@ -355,16 +362,16 @@ struct select_top_predicate {
 // TODO (MEDIUM) replace vector by set
 template <typename predicate_t, typename extractor_t, typename node_t>
 struct select_subnodes_predicate {
-	select_subnodes_predicate(predicate_t& query, extractor_t extractor, std::vector<node_t>& selected) :
-		query(query), extractor(extractor), selected(selected) {}
+	select_subnodes_predicate(predicate_t& query, extractor_t extractor,
+		std::vector<node_t>& selected)
+		: query(query), extractor(extractor), selected(selected) {}
 
 	bool operator()(const node_t& n) {
 		if (!query(n)) return true;
 		auto extracted = extractor(n);
-		for (auto& e : extracted) {
-			if (std::find(selected.begin(), selected.end(), e) == selected.end())
-				selected.push_back(e);
-		}
+		for (auto& e : extracted)
+			if (std::find(selected.begin(), selected.end(), e)
+				== selected.end()) selected.push_back(e);
 		return false;
 	}
 
@@ -379,8 +386,8 @@ struct select_subnodes_predicate {
 // TODO (MEDIUM) replace vector by set
 template <typename predicate_t, typename node_t>
 struct select_all_predicate {
-	select_all_predicate(predicate_t& query, std::vector<node_t>& selected) :
-		query(query), selected(selected) {}
+	select_all_predicate(predicate_t& query, std::vector<node_t>& selected)
+		: query(query), selected(selected) {}
 
 	bool operator()(const node_t& n) {
 		if (query(n)) selected.push_back(n);
@@ -396,8 +403,8 @@ struct select_all_predicate {
 // supplied vector.
 template <typename predicate_t, typename node_t>
 struct find_top_predicate {
-	find_top_predicate(predicate_t& query, std::optional<node_t>& found) :
-	query(query), found(found) {}
+	find_top_predicate(predicate_t& query, std::optional<node_t>& found)
+		: query(query), found(found) {}
 
 	bool operator()(const node_t& n) {
 		if (!found && query(n)) found = n;
@@ -416,10 +423,7 @@ struct find_top_predicate {
 // Check if we have other cases like this one
 template<typename node_t>
 struct true_predicate {
-
-	bool operator()(const node_t& /*n*/) const {
-		return true;
-	}
+	bool operator()(const node_t&) const { return true; }
 };
 
 template <typename node_t>
@@ -432,10 +436,7 @@ using true_predicate_t = true_predicate<node_t>;
 // Check if we have other cases like this one
 template<typename node_t>
 struct false_predicate {
-
-	bool operator()(const node_t& /*n*/) const {
-		return false;
-	}
+	bool operator()(const node_t&) const { return false; }
 };
 
 template <typename node_t>
@@ -451,9 +452,7 @@ struct and_predicate {
 	and_predicate(l_predicate_t& p1, r_predicate_t& p2) : p1(p1), p2(p2) {}
 
 	template<typename node_t>
-	bool operator()(const node_t& n) const {
-		return p1(n) && p2(n);
-	}
+	bool operator()(const node_t& n) const { return p1(n) && p2(n);	}
 
 	l_predicate_t& p1;
 	r_predicate_t& p2;
@@ -472,9 +471,7 @@ struct or_predicate {
 	or_predicate(l_predicate_t& p1, r_predicate_t& p2) : p1(p1), p2(p2) {}
 
 	template<typename node_t>
-	bool operator()(const node_t& n) const {
-		return p1(n) || p2(n);
-	}
+	bool operator()(const node_t& n) const { return p1(n) || p2(n); }
 
 	l_predicate_t& p1;
 	r_predicate_t& p2;
@@ -493,9 +490,7 @@ struct neg_predicate {
 	neg_predicate(predicate_t& p) : p(p) {}
 
 	template<typename node_t>
-	bool operator()(const node_t& n) const {
-		return !p(n);
-	}
+	bool operator()(const node_t& n) const { return !p(n); }
 
 	predicate_t& p;
 };
@@ -504,7 +499,8 @@ template <typename predicate_t>
 using neg_predicate_t = neg_predicate<predicate_t>;
 
 // delete all top nodes that satisfy a predicate.
-template <typename predicate_t, typename symbol_t, typename node_t = sp_node<symbol_t>>
+template <typename predicate_t, typename symbol_t,
+	typename node_t = sp_node<symbol_t>>
 node_t trim_top(const node_t& input, predicate_t& query) {
 	neg_predicate<predicate_t> neg(query);
 	map_transformer<identity_t<symbol_t>, node_t> map(identity<symbol_t>);
@@ -530,9 +526,12 @@ std::vector<node_t> select_top(const node_t& input, predicate_t& query) {
 
 // select all subnodes that satisfy a predicate according to the extractor and return them.
 template <typename predicate_t, typename extractor_t, typename node_t>
-std::vector<node_t> select_subnodes(const node_t& input, predicate_t& query, extractor_t extractor) {
+std::vector<node_t> select_subnodes(const node_t& input, predicate_t& query,
+	extractor_t extractor)
+{
 	std::vector<node_t> selected;
-	select_subnodes_predicate<predicate_t, extractor_t, node_t> select(query, extractor, selected);
+	select_subnodes_predicate<predicate_t, extractor_t, node_t> select(
+		query, extractor, selected);
 	post_order_traverser<
 			identity_t<node_t>,
 			select_top_predicate<predicate_t, node_t>,
@@ -586,11 +585,10 @@ node_t replace(const node_t& n, std::map<node_t, node_t>& changes) {
 template <typename node_t>
 struct while_not_found_predicate {
 
-	while_not_found_predicate(std::optional<node_t>& found) : found(found) {}
+	while_not_found_predicate(std::optional<node_t>& found)
+		: found(found) {}
 
-	bool operator()(const node_t& /*n*/) const {
-		return !found;
-	}
+	bool operator()(const node_t& /*n*/) const { return !found; }
 
 	std::optional<node_t>& found;
 };
@@ -600,7 +598,8 @@ struct while_not_found_predicate {
 template <typename predicate_t, typename node_t>
 struct find_visitor {
 
-	find_visitor(predicate_t& query, std::optional<node_t>& found) : query(query), found(found) {}
+	find_visitor(predicate_t& query, std::optional<node_t>& found)
+		: query(query), found(found) {}
 
 	node_t operator()(const node_t& n) const {
 		if (!found && query(n)) found = n;
@@ -652,8 +651,9 @@ struct pattern_matcher {
 	using pattern_t = node_t;
 
 	pattern_matcher(pattern_t& pattern, environment<node_t>& env,
-		is_ignore_t& is_ignore, is_capture_t& is_capture): pattern(pattern),
-		env(env), is_ignore(is_ignore), is_capture(is_capture) {}
+		is_ignore_t& is_ignore, is_capture_t& is_capture)
+		: pattern(pattern), env(env), is_ignore(is_ignore),
+			is_capture(is_capture) {}
 
 	bool operator()(const node_t& n) {
 		// if we have matched the pattern, we never try again to unify
@@ -680,8 +680,8 @@ private:
 		// we check if it is the same as the current node, if it is not, we
 		// return false...
 		if (is_capture(p))
-			if (auto it = env.find(p); it != env.end() && it->second != n)
-				return false;
+			if (auto it = env.find(p);
+				it != env.end()&& it->second != n) return false;
 			// ...otherwise we save the current node as the one associated to the
 			// current capture and return true.
 			else return env.emplace(p, n), true;
@@ -692,11 +692,11 @@ private:
 		// match recursively.
 		else if (p->value == n->value) {
 			if (p->child.size() != n->child.size()) return false;
-			for (size_t i = 0; i < p->child.size(); ++i) {
+			for (size_t i = 0; i < p->child.size(); ++i)
 				if (p->child[i] == n->child[i]) continue;
-				else if (match(p->child[i], n->child[i])) continue;
+				else if (match(p->child[i], n->child[i]))
+					continue;
 				else return false;
-			}
 			return true;
 		}
 		return false;
@@ -709,13 +709,15 @@ private:
 // TODO (LOW) create and env in operator() and pass it as a parameter to match, if
 // a  match occurs, copy the data from the temp env to the env passed as
 // parameter.
-template <typename node_t, typename is_ignore_t, typename is_capture_t, typename is_skip_t>
+template <typename node_t, typename is_ignore_t, typename is_capture_t,
+	typename is_skip_t>
 struct pattern_matcher_with_skip {
 	using pattern_t = node_t;
 
-	pattern_matcher_with_skip(const pattern_t& pattern, environment<node_t>& env,
-		is_ignore_t& is_ignore, is_capture_t& is_capture, is_skip_t& is_skip):
-		pattern(pattern), env(env), is_ignore(is_ignore),
+	pattern_matcher_with_skip(const pattern_t& pattern,
+		environment<node_t>& env, is_ignore_t& is_ignore,
+		is_capture_t& is_capture, is_skip_t& is_skip)
+		: pattern(pattern), env(env), is_ignore(is_ignore),
 		is_capture(is_capture), is_skip(is_skip) {}
 
 	bool operator()(const node_t& n) {
@@ -744,8 +746,8 @@ private:
 		// we check if it is the same as the current node, if it is not, we
 		// return false...
 		if (is_capture(p))
-			if (auto it = env.find(p); it != env.end()  && it->second != n)
-				return false;
+			if (auto it = env.find(p); it != env.end()
+				&& it->second != n) return false;
 			// ...otherwise we save the current node as the one associated to the
 			// current capture and return true.
 			else return env.emplace(p, n), true;
@@ -754,19 +756,17 @@ private:
 		// otherwise, we check the symbol of the current node and if it is the
 		// same as the one of the current pattern, we check if the children
 		// match recursively.
-		else if (p->value == n->value) {
-			auto p_it = p->child.begin();
-			auto n_it = n->child.begin();
-			while (p_it != p->child.end() && n_it != n->child.end()) {
-				if (is_skip(*p_it)) { ++p_it; continue; }
-				if (is_skip(*n_it)) { ++n_it; continue; }
-				if (*p_it == *n_it) { ++p_it; ++n_it; continue; }
-				if (match(*p_it, *n_it)) { ++p_it; ++n_it; continue; }
-				return false;
-			}
-			return true;
+		else if (p->value != n->value) return false;
+		auto p_it = p->child.begin();
+		auto n_it = n->child.begin();
+		while (p_it != p->child.end() && n_it != n->child.end()) {
+			if (is_skip(*p_it)) { ++p_it; continue; }
+			if (is_skip(*n_it)) { ++n_it; continue; }
+			if (*p_it == *n_it) { ++p_it; ++n_it; continue; }
+			if (match(*p_it, *n_it)) { ++p_it; ++n_it; continue; }
+			return false;
 		}
-		return false;
+		return true;
 	}
 };
 
@@ -776,14 +776,17 @@ private:
 // TODO (LOW) create an env in operator() and pass it as a parameter to match, if
 // a  match occurs, copy the data from the temp env to the env passed as
 // parameter.
-template <typename node_t, typename is_ignore_t, typename is_capture_t, typename is_skip_t, typename predicate_t>
+template <typename node_t, typename is_ignore_t, typename is_capture_t,
+	typename is_skip_t, typename predicate_t>
 struct pattern_matcher_with_skip_if {
 	using pattern_t = node_t;
 
-	pattern_matcher_with_skip_if(const pattern_t& pattern, environment<node_t>& env,
-		is_ignore_t& is_ignore, is_capture_t& is_capture, is_skip_t &is_skip, predicate_t& predicate):
-		pattern(pattern), env(env), is_ignore(is_ignore),
-		is_capture(is_capture), is_skip(is_skip), predicate(predicate) {}
+	pattern_matcher_with_skip_if(const pattern_t& pattern,
+		environment<node_t>& env, is_ignore_t& is_ignore,
+		is_capture_t& is_capture, is_skip_t &is_skip,
+		predicate_t& predicate)
+		: pattern(pattern), env(env), is_ignore(is_ignore),
+		is_capture(is_capture), is_skip(is_skip), predicate(predicate){}
 
 	bool operator()(const node_t& n) {
 		// if we have matched the pattern, we never try again to unify
@@ -812,8 +815,8 @@ private:
 		// we check if it is the same as the current node, if it is not, we
 		// return false...
 		if (is_capture(p))
-			if (auto it = env.find(p); it != env.end()  && it->second != n)
-				return false;
+			if (auto it = env.find(p); it != env.end()
+				&& it->second != n) return false;
 			// ...otherwise we save the current node as the one associated to the
 			// current capture and return true.
 			else return env.emplace(p, n), true;
@@ -822,19 +825,17 @@ private:
 		// otherwise, we check the symbol of the current node and if it is the
 		// same as the one of the current pattern, we check if the children
 		// match recursively.
-		else if (p->value == n->value) {
-			auto p_it = p->child.begin();
-			auto n_it = n->child.begin();
-			while (p_it != p->child.end() && n_it != n->child.end()) {
-				if (is_skip(*p_it)) { ++p_it; continue; }
-				if (is_skip(*n_it)) { ++n_it; continue; }
-				if (*p_it == *n_it) { ++p_it; ++n_it; continue; }
-				if (match(*p_it, *n_it)) { ++p_it; ++n_it; continue; }
-				return false;
-			}
-			return true;
+		else if (p->value != n->value) return false;
+		auto p_it = p->child.begin();
+		auto n_it = n->child.begin();
+		while (p_it != p->child.end() && n_it != n->child.end()) {
+			if (is_skip(*p_it)) { ++p_it; continue; }
+			if (is_skip(*n_it)) { ++n_it; continue; }
+			if (*p_it == *n_it) { ++p_it; ++n_it; continue; }
+			if (match(*p_it, *n_it)) { ++p_it; ++n_it; continue; }
+			return false;
 		}
-		return false;
+		return true;
 	}
 };
 
@@ -851,7 +852,9 @@ node_t apply(rule<node_t>& r, node_t& n, is_ignore_t& i, is_capture_t& c) {
 // unnecessary subtrees
 template <typename node_t, typename is_ignore_t, typename is_capture_t,
 	typename is_skip_t>
-node_t apply_with_skip(const rule<node_t>& r, const node_t& n, is_ignore_t& i, is_capture_t& c, is_skip_t& sk) {
+node_t apply_with_skip(const rule<node_t>& r, const node_t& n, is_ignore_t& i,
+	is_capture_t& c, is_skip_t& sk)
+{
 	auto [p , s] = r;
 
 	environment<node_t> u;
@@ -874,11 +877,13 @@ node_t apply_with_skip(const rule<node_t>& r, const node_t& n, is_ignore_t& i, i
 // unnecessary subtrees
 template <typename node_t, typename is_ignore_t, typename is_capture_t,
 	typename is_skip_t, typename predicate_t>
-node_t apply_with_skip_if(const rule<node_t>& r, const node_t& n, is_ignore_t& i, is_capture_t& c, is_skip_t& sk, predicate_t& predicate) {
+node_t apply_with_skip_if(const rule<node_t>& r, const node_t& n,
+	is_ignore_t& i, is_capture_t& c, is_skip_t& sk, predicate_t& predicate)
+{
 	auto [p , s] = r;
 	environment<node_t> u;
-	pattern_matcher_with_skip_if<node_t, is_ignore_t, is_capture_t, is_skip_t, predicate_t>
-		matcher {p, u, i, c, sk, predicate};
+	pattern_matcher_with_skip_if<node_t, is_ignore_t, is_capture_t,
+		is_skip_t, predicate_t> matcher {p, u, i, c, sk, predicate};
 	auto nn = apply(s, n, matcher);
 
 #ifdef LOG_REWRITING
@@ -894,7 +899,8 @@ node_t apply_with_skip_if(const rule<node_t>& r, const node_t& n, is_ignore_t& i
 // use internaly by apply and apply with skip.
 template <typename node_t, typename matcher_t>
 node_t apply(const node_t& s, const node_t& n, matcher_t& matcher) {
-	post_order_query_traverser<identity_t<node_t>, matcher_t, node_t>(identity<node_t>, matcher)(n);
+	post_order_query_traverser<identity_t<node_t>, matcher_t, node_t>(
+		identity<node_t>, matcher)(n);
 	if (matcher.matched) {
 		auto nn = replace<node_t>(s, matcher.env);
 		environment<node_t> nenv { {matcher.matched.value(), nn} };
@@ -905,7 +911,7 @@ node_t apply(const node_t& s, const node_t& n, matcher_t& matcher) {
 
 // drop unnecessary information from the parse tree nodes
 template <typename parse_symbol_t, typename symbol_t>
-auto drop_location = [](const parse_symbol_t& n) -> symbol_t { return n.first; };
+auto drop_location = [](const parse_symbol_t& n)-> symbol_t { return n.first; };
 template <typename parse_symbol_t, typename symbol_t>
 using drop_location_t = decltype(drop_location<parse_symbol_t, symbol_t>);
 
@@ -948,7 +954,8 @@ template<typename parser_t, typename transformer_t, typename parse_symbol_t,
 	typename symbol_t>
 sp_node<symbol_t> make_node_from_string(const transformer_t& transformer,
 	const std::string source, idni::parser<>::parse_options options = {}) {
-	auto f = parser_instance<parser_t>().parse(source.c_str(), source.size(), options);
+	auto f = parser_instance<parser_t>().parse(
+		source.c_str(), source.size(), options);
 	if (check_parser_result<parser_t>(source, f.get(), options.start))
 		return 0;
 	return make_node_from_forest<
@@ -997,19 +1004,25 @@ sp_node<symbol_t> make_node_from_file(const transformer_t& transformer,
 
 // << for sp_node
 template <typename symbol_t>
-std::ostream& operator<<(std::ostream& stream, const idni::rewriter::sp_node<symbol_t>& n) {
+std::ostream& operator<<(std::ostream& stream,
+	const idni::rewriter::sp_node<symbol_t>& n)
+{
 	return stream << n << "\n";
 }
 
 // << for node (make it shared make use of the previous operator)
 template <typename symbol_t>
-std::ostream& operator<<(std::ostream& stream, const idni::rewriter::node<symbol_t>& n) {
+std::ostream& operator<<(std::ostream& stream,
+	const idni::rewriter::node<symbol_t>& n)
+{
 	return stream << make_shared<idni::rewriter::sp_node<symbol_t>>(n);
 }
 
 // << for rule
 template <typename node_t>
-std::ostream& operator<<(std::ostream& stream, const idni::rewriter::rule<node_t>& r) {
+std::ostream& operator<<(std::ostream& stream,
+	const idni::rewriter::rule<node_t>& r)
+{
 	return stream << r.first << " := " << r.second << ".";
 }
 
