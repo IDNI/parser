@@ -98,6 +98,7 @@ struct tgf {
 				//}
 				//std::cout << "}\n";
 				last = i + 1;
+				//std::cout << "parsing: " << to_std_string(std::basic_string<C>(nc, nl)) << std::endl;
 				int ret = b.parse(nc, nl);
 				//std::cout << "ret:   " << ret << std::endl;
 				if (ret == 1) break;
@@ -174,7 +175,8 @@ private:
 			static tgf_parser::parse_options po{
 				.start = tgf_parser::start_statement };
 			auto f = p.parse(s, l, po);
-			if (!p.found(po.start) || !f) return 1;
+			if (!p.found(po.start) || !f) return std::cerr
+				<< "TGF: " << p.get_error().to_str() << "\n", 1;
 			char dummy = '\0';
 			auto source = idni::rewriter::make_node_from_forest<
 				tgf_parser, char, tgf_parser::node_type,

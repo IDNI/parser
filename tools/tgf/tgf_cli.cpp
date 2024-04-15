@@ -584,10 +584,22 @@ bool set_bool_value(bool& val, const size_t& vt) {
 	return val;
 };
 
-std::string unquote(const string& q) {
-	istringstream iss(q);
-	string u;
-	return iss >> quoted(u), u;
+string unquote(const string& s) {
+	std::stringstream ss;
+	size_t l = s.size() - 1;
+	for (size_t i = 0; i != s.size(); ++i) {
+		if (i != l && s[i] == '\\') {
+			switch (s[++i]) {
+			case 'r': ss << '\r'; break;
+			case 'n': ss << '\n'; break;
+			case 't': ss << '\t'; break;
+			case 'b': ss << '\b'; break;
+			case 'f': ss << '\f'; break;
+			default: ss << s[i];
+			}
+		} else ss << s[i];
+	}
+	return ss.str();
 };
 
 void tgf_repl_evaluator::set_cmd(const traverser_t& n) {
@@ -764,6 +776,7 @@ void help(size_t nt = tgf_repl_parser::help_sym) {
 		<< "  help <command>               print help for a command\n"
 		<< "  quit, q, exit or e           exit the repl\n"
 		<< "  version or v                 print version\n"
+		<< "  clear or cls                 clears the screen\n"
 		<< "\n"
 		<< "settings commands:\n"
 		<< "  get                          get options' values\n"
@@ -781,7 +794,7 @@ void help(size_t nt = tgf_repl_parser::help_sym) {
 		<< "  unreachable or u             show unreachable productions\n"
 		<< "\n"
 		<< "parsing commands:\n"
-		<< "  parse                        parse input\n"
+		<< "  parse or p                   parse input\n"
 		<< "  parse file or pf or f        parse input file\n"
 		<< "\n";
 		break;
@@ -792,6 +805,11 @@ void help(size_t nt = tgf_repl_parser::help_sym) {
 		<< "command: quit or exit\n"
 		<< "short: q or e\n"
 		<< "\texits the repl\n";
+		break;
+	case tgf_repl_parser::clear_sym: cout
+		<< "command: clear\n"
+		<< "short: cls\n"
+		<< "\tclears the screen\n";
 		break;
 	case tgf_repl_parser::get_sym: cout
 		<< "command: get [<option>]\n"
@@ -883,6 +901,8 @@ void help(size_t nt = tgf_repl_parser::help_sym) {
 
 int tgf_repl_evaluator::eval(const traverser_t& s) {
 	switch (s | get_nonterminal) {
+	case tgf_repl_parser::quit: return cout << "Quit.\n", 1;
+	case tgf_repl_parser::clear: if (r) r->clear(); break;
 	case tgf_repl_parser::help: {
 		auto optarg = s | tgf_repl_parser::cmd_symbol
 			| get_only_child
@@ -902,7 +922,6 @@ int tgf_repl_evaluator::eval(const traverser_t& s) {
 		update_bool_opt_cmd(s, [](bool& b){ return b = false; }); break;
 	case tgf_repl_parser::add:           add_cmd(s); break;
 	case tgf_repl_parser::del:           del_cmd(s); break;
-	case tgf_repl_parser::quit: return cout << "Quit.\n", 1;
 	case tgf_repl_parser::reload_cmd: reload(); break;
 	case tgf_repl_parser::load_cmd: {
 		auto n = s | tgf_repl_parser::filename;
@@ -959,7 +978,20 @@ int tgf_repl_evaluator::eval(const traverser_t& s) {
 		break;
 	}
 	case tgf_repl_parser::parse_cmd: {
-		auto input = s | tgf_repl_parser::parse_input | get_terminals;
+		std::string input{};
+		auto i = s | tgf_repl_parser::parse_input;
+		if (auto seq = i | tgf_repl_parser::parse_input_char_seq;
+			seq.has_value()) input = seq | get_terminals;
+		else if (auto qstr = i | tgf_repl_parser::quoted_string;
+			qstr.has_value()) {
+				auto temp = qstr
+					|| tgf_repl_parser::quoted_string_char
+					|| get_terminals;
+				input = unquote(qstr
+				|| tgf_repl_parser::quoted_string_char
+				|| get_terminals);
+			}
+		//if (opt.debug) std::cout << "input: " << input << "\n";
 		parse(input.c_str(), input.size());
 		break;
 	}

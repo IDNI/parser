@@ -21,8 +21,11 @@
 #include <unistd.h>
 #include <termios.h>
 
-// TODO (LOW) add windows and mac support (only linux terminal works)
-// TODO (LOW) support for multi-line inputs if necessary
+// TODO (HIGH) support inputs longer then terminal width (currently breaks the input line)
+// TODO (MEDIUM) support multiline input (containing '\n') - escape new lines?
+// TODO (MEDIUM) windows support (+ test on mac since it should work on POSIX)
+// TODO (LOW) implement clear directly (not by calling system(clear/cls) and
+//            make evaluators call it instead of clearing the screen themselves
 
 namespace idni {
 
@@ -109,12 +112,20 @@ struct repl {
 			}
 			if (s.empty()) continue;
 			if (re_.eval(s)) break; // exit loop if nonzero
-			clear();
+			clear_input();
 		}
 		return 0;
 	}
 	// sets the prompt
 	void prompt(const std::string& p) { prompt_ = p, refresh_input(); }
+	void clear() { std::system(
+#ifdef _WIN32
+		"cls"
+#else
+		"clear"
+#endif
+		);
+	}
 	// returns the current prompt
 	std::string prompt() const { return prompt_; }
 private:
@@ -137,7 +148,7 @@ private:
 	}
 	// clears the input line (set to empty)
 	void set() { input_.clear(), pos_ = 0; }
-	void clear() { // clears the input line
+	void clear_input() { // clears the input line
 		input_.clear(), pos_ = 0, refresh_input();
 	}
 	void backspace() { // delete character before the cursor
