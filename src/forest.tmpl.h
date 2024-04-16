@@ -88,17 +88,17 @@ void forest<NodeT>::_get_shaped_tree_children(const tree_shaping_options& opts,
 		return std::find(list.begin(), list.end(),
 			n.first.to_std_string()) != list.end();
 	};
-	for (auto& chd : nodes)
-		if (!one_of(chd, opts.to_trim)
-			&& (!opts.trim_terminals || chd.first.nt()))
-	{
+	for (auto& chd : nodes) {
+		if (one_of(chd, opts.to_trim)
+			|| (opts.trim_terminals && !chd.first.nt())) continue;
 		if (matches_inline_prefix(chd) || one_of(chd, opts.to_inline)
 			|| (opts.inline_char_classes
 				&& one_of_str(chd, cc_names)))
 		{
 			auto it = g.find(chd);
 			if (it != g.end()) {
-				if (one_of(chd, opts.to_trim_children)) continue;
+				if (one_of(chd, opts.to_trim_children))
+					continue;
 				for (const auto& cnodes : it->second)
 					//std::cout << "getting children for inlined " << chd.first.to_std_string() << std::endl,
 					_get_shaped_tree_children(
@@ -123,6 +123,7 @@ forest<NodeT>::sptree forest<NodeT>::get_shaped_tree(const NodeT& n,
 			if (n.first.n() == nt) return true;
 		return false;
 	};
+	if (!n.first.nt() && n.first.is_null()) return NULL;
 	if (n.first.nt() && !one_of(n, opts.to_trim_children)) {
 		auto it = g.find(n);
 		if (it == g.end()) {

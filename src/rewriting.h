@@ -921,7 +921,7 @@ template<typename parser_t, typename transformer_t, typename parse_symbol_t,
 sp_node<symbol_t> make_node_from_forest(const transformer_t& /*transformer*/,
 	forest<parse_symbol_t>* f, const parse_symbol_t& root)
 {
-	auto t = f->get_shaped_tree(root);
+	auto t = parser_instance<parser_t>().shape(f, root);
 	using sp_parse_tree = decltype(t);
 
 	map_transformer<
