@@ -864,7 +864,7 @@ node_t apply_with_skip(const rule<node_t>& r, const node_t& n, is_ignore_t& i,
 
 #ifdef LOG_REWRITING
 	if (nn != n) {
-		LOG_INFO << "(R) " << p << " = " << s << LOG_END;
+		LOG_INFO << "(R) " << p << " := " << s << LOG_END;
 		LOG_INFO << "(F) " << nn << LOG_END;
 		//DBG(print_sp_tau_node_tree(std::cout << "old node: ", n));
 		//DBG(print_sp_tau_node_tree(std::cout << "new node: ", nn));
@@ -888,7 +888,7 @@ node_t apply_with_skip_if(const rule<node_t>& r, const node_t& n,
 
 #ifdef LOG_REWRITING
 	if (nn != n) {
-		LOG_INFO << "(R) " << p << " = " << s << LOG_END;
+		LOG_INFO << "(R) " << p << " := " << s << LOG_END;
 		LOG_INFO << "(F) " << nn << LOG_END;
 	}
 #endif
