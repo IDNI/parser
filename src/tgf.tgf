@@ -37,7 +37,8 @@ alternation            => conjunction   (_ '|' _ conjunction)*.
 conjunction            => concatenation (_ '&' _ concatenation)*.
 concatenation          => factor (__ factor)*.
 
-factor                 => optional
+factor                 => shorthand_rule
+                        | optional
                         | repeat
                         | none_or_repeat
                         | neg
@@ -48,6 +49,8 @@ term                   => group
                         | repeat_group
                         | terminal
                         | sym.
+
+shorthand_rule         => factor ':' sym.
 
 # operators incl. EBNF
 neg                    => '~' term.

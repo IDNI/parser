@@ -366,10 +366,20 @@ private:
 			}
 			return {};
 		}
+		prods_t shorthand_rule(const prods_t& sym, const traverser_t& t) {
+			//print_node(std::cout << "shorthand_rule: ", t.value()) << "\n";
+			auto f = t | tgf_parser::factor;
+			auto s = t | tgf_parser::sym | get_terminals;
+			auto nt = nts(s);
+			ps(nt, factor(sym, f));
+			return nt;
+		}
 		prods_t factor(const prods_t& sym, const traverser_t& t) {
 			//print_node(std::cout << "factor: ", t.value()) << "\n";
 			auto f = t | get_only_child;
 			auto nt = f | get_nonterminal;
+			if (nt == tgf_parser::shorthand_rule)
+				return shorthand_rule(sym, f);
 			if (nt == tgf_parser::term) return term(sym, f);
 			auto trm = term(sym, f | tgf_parser::term);
 			switch (nt) {
