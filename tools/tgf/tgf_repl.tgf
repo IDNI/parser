@@ -31,46 +31,28 @@ statement              => grammar_cmd | internal_grammar_cmd | unreachable_cmd
                         | get | set | toggle | enable | disable | add | del
                         | parse_file_cmd | parse_cmd.
 
-parse_cmd              => parse_sym __ parse_input.
-parse_file_cmd         => parse_file_sym __ filename.
-grammar_cmd            => grammar_sym. # [ __ symbol ].
-internal_grammar_cmd   => internal_grammar_sym [ __ symbol ].
-start_cmd              => start_sym [ __ symbol ].
-unreachable_cmd        => unreachable_sym [ __ symbol ].
-reload_cmd             => reload_sym.
-load_cmd               => load_sym __ filename.
-help                   => help_sym [ __ cmd_symbol ].
-version                => version_sym.
-quit                   => quit_sym.
-clear                  => clear_sym.
-add                    => add_sym    __ list_option __ symbol_list.
-del                    => del_sym    __ list_option __ symbol_list.
-get                    => get_sym  [ __ option ].
-set                    => set_sym    __ option (__ | _ '=' _) option_value.
-toggle                 => toggle_sym __ bool_option.
-enable                 => enable_sym    bool_option.
-disable                => disable_sym   bool_option.
-
-# symbols
-grammar_sym            => "g" | "grammar".
-internal_grammar_sym   => "i" | "ig" | "internal-grammar".
-unreachable_sym        => "u" | "unreachable".
-parse_sym              => "p" | "parse".
-parse_file_sym         => "f" | "pf" | "parse file".
-start_sym              => "s" | "start".
-reload_sym             => "r" | "reload".
-load_sym               => "l" | "load".
-help_sym               => "h" | "help".
-version_sym            => "v" | "version".
-quit_sym               => "q" | "quit" | "e" | "exit".
-clear_sym              => "cls" | "clear".
-get_sym                => "get".
-set_sym                => "set".
-toggle_sym             => "tog" | "toggle".
-add_sym                => "add".
-del_sym                => "del" | "delete" | "rm" | "rem" | "remove".
-enable_sym             => "en"  __ | "enable"  __.
-disable_sym            => "dis" __ | "disable" __.
+parse_cmd              => ("p" | "parse"):parse_sym __ parse_input.
+parse_file_cmd         => ("f" | "pf"
+				| "parse file"):parse_file_sym __ filename.
+grammar_cmd            => ("g" | "grammar"):grammar_sym. # [ __ symbol ].
+internal_grammar_cmd   => ("i" | "ig" | "internal-grammar"):internal_grammar_sym
+				[ __ symbol ].
+start_cmd              => ("s" | "start"):start_sym [ __ symbol ].
+unreachable_cmd        => ("u" | "unreachable"):unreachable_sym [ __ symbol ].
+reload_cmd             => ("r" | "reload"):reload_sym.
+load_cmd               => ("l" | "load"):load_sym __ filename.
+help                   => ("h" | "help"):help_sym [ __ cmd_symbol ].
+version                => ("v" | "version"):version_sym.
+quit                   => ("q" | "quit" | "e" | "exit"):quit_sym.
+clear                  => ("cls" | "clear"):clear_sym.
+add                    => "add":add_sym __ list_option __ symbol_list.
+del                    => ("del" | "delete" | "rm" | "rem" | "remove"):del_sym
+				__ list_option __ symbol_list.
+get                    => "get":get_sym [ __ option ].
+set                    => "set":set_sym __ option (__ | _ '=' _) option_value.
+toggle                 => ("tog" | "toggle"):toggle_sym __ bool_option.
+enable                 => ("en"  __ | "enable"  __):enable_sym  bool_option.
+disable                => ("dis" __ | "disable" __):disable_sym bool_option.
 
 cmd_symbol             => grammar_sym | internal_grammar_sym | unreachable_sym
 			| start_sym | parse_sym | parse_file_sym
@@ -80,38 +62,33 @@ cmd_symbol             => grammar_sym | internal_grammar_sym | unreachable_sym
                         | toggle_sym | enable_sym | disable_sym.
 
 # options
-option                 => bool_option | error_verbosity_opt | list_option.
-bool_option            => status_opt | colors_opt | print_ambiguity_opt
-                        | print_graphs_opt | print_rules_opt | print_facts_opt
-			| print_terminals_opt
-			| measure_parsing_opt | measure_each_pos_opt
-			| measure_forest_opt | measure_preprocess_opt
-                        | debug_opt | auto_disambiguate_opt
-			| trim_terminals_opt | inline_cc_opt.
-list_option            => nodisambig_list_opt
-                        | trim_opt | trim_children_opt | inline_opt.
-
-# option name symbols
-debug_opt              => "d"  | "debug".
-status_opt             => "s"  | "status".
-colors_opt             => "c"  | "color" | "colors".
-print_ambiguity_opt    => "a"  | "ambiguity" | "print-ambiguity".
-print_terminals_opt    => "t"  | "terminals" | "print-terminals".
-print_graphs_opt       => "g"  | "graphs" | "print-graphs".
-print_rules_opt        => "r"  | "rules" | "print-rules".
-print_facts_opt        => "f"  | "facts" | "print-facts".
-measure_parsing_opt    => "m"  | "measure" | "measure-parsing".
-measure_each_pos_opt   => "me" | "measure-each" | "mep" | "measure-each-pos".
-measure_forest_opt     => "mf" | "measure-forest".
-measure_preprocess_opt => "mp" | "measure-preprocess".
-auto_disambiguate_opt  => "ad" | "auto-disambiguate".
-error_verbosity_opt    => "e"  | "error-verbosity".
-nodisambig_list_opt    => "nd" | "ndl" | "nodisambig-list".
-trim_terminals_opt     => "tt" | "trim-terminals".
-trim_opt               => "trim".
-trim_children_opt      => "tc" | "trim-children".
-inline_cc_opt          => "icc" | "inline-cc" | "inline-char-classes".
-inline_opt             => "i" | "inline".
+option                 => bool_option
+			| ("e" | "error-verbosity"):error_verbosity_opt
+			| list_option.
+bool_option            => ("s" | "status"):status_opt
+			| ("c" | "color" | "colors"):colors_opt
+			| ("a" | "ambiguity"
+				| "print-ambiguity"):print_ambiguity_opt
+                        | ("g" | "graphs" | "print-graphs"):print_graphs_opt
+			| ("r" | "rules" | "print-rules"):print_rules_opt
+			| ("f" | "facts" | "print-facts"):print_facts_opt
+			| ("t" | "terminals"
+				| "print-terminals"):print_terminals_opt
+			| ("m" | "measure"
+				| "measure-parsing"):measure_parsing_opt
+			| ("me" | "measure-each" | "mep"
+				| "measure-each-pos"):measure_each_pos_opt
+			| ("mf" | "measure-forest"):measure_forest_opt
+			| ("mp" | "measure-preprocess"):measure_preprocess_opt
+                        | ("d" | "debug"):debug_opt
+			| ("ad" | "auto-disambiguate"):auto_disambiguate_opt
+			| ("tt" | "trim-terminals"):trim_terminals_opt
+			| ("icc" | "inline-cc"
+				| "inline-char-classes"):inline_cc_opt.
+list_option            => ("nd" | "ndl" | "nodisambig-list"):nodisambig_list_opt
+                        | "trim":trim_opt
+			| ("tc" | "trim-children"):trim_children_opt
+			| ("i" | "inline"):inline_opt.
 
 # option values symbols
 option_value           => option_value_true | option_value_false.
@@ -121,9 +98,9 @@ option_value           => symbol_list.
 option_value_true      => "t" | "true"  | "on"  | "1" | "y" | "yes".
 option_value_false     => "f" | "false" | "off" | "0" | "n" | "no".
 # error verbosity values
-error_verbosity        => basic_sym | detailed_sym | root_cause_sym.
-basic_sym              => "b" | "basic".
-detailed_sym           => "d" | "detailed".
-root_cause_sym         => "r" | "rc" | "root-cause".
+error_verbosity        => ("b" | "basic"):basic_sym
+			| ("d" | "detailed"):detailed_sym
+			| ("r" | "rc" | "root-cause"):root_cause_sym.
+
 # symbol list
 symbol_list            => symbol (_ ',' _ symbol)*.
