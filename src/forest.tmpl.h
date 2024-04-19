@@ -129,16 +129,15 @@ void forest<NodeT>::_get_shaped_tree_children(const tree_shaping_options& opts,
 		size_t i = 0;
 		return go(n, tp, i);
 	};
-	auto do_inline = [this, &child, &opts, &treepath, &inline_children](
-		const NodeT& n)
-	{
+	std::function<bool(const NodeT&)> do_inline = [&](const NodeT& n) {
 		for (auto& tp : opts.to_inline)
 			if (auto p = treepath(n, tp); p) {
 				if (tp.size() == 1)
 					inline_children(*p);
 				else { // if path is more than 1 level deep
 					auto x = get_shaped_tree(*p, opts);
-					if (x) child.push_back(x);
+					if (x && !do_inline(x->value))
+						child.push_back(x);
 				}
 				return true;
 			}
