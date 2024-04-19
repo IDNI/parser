@@ -59,7 +59,7 @@ struct tgf_repl_evaluator {
 		std::set<std::string> nodisambig_list{};
 		std::set<std::string> to_trim{};
 		std::set<std::string> to_trim_children{};
-		std::set<std::string> to_inline{};
+		std::set<std::vector<std::string>> to_inline{};
 	} opt;
 
 	tgf_repl_evaluator(const std::string& tgf_file);
@@ -85,6 +85,8 @@ struct tgf_repl_evaluator {
 	void del_cmd(const traverser_t& n);
 	void update_bool_opt_cmd(const traverser_t& n,
 		const std::function<bool(bool&)>& update_fn);
+
+	std::vector<std::string> treepath(const traverser_t& tp) const;
 
 	void update_opts_by_grammar_opts();
 

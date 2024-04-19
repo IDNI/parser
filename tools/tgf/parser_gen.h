@@ -136,7 +136,22 @@ void generate_parser_cpp(const std::string& tgf_filename,
 			const std::set<size_t>& list) -> std::ostream&
 		{
 			size_t i = 0;
-			for (const auto& s : list) os << (i++ ? ", " : "") << s;
+			for (const auto& s : list) os << (i ? "," : "")
+				<< (i % 10 == 0 ? "\n\t\t\t" : " ") << s, i++;
+			return os;
+		};
+		auto pvlist = [](std::ostream& os,
+			const std::set<std::vector<size_t>>& vlist)
+				-> std::ostream&
+		{
+			size_t i = 0;
+			for (const auto& v : vlist) {
+				os << (i++ ? "," : "") << "\n\t\t\t{ ";
+				size_t j = 0;
+				for (const auto& s : v)
+					os << (j++ ? ", " : "") << s;
+				os << " }";
+			}
 			return os;
 		};
 		os << "\t\to.trim_terminals = "
@@ -146,20 +161,20 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		os << "\t\to.auto_disambiguate = "
 			<< pbool[g.opt.auto_disambiguate] << ";\n";
 		if (g.opt.nodisambig_list.size()) {
-			os << "\t\to.nodisambig_list = { ";
-			plist(os, g.opt.nodisambig_list) << " };\n";
+			os << "\t\to.nodisambig_list = {";
+			plist(os, g.opt.nodisambig_list) << "\n\t\t};\n";
 		}
 		if (g.opt.to_trim.size()) {
-			os << "\t\to.to_trim = { ";
-			plist(os, g.opt.to_trim) << " };\n";
+			os << "\t\to.to_trim = {";
+			plist(os, g.opt.to_trim) << "\n\t\t};\n";
 		}
 		if (g.opt.to_trim_children.size()) {
-			os << "\t\to.to_trim_children = { ";
-			plist(os, g.opt.to_trim_children) << " };\n";
+			os << "\t\to.to_trim_children = {";
+			plist(os, g.opt.to_trim_children) << "\n\t\t};\n";
 		}
 		if (g.opt.to_inline.size()) {
-			os << "\t\to.to_inline = { ";
-			plist(os, g.opt.to_inline) << " };\n";
+			os << "\t\to.to_inline = {";
+			pvlist(os, g.opt.to_inline) << "\n\t\t};\n";
 		}
 		return os.str();
 	};

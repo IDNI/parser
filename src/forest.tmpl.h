@@ -12,8 +12,8 @@
 // modified over time by the Author.
 #ifndef __IDNI__PARSER__FOREST_TMPL_H__
 #define __IDNI__PARSER__FOREST_TMPL_H__
+#include <optional>
 #include "forest.h"
-
 namespace idni {
 
 #ifdef DEBUG
@@ -88,23 +88,71 @@ void forest<NodeT>::_get_shaped_tree_children(const tree_shaping_options& opts,
 		return std::find(list.begin(), list.end(),
 			n.first.to_std_string()) != list.end();
 	};
+	auto get_children = [&](const NodeT& n) -> std::set<std::vector<NodeT>>{
+		if (one_of(n, opts.to_trim_children)) return {};
+		auto it = g.find(n);
+		if (it != g.end()) return it->second;
+		return {};
+	};
+	auto inline_children = [&](const NodeT& n) {
+		for (const auto& cnodes : get_children(n))
+			//std::cout << "getting children for inlined " << chd.first.to_std_string() << std::endl,
+			_get_shaped_tree_children(opts, cnodes, child);
+	};
+	std::function<const NodeT*(const NodeT& n,
+		const std::vector<size_t>& tp, size_t& i)> go;
+	go = [&](const NodeT& n, const std::vector<size_t>& tp, size_t& i)
+		-> const NodeT*
+	{
+		if (!n.first.nt()) return 0;
+		if (matches_inline_prefix(n))
+			for (const auto& cnodes : get_children(n))
+				for (const auto& c : cnodes) {
+					const NodeT* y = go(c, tp, i);
+					if (y) return go(*y, tp, i);
+				}
+		else if (n.first.nt() && n.first.n() == tp[i]) {
+			if (++i == tp.size()) return &n;
+			for (const auto& cnodes : get_children(n))
+				for (const auto& c : cnodes) {
+					const NodeT* y = go(c, tp, i);
+					if (y) return i == tp.size() ? y
+								: go(*y, tp, i);
+				}
+		}
+		return 0;
+	};
+	// returns node pointer according to path from n or 0 if not found
+	auto treepath = [&go](const NodeT& n, const std::vector<size_t>& tp)
+		-> const NodeT*
+	{
+		size_t i = 0;
+		return go(n, tp, i);
+	};
+	auto do_inline = [this, &child, &opts, &treepath, &inline_children](
+		const NodeT& n)
+	{
+		for (auto& tp : opts.to_inline)
+			if (auto p = treepath(n, tp); p) {
+				if (tp.size() == 1)
+					inline_children(*p);
+				else { // if path is more than 1 level deep
+					auto x = get_shaped_tree(*p, opts);
+					if (x) child.push_back(x);
+				}
+				return true;
+			}
+		return false;
+	};
 	for (auto& chd : nodes) {
 		if (one_of(chd, opts.to_trim)
 			|| (opts.trim_terminals && !chd.first.nt())) continue;
-		if (matches_inline_prefix(chd) || one_of(chd, opts.to_inline)
+		if (do_inline(chd)) continue;
+		if (matches_inline_prefix(chd)
 			|| (opts.inline_char_classes
 				&& one_of_str(chd, cc_names)))
-		{
-			auto it = g.find(chd);
-			if (it != g.end()) {
-				if (one_of(chd, opts.to_trim_children))
-					continue;
-				for (const auto& cnodes : it->second)
-					//std::cout << "getting children for inlined " << chd.first.to_std_string() << std::endl,
-					_get_shaped_tree_children(
-						opts, cnodes, child);
-			}
-		} else if (!chd.first.is_null()) {
+					inline_children(chd);
+		else if (!chd.first.is_null()) {
 			auto x = get_shaped_tree(chd, opts);
 			if (x) child.push_back(x);
 		}

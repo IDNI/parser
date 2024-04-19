@@ -385,7 +385,12 @@ void tgf_repl_evaluator::update_opts_by_grammar_opts() {
 	};
 	opt.to_trim          = ntids2strs(g->opt.to_trim);
 	opt.to_trim_children = ntids2strs(g->opt.to_trim_children);
-	opt.to_inline        = ntids2strs(g->opt.to_inline);
+	opt.to_inline.clear();
+	for (const auto& tp : g->opt.to_inline) {
+		std::vector<std::string> v;
+		for (const auto& s : tp) v.push_back(nts->get(s));
+		opt.to_inline.insert(v);
+	}
 }
 
 void tgf_repl_evaluator::set_repl(repl<tgf_repl_evaluator>& r_) {
@@ -444,8 +449,14 @@ void tgf_repl_evaluator::parsed(unique_ptr<parser_type::pforest> f) {
 		if (opt.to_trim.size())
 			sopt.to_trim_children = str2ntids(opt.to_trim_children);
 		else sopt.to_trim_children = g->opt.to_trim_children;
-		if (opt.to_inline.size())
-			sopt.to_inline        = str2ntids(opt.to_inline);
+		if (opt.to_inline.size()) {
+			for (const auto& tp : opt.to_inline) {
+				std::vector<size_t> v;
+				for (const auto& s : tp)
+					v.push_back(nts->get(s));
+				sopt.to_inline.insert(v);
+			}
+		}
 		else sopt.to_inline = g->opt.to_inline;
 		pretty_print(ss << "parsed graph:\n",
 			f->get_shaped_tree(sopt), {}, false, 1);
@@ -493,6 +504,7 @@ void tgf_repl_evaluator::reload(const string& new_tgf_file) {
 	nts = make_shared<nonterminals_type>();
 	g = make_shared<grammar_type>(tgf<char>::from_file(*nts, tgf_file));
 	p = make_shared<parser_type>(*g);
+	update_opts_by_grammar_opts();
 	cout << "loaded: " << tgf_file << "\n";
 }
 
@@ -500,14 +512,21 @@ void tgf_repl_evaluator::reload() {
 	reload(tgf_file);
 }
 
-size_t get_opt(traverser_t t) {
-	traverser_t bool_opt = t | tgf_repl_parser::bool_option;
-	if (bool_opt.has_value()) t = bool_opt;
-	else {
-		traverser_t list_opt = t | tgf_repl_parser::list_option;
-		if (list_opt.has_value()) t = list_opt;
-	}
-	return t | get_only_child | get_nonterminal;
+std::pair<tgf_repl_parser::nonterminal, traverser_t>
+	get_opt(const traverser_t& t)
+{
+	using p = tgf_repl_parser;
+	static const std::map<p::nonterminal, p::nonterminal> ov{
+		{ p::bool_option,      p::bool_value },
+		{ p::list_option,      p::symbol_list },
+		{ p::treepaths_option, p::treepath_list },
+		{ p::enum_ev_option,   p::error_verbosity }
+	};
+	for (auto it = ov.begin(); it != ov.end(); ++it)
+		if (auto x = t | it->first; x.has_value())
+			return { x | get_only_child | get_nonterminal,
+				t | it->second };
+	return { p::nul, t };
 }
 
 void tgf_repl_evaluator::get_cmd(const traverser_t& n) {
@@ -526,6 +545,20 @@ void tgf_repl_evaluator::get_cmd(const traverser_t& n) {
 		std::stringstream ss;
 		bool first = true;
 		for (auto& s : l) ss << (first ? first = false, "" : ", ") << s;
+		return ss.str();
+	};
+	static auto ptreepaths = [](
+		const std::set<std::vector<std::string>>& l)
+	{
+		if (l.empty()) return std::string("(empty)");
+		std::stringstream ss;
+		bool first = true;
+		for (auto& tp : l) {
+			ss << (first ? first = false, "" : ", ");
+			bool first_s = true;
+			for (auto& s : tp) ss
+				<< (first_s ? first_s = false, "" : " > ") << s;
+		}
 		return ss.str();
 	};
 	static std::map<size_t,	std::function<void()>> printers = {
@@ -562,27 +595,22 @@ void tgf_repl_evaluator::get_cmd(const traverser_t& n) {
 	{ tgf_repl_parser::trim_children_opt, [this]() { cout <<
 		"trim-children:       " << plist(opt.to_trim_children) << "\n"; } },
 	{ tgf_repl_parser::inline_opt, [this]() { cout <<
-		"inline:              " << plist(opt.to_inline) << "\n"; } },
+		"inline:              " << ptreepaths(opt.to_inline) << "\n"; } },
 	{ tgf_repl_parser::auto_disambiguate_opt, [this]() { cout <<
 		"auto-disambiguate:   " << pbool(g->opt.auto_disambiguate) << "\n"; } },
 	{ tgf_repl_parser::nodisambig_list_opt, [this]() { cout <<
 		"nodisambig-list:     " << plist(opt.nodisambig_list) << "\n"; } },
 	{ tgf_repl_parser::error_verbosity_opt, [this]() { cout <<
 		"error-verbosity:     " << pverb(opt.error_verbosity) << "\n"; } }};
-	auto option = n | tgf_repl_parser::option;
-	if (!option.has_value()) option = n | tgf_repl_parser::bool_option;
-	if (!option.has_value()) option = n | tgf_repl_parser::list_option;
-	if (!option.has_value()) { for (auto& [_, v] : printers) v(); return; }
-	printers[get_opt(option)]();
+	if (!n.has_value()) { for (auto& [_, v] : printers) v(); return; }
+	auto [o, _] = get_opt(n);
+	printers[o]();
 }
 
-bool set_bool_value(bool& val, const size_t& vt) {
-	if      (vt == tgf_repl_parser::option_value_true) val = true;
-	else if (vt == tgf_repl_parser::option_value_false) val = false;
-	else cout << "error: invalid bool value: " << vt << " = " <<
-		parser_instance<tgf_repl_parser>().name(vt) << "\n";
-	return val;
-};
+bool get_bool_value(const traverser_t& t) {
+	return (t | get_only_child | get_nonterminal)
+			== tgf_repl_parser::true_value;
+}
 
 string unquote(const string& s) {
 	std::stringstream ss;
@@ -602,68 +630,65 @@ string unquote(const string& s) {
 	return ss.str();
 };
 
+vector<string> tgf_repl_evaluator::treepath(const traverser_t& tp) const {
+	vector<string> v;
+	for (const auto& s : (tp || tgf_repl_parser::symbol)())
+		v.push_back(s | get_terminals);
+	return v;
+}
+
 void tgf_repl_evaluator::set_cmd(const traverser_t& n) {
-	auto option = n | tgf_repl_parser::option;
-	auto v  = n | tgf_repl_parser::option_value;
-	auto vt = v | get_only_child | get_nonterminal;
-	switch (get_opt(option)) {
+	auto [o, v] = get_opt(n);
+	switch (o) {
 	case tgf_repl_parser::debug_opt:
-		set_bool_value(opt.debug, vt); break;
+		opt.debug = get_bool_value(v); break;
 	case tgf_repl_parser::status_opt:
-		set_bool_value(opt.status, vt); break;
+		opt.status = get_bool_value(v); break;
 	case tgf_repl_parser::colors_opt:
-		TC.set(set_bool_value(opt.colors, vt)); break;
+		TC.set((opt.colors = get_bool_value(v))); break;
 	case tgf_repl_parser::print_terminals_opt:
-		set_bool_value(opt.print_terminals, vt); break;
+		opt.print_terminals = get_bool_value(v); break;
 	case tgf_repl_parser::print_graphs_opt:
-		set_bool_value(opt.print_graphs, vt); break;
+		opt.print_graphs = get_bool_value(v); break;
 	case tgf_repl_parser::print_ambiguity_opt:
-		set_bool_value(opt.print_ambiguity, vt); break;
+		opt.print_ambiguity = get_bool_value(v); break;
 	case tgf_repl_parser::print_rules_opt:
-		set_bool_value(opt.tml_rules, vt); break;
+		opt.tml_rules = get_bool_value(v); break;
 	case tgf_repl_parser::print_facts_opt:
-		set_bool_value(opt.tml_facts, vt); break;
+		opt.tml_facts = get_bool_value(v); break;
 	case tgf_repl_parser::measure_parsing_opt:
-		set_bool_value(opt.measure, vt); break;
+		opt.measure = get_bool_value(v); break;
 	case tgf_repl_parser::measure_each_pos_opt:
-		set_bool_value(opt.measure_each_pos, vt); break;
+		opt.measure_each_pos = get_bool_value(v); break;
 	case tgf_repl_parser::measure_forest_opt:
-		set_bool_value(opt.measure_forest, vt); break;
+		opt.measure_forest = get_bool_value(v); break;
 	case tgf_repl_parser::measure_preprocess_opt:
-		set_bool_value(opt.measure_preprocess, vt); break;
+		opt.measure_preprocess = get_bool_value(v); break;
 	case tgf_repl_parser::trim_terminals_opt:
-		set_bool_value(g->opt.trim_terminals, vt); break;
+		g->opt.trim_terminals = get_bool_value(v); break;
 	case tgf_repl_parser::inline_cc_opt:
-		set_bool_value(g->opt.inline_char_classes, vt); break;
+		g->opt.inline_char_classes = get_bool_value(v); break;
 	case tgf_repl_parser::trim_opt:
 		opt.to_trim.clear();
-		for (const auto& s : (v
-			| tgf_repl_parser::symbol_list
-			|| tgf_repl_parser::symbol).traversers())
-				opt.to_trim.insert(s | get_terminals);
+		for (const auto& s : (v || tgf_repl_parser::symbol)())
+			opt.to_trim.insert(s | get_terminals);
 		break;
 	case tgf_repl_parser::trim_children_opt:
 		opt.to_trim_children.clear();
-		for (const auto& s : (v
-			| tgf_repl_parser::symbol_list
-			|| tgf_repl_parser::symbol).traversers())
-				opt.to_trim_children.insert(s | get_terminals);
+		for (const auto& s : (v || tgf_repl_parser::symbol)())
+			opt.to_trim_children.insert(s | get_terminals);
 		break;
 	case tgf_repl_parser::inline_opt:
 		opt.to_inline.clear();
-		for (const auto& s : (v
-			| tgf_repl_parser::symbol_list
-			|| tgf_repl_parser::symbol).traversers())
-				opt.to_inline.insert(s | get_terminals);
+		for (const auto& tp : (v || tgf_repl_parser::treepath)())
+			opt.to_inline.insert(treepath(tp));
 		break;
 	case tgf_repl_parser::auto_disambiguate_opt:
-		set_bool_value(g->opt.auto_disambiguate, vt); break;
+		g->opt.auto_disambiguate = get_bool_value(v); break;
 	case tgf_repl_parser::nodisambig_list_opt:
 		g->opt.nodisambig_list.clear();
-		for (const auto& s : (v
-			| tgf_repl_parser::symbol_list
-			|| tgf_repl_parser::symbol).traversers())
-				opt.nodisambig_list.insert(s | get_terminals);
+		for (const auto& s : (v || tgf_repl_parser::symbol)())
+			opt.nodisambig_list.insert(s | get_terminals);
 		break;
 	case tgf_repl_parser::error_verbosity_opt: {
 		auto vrb = v | tgf_repl_parser::error_verbosity;
@@ -678,37 +703,49 @@ void tgf_repl_evaluator::set_cmd(const traverser_t& n) {
 			opt.error_verbosity = lvl::INFO_DETAILED; break;
 		case tgf_repl_parser::root_cause_sym:
 			opt.error_verbosity = lvl::INFO_ROOT_CAUSE; break;
-		default: cout << "error: invalid error verbosity value\n"; return;
+		default: cout << "error: invalid error verbosity value\n";
+			return;
 		}
 		break;
 	}
+	default: assert(false);
 	};
 	get_cmd(n);
 }
 
 void tgf_repl_evaluator::add_cmd(const traverser_t& n) {
-	auto nt = static_cast<tgf_repl_parser::nonterminal>(
-		get_opt(n | tgf_repl_parser::list_option));
+	auto [o, v] = get_opt(n);
 	set<string> empty{};
-	auto& l(nt == tgf_repl_parser::nodisambig_list_opt ? opt.nodisambig_list :
-		nt == tgf_repl_parser::trim_opt            ? opt.to_trim :
-		nt == tgf_repl_parser::trim_children_opt   ? opt.to_trim_children :
-		nt == tgf_repl_parser::inline_opt          ? opt.to_inline : empty);
-	for (const auto& s : (n | tgf_repl_parser::symbol_list
-		|| tgf_repl_parser::symbol).traversers()) l.insert(s | get_terminals);
+	if (o == tgf_repl_parser::inline_opt) {
+		for (const auto& tp : (v || tgf_repl_parser::treepath)())
+			opt.to_inline.insert(treepath(tp));
+		get_cmd(n);
+		return;
+	}
+	auto& l(o == tgf_repl_parser::nodisambig_list_opt ? opt.nodisambig_list :
+		o == tgf_repl_parser::trim_opt            ? opt.to_trim :
+		o == tgf_repl_parser::trim_children_opt   ? opt.to_trim_children
+								: empty);
+	for (const auto& s : (v || tgf_repl_parser::symbol)())
+		l.insert(s | get_terminals);
 	get_cmd(n);
 }
 
 void tgf_repl_evaluator::del_cmd(const traverser_t& n) {
-	auto nt = static_cast<tgf_repl_parser::nonterminal>(
-		get_opt(n | tgf_repl_parser::list_option));
+	auto [o, v] = get_opt(n);
+	if (o == tgf_repl_parser::inline_opt) {
+		for (const auto& tp : (v || tgf_repl_parser::treepath)())
+			opt.to_inline.erase(treepath(tp));
+		get_cmd(n);
+		return;
+	}
 	set<string> empty{};
-	auto& l(nt == tgf_repl_parser::nodisambig_list_opt ? opt.nodisambig_list :
-		nt == tgf_repl_parser::trim_opt            ? opt.to_trim :
-		nt == tgf_repl_parser::trim_children_opt   ? opt.to_trim_children :
-		nt == tgf_repl_parser::inline_opt          ? opt.to_inline : empty);
-	for (const auto& s : (n | tgf_repl_parser::symbol_list
-		|| tgf_repl_parser::symbol).traversers()) l.erase(s | get_terminals);
+	auto& l(o == tgf_repl_parser::nodisambig_list_opt ? opt.nodisambig_list :
+		o == tgf_repl_parser::trim_opt            ? opt.to_trim :
+		o == tgf_repl_parser::trim_children_opt   ? opt.to_trim_children
+								: empty);
+	for (const auto& s : (n || tgf_repl_parser::symbol)())
+		l.erase(s | get_terminals);
 	get_cmd(n);
 }
 
@@ -760,15 +797,19 @@ void help(size_t nt = tgf_repl_parser::help_sym) {
 	static const std::string list_options =
 		"  nodisambig-list        list of nodes to keep ambiguous    symbol1, symbol2...\n"
 		"  trim                   list of nodes to trim              symbol1, symbol2...\n"
-		"  trim-children          list of nodes to trim children     symbol1, symbol2...\n"
-		"  inline                 list of nodes to inline            symbol1, symbol2...\n";
-	static const std::string all_available_options = std::string{} +
-		"Available options:\n" + bool_options + list_options +
+		"  trim-children          list of nodes to trim children     symbol1, symbol2...\n";
+	static const std::string treepaths_options =
+		"  inline                 list of tree paths to inline       symbol1 > ch1 > ch2, symbol2...\n";
+	static const string enum_ev_option =
 		"  error-verbosity        parse errors verbosity             basic/detailed/root-cause\n";
-	static const std::string bool_available_options = std::string{} +
+	static const std::string all_available_options = string{} +
+		"Available options:\n" + bool_options + list_options
+			+ treepaths_options + enum_ev_option;
+	static const std::string bool_available_options = string{} +
 		"Available options:\n" + bool_options;
-	static const std::string list_available_options = std::string{} +
-		"Available options:\n" + list_options;
+	static const std::string list_and_treepaths_available_options =
+		string{} +
+		"Available options:\n" + list_options + treepaths_options;
 	switch (nt) {
 	case tgf_repl_parser::help_sym: cout
 		<< "tgf commands:\n"
@@ -849,14 +890,14 @@ void help(size_t nt = tgf_repl_parser::help_sym) {
 		<< "command: add <option> <value>\n"
 		<< "\tadds the value to the given option list\n"
 		<< "\n"
-		<< list_available_options;
+		<< list_and_treepaths_available_options;
 		break;
 	case tgf_repl_parser::del_sym: cout
 		<< "command: delete <option> <value>\n"
 		<< "or: del, remove, rem or rm\n"
 		<< "\tremoves the value from the given option list\n"
 		<< "\n"
-		<< list_available_options;
+		<< list_and_treepaths_available_options;
 		break;
 	case tgf_repl_parser::load_sym: cout
 		<< "command: file \"TGF filepath\"\n"
@@ -911,17 +952,17 @@ int tgf_repl_evaluator::eval(const traverser_t& s) {
 		else help();
 		break;
 	}
-	case tgf_repl_parser::version:       version(); break;
-	case tgf_repl_parser::get:           get_cmd(s); break;
-	case tgf_repl_parser::set:           set_cmd(s); break;
+	case tgf_repl_parser::version: version(); break;
+	case tgf_repl_parser::get:     get_cmd(s | tgf_repl_parser::option); break;
+	case tgf_repl_parser::set:     set_cmd(s); break;
 	case tgf_repl_parser::toggle:
 		update_bool_opt_cmd(s, [](bool& b){ return b = !b; }); break;
 	case tgf_repl_parser::enable:
 		update_bool_opt_cmd(s, [](bool& b){ return b = true; }); break;
 	case tgf_repl_parser::disable:
 		update_bool_opt_cmd(s, [](bool& b){ return b = false; }); break;
-	case tgf_repl_parser::add:           add_cmd(s); break;
-	case tgf_repl_parser::del:           del_cmd(s); break;
+	case tgf_repl_parser::add:     add_cmd(s); break;
+	case tgf_repl_parser::del:     del_cmd(s); break;
 	case tgf_repl_parser::reload_cmd: reload(); break;
 	case tgf_repl_parser::load_cmd: {
 		auto n = s | tgf_repl_parser::filename;
@@ -983,14 +1024,9 @@ int tgf_repl_evaluator::eval(const traverser_t& s) {
 		if (auto seq = i | tgf_repl_parser::parse_input_char_seq;
 			seq.has_value()) input = seq | get_terminals;
 		else if (auto qstr = i | tgf_repl_parser::quoted_string;
-			qstr.has_value()) {
-				auto temp = qstr
-					|| tgf_repl_parser::quoted_string_char
-					|| get_terminals;
-				input = unquote(qstr
+			qstr.has_value()) input = unquote(qstr
 				|| tgf_repl_parser::quoted_string_char
 				|| get_terminals);
-			}
 		//if (opt.debug) std::cout << "input: " << input << "\n";
 		parse(input.c_str(), input.size());
 		break;

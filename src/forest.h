@@ -36,7 +36,7 @@ struct tree_shaping_options {
 	std::set<size_t> to_trim{};
 	std::set<size_t> to_trim_children{};
 	bool trim_terminals = false;
-	std::set<size_t> to_inline{};
+	std::set<std::vector<size_t>> to_inline{};
 	bool inline_char_classes = false;
 };
 

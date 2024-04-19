@@ -50,7 +50,7 @@ term                   => group
                         | terminal
                         | sym.
 
-shorthand_rule         => factor ':' sym.
+shorthand_rule         => factor _ ':' sym.
 
 # operators incl. EBNF
 neg                    => '~' term.
@@ -77,7 +77,8 @@ trim_children_dir      => "trim" sep "children" __ sym (_ ',' _ sym)*.
 
 # inline nonterminals by their children
 inline_dir             => "inline" __ inline_arg (_ ',' _ inline_arg)*.
-inline_arg             => sym | char_classes_sym.
+inline_arg             => tree_path | char_classes_sym.
+tree_path              => sym (_ '>' _ sym)*.
 char_classes_sym       => "char" sep "class" "es"?.
 
 # use directive

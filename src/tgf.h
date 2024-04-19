@@ -202,10 +202,25 @@ private:
 		}
 	private:
 		size_t id = 0;
+		size_t node2nt(const traverser_t& t) {
+			return nts.get(t | get_terminals);
+		}
+		void inline_dir(const traverser_t& t) {
+			for (auto& n : (t || tgf_parser::inline_arg)())
+			if ((n | get_only_child
+				| get_nonterminal) ==
+				tgf_parser::char_classes_sym)
+					opt.inline_char_classes = true;
+			else {
+				std::vector<size_t> tree_path{};
+				for (auto& s : (n
+					| tgf_parser::tree_path
+					|| tgf_parser::sym)())
+						tree_path.push_back(node2nt(s));
+				opt.to_inline.insert(tree_path);
+			}
+		}
 		void directive(const traverser_t& t) {
-			auto node2nt = [this](const traverser_t& t) -> size_t {
-				return nts.get(t | get_terminals);
-			};
 			//print_node(std::cout << "directive: ", t.value()) << "\n";
 			auto d = t | tgf_parser::directive_body | get_only_child;
 			auto nt = d | get_nonterminal;
@@ -235,14 +250,7 @@ private:
 				for (auto& n : (d || tgf_parser::sym)())
 					opt.to_trim_children.insert(node2nt(n));
 				break;
-			case tgf_parser::inline_dir:
-				for (auto& n : (d || tgf_parser::inline_arg)())
-					if ((n | get_only_child
-						| get_nonterminal) ==
-						tgf_parser::char_classes_sym)
-						opt.inline_char_classes = true;
-					else opt.to_inline.insert(node2nt(n));
-				break;
+			case tgf_parser::inline_dir: inline_dir(d); break;
 			case tgf_parser::boolean_dir: {
 				auto action = d | tgf_parser::boolean_action;
 				opt.auto_disambiguate = !action.has_value()

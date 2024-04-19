@@ -130,7 +130,7 @@ struct grammar {
 		std::set<size_t> to_trim_children{};
 		bool trim_terminals = false; // @trim all terminals.
 		// nonterminal ids to inline by shaping coming from @inline ...
-		std::set<size_t> to_inline{};
+		std::set<std::vector<size_t>> to_inline{};
 		bool inline_char_classes = false; // @inline char classes.
 		bool auto_disambiguate = true; // @enable/disable disambig.
 		std::set<size_t> nodisambig_list{}; // @nodisambig nonterminal ids.
