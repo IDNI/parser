@@ -19,6 +19,8 @@
 #include <vector>
 #include <string>
 #include <unistd.h>
+#include <sys/ioctl.h>
+#include <stdio.h>
 #include <termios.h>
 
 // TODO (HIGH) support inputs longer then terminal width (currently breaks the input line)
@@ -215,8 +217,55 @@ private:
 		if (file) file << history_[hpos_ - 1] << '\n';
 		return history_[hpos_ - 1];
 	}
+	std::pair<unsigned short, unsigned short> get_termsize() const {
+		struct winsize w;
+		ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+		return { w.ws_row, w.ws_col };
+	}
+	size_t printed_size(const std::string& s) const {
+		size_t size = 0;
+		bool in_escape = false;
+		// count characters skip escapes
+		for (auto c : s) if (in_escape) {
+				if (c == 'm') in_escape = false;
+			} else if (c == '\033') in_escape = true;
+			else size++;
+		return size;
+	}
+	size_t get_number_of_lines() const {
+		auto [_, cols] = get_termsize();
+		size_t prompt_size = printed_size(prompt_);
+		size_t l = prompt_size + input_.size();
+		if (l > 0) l--;
+		return l / cols + 1;
+	}
 	void refresh_input() const { // refresh input line
+		static size_t last_n = 1;
+		size_t n = get_number_of_lines();
+		size_t down = last_n > n ? last_n - n : 0;
+		if (n >= last_n) last_n = n;
+		else
+			//std::cerr << "n " << n << " < last_n " << last_n << "\n",
+			std::swap(n, last_n);
+// #ifdef DEBUG
+// 		auto [rows, cols] = get_termsize();
+// 		size_t prompt_size = printed_size(prompt_);
+// 		size_t l = input_.size() + prompt_size;
+// 		if (l > 0) l--;
+// 		std::cerr << pos_;
+// 		std::cerr << "[" << cols << "," << rows << "]";
+// 		std::cerr << prompt_size << "+";
+// 		std::cerr << input_.size() << "=";
+// 		std::cerr << l << "/" << n << "%" << last_n << "\n";
+// #endif // DEBUG
+		for (size_t i = 0; i < n-1; i++)
+			std::cerr << "clear line and move up\n",
+			out("\r\033[K\033[A", 8); // clear line and move up
 		out("\r\033[K", 4); // clear input
+		if (down) {
+			for (size_t i = 0; i < down; i++)
+				out("\033[B", 3); // move down
+		}
 //#ifdef DEBUG
 //		std::stringstream ss;
 //		ss << "[";
