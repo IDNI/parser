@@ -595,6 +595,8 @@ template <typename C, typename T>
 lit<C, T> grammar<C, T>::nt(const std::basic_string<C>& s) {
 	return nt(nts.get(s));
 }
+template <typename C, typename T>
+const lit<C, T>& grammar<C, T>::get_start() const { return start; }
 
 template <typename C, typename T>
 std::ostream& grammar<C, T>::check_nullable_ambiguity(std::ostream& os) const {

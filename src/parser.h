@@ -183,6 +183,7 @@ struct grammar {
 #endif
 	lit<C, T> nt(size_t n);
 	lit<C, T> nt(const std::basic_string<C>& s);
+	const lit<C, T>& get_start() const;
 private:
 	bool all_nulls(const lits<C, T>& a) const;
 	nonterminals<C, T>& nts;

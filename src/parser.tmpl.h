@@ -432,10 +432,15 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
 {
 	measure measure_parsing("parsing", po.measure);
 	debug = po.debug;
-	//DBGP(std::cout << "parse: `" << to_std_string(s) << "`[" << len <<
-	//	"] g.start:" << g.start << "(" << g.start.nt() << ")" << "\n";)
-	DBGP(g.print_internal_grammar(std::cout << "grammar: \n", "\t", true)
-		<< std::endl;)
+	if (debug) {
+		std::string tmp;
+		tmp = in->get();
+		std::cout << "parse: `" << tmp << "`"
+			<< "`[" << tmp.size() << "] start sym:" << g.get_start()
+			<< "(" << g.get_start().nt() << ")" << "\n";
+		g.print_internal_grammar(std::cout << "grammar: \n", "\t", true)
+			<< "\n";
+	}
 	auto f = std::make_unique<pforest>();
 	S.clear(), U.clear(), bin_tnt.clear(), refi.clear(),
 		gcready.clear(), sorted_citem.clear(), rsorted_citem.clear();
