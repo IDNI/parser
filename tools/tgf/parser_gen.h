@@ -154,27 +154,27 @@ void generate_parser_cpp(const std::string& tgf_filename,
 			}
 			return os;
 		};
-		os << "\t\to.trim_terminals = "
-			<< pbool[g.opt.trim_terminals] << ";\n";
-		os << "\t\to.inline_char_classes = "
-			<< pbool[g.opt.inline_char_classes] << ";\n";
 		os << "\t\to.auto_disambiguate = "
 			<< pbool[g.opt.auto_disambiguate] << ";\n";
 		if (g.opt.nodisambig_list.size()) {
 			os << "\t\to.nodisambig_list = {";
 			plist(os, g.opt.nodisambig_list) << "\n\t\t};\n";
 		}
-		if (g.opt.to_trim.size()) {
-			os << "\t\to.to_trim = {";
-			plist(os, g.opt.to_trim) << "\n\t\t};\n";
+		if (g.opt.shaping.to_trim.size()) {
+			os << "\t\to.shaping.to_trim = {";
+			plist(os, g.opt.shaping.to_trim) << "\n\t\t};\n";
 		}
-		if (g.opt.to_trim_children.size()) {
-			os << "\t\to.to_trim_children = {";
-			plist(os, g.opt.to_trim_children) << "\n\t\t};\n";
+		os << "\t\to.shaping.trim_terminals = "
+			<< pbool[g.opt.shaping.trim_terminals] << ";\n";
+		if (g.opt.shaping.to_trim_children.size()) {
+			os << "\t\to.shaping.to_trim_children = {";
+			plist(os, g.opt.shaping.to_trim_children) << "\n\t\t};\n";
 		}
-		if (g.opt.to_inline.size()) {
-			os << "\t\to.to_inline = {";
-			pvlist(os, g.opt.to_inline) << "\n\t\t};\n";
+		os << "\t\to.shaping.inline_char_classes = "
+			<< pbool[g.opt.shaping.inline_char_classes] << ";\n";
+		if (g.opt.shaping.to_inline.size()) {
+			os << "\t\to.shaping.to_inline = {";
+			pvlist(os, g.opt.shaping.to_inline) << "\n\t\t};\n";
 		}
 		return os.str();
 	};
@@ -246,6 +246,7 @@ void generate_parser_cpp(const std::string& tgf_filename,
 				" idni::parser<char_type, terminal_type>;\n"
 		"	using options         = parser_type::options;\n"
 		"	using parse_options   = parser_type::parse_options;\n"
+		"	using parse_result    = parser_type::result;\n"
 		"	using forest_type     = parser_type::pforest;\n"
 		"	using sptree_type     = parser_type::psptree;\n"
 		"	using input_type      = parser_type::input;\n"
@@ -254,76 +255,70 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		"	using encoder_type    = "
 				"std::function<std::basic_string<char_type>(\n"
 		"			const std::vector<terminal_type>&)>;\n"
+		"	static " <<opt.name<< "& instance() { static " <<opt.name<< " i; return i; }"
 		"	" <<opt.name<< "() :\n"
 		"		nts(load_nonterminals()), cc(load_cc()),\n"
 		"		g(nts, load_prods(), nt(" <<gi.start().n()<<
 				"), cc, load_grammar_opts()),\n"
 		"		p(g, load_opts()) {}\n"
-		"	std::unique_ptr<forest_type> parse(const char_type* data, size_t size,\n"
+
+		"	parse_result parse(const char_type* data, size_t size,\n"
 		"		parse_options po = {}) { return p.parse(data, size, po); }\n"
-		"	std::unique_ptr<forest_type> parse(std::basic_istream<char_type>& is,\n"
+		"	parse_result parse(std::basic_istream<char_type>& is,\n"
 		"		parse_options po = {}) { return p.parse(is, po); }\n"
-		"	std::unique_ptr<forest_type> parse(const std::string& fn,\n"
+		"	parse_result parse(const std::string& fn,\n"
 		"		parse_options po = {}) { return p.parse(fn, po); }\n"
 		"#ifndef WIN32\n"
-		"	std::unique_ptr<forest_type> parse(int fd, parse_options po = {})\n"
+		"	parse_result parse(int fd, parse_options po = {})\n"
 		"		{ return p.parse(fd, po); }\n"
 		"#endif //WIN32\n"
-		"	sptree_type shape(forest_type* f, const node_type& n) {\n"
-		"		idni::tree_shaping_options opt;\n"
-		"		opt.to_trim = g.opt.to_trim;\n"
-		"		opt.to_trim_children = g.opt.to_trim_children;\n"
-		"		opt.trim_terminals = g.opt.trim_terminals;\n"
-		"		opt.to_inline = g.opt.to_inline;\n"
-		"		opt.inline_char_classes = g.opt.inline_char_classes;\n"
-		"		return f->get_shaped_tree(n, opt);\n"
+		"	sptree_type shape(const parse_result& r, const node_type& n) {\n"
+		"		return r.get_shaped_tree(n, g.opt.shaping);\n"
 		"	}\n"
 		"	sptree_type parse_and_shape(const char_type* data, size_t size,\n"
 		"		const node_type& n, parse_options po = {})\n"
 		"	{\n"
-		"		return shape(p.parse(data, size, po).get(), n);\n"
+		"		return shape(p.parse(data, size, po), n);\n"
 		"	}\n"
 		"	sptree_type parse_and_shape(const char_type* data, size_t size,\n"
 		"		parse_options po = {})\n"
 		"	{\n"
-		"		auto f = p.parse(data, size, po);\n"
-		"		return shape(f.get(), f->root());\n"
+		"		auto r = p.parse(data, size, po);\n"
+		"		return shape(r, r.get_forest()->root());\n"
 		"	}\n"
 		"	sptree_type parse_and_shape(std::basic_istream<char_type>& is,\n"
 		"		const node_type& n, parse_options po = {})\n"
 		"	{\n"
-		"		return shape(p.parse(is, po).get(), n);\n"
+		"		return shape(p.parse(is, po), n);\n"
 		"	}\n"
 		"	sptree_type parse_and_shape(std::basic_istream<char_type>& is,\n"
 		"		parse_options po = {})\n"
 		"	{\n"
-		"		auto f = p.parse(is, po);\n"
-		"		return shape(f.get(), f->root());\n"
+		"		auto r = p.parse(is, po);\n"
+		"		return shape(r, r.get_forest()->root());\n"
 		"	}\n"
 		"	sptree_type parse_and_shape(const std::string& fn,\n"
 		"		const node_type& n, parse_options po = {})\n"
 		"	{\n"
-		"		return shape(p.parse(fn, po).get(), n);\n"
+		"		return shape(p.parse(fn, po), n);\n"
 		"	}\n"
 		"	sptree_type parse_and_shape(const std::string& fn,\n"
 		"		parse_options po = {})\n"
 		"	{\n"
-		"		auto f = p.parse(fn, po);\n"
-		"		return shape(f.get(), f->root());\n"
+		"		auto r = p.parse(fn, po);\n"
+		"		return shape(r, r.get_forest()->root());\n"
 		"	}\n"
 		"#ifndef WIN32\n"
 		"	sptree_type parse_and_shape(int fd, const node_type& n, parse_options po = {})\n"
 		"	{\n"
-		"		return shape(p.parse(fd, po).get(), n);\n"
+		"		return shape(p.parse(fd, po), n);\n"
 		"	}\n"
 		"	sptree_type parse_and_shape(int fd, parse_options po = {})\n"
 		"	{\n"
-		"		auto f = p.parse(fd, po);\n"
-		"		return shape(f.get(), f->root());\n"
+		"		auto r = p.parse(fd, po);\n"
+		"		return shape(r, r.get_forest()->root());\n"
 		"	}\n"
 		"#endif //WIN32\n"
-		"	bool found(size_t start = SIZE_MAX) { return p.found(start); }\n"
-		"	typename parser_type::error get_error() { return p.get_error(); }\n"
 		"	enum nonterminal {" << gen_nts_enum_cte() <<
 								"	};\n"
 		"	size_t id(const std::basic_string<char_type>& name) {\n"

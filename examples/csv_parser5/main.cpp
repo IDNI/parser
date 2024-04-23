@@ -17,6 +17,7 @@
 // Strings are quoted by quotes ("") and escaped with backslash (\).
 // Simple usage of a forest traversal is also showed to get value of its type.
 
+#include <optional>
 #include <limits>
 
 #include "parser.h"
@@ -46,18 +47,15 @@ struct csv_parser {
 		unescaped(nts("unescaped")), strchar(nts("strchar")),
 		strchars(nts("strchars")), str(nts("string")),
 		g(nts, rules(), start, cc), p(g) {}
-	value parse(const char* data, size_t size,
-		bool& parse_error, bool& out_of_range)
-	{
-		auto f = p.parse(data, size);
-		parse_error = !p.found();
-		if (parse_error) return ""; // if parse_error return ""
+	optional<value> parse(const char* data, size_t size) {
+		auto res = p.parse(data, size);
+		if (!res.found)	{
+			cerr << res.parse_error << '\n';
+			return {};
+		}
 		// return parsed value by calling get_value method
 		// which traverses the forest and gets the value
-		return get_value(f.get(), out_of_range);
-	}
-	ostream& print_error(ostream& os) {
-		return os << p.get_error().to_str() << '\n';
+		return get_value(res);
 	}
 private:
 	nonterminals<> nts{};
@@ -96,25 +94,32 @@ private:
 	}
 
 	// traverses the parsed forest and reads a parsed value from it.
-	value get_value(typename parser<>::pforest* f, bool& out_of_range) {
-		value v; // value we will return
-		out_of_range = false; // out of integer range error
+	value get_value(typename parser<>::result& res) {
+		value v; // return value
+		// takes node's terminals and converts them to int
+		// if conversion fails, prints out of range and returns NULL
+		auto get_int = [&res](const auto& n) -> value {
+			auto i = res.get_terminals_to_int(n);
+			if (!i) return cerr
+				<< "out of range, allowed range is from: "
+				<< numeric_limits<int_t>::min() << " to: "
+				<< numeric_limits<int_t>::max() << '\n', false;
+			return i.value();
+		};
 		// define a callback called when the traversal enters a node n
-		auto cb_enter = [&v, &out_of_range, &f, this](const auto& n) {
-			// n is a pair of a literal and its range
+		auto cb_enter = [&v, &get_int, &res, this](const auto& n) {
+			// n is a pair of a literal and its span
 			// we can compare the literal with literals predefined
 			// as members of 'this' object: integer/str/nullvalue
-			if (n.first == integer)
-				// if integer, flatten the node into an int
-				v = terminals_to_int(*f, n, out_of_range);
-			else if (n.first == str)
-				// if string, flatten the node into a string
-				v = terminals_to_str(*f, n);
-			else if (n.first == nullvalue)
-				v = true; // if null, v is bool
+			// if integer, get int from node's terminals
+			if (n.first == integer) v = get_int(n);
+			// if string, get node's terminals as a string
+			else if (n.first == str) v = res.get_terminals(n);
+			// if null, v is bool
+			else if (n.first == nullvalue) v = true;
 		};
 		// run traversal with the enter callback
-		f->traverse(cb_enter);
+		res.get_forest()->traverse(cb_enter);
 		return v; // return the value
 	}
 };
@@ -125,23 +130,18 @@ int main() {
 	csv_parser p;
 	string line;
 	while (getline(cin, line)) {
-		cout << "entered: `" << line << "`";
-		bool parse_error, out_of_range;
-		// instad of getting just an int we now get a value
-		csv_parser::value v = p.parse(line.c_str(), line.size(),
-						parse_error, out_of_range);
-		if (parse_error) p.print_error(cerr);
-		else if (out_of_range) cerr << " out of range, allowed range "
-			"is from: " << numeric_limits<int_t>::min() <<
-			" to: " << numeric_limits<int_t>::max() << '\n';
-		else {
-			cout << " parsed value: ";
-			// since the value is a variant we can use
-			// holds_alternative<T> and get<T> to access the data
-			if (holds_alternative<int_t>(v)) cout << get<int_t>(v);
-			else if (holds_alternative<bool>(v)) cout << "NULL";
-			else cout << get<string>(v);
-			cout << '\n';
-		}
+		cout << "entered: `" << line << "`\n";
+		// instead of getting just an int we now get a value
+		optional<csv_parser::value> vopt =
+					p.parse(line.c_str(), line.size());
+		if (!vopt) continue;
+		auto& v = vopt.value();
+		cout << "parsed value: ";
+		// since the value is a variant we can use
+		// holds_alternative<T> and get<T> to access the data
+		if (holds_alternative<int_t>(v)) cout << get<int_t>(v);
+		else if (holds_alternative<bool>(v)) cout << "NULL";
+		else cout << get<string>(v);
+		cout << '\n';
 	}
 }

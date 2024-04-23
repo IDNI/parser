@@ -44,6 +44,7 @@ struct tgf_repl_evaluator {
 		bool debug              = false;
 		bool status             = true;
 		bool colors             = true;
+		bool print_input        = false;
 		bool print_terminals    = true;
 		bool print_graphs       = true;
 		bool print_ambiguity    = true;
@@ -74,7 +75,7 @@ struct tgf_repl_evaluator {
 	void parse(const char* input, size_t size);
 	void parse(std::istream& instream);
 	void parse(const std::string& infile);
-	void parsed(std::unique_ptr<parser<char>::pforest> f);
+	void parsed(parser_type::result& r);
 
 	void reload();
 	void reload(const std::string& new_tgf_file);

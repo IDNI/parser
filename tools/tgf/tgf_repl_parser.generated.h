@@ -21,81 +21,74 @@ struct tgf_repl_parser {
 	using parser_type     = idni::parser<char_type, terminal_type>;
 	using options         = parser_type::options;
 	using parse_options   = parser_type::parse_options;
+	using parse_result    = parser_type::result;
 	using forest_type     = parser_type::pforest;
 	using sptree_type     = parser_type::psptree;
 	using input_type      = parser_type::input;
 	using decoder_type    = parser_type::input::decoder_type;
 	using encoder_type    = std::function<std::basic_string<char_type>(
 			const std::vector<terminal_type>&)>;
-	tgf_repl_parser() :
+	static tgf_repl_parser& instance() { static tgf_repl_parser i; return i; }	tgf_repl_parser() :
 		nts(load_nonterminals()), cc(load_cc()),
 		g(nts, load_prods(), nt(53), cc, load_grammar_opts()),
 		p(g, load_opts()) {}
-	std::unique_ptr<forest_type> parse(const char_type* data, size_t size,
+	parse_result parse(const char_type* data, size_t size,
 		parse_options po = {}) { return p.parse(data, size, po); }
-	std::unique_ptr<forest_type> parse(std::basic_istream<char_type>& is,
+	parse_result parse(std::basic_istream<char_type>& is,
 		parse_options po = {}) { return p.parse(is, po); }
-	std::unique_ptr<forest_type> parse(const std::string& fn,
+	parse_result parse(const std::string& fn,
 		parse_options po = {}) { return p.parse(fn, po); }
 #ifndef WIN32
-	std::unique_ptr<forest_type> parse(int fd, parse_options po = {})
+	parse_result parse(int fd, parse_options po = {})
 		{ return p.parse(fd, po); }
 #endif //WIN32
-	sptree_type shape(forest_type* f, const node_type& n) {
-		idni::tree_shaping_options opt;
-		opt.to_trim = g.opt.to_trim;
-		opt.to_trim_children = g.opt.to_trim_children;
-		opt.trim_terminals = g.opt.trim_terminals;
-		opt.to_inline = g.opt.to_inline;
-		opt.inline_char_classes = g.opt.inline_char_classes;
-		return f->get_shaped_tree(n, opt);
+	sptree_type shape(const parse_result& r, const node_type& n) {
+		return r.get_shaped_tree(n, g.opt.shaping);
 	}
 	sptree_type parse_and_shape(const char_type* data, size_t size,
 		const node_type& n, parse_options po = {})
 	{
-		return shape(p.parse(data, size, po).get(), n);
+		return shape(p.parse(data, size, po), n);
 	}
 	sptree_type parse_and_shape(const char_type* data, size_t size,
 		parse_options po = {})
 	{
-		auto f = p.parse(data, size, po);
-		return shape(f.get(), f->root());
+		auto r = p.parse(data, size, po);
+		return shape(r, r.get_forest()->root());
 	}
 	sptree_type parse_and_shape(std::basic_istream<char_type>& is,
 		const node_type& n, parse_options po = {})
 	{
-		return shape(p.parse(is, po).get(), n);
+		return shape(p.parse(is, po), n);
 	}
 	sptree_type parse_and_shape(std::basic_istream<char_type>& is,
 		parse_options po = {})
 	{
-		auto f = p.parse(is, po);
-		return shape(f.get(), f->root());
+		auto r = p.parse(is, po);
+		return shape(r, r.get_forest()->root());
 	}
 	sptree_type parse_and_shape(const std::string& fn,
 		const node_type& n, parse_options po = {})
 	{
-		return shape(p.parse(fn, po).get(), n);
+		return shape(p.parse(fn, po), n);
 	}
 	sptree_type parse_and_shape(const std::string& fn,
 		parse_options po = {})
 	{
-		auto f = p.parse(fn, po);
-		return shape(f.get(), f->root());
+		auto r = p.parse(fn, po);
+		return shape(r, r.get_forest()->root());
 	}
 #ifndef WIN32
 	sptree_type parse_and_shape(int fd, const node_type& n, parse_options po = {})
 	{
-		return shape(p.parse(fd, po).get(), n);
+		return shape(p.parse(fd, po), n);
 	}
 	sptree_type parse_and_shape(int fd, parse_options po = {})
 	{
-		auto f = p.parse(fd, po);
-		return shape(f.get(), f->root());
+		auto r = p.parse(fd, po);
+		return shape(r, r.get_forest()->root());
 	}
 #endif //WIN32
-	bool found(size_t start = SIZE_MAX) { return p.found(start); }
-	typename parser_type::error get_error() { return p.get_error(); }
 	enum nonterminal {
 		nul, eof, alnum, alpha, space, printable, parse_input_char, _, __, grammar_sym, 
 		internal_grammar_sym, unreachable_sym, start_sym, parse_sym, parse_file_sym, load_sym, reload_sym, help_sym, quit_sym, version_sym, 
@@ -177,20 +170,20 @@ private:
 	grammar_type::options load_grammar_opts() {
 		grammar_type::options o;
 		o.transform_negation = false;
-		o.trim_terminals = false;
-		o.inline_char_classes = true;
 		o.auto_disambiguate = true;
-		o.to_trim = {
+		o.shaping.to_trim = {
 			7, 8
 		};
-		o.to_trim_children = {
+		o.shaping.trim_terminals = false;
+		o.shaping.to_trim_children = {
 			9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
 			19, 20, 21, 22, 23, 24, 25, 26, 27, 28,
 			29, 30, 31, 32, 33, 34, 35, 36, 37, 38,
 			39, 40, 41, 42, 43, 44, 45, 46, 47, 48,
 			49, 50, 51, 52
 		};
-		o.to_inline = {
+		o.shaping.inline_char_classes = true;
+		o.shaping.to_inline = {
 			{ 6 }
 		};
 		return o;

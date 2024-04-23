@@ -15,6 +15,7 @@
 //
 // In this part we replace programatically defined grammar by a grammar in TGF.
 
+#include <optional>
 #include <limits>
 
 #include "parser.h"
@@ -34,17 +35,17 @@ struct csv_parser {
 	// TGF concatenates literals separated by a whitespace
 	// contrary to C++ where operator+ is required to concatenate literals
 	const char* csv_tgf =
-	"	@use_char_class digit, printable. "
+	"	@use char classes digit, printable. "
 	// quote and esc to name the literal and use it in other rules by name
-	"	esc        => '\\'. "
+	"	esc        => '\\\\'. "
 	"	quote      => '\"'. "
-	"	digits     => digit | (digits digit). "
-	"	integer    => digits | ('-' digits). "
+	"	digits     => digit | digits digit. "
+	"	integer    => digits | '-' digits. "
 	"	escaping   => quote | esc. "
 	"	unescaped  => printable & ~escaping. "
 	"	escaped    => esc escaping. "
 	"	strchar    => unescaped | escaped. "
-	"	strchars   => (strchar strchars) | null. "
+	"	strchars   => strchar strchars | null. "
 	"	str        => quote strchars quote. "
 	// null is a reserved word representing a null literal
 	"	nullvalue  => null. "
@@ -52,10 +53,10 @@ struct csv_parser {
 	// TGF names do not conflict with C++ names so it is safe
 	//  to remove _ from row_ and rows_
 	"	row        => val row_rest. "
-	"	row_rest   => (',' val row_rest) | null. "
-	"	eol        => '\n' | \"\r\n\". "
+	"	row_rest   => ',' val row_rest | null. "
+	"	eol        => '\\n' | \"\\r\\n\". "
 	"	rows       => row rows_rest. "
-	"	rows_rest  => (eol row rows_rest) | null. "
+	"	rows_rest  => eol row rows_rest | null. "
 	"	start      => rows. "
 	;
 	typedef variant<bool, int_t, string> value;
@@ -63,16 +64,13 @@ struct csv_parser {
 	typedef vector<row> rows;
 	// when initializing the CSV parser read the grammar from the TGF string
 	csv_parser() : g(tgf<>::from_string(nts, csv_tgf)), p(g) {}
-	rows parse(const char* data, size_t size,
-		bool& parse_error, bool& out_of_range)
-	{
-		auto f = p.parse(data, size);
-		parse_error = !p.found();
-		if (parse_error) return {};
-		return get_rows(f.get(), out_of_range);
-	}
-	ostream& print_error(ostream& os) {
-		return os << p.get_error().to_str() << '\n';
+	optional<rows> parse(const char* data, size_t size) {
+		auto res = p.parse(data, size);
+		if (!res.found)	{
+			cerr << res.parse_error << '\n';
+			return {};
+		}
+		return get_rows(res);
 	}
 private:
 	nonterminals<> nts;
@@ -80,10 +78,17 @@ private:
 	parser<> p;
 	// container for char class functions and all prods removed since it is
 	// covered by TGF
-	rows get_rows(typename parser<>::pforest* f, bool& out_of_range) {
+	rows get_rows(typename parser<>::result& res) {
 		rows r;
-		out_of_range = false;
-		auto cb_enter = [&r, &out_of_range, &f, this](const auto& n) {
+		auto get_int = [&res](const auto& n) -> value {
+			auto i = res.get_terminals_to_int(n);
+			if (!i) return cerr
+				<< "out of range, allowed range is from: "
+				<< numeric_limits<int_t>::min() << " to: "
+				<< numeric_limits<int_t>::max() << '\n', false;
+			return i.value();
+		};
+		auto cb_enter = [&r, &get_int, &res, this](const auto& n) {
 			// we care only for nonterminals, so skip terminals
 			if (!n.first.nt()) return;
 			// get name of the nonterminal
@@ -92,14 +97,13 @@ private:
 			// we can remove _ in row_ because no conflict with row
 			if (nt == "row") r.emplace_back();
 			else if (nt == "integer")
-				r.back().push_back(
-					terminals_to_int(*f, n, out_of_range));
+				r.back().push_back(get_int(n));
 			else if (nt == "str")
-				r.back().push_back(terminals_to_str(*f, n));
+				r.back().push_back(res.get_terminals(n));
 			else if (nt == "nullvalue")
 				r.back().push_back(true);
 		};
-		f->traverse(cb_enter);
+		res.get_forest()->traverse(cb_enter);
 		return r;
 	}
 };
@@ -118,22 +122,14 @@ int main() {
 	csv_parser p;
 	istreambuf_iterator<char> begin(cin), end;
 	string input(begin, end);
-	cout << "entered: `" << input << "`";
-	bool parse_error, out_of_range;
-	csv_parser::rows rs = p.parse(input.c_str(), input.size(),
-					parse_error, out_of_range);
-	if (parse_error) p.print_error(cerr);
-	else if (out_of_range) cerr << " out of range, allowed range "
-		"is from: " << numeric_limits<int_t>::min() <<
-		" to: " << numeric_limits<int_t>::max() << '\n';
-	else {
-		for (const csv_parser::row& r : rs) {
-			cout << " parsed row: ";
-			for (size_t i = 0; i != r.size(); ++i) {
-				if (i) cout << ", ";
-				cout << r[i];
-			}
-			cout << '\n';
-		}
+	cout << "entered: `" << input << "`\n";
+	optional<csv_parser::rows> rsopt = p.parse(input.c_str(), input.size());
+	if (!rsopt) return 1;
+	for (const csv_parser::row& r : rsopt.value()) {
+		cout << "parsed row: ";
+		for (size_t i = 0; i != r.size(); ++i)
+			cout << (i ? ", " : "") << r[i];
+		cout << '\n';
 	}
+	return 0;
 }

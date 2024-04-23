@@ -15,6 +15,7 @@
 //
 // In this part we introduce parsing the CSV rows separated by an end of line.
 
+#include <optional>
 #include <limits>
 
 #include "parser.h"
@@ -48,17 +49,14 @@ struct csv_parser {
 		rows_(nts("rows")), rows_rest(nts("rows_rest")),
 		g(nts, rules(), start, cc), p(g) {}
 	// parse now returns rows instead of a row
-	rows parse(const char* data, size_t size,
-		bool& parse_error, bool& out_of_range)
-	{
-		auto f = p.parse(data, size);
-		parse_error = !p.found();
-		if (parse_error) return {};
+	optional<rows> parse(const char* data, size_t size) {
+		auto res = p.parse(data, size);
+		if (!res.found)	{
+			cerr << res.parse_error << '\n';
+			return {};
+		}
 		// return parsed CSV rows
-		return get_rows(f.get(), out_of_range);
-	}
-	ostream& print_error(ostream& os) {
-		return os << p.get_error().to_str() << '\n';
+		return get_rows(res);
 	}
 private:
 	nonterminals<> nts{};
@@ -96,22 +94,28 @@ private:
 		r(start,      rows_);
 		return r;
 	}
-	rows get_rows(typename parser<>::pforest* f, bool& out_of_range) {
+	rows get_rows(typename parser<>::result& res) {
 		rows r; // rows of values we will return
-		out_of_range = false;
-		auto cb_enter = [&r, &out_of_range, &f, this](const auto& n) {
+		auto get_int = [&res](const auto& n) -> value {
+			auto i = res.get_terminals_to_int(n);
+			if (!i) return cerr
+				<< "out of range, allowed range is from: "
+				<< numeric_limits<int_t>::min() << " to: "
+				<< numeric_limits<int_t>::max() << '\n', false;
+			return i.value();
+		};
+		auto cb_enter = [&r, &get_int, &res, this](const auto& n) {
 			// for every new row we add a new row into r
 			if (n.first == row_) r.emplace_back();
 			else if (n.first == integer)
 				// and we use r.back() to ref the current row
-				r.back().push_back(
-					terminals_to_int(*f, n, out_of_range));
+				r.back().push_back(get_int(n));
 			else if (n.first == str)
-				r.back().push_back(terminals_to_str(*f, n));
+				r.back().push_back(res.get_terminals(n));
 			else if (n.first == nullvalue)
 				r.back().push_back(true);
 		};
-		f->traverse(cb_enter);
+		res.get_forest()->traverse(cb_enter);
 		return r;
 	}
 };
@@ -131,24 +135,16 @@ int main() {
 	// instead of reading line by line, read the whole standard input
 	istreambuf_iterator<char> begin(cin), end;
 	string input(begin, end);
-	cout << "entered: `" << input << "`";
-	bool parse_error, out_of_range;
-	// instad of getting just a row we now get all the rows
-	csv_parser::rows rs = p.parse(input.c_str(), input.size(),
-					parse_error, out_of_range);
-	if (parse_error) p.print_error(cerr);
-	else if (out_of_range) cerr << " out of range, allowed range "
-		"is from: " << numeric_limits<int_t>::min() <<
-		" to: " << numeric_limits<int_t>::max() << '\n';
-	else {
-		// print the parsed rows
-		for (const csv_parser::row& r : rs) {
-			cout << " parsed row: ";
-			for (size_t i = 0; i != r.size(); ++i) {
-				if (i) cout << ", ";
-				cout << r[i];
-			}
-			cout << '\n';
-		}
+	cout << "entered: `" << input << "`\n";
+	// instead of getting just a row we now get rows
+	optional<csv_parser::rows> rsopt = p.parse(input.c_str(), input.size());
+	if (!rsopt) return 1;
+	// print the parsed rows
+	for (const csv_parser::row& r : rsopt.value()) {
+		cout << "parsed row: ";
+		for (size_t i = 0; i != r.size(); ++i)
+			cout << (i ? ", " : "") << r[i];
+		cout << '\n';
 	}
+	return 0;
 }

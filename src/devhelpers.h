@@ -19,7 +19,7 @@
 namespace idni {
 
 template <typename C, typename T = C>
-bool to_tml_facts(std::ostream& os, const typename parser<C, T>::pforest& f);
+bool to_tml_facts(std::ostream& os, const typename parser<C, T>::result& f);
 template <typename C, typename T = C>
 bool to_dot(std::ostream& os, const typename parser<C, T>::pforest& f,
 	const std::string& inputstr = "",
@@ -142,8 +142,8 @@ bool to_dot(std::ostream& ss, P& g, const std::string& inputstr,
 	}
 }
 template <typename C, typename T>
-bool to_tml_facts(std::ostream& ss, const typename parser<C, T>::pforest& f){
-	auto n_e = f.get_nodes_and_edges();
+bool to_tml_facts(std::ostream& ss, const typename parser<C, T>::result& r){
+	auto n_e = r.get_nodes_and_edges();
 	auto& n = n_e.first;
 	auto& e = n_e.second;
 	for (size_t i = 0; n.size() && i < n.size()-1; ++i)

@@ -55,7 +55,7 @@ bool is_true_value(string s) {
 	return find(trues.begin(), trues.end(), s) != trues.end();
 }
 
-std::string long_for(char c, const cli::options& opts) {
+string long_for(char c, const cli::options& opts) {
 	for (auto& opt : opts) if (opt.second.matches(c))
 		return opt.second.name();
 	return "";
@@ -251,7 +251,7 @@ ostream& cli::help(ostream& os, command cmd) const {
 // if it is invalid option and we dont have a command returns 3
 // if it is invalid option and we have a command returns 1
 int cli::process_arg(int& arg, bool& has_cmd, options& opts) {
-	//DBG(std::cout << "process_arg: " << arg << " args[arg]: " << args_[arg] << "\n";)
+	//DBG(cout << "process_arg: " << arg << " args[arg]: " << args_[arg] << "\n";)
 	cli::option* cur = 0;
 	string opt(args_[arg]);
 	bool isshort;
@@ -350,11 +350,11 @@ int cli::process_args() {
 		return error("Invalid option: " + args_[arg], true);
 
 	// get command
-	std::string cmdarg = status_ == 2 ? args_[arg++]
+	string cmdarg = status_ == 2 ? args_[arg++]
 		: (status_ == 3 || status_ == 0) ? dflt_cmd_
 			: "";
 	status_ = 0;
-	//DBG(std::cout << "cmdarg: " << cmdarg << "\n";)
+	//DBG(cout << "cmdarg: " << cmdarg << "\n";)
 
 	// if command, get its options
 	if (cmdarg.size()) {

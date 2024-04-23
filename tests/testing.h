@@ -111,11 +111,12 @@ bool info(std::ostream& os) {
 // saves resulting forest and graphs into files with various formats
 template <typename T>
 int test_out(int c, const grammar<T>& g, const std::basic_string<T>& inputstr,
-	typename parser<T>::pforest& f)
+	typename parser<T>::result& r)
 {
 	std::stringstream ptd;
 	std::stringstream ssf;
 
+	auto& f = *r.get_forest();
 	g.print_internal_grammar(ssf, "\\l", true);
 	std::string s = ssf.str();
 	ssf.str({});
@@ -130,7 +131,7 @@ int test_out(int c, const grammar<T>& g, const std::basic_string<T>& inputstr,
 
 	ssf << "forest_facts" << c << ".tml";
 	std::ofstream file1(ssf.str());
-	to_tml_facts<T>(ptd, as_const(f));
+	to_tml_facts<T>(ptd, r);
 	file1 << ptd.str();
 	file1.close();
 	ssf.str({});
@@ -174,7 +175,7 @@ int test_out(int c, const grammar<T>& g, const std::basic_string<T>& inputstr,
 	auto cb_next_graph = [&](typename parser<T>::pgraph& g){
 		f.detect_cycle(g);
 		dump_files(g);
-		if (options<T>.binarize && f.remove_binarization(g))
+		if (options<T>.binarize && r.inline_prefixed_nodes(g, "__B_"))
 			dump_files(g, "rembin");
 		i++;
 
@@ -185,23 +186,6 @@ int test_out(int c, const grammar<T>& g, const std::basic_string<T>& inputstr,
 	return 1;
 }
 
-template <typename T>
-void print_ambig_nodes(std::ostream& os, typename parser<T>::pforest& f) {
-	if (!f.is_ambiguous()) return;
-	os << "\t# ambiguous nodes:\n";
-	for (auto& n : f.ambiguous_nodes()) {
-		os << "\t `" << n.first.first << "` [" << n.first.second[0] <<
-			"," << n.first.second[1] << "]\n";
-		size_t d = 0;
-		for (auto ns : n.second) {
-			os << "\t\t " << d++ << "\t";
-			for (auto nt : ns) os << " `" << nt.first << "`[" <<
-				nt.second[0] << "," << nt.second[1] << "] ";
-			os << "\n";
-		}
-	}
-}
-
 // runs a test
 template <typename T>
 bool run_test_(grammar<T>& g, parser<T>& p, const std::basic_string<T>& input,
@@ -210,9 +194,9 @@ bool run_test_(grammar<T>& g, parser<T>& p, const std::basic_string<T>& input,
 	std::stringstream ss;
 	if (!info(ss)) return true;
 	std::stringstream ssna;
-	g.check_nullable_ambiguity(ssna);
-	if (ssna.tellp())
-		ss << "\npossible nullable ambiguity...\n" << ssna.str() <<"\n";
+	//g.check_nullable_ambiguity(ssna);
+	//if (ssna.tellp())
+	//	ss << "\npossible nullable ambiguity...\n" << ssna.str() <<"\n";
 	bool expect_fail = opts.error_expected.size() > 0;
 	if (verbosity == 0) opts.dump = false;
 	else {
@@ -222,7 +206,7 @@ bool run_test_(grammar<T>& g, parser<T>& p, const std::basic_string<T>& input,
 			ss << "\t# grammar productions:\n", "\t# ") <<std::endl;
 	}
 	emeasure_time_start(start_p, end_p);
-	auto f = p.parse(input.c_str(), input.size(), {
+	auto r = p.parse(input.c_str(), input.size(), {
 		.start = opts.start,
 		.debug = false
 	});
@@ -230,13 +214,15 @@ bool run_test_(grammar<T>& g, parser<T>& p, const std::basic_string<T>& input,
 		ss << "\nelapsed parsing: ";
 		emeasure_time_end_to(start_p, end_p, ss) << "\t";
 	}
-	bool found = p.found(opts.start);
+	bool found = r.found;
 	bool found_orig = found;
+	auto* f = r.get_forest();
+
 	std::string msg{};
-	if (!found) msg = p.get_error()
+	if (!found) msg = r.parse_error
 			.to_str(parser<T>::error::info_lvl::INFO_BASIC);
 	//if (!found and opts.dump) p.print_S(ss << "\t# S:\n") << "\n";
-	bool ambiguity = found && f->is_ambiguous();
+	bool ambiguity = found && r.is_ambiguous();
 	if (ambiguity && opts.ambiguity_fails) {
 		expect_fail = found = false;
 		msg = "Input with provided grammar is providing ambiguous "
@@ -268,17 +254,17 @@ bool run_test_(grammar<T>& g, parser<T>& p, const std::basic_string<T>& input,
 	}
 	if (found) {
 		if (verbosity > 0)
-			ss << "\t# is_ambiguous " << (f->is_ambiguous()
+			ss << "\t# is_ambiguous " << (r.is_ambiguous()
 				? "yes" : "no") << "\n",
-			ss << "\t# count_trees " << f->count_trees() << "\n";
+			ss << "\t# count_trees "
+				<< f->count_trees() << "\n";
 	}
 	if (found && verbosity > 1) {
 		struct {
 			bool graphs = false, facts = false, rules = false;
 		} print;
-		auto cb_next_g = [&f, &print, &ss](parser<T>::pgraph& g) {
-			f->remove_binarization(g);
-			f->remove_recursive_nodes(g);
+		auto cb_next_g = [&r, &print, &ss](parser<T>::pgraph& g) {
+			r.inline_grammar_transformations(g);
 			if (print.graphs) {
 				static size_t c = 1;
 				ss << "\n\t# parsed graph";
@@ -295,16 +281,15 @@ bool run_test_(grammar<T>& g, parser<T>& p, const std::basic_string<T>& input,
 		if (print.rules || print.graphs)
 			f->extract_graphs(f->root(), cb_next_g);
 		if (print.facts) to_tml_facts<T,T>(ss << "\n\t# TML facts:\n\n",
-			*f), ss << "\n";
+			r), ss << "\n";
 		ss << "\t# terminals parsed: `" << to_string(
-			terminals_to_str<T>(*f, f->root())) << "`\n";
-		if (verbosity > 2) test_out<T>(c, g, input.size() > 100
-						? input.substr(0, 100) : input, *f);
+			r.get_terminals()) << "`\n";
+		if (verbosity > 2) test_out<T>(c, g,
+			input.size() > 100 ? input.substr(0, 100) : input, r);
 	}
 
 
-	if (ambiguity && verbosity > 0)
-		print_ambig_nodes<T>(ss, *f);
+	if (ambiguity && verbosity > 0) r.print_ambiguous_nodes(ss);
 	if (expect_fail) found = msg.find(opts.error_expected) ==
 					decltype(opts.error_expected)::npos;
 	bool fail = false;

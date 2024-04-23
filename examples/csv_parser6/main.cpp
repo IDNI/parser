@@ -15,6 +15,7 @@
 //
 // In this part we introduce parsing values separated by a comma.
 
+#include <optional>
 #include <limits>
 
 #include "parser.h"
@@ -45,17 +46,14 @@ struct csv_parser {
 		row_(nts("row")), row_rest(nts("row_rest")),
 		g(nts, rules(), start, cc), p(g) {}
 	// parse now returns a row instead of a value
-	row parse(const char* data, size_t size,
-		bool& parse_error, bool& out_of_range)
-	{
-		auto f = p.parse(data, size);
-		parse_error = !p.found();
-		if (parse_error) return {};
+	optional<row> parse(const char* data, size_t size) {
+		auto res = p.parse(data, size);
+		if (!res.found)	{
+			cerr << res.parse_error << '\n';
+			return {};
+		}
 		// return parsed values as a row by calling get_row method
-		return get_row(f.get(), out_of_range);
-	}
-	ostream& print_error(ostream& os) {
-		return os << p.get_error().to_str() << '\n';
+		return get_row(res);
 	}
 private:
 	nonterminals<> nts;
@@ -89,26 +87,30 @@ private:
 		return r;
 	}
 	// traverses the parsed forest and reads a parsed row of values from it.
-	row get_row(typename parser<>::pforest* f, bool& out_of_range) {
+	row get_row(typename parser<>::result& res) {
 		row r; // values we will return
-		out_of_range = false; // out of integer range error
-		// define a callback called when the traversal enters a node n
-		auto cb_enter = [&r, &out_of_range, &f, this](const auto& n) {
+		auto get_int = [&res](const auto& n) -> value {
+			auto i = res.get_terminals_to_int(n);
+			if (!i) return cerr
+				<< "out of range, allowed range is from: "
+				<< numeric_limits<int_t>::min() << " to: "
+				<< numeric_limits<int_t>::max() << '\n', false;
+			return i.value();
+		};
+		auto cb_enter = [&r, &get_int, &res, this](const auto& n) {
 			// n is a pair of a literal and its range
 			// we can compare the literal with literals predefined
 			// as members of 'this' object: integer/str/nullvalue
-			if (n.first == integer)
-				// push the integer into row of values
-				r.push_back(
-					terminals_to_int(*f, n, out_of_range));
+			// if integer push the integer into row of values
+			if (n.first == integer) r.push_back(get_int(n));
+			// if str then push the string into row of values
 			else if (n.first == str)
-				// push the string into row of values
-				r.push_back(terminals_to_str(*f, n));
-			else if (n.first == nullvalue)
-				r.push_back(true); // if null, push the bool
+					r.push_back(res.get_terminals(n));
+			// if null, push the bool
+			else if (n.first == nullvalue) r.push_back(true);
 		};
 		// run traversal with the enter callback
-		f->traverse(cb_enter);
+		res.get_forest()->traverse(cb_enter);
 		return r; // return the value
 	}
 };
@@ -127,22 +129,15 @@ int main() {
 	csv_parser p;
 	string line;
 	while (getline(cin, line)) {
-		cout << "entered: `" << line << "`";
-		bool parse_error, out_of_range;
-		// instad of getting just a value we now get a row of values
-		csv_parser::row r = p.parse(line.c_str(), line.size(),
-						parse_error, out_of_range);
-		if (parse_error) p.print_error(cerr);
-		else if (out_of_range) cerr << " out of range, allowed range "
-			"is from: " << numeric_limits<int_t>::min() <<
-			" to: " << numeric_limits<int_t>::max() << '\n';
-		else {
-			cout << " parsed row: "; // print the parsed values
-			for (size_t i = 0; i != r.size(); ++i) {
-				if (i) cout << ", ";
-				cout << r[i];
-			}
-			cout << '\n';
-		}
+		cout << "entered: `" << line << "`\n";
+		// instead of getting just a value we now get a row of values
+		optional<csv_parser::row> ropt =
+					p.parse(line.c_str(), line.size());
+		if (!ropt) continue;
+		auto& r = ropt.value();
+		cout << "parsed row: "; // print parsed values
+		for (size_t i = 0; i != r.size(); ++i)
+			cout << (i ? ", " : "") << r[i];
+		cout << '\n';
 	}
 }

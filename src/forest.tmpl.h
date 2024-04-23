@@ -16,220 +16,25 @@
 #include "forest.h"
 namespace idni {
 
-#ifdef DEBUG
 template <typename NodeT>
-std::ostream& forest<NodeT>::print_data(std::ostream& os) const {
-	os << "number of nodes: " << g.size() << std::endl;
-	for (const auto& n : g) {
-		os << n.first.first.to_std_string() << "\n";
-		for (const auto& p : n.second) {
-			os << "\t";
-			for (const auto& c : p)
-				os << " `" << c.first.to_std_string() << "`";
-			os << "\n";
-		}
-	}
+std::ostream& forest<NodeT>::tree::to_print(std::ostream& os, size_t l,
+	std::set<size_t> skip, bool nulls) const
+{
+	if (skip.size() && value.first.nt() &&
+		skip.find(value.first.n()) != skip.end())
+			return os;
+	if (!nulls && value.first.is_null()) return os;
+	os << "\n";
+	for (size_t t = 0; t < l; t++) os << "\t";
+	if (value.first.nt()) os << value.first
+		<< "(" << value.first.n() << ")";
+	else if (value.first.is_null()) os << "null";
+	else os << value.first;
+	os << "[" << value.second[0] << ", "
+		<< value.second[1] << "]";
+	for (auto& d : child)
+		d->to_print(os, l + 1, skip, nulls);
 	return os;
-}
-#endif
-
-// get a first parse tree from the forest optionally provide root of the tree.
-// be sure the forest has only a single tree
-// check if has_single_parse_tree() is true or is_ambiguous() is false first
-// or ambiguous_nodes() is empty
-template <typename NodeT>
-forest<NodeT>::sptree forest<NodeT>::get_tree(const NodeT& n) {
-	forest<NodeT>::sptree t;
-	extract_graphs(n, [this, &t] (auto& g) {
-		remove_recursive_nodes(g);
-		remove_binarization(g);
-		t = g.extract_trees();
-		return false;
-	});
-	return t;
-}
-template <typename NodeT>
-forest<NodeT>::sptree forest<NodeT>::get_tree() {
-	return get_tree(root());
-}
-
-template <typename NodeT>
-void forest<NodeT>::_get_shaped_tree_children(const tree_shaping_options& opts,
-	const std::vector<NodeT>& nodes,
-	std::vector<typename forest<NodeT>::sptree>& child)
-{
-	auto matches_inline_prefix = [](const NodeT& n) {
-		static const std::vector<std::string> prefixes = {
-			"__E_", // ebnf prefix
-			"__B_"  // binarization prefix
-			//"__N_"  // negation prefix
-		};
-		if (n.first.nt()) {
-			auto s = n.first.to_std_string();
-			for (auto& prefix : prefixes)
-				if (s.find(prefix) != decltype(s)::npos)
-					return true;
-		}
-		return false;
-	};
-	static const std::vector<std::string> cc_names = {
-		"eof",  "alnum", "alpha", "blank",
-                        "cntrl", "digit", "graph", "lower", "printable",
-                        "punct", "space", "upper", "xdigit"
-	};
-	auto one_of = [](const NodeT& n, const std::set<size_t>& list) {
-		if (n.first.nt()) for (auto& nt : list)
-			if (n.first.n() == nt) return true;
-		return false;
-	};
-	auto one_of_str = [](const NodeT& n,
-		const std::vector<std::string>& list)
-	{
-		return std::find(list.begin(), list.end(),
-			n.first.to_std_string()) != list.end();
-	};
-	auto get_children = [&](const NodeT& n) -> std::set<std::vector<NodeT>>{
-		if (one_of(n, opts.to_trim_children)) return {};
-		auto it = g.find(n);
-		if (it != g.end()) return it->second;
-		return {};
-	};
-	auto inline_children = [&](const NodeT& n) {
-		for (const auto& cnodes : get_children(n))
-			//std::cout << "getting children for inlined " << chd.first.to_std_string() << std::endl,
-			_get_shaped_tree_children(opts, cnodes, child);
-	};
-	std::function<const NodeT*(const NodeT& n,
-		const std::vector<size_t>& tp, size_t& i)> go;
-	go = [&](const NodeT& n, const std::vector<size_t>& tp, size_t& i)
-		-> const NodeT*
-	{
-		if (!n.first.nt()) return 0;
-		if (matches_inline_prefix(n))
-			for (const auto& cnodes : get_children(n))
-				for (const auto& c : cnodes) {
-					const NodeT* y = go(c, tp, i);
-					if (y) return go(*y, tp, i);
-				}
-		else if (n.first.nt() && n.first.n() == tp[i]) {
-			if (++i == tp.size()) return &n;
-			for (const auto& cnodes : get_children(n))
-				for (const auto& c : cnodes) {
-					const NodeT* y = go(c, tp, i);
-					if (y) return i == tp.size() ? y
-								: go(*y, tp, i);
-				}
-		}
-		return 0;
-	};
-	// returns node pointer according to path from n or 0 if not found
-	auto treepath = [&go](const NodeT& n, const std::vector<size_t>& tp)
-		-> const NodeT*
-	{
-		size_t i = 0;
-		return go(n, tp, i);
-	};
-	std::function<bool(const NodeT&)> do_inline = [&](const NodeT& n) {
-		for (auto& tp : opts.to_inline)
-			if (auto p = treepath(n, tp); p) {
-				if (tp.size() == 1)
-					inline_children(*p);
-				else { // if path is more than 1 level deep
-					auto x = get_shaped_tree(*p, opts);
-					if (x && !do_inline(x->value))
-						child.push_back(x);
-				}
-				return true;
-			}
-		return false;
-	};
-	for (auto& chd : nodes) {
-		if (one_of(chd, opts.to_trim)
-			|| (opts.trim_terminals && !chd.first.nt())) continue;
-		if (do_inline(chd)) continue;
-		if (matches_inline_prefix(chd)
-			|| (opts.inline_char_classes
-				&& one_of_str(chd, cc_names)))
-					inline_children(chd);
-		else if (!chd.first.is_null()) {
-			auto x = get_shaped_tree(chd, opts);
-			if (x) child.push_back(x);
-		}
-	}
-};
-
-template <typename NodeT>
-forest<NodeT>::sptree forest<NodeT>::get_shaped_tree(const NodeT& n,
-	const tree_shaping_options opts)
-{
-	//std::cout << "getting tree for " << n.first.to_std_string() << std::endl;
-	forest<NodeT>::sptree t = std::make_shared<tree>(n);
-	nodes_set pack;
-	auto one_of = [](const NodeT& n, const std::set<size_t>& list) {
-		if (n.first.nt()) for (auto& nt : list)
-			if (n.first.n() == nt) return true;
-		return false;
-	};
-	if (!n.first.nt() && n.first.is_null()) return NULL;
-	if (n.first.nt() && !one_of(n, opts.to_trim_children)) {
-		auto it = g.find(n);
-		if (it == g.end()) {
-			//std::cout << "Not existing node " << n.first.to_std_string() << std::endl;
-			return NULL;
-		}
-		auto& nts = *n.first.nts;
-		pack = it->second;
-		if (pack.size() > 1) {
-			// move ambiguous children sets each into its separate child
-			// copy them also a value of amb. node
-			// and replace value of amb. node with nt: __AMB_<ID>
-			static size_t id = 0;
-			std::stringstream ss;
-			ss << "__AMB_" << id++;
-			auto x = t->value;
-			x.first = nts(ss.str());
-			t = std::make_shared<tree>(x);
-			//std::cout << "Ambigous node " << n.first.to_std_string() << std::endl;
-			for (auto& nodes : pack) {
-				sptree tc = std::make_shared<tree>(n);
-				//std::cout << "getting children for AMBIGUOUS "
-				//	<< n.first.to_std_string() << std::endl;
-				_get_shaped_tree_children(
-					opts, nodes, tc->child);
-				t->child.push_back(tc);
-			}
-		} else for (auto& nodes : pack)
-			//std::cout << "getting children for " << n.first.to_std_string() << std::endl,
-			_get_shaped_tree_children(opts, nodes, t->child);
-	}
-	//std::cout << "returning tree for " << n.first.to_std_string() << " children size = " << t->child.size() << std::endl;
-	return t;
-}
-template <typename NodeT>
-forest<NodeT>::sptree forest<NodeT>::get_shaped_tree(
-	const tree_shaping_options opts)
-{
-	return get_shaped_tree(root(), opts);
-}
-
-// a dfs based approach to detect cycles for
-// any traversable type
-template<typename NodeT>
-template<typename TraversableT>
-bool forest<NodeT>::detect_cycle(TraversableT& gr) const {
-	std::map<NodeT, bool> inprog;
-	auto cb_enter = [&inprog](const auto& n) {
-		if (n.first.nt()) inprog[n] = true;
-	};
-	auto cb_revisit = [&inprog, &gr](const auto& n) {
-		if (inprog[n] == true) gr.cycles.insert(n);
-		return false;
-	};
-	auto cb_exit = [&inprog](const auto& n, auto&) {
-		if (n.first.nt()) inprog[n] = false;
-	};
-	gr.cycles.clear();
-	return traverse(gr, gr.root, cb_enter, cb_exit, cb_revisit);
 }
 
 template<typename NodeT>
@@ -272,40 +77,79 @@ typename forest<NodeT>::sptree forest<NodeT>::graph::_extract_trees(
 }
 
 template <typename NodeT>
-typename forest<NodeT>::nodes_and_edges forest<NodeT>::get_nodes_and_edges()
-	const
-{
-	std::map<node, size_t> nid;
-	std::map<size_t, node> ns;
-	nodes n;
-	edges es;
-	size_t id = 0;
-	for (auto& it : g) {
-		nid[it.first] = id;
-		// skip ids for one child ambig node
-		id += it.second.size() == 1 ? 0 : it.second.size(); // ambig node ids;
-		//DBG(assert(it.second.size()!= 0));
-		id++;
-	}
-	for (auto& it : g) {
-		ns[nid[it.first]] = it.first;
-		size_t p = 0;
-		for (auto& pack : it.second) {
-			if (it.second.size() > 1) {  //skipping if only one ambigous node, an optimization
-				++p;
-				ns[nid[it.first] + p] = it.first;
-				es.emplace_back(nid[it.first], nid[it.first]+p);
-			}
-			for (auto& nn : pack) {
-				if (nid.find(nn) == nid.end()) nid[nn] = id++; // for terminals, not seen before
-				ns[nid[nn]] = nn;
-				es.emplace_back(nid[it.first] + p, nid[nn]);
-			}
+NodeT forest<NodeT>::root() const { return rt; }
+
+template <typename NodeT>
+void forest<NodeT>::root(const node& n) { rt = n; }
+
+template <typename NodeT>
+void forest<NodeT>::clear() { g.clear(); }
+
+template <typename NodeT>
+bool forest<NodeT>::contains(const node& n) const {
+	return g.find(n) != g.end(); }
+
+template <typename NodeT>
+forest<NodeT>::nodes_set& forest<NodeT>::operator[](const NodeT& p) {
+	return g[p];
+}
+
+template <typename NodeT>
+const forest<NodeT>::nodes_set& forest<NodeT>::operator[](const node& p) const {
+	return g[p];
+}
+
+template <typename NodeT>
+size_t forest<NodeT>::count_trees() const { return count_trees(root()); }
+
+template <typename NodeT>
+size_t forest<NodeT>::count_trees(const node& root) const {
+	std::map<node, size_t> ndc;
+	auto cb_exit = [&ndc](const node& croot, auto& ambset) {
+		for (auto& pack : ambset) {
+			size_t pkc = 1; // count of the pack
+			for (auto& sym : pack)
+				if (sym.first.nt() && ndc[sym] != 0) {
+					size_t x = pkc * ndc[sym];
+					if (pkc != 0 && x / pkc != ndc[sym]) {
+						MS(std::cout<<"Overflow\n");
+						ndc[croot]=SIZE_MAX;
+						return;
+					}
+					pkc = x;
+				}
+			ndc[croot] += pkc; // adding to curroot count
 		}
-	}
-	n.resize(id);
-	for (auto& p : ns) n[p.first] = p.second;
-	return nodes_and_edges{ n, es };
+	};
+	traverse(root, NO_ENTER, cb_exit);
+	return ndc[root];
+}
+
+// a dfs based approach to detect cycles for
+// any traversable type
+template<typename NodeT>
+template<typename TraversableT>
+bool forest<NodeT>::detect_cycle(TraversableT& gr) const {
+	std::map<NodeT, bool> inprog;
+	auto cb_enter = [&inprog](const auto& n) {
+		if (n.first.nt()) inprog[n] = true;
+	};
+	auto cb_revisit = [&inprog, &gr](const auto& n) {
+		if (inprog[n] == true) gr.cycles.insert(n);
+		return false;
+	};
+	auto cb_exit = [&inprog](const auto& n, auto&) {
+		if (n.first.nt()) inprog[n] = false;
+	};
+	gr.cycles.clear();
+	return traverse(gr, gr.root, cb_enter, cb_exit, cb_revisit);
+}
+
+template <typename NodeT>
+bool forest<NodeT>::is_binarized() const {
+	for (auto& kv : this->g) for (auto& rhs : kv.second)
+		if (rhs.size() > 2) return false;
+	return true;
 }
 
 template <typename NodeT>
@@ -427,7 +271,15 @@ typename forest<NodeT>::graphv forest<NodeT>::extract_graphs(
 						cb_next_graph, no_stop);
 	else _extract_graph_uniq_node(dn, todo, graphs,0,cb_next_graph,no_stop);
 	return graphs;
+}
 
+template <typename NodeT>
+template <typename cb_enter_t, typename cb_exit_t,
+	typename cb_revisit_t, typename cb_ambig_t>
+bool forest<NodeT>::traverse(cb_enter_t cb_enter, cb_exit_t cb_exit,
+	cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const
+{
+	return traverse(root(), cb_enter, cb_exit, cb_revisit,cb_ambig);
 }
 
 template <typename NodeT>
@@ -490,43 +342,6 @@ bool forest<NodeT>::_traverse(const node_graph& g, const node& root,
 #endif
 	cb_exit(root, choosen_pack);
 	return ret;
-}
-
-template <typename NodeT>
-bool forest<NodeT>::is_binarized() const {
-	for (auto& kv : this->g) for (auto& rhs : kv.second)
-		if (rhs.size() > 2) return false;
-	return true;
-}
-
-template <typename NodeT>
-bool forest<NodeT>::remove_recursive_nodes(graph& g) {
-	//decltype(NodeT().first.t()) prefix []= { '_', 'R' };
-	//collect all prefix like nodes for replacement
-	std::string prefix = "__E_";
-	std::vector<NodeT> s;
-	for (auto& kv : g) {
-		auto name = kv.first.first.to_std_string();
-		if (name.find(prefix) != decltype(name)::npos)
-			s.insert(s.end(), kv.first);
-	}
-	return replace_nodes(g, s);
-}
-
-template <typename NodeT>
-bool forest<NodeT>::remove_binarization(graph& g) {
-	//better use parser::tnt_prefix()
-	//decltype(NodeT().first.t()) prefix []= { '_','_','t','e','m','p' };
-	//collect all prefix like nodes for replacement
-	std::string prefix="__B_";
-	std::vector<NodeT> s;
-	for (auto& kv : g) {
-		auto name = kv.first.first.to_std_string();
-		if (name.find(prefix) != decltype(name)::npos)
-			s.insert(s.end(), kv.first);
-	}
-	//std::cout<<"removing binarization if any " << s.size();
-	return replace_nodes(g, s);
 }
 
 template <typename NodeT>
@@ -593,43 +408,22 @@ bool forest<NodeT>::replace_node(graph& g, const node& torepl,
 	return gchange;
 }
 
+#ifdef DEBUG
 template <typename NodeT>
-bool forest<NodeT>::is_ambiguous() const {
-	for (auto& kv : this->g) if (kv.second.size() > 1) return true;
-	return false;
-}
-
-template <typename NodeT>
-std::set<std::pair<NodeT, std::set<std::vector<NodeT>>>>
-	forest<NodeT>::ambiguous_nodes() const
-{
-	std::set<std::pair<node, nodes_set>> r;
-	for (auto& kv : this->g) if (kv.second.size() > 1) r.insert(kv);
-	return r;
-}
-
-template <typename NodeT>
-size_t forest<NodeT>::count_trees(const node& root) const {
-	std::map<node, size_t> ndc;
-	auto cb_exit = [&ndc](const node& croot, auto& ambset) {
-		for (auto& pack : ambset) {
-			size_t pkc = 1; // count of the pack
-			for (auto& sym : pack)
-				if (sym.first.nt() && ndc[sym] != 0) {
-					size_t x = pkc * ndc[sym];
-					if( pkc != 0 && x / pkc != ndc[sym]  ) {
-						MS(std::cout<<"Overflow\n");
-						ndc[croot]=SIZE_MAX;
-						return;
-					}
-					pkc = x;
-				}
-			ndc[croot] += pkc; // adding to curroot count
+std::ostream& forest<NodeT>::print_data(std::ostream& os) const {
+	os << "number of nodes: " << g.size() << std::endl;
+	for (const auto& n : g) {
+		os << n.first.first.to_std_string() << "\n";
+		for (const auto& p : n.second) {
+			os << "\t";
+			for (const auto& c : p)
+				os << " `" << c.first.to_std_string() << "`";
+			os << "\n";
 		}
-	};
-	traverse(root, NO_ENTER, cb_exit);
-	return ndc[root];
+	}
+	return os;
 }
+#endif
 
 } // idni namespace
 #endif // __IDNI__PARSER__FOREST_TMPL_H__

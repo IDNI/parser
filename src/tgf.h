@@ -112,34 +112,13 @@ struct tgf {
 	{
 		std::ifstream ifs(filename);
 		if (!ifs) {
-			std::cerr << "cannot open file: " << filename << std::endl;
+			std::cerr << "cannot open file: "
+						<< filename << std::endl;
 			return grammar<C, T>(nts_);
 		}
 		return from_string(nts_, std::string(
 				std::istreambuf_iterator<C>(ifs),
 				std::istreambuf_iterator<C>()));
-	}
-
-	static grammar<C, T> from_forest(nonterminals<C, T>& nts_,
-		std::unique_ptr<typename parser<C, T>::pforest> f,
-		const std::basic_string<C>& start_nt = from_cstr<C>("start"))
-	{
-		auto& p = parser_instance<tgf_parser>();
-		if (!p.found(p.id(start_nt))) return std::cout << "TGF: "
-			<< p.get_error().to_str() << "\n", grammar<C, T>(nts_);
-		if (!f) return std::cout << "No parse forest\n",
-							grammar<C, T>(nts_);
-		auto n_trees = f->count_trees();
-		if (f->is_ambiguous() && n_trees > 1) std::cout
-			<< "\nambiguity... number of trees: " << n_trees <<"\n";
-		char dummy = '\0'; // as a dummy transformer
-		auto source = idni::rewriter::make_node_from_forest<
-			tgf_parser, char, tgf_parser::node_type,
-			node_variant_t>(dummy, f.get());
-		//print_node(std::cout << "source: `", source) << "`\n";
-		traverser_t t(source);
-		grammar_builder b(nts_, t);
-		return b.g();
 	}
 
 private:
@@ -174,13 +153,13 @@ private:
 			auto& p = parser_instance<tgf_parser>();
 			static tgf_parser::parse_options po{
 				.start = tgf_parser::start_statement };
-			auto f = p.parse(s, l, po);
-			if (!p.found(po.start) || !f) return std::cerr
-				<< "TGF: " << p.get_error().to_str() << "\n", 1;
+			auto r = p.parse(s, l, po);
+			if (!r.found) return std::cerr
+					<< "TGF: " << r.parse_error << "\n", 1;
 			char dummy = '\0';
-			auto source = idni::rewriter::make_node_from_forest<
+			auto source = idni::rewriter::make_node_from_tree<
 				tgf_parser, char, tgf_parser::node_type,
-				node_variant_t>(dummy, f.get());
+				node_variant_t>(dummy, r.get_shaped_tree());
 			//print_node(std::cout << "source: `", source) << "`\n";
 			build(traverser_t(source));
 			return 0;
@@ -210,14 +189,14 @@ private:
 			if ((n | get_only_child
 				| get_nonterminal) ==
 				tgf_parser::char_classes_sym)
-					opt.inline_char_classes = true;
+					opt.shaping.inline_char_classes = true;
 			else {
 				std::vector<size_t> tree_path{};
 				for (auto& s : (n
 					| tgf_parser::tree_path
 					|| tgf_parser::sym)())
 						tree_path.push_back(node2nt(s));
-				opt.to_inline.insert(tree_path);
+				opt.shaping.to_inline.insert(tree_path);
 			}
 		}
 		void directive(const traverser_t& t) {
@@ -240,15 +219,16 @@ private:
 				start = prods_t(node2nt(d | tgf_parser::sym));
 				break;
 			case tgf_parser::trim_terminals_dir:
-				opt.trim_terminals = true;
+				opt.shaping.trim_terminals = true;
 				break;
 			case tgf_parser::trim_dir:
 				for (auto& n : (d || tgf_parser::sym)())
-					opt.to_trim.insert(node2nt(n));
+					opt.shaping.to_trim.insert(node2nt(n));
 				break;
 			case tgf_parser::trim_children_dir:
 				for (auto& n : (d || tgf_parser::sym)())
-					opt.to_trim_children.insert(node2nt(n));
+					opt.shaping.to_trim_children
+						.insert(node2nt(n));
 				break;
 			case tgf_parser::inline_dir: inline_dir(d); break;
 			case tgf_parser::boolean_dir: {
@@ -341,10 +321,12 @@ private:
 			auto cs = t || tgf_parser::terminal_string_char;
 			for (auto& ch : cs()) {
 				auto c = ch | tgf_parser::unescaped_s;
-				if (c.has_value()) r = r + prods_t(c | get_terminals);
+				if (c.has_value())
+					r = r + prods_t(c | get_terminals);
 				else {
 					c = ch | tgf_parser::escaped_s;
-					r = r + prods_t(unescape(c | get_terminals));
+					r = r + prods_t(unescape(
+							c | get_terminals));
 				}
 			}
 			return r;
@@ -415,7 +397,8 @@ private:
 		}
 		prods_t get_new_name(const prods_t& sym) {
 			std::stringstream ss;
-			ss << "__E_" << sym.to_lit().to_std_string() << "_" << id++;
+			ss << "__E_" << sym.to_lit().to_std_string()
+								<< "_" << id++;
 			//std::cout << "new name: " << id << " " << to_std_string(ss.str()) << "\n";
 			return prods_t(nts(from_str<C>(ss.str())));
 		}

@@ -9,7 +9,7 @@ escaping   => quote | esc.
 unescaped  => printable & ~escaping.
 escaped    => esc escaping.
 strchar    => unescaped | escaped.
-str        => quote (strchar*) quote.
+str        => quote strchar* quote.
 
 nullvalue  => null.
 
