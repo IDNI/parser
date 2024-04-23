@@ -259,7 +259,7 @@ private:
 // 		std::cerr << l << "/" << n << "%" << last_n << "\n";
 // #endif // DEBUG
 		for (size_t i = 0; i < n-1; i++)
-			std::cerr << "clear line and move up\n",
+			//std::cerr << "clear line and move up\n",
 			out("\r\033[K\033[A", 8); // clear line and move up
 		out("\r\033[K", 4); // clear input
 		if (down) {
