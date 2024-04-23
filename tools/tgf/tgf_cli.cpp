@@ -614,8 +614,10 @@ bool get_bool_value(const traverser_t& t) {
 
 string unquote(const string& s) {
 	std::stringstream ss;
-	size_t l = s.size() - 1;
-	for (size_t i = 0; i != s.size(); ++i) {
+	if (s.size() < 2 || s[0] != '"' || s[s.size() - 1] != '"')
+		return s;
+	size_t l = s.size() - 2;
+	for (size_t i = 1; i != s.size() - 1; ++i) {
 		if (i != l && s[i] == '\\') {
 			switch (s[++i]) {
 			case 'r': ss << '\r'; break;
