@@ -254,6 +254,7 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		"	using encoder_type    = "
 				"std::function<std::basic_string<char_type>(\n"
 		"			const std::vector<terminal_type>&)>;\n"
+		" static " <<opt.name<< "& instance() { static " <<opt.name<< " i; return i; }"
 		"	" <<opt.name<< "() :\n"
 		"		nts(load_nonterminals()), cc(load_cc()),\n"
 		"		g(nts, load_prods(), nt(" <<gi.start().n()<<
