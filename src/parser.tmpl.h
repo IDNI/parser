@@ -433,9 +433,9 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
 	measure measure_parsing("parsing", po.measure);
 	debug = po.debug;
 	if (debug) {
-		std::string tmp;
+		std::basic_string<C> tmp;
 		tmp = in->get();
-		std::cout << "parse: `" << tmp << "`"
+		std::cout << "parse: `" << to_std_string(tmp) << "`"
 			<< "`[" << tmp.size() << "] start sym:" << g.get_start()
 			<< "(" << g.get_start().nt() << ")" << "\n";
 		g.print_internal_grammar(std::cout << "grammar: \n", "\t", true)
