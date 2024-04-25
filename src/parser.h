@@ -22,6 +22,7 @@
 #include <span>
 #include <cassert>
 #include <algorithm>
+#include <initializer_list>
 #include "memory_map.h"
 #include "defs.h"
 #include "characters.h"
@@ -40,9 +41,13 @@ struct lit;
 // nonterminals dict = vector with index being nonterminal's id
 template <typename C = char, typename T = C>
 struct nonterminals : public std::vector<std::basic_string<C>> {
+	nonterminals() = default;
+	nonterminals(const std::vector<std::basic_string<C>>& init_list);
+	nonterminals(std::initializer_list<std::basic_string<C>> init_list);
 	size_t get(const std::basic_string<C>& s);
 	const std::basic_string<C>& get(size_t n) const;
 	lit<C, T> operator()(const std::basic_string<C>& s);
+	lit<C, T> operator()(size_t n);
 private:
 	std::map<std::basic_string<C>, size_t> m;
 };
@@ -134,10 +139,10 @@ struct grammar {
 	friend struct grammar_inspector<C, T>;
 	typedef std::pair<lit<C, T>, std::vector<lits<C, T>>> production;
 	struct options {
-		shaping_options shaping = {};
+		bool transform_negation = true; // false to disable negation transformation
 		bool auto_disambiguate = true; // @enable/disable disambig.
 		std::set<size_t> nodisambig_list{}; // @nodisambig nonterminal ids.
-		bool transform_negation = true; // false to disable negation transformation
+		shaping_options shaping = {};
 	} opt;
 	grammar(nonterminals<C, T>& nts, options opt = {});
 	grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
@@ -203,21 +208,26 @@ public:
 	struct input;
 	using char_type     = C;
 	using terminal_type = T;
-	using traits_type   = std::char_traits<C>;
-	using int_type      = typename traits_type::int_type;
-	using parser_type   = parser<C, T>;
-	using input_type    = parser_type::input;
-	using decoder_type  = parser_type::input::decoder_type;
-	using encoder_type  = std::function<
-				std::basic_string<C>(const std::vector<T>&)>;
-	using pnode         = std::pair<lit<C, T>, std::array<size_t, 2>>;
-	using pforest       = forest<pnode>;
-	using pnodes        = pforest::nodes;
-	using pnodes_set    = pforest::nodes_set;
-	using pnode_graph   = pforest::node_graph;
-	using pgraph        = pforest::graph;
-	using ptree         = pforest::tree;
-	using psptree       = pforest::sptree;
+	using traits_type     = std::char_traits<char_type>;
+	using int_type        = typename traits_type::int_type;
+	using grammar_type    = idni::grammar<char_type, terminal_type>;
+	using grammar_options = grammar_type::options;
+	using symbol_type     = idni::lit<char_type, terminal_type>;
+	using location_type   = std::array<size_t, 2>;
+	using node_type       = std::pair<symbol_type, location_type>;
+	using parser_type     = idni::parser<char_type, terminal_type>;
+	using pnode           = node_type;
+	using pforest         = forest<pnode>;
+	using pnodes          = pforest::nodes;
+	using pnodes_set      = pforest::nodes_set;
+	using pnode_graph     = pforest::node_graph;
+	using pgraph          = pforest::graph;
+	using ptree           = pforest::tree;
+	using psptree         = pforest::sptree;
+	using forest_type     = pforest;
+	using sptree_type     = psptree;
+	using encoder_type    = std::function<std::basic_string<char_type>(
+			const std::vector<terminal_type>&)>;
 
 	// earley item
 	struct item {
@@ -227,26 +237,6 @@ public:
 		size_t set, prod, con, from, dot;
 	};
 
-	// parser options for its constructor
-	struct options {
-		// applying binarization to ensure every forest node
-		// has atmost 2 or less children nodes
-		bool binarize = DEFAULT_BINARIZE;
-		// build forest incrementally as soon any
-		// item is completed
-		bool incr_gen_forest = DEFAULT_INCR_GEN_FOREST;
-		// enable garbage collection
-		bool enable_gc = false;
-		// number of steps garbage collection lags behind
-		// parsing position n. should be greater than
-		// 0 and less than the size of the input
-		// for any collection activity. We cannot use
-		// % since in the streaming case, we do not know
-		// exact size in advance
-		size_t gc_lag = 1;
-		decoder_type chars_to_terminals = 0;
-		encoder_type terminals_to_chars = 0;
-	};
 	// input manager and decoder used by the parser
 	struct input {
 		using decoder_type =
@@ -298,6 +288,29 @@ public:
 		std::vector<T> ts{};  // all collected terminals
 		size_t tp = 0;        // current terminal pos
 	};
+	using decoder_type = input::decoder_type;
+
+	// parser options for its constructor
+	struct options {
+		// applying binarization to ensure every forest node
+		// has atmost 2 or less children nodes
+		bool binarize = DEFAULT_BINARIZE;
+		// build forest incrementally as soon any
+		// item is completed
+		bool incr_gen_forest = DEFAULT_INCR_GEN_FOREST;
+		// enable garbage collection
+		bool enable_gc = false;
+		// number of steps garbage collection lags behind
+		// parsing position n. should be greater than
+		// 0 and less than the size of the input
+		// for any collection activity. We cannot use
+		// % since in the streaming case, we do not know
+		// exact size in advance
+		size_t gc_lag = 1;
+		decoder_type chars_to_terminals = 0;
+		encoder_type terminals_to_chars = 0;
+	};
+
 	// parse error
 	struct error {
 		enum info_lvl {
@@ -413,6 +426,7 @@ public:
 
 	// constructor
 	parser(grammar<C, T>& g, options o = {});
+	virtual ~parser() {};
 
 	// parse call
 	result parse(const C* data, size_t size, parse_options po = {});

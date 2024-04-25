@@ -54,11 +54,24 @@ std::ostream& operator<<(std::ostream& os, const prods<C, T>& p) {
 }
 //-----------------------------------------------------------------------------
 template <typename C, typename T>
+nonterminals<C, T>::nonterminals(
+	std::initializer_list<std::basic_string<C>> init_list)
+{
+	for (const auto& s : init_list)
+		m.emplace(s, this->size()), this->push_back(s);
+}
+template <typename C, typename T>
+nonterminals<C, T>::nonterminals(
+	const std::vector<std::basic_string<C>>& init_list)
+{
+	for (const auto& s : init_list)
+		m.emplace(s, this->size()), this->push_back(s);
+}
+
+template <typename C, typename T>
 size_t nonterminals<C, T>::get(const std::basic_string<C>& s) {
-	if (auto it = m.find(s); it != m.end())
-		return it->second;
-	return m.emplace(s, this->size()),
-		this->push_back(s), this->size() - 1;
+	if (auto it = m.find(s); it != m.end()) return it->second;
+	return m.emplace(s, this->size()), this->push_back(s), this->size() - 1;
 }
 template <typename C, typename T>
 const std::basic_string<C>& nonterminals<C, T>::get(size_t n) const {
@@ -67,7 +80,11 @@ const std::basic_string<C>& nonterminals<C, T>::get(size_t n) const {
 }
 template <typename C, typename T>
 lit<C, T> nonterminals<C, T>::operator()(const std::basic_string<C>& s) {
-	return lit<C, T>{ get(s), &*this };
+	return (*this)(get(s));
+}
+template <typename C, typename T>
+lit<C, T> nonterminals<C, T>::operator()(size_t n) {
+	return lit<C, T>{ n, &*this };
 }
 //-----------------------------------------------------------------------------
 template <typename C, typename T>
