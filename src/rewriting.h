@@ -919,12 +919,13 @@ auto drop_location = [](const parse_symbol_t& n)-> symbol_t { return n.first; };
 template <typename parse_symbol_t, typename symbol_t>
 using drop_location_t = decltype(drop_location<parse_symbol_t, symbol_t>);
 
-template<typename parser_t, typename transformer_t, typename parse_symbol_t,
-	typename symbol_t>
-sp_node<symbol_t> make_node_from_tree(const transformer_t& /*transformer*/,
+template<typename parser_t, typename transformer_t, typename symbol_t>
+sp_node<symbol_t> make_node_from_tree(
+	const transformer_t& /*transformer*/,
 	typename parser_t::sptree_type t)
 {
-	using sp_parse_tree = typename parser_t::sptree_type;
+	using parse_symbol_t = typename parser_t::node_type;
+	using sp_parse_tree  = typename parser_t::sptree_type;
 	map_transformer<
 		drop_location_t<parse_symbol_t, symbol_t>,
 		sp_parse_tree,
@@ -942,50 +943,44 @@ sp_node<symbol_t> make_node_from_tree(const transformer_t& /*transformer*/,
 }
 
 // make a tree from the given parse result and logs parse error if parse fails.
-template<typename parser_t, typename transformer_t, typename parse_symbol_t,
-	typename symbol_t>
-sp_node<symbol_t> make_node_from_parse_result(const transformer_t& transformer,
-	typename parser_t::parse_result& r)
+template<typename parser_t, typename transformer_t, typename symbol_t>
+sp_node<symbol_t> make_node_from_parse_result(
+	const transformer_t& transformer, typename parser_t::result& r)
 {
-	if (r.found) return make_node_from_tree<parser_t, transformer_t,
-		parse_symbol_t, symbol_t>(transformer, r.get_shaped_tree());
+	if (r.found) return make_node_from_tree<
+		parser_t, transformer_t, symbol_t>(
+			transformer, r.get_shaped_tree());
 	LOG_ERROR << r.parse_error << LOG_END;
 	return 0;
 }
 
 // make a tree from the given source code string.
-template<typename parser_t, typename transformer_t, typename parse_symbol_t,
-	typename symbol_t>
-sp_node<symbol_t> make_node_from_string(const transformer_t& transformer,
+template<typename parser_t, typename transformer_t, typename symbol_t>
+sp_node<symbol_t> make_node_from_string(
+	const transformer_t& transformer,
 	const std::string source, idni::parser<>::parse_options options = {})
 {
-	return make_node_from_parse_result<parser_t, transformer_t,
-			parse_symbol_t, symbol_t>(transformer,
-				parser_t::instance().parse(
-					source.c_str(), source.size(),
-					options));
+	return make_node_from_parse_result<parser_t, transformer_t>(
+		transformer, parser_t::instance().parse(
+			source.c_str(), source.size(), options));
 }
 
 // make a tree from the given source code stream.
-template<typename parser_t, typename transformer_t, typename parse_symbol_t,
-	typename symbol_t>
+template<typename parser_t, typename transformer_t, typename symbol_t>
 sp_node<symbol_t> make_node_from_stream(const transformer_t& transformer,
 	std::istream& is, idni::parser<>::parse_options options = {})
 {
-	return make_node_from_parse_result<parser_t, transformer_t,
-			parse_symbol_t, symbol_t>(transformer,
-				parser_t::instance().parse(is, options));
+	return make_node_from_parse_result<parser_t, transformer_t, symbol_t>(
+		transformer, parser_t::instance().parse(is, options));
 }
 
 // make a tree from the given source code file.
-template<typename parser_t, typename transformer_t, typename parse_symbol_t,
-	typename symbol_t>
+template<typename parser_t, typename transformer_t, typename symbol_t>
 sp_node<symbol_t> make_node_from_file(const transformer_t& transformer,
 	const std::string& filename, idni::parser<>::parse_options options = {})
 {
-	return make_node_from_parse_result<parser_t, transformer_t,
-			parse_symbol_t, symbol_t>(transformer,
-				parser_t::instance().parse(filename, options));
+	return make_node_from_parse_result<parser_t, transformer_t, symbol_t>(
+		transformer, parser_t::instance().parse(filename, options));
 }
 
 } // namespace idni::rewriter

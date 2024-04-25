@@ -158,8 +158,8 @@ private:
 					<< "TGF: " << r.parse_error << "\n", 1;
 			char dummy = '\0';
 			auto source = idni::rewriter::make_node_from_tree<
-				tgf_parser, char, tgf_parser::node_type,
-				node_variant_t>(dummy, r.get_shaped_tree());
+				tgf_parser, char, node_variant_t>(
+					dummy, r.get_shaped_tree());
 			//print_node(std::cout << "source: `", source) << "`\n";
 			build(traverser_t(source));
 			return 0;

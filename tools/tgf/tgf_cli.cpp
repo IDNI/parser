@@ -1040,8 +1040,7 @@ int tgf_repl_evaluator::eval(const string& src) {
 		}
 		char dummy = '\0'; // as a dummy transformer
 		auto source = idni::rewriter::make_node_from_parse_result<
-			tgf_repl_parser, char, tgf_repl_parser::node_type,
-			node_variant_t>(dummy, r);
+			tgf_repl_parser, char, node_variant_t>(dummy, r);
 		auto t  = traverser_t(source);
 		//cout << "t.has_value(): " << t.has_value() << "\n";
 		//cout << "t.size(): " << t.values().size() << "\n";
