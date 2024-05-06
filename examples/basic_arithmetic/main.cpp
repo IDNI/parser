@@ -65,7 +65,7 @@ private:
 	}
 	int_t evaluate(parser<char>::result& res) {
 		vector<int_t> x;  // intermediate evaluations (nested)
-		auto cb_enter = [&x, &res, this](const auto& n) {
+		auto cb_enter = [&x, &res, this](const parser<char>::pnode& n) {
 			//DBG(cout << "entering: `" << n.first.to_std_string() << "` ["<<n.second[0]<<","<<n.second[1]<<"]\n";)
 			if (n.first == integer) {
 				auto i = res.get_terminals_to_int(n);
@@ -73,7 +73,7 @@ private:
 				else x.push_back(i.value());
 			}
 		};
-		auto cb_exit = [&x, this](const auto& n, const auto&) {
+		auto cb_exit = [&x, this](const parser<char>::pnode& n, const auto&) {
 			//DBG(cout << "exiting: `" << n.first.to_std_string() << "`\n";)
 			const auto& l = n.first;
 			if      (l == neg) x.back() = -x.back();

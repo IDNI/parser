@@ -88,7 +88,7 @@ private:
 				<< numeric_limits<int_t>::max() << '\n', false;
 			return i.value();
 		};
-		auto cb_enter = [&r, &get_int, &res, this](const auto& n) {
+		auto cb_enter = [&r, &get_int, &res, this](const parser<>::pnode& n) {
 			// we care only for nonterminals, so skip terminals
 			if (!n.first.nt()) return;
 			// get name of the nonterminal

@@ -107,7 +107,7 @@ private:
 			return i.value();
 		};
 		// define a callback called when the traversal enters a node n
-		auto cb_enter = [&v, &get_int, &res, this](const auto& n) {
+		auto cb_enter = [&v, &get_int, &res, this](const parser<>::pnode& n) {
 			// n is a pair of a literal and its span
 			// we can compare the literal with literals predefined
 			// as members of 'this' object: integer/str/nullvalue

@@ -23,6 +23,26 @@ using namespace idni::term;
 static inline term::colors TC;
 
 template <typename C, typename T>
+std::map<const typename parser<C,T>::pnode, 
+	typename forest<typename parser<C,T>::pnode>::node> 
+		parser<C,T>::pnode::nid;
+
+
+template <typename C, typename T>
+typename forest<typename parser<C,T>::pnode>::node 
+	parser<C,T>::pnode::ptrof(
+		const typename parser<C,T>::pnode& pn) {
+	auto r = nid.insert( {pn, (nullptr)} );
+	if (r.second) {
+			//rnid.push_back( &(r.first->first) );
+			nid[pn] = typename parser<C,T>::pforest::node(&(r.first->first));
+			//return rnid.size();
+			return nid[pn];
+	}
+	return r.first->second;
+}
+
+template <typename C, typename T>
 parser<C, T>::item::item(size_t set, size_t prod, size_t con, size_t from,
 	size_t dot) : set(set), prod(prod), con(con), from(from), dot(dot) {}
 template <typename C, typename T>
@@ -854,13 +874,13 @@ bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
 // span of the item and stores them in the set ambset.
 template <typename C, typename T>
 void parser<C, T>::sbl_chd_forest(const item& eitem,
-	std::vector<pnode>& curchd, size_t xfrom,
-	std::set<std::vector<pnode>>& ambset)
+	pnodes& curchd, size_t xfrom,
+	pnodes_set& ambset)
 {
 	//check if we have reached the end of the rhs of prod
 	if (g.len(eitem.prod, eitem.con) <= curchd.size())  {
 		// match the end of the span we are searching in.
-		if (curchd.back().second[1] == eitem.set)
+		if (curchd.back()->second[1] == eitem.set)
 			ambset.insert(curchd);
 		return;
 	}
@@ -903,7 +923,7 @@ void parser<C, T>::sbl_chd_forest(const item& eitem,
 }
 template <typename C, typename T>
 bool parser<C, T>::binarize_comb(const item& eitem,
-	std::set<std::vector<pnode>>& ambset)
+	pnodes_set& ambset)
 {
 	std::vector<pnode> rcomb, lcomb;
 	if (eitem.dot < 1) return false;
@@ -1075,7 +1095,7 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 
 	for (auto& aset : (snodes.size() && check_allowed(*snodes.begin()))
 			? cambset : ambset)
-		for (const pnode& nxt : aset) build_forest(f, nxt);
+		for (const auto nxt : aset) build_forest(f, nxt);
 
 	return true;
 }

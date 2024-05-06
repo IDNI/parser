@@ -73,12 +73,12 @@ struct csv_reader {
 			return i.value();
 		};
 		auto cb_enter = [&r, &get_int, &res, this](const auto& n) {
-			if (!n.first.nt()) return;
+			if (!n->first.nt()) return;
 			// generated csv_parser contains enum containing all
 			// nonterminals from the grammar with their id values.
 			// These can be used to compare with result of call
 			// to literal's method n()
-			auto id = n.first.n();
+			auto id = n->first.n();
 			if      (id == csv_parser::row) r.emplace_back();
 			else if (id == csv_parser::integer)
 				r.back().push_back(get_int(n));

@@ -231,14 +231,14 @@ bool run_test_(grammar<T>& g, parser<T>& p, const std::basic_string<T>& input,
 	bool contained = false;
 	if (found && (opts.dump || opts.contains.size())) {
 		auto cb_enter = [&opts, &contained, &ss] (const auto& n) {
-			if (opts.contains == n.first.to_std_string())
+			if (opts.contains == n->first.to_std_string())
 				contained = true;
 			if (opts.dump) ss << "\t#\t entering: \"" <<
-				n.first.to_std_string() << "\"\n";
+				n->first.to_std_string() << "\"\n";
 		};
 		auto cb_exit = [&opts, &ss](const auto& n, const auto&) {
 			if (opts.dump) ss << "\t#\t exiting: \"" <<
-				n.first.to_std_string() << "\"\n";
+				n->first.to_std_string() << "\"\n";
 		};
 		f->traverse(cb_enter, cb_exit);
 	}

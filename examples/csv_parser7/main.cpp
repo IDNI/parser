@@ -104,7 +104,8 @@ private:
 				<< numeric_limits<int_t>::max() << '\n', false;
 			return i.value();
 		};
-		auto cb_enter = [&r, &get_int, &res, this](const auto& n) {
+		auto cb_enter = [&r, &get_int, &res, this](const auto& _n) {
+			const parser<>::pnode& n = _n;
 			// for every new row we add a new row into r
 			if (n.first == row_) r.emplace_back();
 			else if (n.first == integer)

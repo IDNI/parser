@@ -341,13 +341,13 @@ ostream& tgf_repl_evaluator::pretty_print(ostream& os,
 	const parser_type::psptree& n, set<size_t> skip = {},
 	bool nulls = false, size_t l = 0)
 {
-	auto& value = n->value;
-	if (skip.size() && n->value.first.nt() &&
-		skip.find(n->value.first.n()) != skip.end())
+	parser_type::pnode value = n->value;
+	if (skip.size() && value.first.nt() &&
+		skip.find(value.first.n()) != skip.end())
 			return os;
-	if (!nulls && n->value.first.is_null()) return os;
+	if (!nulls && value.first.is_null()) return os;
 	for (size_t t = 0; t < l; t++) os << "\t";
-	if (n->value.first.nt())
+	if (value.first.nt())
 		os << TC_NT << value.first << TC.CLEAR() << TC_NT_ID
 			<< "(" << value.first.n() << ")" << TC.CLEAR();
 	else if (value.first.is_null())

@@ -97,7 +97,7 @@ private:
 				<< numeric_limits<int_t>::max() << '\n', false;
 			return i.value();
 		};
-		auto cb_enter = [&r, &get_int, &res, this](const auto& n) {
+		auto cb_enter = [&r, &get_int, &res, this](const parser<>::pnode& n) {
 			// n is a pair of a literal and its range
 			// we can compare the literal with literals predefined
 			// as members of 'this' object: integer/str/nullvalue

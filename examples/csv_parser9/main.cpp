@@ -80,8 +80,8 @@ private:
 			return i.value();
 		};
 		auto cb_enter = [&r, &get_int, &res, this](const auto& n) {
-			if (!n.first.nt()) return;
-			string nt = nts.get(n.first.n());
+			if (!n->first.nt()) return;
+			string nt = nts.get(n->first.n());
 			if (nt == "row") r.emplace_back();
 			else if (nt == "integer")
 				r.back().push_back(get_int(n));

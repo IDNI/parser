@@ -81,7 +81,7 @@ parser<C, T>::psptree parser<C, T>::result::get_shaped_tree(const pnode& n,
 			// move ambiguous children sets each into its separate child
 			// copy them also a value of amb. node
 			// and replace value of amb. node with nt: __AMB_<ID>
-			auto x = t->value;
+			pnode x = t->value;
 			x.first = amb_node;
 			t = std::make_shared<ptree>(x);
 			//std::cout << "Ambigous node " << n.first.to_std_string() << std::endl;
@@ -104,7 +104,7 @@ parser<C, T>::psptree parser<C, T>::result::get_shaped_tree(const pnode& n,
 template <typename C, typename T>
 void parser<C, T>::result::_get_shaped_tree_children(
 	const shaping_options& opts,
-	const std::vector<pnode>& nodes,
+	const pnodes& nodes,
 	std::vector<psptree>& child) const
 {
 	auto matches_inline_prefix = [](const pnode& n) {
@@ -137,7 +137,7 @@ void parser<C, T>::result::_get_shaped_tree_children(
 		return std::find(list.begin(), list.end(),
 			n.first.to_std_string()) != list.end();
 	};
-	auto get_children = [&](const pnode& n) -> std::set<std::vector<pnode>>{
+	auto get_children = [&](const pnode& n) -> pnodes_set {
 		if (one_of(n, opts.to_trim_children)) return {};
 		auto it = f->g.find(n);
 		if (it != f->g.end()) return it->second;
@@ -194,13 +194,13 @@ void parser<C, T>::result::_get_shaped_tree_children(
 	};
 	for (auto& chd : nodes) {
 		if (one_of(chd, opts.to_trim)
-			|| (opts.trim_terminals && !chd.first.nt())) continue;
+			|| (opts.trim_terminals && !chd->first.nt())) continue;
 		if (do_inline(chd)) continue;
 		if (matches_inline_prefix(chd)
 			|| (opts.inline_char_classes
 				&& one_of_str(chd, cc_names)))
 					inline_children(chd);
-		else if (!chd.first.is_null()) {
+		else if (!chd->first.is_null()) {
 			auto x = get_shaped_tree(chd, opts);
 			if (x) child.push_back(x);
 		}
@@ -226,7 +226,7 @@ parser<C, T>::psptree parser<C, T>::result::get_tree(const pnode& n) {
 
 template <typename C, typename T>
 std::basic_string<T> parser<C, T>::result::get_terminals() const {
-	return in->get_terminals(f->root().second);
+	return in->get_terminals(f->root()->second);
 }
 
 template <typename C, typename T>
@@ -278,8 +278,8 @@ std::ostream& parser<C, T>::result::print_ambiguous_nodes(std::ostream& os)
 		for (auto ns : n.second) {
 			std::stringstream ss;
 			ss << "\t\t " << d++ << "\t";
-			for (auto nt : ns) ss << " `" << nt.first << "`["
-				<< nt.second[0] << "," << nt.second[1] << "] ";
+			for (auto nt : ns) ss << " `" << nt->first << "`["
+				<< nt->second[0] << "," << nt->second[1] << "] ";
 			os << ss.str() << "\n";
 		}
 	}
@@ -342,7 +342,7 @@ bool parser<C, T>::result::inline_prefixed_nodes(pgraph& g,
 	//collect all prefix like nodes for replacement
 	std::vector<pnode> s;
 	for (auto& kv : f->g) {
-		auto name = kv.first.first.to_std_string();
+		auto name = kv.first->first.to_std_string();
 		if (name.find(prefix) != decltype(name)::npos)
 			s.insert(s.end(), kv.first);
 	}

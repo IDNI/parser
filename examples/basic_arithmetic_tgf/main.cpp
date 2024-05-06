@@ -51,7 +51,7 @@ private:
 	size_t id(const string& s) { return nts.get(s); }
 	int_t evaluate(parser<char>::result& r) {
 		vector<int_t> x;  // intermediate evaluations (nested)
-		auto cb_enter = [&x, &r, this](const auto& n) {
+		auto cb_enter = [&x, &r, this](const parser<char>::pnode& n) {
 			//DBG(cout << "entering: `" << n.first.to_std_string() << "` ["<<n.second[0]<<","<<n.second[1]<<"]\n";)
 			if (n.first.nt() && n.first.n() == id("integer")) {
 				auto i = r.get_terminals_to_int(n);
@@ -59,7 +59,7 @@ private:
 				else x.push_back(i.value());
 			}
 		};
-		auto cb_exit = [&x, this](const auto& n, const auto&) {
+		auto cb_exit = [&x, this](const parser<char>::pnode& n, const auto&) {
 			//DBG(cout << "exiting: `" << n.first.to_std_string() << "`\n";)
 			if (!n.first.nt()) return;
 			const auto& l = n.first.n();

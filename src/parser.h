@@ -216,8 +216,27 @@ public:
 	using location_type   = std::array<size_t, 2>;
 	using node_type       = std::pair<symbol_type, location_type>;
 	using parser_type     = idni::parser<char_type, terminal_type>;
-	using pnode           = node_type;
-	using pforest         = forest<pnode>;
+	
+	struct pnode : public node_type {
+		//using pnodebase::pnodebase;
+		private:
+		// every pnode object has its pointer
+       	static std::map<const pnode, typename forest<pnode>::node> nid;
+       	//static std::vector<const pnode*> rnid;       
+       	static typename forest<pnode>::node ptrof(const pnode& p);
+		//static pnode& pndof(const nptr_t& );
+		public:
+		pnode(){}
+		pnode(const lit<C,T> &_f, const std::array<size_t,2> &_s): 
+			node_type(_f,_s) {}
+		
+		inline operator typename forest<pnode>::node() const {
+			return ptrof(*this);
+		}
+		//inline lit<C,T> &first() const { return this->first; }
+		//inline std::array<size_t, 2>& second() const { return this->second; } 	
+	};
+	using pforest		  = forest<pnode>;
 	using pnodes          = pforest::nodes;
 	using pnodes_set      = pforest::nodes_set;
 	using pnode_graph     = pforest::node_graph;
@@ -409,7 +428,7 @@ public:
 		lit<C, T> amb_node{};
 		// recursive part of get_shaped_tree()
 		void _get_shaped_tree_children(const shaping_options& opts,
-			const std::vector<pnode>& nodes,
+			const pnodes& nodes,
 			std::vector<psptree>& child) const;
 	};
 	// parse options for parse() call
@@ -502,9 +521,9 @@ private:
 	bool init_forest(pforest& f, const lit<C, T>& start_lit,
 		const parse_options& po);
 	bool build_forest(pforest& f, const pnode& root);
-	bool binarize_comb(const item&, std::set<std::vector<pnode>>&);
+	bool binarize_comb(const item&, pnodes_set&);
 	void sbl_chd_forest(const item&,
-		std::vector<pnode>&, size_t, std::set<std::vector<pnode>>&);
+		pnodes&, size_t, pnodes_set&);
 #ifdef DEBUG
 	template <typename CharU>
 	friend std::ostream& operator<<(std::ostream& os, lit<C, T>& l);

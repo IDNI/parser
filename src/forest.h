@@ -41,12 +41,36 @@ namespace idni {
 // no cycles and no sharing implies its a tree
 
 template <typename NodeT>
-struct forest {
-	using node       = NodeT;
+struct forest { 
+	struct nptr_t {
+		const NodeT *id;	
+	
+		nptr_t(const NodeT *_id = nullptr) : id(_id) { }
+
+		inline operator NodeT() const{
+			return *id;
+		}
+		//inline const NodeT& getobj() const { return *id; }
+		inline const NodeT* operator->() const { return id;}
+		inline bool operator<(const nptr_t& rhs) const {
+			return id < rhs.id;
+		}
+		inline bool operator == (const nptr_t& rhs) const {
+			return id == rhs.id;
+		}
+		//inline lit<C,T> &first() const { DBG(assert(id!=0)); return id->first; }
+		//inline std::array<size_t, 2>& second() const { DBG(assert(id!=0)); return id->second; } 	
+	};
+
+	using node       = nptr_t;
 	using nodes      = std::vector<node>;
 	using nodes_set  = std::set<nodes>;
 	using node_graph = std::map<node, nodes_set>;
 	using edge       = std::pair<size_t, size_t>;
+	public:
+	
+	// node pointer in forerst
+	
 	struct tree {
 		node value;
 		std::vector<std::shared_ptr<struct tree>> child;
