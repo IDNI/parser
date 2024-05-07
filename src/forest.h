@@ -139,7 +139,7 @@ struct forest {
 	/// dependency if any. deletes from graph g as well.
 	/// return true if any one of the nodes' replacement
 	/// succeeds
-	bool replace_nodes(graph& g, std::vector<NodeT>& s);
+	bool replace_nodes(graph& g, nodes& s);
 	/// replaces node 'torep' in one pass with the given nodes
 	/// 'replacement' everywhere in the forest and returns true
 	/// if changed. Does not care if its recursive or cyclic, its

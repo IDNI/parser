@@ -340,7 +340,7 @@ bool parser<C, T>::result::inline_prefixed_nodes(pgraph& g,
 	const std::string& prefix)
 {
 	//collect all prefix like nodes for replacement
-	std::vector<pnode> s;
+	pnodes s;
 	for (auto& kv : f->g) {
 		auto name = kv.first->first.to_std_string();
 		if (name.find(prefix) != decltype(name)::npos)

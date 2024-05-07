@@ -346,11 +346,12 @@ bool forest<NodeT>::_traverse(const node_graph& g, const node& root,
 }
 
 template <typename NodeT>
-bool forest<NodeT>::replace_nodes(graph& g, std::vector<NodeT>& s) {
+bool forest<NodeT>::replace_nodes(graph& g, nodes& s) {
 	bool changed = false;
 	for (auto& n : s) {
 		//DBG(assert(g[n].size() == 1);)
-		if (replace_node(g, n, *(g[n].begin())))
+		if (g.find(n) != g.end() &&
+				replace_node(g, n, *(g[n].begin())))
 			changed = true, g.erase(n);
 	}
 	return changed;

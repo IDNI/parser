@@ -461,6 +461,7 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 	auto f = std::make_unique<pforest>();
 	S.clear(), U.clear(), bin_tnt.clear(), refi.clear(),
 		gcready.clear(), sorted_citem.clear(), rsorted_citem.clear();
+	pnode::nid.clear();
 	MS(int gcnt = 0;) // count of collected items
 	tid = 0;
 	S.resize(1);
