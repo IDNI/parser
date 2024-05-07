@@ -60,6 +60,7 @@ struct tgf_repl_evaluator {
 		std::set<std::string> nodisambig_list{};
 		std::set<std::string> to_trim{};
 		std::set<std::string> to_trim_children{};
+		std::set<std::string> to_trim_children_terminals{};
 		std::set<std::vector<std::string>> to_inline{};
 	} opt;
 

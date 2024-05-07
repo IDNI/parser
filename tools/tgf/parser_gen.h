@@ -167,7 +167,12 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		}
 		if (g.opt.shaping.to_trim_children.size()) {
 			os << "\t\t.to_trim_children = {";
-			plist(os, g.opt.shaping.to_trim_children) << "\n\t\t},\n";
+			plist(os, g.opt.shaping.to_trim_children)<<"\n\t\t},\n";
+		}
+		if (g.opt.shaping.to_trim_children_terminals.size()) {
+			os << "\t\t.to_trim_children_terminals = {";
+			plist(os, g.opt.shaping.to_trim_children_terminals)
+								<< "\n\t\t},\n";
 		}
 		os << "\t\t.trim_terminals = "
 			<< pbool[g.opt.shaping.trim_terminals] << ",\n";
