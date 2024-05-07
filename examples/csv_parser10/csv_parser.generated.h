@@ -140,6 +140,15 @@ struct csv_parser : public idni::parser<char, char> {
 	csv_parser() : idni::parser<char_type, terminal_type>(
 		csv_parser_data::grammar,
 		csv_parser_data::parser_options) {}
+	size_t id(const std::basic_string<char_type>& name) {
+		return csv_parser_data::nts.get(name);
+	}
+	const std::basic_string<char_type>& name(size_t id) {
+		return csv_parser_data::nts.get(id);
+	}
+	symbol_type literal(const nonterminal& nt) {
+		return symbol_type(nt, &csv_parser_data::nts);
+	}
 };
 
 #endif // __CSV_PARSER_H__

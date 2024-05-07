@@ -484,6 +484,15 @@ struct tgf_parser : public idni::parser<char, char> {
 	tgf_parser() : idni::parser<char_type, terminal_type>(
 		tgf_parser_data::grammar,
 		tgf_parser_data::parser_options) {}
+	size_t id(const std::basic_string<char_type>& name) {
+		return tgf_parser_data::nts.get(name);
+	}
+	const std::basic_string<char_type>& name(size_t id) {
+		return tgf_parser_data::nts.get(id);
+	}
+	symbol_type literal(const nonterminal& nt) {
+		return symbol_type(nt, &tgf_parser_data::nts);
+	}
 };
 
 #endif // __TGF_PARSER_H__

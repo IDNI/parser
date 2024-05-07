@@ -293,6 +293,15 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		"	" << opt.name << "() : idni::parser<char_type, terminal_type>(\n"
 		"		" << opt.name << "_data::grammar,\n"
 		"		" << opt.name << "_data::parser_options) {}\n"
+		"	size_t id(const std::basic_string<char_type>& name) {\n"
+		"		return " << opt.name << "_data::nts.get(name);\n"
+		"	}\n"
+		"	const std::basic_string<char_type>& name(size_t id) {\n"
+		"		return " << opt.name << "_data::nts.get(id);\n"
+		"	}\n"
+		"	symbol_type literal(const nonterminal& nt) {\n"
+		"		return symbol_type(nt, &" << opt.name << "_data::nts);\n"
+		"	}\n"
 		"};\n"
 		"\n";
 	if (opt.ns.size()) os << "\n} // " <<opt.ns<< " namespace\n";
