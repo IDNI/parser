@@ -1,110 +1,73 @@
 @use char class eof, alnum, alpha, space, printable.
 
-@trim __, _.
+@trim __, _, sep.
+@trim children terminals
+	cc_sym, production, directive, tree_path, shorthand_rule,
+	optional, repeat, none_or_repeat, neg,
+	group, optional_group, repeat_group,
+	start_dir, inline_dir, trim_children_dir, trim_children_terminals_dir,
+	trim_terminals_dir, trim_dir, use_dir, disable_ad_dir, ambiguous_dir.
 @inline char classes.
-@inline digits, chars, charvar.
 
-# TGF grammar
+# start symbol
 start                  => (_ statement)* _.
+
 statement              => directive | production.
 start_statement	       => _ statement _.
 
-# common productions
-_                      => [__].                 # optional whitespace
-__                     => (space | comment) _.  # whitespace (includes comments)
-comment                => '#' (printable | '\t')* ('\r' | '\n' | eof).
-sep                    => [sep_required].
-sep_required           => '-' | '_' | __.
-
-
-# terminal char and string
-terminal_char          => "'" (unescaped_c | escaped_c) "'".
-unescaped_c            => printable & ~( "'" | '\\').
-escaped_c              => '\\' ("'" | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't').
-terminal_string        => '"' terminal_string_char* '"'.
-terminal_string_char   => unescaped_s | escaped_s.
-unescaped_s            => printable & ~('"' | '\\').
-escaped_s              => '\\' ('"' | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't').
+# productions
+production             => sym _ "=>" _ alternation _ '.'.
+alternation            => conjunction   (_ '|' _ conjunction)*.
+conjunction            => concatenation (_ '&' _ concatenation)*.
+concatenation          => factor (__ factor)*.
+factor                 => (factor _ ':' sym)       :shorthand_rule
+                        | (term '?')               :optional
+                        | (term '+')               :repeat
+                        | (term '*')               :none_or_repeat
+                        | ('~' term)               :neg
+                        |                           term.
+term                   => ('(' _ alternation _ ')'):group
+                        | ('[' _ alternation _ ']'):optional_group
+                        | ('{' _ alternation _ '}'):repeat_group
+                        |                           terminal
+                        |                           sym.
 
 # literals
 terminal               => terminal_char | terminal_string.
 sym                    => (alpha | '_') (alnum | '_')*.
-
-# productions
-production             => sym _ "=>" _ alternation _ '.'.
-
-alternation            => conjunction   (_ '|' _ conjunction)*.
-conjunction            => concatenation (_ '&' _ concatenation)*.
-concatenation          => factor (__ factor)*.
-
-factor                 => shorthand_rule
-                        | optional
-                        | repeat
-                        | none_or_repeat
-                        | neg
-                        | term.
-
-term                   => group
-                        | optional_group
-                        | repeat_group
-                        | terminal
-                        | sym.
-
-shorthand_rule         => factor _ ':' sym.
-
-# operators incl. EBNF
-neg                    => '~' term.
-optional               => term '?'.
-repeat                 => term '+'.
-none_or_repeat         => term '*'.
-group                  => '(' _ alternation _ ')'.
-optional_group         => '[' _ alternation _ ']'.
-repeat_group           => '{' _ alternation _ '}'.
+terminal_char          => "'" (unescaped_c | escaped_c) "'".
+unescaped_c            => printable & ~( "'" | '\\').
+escaped_c              => '\\' ("'" | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't').
+terminal_string        => '"' ((unescaped_s | escaped_s):terminal_string_char)* '"'.
+unescaped_s            => printable & ~('"' | '\\').
+escaped_s              => '\\' ('"' | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't').
 
 # directives
 directive              => '@' _ directive_body _ '.'.
-directive_body         => start_dir | inline_dir
-                        | trim_children_dir | trim_terminals | trim_dir
-                        | use_dir | boolean_dir | nodisambig_dir.
+directive_body         =>
+	  ("start" __ sym)                                  :start_dir
+	| ("inline" __ inline_arg (_ ',' _ inline_arg)*)    :inline_dir
+	| ("trim" sep "children" __ sym (_ ',' _ sym)*)     :trim_children_dir
+	| ("trim" sep "children" sep "terminals" __ sym (_ ',' _ sym)*)
+	                                        :trim_children_terminals_dir
+	| ("trim" sep "all" sep "terminals")                :trim_terminals_dir
+	| ("trim" __ sym (_ ',' _ sym)*)                    :trim_dir
+	| ("use" __ cc_sym:use_from __ use_param (_ ',' _ use_param)*)
+	                                                    :use_dir
+	| ("disable" __ ["auto" sep] "disambig" "uation"?)  :disable_ad_dir
+	| ("ambiguous" _ sym (_ ',' _ sym)*)                :ambiguous_dir
+	.
 
-# set starting symbol
-start_dir              => "start" __ sym.
-
-# trim nonterminals and its children from parsed tree
-trim_dir               => "trim" __ sym (_ ',' _ sym)*.
-trim_terminals_dir     => "trim" sep "all" sep "terminals".
-trim_children_dir      => "trim" sep "children" __ sym (_ ',' _ sym)*.
-
-# inline nonterminals by their children
-inline_dir             => "inline" __ inline_arg (_ ',' _ inline_arg)*.
-inline_arg             => tree_path | char_classes_sym.
+inline_arg             => tree_path | ("char" sep "class" "es"?):cc_sym.
 tree_path              => sym (_ '>' _ sym)*.
-char_classes_sym       => "char" sep "class" "es"?.
-
-# use directive
-use_dir                => "use" __ use_from __ use_param (_ ',' _ use_param)*.
-# TODO keep "@use_char_class" for backward compatibility (consider to remove)
-use_dir                => "use_char_class"  __ use_param (_ ',' _ use_param)*.
-
-# use can currently inport character classes only
-use_from               => char_classes_sym.
-use_param              => char_class_name.
-char_class_name        => "eof"   | "alnum" | "alpha" | "blank"
+use_param              => ("eof"   | "alnum" | "alpha" | "blank"
                         | "cntrl" | "digit" | "graph" | "lower" | "printable"
-                        | "punct" | "space" | "upper" | "xdigit".
+                        | "punct" | "space" | "upper" | "xdigit"):cc_name.
 
-# boolean directives enable/disable to change boolean values
-boolean_dir            => [ boolean_action __ ] boolean_dir_name.
-boolean_dir_name       => autodisambig_sym.
-boolean_action         => enable_sym | disable_sym.
-enable_sym             => "enable".
-disable_sym            => "disable".
+# common productions
+sep                    => [sep_required].
+sep_required           => '-' | '_' | __.
 
-# autodisambiguation bollean value for enabling/disabling disambiguation
-autodisambig_sym       => [ "auto" sep ] disambig_sym.
-disambig_sym           => "disambig" [ "uat" ("e" | "i" ("on" | "ng")) ].
-
-# nodisambiglist directive for providing a list of symbols that should not be disambiguated
-nodisambig_dir         => nodisambig_sym _ sym (_ ',' _ sym)*.
-nodisambig_sym         => ("no" 'n'? | "don" "'"? "t") sep
-                          disambig_sym [ sep "list" ].
+_                      => [__].                 # optional whitespace
+__                     => (space | comment) _.  # whitespace (includes comments)
+comment                => '#' (printable | '\t')* ('\r' | '\n' | eof).
