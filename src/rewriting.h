@@ -960,9 +960,10 @@ sp_node<symbol_t> make_node_from_string(
 	const transformer_t& transformer,
 	const std::string source, idni::parser<>::parse_options options = {})
 {
-	return make_node_from_parse_result<parser_t, transformer_t>(
-		transformer, parser_t::instance().parse(
-			source.c_str(), source.size(), options));
+	auto result = parser_t::instance().parse(
+			source.c_str(), source.size(), options);
+	return make_node_from_parse_result<parser_t, transformer_t, symbol_t>(
+		transformer, result);
 }
 
 // make a tree from the given source code stream.
@@ -970,8 +971,9 @@ template<typename parser_t, typename transformer_t, typename symbol_t>
 sp_node<symbol_t> make_node_from_stream(const transformer_t& transformer,
 	std::istream& is, idni::parser<>::parse_options options = {})
 {
+	auto result = parser_t::instance().parse(is, options);
 	return make_node_from_parse_result<parser_t, transformer_t, symbol_t>(
-		transformer, parser_t::instance().parse(is, options));
+		transformer, result);
 }
 
 // make a tree from the given source code file.
@@ -979,8 +981,9 @@ template<typename parser_t, typename transformer_t, typename symbol_t>
 sp_node<symbol_t> make_node_from_file(const transformer_t& transformer,
 	const std::string& filename, idni::parser<>::parse_options options = {})
 {
+	auto result = parser_t::instance().parse(filename, options);
 	return make_node_from_parse_result<parser_t, transformer_t, symbol_t>(
-		transformer, parser_t::instance().parse(filename, options));
+		transformer, result);
 }
 
 } // namespace idni::rewriter
