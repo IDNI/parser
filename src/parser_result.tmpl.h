@@ -34,6 +34,9 @@ typename parser<C, T>::pforest* parser<C, T>::result::get_forest() const {
 }
 
 template <typename C, typename T>
+bool parser<C, T>::result::good() const { return in->good(); }
+
+template <typename C, typename T>
 std::basic_string<C> parser<C, T>::result::get_input() {
 	return in->get_string();
 }
@@ -42,7 +45,7 @@ template <typename C, typename T>
 bool trimmable_node(const typename parser<C, T>::pnode& n,
 	const shaping_options& opts)
 {
-	if (!n.first.nt()) return opts.trim_terminals;
+	if (!n.first.nt()) return n.first.is_null() || opts.trim_terminals;
 	if (opts.to_trim.find(n.first.n()) != opts.to_trim.end()) return true;
 	return false;
 }
@@ -53,10 +56,9 @@ bool trimmable_child(const typename parser<C, T>::pnode& n,
 	const shaping_options& opts)
 {
 	if (trimmable_node<C, T>(c, opts)) return true;
-	if (n.first.nt()) return opts.to_trim_children.find(n.first.n())
-				!= opts.to_trim_children.end();
-	if (c.first.is_null()) return true;
-	return opts.to_trim_children_terminals.find(n.first.n())
+	if (n.first.nt() && opts.to_trim_children.find(n.first.n())
+			!= opts.to_trim_children.end()) return true;
+	return !c.first.nt() && opts.to_trim_children_terminals.find(n.first.n())
 		!= opts.to_trim_children_terminals.end();
 }
 
@@ -236,25 +238,55 @@ typename parser<C, T>::psptree parser<C, T>::result::inline_tree_paths(
 }
 
 template <typename C, typename T>
-typename parser<C, T>::psptree parser<C, T>::result::inline_tree(psptree& t,
-	const shaping_options opts) const
+typename parser<C, T>::psptree parser<C, T>::result::inline_tree(
+	psptree& t, const shaping_options opts) const
 {
 	auto inlined = inline_tree_nodes(t, t, opts);
 	return inline_tree_paths(inlined, opts);
 }
 template <typename C, typename T>
-typename parser<C, T>::psptree parser<C, T>::result::inline_tree(psptree& t)
-	const
+typename parser<C, T>::psptree parser<C, T>::result::inline_tree(
+	psptree& t) const
 {
 	return inline_tree(t, shaping);
 }
+
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::trim_children_terminals(
+	const psptree& t, const shaping_options opts) const
+{
+	psptree r = 0;
+	if (!t) return r;
+	auto& l = t->value->first;
+	if (!l.nt()) return r = t, r;
+	bool trim = opts.to_trim_children_terminals.find(l.n())
+			!= opts.to_trim_children_terminals.end();
+	r = std::make_shared<ptree>(t->value);
+	for (auto& c : t->child) {
+		auto& cl = c->value->first;
+		if (cl.nt() || cl.is_null() || !trim) {
+			auto x = trim_children_terminals(c, opts);
+			if (x) r->child.push_back(x);
+		}
+	}
+	return r;
+}
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::trim_children_terminals(
+	const psptree& t) const
+{
+	return trim_children_nodes(t, shaping);
+}
+
 template <typename C, typename T>
 typename parser<C, T>::psptree parser<C, T>::result::get_shaped_tree(
 	const typename parser<C, T>::pnode& n, const shaping_options opts) const
 {
 	//std::cout << "getting tree for " << n.first.to_std_string() << std::endl;
 	auto trimmed = get_trimmed_tree(n, opts);
-	return inline_tree(trimmed, opts);
+	auto inlined = inline_tree(trimmed, opts);
+	auto shaped  = trim_children_terminals(inlined, opts);
+	return shaped;
 }
 template <typename C, typename T>
 typename parser<C, T>::psptree parser<C, T>::result::get_shaped_tree(

@@ -277,6 +277,7 @@ public:
 			int_type e = std::char_traits<C>::eof());
 #endif
 		~input();
+		inline bool good() const;
 		inline bool isstream() const;
 		void clear(); // resets stream (if used) to reenable at()/tat()
 		std::basic_string<C> get_string(); // returns input data as a string
@@ -355,7 +356,8 @@ public:
 		// list of expected token and respective productions
 		std::vector<exp_prod_t> expv;
 		error() : loc(-1) {}
-		std::string to_str(info_lvl lv = INFO_ROOT_CAUSE) const;
+		std::string to_str(info_lvl lv = INFO_DETAILED,
+			size_t line_start = 0) const;
 	};
 	// result of the parse call
 	struct result {
@@ -391,6 +393,9 @@ public:
 		psptree inline_tree(psptree& t) const;
 		psptree inline_tree(psptree& t,
 			const shaping_options opts) const;
+		psptree trim_children_terminals(const psptree& t) const;
+		psptree trim_children_terminals(const psptree& t,
+			const shaping_options opts) const;
 		// transforms forest into a tree and applies shaping
 		psptree get_shaped_tree() const;
 		psptree get_shaped_tree(const shaping_options opts) const;
@@ -402,6 +407,8 @@ public:
 		psptree get_tree();
 		psptree get_tree(const pnode& n);
 
+		// is input good = stream is good or mmap is opened
+		bool good() const;
 		// returns the input as a string (input's char type, ie. C)
 		std::basic_string<C> get_input();
 		// read terminals from input (input's terminal type, ie. T)

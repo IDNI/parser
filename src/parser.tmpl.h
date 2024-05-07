@@ -23,13 +23,13 @@ using namespace idni::term;
 static inline term::colors TC;
 
 template <typename C, typename T>
-std::map<const typename parser<C,T>::pnode, 
-	typename forest<typename parser<C,T>::pnode>::node> 
+std::map<const typename parser<C,T>::pnode,
+	typename forest<typename parser<C,T>::pnode>::node>
 		parser<C,T>::pnode::nid;
 
 
 template <typename C, typename T>
-typename forest<typename parser<C,T>::pnode>::node 
+typename forest<typename parser<C,T>::pnode>::node
 	parser<C,T>::pnode::ptrof(
 		const typename parser<C,T>::pnode& pn) {
 	auto r = nid.insert( {pn, (nullptr)} );
@@ -98,6 +98,13 @@ template <typename C, typename T>
 parser<C, T>::input::~input() {
 	//if (itype == MMAP && d != 0) munmap(const_cast<C*>(d), l);
 }
+template <typename C, typename T>
+bool parser<C, T>::input::good() const {
+	return    itype == STREAM ? s.good()
+		: itype == MMAP   ? !mm.error
+		:                   true;
+}
+
 template <typename C, typename T>
 bool parser<C, T>::input::isstream() const { return itype == STREAM; }
 template <typename C, typename T>
@@ -659,7 +666,7 @@ std::vector<typename parser<C, T>::item> parser<C, T>::rsorted_citem(
 */
 //------------------------------------------------------------------------------
 template <typename C, typename T>
-std::string parser<C, T>::error::to_str(info_lvl elvl) const {
+std::string parser<C, T>::error::to_str(info_lvl elvl, size_t line_start) const{
 	if (ctxt.size() == 0) return "";
 	std::stringstream ss;
 	for (const auto& t : unexp) {
@@ -672,8 +679,8 @@ std::string parser<C, T>::error::to_str(info_lvl elvl) const {
 		ss << quote << s << quote;
 	} else ss << "end of file";
 	s = ss.str();
-	ss = {}, ss << "Syntax Error: Unexpected " << s << " at " << line << ":"
-		<< col << " (" << loc+1 << "): ";
+	ss = {}, ss << "Syntax Error: Unexpected " << s << " at "
+		<< (line_start+line) << ":" << col << " (" << loc+1 << "): ";
 	for (size_t i = ctxt.size() - 1; i != 0; --i)
 		if constexpr (std::is_same_v<T, char32_t>)
 			ss << to_std_string(ctxt[i]);
