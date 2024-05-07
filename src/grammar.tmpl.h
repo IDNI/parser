@@ -656,6 +656,10 @@ std::ostream& grammar<C, T>::print_production(std::ostream& os,
 {
 	const int ID_SIZE   = 6;
 	const int HEAD_SIZE = 20;
+	auto nt_begin = [this, &TC](const lit<C, T>& l) {
+		if (!l.nt()) return std::string{};
+		return is_cc_fn(l.n()) ? TC_CC : TC_NT;
+	};
 	std::stringstream ss;
 	if (print_ids) ss << "G" << p << ":";
 	std::string id = ss.str();
@@ -664,7 +668,8 @@ std::ostream& grammar<C, T>::print_production(std::ostream& os,
 	std::string head = G[p].first.to_std_string();
 	ss = {}, ss << "(" << G[p].first.n()<< ")";
 	std::string head_id = ss.str();
-	os << TC_NT << head << TC_DEFAULT << TC_NT_ID << head_id << TC_DEFAULT;
+	os << nt_begin(G[p].first) << head << TC_DEFAULT
+		<< TC_NT_ID << head_id << TC_DEFAULT;
 	int len = HEAD_SIZE-head.size()-head_id.size();
 	for (int i = 0; i < len; ++i) os <<" ";
 	os << " =>";
@@ -676,7 +681,7 @@ std::ostream& grammar<C, T>::print_production(std::ostream& os,
 		for (const auto& l : c) {
 			os << " ";
 			if (l.nt())
-				os << TC_NT << l.to_std_string() << TC_DEFAULT
+				os << nt_begin(l) << l.to_std_string() << TC_DEFAULT
 				<< TC_NT_ID << "(" <<l.n()<< ")" << TC_DEFAULT;
 			else if (l.is_null())
 				os << TC_NULL << "null" << TC_DEFAULT;
