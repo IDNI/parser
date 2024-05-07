@@ -396,7 +396,7 @@ int main(int argc, char **argv)
 
 		TEST("stress", "cbf_rule")
 		const char* g1 =
-			"@use_char_class alpha, alnum."
+			"@use char classes alpha, alnum."
 			"chars    => alpha (alnum)*."
 			"cbf_rule => cbf_head | chars '=' cbf."
 			"cbf_head => cbf."

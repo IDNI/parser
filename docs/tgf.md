@@ -100,7 +100,7 @@ For more information about decoder and encoder functions see [recoders](recoders
 
 ## TGF syntax
 
-TGF uses statements ending with a dot `.`. Statement of TGF can be either a production rule or it can be a directive `@use_char_class`.
+TGF uses statements ending with a dot `.`. Statement of TGF can be either a production rule or it can be a directive `@use char classes`.
 
 ### production rules
 
@@ -257,7 +257,7 @@ bin_digits => bin_digit bin_digits | null.
 bin_digit  => '0' | '1'.
 ```
 
-### @use_char_class \<list of names>.
+### @use char classes \<list of names>.
 
 This directive takes comma separated list of predefined character class function names.
 
@@ -267,5 +267,5 @@ It can be one of: `alnum`, `alpha`, `blank`, `cntrl`, `digit`, `graph`, `lower`,
 
 Usage:
 ```
-@use_char_class alpha, digit, space.
+@use char classes alpha, digit, space.
 ```
