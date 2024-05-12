@@ -50,7 +50,7 @@ int main(int argc, char **argv)
 /*******************************************************************************
 *       BASIC
 *******************************************************************************/
-
+	{
 	// null
 	TEST("basic", "null")
 	ps(start, nll);
@@ -437,7 +437,7 @@ int main(int argc, char **argv)
 		if (testing::verbosity > 0)
 			cout << "stress test finished" << endl;
 	}
-
+	}
 	cout << endl;
 	if (testing::failed) cout << "FAILED\n";
 	return testing::failed ? 1 : 0;

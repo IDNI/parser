@@ -42,22 +42,42 @@ namespace idni {
 
 template <typename NodeT>
 struct forest { 
+	
+	// node pointer in forerst
 	struct nptr_t {
 		const NodeT *id;	
-	
-		nptr_t(const NodeT *_id = nullptr) : id(_id) { }
-
+		static size_t nc;
+		nptr_t(const NodeT *_id = nullptr) : id(_id) { if(id) nc++; }
+		nptr_t(const nptr_t& rhs) {  id = rhs.id; if(id) nc++;}
+		nptr_t(const nptr_t&& rhs) {  id = rhs.id; if(id) nc++;}
 		inline operator NodeT() const{
 			return *id;
 		}
 		//inline const NodeT& getobj() const { return *id; }
 		inline const NodeT* operator->() const { return id;}
+		inline nptr_t& operator=(const nptr_t& rhs) {
+			if(!id && rhs.id != nullptr ) nc++;
+			id = rhs.id;
+			return *this;
+		}
+		inline nptr_t& operator=(const nptr_t&& rhs) {	 
+			 if(!id && rhs.id != nullptr ) nc++;
+			 id = rhs.id;
+			 return *this;
+		}
 		inline bool operator<(const nptr_t& rhs) const {
 			return id < rhs.id;
 		}
 		inline bool operator == (const nptr_t& rhs) const {
 			return id == rhs.id;
 		}
+		~nptr_t() { 
+			//DBG( assert(nc!=0));
+			DBG(std::cout <<"-"<< NodeT::nid.size() <<" "<<nc );
+			if(id != nullptr) nc--, id = 0 ; 
+			//if(nc == NodeT::nid.size() && NodeT::nid.size()) NodeT::nid.clear();
+		}
+
 		//inline lit<C,T> &first() const { DBG(assert(id!=0)); return id->first; }
 		//inline std::array<size_t, 2>& second() const { DBG(assert(id!=0)); return id->second; } 	
 	};
@@ -69,8 +89,7 @@ struct forest {
 	using edge       = std::pair<size_t, size_t>;
 	public:
 	
-	// node pointer in forerst
-	
+
 	struct tree {
 		node value;
 		std::vector<std::shared_ptr<struct tree>> child;
@@ -162,6 +181,9 @@ private:
 		std::vector<node>& todo, graphv& graphs, size_t gid,
 		cb_next_graph_t g, bool& no_stop) const;
 };
+
+template<typename NodeT>
+size_t forest<NodeT>::nptr_t::nc = 0;
 
 } // idni namespace
 #include "forest.tmpl.h"  // template definitions for forest

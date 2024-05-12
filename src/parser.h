@@ -230,6 +230,7 @@ public:
 			// every pnode object has its pointer
        	static std::map<const pnode, typename forest<pnode>::node> nid;
 		inline operator typename forest<pnode>::node() const {
+			//forest<pnode>::node::nc++;
 			return ptrof(*this);
 		}
 		//inline lit<C,T> &first() const { return this->first; }
