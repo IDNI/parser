@@ -11,25 +11,25 @@ namespace csv_parser_data {
 using char_type     = char;
 using terminal_type = char;
 
-static inline std::vector<std::string> symbol_names{
+inline std::vector<std::string> symbol_names{
 	"", "digit", "printable", "integer", "__E_integer_0", "__E_integer_1", "quote", "esc", "escaping", "unescaped", 
 	"escaped", "strchar", "str", "__E_str_2", "nullvalue", "val", "eol", "__E_eol_3", "row", "__E_row_4", 
 	"__E_row_5", "rows", "__E_rows_6", "__E_rows_7", "start", "__N_0", 
 };
 
-static inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
+inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
 
-static inline std::vector<terminal_type> terminals{
+inline std::vector<terminal_type> terminals{
 	'\0', '-', '"', '\\', '\r', '\n', ',', 
 };
 
-static inline ::idni::char_class_fns<terminal_type> char_classes =
+inline ::idni::char_class_fns<terminal_type> char_classes =
 	::idni::predefined_char_classes<char_type, terminal_type>({
 		"digit",
 		"printable",
 	}, nts);
 
-static inline struct ::idni::grammar<char_type, terminal_type>::options
+inline struct ::idni::grammar<char_type, terminal_type>::options
 	grammar_options
 {
 	.transform_negation = false,
@@ -39,12 +39,13 @@ static inline struct ::idni::grammar<char_type, terminal_type>::options
 		.inline_char_classes = false
 	}
 };
-static inline ::idni::parser<char_type, terminal_type>::options parser_options{
+
+inline ::idni::parser<char_type, terminal_type>::options parser_options{
 };
 
-static inline ::idni::prods<char_type, terminal_type> start_symbol{ nts(24) };
+inline ::idni::prods<char_type, terminal_type> start_symbol{ nts(24) };
 
-static inline idni::prods<char_type, terminal_type>& productions() {
+inline idni::prods<char_type, terminal_type>& productions() {
 	static bool loaded = false;
 	static idni::prods<char_type, terminal_type>
 		p, nul(idni::lit<char_type, terminal_type>{});
@@ -122,7 +123,7 @@ static inline idni::prods<char_type, terminal_type>& productions() {
 	return loaded = true, p;
 }
 
-static inline ::idni::grammar<char_type, terminal_type> grammar(
+inline ::idni::grammar<char_type, terminal_type> grammar(
 	nts, productions(), start_symbol, char_classes, grammar_options);
 
 } // namespace csv_parser_data

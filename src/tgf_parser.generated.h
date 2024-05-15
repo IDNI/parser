@@ -11,7 +11,7 @@ namespace tgf_parser_data {
 using char_type     = char;
 using terminal_type = char;
 
-static inline std::vector<std::string> symbol_names{
+inline std::vector<std::string> symbol_names{
 	"", "eof", "alnum", "alpha", "space", "printable", "__", "_", "sep", "cc_sym", 
 	"production", "directive", "tree_path", "shorthand_rule", "optional", "repeat", "none_or_repeat", "neg", "group", "optional_group", 
 	"repeat_group", "start_dir", "inline_dir", "trim_children_dir", "trim_children_terminals_dir", "trim_terminals_dir", "trim_dir", "use_dir", "disable_ad_dir", "ambiguous_dir", 
@@ -26,9 +26,9 @@ static inline std::vector<std::string> symbol_names{
 	"__E____57", "comment", "__E_comment_58", "__E_comment_59", "__E_comment_60", "__N_0", "__N_1", 
 };
 
-static inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
+inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
 
-static inline std::vector<terminal_type> terminals{
+inline std::vector<terminal_type> terminals{
 	'\0', '=', '>', '.', '|', '&', ':', '?', '+', 
 	'*', '~', '(', ')', '[', ']', '{', '}', '_', '\'', 
 	'\\', '/', 'b', 'f', 'n', 'r', 't', '"', '@', 's', 
@@ -37,7 +37,7 @@ static inline std::vector<terminal_type> terminals{
 	'#', 
 };
 
-static inline ::idni::char_class_fns<terminal_type> char_classes =
+inline ::idni::char_class_fns<terminal_type> char_classes =
 	::idni::predefined_char_classes<char_type, terminal_type>({
 		"eof",
 		"alnum",
@@ -46,7 +46,7 @@ static inline ::idni::char_class_fns<terminal_type> char_classes =
 		"printable",
 	}, nts);
 
-static inline struct ::idni::grammar<char_type, terminal_type>::options
+inline struct ::idni::grammar<char_type, terminal_type>::options
 	grammar_options
 {
 	.transform_negation = false,
@@ -64,12 +64,13 @@ static inline struct ::idni::grammar<char_type, terminal_type>::options
 		.inline_char_classes = true
 	}
 };
-static inline ::idni::parser<char_type, terminal_type>::options parser_options{
+
+inline ::idni::parser<char_type, terminal_type>::options parser_options{
 };
 
-static inline ::idni::prods<char_type, terminal_type> start_symbol{ nts(30) };
+inline ::idni::prods<char_type, terminal_type> start_symbol{ nts(30) };
 
-static inline idni::prods<char_type, terminal_type>& productions() {
+inline idni::prods<char_type, terminal_type>& productions() {
 	static bool loaded = false;
 	static idni::prods<char_type, terminal_type>
 		p, nul(idni::lit<char_type, terminal_type>{});
@@ -457,7 +458,7 @@ static inline idni::prods<char_type, terminal_type>& productions() {
 	return loaded = true, p;
 }
 
-static inline ::idni::grammar<char_type, terminal_type> grammar(
+inline ::idni::grammar<char_type, terminal_type> grammar(
 	nts, productions(), start_symbol, char_classes, grammar_options);
 
 } // namespace tgf_parser_data

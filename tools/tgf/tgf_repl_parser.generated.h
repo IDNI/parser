@@ -11,7 +11,7 @@ namespace tgf_repl_parser_data {
 using char_type     = char;
 using terminal_type = char;
 
-static inline std::vector<std::string> symbol_names{
+inline std::vector<std::string> symbol_names{
 	"", "eof", "alnum", "alpha", "space", "printable", "_", "__", "grammar_sym", "internal_grammar_sym", 
 	"unreachable_sym", "start_sym", "parse_sym", "parse_file_sym", "load_sym", "reload_sym", "help_sym", "quit_sym", "version_sym", "clear_sym", 
 	"get_sym", "set_sym", "add_sym", "del_sym", "toggle_sym", "enable_sym", "disable_sym", "true_value", "false_value", "basic_sym", 
@@ -32,16 +32,16 @@ static inline std::vector<std::string> symbol_names{
 	"__E_comment_75", "__N_0", 
 };
 
-static inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
+inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
 
-static inline std::vector<terminal_type> terminals{
+inline std::vector<terminal_type> terminals{
 	'\0', '.', 'p', 'a', 'r', 's', 'e', 'f', ' ', 
 	'i', 'l', 'g', 'm', 'n', 't', '-', 'u', 'c', 'h', 
 	'b', 'o', 'd', 'v', 'q', 'x', '=', '\t', 'y', '1', 
 	'0', '_', ',', '>', '"', '\\', '/', '\r', '\n', '#', 
 };
 
-static inline ::idni::char_class_fns<terminal_type> char_classes =
+inline ::idni::char_class_fns<terminal_type> char_classes =
 	::idni::predefined_char_classes<char_type, terminal_type>({
 		"eof",
 		"alnum",
@@ -50,7 +50,7 @@ static inline ::idni::char_class_fns<terminal_type> char_classes =
 		"printable",
 	}, nts);
 
-static inline struct ::idni::grammar<char_type, terminal_type>::options
+inline struct ::idni::grammar<char_type, terminal_type>::options
 	grammar_options
 {
 	.transform_negation = false,
@@ -70,12 +70,13 @@ static inline struct ::idni::grammar<char_type, terminal_type>::options
 		.inline_char_classes = true
 	}
 };
-static inline ::idni::parser<char_type, terminal_type>::options parser_options{
+
+inline ::idni::parser<char_type, terminal_type>::options parser_options{
 };
 
-static inline ::idni::prods<char_type, terminal_type> start_symbol{ nts(52) };
+inline ::idni::prods<char_type, terminal_type> start_symbol{ nts(52) };
 
-static inline idni::prods<char_type, terminal_type>& productions() {
+inline idni::prods<char_type, terminal_type>& productions() {
 	static bool loaded = false;
 	static idni::prods<char_type, terminal_type>
 		p, nul(idni::lit<char_type, terminal_type>{});
@@ -755,7 +756,7 @@ static inline idni::prods<char_type, terminal_type>& productions() {
 	return loaded = true, p;
 }
 
-static inline ::idni::grammar<char_type, terminal_type> grammar(
+inline ::idni::grammar<char_type, terminal_type> grammar(
 	nts, productions(), start_symbol, char_classes, grammar_options);
 
 } // namespace tgf_repl_parser_data
