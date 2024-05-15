@@ -21,7 +21,6 @@
 #include "tgf_cli.h"
 #include "parser_gen.h"
 #include "parser_term_color_macros.h"
-#include "parser_instance.h"
 
 #define PBOOL(bval) (( bval ) ? "true" : "false")
 

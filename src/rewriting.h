@@ -27,7 +27,6 @@
 #include <compare>
 
 #include "forest.h"
-#include "parser_instance.h"
 #include "parser.h"
 
 // use boost log if available otherwise use std::cout

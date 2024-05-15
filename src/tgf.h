@@ -15,7 +15,6 @@
 #include <fstream>
 #include <streambuf>
 
-#include "parser_instance.h"
 #include "tgf_parser.generated.h"
 #include "traverser.h"
 #include "devhelpers.h"
@@ -155,7 +154,7 @@ private:
 			for (const auto& pr : productions()) production(pr);
 		}
 		int parse(const char* s, size_t l, size_t line) {
-			auto& p = parser_instance<tgf_parser>();
+			auto& p = tgf_parser::instance();
 			static tgf_parser::parse_options po{
 				.start = tgf_parser::start_statement };
 			auto r = p.parse(s, l, po);
