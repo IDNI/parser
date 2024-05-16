@@ -647,16 +647,14 @@ using rule = std::pair<node_t, node_t>;
 // a  match occurs, copy the data from the temp env to the env passed as
 // parameter.
 //
-// IDEA use also a skip predicate to skip subtrees that are not needed in the match.
 // It should allow to detects matches in the middle of a tree.
-template <typename node_t, typename is_ignore_t, typename is_capture_t>
+template <typename node_t, typename is_capture_t>
 struct pattern_matcher {
 	using pattern_t = node_t;
 
-	pattern_matcher(pattern_t& pattern, environment<node_t>& env,
-		is_ignore_t& is_ignore, is_capture_t& is_capture)
-		: pattern(pattern), env(env), is_ignore(is_ignore),
-			is_capture(is_capture) {}
+	pattern_matcher(const pattern_t& pattern, environment<node_t>& env,
+		const is_capture_t& is_capture)
+		: pattern(pattern), env(env), is_capture(is_capture) {}
 
 	bool operator()(const node_t& n) {
 		// if we have matched the pattern, we never try again to unify
@@ -672,10 +670,9 @@ struct pattern_matcher {
 	}
 
 	std::optional<node_t> matched = std::nullopt;
-	pattern_t& pattern;
+	const pattern_t& pattern;
 	environment<node_t>& env;
-	is_ignore_t& is_ignore;
-	is_capture_t& is_capture;
+	const is_capture_t& is_capture;
 
 private:
 	bool match(const pattern_t& p, const node_t& n) {
@@ -688,8 +685,6 @@ private:
 			// ...otherwise we save the current node as the one associated to the
 			// current capture and return true.
 			else return env.emplace(p, n), true;
-		// if the current node is an ignore, we return true.
-		else if (is_ignore(p)) return true;
 		// otherwise, we check the symbol of the current node and if it is the
 		// same as the one of the current pattern, we check if the children
 		// match recursively.
@@ -709,87 +704,17 @@ private:
 // this predicate matches when there exists a environment that makes the
 // pattern match the node ignoring the nodes detected as skippable.
 //
-// TODO (LOW) create and env in operator() and pass it as a parameter to match, if
-// a  match occurs, copy the data from the temp env to the env passed as
-// parameter.
-template <typename node_t, typename is_ignore_t, typename is_capture_t,
-	typename is_skip_t>
-struct pattern_matcher_with_skip {
-	using pattern_t = node_t;
-
-	pattern_matcher_with_skip(const pattern_t& pattern,
-		environment<node_t>& env, is_ignore_t& is_ignore,
-		is_capture_t& is_capture, is_skip_t& is_skip)
-		: pattern(pattern), env(env), is_ignore(is_ignore),
-		is_capture(is_capture), is_skip(is_skip) {}
-
-	bool operator()(const node_t& n) {
-		// if we have matched the pattern, we never try again to unify
-		if (matched) return false;
-		// we clear previous environment attempts
-		env.clear();
-		// then we try to match the pattern against the node and if the match
-		// was successful, we save the node that matched.
-		if (match(pattern, n)) matched = { n };
-		else env.clear();
-		// we continue visiting until we found a match.
-		return matched.has_value();
-	}
-
-	std::optional<node_t> matched = std::nullopt;
-	const pattern_t& pattern;
-	environment<node_t>& env;
-	is_ignore_t& is_ignore;
-	is_capture_t& is_capture;
-	is_skip_t& is_skip;
-
-private:
-	bool match(const pattern_t& p, const node_t& n) {
-		// if we already have captured a node associated to the current capture
-		// we check if it is the same as the current node, if it is not, we
-		// return false...
-		if (is_capture(p))
-			if (auto it = env.find(p); it != env.end()
-				&& it->second != n) return false;
-			// ...otherwise we save the current node as the one associated to the
-			// current capture and return true.
-			else return env.emplace(p, n), true;
-		// if the current node is an ignore, we return true.
-		else if (is_ignore(p)) return true;
-		// otherwise, we check the symbol of the current node and if it is the
-		// same as the one of the current pattern, we check if the children
-		// match recursively.
-		else if (p->value != n->value) return false;
-		auto p_it = p->child.begin();
-		auto n_it = n->child.begin();
-		while (p_it != p->child.end() && n_it != n->child.end()) {
-			if (is_skip(*p_it)) { ++p_it; continue; }
-			if (is_skip(*n_it)) { ++n_it; continue; }
-			if (*p_it == *n_it) { ++p_it; ++n_it; continue; }
-			if (match(*p_it, *n_it)) { ++p_it; ++n_it; continue; }
-			return false;
-		}
-		return true;
-	}
-};
-
-// this predicate matches when there exists a environment that makes the
-// pattern match the node ignoring the nodes detected as skippable.
-//
 // TODO (LOW) create an env in operator() and pass it as a parameter to match, if
 // a  match occurs, copy the data from the temp env to the env passed as
 // parameter.
-template <typename node_t, typename is_ignore_t, typename is_capture_t,
-	typename is_skip_t, typename predicate_t>
-struct pattern_matcher_with_skip_if {
+template <typename node_t, typename is_capture_t, typename predicate_t>
+struct pattern_matcher_if {
 	using pattern_t = node_t;
 
-	pattern_matcher_with_skip_if(const pattern_t& pattern,
-		environment<node_t>& env, is_ignore_t& is_ignore,
-		is_capture_t& is_capture, is_skip_t &is_skip,
-		predicate_t& predicate)
-		: pattern(pattern), env(env), is_ignore(is_ignore),
-		is_capture(is_capture), is_skip(is_skip), predicate(predicate){}
+	pattern_matcher_if(const pattern_t& pattern,
+		environment<node_t>& env,
+		is_capture_t& is_capture, predicate_t& predicate)
+		: pattern(pattern), env(env), is_capture(is_capture), predicate(predicate){}
 
 	bool operator()(const node_t& n) {
 		// if we have matched the pattern, we never try again to unify
@@ -807,9 +732,7 @@ struct pattern_matcher_with_skip_if {
 	std::optional<node_t> matched = std::nullopt;
 	const pattern_t& pattern;
 	environment<node_t>& env;
-	is_ignore_t& is_ignore;
 	is_capture_t& is_capture;
-	is_skip_t& is_skip;
 	predicate_t& predicate;
 
 private:
@@ -823,8 +746,6 @@ private:
 			// ...otherwise we save the current node as the one associated to the
 			// current capture and return true.
 			else return env.emplace(p, n), true;
-		// if the current node is an ignore, we return true.
-		else if (is_ignore(p)) return true;
 		// otherwise, we check the symbol of the current node and if it is the
 		// same as the one of the current pattern, we check if the children
 		// match recursively.
@@ -832,8 +753,6 @@ private:
 		auto p_it = p->child.begin();
 		auto n_it = n->child.begin();
 		while (p_it != p->child.end() && n_it != n->child.end()) {
-			if (is_skip(*p_it)) { ++p_it; continue; }
-			if (is_skip(*n_it)) { ++n_it; continue; }
 			if (*p_it == *n_it) { ++p_it; ++n_it; continue; }
 			if (match(*p_it, *n_it)) { ++p_it; ++n_it; continue; }
 			return false;
@@ -843,50 +762,24 @@ private:
 };
 
 // apply a rule to a tree using the predicate to pattern_matcher.
-template <typename node_t, typename is_ignore_t, typename is_capture_t>
-node_t apply(rule<node_t>& r, node_t& n, is_ignore_t& i, is_capture_t& c) {
+template <typename node_t, typename is_capture_t>
+node_t apply_rule(const rule<node_t>& r, const node_t& n, const is_capture_t& c) {
 	auto [p , s] = r;
 	environment<node_t> u;
-	pattern_matcher<node_t, is_ignore_t, is_capture_t> matcher {p, u, i, c};
+	pattern_matcher<node_t, is_capture_t> matcher {p, u, c};
 	return apply(s, n, matcher);
 }
 
 // apply a rule to a tree using the predicate to pattern_matcher and skipping
 // unnecessary subtrees
-template <typename node_t, typename is_ignore_t, typename is_capture_t,
-	typename is_skip_t>
-node_t apply_with_skip(const rule<node_t>& r, const node_t& n, is_ignore_t& i,
-	is_capture_t& c, is_skip_t& sk)
-{
-	auto [p , s] = r;
-
-	environment<node_t> u;
-	pattern_matcher_with_skip<node_t, is_ignore_t, is_capture_t, is_skip_t>
-		matcher {p, u, i, c, sk};
-	auto nn = apply(s, n, matcher);
-
-#ifdef LOG_REWRITING
-	if (nn != n) {
-		LOG_INFO << "(R) " << p << " := " << s << LOG_END;
-		LOG_INFO << "(F) " << nn << LOG_END;
-		//DBG(print_sp_tau_node_tree(std::cout << "old node: ", n));
-		//DBG(print_sp_tau_node_tree(std::cout << "new node: ", nn));
-	}
-#endif
-	return nn;
-}
-
-// apply a rule to a tree using the predicate to pattern_matcher and skipping
-// unnecessary subtrees
-template <typename node_t, typename is_ignore_t, typename is_capture_t,
-	typename is_skip_t, typename predicate_t>
-node_t apply_with_skip_if(const rule<node_t>& r, const node_t& n,
-	is_ignore_t& i, is_capture_t& c, is_skip_t& sk, predicate_t& predicate)
+template <typename node_t, typename is_capture_t, typename predicate_t>
+node_t apply_if(const rule<node_t>& r, const node_t& n,
+	is_capture_t& c, predicate_t& predicate)
 {
 	auto [p , s] = r;
 	environment<node_t> u;
-	pattern_matcher_with_skip_if<node_t, is_ignore_t, is_capture_t,
-		is_skip_t, predicate_t> matcher {p, u, i, c, sk, predicate};
+	pattern_matcher_if<node_t, is_capture_t,
+		predicate_t> matcher {p, u, c, predicate};
 	auto nn = apply(s, n, matcher);
 
 #ifdef LOG_REWRITING
