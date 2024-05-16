@@ -1007,14 +1007,6 @@ std::ostream& operator<<(std::ostream& stream,
 	return stream << make_shared<idni::rewriter::sp_node<symbol_t>>(n);
 }
 
-// << for rule
-template <typename node_t>
-std::ostream& operator<<(std::ostream& stream,
-	const idni::rewriter::rule<node_t>& r)
-{
-	return stream << r.first << " := " << r.second << ".";
-}
-
 #undef LOG_DEBUG
 #undef LOG_INFO
 #undef LOG_ERROR
