@@ -220,12 +220,11 @@ public:
 	struct pnode : public node_type {
 		private:
 	   	static typename forest<pnode>::node ptrof(const pnode& p);
+		static std::map<const pnode, typename forest<pnode>::node> nid;
 		public:
 		pnode(){}
 		pnode(const lit<C,T> &_f, const std::array<size_t,2> &_s): 
 			node_type(_f,_s) {}
-			// every pnode object has its pointer
-       	static std::map<const pnode, typename forest<pnode>::node> nid;
 		inline operator typename forest<pnode>::node() const {
 			return ptrof(*this);
 		}
