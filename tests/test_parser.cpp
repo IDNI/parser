@@ -64,7 +64,7 @@ int main(int argc, char **argv)
 			p4 = f(p1);
 			n3 = p4;
 		}
-		cout<<"End , GCed:"<<(assert( parser<>::pnode::nid.size() == 0),"yes");
+		cout<<"End , GCed:"<<(assert( n1._mpsize() == 0),"yes");
 
 
 
