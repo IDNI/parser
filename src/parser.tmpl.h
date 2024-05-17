@@ -33,13 +33,10 @@ template <typename C, typename T>
 typename forest<typename parser<C,T>::pnode>::node 
 	parser<C,T>::pnode::ptrof(
 		const typename parser<C,T>::pnode& pn) {
-	auto r = nid.insert( {pn, nullptr} );
-	if (r.second) {
-			//rnid.push_back( &(r.first->first) );
-			nid[pn] = typename parser<C,T>::pforest::node(&(r.first->first));
-			//return rnid.size();
-			return nid[pn];
-	}
+	auto r = nid.emplace( pn, nullptr );
+	if (r.second) r.first->second.id = &(r.first->first);
+		// r.first->second = typename 
+		// forest<typename parser<C,T>::pnode>::node(&(r.first->first));		
 	return r.first->second;
 }
 
@@ -882,7 +879,7 @@ void parser<C, T>::sbl_chd_forest(const item& eitem,
 	//check if we have reached the end of the rhs of prod
 	if (g.len(eitem.prod, eitem.con) <= curchd.size())  {
 		// match the end of the span we are searching in.
-		if (curchd.back()->second[1] == eitem.set)
+		if ( curchd.back()->second[1] == eitem.set)
 			ambset.insert(curchd);
 		return;
 	}

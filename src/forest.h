@@ -44,25 +44,39 @@ template <typename NodeT>
 struct forest { 
 	
 	// node pointer in forerst
+	
+	private:
 	struct nptr_t {
-		const NodeT *id;	
-		static size_t nc;
-		nptr_t(const NodeT *_id = nullptr) : id(_id) { if(id) nc++; }
-		nptr_t(const nptr_t& rhs) {  id = rhs.id; if(id) nc++;}
-		nptr_t(const nptr_t&& rhs) {  id = rhs.id; if(id) nc++;}
+		friend NodeT;
+		private:
+		const NodeT *id; // points to pnode
+		static size_t nc; // maintains a refcount for # of id pointers
+		// to NodeT obj in NodeT::nid map both externally and from inside nid
+		public:	
+		nptr_t(const NodeT *_id = nullptr) : id(_id) {  //if(id) 	
+			nc++;}
+		nptr_t(const nptr_t& rhs) {  id = rhs.id; //if(id)
+			nc++;}
+		nptr_t(const nptr_t&& rhs) {  id = rhs.id; //if(id) 
+			nc++;}
+		// did not define conversion constructor.
+		// as we use NodeT::nptr_t aka NodeT::node() operator 
 		inline operator NodeT() const{
 			return *id;
 		}
-		//inline const NodeT& getobj() const { return *id; }
 		inline const NodeT* operator->() const { return id;}
 		inline nptr_t& operator=(const nptr_t& rhs) {
-			if(!id && rhs.id != nullptr ) nc++;
-			id = rhs.id;
+			//if(  !id && rhs.id) 
+			//if(&rhs != this) nc++;
+			//else if( id && !rhs.id) nc--;
+			if(&rhs != this) id = rhs.id;
 			return *this;
 		}
 		inline nptr_t& operator=(const nptr_t&& rhs) {	 
-			 if(!id && rhs.id != nullptr ) nc++;
-			 id = rhs.id;
+			//if( //!id && 	rhs.id) 
+			//if(&rhs != this) nc++;
+			//else if( id && !rhs.id) nc--;
+			 if(&rhs != this) id = rhs.id;
 			 return *this;
 		}
 		inline bool operator<(const nptr_t& rhs) const {
@@ -72,24 +86,27 @@ struct forest {
 			return id == rhs.id;
 		}
 		~nptr_t() { 
-			//DBG( assert(nc!=0));
-			DBG(std::cout <<"-"<< NodeT::nid.size() <<" "<<nc );
-			if(id != nullptr) nc--, id = 0 ; 
-			//if(nc == NodeT::nid.size() && NodeT::nid.size()) NodeT::nid.clear();
+			//DBG(std::cout <<"-"<< NodeT::nid.size() <<" "<<nc ); 
+			//if(id){	
+				if((nc == (NodeT::nid.size() + 1)) ){
+					DBG(std::cout<<"GCing nodes:  "<< nc-1 <<std::endl);
+					nc--;
+					NodeT::nid.clear();
+					DBG(std::cout <<"-D"<< NodeT::nid.size() <<" "<<nc) ;
+				}
+				else if (nc > 0) nc--;
+				id = 0; //dont delete as nid.clear takes responsibility
+			//}
 		}
-
 		//inline lit<C,T> &first() const { DBG(assert(id!=0)); return id->first; }
 		//inline std::array<size_t, 2>& second() const { DBG(assert(id!=0)); return id->second; } 	
 	};
-
+	public:
 	using node       = nptr_t;
 	using nodes      = std::vector<node>;
 	using nodes_set  = std::set<nodes>;
 	using node_graph = std::map<node, nodes_set>;
 	using edge       = std::pair<size_t, size_t>;
-	public:
-	
-
 	struct tree {
 		node value;
 		std::vector<std::shared_ptr<struct tree>> child;

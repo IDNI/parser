@@ -218,11 +218,8 @@ public:
 	using parser_type     = idni::parser<char_type, terminal_type>;
 	
 	struct pnode : public node_type {
-		//using pnodebase::pnodebase;
 		private:
-	  	//static std::vector<const pnode*> rnid;       
-       	static typename forest<pnode>::node ptrof(const pnode& p);
-		//static pnode& pndof(const nptr_t& );
+	   	static typename forest<pnode>::node ptrof(const pnode& p);
 		public:
 		pnode(){}
 		pnode(const lit<C,T> &_f, const std::array<size_t,2> &_s): 
@@ -230,7 +227,6 @@ public:
 			// every pnode object has its pointer
        	static std::map<const pnode, typename forest<pnode>::node> nid;
 		inline operator typename forest<pnode>::node() const {
-			//forest<pnode>::node::nc++;
 			return ptrof(*this);
 		}
 		//inline lit<C,T> &first() const { return this->first; }
