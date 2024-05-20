@@ -35,8 +35,8 @@ typename forest<typename parser<C,T>::pnode>::node
 		const typename parser<C,T>::pnode& pn) {
 	auto r = nid.emplace( pn, nullptr );
 	if (r.second) r.first->second.id = &(r.first->first);
-		// r.first->second = typename 
-		// forest<typename parser<C,T>::pnode>::node(&(r.first->first));		
+		// r.first->second = typename
+		// forest<typename parser<C,T>::pnode>::node(&(r.first->first));
 	return r.first->second;
 }
 
@@ -460,8 +460,7 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 	measure measure_parsing("parsing", po.measure);
 	debug = po.debug;
 	if (debug) {
-		std::basic_string<C> tmp;
-		tmp = in->get();
+		std::basic_string<C> tmp = in->get_string();
 		std::cout << "parse: `" << to_std_string(tmp) << "`"
 			<< "`[" << tmp.size() << "] start sym:" << g.get_start()
 			<< "(" << g.get_start().nt() << ")" << "\n";
