@@ -22,6 +22,7 @@ using namespace idni::term;
 
 static inline term::colors TC;
 
+
 template <typename C, typename T>
 std::map<const typename parser<C,T>::pnode,
 	typename forest<typename parser<C,T>::pnode>::node>
@@ -32,13 +33,10 @@ template <typename C, typename T>
 typename forest<typename parser<C,T>::pnode>::node
 	parser<C,T>::pnode::ptrof(
 		const typename parser<C,T>::pnode& pn) {
-	auto r = nid.insert( {pn, (nullptr)} );
-	if (r.second) {
-			//rnid.push_back( &(r.first->first) );
-			nid[pn] = typename parser<C,T>::pforest::node(&(r.first->first));
-			//return rnid.size();
-			return nid[pn];
-	}
+	auto r = nid.emplace( pn, nullptr );
+	if (r.second) r.first->second.id = &(r.first->first);
+		// r.first->second = typename 
+		// forest<typename parser<C,T>::pnode>::node(&(r.first->first));		
 	return r.first->second;
 }
 
@@ -468,7 +466,7 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 	auto f = std::make_unique<pforest>();
 	S.clear(), U.clear(), bin_tnt.clear(), refi.clear(),
 		gcready.clear(), sorted_citem.clear(), rsorted_citem.clear();
-	pnode::nid.clear();
+	//pnode::nid.clear();
 	MS(int gcnt = 0;) // count of collected items
 	tid = 0;
 	S.resize(1);
@@ -888,7 +886,7 @@ void parser<C, T>::sbl_chd_forest(const item& eitem,
 	//check if we have reached the end of the rhs of prod
 	if (g.len(eitem.prod, eitem.con) <= curchd.size())  {
 		// match the end of the span we are searching in.
-		if (curchd.back()->second[1] == eitem.set)
+		if ( curchd.back()->second[1] == eitem.set)
 			ambset.insert(curchd);
 		return;
 	}
@@ -1103,7 +1101,7 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 
 	for (auto& aset : (snodes.size() && check_allowed(*snodes.begin()))
 			? cambset : ambset)
-		for (const auto nxt : aset) build_forest(f, nxt);
+		for (const auto &nxt : aset) build_forest(f, nxt);
 
 	return true;
 }
