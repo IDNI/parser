@@ -15,6 +15,7 @@
 //
 // In this part we enhance the parser for parsing also negative integers.
 
+#include <optional>
 #include <limits>
 
 #include "parser.h"
@@ -36,18 +37,15 @@ struct csv_parser {
 		// add digits nonterminal which represents a sequence of digits
 		digits(nts("digits")),
 		g(nts, rules(), start, cc), p(g) {}
-	int_t parse(const char* data, size_t size,
-		bool& parse_error, bool& out_of_range)
-	{
-		int_t i = 0;
-		auto f = p.parse(data, size);
-		parse_error = !p.found();
-		if (!parse_error)
-			i = terminals_to_int(*f, f->root(), out_of_range);
+	optional<int_t> parse(const char* data, size_t size) {
+		auto res = p.parse(data, size);
+		optional<int_t> i{};
+		if (!res.found)	return cerr << res.parse_error << '\n', i;
+		i = res.get_terminals_to_int(res.get_forest()->root());
+		if (!i)	return cerr << "out of range, allowed range is from: "
+				<< numeric_limits<int_t>::min() << " to: "
+				<< numeric_limits<int_t>::max() << '\n', i;
 		return i;
-	}
-	ostream& print_error(ostream& os) {
-		return os << p.get_error().to_str() << '\n';
 	}
 private:
 	nonterminals<> nts;
@@ -72,14 +70,8 @@ int main() {
 	csv_parser p;
 	string line;
 	while (getline(cin, line)) {
-		cout << "entered: `" << line << "`";
-		bool parse_error, out_of_range;
-		int_t i = p.parse(line.c_str(), line.size(),
-				parse_error, out_of_range);
-		if (parse_error) p.print_error(cerr);
-		else if (out_of_range) cerr << " out of range, allowed range "
-			"is from: " << numeric_limits<int_t>::min() <<
-			" to: " << numeric_limits<int_t>::max() << '\n';
-		else cout << " parsed integer: " << i << '\n';
+		cout << "entered: `" << line << "`\n";
+		auto i = p.parse(line.c_str(), line.size());
+		if (i) cout << "parsed integer: " << i.value() << '\n';
 	}
 }

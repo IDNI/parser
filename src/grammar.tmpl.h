@@ -54,11 +54,24 @@ std::ostream& operator<<(std::ostream& os, const prods<C, T>& p) {
 }
 //-----------------------------------------------------------------------------
 template <typename C, typename T>
+nonterminals<C, T>::nonterminals(
+	std::initializer_list<std::basic_string<C>> init_list)
+{
+	for (const auto& s : init_list)
+		m.emplace(s, this->size()), this->push_back(s);
+}
+template <typename C, typename T>
+nonterminals<C, T>::nonterminals(
+	const std::vector<std::basic_string<C>>& init_list)
+{
+	for (const auto& s : init_list)
+		m.emplace(s, this->size()), this->push_back(s);
+}
+
+template <typename C, typename T>
 size_t nonterminals<C, T>::get(const std::basic_string<C>& s) {
-	if (auto it = m.find(s); it != m.end())
-		return it->second;
-	return m.emplace(s, this->size()),
-		this->push_back(s), this->size() - 1;
+	if (auto it = m.find(s); it != m.end()) return it->second;
+	return m.emplace(s, this->size()), this->push_back(s), this->size() - 1;
 }
 template <typename C, typename T>
 const std::basic_string<C>& nonterminals<C, T>::get(size_t n) const {
@@ -67,7 +80,11 @@ const std::basic_string<C>& nonterminals<C, T>::get(size_t n) const {
 }
 template <typename C, typename T>
 lit<C, T> nonterminals<C, T>::operator()(const std::basic_string<C>& s) {
-	return lit<C, T>{ get(s), &*this };
+	return (*this)(get(s));
+}
+template <typename C, typename T>
+lit<C, T> nonterminals<C, T>::operator()(size_t n) {
+	return lit<C, T>{ n, &*this };
 }
 //-----------------------------------------------------------------------------
 template <typename C, typename T>
@@ -641,6 +658,10 @@ std::ostream& grammar<C, T>::print_production(std::ostream& os,
 {
 	const int ID_SIZE   = 6;
 	const int HEAD_SIZE = 20;
+	auto nt_begin = [this, &TC](const lit<C, T>& l) {
+		if (!l.nt()) return std::string{};
+		return is_cc_fn(l.n()) ? TC_CC : TC_NT;
+	};
 	std::stringstream ss;
 	if (print_ids) ss << "G" << p << ":";
 	std::string id = ss.str();
@@ -649,7 +670,8 @@ std::ostream& grammar<C, T>::print_production(std::ostream& os,
 	std::string head = G[p].first.to_std_string();
 	ss = {}, ss << "(" << G[p].first.n()<< ")";
 	std::string head_id = ss.str();
-	os << TC_NT << head << TC_DEFAULT << TC_NT_ID << head_id << TC_DEFAULT;
+	os << nt_begin(G[p].first) << head << TC_DEFAULT
+		<< TC_NT_ID << head_id << TC_DEFAULT;
 	int len = HEAD_SIZE-head.size()-head_id.size();
 	for (int i = 0; i < len; ++i) os <<" ";
 	os << " =>";
@@ -661,7 +683,7 @@ std::ostream& grammar<C, T>::print_production(std::ostream& os,
 		for (const auto& l : c) {
 			os << " ";
 			if (l.nt())
-				os << TC_NT << l.to_std_string() << TC_DEFAULT
+				os << nt_begin(l) << l.to_std_string() << TC_DEFAULT
 				<< TC_NT_ID << "(" <<l.n()<< ")" << TC_DEFAULT;
 			else if (l.is_null())
 				os << TC_NULL << "null" << TC_DEFAULT;

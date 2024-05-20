@@ -15,6 +15,7 @@
 //
 // In this part we refactor all the parser related code to a struct.
 
+#include <optional>
 #include <limits>
 
 #include "parser.h"
@@ -39,21 +40,19 @@ struct csv_parser {
 		cc(predefined_char_classes({ "digit" }, nts)),
 		start(nts("start")), digit(nts("digit")),
 		g(nts, rules(), start, cc), p(g) {}
-	// parsing and conversion to int is wrapped and returns only value
-	// and sets parse_error or out_of_range bool refs if error
-	int_t parse(const char* data, size_t size,
-		bool& parse_error, bool& out_of_range)
-	{
-		int_t i = 0;
-		auto f = p.parse(data, size);
-		parse_error = !p.found();
-		if (!parse_error)
-			i = terminals_to_int(*f, f->root(), out_of_range);
+	// parse method takes input, runs parser and transforms parsed terminals
+	// into int. if parse fails prints parse error.
+	// if tranformation into int failse writes out of range error.
+	// returns optional int which has no value if parse fails or out of range
+	optional<int_t> parse(const char* data, size_t size) {
+		auto res = p.parse(data, size);
+		optional<int_t> i{};
+		if (!res.found)	return cerr << res.parse_error << '\n', i;
+		i = res.get_terminals_to_int(res.get_forest()->root());
+		if (!i) return cerr
+			<< "out of range, allowed range is from: 0 to: "
+			<< numeric_limits<int_t>::max() << '\n', i;
 		return i;
-	}
-	// if there is a parse error this method prints details to a stream os
-	ostream& print_error(ostream& os) {
-		return os << p.get_error().to_str() << '\n';
 	}
 private:
 	// all parsing related variables as members
@@ -77,16 +76,8 @@ int main() {
 	csv_parser p;
 	string line;
 	while (getline(cin, line)) {
-		cout << "entered: `" << line << "`";
-		// declare variables to get error information
-		bool parse_error, out_of_range;
-		// parse the line input and get the result into i
-		int_t i = p.parse(line.c_str(), line.size(),
-				parse_error, out_of_range);
-		// handle errors or print the parsed integer
-		if (parse_error) p.print_error(cerr);
-		else if (out_of_range) cerr << " out of range, max value is: "
-				<< numeric_limits<int_t>::max() << '\n';
-		else cout << " parsed integer: " << i << '\n';
+		cout << "entered: `" << line << "`\n";
+		auto i = p.parse(line.c_str(), line.size());
+		if (i)	cout << "parsed integer: " << i.value() << '\n';
 	}
 }

@@ -14,6 +14,8 @@
 // CSV parser tutorial - part 2
 //
 // In this part we show using a predefined character class function for digits.
+
+#include <optional>
 #include <limits>
 
 #include "parser.h"
@@ -42,15 +44,15 @@ int main() {
 	parser p(g);
 	string line;
 	while (getline(cin, line)) {
-		cout << "entered: `" << line << "`";
-		auto f = p.parse(line.c_str(), line.size());
-		if (p.found()) {
-			bool err;
-			int_t i = terminals_to_int(*f, f->root(), err);
-			if (!err) cout << " parsed integer: " << i << '\n';
-			else cerr << " out of range, max value is: "
-				<< numeric_limits<int_t>::max() << '\n';
+		cout << "entered: `" << line << "`\n";
+		auto res = p.parse(line.c_str(), line.size());
+		if (!res.found) {
+			cerr << res.parse_error << '\n';
+			continue;
 		}
-		else cerr << p.get_error().to_str() << '\n';
+		auto i = res.get_terminals_to_int(res.get_forest()->root());
+		if (!i) cerr << "out of range, allowed range is from: 0 to: "
+				<< numeric_limits<int_t>::max() << '\n';
+		else cout << "parsed integer: " << i.value() << '\n';
 	}
 }

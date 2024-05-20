@@ -18,6 +18,7 @@
 #include <memory>
 #include <functional>
 #include <deque>
+#include <sstream>
 #include "defs.h"
 
 #ifdef DEBUG
@@ -32,56 +33,87 @@
 
 namespace idni {
 
-struct tree_shaping_options {
-	std::set<size_t> to_trim{};
-	std::set<size_t> to_trim_children{};
-	bool trim_terminals = false;
-	std::set<std::vector<size_t>> to_inline{};
-	bool inline_char_classes = false;
-};
+// shared packed parse forest (SPPF) that captures ambiguities while
+// reusing shared sub structure within the forest
+// parse tree extracted from graphs of the forest
+// a least maximal core graph without ambiguity/repeating nodes/edges
+// possibly with cycles or shared nodes.
+// no cycles and no sharing implies its a tree
 
 template <typename NodeT>
-struct forest {
-	typedef NodeT node;
-	typedef std::vector<node> nodes;
-	typedef std::set<nodes> nodes_set;
-
-	typedef std::map<node, nodes_set> node_graph;
-	typedef std::pair<node, node> node_edge;
-	typedef std::pair<size_t, size_t> edge;
-	typedef std::vector<edge> edges;
-	typedef std::pair<nodes, edges> nodes_and_edges;
-	// shared packed parse forest (SPPF) that captures ambiguities while
-	// reusing shared sub structure within the forest
-	node_graph g;
-	// parse tree extracted from graphs of the forest
+struct forest { 
+	
+	// node pointer in forerst
+	
+	private:
+	struct nptr_t {
+		friend NodeT;
+		private:
+		const NodeT *id; // points to pnode
+		static size_t nc; // maintains a refcount for # of id pointers
+		// to NodeT obj in NodeT::nid map both externally and from inside nid
+		public:	
+		nptr_t(const NodeT *_id = nullptr) : id(_id) {  //if(id) 	
+			nc++;}
+		nptr_t(const nptr_t& rhs) {  id = rhs.id; //if(id)
+			nc++;}
+		nptr_t(const nptr_t&& rhs) {  id = rhs.id; //if(id) 
+			nc++;}
+		// did not define conversion constructor.
+		// as we use NodeT::nptr_t aka NodeT::node() operator 
+		inline operator NodeT() const{
+			return *id;
+		}
+		inline const NodeT* operator->() const { return id;}
+		inline nptr_t& operator=(const nptr_t& rhs) {
+			//if(  !id && rhs.id) 
+			//if(&rhs != this) nc++;
+			//else if( id && !rhs.id) nc--;
+			if(&rhs != this) id = rhs.id;
+			return *this;
+		}
+		inline nptr_t& operator=(const nptr_t&& rhs) {	 
+			//if( //!id && 	rhs.id) 
+			//if(&rhs != this) nc++;
+			//else if( id && !rhs.id) nc--;
+			 if(&rhs != this) id = rhs.id;
+			 return *this;
+		}
+		inline bool operator<(const nptr_t& rhs) const {
+			return id < rhs.id;
+		}
+		inline bool operator == (const nptr_t& rhs) const {
+			return id == rhs.id;
+		}
+		~nptr_t() { 
+			//DBG(std::cout <<"-"<< NodeT::nid.size() <<" "<<nc ); 
+			//if(id){	
+				if((nc == (NodeT::nid.size() + 1)) ){
+					DBG(std::cout<<"GCing nodes:  "<< nc-1 <<std::endl);
+					nc--;
+					NodeT::nid.clear();
+					DBG(std::cout <<"-D"<< NodeT::nid.size() <<" "<<nc) ;
+				}
+				else if (nc > 0) nc--;
+				id = 0; //dont delete as nid.clear takes responsibility
+			//}
+		}
+		//inline lit<C,T> &first() const { DBG(assert(id!=0)); return id->first; }
+		//inline std::array<size_t, 2>& second() const { DBG(assert(id!=0)); return id->second; } 	
+	};
+	public:
+	using node       = nptr_t;
+	using nodes      = std::vector<node>;
+	using nodes_set  = std::set<nodes>;
+	using node_graph = std::map<node, nodes_set>;
+	using edge       = std::pair<size_t, size_t>;
 	struct tree {
 		node value;
 		std::vector<std::shared_ptr<struct tree>> child;
 		std::ostream& to_print(std::ostream& os, size_t l = 0,
-			std::set<size_t> skip = {}, bool nulls = false)
-		{
-			if (skip.size() && value.first.nt() &&
-				skip.find(value.first.n()) != skip.end())
-					return os;
-			if (!nulls && value.first.is_null()) return os;
-			os << "\n";
-			for (size_t t = 0; t < l; t++) os << "\t";
-			if (value.first.nt()) os << value.first
-				<< "(" << value.first.n() << ")";
-			else if (value.first.is_null()) os << "null";
-			else os << value.first;
-			os << "[" << value.second[0] << ", "
-				<< value.second[1] << "]";
-			for (auto& d : child)
-				d->to_print(os, l + 1, skip, nulls);
-			return os;
-		}
+			std::set<size_t> skip = {}, bool nulls = false) const;
 	};
-	typedef std::shared_ptr<tree> sptree;
-	// a least maximal core graph without ambiguity/repeating nodes/edges
-	// possibly with cycles or shared nodes.
-	// no cycles and no sharing implies its a tree
+	using sptree = std::shared_ptr<tree>;
 	struct graph : public node_graph {
 		node root;
 		/// nodes that lead to cycle
@@ -91,46 +123,33 @@ struct forest {
 	private:
 		sptree _extract_trees(node& r, int_t choice = 0);
 	};
+	//vector of graph with callback
+	using graphv = std::vector<graph>;
+	using cb_next_graph_t = std::function<bool(graph&)>;
+
+	node_graph g;
+	node rt;
 	std::set<node> cycles;
+
+	node root() const;
+	void root(const node& n);
+	void clear();
+	bool contains(const node& n) const;
+	nodes_set& operator[](const node& p);
+	const nodes_set& operator[](const node& p) const;
+	size_t count_trees() const;
+	size_t count_trees(const node& root) const;
+
+	bool is_binarized() const;
 	template<typename TraversableT>
 	bool detect_cycle(TraversableT& g) const;
-
-	//vector of graph with callback
-	typedef std::vector<graph> graphv;
-	typedef std::function<bool(graph&)> cb_next_graph_t;
-	node rt;
-	node root() const { return rt; }
-	void root(const node& n) { rt = n; }
-	void clear() { g.clear(); }
-	bool contains(const node& n) { return g.find(n) != g.end(); }
-	nodes_set& operator[](const node& p)             { return g[p]; }
-	const nodes_set& operator[](const node& p) const { return g[p]; }
-	bool is_ambiguous() const;
-	bool has_single_parse_tree() const { return !is_ambiguous(); };
-	bool is_binarized() const;
-	/// removes all __temp symbols from the graph everywhere
-	/// by replacing them with their immediate children nodes
-	bool remove_binarization(graph&);
-	/// removes all __R symbols from the graph everywhere
-	/// by replacing them with their immediate children nodes
-	bool remove_recursive_nodes(graph&);
-
-	std::set<std::pair<node, nodes_set>> ambiguous_nodes() const;
-	size_t count_trees(const node& root) const;
-	size_t count_trees() const { return count_trees(root()); };
-	nodes_and_edges get_nodes_and_edges() const;
 	graphv extract_graphs(const node& root, cb_next_graph_t cb_next_graph,
 		bool unique_edge = true) const;
 
-	sptree get_tree();
-	sptree get_tree(const node& n);
-	sptree get_shaped_tree(const tree_shaping_options opts = {});
-	sptree get_shaped_tree(const node& n,
-		const tree_shaping_options opts = {});
-	typedef std::function<void(const node&)> enter_t;
-	typedef std::function<void(const node&, const nodes_set&)> exit_t;
-	typedef std::function<bool(const node&)> revisit_t;
-	typedef std::function<nodes_set(const node&, const nodes_set&)> ambig_t;
+	using enter_t  =std::function<void(const node&)>;
+	using exit_t   =std::function<void(const node&, const nodes_set&)>;
+	using revisit_t=std::function<bool(const node&)>;
+	using ambig_t  =std::function<nodes_set(const node&, const nodes_set&)>;
 
 	template <typename cb_enter_t, typename cb_exit_t = exit_t,
 		typename cb_revisit_t = revisit_t, typename cb_ambig_t =ambig_t>
@@ -149,10 +168,20 @@ struct forest {
 	bool traverse(cb_enter_t cb_enter,
 		cb_exit_t cb_exit = NO_EXIT,
 		cb_revisit_t cb_revisit = NO_REVISIT,
-		cb_ambig_t cb_ambig = NO_AMBIG) const
-	{
-		return traverse(root(), cb_enter, cb_exit, cb_revisit,cb_ambig);
-	}
+		cb_ambig_t cb_ambig = NO_AMBIG) const;
+	/// replace each node with its immediate children,
+	/// assuming its only one pack (unambigous)
+	/// the caller to ensure the right order to avoid cyclic
+	/// dependency if any. deletes from graph g as well.
+	/// return true if any one of the nodes' replacement
+	/// succeeds
+	bool replace_nodes(graph& g, nodes& s);
+	/// replaces node 'torep' in one pass with the given nodes
+	/// 'replacement' everywhere in the forest and returns true
+	/// if changed. Does not care if its recursive or cyclic, its
+	/// caller's responsibility to ensure
+	bool replace_node(graph& g, const node& torep,const nodes& replacement);
+
 #ifdef DEBUG
 	std::ostream& print_data(std::ostream& os) const;
 #endif
@@ -168,22 +197,10 @@ private:
 	bool _extract_graph_uniq_node(std::set<node>& done,
 		std::vector<node>& todo, graphv& graphs, size_t gid,
 		cb_next_graph_t g, bool& no_stop) const;
-	void _get_shaped_tree_children(const tree_shaping_options& opts,
-		const std::vector<NodeT>& nodes,
-		std::vector<typename forest<NodeT>::sptree>& child);
-	/// replace each node with its immediate children,
-	/// assuming its only one pack (unambigous)
-	/// the caller to ensure the right order to avoid cyclic
-	/// dependency if any. deletes from graph g as well.
-	/// return true if any one of the nodes' replacement
-	/// succeeds
-	bool replace_nodes(graph& g, std::vector<NodeT>& s);
-	/// replaces node 'torep' in one pass with the given nodes
-	/// 'replacement' everywhere in the forest and returns true
-	/// if changed. Does not care if its recursive or cyclic, its
-	/// caller's responsibility to ensure
-	bool replace_node(graph& g, const node& torep,const nodes& replacement);
 };
+
+template<typename NodeT>
+size_t forest<NodeT>::nptr_t::nc = 0;
 
 } // idni namespace
 #include "forest.tmpl.h"  // template definitions for forest

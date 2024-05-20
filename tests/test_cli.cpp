@@ -40,7 +40,7 @@ ostream cnull(0);
 bool run_test(const test_options& o, const test_expected& exp) {
 
 	if (!testing::check()) return testing::info(cout), true;
-	std::stringstream os;
+	stringstream os;
 	if (!testing::info(os)) return true;
 
 	auto value2str = [](const cli::option::value& v) {
@@ -119,7 +119,7 @@ bool run_test(const test_options& o, const test_expected& exp) {
 	failed = false;
 
 end:
-	if (!testing::print_only_failed || failed) std::cout << os.str();
+	if (!testing::print_only_failed || failed) cout << os.str();
 
 	return true;
 }

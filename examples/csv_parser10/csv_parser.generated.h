@@ -3,156 +3,153 @@
 //
 #ifndef __CSV_PARSER_H__
 #define __CSV_PARSER_H__
-#include <string.h>
+
 #include "parser.h"
-struct csv_parser {
-	using char_type     = char;
-	using terminal_type = char;
-	using traits_type   = std::char_traits<char_type>;
-	using int_type      = typename traits_type::int_type;
-	using symbol_type   = idni::lit<char_type, terminal_type>;
-	using location_type = std::array<size_t, 2>;
-	using node_type     = std::pair<symbol_type, location_type>;
-	using parser_type   = idni::parser<char_type, terminal_type>;
-	using options       = parser_type::options;
-	using parse_options = parser_type::parse_options;
-	using forest_type   = parser_type::pforest;
-	using input_type    = parser_type::input;
-	using decoder_type  = parser_type::input::decoder_type;
-	using encoder_type  = std::function<std::basic_string<char_type>(
-			const std::vector<terminal_type>&)>;
-	csv_parser() :
-		nts(load_nonterminals()), cc(load_cc()),
-		g(nts, load_prods(), nt(25), cc), p(g, load_opts()) {}
-	std::unique_ptr<forest_type> parse(const char_type* data, size_t size,
-		parse_options po = {}) { return p.parse(data, size, po); }
-	std::unique_ptr<forest_type> parse(std::basic_istream<char_type>& is,
-		parse_options po = {}) { return p.parse(is, po); }
-	std::unique_ptr<forest_type> parse(const std::string& fn,
-		parse_options po = {}) { return p.parse(fn, po); }
-#ifndef WIN32
-	std::unique_ptr<forest_type> parse(int fd, parse_options po = {})
-		{ return p.parse(fd, po); }
-#endif //WIN32
-	bool found(int start = -1) { return p.found(start); }
-	typename parser_type::error get_error() { return p.get_error(); }
-	enum nonterminal {
-		nul, digit, printable, integer, _Rinteger_0, _Rinteger_1, quote, esc, escaping, unescaped, 
-		escaped, strchar, str, _Rstr_2, _Rstr_3, nullvalue, val, eol, _Reol_4, row, 
-		_Rrow_5, _Rrow_6, rows, _Rrows_7, _Rrows_8, start, __neg_0, 
-	};
-	size_t id(const std::basic_string<char_type>& name) {
-		return nts.get(name);
-	}
-	const std::basic_string<char_type>& name(size_t id) {
-		return nts.get(id);
-	}
-private:
-	std::vector<terminal_type> ts{
-		'\0', '-', '"', '\\', '\r', '\n', ',', 
-	};
-	idni::nonterminals<char_type, terminal_type> nts{};
-	idni::char_class_fns<terminal_type> cc;
-	idni::grammar<char_type, terminal_type> g;
-	parser_type p;
-	idni::prods<char_type, terminal_type> t(size_t tid) {
-		return idni::prods<char_type, terminal_type>(ts[tid]);
-	}
-	idni::prods<char_type, terminal_type> nt(size_t ntid) {
-		return idni::prods<char_type, terminal_type>(
-			symbol_type(ntid, &nts));
-	}
-	idni::nonterminals<char_type, terminal_type> load_nonterminals() const {
-		idni::nonterminals<char_type, terminal_type> nts{};
-		for (const auto& nt : {
-			"", "digit", "printable", "integer", "_Rinteger_0", "_Rinteger_1", "quote", "esc", "escaping", "unescaped", 
-			"escaped", "strchar", "str", "_Rstr_2", "_Rstr_3", "nullvalue", "val", "eol", "_Reol_4", "row", 
-			"_Rrow_5", "_Rrow_6", "rows", "_Rrows_7", "_Rrows_8", "start", "__neg_0", 
-		}) nts.get(nt);
-		return nts;
-	}
-	idni::char_class_fns<terminal_type> load_cc() {
-		return idni::predefined_char_classes<char_type, terminal_type>({
-			"digit",
-			"printable",
-		}, nts);
-	}
-	options load_opts() {
-		options o;
-		return o;
-	}
-	idni::prods<char_type, terminal_type> load_prods() {
-		idni::prods<char_type, terminal_type> q,
-			nul(symbol_type{});
-		// _Rinteger_0 => null.
-		q(nt(4), (nul));
-		// _Rinteger_0 => '-'.
-		q(nt(4), (t(1)));
-		// _Rinteger_1 => digit.
-		q(nt(5), (nt(1)));
-		// _Rinteger_1 => digit _Rinteger_1.
-		q(nt(5), (nt(1)+nt(5)));
-		// integer => _Rinteger_0 _Rinteger_1.
-		q(nt(3), (nt(4)+nt(5)));
-		// quote => '"'.
-		q(nt(6), (t(2)));
-		// esc => '\\'.
-		q(nt(7), (t(3)));
-		// escaping => quote.
-		q(nt(8), (nt(6)));
-		// escaping => esc.
-		q(nt(8), (nt(7)));
-		// __neg_0 => escaping.
-		q(nt(26), (nt(8)));
-		// unescaped => printable & ~( __neg_0 ).
-		q(nt(9), (nt(2)) & ~(nt(26)));
-		// escaped => esc escaping.
-		q(nt(10), (nt(7)+nt(8)));
-		// strchar => unescaped.
-		q(nt(11), (nt(9)));
-		// strchar => escaped.
-		q(nt(11), (nt(10)));
-		// _Rstr_2 => null.
-		q(nt(13), (nul));
-		// _Rstr_2 => strchar _Rstr_2.
-		q(nt(13), (nt(11)+nt(13)));
-		// _Rstr_3 => _Rstr_2.
-		q(nt(14), (nt(13)));
-		// str => quote _Rstr_3 quote.
-		q(nt(12), (nt(6)+nt(14)+nt(6)));
-		// nullvalue => null.
-		q(nt(15), (nul));
-		// val => integer.
-		q(nt(16), (nt(3)));
-		// val => str.
-		q(nt(16), (nt(12)));
-		// val => nullvalue.
-		q(nt(16), (nt(15)));
-		// _Reol_4 => null.
-		q(nt(18), (nul));
-		// _Reol_4 => '\r'.
-		q(nt(18), (t(4)));
-		// eol => _Reol_4 '\n'.
-		q(nt(17), (nt(18)+t(5)));
-		// _Rrow_5 => ',' val.
-		q(nt(20), (t(6)+nt(16)));
-		// _Rrow_6 => null.
-		q(nt(21), (nul));
-		// _Rrow_6 => _Rrow_5 _Rrow_6.
-		q(nt(21), (nt(20)+nt(21)));
-		// row => val _Rrow_6.
-		q(nt(19), (nt(16)+nt(21)));
-		// _Rrows_7 => eol row.
-		q(nt(23), (nt(17)+nt(19)));
-		// _Rrows_8 => null.
-		q(nt(24), (nul));
-		// _Rrows_8 => _Rrows_7 _Rrows_8.
-		q(nt(24), (nt(23)+nt(24)));
-		// rows => row _Rrows_8.
-		q(nt(22), (nt(19)+nt(24)));
-		// start => rows.
-		q(nt(25), (nt(22)));
-		return q;
+
+namespace csv_parser_data {
+
+using char_type     = char;
+using terminal_type = char;
+
+inline std::vector<std::string> symbol_names{
+	"", "digit", "printable", "integer", "__E_integer_0", "__E_integer_1", "quote", "esc", "escaping", "unescaped", 
+	"escaped", "strchar", "str", "__E_str_2", "nullvalue", "val", "eol", "__E_eol_3", "row", "__E_row_4", 
+	"__E_row_5", "rows", "__E_rows_6", "__E_rows_7", "start", "__N_0", 
+};
+
+inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
+
+inline std::vector<terminal_type> terminals{
+	'\0', '-', '"', '\\', '\r', '\n', ',', 
+};
+
+inline ::idni::char_class_fns<terminal_type> char_classes =
+	::idni::predefined_char_classes<char_type, terminal_type>({
+		"digit",
+		"printable",
+	}, nts);
+
+inline struct ::idni::grammar<char_type, terminal_type>::options
+	grammar_options
+{
+	.transform_negation = false,
+	.auto_disambiguate = true,
+	.shaping = {
+		.trim_terminals = false,
+		.inline_char_classes = false
 	}
 };
+
+inline ::idni::parser<char_type, terminal_type>::options parser_options{
+};
+
+inline ::idni::prods<char_type, terminal_type> start_symbol{ nts(24) };
+
+inline idni::prods<char_type, terminal_type>& productions() {
+	static bool loaded = false;
+	static idni::prods<char_type, terminal_type>
+		p, nul(idni::lit<char_type, terminal_type>{});
+	if (loaded) return p;
+	#define  T(x) (idni::prods<char_type, terminal_type>{ terminals[x] })
+	#define NT(x) (idni::prods<char_type, terminal_type>{ nts(x) })
+//G0:   __E_integer_0(4)     => '-'.
+	p(NT(4), (T(1)));
+//G1:   __E_integer_0(4)     => null.
+	p(NT(4), (nul));
+//G2:   __E_integer_1(5)     => digit(1).
+	p(NT(5), (NT(1)));
+//G3:   __E_integer_1(5)     => digit(1) __E_integer_1(5).
+	p(NT(5), (NT(1)+NT(5)));
+//G4:   integer(3)           => __E_integer_0(4) __E_integer_1(5).
+	p(NT(3), (NT(4)+NT(5)));
+//G5:   quote(6)             => '"'.
+	p(NT(6), (T(2)));
+//G6:   esc(7)               => '\\'.
+	p(NT(7), (T(3)));
+//G7:   escaping(8)          => quote(6).
+	p(NT(8), (NT(6)));
+//G8:   escaping(8)          => esc(7).
+	p(NT(8), (NT(7)));
+//G9:   __N_0(25)            => escaping(8).
+	p(NT(25), (NT(8)));
+//G10:  unescaped(9)         => printable(2) & ~( __N_0(25) ).	 # conjunctive
+	p(NT(9), (NT(2)) & ~(NT(25)));
+//G11:  escaped(10)          => esc(7) escaping(8).
+	p(NT(10), (NT(7)+NT(8)));
+//G12:  strchar(11)          => unescaped(9).
+	p(NT(11), (NT(9)));
+//G13:  strchar(11)          => escaped(10).
+	p(NT(11), (NT(10)));
+//G14:  __E_str_2(13)        => null.
+	p(NT(13), (nul));
+//G15:  __E_str_2(13)        => strchar(11) __E_str_2(13).
+	p(NT(13), (NT(11)+NT(13)));
+//G16:  str(12)              => quote(6) __E_str_2(13) quote(6).
+	p(NT(12), (NT(6)+NT(13)+NT(6)));
+//G17:  nullvalue(14)        => null.
+	p(NT(14), (nul));
+//G18:  val(15)              => integer(3).
+	p(NT(15), (NT(3)));
+//G19:  val(15)              => str(12).
+	p(NT(15), (NT(12)));
+//G20:  val(15)              => nullvalue(14).
+	p(NT(15), (NT(14)));
+//G21:  __E_eol_3(17)        => '\r'.
+	p(NT(17), (T(4)));
+//G22:  __E_eol_3(17)        => null.
+	p(NT(17), (nul));
+//G23:  eol(16)              => __E_eol_3(17) '\n'.
+	p(NT(16), (NT(17)+T(5)));
+//G24:  __E_row_4(19)        => ',' val(15).
+	p(NT(19), (T(6)+NT(15)));
+//G25:  __E_row_5(20)        => null.
+	p(NT(20), (nul));
+//G26:  __E_row_5(20)        => __E_row_4(19) __E_row_5(20).
+	p(NT(20), (NT(19)+NT(20)));
+//G27:  row(18)              => val(15) __E_row_5(20).
+	p(NT(18), (NT(15)+NT(20)));
+//G28:  __E_rows_6(22)       => eol(16) row(18).
+	p(NT(22), (NT(16)+NT(18)));
+//G29:  __E_rows_7(23)       => null.
+	p(NT(23), (nul));
+//G30:  __E_rows_7(23)       => __E_rows_6(22) __E_rows_7(23).
+	p(NT(23), (NT(22)+NT(23)));
+//G31:  rows(21)             => row(18) __E_rows_7(23).
+	p(NT(21), (NT(18)+NT(23)));
+//G32:  start(24)            => rows(21).
+	p(NT(24), (NT(21)));
+	#undef T
+	#undef NT
+	return loaded = true, p;
+}
+
+inline ::idni::grammar<char_type, terminal_type> grammar(
+	nts, productions(), start_symbol, char_classes, grammar_options);
+
+} // namespace csv_parser_data
+
+struct csv_parser : public idni::parser<char, char> {
+	enum nonterminal {
+		nul, digit, printable, integer, __E_integer_0, __E_integer_1, quote, esc, escaping, unescaped, 
+		escaped, strchar, str, __E_str_2, nullvalue, val, eol, __E_eol_3, row, __E_row_4, 
+		__E_row_5, rows, __E_rows_6, __E_rows_7, start, __N_0, 
+	};
+	static csv_parser& instance() {
+		static csv_parser inst;
+		return inst;
+	}
+	csv_parser() : idni::parser<char_type, terminal_type>(
+		csv_parser_data::grammar,
+		csv_parser_data::parser_options) {}
+	size_t id(const std::basic_string<char_type>& name) {
+		return csv_parser_data::nts.get(name);
+	}
+	const std::basic_string<char_type>& name(size_t id) {
+		return csv_parser_data::nts.get(id);
+	}
+	symbol_type literal(const nonterminal& nt) {
+		return symbol_type(nt, &csv_parser_data::nts);
+	}
+};
+
 #endif // __CSV_PARSER_H__

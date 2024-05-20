@@ -45,12 +45,32 @@ int main(int argc, char **argv)
 		enabled(nt("enabled")), disabled(nt("disabled")),
 		number(nt("number")),  digits(nt("digits")),
 		q_str(lit<>{'"'}), esc(lit<>{'\\'}), escape(nt("escape"));
+	
+		parser<>::pnode n1, n2,n3;
+		{
+			cout<<"START Ref counting tests "<<std::endl;
+			n2.second ={ 1,1};
+			const parser<>::forest_type::node p1 = n1;
+			parser<>::forest_type::node p4, p2 = n1;
+			*(&p2) = 0;
+			p2 = p1;
+			p2 = n2;
+			p2 = p4;
+			
+			auto f= [p1,&p2](auto a){
+				return	p2 = a;
+				
+			};
+			p4 = f(p1);
+			n3 = p4;
+		}
+		cout<<"End , GCed:"<<(assert( n1._mpsize() == 0),"yes");
+
 
 
 /*******************************************************************************
 *       BASIC
 *******************************************************************************/
-
 	// null
 	TEST("basic", "null")
 	ps(start, nll);
@@ -75,7 +95,7 @@ int main(int argc, char **argv)
 	o.error_expected = "Unexpected 'a' at 1:4 (4)";
 	run_test<char>(ps, nt, start, "abcabc", {}, o);
 	ps.clear();
-
+	{
 	TEST("basic", "terminal")
 	ps(start, a | one | plus | lf);
 	run_test<char>(ps, nt, start, "a");
@@ -92,7 +112,7 @@ int main(int argc, char **argv)
 	run_test<char>(ps, nt, start, "\r", {}, o);
 	o.error_expected = "";
 	ps.clear();
-
+	}
 	// char classes
 	TEST("basic", "char_classes")
 	ps(start, digit | alpha);
@@ -396,7 +416,7 @@ int main(int argc, char **argv)
 
 		TEST("stress", "cbf_rule")
 		const char* g1 =
-			"@use_char_class alpha, alnum."
+			"@use char classes alpha, alnum."
 			"chars    => alpha (alnum)*."
 			"cbf_rule => cbf_head | chars '=' cbf."
 			"cbf_head => cbf."
@@ -437,7 +457,7 @@ int main(int argc, char **argv)
 		if (testing::verbosity > 0)
 			cout << "stress test finished" << endl;
 	}
-
+	
 	cout << endl;
 	if (testing::failed) cout << "FAILED\n";
 	return testing::failed ? 1 : 0;

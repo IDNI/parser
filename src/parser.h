@@ -22,6 +22,7 @@
 #include <span>
 #include <cassert>
 #include <algorithm>
+#include <initializer_list>
 #include "memory_map.h"
 #include "defs.h"
 #include "characters.h"
@@ -40,9 +41,13 @@ struct lit;
 // nonterminals dict = vector with index being nonterminal's id
 template <typename C = char, typename T = C>
 struct nonterminals : public std::vector<std::basic_string<C>> {
+	nonterminals() = default;
+	nonterminals(const std::vector<std::basic_string<C>>& init_list);
+	nonterminals(std::initializer_list<std::basic_string<C>> init_list);
 	size_t get(const std::basic_string<C>& s);
 	const std::basic_string<C>& get(size_t n) const;
 	lit<C, T> operator()(const std::basic_string<C>& s);
+	lit<C, T> operator()(size_t n);
 private:
 	std::map<std::basic_string<C>, size_t> m;
 };
@@ -67,7 +72,6 @@ struct lit : public std::variant<size_t, T> {
 	// IDEA maybe we could use directly the default operator== for lit
 	bool operator==(const lit<C, T>& l) const;
 
-	//std::ostream& operator<<(std::ostream& os)
 	std::vector<T> to_terminals() const;
 	std::basic_string<C> to_string(const std::basic_string<C>& nll={})const;
 	std::string to_std_string(const std::basic_string<C>& nll = {}) const;
@@ -117,6 +121,19 @@ template <typename C = char, typename T = C>
 char_class_fns<T> predefined_char_classes(
 	const std::vector<std::string>& cc_fn_names, nonterminals<C, T>& nts);
 
+struct shaping_options {
+	std::set<size_t> to_trim{};
+	// nonterminal ids which children to trim by shaping coming from @trim children ...
+	std::set<size_t> to_trim_children{};
+	// nonterminal ids which children terminal to trim by shaping coming
+	// from @trim children terminals ...
+	std::set<size_t> to_trim_children_terminals{};
+	bool trim_terminals = false; // @trim all terminals.
+	// nonterminal ids to inline by shaping coming from @inline ...
+	std::set<std::vector<size_t>> to_inline{};
+	bool inline_char_classes = false; // @inline char classes.
+};
+
 // grammar struct required by parser.
 // accepts nonterminals ref, prods and char class functions
 template <typename C, typename T> struct grammar_inspector;
@@ -125,16 +142,10 @@ struct grammar {
 	friend struct grammar_inspector<C, T>;
 	typedef std::pair<lit<C, T>, std::vector<lits<C, T>>> production;
 	struct options {
-		std::set<size_t> to_trim{};
-		// nonterminal ids which children to trim by shaping coming from @trim children ...
-		std::set<size_t> to_trim_children{};
-		bool trim_terminals = false; // @trim all terminals.
-		// nonterminal ids to inline by shaping coming from @inline ...
-		std::set<std::vector<size_t>> to_inline{};
-		bool inline_char_classes = false; // @inline char classes.
+		bool transform_negation = true; // false to disable negation transformation
 		bool auto_disambiguate = true; // @enable/disable disambig.
 		std::set<size_t> nodisambig_list{}; // @nodisambig nonterminal ids.
-		bool transform_negation = true; // false to disable negation transformation
+		shaping_options shaping = {};
 	} opt;
 	grammar(nonterminals<C, T>& nts, options opt = {});
 	grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
@@ -201,20 +212,54 @@ public:
 	struct input;
 	using char_type     = C;
 	using terminal_type = T;
-	using traits_type   = std::char_traits<C>;
-	using int_type      = typename traits_type::int_type;
-	using parser_type   = parser<C, T>;
-	using input_type    = parser_type::input;
-	using decoder_type  = parser_type::input::decoder_type;
-	using encoder_type  = std::function<
-				std::basic_string<C>(const std::vector<T>&)>;
-	typedef typename std::pair<lit<C, T>, std::array<size_t, 2>> pnode;
+	using traits_type     = std::char_traits<char_type>;
+	using int_type        = typename traits_type::int_type;
+	using grammar_type    = idni::grammar<char_type, terminal_type>;
+	using grammar_options = grammar_type::options;
+	using symbol_type     = idni::lit<char_type, terminal_type>;
+	using location_type   = std::array<size_t, 2>;
+	using node_type       = std::pair<symbol_type, location_type>;
+	using parser_type     = idni::parser<char_type, terminal_type>;
+
+	struct pnode : public node_type {
+		friend forest<pnode>;
+		private:
+		static typename forest<pnode>::node ptrof(const pnode& p);
+		static std::map<const pnode, typename forest<pnode>::node> nid;
+		public:
+		pnode(){}
+		pnode(const lit<C,T> &_f, const std::array<size_t,2> &_s):
+			node_type(_f,_s) {}
+		inline operator typename forest<pnode>::node() const {
+			return ptrof(*this);
+		}
+		inline size_t _mpsize() const {
+			return nid.size();
+		}
+		//inline lit<C,T> &first() const { return this->first; }
+		//inline std::array<size_t, 2>& second() const { return this->second; }
+	};
+	using pforest		  = forest<pnode>;
+	using pnodes          = pforest::nodes;
+	using pnodes_set      = pforest::nodes_set;
+	using pnode_graph     = pforest::node_graph;
+	using pgraph          = pforest::graph;
+	using ptree           = pforest::tree;
+	using psptree         = pforest::sptree;
+	using forest_type     = pforest;
+	using sptree_type     = psptree;
+	using encoder_type    = std::function<std::basic_string<char_type>(
+			const std::vector<terminal_type>&)>;
+
+	// earley item
 	struct item {
 		item(size_t set, size_t prod,size_t con,size_t from,size_t dot);
 		bool operator<(const item& i) const;
 		bool operator==(const item& i) const;
 		size_t set, prod, con, from, dot;
 	};
+
+	// input manager and decoder used by the parser
 	struct input {
 		using decoder_type =
 				std::function<std::vector<T>(input&)>;
@@ -233,9 +278,13 @@ public:
 			int_type e = std::char_traits<C>::eof());
 #endif
 		~input();
+		inline bool good() const;
 		inline bool isstream() const;
 		void clear(); // resets stream (if used) to reenable at()/tat()
-		std::basic_string<C> get(); // returns input data as a string
+		std::basic_string<C> get_string(); // returns input data as a string
+		std::basic_string<T> get_terminals(size_t start, size_t end);
+		std::basic_string<T> get_terminals(
+			std::array<size_t, 2> pos_span);
 		// source stream access
 		C cur();
 		size_t pos();
@@ -262,15 +311,9 @@ public:
 		std::vector<T> ts{};  // all collected terminals
 		size_t tp = 0;        // current terminal pos
 	};
-	typedef forest<pnode> pforest;
-	typedef pforest::nodes pnodes;
-	typedef pforest::nodes_set pnodes_set;
-	typedef pforest::node_graph pnode_graph;
-	typedef pforest::graph pgraph;
-	typedef pforest::tree ptree;
-	typedef pforest::sptree psptree;
+	using decoder_type = input::decoder_type;
 
-	// parser options for constructor
+	// parser options for its constructor
 	struct options {
 		// applying binarization to ensure every forest node
 		// has atmost 2 or less children nodes
@@ -290,42 +333,8 @@ public:
 		decoder_type chars_to_terminals = 0;
 		encoder_type terminals_to_chars = 0;
 	};
-	// constructor
-	parser(grammar<C, T>& g, options o = {});
 
-	// parse options for parse() call
-	struct parse_options {
-		size_t max_length = 0; // read up to max length of the input size
-		size_t start = SIZE_MAX; // start non-terminal, SIZE_MAX = use default
-		C eof = std::char_traits<C>::eof(); // end of a stream
-		bool measure = false; // measure time taken for parsing
-		bool measure_each_pos = false;
-		bool measure_forest = false;
-		bool measure_preprocess = false;
-		bool debug = false;
-	};
-	// parse call
-	std::unique_ptr<pforest> parse(const C* data, size_t size,
-		parse_options po = {});
-	std::unique_ptr<pforest> parse(std::basic_istream<C>& is,
-		parse_options po = {});
-	std::unique_ptr<pforest> parse(const std::string& fn,
-		parse_options po = {});
-#ifndef _WIN32
-	std::unique_ptr<pforest> parse(int filedescriptor,
-		parse_options po = {});
-#endif
-	bool found(size_t start = SIZE_MAX);
-	std::basic_string<C> get_input();
-private:
-	typedef std::set<item> container_t;
-	typedef typename container_t::iterator container_iter;
-public:
-	std::ostream& print(std::ostream& os, const item& i) const;
-	std::ostream& print(std::ostream& os, const container_t& c,
-		bool only_completed = false) const;
-	std::ostream& print_data(std::ostream& os) const;
-	std::ostream& print_S(std::ostream& os, bool only_completed=false)const;
+	// parse error
 	struct error {
 		enum info_lvl {
 			INFO_BASIC,
@@ -348,17 +357,152 @@ public:
 		// list of expected token and respective productions
 		std::vector<exp_prod_t> expv;
 		error() : loc(-1) {}
-		std::string to_str(info_lvl lv = INFO_ROOT_CAUSE);
+		std::string to_str(info_lvl lv = INFO_DETAILED,
+			size_t line_start = 0) const;
 	};
+	// result of the parse call
+	struct result {
+		// true if the parse was successful
+		const bool found;
+		// contains error information if the parse was unsuccessful
+		const error parse_error;
+		// tree shaping options from grammar
+		const shaping_options shaping;
+
+		// constructor
+		result(grammar<C, T>& g, std::unique_ptr<input> in,
+			std::unique_ptr<pforest> f, bool found, error err);
+
+		// returns the parsed forest
+		pforest* get_forest() const;
+		// transforms forest into tree and applies trimming
+		// grammar shaping options are used by default
+		// also transforms ambiguous nodes as children of __AMB__ nodes
+		psptree get_trimmed_tree(const pnode& n) const;
+		psptree get_trimmed_tree(const pnode& n,
+			const shaping_options opts) const;
+		// applies inlining to a tree (w/o tree paths)
+		psptree inline_tree_nodes(const psptree& t, psptree& parent)
+			const;
+		psptree inline_tree_nodes(const psptree& t, psptree& parent,
+			const shaping_options opts) const;
+		// applies tree paths inlining to a tree
+		psptree inline_tree_paths(const psptree& t) const;
+		psptree inline_tree_paths(const psptree& t,
+			const shaping_options opts) const;
+		// applies inlining to a tree
+		psptree inline_tree(psptree& t) const;
+		psptree inline_tree(psptree& t,
+			const shaping_options opts) const;
+		psptree trim_children_terminals(const psptree& t) const;
+		psptree trim_children_terminals(const psptree& t,
+			const shaping_options opts) const;
+		// transforms forest into a tree and applies shaping
+		psptree get_shaped_tree() const;
+		psptree get_shaped_tree(const shaping_options opts) const;
+		psptree get_shaped_tree(const pnode& n) const;
+		psptree get_shaped_tree(const pnode& n,
+			const shaping_options opts) const;
+
+		// extracts the first parse tree from the parsed forest
+		psptree get_tree();
+		psptree get_tree(const pnode& n);
+
+		// is input good = stream is good or mmap is opened
+		bool good() const;
+		// returns the input as a string (input's char type, ie. C)
+		std::basic_string<C> get_input();
+		// read terminals from input (input's terminal type, ie. T)
+		std::basic_string<T> get_terminals() const;
+		// read terminals from input according to the position span of
+		// a provided node
+		std::basic_string<T> get_terminals(const pnode& n) const;
+		std::basic_ostream<T>& get_terminals_to_stream(
+			std::basic_ostream<T>& os, const pnode& n) const;
+		// reads terminals of a node and converts them to int
+		// if the conversion fails or the int is out of range
+		// returns no value
+		std::optional<int_t> get_terminals_to_int(const pnode& n) const;
+
+		// returns true if the parse foreest is ambiguous (contains >1 tree)
+		bool is_ambiguous() const;
+		// returns true if the parse forest is not ambiguous (contains 1 tree)
+		bool has_single_parse_tree() const;
+		// returns ambiguous nodes
+		std::set<std::pair<pnode, pnodes_set>> ambiguous_nodes() const;
+		std::ostream& print_ambiguous_nodes(std::ostream& os) const;
+
+		// returns all nodes and edges of the forest
+		using node_edge       = std::pair<pnode, pnode>;
+		using edges           = std::vector<typename pforest::edge>;
+		using nodes_and_edges = std::pair<pnodes, edges>;
+		nodes_and_edges get_nodes_and_edges() const;
+
+		// removes all prefixed symbols from the graph everywhere
+		// by replacing them with their immediate children nodes
+		bool inline_prefixed_nodes(pgraph& g,const std::string& prefix);
+		// removes EBNF and binarize transformation prefixes
+		bool inline_grammar_transformations(pgraph& g);
+
+		// private members are accessible by parser
+		friend parser<C, T>;
+	private:
+		// input moved here from the parse call
+		std::unique_ptr<input> in = 0;
+		// forest moved here from the parse call
+		std::unique_ptr<pforest> f = 0;
+		// if ambiguous, this is __AMB__ node lit used in a shaped tree
+		lit<C, T> amb_node{};
+		// recursive part of get_shaped_tree()
+		void _get_shaped_tree_children(const shaping_options& opts,
+			const pnodes& nodes,
+			std::vector<psptree>& child) const;
+	};
+	// parse options for parse() call
+	struct parse_options {
+		size_t max_length = 0; // read up to max length of the input size
+		size_t start = SIZE_MAX; // start non-terminal, SIZE_MAX = use default
+		C eof = std::char_traits<C>::eof(); // end of a stream
+		bool measure = false; // measure time taken for parsing
+		bool measure_each_pos = false; // for each string pos
+		bool measure_forest = false; // forest building
+		bool measure_preprocess = false; // preprocessing
+		bool debug = false;
+	};
+
+	// constructor
+	parser(grammar<C, T>& g, options o = {});
+	virtual ~parser() {};
+
+	// parse call
+	result parse(const C* data, size_t size, parse_options po = {});
+	result parse(std::basic_istream<C>& is, parse_options po = {});
+	result parse(const std::string& fn, parse_options po = {});
+#ifndef _WIN32
+	result parse(int filedescriptor, parse_options po = {});
+#endif
+	bool found(size_t start = SIZE_MAX);
 	error get_error();
-	static std::basic_string<C> tnt_prefix() {
-		static std::basic_string<C> pr = { '_','_','B','_' };
-		return pr;
-	}
+	grammar<C, T>& get_grammar() { return g; }
 	bool debug = false;
 	std::pair<size_t, size_t> debug_at = { DEBUG_POS_FROM, DEBUG_POS_TO };
 private:
-	std::vector<item> back_track(const item& obj);
+	using container_t    = std::set<item>;
+	using container_iter = typename container_t::iterator;
+public:
+	std::ostream& print(std::ostream& os, const item& i) const;
+	std::ostream& print(std::ostream& os, const container_t& c,
+		bool only_completed = false) const;
+	std::ostream& print_data(std::ostream& os) const;
+	std::ostream& print_S(std::ostream& os, bool only_completed=false)const;
+	friend std::ostream& operator<<(std::ostream& os, const error& err) {
+		return os << err.to_str(error::info_lvl::INFO_BASIC);
+	}
+	friend std::ostream& operator<<(std::ostream& os, const result& res) {
+		return res.print_error(os);
+	}
+private:
+
 	grammar<C, T>& g;
 	options o;
 	std::unique_ptr<input> in = 0;
@@ -379,13 +523,15 @@ private:
 	// binarized temporary intermediate non-terminals
 	std::map<std::vector<lit<C, T>>, lit<C, T>> bin_tnt;
 	size_t tid; // id for temporary non-terminals
-	std::basic_string<C> get_fresh_tnt() {
-		std::basic_stringstream<C> ss;
-		ss << tnt_prefix() << tid++;
-		return ss.str();
-	}
+
+	// helpers
 	lit<C, T> get_lit(const item& i) const;
 	lit<C, T> get_nt(const item& i) const;
+	std::basic_string<C> get_fresh_tnt();
+	std::vector<item> back_track(const item& obj);
+
+	// parsing
+	result _parse(const parse_options& po);
 	std::pair<container_iter, bool> add(container_t& t, const item& i);
 	bool nullable(const item& i) const;
 	void resolve_conjunctions(container_t& c, container_t& t);
@@ -403,10 +549,9 @@ private:
 	bool init_forest(pforest& f, const lit<C, T>& start_lit,
 		const parse_options& po);
 	bool build_forest(pforest& f, const pnode& root);
-	bool binarize_comb(const item&, std::set<std::vector<pnode>>&);
+	bool binarize_comb(const item&, pnodes_set&);
 	void sbl_chd_forest(const item&,
-		std::vector<pnode>&, size_t, std::set<std::vector<pnode>>&);
-	std::unique_ptr<pforest> _parse(const parse_options& po);
+		pnodes&, size_t, pnodes_set&);
 #ifdef DEBUG
 	template <typename CharU>
 	friend std::ostream& operator<<(std::ostream& os, lit<C, T>& l);
@@ -415,18 +560,6 @@ private:
 		const std::vector<lit<C, T>>& v);
 #endif
 };
-
-template <typename C = char, typename T = C> // flattens terminals of a subforest into an ostream
-std::basic_ostream<T>& terminals_to_stream(std::basic_ostream<T>& os,
-	const typename parser<C, T>::pforest& f,
-	const typename parser<C, T>::pnode& r);
-template <typename C = char, typename T = C> // flattens terminals of a subforest into a string
-std::basic_string<T> terminals_to_str(
-	const typename parser<C, T>::pforest& f,
-	const typename parser<C, T>::pnode& r);
-template <typename C = char, typename T = C> // flattens terminals of a subforest into an int
-int_t terminals_to_int(const typename parser<C, T>::pforest& f,
-	const typename parser<C, T>::pnode& r, bool& error);
 
 template <typename C, typename T>
 bool operator==(const lit<C, T>& l, const prods<C, T>& p);
@@ -470,9 +603,11 @@ std::ostream& print_dictmap(std::ostream& os,
 #endif
 
 } // idni namespace
-#include "grammar.tmpl.h" // template definitions for grammar and related
-#include "parser.tmpl.h"  // template definitions for parser
-#include "tgf.h"          // Tau Grammar Form
+// template definitions
+#include "grammar.tmpl.h"       // for grammar and related
+#include "parser.tmpl.h"        // for parser
+#include "parser_result.tmpl.h" // for parse::result
+#include "tgf.h"                // Tau Grammar Form
 #ifdef WITH_DEVHELPERS
 #include "devhelpers.h"   // various helpers for converting forest
 #endif

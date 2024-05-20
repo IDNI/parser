@@ -22,6 +22,24 @@ using namespace idni::term;
 
 static inline term::colors TC;
 
+
+template <typename C, typename T>
+std::map<const typename parser<C,T>::pnode,
+	typename forest<typename parser<C,T>::pnode>::node>
+		parser<C,T>::pnode::nid;
+
+
+template <typename C, typename T>
+typename forest<typename parser<C,T>::pnode>::node
+	parser<C,T>::pnode::ptrof(
+		const typename parser<C,T>::pnode& pn) {
+	auto r = nid.emplace( pn, nullptr );
+	if (r.second) r.first->second.id = &(r.first->first);
+		// r.first->second = typename 
+		// forest<typename parser<C,T>::pnode>::node(&(r.first->first));		
+	return r.first->second;
+}
+
 template <typename C, typename T>
 parser<C, T>::item::item(size_t set, size_t prod, size_t con, size_t from,
 	size_t dot) : set(set), prod(prod), con(con), from(from), dot(dot) {}
@@ -79,6 +97,13 @@ parser<C, T>::input::~input() {
 	//if (itype == MMAP && d != 0) munmap(const_cast<C*>(d), l);
 }
 template <typename C, typename T>
+bool parser<C, T>::input::good() const {
+	return    itype == STREAM ? s.good()
+		: itype == MMAP   ? !mm.error
+		:                   true;
+}
+
+template <typename C, typename T>
 bool parser<C, T>::input::isstream() const { return itype == STREAM; }
 template <typename C, typename T>
 void parser<C, T>::input::clear() { if (isstream()) s.clear(); }
@@ -97,9 +122,7 @@ bool parser<C, T>::input::next() {
 template <typename C, typename T>
 size_t parser<C, T>::input::pos() { return n; }
 template <typename C, typename T>
-bool parser<C, T>::input::eof() {
-	return cur() == e;
-}
+bool parser<C, T>::input::eof() { return cur() == e; }
 template <typename C, typename T>
 C parser<C, T>::input::at(size_t p) {
 	if (isstream()) return s.seekg(p), s.get();
@@ -143,6 +166,13 @@ void parser<C, T>::input::decode() {
 //------------------------------------------------------------------------------
 template <typename C, typename T>
 parser<C, T>::parser(grammar<C, T>& g, options o) : g(g), o(o) {}
+template <typename C, typename T>
+std::basic_string<C> parser<C, T>::get_fresh_tnt() {
+	static std::basic_string<C> prefix = { '_','_','B','_' };
+	std::basic_stringstream<C> ss;
+	ss << prefix << tid++;
+	return ss.str();
+}
 template <typename C, typename T>
 lit<C, T> parser<C, T>::get_lit(const item& i) const {
 	return g[i.prod][i.con][i.dot];
@@ -392,25 +422,26 @@ void parser<C, T>::scan_cc_function(const item& i, size_t n, T ch,
 	//gcready.insert(k);
 	if (eof_fn) c.insert(k); // add current item for completion if eof_fn
 }
+
 template <typename C, typename T>
-std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
-	const C* data, size_t size, parse_options po)
+parser<C, T>::result parser<C, T>::parse(const C* data, size_t size,
+	parse_options po)
 {
 	in = std::make_unique<input>(data, size,
 		po.max_length, o.chars_to_terminals, po.eof);
 	return _parse(po);
 }
 template <typename C, typename T>
-std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
-	std::basic_istream<C>& is, parse_options po)
+parser<C, T>::result parser<C, T>::parse(std::basic_istream<C>& is,
+	parse_options po)
 {
 	in = std::make_unique<input>(is,
 		po.max_length, o.chars_to_terminals, po.eof);
 	return _parse(po);
 }
 template <typename C, typename T>
-std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
-	const std::string& fn, parse_options po)
+parser<C, T>::result  parser<C, T>::parse(const std::string& fn,
+	parse_options po)
 {
 	in = std::make_unique<input>(fn,
 		po.max_length, o.chars_to_terminals, po.eof);
@@ -418,18 +449,14 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
 }
 #ifndef _WIN32
 template <typename C, typename T>
-std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::parse(
-	int fd, parse_options po)
-{
+parser<C, T>::result parser<C, T>::parse(int fd, parse_options po) {
 	in = std::make_unique<input>(fd,
 		po.max_length, o.chars_to_terminals, po.eof);
 	return _parse(po);
 }
 #endif
 template <typename C, typename T>
-std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
-	const parse_options& po)
-{
+parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 	measure measure_parsing("parsing", po.measure);
 	debug = po.debug;
 	if (debug) {
@@ -444,6 +471,7 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
 	auto f = std::make_unique<pforest>();
 	S.clear(), U.clear(), bin_tnt.clear(), refi.clear(),
 		gcready.clear(), sorted_citem.clear(), rsorted_citem.clear();
+	//pnode::nid.clear();
 	MS(int gcnt = 0;) // count of collected items
 	tid = 0;
 	S.resize(1);
@@ -561,7 +589,10 @@ std::unique_ptr<typename parser<C, T>::pforest> parser<C, T>::_parse(
 	if (!o.incr_gen_forest) init_forest(*f, start_lit, po);
 	else f->root(pnode(start_lit, { 0, in->tpos() }));
 	if (debug) debug = false;
-	return f;
+
+	bool fnd = found(po.start);
+	error err = fnd ? error{} : get_error();
+	return result(g, std::move(in), std::move(f), fnd, err);
 }
 template <typename C, typename T>
 bool parser<C, T>::found(size_t start) {
@@ -638,7 +669,8 @@ std::vector<typename parser<C, T>::item> parser<C, T>::rsorted_citem(
 */
 //------------------------------------------------------------------------------
 template <typename C, typename T>
-std::string parser<C, T>::error::to_str(info_lvl elvl) {
+std::string parser<C, T>::error::to_str(info_lvl elvl, size_t line_start) const{
+	if (ctxt.size() == 0) return "";
 	std::stringstream ss;
 	for (const auto& t : unexp) {
 		std::string s = t.to_std_string();
@@ -650,8 +682,8 @@ std::string parser<C, T>::error::to_str(info_lvl elvl) {
 		ss << quote << s << quote;
 	} else ss << "end of file";
 	s = ss.str();
-	ss = {}, ss << "Syntax Error: Unexpected " << s << " at " << line << ":"
-		<< col << " (" << loc+1 << "): ";
+	ss = {}, ss << "Syntax Error: Unexpected " << s << " at "
+		<< (line_start+line) << ":" << col << " (" << loc+1 << "): ";
 	for (size_t i = ctxt.size() - 1; i != 0; --i)
 		if constexpr (std::is_same_v<T, char32_t>)
 			ss << to_std_string(ctxt[i]);
@@ -853,13 +885,13 @@ bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
 // span of the item and stores them in the set ambset.
 template <typename C, typename T>
 void parser<C, T>::sbl_chd_forest(const item& eitem,
-	std::vector<pnode>& curchd, size_t xfrom,
-	std::set<std::vector<pnode>>& ambset)
+	pnodes& curchd, size_t xfrom,
+	pnodes_set& ambset)
 {
 	//check if we have reached the end of the rhs of prod
 	if (g.len(eitem.prod, eitem.con) <= curchd.size())  {
 		// match the end of the span we are searching in.
-		if (curchd.back().second[1] == eitem.set)
+		if ( curchd.back()->second[1] == eitem.set)
 			ambset.insert(curchd);
 		return;
 	}
@@ -902,7 +934,7 @@ void parser<C, T>::sbl_chd_forest(const item& eitem,
 }
 template <typename C, typename T>
 bool parser<C, T>::binarize_comb(const item& eitem,
-	std::set<std::vector<pnode>>& ambset)
+	pnodes_set& ambset)
 {
 	std::vector<pnode> rcomb, lcomb;
 	if (eitem.dot < 1) return false;
@@ -1074,54 +1106,37 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 
 	for (auto& aset : (snodes.size() && check_allowed(*snodes.begin()))
 			? cambset : ambset)
-		for (const pnode& nxt : aset) build_forest(f, nxt);
+		for (const auto &nxt : aset) build_forest(f, nxt);
 
 	return true;
 }
 template <typename C, typename T>
-std::basic_string<C> parser<C, T>::input::get() {
+std::basic_string<C> parser<C, T>::input::get_string() {
 	if (!isstream()) return std::basic_string<C>(d, l);
 	std::basic_stringstream<C> ss;
 	return ss << s.rdbuf(), clear(), ss.str();
 }
 template <typename C, typename T>
-std::basic_string<C> parser<C, T>::get_input() {
-	return in->get();
+std::basic_string<T> parser<C, T>::input::get_terminals(
+	std::array<size_t, 2> pos_span)
+{
+	return get_terminals(pos_span[0], pos_span[1]);
 }
 template <typename C, typename T>
-std::basic_ostream<T>& terminals_to_stream(std::basic_ostream<T>& os,
-	const typename parser<C, T>::pforest& f,
-	const typename parser<C, T>::pnode& root)
+std::basic_string<T> parser<C, T>::input::get_terminals(
+	size_t start, size_t end)
 {
-	auto cb_enter = [&os](const auto& n) {
-		if (!n.first.nt() && !n.first.is_null()) os << n.first.t();
-	};
-	auto ambig = [](const auto&, const auto& ns) {
-		return decltype(ns){ *ns.begin() };
-	};
-	f.traverse(root, cb_enter, NO_EXIT, DO_REVISIT, ambig);
-	return os;
-}
-template <typename C, typename T>
-std::basic_string<T> terminals_to_str(
-	const typename parser<C, T>::pforest& f,
-	const typename parser<C, T>::pnode& root)
-{
+	if (decoder) {
+		if (start > ts.size()) start = ts.size();
+		if (end > ts.size()) end = ts.size();
+		return std::basic_string<T>(ts.begin() + start,
+			ts.begin() + end);
+	}
+	if (!isstream()) return std::basic_string<T>(d + start, end - start);
 	std::basic_stringstream<T> ss;
-	terminals_to_stream<C, T>(ss, f, root);
-	return ss.str();
-}
-template <typename C, typename T>
-int_t terminals_to_int(
-	const typename parser<C, T>::pforest& f,
-	const typename parser<C, T>::pnode& root, bool& error)
-{
-	//DBG(std::cout << "terminals_to_int: `" << to_std_string(terminals_to_str<C, T>(f, root)) << "`"<<std::endl;)
-	std::stringstream is(to_std_string(terminals_to_str<C, T>(f, root)));
-	int_t result = 0;
-	error = false;
-	if (!(is >> result)) error = true;
-	return result;
+	s.seekg(start);
+	while (end > start++) ss << s.get();
+	return clear(), ss.str();
 }
 
 template <typename C, typename T>

@@ -18,7 +18,7 @@ namespace idni {
 
 parser<char, char32_t>::decoder_type utf8_to_u32_conv =
 	[](idni::parser<char, char32_t>::input& in) {
-		std::vector<char32_t> r;
+		vector<char32_t> r;
 		idni::utf8char s[4] = { 0, 0, 0, 0 };
 		char32_t ch;
 		for (uint8_t p = 0; p != 3; ++p) {
@@ -32,8 +32,8 @@ parser<char, char32_t>::decoder_type utf8_to_u32_conv =
 	};
 
 parser<char, char32_t>::encoder_type u32_to_utf8_conv =
-	[](const std::vector<char32_t>& ts) {
-		std::stringstream ss;
+	[](const vector<char32_t>& ts) {
+		stringstream ss;
 		for (auto t : ts) ss << idni::to_string(t);
 		return ss.str();
 	};

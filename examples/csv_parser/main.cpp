@@ -18,27 +18,26 @@ using namespace idni;
 
 struct csv_parser {
 	const char* csv_tgf =
-	"	@use_char_class space, digit. "
-	" 	el      => '\n'. "
-	"	ws      => space*. "
-	"	integer => digit+. "
-	"	line    => ws integer  (ws ',' ws integer ws)*  . "
-	"	start   => ws ( line el )*  ws . "
+	"	@use char classes space, digit.\n"
+	" 	el      => '\n'.\n"
+	"	_       => space*.\n"
+	"	integer => digit+.\n"
+	"	line    => _ integer ( _ ',' _ integer _ )*."
+	"	start   => _ ( line el )* _.\n"
 	;
 	csv_parser() :
 		g(tgf<char>::from_string(nts, csv_tgf)), p(g, { true, true }) {}
 	bool eval(const string& s) {
-		auto f = p.parse(s.c_str(), s.size());
-		if (!f || !p.found()) {
-			return cerr << p.get_error().to_str(), false; }
-		auto cb_next_g = [&f] (decltype(p)::pgraph& g){
+		auto res = p.parse(s.c_str(), s.size());
+		if (!res.found) return cerr << res.parse_error, false;
+		auto cb_next_g = [&res] (decltype(p)::pgraph& g){
 			g.extract_trees()->to_print(cout);
-			f->remove_binarization(g);
-			f->remove_recursive_nodes(g);
+			res.inline_grammar_transformations(g);
 			cout<< "\nafter removal of _temp/_R..\n";
 			g.extract_trees()->to_print(cout);
 			return true;
 		};
+		auto f = res.get_forest();
 		f->extract_graphs(f->root(), cb_next_g);
 		return true;
 	}

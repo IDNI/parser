@@ -32,6 +32,7 @@
 // Additionally it provides size_t id(const basic_string<C>&) method to get id
 // of a nonterminal.
 
+#include <optional>
 #include <limits>
 
 // include the generated header file instead of using the generic parser
@@ -55,35 +56,38 @@ struct csv_reader {
 	typedef vector<row> rows;
 	// use csv_parser from the header file with a generated parser
 	csv_parser p;
-	ostream& print_error(ostream& os) {
-		return os << p.get_error().to_str() << '\n';
-	}
 	// get_rows now takes the string input and returns errors as refs
-	rows get_rows(string input, bool& parse_error, bool& out_of_range) {
-		// run the parser
-		auto f = p.parse(input.c_str(), input.size());
-		// checks for the error
-		if ((parse_error = !p.found()) || f == 0) return {};
-		// traverse
+	optional<rows> get_rows(const string& input) {
+		auto res = p.parse(input.c_str(), input.size());
+		if (!res.found)	{
+			cerr << res.parse_error << '\n';
+			return {};
+		}
 		rows r;
-		out_of_range = false;
-		auto cb_enter = [&r, &out_of_range, &f, this](const auto& n) {
-			if (!n.first.nt()) return;
-			// Since the nonterminals container is encapsulated in
-			// a generated parser, struct provides an id(string)
-			// method to get id of a nonterminal.
-			// We can then compare id's to nt id in n.first.n()
-			auto id = n.first.n(); // shortcut to the id;
-			if      (id == p.id("row")) r.emplace_back();
-			else if (id == p.id("integer"))
-				r.back().push_back(
-					terminals_to_int(*f, n, out_of_range));
-			else if (id == p.id("str"))
-				r.back().push_back(terminals_to_str(*f, n));
-			else if (id == p.id("nullvalue"))
+		auto get_int = [&res](const auto& n) -> value {
+			auto i = res.get_terminals_to_int(n);
+			if (!i) return cerr
+				<< "out of range, allowed range is from: "
+				<< numeric_limits<int_t>::min() << " to: "
+				<< numeric_limits<int_t>::max() << '\n', false;
+			return i.value();
+		};
+		auto cb_enter = [&r, &get_int, &res, this](const auto& n) {
+			if (!n->first.nt()) return;
+			// generated csv_parser contains enum containing all
+			// nonterminals from the grammar with their id values.
+			// These can be used to compare with result of call
+			// to literal's method n()
+			auto id = n->first.n();
+			if      (id == csv_parser::row) r.emplace_back();
+			else if (id == csv_parser::integer)
+				r.back().push_back(get_int(n));
+			else if (id == csv_parser::str)
+				r.back().push_back(res.get_terminals(n));
+			else if (id == csv_parser::nullvalue)
 				r.back().push_back(true);
 		};
-		f->traverse(cb_enter);
+		res.get_forest()->traverse(cb_enter);
 		return r;
 	}
 };
@@ -103,22 +107,15 @@ int main() {
 	csv_reader csv;
 	istreambuf_iterator<char> begin(cin), end;
 	string input(begin, end);
-	cout << "entered: `" << input << "`";
-	bool parse_error, out_of_range;
+	cout << "entered: `" << input << "`\n";
 	// call csv_reader's get_rows to parse the input and get rows w/ values
-	csv_reader::rows rs = csv.get_rows(input, parse_error, out_of_range);
-	if (parse_error) csv.print_error(cerr);
-	else if (out_of_range) cerr << " out of range, allowed range "
-		"is from: " << numeric_limits<int_t>::min() <<
-		" to: " << numeric_limits<int_t>::max() << '\n';
-	else {
-		for (const csv_reader::row& r : rs) {
-			cout << " parsed row: ";
-			for (size_t i = 0; i != r.size(); ++i) {
-				if (i) cout << ", ";
-				cout << r[i];
-			}
-			cout << '\n';
-		}
+	optional<csv_reader::rows> rsopt = csv.get_rows(input);
+	if (!rsopt) return 1;
+	for (const csv_reader::row& r : rsopt.value()) {
+		cout << "parsed row: ";
+		for (size_t i = 0; i != r.size(); ++i)
+			cout << (i ? ", " : "") << r[i];
+		cout << '\n';
 	}
+	return 0;
 }

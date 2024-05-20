@@ -86,10 +86,10 @@ void generate_parser_cpp(const std::string& tgf_filename,
 
 	auto gen_ts = [&ts, &U]() {
 		std::stringstream os;
-		os << "\t\t";
+		os << "\t";
 		size_t n = 0;
 		for (const C ch : ts) {
-			if (++n == 10) n = 0, os << "\n\t\t";
+			if (++n == 10) n = 0, os << "\n\t";
 			os << U << "'" <<
 				( ch == (C)    0 ? "\\0"
 				: ch == (C) '\r' ? "\\r"
@@ -116,7 +116,7 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		std::stringstream os;
 		auto& x = gi.nts();
 		for (size_t n = 0; n != x.size(); ++n)
-			os << (n % 10 == 0 ? "\n\t\t\t" : "") <<
+			os << (n % 10 == 0 ? "\n\t" : "") <<
 				"\"" << to_std_string(x[n]) << "\", ";
 		os << "\n";
 		return os.str();
@@ -125,7 +125,7 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		std::stringstream os;
 		auto& x = gi.nts();
 		for (const auto& fn : gi.cc_fns().fns)
-			if (x[fn.first].size()) os << "\t\t\t\""
+			if (x[fn.first].size()) os << "\t\t\""
 				<< to_std_string(x[fn.first]) << "\",\n";
 		return os.str();
 	};
@@ -154,36 +154,43 @@ void generate_parser_cpp(const std::string& tgf_filename,
 			}
 			return os;
 		};
-		os << "\t\to.trim_terminals = "
-			<< pbool[g.opt.trim_terminals] << ";\n";
-		os << "\t\to.inline_char_classes = "
-			<< pbool[g.opt.inline_char_classes] << ";\n";
-		os << "\t\to.auto_disambiguate = "
-			<< pbool[g.opt.auto_disambiguate] << ";\n";
+		os << "\t.auto_disambiguate = "
+			<< pbool[g.opt.auto_disambiguate] << ",\n";
 		if (g.opt.nodisambig_list.size()) {
-			os << "\t\to.nodisambig_list = {";
-			plist(os, g.opt.nodisambig_list) << "\n\t\t};\n";
+			os << "\t.nodisambig_list = {";
+			plist(os, g.opt.nodisambig_list) << "\n\t},\n";
 		}
-		if (g.opt.to_trim.size()) {
-			os << "\t\to.to_trim = {";
-			plist(os, g.opt.to_trim) << "\n\t\t};\n";
+		os << "\t.shaping = {\n";
+		if (g.opt.shaping.to_trim.size()) {
+			os << "\t\t.to_trim = {";
+			plist(os, g.opt.shaping.to_trim) << "\n\t\t},\n";
 		}
-		if (g.opt.to_trim_children.size()) {
-			os << "\t\to.to_trim_children = {";
-			plist(os, g.opt.to_trim_children) << "\n\t\t};\n";
+		if (g.opt.shaping.to_trim_children.size()) {
+			os << "\t\t.to_trim_children = {";
+			plist(os, g.opt.shaping.to_trim_children)<<"\n\t\t},\n";
 		}
-		if (g.opt.to_inline.size()) {
-			os << "\t\to.to_inline = {";
-			pvlist(os, g.opt.to_inline) << "\n\t\t};\n";
+		if (g.opt.shaping.to_trim_children_terminals.size()) {
+			os << "\t\t.to_trim_children_terminals = {";
+			plist(os, g.opt.shaping.to_trim_children_terminals)
+								<< "\n\t\t},\n";
 		}
+		os << "\t\t.trim_terminals = "
+			<< pbool[g.opt.shaping.trim_terminals] << ",\n";
+		if (g.opt.shaping.to_inline.size()) {
+			os << "\t\t.to_inline = {";
+			pvlist(os, g.opt.shaping.to_inline) << "\n\t\t},\n";
+		}
+		os << "\t\t.inline_char_classes = "
+			<< pbool[g.opt.shaping.inline_char_classes] << "\n";
+		os << "\t}\n";
 		return os.str();
 	};
 	auto gen_opts = [&opt]() {
 		std::stringstream os;
-		if (opt.decoder.size()) os << "\t\to.chars_to_terminals = "
-			<< opt.decoder << ";\n";
-		if (opt.encoder.size()) os << "\t\to.terminals_to_chars = "
-			<< opt.encoder << ";\n";
+		if (opt.decoder.size()) os << "\t.chars_to_terminals = "
+			<< opt.decoder << ",\n";
+		if (opt.encoder.size()) os << "\t.terminals_to_chars = "
+			<< opt.encoder << "\n";
 		return os.str();
 	};
 	auto gen_prods = [&g, &gi, &ts]() {
@@ -196,8 +203,8 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		};
 		for (size_t i = 0; i != gi.G().size(); ++i) {
 			const auto& p = gi.G()[i];
-			g.print_production(os << "\t\t// ", i) << "\n";
-			os << "\t\tq(nt(" << p.first.n() << "), ";
+			g.print_production(os << "//", i, true) << "\n";
+			os << "\tp(NT(" << p.first.n() << "), ";
 			bool first_c = true;
 			for (const auto& c : p.second) {
 				if (!first_c) os << " & "; else first_c = false;
@@ -207,9 +214,9 @@ void generate_parser_cpp(const std::string& tgf_filename,
 				for (const auto& l : c) {
 					if (!first_l) os << "+";
 					else first_l = false;
-					if (l.nt()) os << "nt(" << l.n() << ")";
+					if (l.nt()) os << "NT(" << l.n() << ")";
 					else if (l.is_null()) os << "nul";
-					else os << "t(" << terminal(l) << ")";
+					else os << "T(" << terminal(l) << ")";
 				}
 				os << ')';
 			}
@@ -222,164 +229,84 @@ void generate_parser_cpp(const std::string& tgf_filename,
 					tgf_filename_stripped << " by\n"
 		"//       https://github.com/IDNI/parser/tools/tgf\n"
 		"//\n"
-		"#ifndef __" <<guard<< "_H__\n"
-		"#define __" <<guard<< "_H__\n"
-		"\n"
-		"#include <string.h>\n"
+		"#ifndef __" << guard << "_H__\n"
+		"#define __" << guard << "_H__\n"
 		"\n"
 		"#include \"parser.h\"\n"
 		"\n";
-	if (opt.ns.size()) os << "namespace " <<opt.ns<< " {\n\n";
-	os <<	"struct " <<opt.name<< " {\n"
-		"	using char_type       = "<<opt.char_type<<";\n"
-		"	using terminal_type   = "<<opt.terminal_type<<";\n"
-		"	using traits_type     = std::char_traits<char_type>;\n"
-		"	using int_type        = typename traits_type::int_type;\n"
-		"	using grammar_type    = idni::grammar<char_type, terminal_type>;\n"
-		"	using grammar_options = grammar_type::options;\n"
-		"	using symbol_type     ="
-				" idni::lit<char_type, terminal_type>;\n"
-		"	using location_type   = std::array<size_t, 2>;\n"
-		"	using node_type       ="
-				" std::pair<symbol_type, location_type>;\n"
-		"	using parser_type     ="
-				" idni::parser<char_type, terminal_type>;\n"
-		"	using options         = parser_type::options;\n"
-		"	using parse_options   = parser_type::parse_options;\n"
-		"	using forest_type     = parser_type::pforest;\n"
-		"	using sptree_type     = parser_type::psptree;\n"
-		"	using input_type      = parser_type::input;\n"
-		"	using decoder_type    ="
-				" parser_type::input::decoder_type;\n"
-		"	using encoder_type    = "
-				"std::function<std::basic_string<char_type>(\n"
-		"			const std::vector<terminal_type>&)>;\n"
-		" static " <<opt.name<< "& instance() { static " <<opt.name<< " i; return i; }"
-		"	" <<opt.name<< "() :\n"
-		"		nts(load_nonterminals()), cc(load_cc()),\n"
-		"		g(nts, load_prods(), nt(" <<gi.start().n()<<
-				"), cc, load_grammar_opts()),\n"
-		"		p(g, load_opts()) {}\n"
-		"	std::unique_ptr<forest_type> parse(const char_type* data, size_t size,\n"
-		"		parse_options po = {}) { return p.parse(data, size, po); }\n"
-		"	std::unique_ptr<forest_type> parse(std::basic_istream<char_type>& is,\n"
-		"		parse_options po = {}) { return p.parse(is, po); }\n"
-		"	std::unique_ptr<forest_type> parse(const std::string& fn,\n"
-		"		parse_options po = {}) { return p.parse(fn, po); }\n"
-		"#ifndef WIN32\n"
-		"	std::unique_ptr<forest_type> parse(int fd, parse_options po = {})\n"
-		"		{ return p.parse(fd, po); }\n"
-		"#endif //WIN32\n"
-		"	sptree_type shape(forest_type* f, const node_type& n) {\n"
-		"		idni::tree_shaping_options opt;\n"
-		"		opt.to_trim = g.opt.to_trim;\n"
-		"		opt.to_trim_children = g.opt.to_trim_children;\n"
-		"		opt.trim_terminals = g.opt.trim_terminals;\n"
-		"		opt.to_inline = g.opt.to_inline;\n"
-		"		opt.inline_char_classes = g.opt.inline_char_classes;\n"
-		"		return f->get_shaped_tree(n, opt);\n"
+	if (opt.ns.size()) os << "namespace " << opt.ns << " {\n\n";
+	os << "namespace " << opt.name << "_data {\n\n";
+	os <<
+		"using char_type     = " << opt.char_type << ";\n"
+		"using terminal_type = " << opt.terminal_type << ";\n"
+		"\n"
+		"inline std::vector<std::string> symbol_names{"
+			<< gen_nts() <<
+		"};\n"
+		"\n"
+		"inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};\n"
+		"\n"
+		"inline std::vector<terminal_type> terminals{\n"
+			<< gen_ts() <<
+		"};\n"
+		"\n"
+		"inline ::idni::char_class_fns<terminal_type> char_classes =\n"
+		"	::idni::predefined_char_classes<char_type, terminal_type>({\n"
+			<< gen_cc_fns() <<
+		"	}, nts);\n"
+		"\n"
+		"inline struct ::idni::grammar<char_type, terminal_type>::options\n"
+		"	grammar_options\n"
+		"{\n"
+		"	.transform_negation = false,\n"
+			<< gen_grammar_opts() <<
+		"};\n"
+		"\n"
+		"inline ::idni::parser<char_type, terminal_type>::options parser_options{\n"
+			<< gen_opts() <<
+		"};\n"
+		"\n"
+		"inline ::idni::prods<char_type, terminal_type> start_symbol{ nts("
+						<< gi.start().n() << ") };\n"
+		"\n"
+		"inline idni::prods<char_type, terminal_type>& productions() {\n"
+		"	static bool loaded = false;\n"
+		"	static idni::prods<char_type, terminal_type>\n"
+		"		p, nul(idni::lit<char_type, terminal_type>{});\n"
+		"	if (loaded) return p;\n"
+		"	#define  T(x) (idni::prods<char_type, terminal_type>{ terminals[x] })\n"
+		"	#define NT(x) (idni::prods<char_type, terminal_type>{ nts(x) })\n"
+			<< ps <<
+		"	#undef T\n"
+		"	#undef NT\n"
+		"	return loaded = true, p;\n"
+		"}\n"
+		"\n"
+		"inline ::idni::grammar<char_type, terminal_type> grammar(\n"
+		"	nts, productions(), start_symbol, char_classes, grammar_options);\n"
+		"\n"
+		"} // namespace " << opt.name << "_data\n"
+		"\n"
+		"struct " << opt.name << " : public idni::parser<"
+			<< opt.char_type << ", " << opt.terminal_type << "> {\n"
+		"	enum nonterminal {"
+				<< gen_nts_enum_cte() <<
+		"	};\n"
+		"	static " << opt.name << "& instance() {\n"
+		"		static " << opt.name << " inst;\n"
+		"		return inst;\n"
 		"	}\n"
-		"	sptree_type parse_and_shape(const char_type* data, size_t size,\n"
-		"		const node_type& n, parse_options po = {})\n"
-		"	{\n"
-		"		return shape(p.parse(data, size, po).get(), n);\n"
-		"	}\n"
-		"	sptree_type parse_and_shape(const char_type* data, size_t size,\n"
-		"		parse_options po = {})\n"
-		"	{\n"
-		"		auto f = p.parse(data, size, po);\n"
-		"		return shape(f.get(), f->root());\n"
-		"	}\n"
-		"	sptree_type parse_and_shape(std::basic_istream<char_type>& is,\n"
-		"		const node_type& n, parse_options po = {})\n"
-		"	{\n"
-		"		return shape(p.parse(is, po).get(), n);\n"
-		"	}\n"
-		"	sptree_type parse_and_shape(std::basic_istream<char_type>& is,\n"
-		"		parse_options po = {})\n"
-		"	{\n"
-		"		auto f = p.parse(is, po);\n"
-		"		return shape(f.get(), f->root());\n"
-		"	}\n"
-		"	sptree_type parse_and_shape(const std::string& fn,\n"
-		"		const node_type& n, parse_options po = {})\n"
-		"	{\n"
-		"		return shape(p.parse(fn, po).get(), n);\n"
-		"	}\n"
-		"	sptree_type parse_and_shape(const std::string& fn,\n"
-		"		parse_options po = {})\n"
-		"	{\n"
-		"		auto f = p.parse(fn, po);\n"
-		"		return shape(f.get(), f->root());\n"
-		"	}\n"
-		"#ifndef WIN32\n"
-		"	sptree_type parse_and_shape(int fd, const node_type& n, parse_options po = {})\n"
-		"	{\n"
-		"		return shape(p.parse(fd, po).get(), n);\n"
-		"	}\n"
-		"	sptree_type parse_and_shape(int fd, parse_options po = {})\n"
-		"	{\n"
-		"		auto f = p.parse(fd, po);\n"
-		"		return shape(f.get(), f->root());\n"
-		"	}\n"
-		"#endif //WIN32\n"
-		"	bool found(size_t start = SIZE_MAX) { return p.found(start); }\n"
-		"	typename parser_type::error get_error() { return p.get_error(); }\n"
-		"	enum nonterminal {" << gen_nts_enum_cte() <<
-								"	};\n"
+		"	" << opt.name << "() : idni::parser<char_type, terminal_type>(\n"
+		"		" << opt.name << "_data::grammar,\n"
+		"		" << opt.name << "_data::parser_options) {}\n"
 		"	size_t id(const std::basic_string<char_type>& name) {\n"
-		"		return nts.get(name);\n"
+		"		return " << opt.name << "_data::nts.get(name);\n"
 		"	}\n"
 		"	const std::basic_string<char_type>& name(size_t id) {\n"
-		"		return nts.get(id);\n"
+		"		return " << opt.name << "_data::nts.get(id);\n"
 		"	}\n"
 		"	symbol_type literal(const nonterminal& nt) {\n"
-		"		return symbol_type(nt, &nts);\n"
-		"	}\n"
-		"private:\n"
-		"	std::vector<terminal_type> ts{\n" <<
-				gen_ts() <<
-		"	};\n"
-		"	idni::nonterminals<char_type, terminal_type> nts{};\n"
-		"	idni::char_class_fns<terminal_type> cc;\n"
-		"	idni::grammar<char_type, terminal_type> g;\n"
-		"	parser_type p;\n"
-		"	idni::prods<char_type, terminal_type> t(size_t tid) {\n"
-		"		return idni::prods<char_type, terminal_type>(ts[tid]);\n"
-		"	}\n"
-		"	idni::prods<char_type, terminal_type> nt(size_t ntid) {\n"
-		"		return idni::prods<char_type, terminal_type>(\n"
-		"			symbol_type(ntid, &nts));\n"
-		"	}\n"
-		"	idni::nonterminals<char_type, terminal_type> load_nonterminals() "
-								"const {\n"
-		"		idni::nonterminals<char_type, terminal_type> nts{};\n"
-		"		for (const auto& nt : {" <<
-					gen_nts() <<
-		"		}) nts.get(nt);\n"
-		"		return nts;\n"
-		"	}\n"
-		"	idni::char_class_fns<terminal_type> load_cc() {\n"
-		"		return idni::predefined_char_classes<char_type, terminal_type>({\n" <<
-					gen_cc_fns() <<
-		"		}, nts);\n"
-		"	}\n"
-		"	grammar_type::options load_grammar_opts() {\n"
-		"		grammar_type::options o;\n"
-		"		o.transform_negation = false;\n" <<
-				gen_grammar_opts() <<
-		"		return o;\n"
-		"	}\n"
-		"	options load_opts() {\n"
-		"		options o;\n" <<
-				gen_opts() <<
-		"		return o;\n"
-		"	}\n"
-		"	idni::prods<char_type, terminal_type> load_prods() {\n"
-		"		idni::prods<char_type, terminal_type> q,\n"
-		"			nul(symbol_type{});\n"
-				<< ps <<
-		"		return q;\n"
+		"		return symbol_type(nt, &" << opt.name << "_data::nts);\n"
 		"	}\n"
 		"};\n"
 		"\n";

@@ -19,67 +19,62 @@ using namespace idni;
 struct basic_arithmetic {
 	basic_arithmetic() :
 		cc(predefined_char_classes<char>({ "space", "digit" }, nts)),
-		add(nt("add")), addsub(nt("addsub")), digit(nt("digit")),
-		div(nt("div")), expr1(nt("expr1")), expr2(nt("expr2")),
-		factor(nt("factor")), integer(nt("integer")),
-		integer1(nt("integer1")), mul(nt("mul")), muldiv(nt("muldiv")),
-		neg(nt("neg")), pos(nt("pos")), space(nt("space")),
-		start(nt("start")), sub(nt("sub")), ws(nt("ws")),
+		add(nt("add")), digit(nt("digit")), div(nt("div")),
+		expr(nt("expr")), integer(nt("integer")),
+		integer1(nt("integer1")), mul(nt("mul")), neg(nt("neg")),
+		pos(nt("pos")), space(nt("space")), start(nt("start")),
+		sub(nt("sub")), ws(nt("ws")),
 		g(nts, ba_prods(), start, cc), p(g) { }
 	bool eval(const string& s) {
-		auto f = p.parse(s.c_str(), s.size());
-		if (!p.found()) {
+		auto res = p.parse(s.c_str(), s.size());
+		if (!res.found) {
 			return cerr << "\ninput text does not seem to be an "
-				"expression statement\n"<<p.get_error().to_str(
-					parser<char>::error::info_lvl::
-						INFO_DETAILED) << endl, false;
+				"expression statement\n" << res.parse_error
+				<< endl, false;
 		}
-		cout << evaluate_forest(*f) << endl;
+		cout << evaluate(res) << "\n";
 		return true;
 	}
 private:
 	nonterminals<char> nts{};
 	char_class_fns<char> cc;
 	prods<char> nul{lit<char>{}},
-		add, addsub, digit, div, expr1, expr2, factor, integer,
-		integer1, mul, muldiv, neg, pos, space, start, sub, ws;
+		add, digit, div, expr, integer, integer1, mul, neg, pos, space,
+		start, sub, ws;
 	grammar<char> g;
 	parser<char> p;
 	lit<char> nt(const string& s){ return lit<>{nts.get(s),&nts}; };
 	prods<char> ba_prods() {
 		prods<char> q, plus{'+'}, minus{'-'}, lparen{'('};
+		q(start,    (ws + expr + ws) | ws);
 		q(ws,       (space + ws) | nul);
+		q(expr,     pos | neg);
+		q(expr,     add | sub);
+		q(expr,     mul | div);
+		q(expr,     integer);
+		q(expr,     (lparen + ws + expr + ws + ')'));
+		q(mul,      expr + ws + '*' + ws + expr);
+		q(div,      expr + ws + '/' + ws + expr);
+		q(add,      expr + ws + '+' + ws + expr);
+		q(sub,      expr + ws + '-' + ws + expr);
+		q(pos,      plus + ws + expr);
+		q(neg,      minus + ws + expr);
 		q(integer,  digit + integer1);
 		q(integer1, (digit + integer1) | nul);
-		q(expr1,    addsub | expr2);
-		q(expr2,    muldiv | factor);
-		q(addsub,   add | (sub & ~add));
-		q(muldiv,   mul | (div & ~mul));
-		q(add,      expr1 + ws + '+' + ws + expr2);
-		q(sub,      expr1 + ws + '-' + ws + expr2);
-		q(mul,      expr2 + ws + '*' + ws + factor);
-		q(div,      expr2 + ws + '-' + ws + factor);
-		q(factor,   pos | neg | integer |
-				(lparen + ws + expr1 + ws + ')'));
-		q(pos,      plus  + ws + factor);
-		q(neg,      minus + ws + factor);
-		q(start,    (ws + expr1 + ws) | ws);
 		return q;
 	}
-	int_t evaluate_forest(parser<char>::pforest& f) {
+	int_t evaluate(parser<char>::result& res) {
 		vector<int_t> x;  // intermediate evaluations (nested)
-		auto cb_enter = [&x, &f, this](const auto& n) {
+		auto cb_enter = [&x, &res, this](const parser<char>::pnode& n) {
 			//DBG(cout << "entering: `" << n.first.to_std_string() << "` ["<<n.second[0]<<","<<n.second[1]<<"]\n";)
 			if (n.first == integer) {
-				bool err;
-				auto i = terminals_to_int<char>(f, n, err);
-				if (err) cerr << "integer out of range\n";
-				else x.push_back(i);
+				auto i = res.get_terminals_to_int(n);
+				if (!i) cerr << "integer out of range\n";
+				else x.push_back(i.value());
 			}
 		};
-		auto cb_exit = [&x, this](const auto& n, const auto&) {
+		auto cb_exit = [&x, this](const parser<char>::pnode& n, const auto&) {
 			//DBG(cout << "exiting: `" << n.first.to_std_string() << "`\n";)
-			if (!n.first.nt()) return;
 			const auto& l = n.first;
 			if      (l == neg) x.back() = -x.back();
 			else if (l == add) (x[x.size()-2] += x.back()),
@@ -91,7 +86,7 @@ private:
 			else if (l == div) (x[x.size()-2] /= x.back()),
 						x.pop_back();
 		};
-		f.traverse(cb_enter, cb_exit);
+		res.get_forest()->traverse(cb_enter, cb_exit);
 		return x.size() ? x.back() : 0;
 	}
 };
@@ -104,4 +99,5 @@ int main() {
 		cout << "> " << line << " = ";
 		if (!ba.eval(line)) return 1;
 	}
+	return 0;
 }

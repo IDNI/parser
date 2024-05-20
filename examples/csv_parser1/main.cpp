@@ -16,6 +16,7 @@
 // In this part we create a very simple parser validating just positive ints.
 // Comments are related only to a new or modified code in the part.
 
+#include <optional>
 #include <limits>
 
 #include "parser.h"
@@ -32,7 +33,7 @@ using namespace idni;
 
 int main() {
 	cout << "Validator for positive integers. "
-		<< "Enter a positive integer per line or Ctrl-D to quit\n";
+		"Enter a positive integer per line or Ctrl-D to quit\n";
 	// create a map for nonterminal names
 	nonterminals nts;
 	// to define our grammar programatically we need to
@@ -52,19 +53,19 @@ int main() {
 	// read line by line from standard input until EOF
 	string line;
 	while (getline(cin, line)) { // and for each entered line do
-		cout << "entered: `" << line << "`"; // print entered input
-		auto f = p.parse(line.c_str(), line.size()); // run parse
-		// if the parsing was successful
-		if (p.found()) {
-			// flatten all parsed terminals and convert them to int
-			bool err;
-			int_t i = terminals_to_int(*f, f->root(), err);
-			// err is true if conversion failed, ie. out of range
-			if (!err) cout << " parsed integer: " << i << '\n';
-			else cerr << " out of range, max value is: "
-				<< numeric_limits<int_t>::max() << '\n';
+		cout << "entered: `" << line << "`\n"; // print entered input
+		auto res = p.parse(line.c_str(), line.size()); // run parser
+		if (!res.found) {
+			// print parse error if the parsing was unsuccessful
+			cerr << res.parse_error << '\n';
+			continue;
 		}
-		// or print a parse error to error output
-		else cerr << p.get_error().to_str() << '\n';
+		// flatten all parsed terminals and convert them to int
+		optional<int_t> i = res.get_terminals_to_int(
+						res.get_forest()->root());
+		// i has no value if conversion failed, ie. out of range
+		if (!i) cerr << "out of range, allowed range is from: 0 to: "
+				<< numeric_limits<int_t>::max() << '\n';
+		else cout << "parsed integer: " << i.value() << '\n';
 	}
 }
