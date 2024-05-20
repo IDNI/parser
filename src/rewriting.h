@@ -767,7 +767,14 @@ node_t apply_rule(const rule<node_t>& r, const node_t& n, const is_capture_t& c)
 	auto [p , s] = r;
 	environment<node_t> u;
 	pattern_matcher<node_t, is_capture_t> matcher {p, u, c};
-	return apply(s, n, matcher);
+	auto nn = apply(s, n, matcher);
+#ifdef LOG_REWRITING
+	if (nn != n) {
+		LOG_INFO << "(R) " << p << " := " << s << LOG_END;
+		LOG_INFO << "(F) " << nn << LOG_END;
+	}
+#endif // LOG_REWRITING
+	return nn;
 }
 
 // apply a rule to a tree using the predicate to pattern_matcher and skipping
@@ -778,16 +785,14 @@ node_t apply_if(const rule<node_t>& r, const node_t& n,
 {
 	auto [p , s] = r;
 	environment<node_t> u;
-	pattern_matcher_if<node_t, is_capture_t,
-		predicate_t> matcher {p, u, c, predicate};
+	pattern_matcher_if<node_t, is_capture_t, predicate_t> matcher {p, u, c, predicate};
 	auto nn = apply(s, n, matcher);
-
 #ifdef LOG_REWRITING
 	if (nn != n) {
 		LOG_INFO << "(R) " << p << " := " << s << LOG_END;
 		LOG_INFO << "(F) " << nn << LOG_END;
 	}
-#endif
+#endif // LOG_REWRITING
 	return nn;
 }
 
