@@ -45,23 +45,23 @@ struct forest {
 
 	// node pointer in forerst
 
-	private:
+private:
 	struct nptr_t {
 		friend NodeT;
-		private:
+	private:
 		const NodeT *id; // points to pnode
 		static size_t nc; // maintains a refcount for # of id pointers
 		// to NodeT obj in NodeT::nid map both externally and from inside nid
-		public:
-		nptr_t(const NodeT *_id = nullptr) : id(_id) {  //if(id)
-			nc++;}
+	public:
+		nptr_t(const NodeT *_id = nullptr) : id(_id) { //if(id)
+			nc++; }
 		nptr_t(const nptr_t& rhs) {  id = rhs.id; //if(id)
-			nc++;}
-		nptr_t(const nptr_t&& rhs) {  id = rhs.id; //if(id)
-			nc++;}
+			nc++; }
+		nptr_t(const nptr_t&& rhs) { id = rhs.id; //if(id)
+			nc++; }
 		// did not define conversion constructor.
 		// as we use NodeT::nptr_t aka NodeT::node() operator
-		inline operator NodeT() const{
+		inline operator NodeT() const {
 			return *id;
 		}
 		inline const NodeT* operator->() const { return id;}
@@ -69,26 +69,26 @@ struct forest {
 			//if(  !id && rhs.id)
 			//if(&rhs != this) nc++;
 			//else if( id && !rhs.id) nc--;
-			if(&rhs != this) id = rhs.id;
+			if (&rhs != this) id = rhs.id;
 			return *this;
 		}
 		inline nptr_t& operator=(const nptr_t&& rhs) {
 			//if( //!id && 	rhs.id)
 			//if(&rhs != this) nc++;
 			//else if( id && !rhs.id) nc--;
-			 if(&rhs != this) id = rhs.id;
-			 return *this;
+			if (&rhs != this) id = rhs.id;
+			return *this;
 		}
 		inline bool operator<(const nptr_t& rhs) const {
 			return id < rhs.id;
 		}
-		inline bool operator == (const nptr_t& rhs) const {
+		inline bool operator==(const nptr_t& rhs) const {
 			return id == rhs.id;
 		}
 		~nptr_t() {
 			//DBG(std::cout <<"-"<< NodeT::nid.size() <<" "<<nc );
 			//if(id){
-				if((nc == (NodeT::nid.size() + 1)) ){
+				if ((nc == (NodeT::nid.size() + 1))) {
 					//DBG(std::cout<<"GCing nodes:  "<< nc-1 <<std::endl);
 					nc--;
 					NodeT::nid.clear();
@@ -101,7 +101,7 @@ struct forest {
 		//inline lit<C,T> &first() const { DBG(assert(id!=0)); return id->first; }
 		//inline std::array<size_t, 2>& second() const { DBG(assert(id!=0)); return id->second; }
 	};
-	public:
+public:
 	using node       = nptr_t;
 	using nodes      = std::vector<node>;
 	using nodes_set  = std::set<nodes>;

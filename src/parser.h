@@ -210,8 +210,8 @@ template <typename C = char, typename T = C>
 class parser {
 public:
 	struct input;
-	using char_type     = C;
-	using terminal_type = T;
+	using char_type       = C;
+	using terminal_type   = T;
 	using traits_type     = std::char_traits<char_type>;
 	using int_type        = typename traits_type::int_type;
 	using grammar_type    = idni::grammar<char_type, terminal_type>;
@@ -223,13 +223,13 @@ public:
 
 	struct pnode : public node_type {
 		friend forest<pnode>;
-		private:
+	private:
 		static typename forest<pnode>::node ptrof(const pnode& p);
 		static std::map<const pnode, typename forest<pnode>::node> nid;
-		public:
-		pnode(){}
-		pnode(const lit<C,T> &_f, const std::array<size_t,2> &_s):
-			node_type(_f,_s) {}
+	public:
+		pnode() {}
+		pnode(const lit<C, T>& _f, const std::array<size_t, 2>& _s)
+			: node_type(_f, _s) {}
 		inline operator typename forest<pnode>::node() const {
 			return ptrof(*this);
 		}
@@ -239,7 +239,7 @@ public:
 		//inline lit<C,T> &first() const { return this->first; }
 		//inline std::array<size_t, 2>& second() const { return this->second; }
 	};
-	using pforest		  = forest<pnode>;
+	using pforest         = forest<pnode>;
 	using pnodes          = pforest::nodes;
 	using pnodes_set      = pforest::nodes_set;
 	using pnode_graph     = pforest::node_graph;
