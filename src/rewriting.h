@@ -581,6 +581,18 @@ node_t replace(const node_t& n, std::map<node_t, node_t>& changes) {
 		(replace , all<node_t>)(n);
 }
 
+
+// Replace nodes in n according to changes while skipping subtrees specified by query
+template <typename node_t, typename predicate_t>
+node_t replace_if(const node_t& n, std::map<node_t, node_t>& changes, predicate_t& query) {
+	replace_transformer<node_t> replace{changes};
+	return post_order_traverser<
+			replace_transformer<node_t>,
+			predicate_t,
+			node_t>
+		(replace , query)(n);
+}
+
 // TODO (LOW) consider adding a similar functino for replace_node...
 
 // true while found is not set (found), it aborts the traversal once found has
