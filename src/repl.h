@@ -18,6 +18,7 @@
 #include <filesystem>
 #include <vector>
 #include <string>
+#include <climits>
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <stdio.h>
@@ -43,25 +44,28 @@ struct repl {
 		std::string history_file = ".history")
 		: re_(re), prompt_(prompt), history_file_(history_file)
 	{
+		if (!isatty(STDIN_FILENO) // if not tty (stdin)
+			|| tcgetattr(STDIN_FILENO, &orig_attrs_) == -1) return;
 		// save terminal state and set terminal to raw mode
-		tcgetattr(STDIN_FILENO, &orig_attrs_);
 		raw_attrs_ = orig_attrs_;
 		raw_attrs_.c_lflag &= ~(ECHO | ICANON | ISIG);
 		raw_attrs_.c_iflag &= ~(IXON);
 		raw_attrs_.c_cc[VMIN] = 0;
 		raw_attrs_.c_cc[VTIME] = 1;
-		tcsetattr(STDIN_FILENO, TCSANOW, &raw_attrs_);
+		if (tcsetattr(STDIN_FILENO, TCSANOW, &raw_attrs_) == -1) return;
+		reset_terminal = true;
+		re.r = this;
 		// load history from file if exists
 		if (!std::filesystem::exists(history_file_)) return;
 		std::ifstream hf(history_file_);
 		std::string s;
 		while (std::getline(hf, s)) if (s.size()) history_.push_back(s);
 		hpos_ = history_.size();
-		re.r = this;
 	}
 	~repl() {
 		// return terminal to its original state
-		tcsetattr(STDIN_FILENO, TCSANOW, &orig_attrs_);
+		if (reset_terminal)
+			tcsetattr(STDIN_FILENO, TCSANOW, &orig_attrs_);
 	}
 	int run() {
 		refresh_input();
@@ -218,6 +222,7 @@ private:
 		return history_[hpos_ - 1];
 	}
 	std::pair<unsigned short, unsigned short> get_termsize() const {
+		if (!isatty(STDOUT_FILENO)) return { 1, USHRT_MAX };
 		struct winsize w;
 		ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
 		return { w.ws_row, w.ws_col };
@@ -234,6 +239,7 @@ private:
 	}
 	size_t get_number_of_lines() const {
 		auto [_, cols] = get_termsize();
+		if (cols == 0) return 1;
 		size_t prompt_size = printed_size(prompt_);
 		size_t l = prompt_size + input_.size();
 		if (l > 0) l--;
@@ -294,6 +300,7 @@ private:
 	size_t pos_ = 0;
 	size_t hpos_ = 0;
 	struct termios orig_attrs_, raw_attrs_;
+	bool reset_terminal = false;
 };
 
 } // idni namespace
