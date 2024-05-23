@@ -125,6 +125,9 @@ struct shaping_options {
 	std::set<size_t> to_trim{};
 	// nonterminal ids which children to trim by shaping coming from @trim children ...
 	std::set<size_t> to_trim_children{};
+	// nonterminal ids which children terminal to trim by shaping coming
+	// from @trim children terminals ...
+	std::set<size_t> to_trim_children_terminals{};
 	bool trim_terminals = false; // @trim all terminals.
 	// nonterminal ids to inline by shaping coming from @inline ...
 	std::set<std::vector<size_t>> to_inline{};
@@ -216,7 +219,7 @@ public:
 	using location_type   = std::array<size_t, 2>;
 	using node_type       = std::pair<symbol_type, location_type>;
 	using parser_type     = idni::parser<char_type, terminal_type>;
-	
+
 	struct pnode : public node_type {
 		friend forest<pnode>;
 		private:
@@ -224,7 +227,7 @@ public:
 		static std::map<const pnode, typename forest<pnode>::node> nid;
 		public:
 		pnode(){}
-		pnode(const lit<C,T> &_f, const std::array<size_t,2> &_s): 
+		pnode(const lit<C,T> &_f, const std::array<size_t,2> &_s):
 			node_type(_f,_s) {}
 		inline operator typename forest<pnode>::node() const {
 			return ptrof(*this);
@@ -233,7 +236,7 @@ public:
 			return nid.size();
 		}
 		//inline lit<C,T> &first() const { return this->first; }
-		//inline std::array<size_t, 2>& second() const { return this->second; } 	
+		//inline std::array<size_t, 2>& second() const { return this->second; }
 	};
 	using pforest		  = forest<pnode>;
 	using pnodes          = pforest::nodes;
@@ -274,6 +277,7 @@ public:
 			int_type e = std::char_traits<C>::eof());
 #endif
 		~input();
+		inline bool good() const;
 		inline bool isstream() const;
 		void clear(); // resets stream (if used) to reenable at()/tat()
 		std::basic_string<C> get_string(); // returns input data as a string
@@ -352,7 +356,8 @@ public:
 		// list of expected token and respective productions
 		std::vector<exp_prod_t> expv;
 		error() : loc(-1) {}
-		std::string to_str(info_lvl lv = INFO_ROOT_CAUSE) const;
+		std::string to_str(info_lvl lv = INFO_DETAILED,
+			size_t line_start = 0) const;
 	};
 	// result of the parse call
 	struct result {
@@ -369,19 +374,41 @@ public:
 
 		// returns the parsed forest
 		pforest* get_forest() const;
-		// transforms forest into tree and shapes it according to
-		// shaping options (trimming and inlining)
+		// transforms forest into tree and applies trimming
 		// grammar shaping options are used by default
 		// also transforms ambiguous nodes as children of __AMB__ nodes
+		psptree get_trimmed_tree(const pnode& n) const;
+		psptree get_trimmed_tree(const pnode& n,
+			const shaping_options opts) const;
+		// applies inlining to a tree (w/o tree paths)
+		psptree inline_tree_nodes(const psptree& t, psptree& parent)
+			const;
+		psptree inline_tree_nodes(const psptree& t, psptree& parent,
+			const shaping_options opts) const;
+		// applies tree paths inlining to a tree
+		psptree inline_tree_paths(const psptree& t) const;
+		psptree inline_tree_paths(const psptree& t,
+			const shaping_options opts) const;
+		// applies inlining to a tree
+		psptree inline_tree(psptree& t) const;
+		psptree inline_tree(psptree& t,
+			const shaping_options opts) const;
+		psptree trim_children_terminals(const psptree& t) const;
+		psptree trim_children_terminals(const psptree& t,
+			const shaping_options opts) const;
+		// transforms forest into a tree and applies shaping
 		psptree get_shaped_tree() const;
 		psptree get_shaped_tree(const shaping_options opts) const;
 		psptree get_shaped_tree(const pnode& n) const;
-		psptree get_shaped_tree(const pnode& n,	const shaping_options
-								opts) const;
+		psptree get_shaped_tree(const pnode& n,
+			const shaping_options opts) const;
+
 		// extracts the first parse tree from the parsed forest
 		psptree get_tree();
 		psptree get_tree(const pnode& n);
 
+		// is input good = stream is good or mmap is opened
+		bool good() const;
 		// returns the input as a string (input's char type, ie. C)
 		std::basic_string<C> get_input();
 		// read terminals from input (input's terminal type, ie. T)
@@ -455,6 +482,7 @@ public:
 #endif
 	bool found(size_t start = SIZE_MAX);
 	error get_error();
+	grammar<C, T>& get_grammar() { return g; }
 	bool debug = false;
 	std::pair<size_t, size_t> debug_at = { DEBUG_POS_FROM, DEBUG_POS_TO };
 private:

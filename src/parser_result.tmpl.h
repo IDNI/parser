@@ -34,84 +34,43 @@ typename parser<C, T>::pforest* parser<C, T>::result::get_forest() const {
 }
 
 template <typename C, typename T>
+bool parser<C, T>::result::good() const { return in->good(); }
+
+template <typename C, typename T>
 std::basic_string<C> parser<C, T>::result::get_input() {
 	return in->get_string();
 }
+
 template <typename C, typename T>
-parser<C, T>::psptree parser<C, T>::result::get_shaped_tree() const
+bool trimmable_node(const typename parser<C, T>::pnode& n,
+	const shaping_options& opts)
 {
-	return get_shaped_tree(f->root(), shaping);
+	if (!n.first.nt()) return n.first.is_null() || opts.trim_terminals;
+	if (opts.to_trim.find(n.first.n()) != opts.to_trim.end()) return true;
+	return false;
 }
 
 template <typename C, typename T>
-parser<C, T>::psptree parser<C, T>::result::get_shaped_tree(
-	const shaping_options opts) const
+bool trimmable_child(const typename parser<C, T>::pnode& n,
+	const typename parser<C, T>::pnode& c,
+	const shaping_options& opts)
 {
-	return get_shaped_tree(f->root(), opts);
+	if (trimmable_node<C, T>(c, opts)) return true;
+	if (n.first.nt() && opts.to_trim_children.find(n.first.n())
+			!= opts.to_trim_children.end()) return true;
+	return !c.first.nt() && opts.to_trim_children_terminals.find(n.first.n())
+		!= opts.to_trim_children_terminals.end();
 }
 
 template <typename C, typename T>
-parser<C, T>::psptree parser<C, T>::result::get_shaped_tree(const pnode& n)
-	const
+bool node_to_inline(const typename parser<C, T>::pnode& n,
+	const shaping_options& opts)
 {
-	return get_shaped_tree(n, shaping);
-}
-
-template <typename C, typename T>
-parser<C, T>::psptree parser<C, T>::result::get_shaped_tree(const pnode& n,
-	const shaping_options opts) const
-{
-	//std::cout << "getting tree for " << n.first.to_std_string() << std::endl;
-	psptree t = std::make_shared<ptree>(n);
-	pnodes_set pack;
-	auto one_of = [](const pnode& n, const std::set<size_t>& list) {
-		if (n.first.nt()) for (auto& nt : list)
-			if (n.first.n() == nt) return true;
-		return false;
-	};
-	if (!n.first.nt() && n.first.is_null()) return NULL;
-	if (n.first.nt() && !one_of(n, opts.to_trim_children)) {
-		auto it = f->g.find(n);
-		if (it == f->g.end()) {
-			//std::cout << "Not existing node " << n.first.to_std_string() << std::endl;
-			return NULL;
-		}
-		pack = it->second;
-		if (pack.size() > 1) {
-			// move ambiguous children sets each into its separate child
-			// copy them also a value of amb. node
-			// and replace value of amb. node with nt: __AMB_<ID>
-			pnode x = t->value;
-			x.first = amb_node;
-			t = std::make_shared<ptree>(x);
-			//std::cout << "Ambigous node " << n.first.to_std_string() << std::endl;
-			for (auto& nodes : pack) {
-				psptree tc = std::make_shared<ptree>(n);
-				//std::cout << "getting children for AMBIGUOUS "
-				//	<< n.first.to_std_string() << std::endl;
-				_get_shaped_tree_children(
-					opts, nodes, tc->child);
-				t->child.push_back(tc);
-			}
-		} else for (auto& nodes : pack)
-			//std::cout << "getting children for " << n.first.to_std_string() << std::endl,
-			_get_shaped_tree_children(opts, nodes, t->child);
-	}
-	//std::cout << "returning tree for " << n.first.to_std_string() << " children size = " << t->child.size() << std::endl;
-	return t;
-}
-
-template <typename C, typename T>
-void parser<C, T>::result::_get_shaped_tree_children(
-	const shaping_options& opts,
-	const pnodes& nodes,
-	std::vector<psptree>& child) const
-{
-	auto matches_inline_prefix = [](const pnode& n) {
+	if (!n.first.nt()) return false;
+	auto matches_inline_prefix = [](const parser<C, T>::pnode& n) {
 		static const std::vector<std::string> prefixes = {
 			"__E_", // ebnf prefix
 			"__B_"  // binarization prefix
-			//"__N_"  // negation prefix
 		};
 		if (n.first.nt()) {
 			auto s = n.first.to_std_string();
@@ -126,86 +85,226 @@ void parser<C, T>::result::_get_shaped_tree_children(
                         "cntrl", "digit", "graph", "lower", "printable",
                         "punct", "space", "upper", "xdigit"
 	};
-	auto one_of = [](const pnode& n, const std::set<size_t>& list) {
-		if (n.first.nt()) for (auto& nt : list)
-			if (n.first.n() == nt) return true;
-		return false;
-	};
-	auto one_of_str = [](const pnode& n,
+	auto one_of_str = [](const parser<C, T>::pnode& n,
 		const std::vector<std::string>& list)
 	{
 		return std::find(list.begin(), list.end(),
 			n.first.to_std_string()) != list.end();
 	};
-	auto get_children = [&](const pnode& n) -> pnodes_set {
-		if (one_of(n, opts.to_trim_children)) return {};
-		auto it = f->g.find(n);
-		if (it != f->g.end()) return it->second;
-		return {};
-	};
-	auto inline_children = [&](const pnode& n) {
-		for (const auto& cnodes : get_children(n))
-			//std::cout << "getting children for inlined " << chd.first.to_std_string() << std::endl,
-			_get_shaped_tree_children(opts, cnodes, child);
-	};
-	std::function<const pnode*(const pnode& n,
-		const std::vector<size_t>& tp, size_t& i)> go;
-	go = [&](const pnode& n, const std::vector<size_t>& tp, size_t& i)
-		-> const pnode*
+	if ((opts.inline_char_classes && one_of_str(n, cc_names))
+		|| matches_inline_prefix(n)) return true;
+	for (const auto& i : opts.to_inline)
+		if (i.size() == 1 && i[0] == n.first.n()) return true;
+	return false;
+}
+
+
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::get_trimmed_tree(
+	const typename parser<C, T>::pnode& n, const shaping_options opts) const
+{
+	//std::cerr << "get_trimmed_tree for node: `" << n.first.to_std_string() << "`" << std::endl;
+	auto get_children_nodes = [&](const pnode& n,
+		const pnodes& nodes, std::vector<psptree>& output)
 	{
-		if (!n.first.nt()) return 0;
-		if (matches_inline_prefix(n))
-			for (const auto& cnodes : get_children(n))
-				for (const auto& c : cnodes) {
-					const pnode* y = go(c, tp, i);
-					if (y) return go(*y, tp, i);
-				}
-		else if (n.first.nt() && n.first.n() == tp[i]) {
-			if (++i == tp.size()) return &n;
-			for (const auto& cnodes : get_children(n))
-				for (const auto& c : cnodes) {
-					const pnode* y = go(c, tp, i);
-					if (y) return i == tp.size() ? y
-								: go(*y, tp, i);
-				}
-		}
-		return 0;
-	};
-	// returns node pointer according to path from n or 0 if not found
-	auto treepath = [&go](const pnode& n, const std::vector<size_t>& tp)
-		-> const pnode*
-	{
-		size_t i = 0;
-		return go(n, tp, i);
-	};
-	std::function<bool(const pnode&)> do_inline = [&](const pnode& n) {
-		for (auto& tp : opts.to_inline)
-			if (auto p = treepath(n, tp); p) {
-				if (tp.size() == 1)
-					inline_children(*p);
-				else { // if path is more than 1 level deep
-					auto x = get_shaped_tree(*p, opts);
-					if (x && !do_inline(x->value))
-						child.push_back(x);
-				}
-				return true;
+		//std::cerr << "getting children for nodes of `" << n.first.to_std_string() << "`" << std::endl;
+		for (auto& c : nodes) {
+			//std::cerr << "getting child `" << c.first.to_std_string() << "` for node `" << n.first.to_std_string() << "`" << std::endl;
+			if (trimmable_child<C, T>(n, c, opts)) {
+				//std::cerr << "trimmable child: " << c.first.to_std_string();
+				//std::cerr << " in: " << n.first.to_std_string() << std::endl;
+				continue;
 			}
-		return false;
+			auto x = get_trimmed_tree(c, opts);
+			if (x) output.push_back(x);
+		}
 	};
-	for (auto& chd : nodes) {
-		if (one_of(chd, opts.to_trim)
-			|| (opts.trim_terminals && !chd->first.nt())) continue;
-		if (do_inline(chd)) continue;
-		if (matches_inline_prefix(chd)
-			|| (opts.inline_char_classes
-				&& one_of_str(chd, cc_names)))
-					inline_children(chd);
-		else if (!chd->first.is_null()) {
-			auto x = get_shaped_tree(chd, opts);
-			if (x) child.push_back(x);
+	psptree t = 0;
+	if (n.first.is_null()) return t;
+	if (trimmable_node<C, T>(n, opts)) {
+		//std::cerr << "\t is trimmable, skipping" << std::endl;
+		return t;
+	}
+	if (!n.first.nt()) {
+		//std::cerr << "\t terminal node, returning" << std::endl;
+		t = std::make_shared<ptree>(n);
+		return t;
+	}
+	auto f = get_forest();
+	auto it = f->g.find(n);
+	if (it == f->g.end()) {
+		//std::cerr << "\t not existing node, skipping" << std::endl;
+		return t;
+	}
+	t = std::make_shared<ptree>(n);
+	pnodes_set pack = it->second;
+	if (pack.size() > 1) {
+		//std::cerr << "Ambigous node: `" << n.first.to_std_string() << "`" << std::endl;
+		// move ambiguous children sets each into its separate child
+		// copy them also a value of amb. node
+		// and replace value of amb. node with nt: __AMB_<ID>
+		pnode x = t->value;
+		x.first = amb_node;
+		t = std::make_shared<ptree>(x);
+		//std::cout << "Ambigous node " << n.first.to_std_string() << std::endl;
+		for (auto& nodes : pack) {
+			psptree tc = std::make_shared<ptree>(n);
+			get_children_nodes(n, nodes, tc->child);
+			t->child.push_back(tc);
+		}
+	} else for (auto& nodes : pack) get_children_nodes(n, nodes, t->child);
+	return t;
+}
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::get_trimmed_tree(
+	const typename parser<C, T>::pnode& n) const
+{
+	return get_trimmed_tree(n, shaping);
+}
+
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::inline_tree_nodes(
+	const psptree& t, psptree& parent, const shaping_options opts) const
+{
+	psptree r = 0;
+	if (!t) return r;
+	auto& l = t->value->first;
+	if (l.is_null()) return r;
+	if (!l.nt()) return r = std::make_shared<ptree>(t->value), r;
+	//std::cerr << "inlining tree for node: `" << l.to_std_string() << "`" << std::endl;
+	bool do_inline = node_to_inline<C, T>(t->value, opts);
+	//std::cerr << "do_inline: " << do_inline << std::endl;
+	if (!do_inline) r = std::make_shared<ptree>(t->value);
+	psptree& rf = do_inline ? parent : r;
+	for (auto& c : t->child) {
+		auto x = inline_tree_nodes(c, rf, opts);
+		if (x) //{
+			//std::cerr << "inlining child: `" << c->value.first.to_std_string() << "`" << std::endl;
+			//std::cerr << (do_inline ? "- inlined\t" : "- passed\t") << " `"
+			//	<< x->value.first.to_std_string() << "`" << std::endl,
+			rf->child.push_back(x);
+		//} else std::cerr << "skipped\t" << c->value.first.to_std_string() << std::endl;
+	}
+	return r;
+}
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::inline_tree_nodes(
+	const psptree& t, psptree& parent) const
+{
+	return inline_tree_nodes(t, parent, shaping);
+}
+
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::inline_tree_paths(
+	const psptree& t, const shaping_options opts) const
+{
+	psptree r = 0;
+	if (!t) return r;
+	auto& l = t->value->first;
+	if (l.is_null()) return r;
+	if (!l.nt()) return r = std::make_shared<ptree>(t->value), r;
+	//std::cerr << "inlining treepath for node: `" << l.to_std_string() << "`" << std::endl;
+	for (auto& tp : opts.to_inline) {
+		if (tp.size() < 2) continue;
+		std::function<const psptree(const psptree&, size_t)>
+			go = [&](const psptree& t, size_t i) -> const psptree
+		{
+			if (!t->value->first.nt()
+				|| t->value->first.n() != tp[i]) return 0;
+			//std::cerr << "treepath go " << i << ": `"
+			//	<< t->value.first.to_std_string() << "`" << std::endl;
+			if (i == tp.size() - 1) return t;
+			for (const auto& c : t->child) {
+				auto y = go(c, i + 1);
+				if (y) return y;
+			}
+			return 0;
+		};
+		const psptree p = go(t, 0);
+		if (p) return inline_tree_paths(p, opts);
+	}
+	r = std::make_shared<ptree>(t->value);
+	for (auto& c : t->child) {
+		auto x = inline_tree_paths(c, opts);
+		if (x) r->child.push_back(x);
+	}
+	return r;
+}
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::inline_tree_paths(
+	const psptree& t) const
+{
+	return inline_tree_pathse(t, shaping);
+}
+
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::inline_tree(
+	psptree& t, const shaping_options opts) const
+{
+	auto inlined = inline_tree_nodes(t, t, opts);
+	return inline_tree_paths(inlined, opts);
+}
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::inline_tree(
+	psptree& t) const
+{
+	return inline_tree(t, shaping);
+}
+
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::trim_children_terminals(
+	const psptree& t, const shaping_options opts) const
+{
+	psptree r = 0;
+	if (!t) return r;
+	auto& l = t->value->first;
+	if (!l.nt()) return r = t, r;
+	bool trim = opts.to_trim_children_terminals.find(l.n())
+			!= opts.to_trim_children_terminals.end();
+	r = std::make_shared<ptree>(t->value);
+	for (auto& c : t->child) {
+		auto& cl = c->value->first;
+		if (cl.nt() || cl.is_null() || !trim) {
+			auto x = trim_children_terminals(c, opts);
+			if (x) r->child.push_back(x);
 		}
 	}
-};
+	return r;
+}
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::trim_children_terminals(
+	const psptree& t) const
+{
+	return trim_children_nodes(t, shaping);
+}
+
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::get_shaped_tree(
+	const typename parser<C, T>::pnode& n, const shaping_options opts) const
+{
+	//std::cout << "getting tree for " << n.first.to_std_string() << std::endl;
+	auto trimmed = get_trimmed_tree(n, opts);
+	auto inlined = inline_tree(trimmed, opts);
+	auto shaped  = trim_children_terminals(inlined, opts);
+	return shaped;
+}
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::get_shaped_tree(
+	const typename parser<C, T>::pnode& n) const
+{
+	return get_shaped_tree(n, shaping);
+}
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::get_shaped_tree(
+	const shaping_options opts) const
+{
+	return get_shaped_tree(get_forest()->root(), opts);
+}
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::get_shaped_tree() const
+{
+	return get_shaped_tree(shaping);
+}
 
 // get a first parse tree from the parse_forest optionally provide root of the tree.
 template <typename C, typename T>

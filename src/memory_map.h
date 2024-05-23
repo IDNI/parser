@@ -79,16 +79,14 @@ public:
 				: GENERIC_READ | GENERIC_WRITE,
 			FILE_SHARE_READ | FILE_SHARE_WRITE,
 			0, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
-		if (fh_ == INVALID_HANDLE_VALUE)
-			return err("cannot open file for memory map");
+		if (fh_ == INVALID_HANDLE_VALUE) return err("cannot open file");
 #else
 		if (mode_ == MMAP_WRITE && (filename_ == "" || !file_exists()))
 			create();
 		else {
 			fd_ = ::open(filename_.c_str(),mode_ == MMAP_READ ?
 				O_RDONLY : O_RDWR, 0600);
-    			if (fd_ == -1) return err(errno,
-			    		"cannot open file for memory map");
+    			if (fd_ == -1) return err(errno, "cannot open file");
 			if (mode_ == MMAP_WRITE)
 				if (truncate() == -1) return -1;
 		}

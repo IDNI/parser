@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
 
 	TEST("ebnf", "plus")
 	run_test_tgf(
-	"	@use_char_class digit. \n"
+	"	@use char classes digit. \n"
 	"	start  => digit+. \n"
 	, "1382746358690");
 	run_test_tgf(
@@ -96,7 +96,7 @@ int main(int argc, char **argv) {
 
 	TEST("ebnf", "asterisk")
 	run_test_tgf(
-	"	@use_char_class digit. \n"
+	"	@use char classes digit. \n"
 	"	start  => digit*. \n"
 	, "1382746358690");
 
@@ -118,7 +118,7 @@ int main(int argc, char **argv) {
 	if (testing::stress) {
 		TEST("stress", "basic arithmetic")
 		run_test_tgf(
-		"	@use_char_class eof, digit, space, printable. \n"
+		"	@use char class eof, digit, space, printable. \n"
 
 		"	ws_comment   => '#' eol | '#' printable_chars eol. \n"
 		"	ws_required  => space ws | ws_comment ws. \n"

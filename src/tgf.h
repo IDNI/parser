@@ -15,7 +15,6 @@
 #include <fstream>
 #include <streambuf>
 
-#include "parser_instance.h"
 #include "tgf_parser.generated.h"
 #include "traverser.h"
 #include "devhelpers.h"
@@ -51,6 +50,7 @@ struct tgf {
 	{
 		grammar_builder b(nts_);
 		auto c = s.c_str();
+		size_t line = 0;
 		size_t last = 0;
 		auto l = s.size();
 		//std::cout << "parsing: " << to_std_string(s) << std::endl;
@@ -98,11 +98,15 @@ struct tgf {
 				//}
 				//std::cout << "}\n";
 				last = i + 1;
+				size_t line_start = line;
+				for (size_t j = 0; j < nl; ++j)
+					if (nc[j] == '\n') --line_start;
 				//std::cout << "parsing: " << to_std_string(std::basic_string<C>(nc, nl)) << std::endl;
-				int ret = b.parse(nc, nl);
+				int ret = b.parse(nc, nl, line_start);
 				//std::cout << "ret:   " << ret << std::endl;
 				if (ret == 1) break;
 			}
+			if (c[i] == '\n') ++line;
 		}
 		return b.g();
 	}
@@ -149,13 +153,14 @@ private:
 			auto productions = statements || tgf_parser::production;
 			for (const auto& pr : productions()) production(pr);
 		}
-		int parse(const char* s, size_t l) {
-			auto& p = parser_instance<tgf_parser>();
+		int parse(const char* s, size_t l, size_t line) {
+			auto& p = tgf_parser::instance();
 			static tgf_parser::parse_options po{
 				.start = tgf_parser::start_statement };
 			auto r = p.parse(s, l, po);
-			if (!r.found) return std::cerr
-					<< "TGF: " << r.parse_error << "\n", 1;
+			if (!r.found) return std::cerr << "TGF: "
+				<< r.parse_error.to_str(tgf_parser::error::
+					info_lvl::INFO_BASIC, line) << "\n",1;
 			char dummy = '\0';
 			auto source = idni::rewriter::make_node_from_tree<
 				tgf_parser, char, node_variant_t>(
@@ -187,13 +192,11 @@ private:
 		void inline_dir(const traverser_t& t) {
 			for (auto& n : (t || tgf_parser::inline_arg)())
 			if ((n | get_only_child
-				| get_nonterminal) ==
-				tgf_parser::char_classes_sym)
+				| get_nonterminal) == tgf_parser::cc_sym)
 					opt.shaping.inline_char_classes = true;
 			else {
 				std::vector<size_t> tree_path{};
-				for (auto& s : (n
-					| tgf_parser::tree_path
+				for (auto& s : (n | tgf_parser::tree_path
 					|| tgf_parser::sym)())
 						tree_path.push_back(node2nt(s));
 				opt.shaping.to_inline.insert(tree_path);
@@ -208,7 +211,7 @@ private:
 			case tgf_parser::use_dir:
 				for (auto& cc : (d
 					|| tgf_parser::use_param
-					|| tgf_parser::char_class_name)())
+					|| tgf_parser::cc_name)())
 				{
 					auto s = cc | get_terminals;
 					//std::cout << "use char class: `" << s << "`\n";
@@ -230,16 +233,15 @@ private:
 					opt.shaping.to_trim_children
 						.insert(node2nt(n));
 				break;
-			case tgf_parser::inline_dir: inline_dir(d); break;
-			case tgf_parser::boolean_dir: {
-				auto action = d | tgf_parser::boolean_action;
-				opt.auto_disambiguate = !action.has_value()
-					|| (action | get_only_child
-						| get_nonterminal) ==
-							tgf_parser::enable_sym;
+			case tgf_parser::trim_children_terminals_dir:
+				for (auto& n : (d || tgf_parser::sym)())
+					opt.shaping.to_trim_children_terminals
+						.insert(node2nt(n));
 				break;
-			}
-			case tgf_parser::nodisambig_dir:
+			case tgf_parser::inline_dir: inline_dir(d); break;
+			case tgf_parser::disable_ad_dir:
+				opt.auto_disambiguate = false; break;
+			case tgf_parser::ambiguous_dir:
 				for (auto& n : (d || tgf_parser::sym)())
 					opt.nodisambig_list.insert(node2nt(n));
 				break;

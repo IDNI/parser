@@ -167,7 +167,12 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		}
 		if (g.opt.shaping.to_trim_children.size()) {
 			os << "\t\t.to_trim_children = {";
-			plist(os, g.opt.shaping.to_trim_children) << "\n\t\t},\n";
+			plist(os, g.opt.shaping.to_trim_children)<<"\n\t\t},\n";
+		}
+		if (g.opt.shaping.to_trim_children_terminals.size()) {
+			os << "\t\t.to_trim_children_terminals = {";
+			plist(os, g.opt.shaping.to_trim_children_terminals)
+								<< "\n\t\t},\n";
 		}
 		os << "\t\t.trim_terminals = "
 			<< pbool[g.opt.shaping.trim_terminals] << ",\n";
@@ -235,35 +240,36 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		"using char_type     = " << opt.char_type << ";\n"
 		"using terminal_type = " << opt.terminal_type << ";\n"
 		"\n"
-		"static inline std::vector<std::string> symbol_names{"
+		"inline std::vector<std::string> symbol_names{"
 			<< gen_nts() <<
 		"};\n"
 		"\n"
-		"static inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};\n"
+		"inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};\n"
 		"\n"
-		"static inline std::vector<terminal_type> terminals{\n"
+		"inline std::vector<terminal_type> terminals{\n"
 			<< gen_ts() <<
 		"};\n"
 		"\n"
-		"static inline ::idni::char_class_fns<terminal_type> char_classes =\n"
+		"inline ::idni::char_class_fns<terminal_type> char_classes =\n"
 		"	::idni::predefined_char_classes<char_type, terminal_type>({\n"
 			<< gen_cc_fns() <<
 		"	}, nts);\n"
 		"\n"
-		"static inline struct ::idni::grammar<char_type, terminal_type>::options\n"
+		"inline struct ::idni::grammar<char_type, terminal_type>::options\n"
 		"	grammar_options\n"
 		"{\n"
 		"	.transform_negation = false,\n"
 			<< gen_grammar_opts() <<
 		"};\n"
-		"static inline ::idni::parser<char_type, terminal_type>::options parser_options{\n"
+		"\n"
+		"inline ::idni::parser<char_type, terminal_type>::options parser_options{\n"
 			<< gen_opts() <<
 		"};\n"
 		"\n"
-		"static inline ::idni::prods<char_type, terminal_type> start_symbol{ nts("
+		"inline ::idni::prods<char_type, terminal_type> start_symbol{ nts("
 						<< gi.start().n() << ") };\n"
 		"\n"
-		"static inline idni::prods<char_type, terminal_type>& productions() {\n"
+		"inline idni::prods<char_type, terminal_type>& productions() {\n"
 		"	static bool loaded = false;\n"
 		"	static idni::prods<char_type, terminal_type>\n"
 		"		p, nul(idni::lit<char_type, terminal_type>{});\n"
@@ -276,7 +282,7 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		"	return loaded = true, p;\n"
 		"}\n"
 		"\n"
-		"static inline ::idni::grammar<char_type, terminal_type> grammar(\n"
+		"inline ::idni::grammar<char_type, terminal_type> grammar(\n"
 		"	nts, productions(), start_symbol, char_classes, grammar_options);\n"
 		"\n"
 		"} // namespace " << opt.name << "_data\n"
@@ -293,6 +299,15 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		"	" << opt.name << "() : idni::parser<char_type, terminal_type>(\n"
 		"		" << opt.name << "_data::grammar,\n"
 		"		" << opt.name << "_data::parser_options) {}\n"
+		"	size_t id(const std::basic_string<char_type>& name) {\n"
+		"		return " << opt.name << "_data::nts.get(name);\n"
+		"	}\n"
+		"	const std::basic_string<char_type>& name(size_t id) {\n"
+		"		return " << opt.name << "_data::nts.get(id);\n"
+		"	}\n"
+		"	symbol_type literal(const nonterminal& nt) {\n"
+		"		return symbol_type(nt, &" << opt.name << "_data::nts);\n"
+		"	}\n"
 		"};\n"
 		"\n";
 	if (opt.ns.size()) os << "\n} // " <<opt.ns<< " namespace\n";

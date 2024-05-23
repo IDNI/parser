@@ -1,4 +1,4 @@
-@use_char_class digit, printable.
+@use char classes digit, printable.
 
 integer    => [ '-' ] digit+.
 
