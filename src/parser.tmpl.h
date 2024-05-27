@@ -684,9 +684,13 @@ std::string parser<C, T>::error::to_str(info_lvl elvl, size_t line_start) const{
 	ss = {}, ss << "Syntax Error: Unexpected " << s << " at "
 		<< (line_start+line) << ":" << col << " (" << loc+1 << "): ";
 	for (size_t i = ctxt.size() - 1; i != 0; --i)
-		if constexpr (std::is_same_v<T, char32_t>)
-			ss << to_std_string(ctxt[i]);
-		else ss << ctxt[i];
+		if (ctxt[i] != static_cast<T>(0)
+			&& ctxt[i] != static_cast<T>(-1))
+		{
+			if constexpr (std::is_same_v<T, char32_t>)
+				ss << to_std_string(ctxt[i]);
+			else ss << ctxt[i];
+		}
 	if (elvl == INFO_BASIC) return ss.str();
 	for (auto& e : expv) {
 		ss << "\n...expecting " << e.exp << " due to (" << e.prod_nt
@@ -718,9 +722,9 @@ std::vector<typename parser<C, T>::item> parser<C, T>::back_track(
 		auto pit = std::find_if(S[cur.from].begin(), S[cur.from].end(),
 			[&](const item& a)
 		{
-			return exists.find(a) == exists.end() &&
-				get_lit(a) == get_nt(cur) &&
-				cur.from == a.set;
+			return !completed(a) && exists.find(a) == exists.end()
+				&& get_lit(a) == get_nt(cur)
+				&& cur.from == a.set;
 		});
 		if (pit != S[cur.from].end()) cur = *pit, exists.insert(cur);
 		else break;
