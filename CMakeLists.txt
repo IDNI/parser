@@ -14,6 +14,7 @@ option(MEASURE_EACH_POS
 	"measure and print time spent on each position of the input string"
 	FALSE)
 option(WITH_DEVHELPERS "add to_dot, to_tml and to_tml_rules functions" FALSE)
+option(PARSER_ADDRESS_SANITIZER "enable address sanitizer" FALSE)
 ################################################################################
 option(PARSER_BUILD_STATIC_LIBRARY "build static library" FALSE)
 option(PARSER_BUILD_SHARED_LIBRARY "build shared library" FALSE)
@@ -42,7 +43,13 @@ message(STATUS "PARSER_BUILD_SHARED_LIBRARY: ${PARSER_BUILD_SHARED_LIBRARY}")
 message(STATUS "PARSER_BUILD_TESTS: ${PARSER_BUILD_TESTS}")
 message(STATUS "PARSER_BUILD_EXAMPLES: ${PARSER_BUILD_EXAMPLES}")
 message(STATUS "PARSER_BUILD_TOOLS: ${PARSER_BUILD_TOOLS}")
+message(STATUS "PARSER_ADDRESS_SANITIZER: ${PARSER_ADDRESS_SANITIZER}")
 ################################################################################
+
+if(PARSER_ADDRESS_SANITIZER)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
+	set(CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -fsanitize=address")
+endif()
 
 # load common cmake settings and load functions
 # 		target_setup(), target_compile_definitions_if() and exclude()
