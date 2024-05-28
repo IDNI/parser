@@ -22,18 +22,11 @@ using namespace idni::term;
 
 static inline term::colors TC;
 
-
-template <typename C, typename T>
-std::map<const typename parser<C,T>::pnode,
-	typename forest<typename parser<C,T>::pnode>::node>
-		parser<C,T>::pnode::nid;
-
-
 template <typename C, typename T>
 typename forest<typename parser<C,T>::pnode>::node
 	parser<C,T>::pnode::ptrof(
 		const typename parser<C,T>::pnode& pn) {
-	auto r = nid.emplace( pn, nullptr );
+	auto r = nid().emplace( pn, nullptr );
 	if (r.second) r.first->second.id = &(r.first->first);
 		// r.first->second = typename
 		// forest<typename parser<C,T>::pnode>::node(&(r.first->first));
@@ -470,7 +463,7 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 	auto f = std::make_unique<pforest>();
 	S.clear(), U.clear(), bin_tnt.clear(), refi.clear(),
 		gcready.clear(), sorted_citem.clear(), rsorted_citem.clear();
-	//pnode::nid.clear();
+	//pnode::nid().clear();
 	MS(int gcnt = 0;) // count of collected items
 	tid = 0;
 	S.resize(1);

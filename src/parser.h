@@ -225,7 +225,13 @@ public:
 		friend forest<pnode>;
 	private:
 		static typename forest<pnode>::node ptrof(const pnode& p);
-		static std::map<const pnode, typename forest<pnode>::node> nid;
+		static std::map<const pnode,
+			typename forest<pnode>::node>& nid()
+		{
+			static std::map<const pnode,
+					typename forest<pnode>::node> instance;
+			return instance;
+		}
 	public:
 		pnode() {}
 		pnode(const lit<C, T>& _f, const std::array<size_t, 2>& _s)
@@ -234,7 +240,7 @@ public:
 			return ptrof(*this);
 		}
 		inline size_t _mpsize() const {
-			return nid.size();
+			return nid().size();
 		}
 		//inline lit<C,T> &first() const { return this->first; }
 		//inline std::array<size_t, 2>& second() const { return this->second; }

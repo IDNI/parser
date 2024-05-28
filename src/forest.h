@@ -86,13 +86,13 @@ private:
 			return id == rhs.id;
 		}
 		~nptr_t() {
-			//DBG(std::cout <<"-"<< NodeT::nid.size() <<" "<<nc );
+			//DBG(std::cout <<"-"<< NodeT::nid().size() <<" "<<nc );
 			//if(id){
-				if ((nc == (NodeT::nid.size() + 1))) {
+				if ((nc == (NodeT::nid().size() + 1))) {
 					//DBG(std::cout<<"GCing nodes:  "<< nc-1 <<std::endl);
 					nc--;
-					NodeT::nid.clear();
-					//DBG(std::cout <<"-D"<< NodeT::nid.size() <<" "<<nc) ;
+					NodeT::nid().clear();
+					//DBG(std::cout <<"-D"<< NodeT::nid().size() <<" "<<nc) ;
 				}
 				else if (nc > 0) nc--;
 				id = 0; //dont delete as nid.clear takes responsibility
