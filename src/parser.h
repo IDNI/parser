@@ -15,6 +15,7 @@
 #include <array>
 #include <variant>
 #include <unordered_set>
+#include <unordered_map>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -66,6 +67,10 @@ struct lit : public std::variant<size_t, T> {
 	size_t n() const;
 	T      t() const;
 	bool is_null() const;
+	auto hash() const {
+		
+		return std::hash<std::variant<size_t,T>>{}(*(std::variant<size_t,T>*)this); 
+	}
 
 	// IDEA maybe we could use directly the default operator<=> for lit
 	auto operator<=>(const lit<C, T>& l) const;
@@ -220,11 +225,13 @@ public:
 	using node_type       = std::pair<symbol_type, location_type>;
 	using parser_type     = idni::parser<char_type, terminal_type>;
 
+	struct mhash;
+
 	struct pnode : public node_type {
 		friend forest<pnode>;
 		private:
 	   	static typename forest<pnode>::node ptrof(const pnode& p);
-		static std::map<const pnode, typename forest<pnode>::node> nid;
+		static std::unordered_map<const pnode, typename forest<pnode>::node, mhash> nid;
 		public:
 		pnode(){}
 		pnode(const lit<C,T> &_f, const std::array<size_t,2> &_s):
@@ -235,8 +242,21 @@ public:
 		inline size_t _mpsize() const {
 			return nid.size();
 		}
+		size_t hash() const
+    	{
+			return this->first.hash()^
+			std::hash<size_t>{}(this->second[0])^
+			std::hash<size_t>{}(this->second[1]);
+				   
+    	}
+
 		//inline lit<C,T> &first() const { return this->first; }
 		//inline std::array<size_t, 2>& second() const { return this->second; }
+	};
+	struct mhash{
+		size_t operator()(const struct pnode & obj) const {
+			return obj.hash(); 
+		}
 	};
 	using pforest		  = forest<pnode>;
 	using pnodes          = pforest::nodes;

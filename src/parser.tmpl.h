@@ -24,8 +24,9 @@ static inline term::colors TC;
 
 
 template <typename C, typename T>
-std::map<const typename parser<C,T>::pnode,
-	typename forest<typename parser<C,T>::pnode>::node>
+std::unordered_map<const typename parser<C,T>::pnode,
+	typename forest<typename parser<C,T>::pnode>::node,
+	typename parser<C,T>::mhash >
 		parser<C,T>::pnode::nid;
 
 
@@ -33,7 +34,7 @@ template <typename C, typename T>
 typename forest<typename parser<C,T>::pnode>::node
 	parser<C,T>::pnode::ptrof(
 		const typename parser<C,T>::pnode& pn) {
-	auto r = nid.emplace( pn, nullptr );
+	auto r = nid.insert( {pn, nullptr} );
 	if (r.second) r.first->second.id = &(r.first->first);
 		// r.first->second = typename 
 		// forest<typename parser<C,T>::pnode>::node(&(r.first->first));		

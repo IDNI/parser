@@ -85,8 +85,15 @@ struct forest {
 		inline bool operator == (const nptr_t& rhs) const {
 			return id == rhs.id;
 		}
+		inline auto hash() const{
+			// go by the pointer value as the nptr_t is already
+			// ensuring there is a unique ptr per pnode
+			// ...deep hash could be to do based on NodeT::hash
+			// ...then different id could be treated same
+			return size_t(id);
+		}
 		~nptr_t() { 
-			//DBG(std::cout <<"-"<< NodeT::nid.size() <<" "<<nc ); 
+			DBG(assert(nc != 0)); 
 			//if(id){	
 				if((nc == (NodeT::nid.size() + 1)) ){
 					DBG(std::cout<<"GCing nodes:  "<< nc-1 <<std::endl);
@@ -101,11 +108,16 @@ struct forest {
 		//inline lit<C,T> &first() const { DBG(assert(id!=0)); return id->first; }
 		//inline std::array<size_t, 2>& second() const { DBG(assert(id!=0)); return id->second; } 	
 	};
+	struct nhash {
+		size_t operator()(const nptr_t &n) const{
+			return (size_t)n.hash();
+		}
+	};
 	public:
 	using node       = nptr_t;
 	using nodes      = std::vector<node>;
 	using nodes_set  = std::set<nodes>;
-	using node_graph = std::map<node, nodes_set>;
+	using node_graph = std::unordered_map<node, nodes_set, nhash>;
 	using edge       = std::pair<size_t, size_t>;
 	struct tree {
 		node value;
