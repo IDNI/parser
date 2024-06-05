@@ -64,7 +64,7 @@ cli::commands tgf_commands() {
 
 	auto help = OPT(cli::option("help",   'h', false));
 		DESC("detailed information about command options");
-	auto start = OPT(cli::option("start", 's', "start"));
+	auto start = OPT(cli::option("start", 's', ""));
 		DESC("starting literal");
 	auto print_grammar = OPT(cli::option("grammar", 'g', true));
 		DESC("prints grammar");
@@ -394,6 +394,8 @@ void tgf_repl_evaluator::update_opts_by_grammar_opts() {
 		for (const auto& s : tp) v.push_back(nts->get(s));
 		opt.to_inline.insert(v);
 	}
+	if (opt.start.size() == 0)
+		opt.start = g->start_literal().to_std_string();
 }
 
 void tgf_repl_evaluator::set_repl(repl<tgf_repl_evaluator>& r_) {

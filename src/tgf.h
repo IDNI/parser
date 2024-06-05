@@ -219,7 +219,8 @@ private:
 				}
 				break;
 			case tgf_parser::start_dir:
-				start = prods_t(node2nt(d | tgf_parser::sym));
+				start = prods_t(nts(d
+					| tgf_parser::sym | get_terminals));
 				break;
 			case tgf_parser::trim_terminals_dir:
 				opt.shaping.trim_terminals = true;

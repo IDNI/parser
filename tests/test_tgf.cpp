@@ -115,6 +115,12 @@ int main(int argc, char **argv) {
 	"	start  => '1' ( '0' '0' )* '1'. \n"
 	, "11");
 
+	TEST("directives", "start directive")
+	run_test_tgf(
+	"	@start S. \n"
+	"	S  => S S S | S S | '1'. \n"
+	, "111");
+
 	if (testing::stress) {
 		TEST("stress", "basic arithmetic")
 		run_test_tgf(
