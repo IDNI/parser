@@ -259,7 +259,7 @@ struct post_order_recursive_traverser {
 private:
 	node_t traverse (const node_t n, auto& query, auto& wrapped) {
 		std::vector<node_t> children;
-		for (const auto c : n->child)
+		for (const auto& c : n->child)
 			if (query(c)) children.push_back(traverse(c, query, wrapped));
 		return wrapped(n, children);
 	}
