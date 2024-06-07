@@ -246,6 +246,25 @@ private:
 	}
 };
 
+template<typename node_t>
+struct post_order_recursive_traverser {
+	auto operator() (const node_t n, auto& query, auto& wrapped) {
+		if (query(n))
+			return traverse(n, query, wrapped);
+		else {
+			std::vector<node_t> c;
+			return wrapped(n, c);
+		}
+	}
+private:
+	node_t traverse (const node_t n, auto& query, auto& wrapped) {
+		std::vector<node_t> children;
+		for (const auto c : n->child)
+			if (query(c)) children.push_back(traverse(c, query, wrapped));
+		return wrapped(n, children);
+	}
+};
+
 // visitor that produces nodes transformed accordingly to the
 // given transformer. It only works with post order traversals.
 template <typename wrapped_t, typename input_node_t,
