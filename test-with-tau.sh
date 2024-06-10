@@ -1,13 +1,24 @@
 #!/bin/bash
 
 # This helper script clones tau-lang and compiles it with current parser code.
-# Then it run tau-lang tests to check if parser changes do not break tau-lang.
+# Then it runs tau-lang tests to check if parser changes do not break tau-lang.
 #
 # This script accepts an optional argument: BUILD_TYPE.
-# It is one of "debug" or "release".
+# It can be one of "debug" or "release".
 # "release" is default if no argument is provided
 
 TAUDIR="./tau-lang"
+
+# check the first argument if it contains "release" or "debug".
+# if no argument is provided "release" is used
+BUILD_TYPE="${1:-release}"
+BUILD_TYPE=$(echo "$BUILD_TYPE" | tr '[:upper:]' '[:lower:]')
+BUILD_TYPES=("release" "debug")
+if [[ ! " ${BUILD_TYPES[@]} " =~ " ${BUILD_TYPE} " ]]; then
+	echo "Invalid build type: ${BUILD_TYPE}"
+	echo "Valid build types are: ${BUILD_TYPES[*]}"
+	exit 1
+fi
 
 # clone tau
 if [ ! -d "$TAUDIR" ]; then
@@ -37,19 +48,8 @@ rm -rf external/parser/*
 # copy current parser source to place where tau expects it
 cp -r ../cmake ../src ../tools ../CMakeLists.txt external/parser
 
-# check the first argument if it contains "release" or "debug".
-# if no argument is provided "release" is used
-BUILD_TYPE="${1:-release}"
-BUILD_TYPE=$(echo "$BUILD_TYPE" | tr '[:upper:]' '[:lower:]')
-BUILD_TYPES=("release" "debug")
-if [[ ! " ${BUILD_TYPES[@]} " =~ " ${BUILD_TYPE} " ]]; then
-	echo "Invalid build type: ${BUILD_TYPE}"
-	echo "Valid build types are: ${BUILD_TYPES[*]}"
-	exit 1
-fi
-
-# build release version of tau with tests
+# build tau with tests
 ./$BUILD_TYPE.sh -DTAU_BUILD_TESTS=ON
 
-# run release tests
+# run tests
 ./test-$BUILD_TYPE.sh
