@@ -88,17 +88,17 @@ lit<C, T> nonterminals<C, T>::operator()(size_t n) {
 }
 //-----------------------------------------------------------------------------
 template <typename C, typename T>
-lit<C, T>::lit() : lit_t(static_cast<T>(0)), is_null_(true) { }
+lit<C, T>::lit() : data(static_cast<T>(0)), is_null_(true) { }
 template <typename C, typename T>
-lit<C, T>::lit(T c) : lit_t(c), nts(0) { }
+lit<C, T>::lit(T c) : data(c), nts(0) { }
 template <typename C, typename T>
-lit<C, T>::lit(size_t n, nonterminals<C, T>* nts) : lit_t(n), nts(nts) { }
+lit<C, T>::lit(size_t n, nonterminals<C, T>* nts) : data(n), nts(nts) { }
 template <typename C, typename T>
-bool lit<C, T>::nt() const { return std::holds_alternative<size_t>(*this); }
+bool lit<C, T>::nt() const { return std::holds_alternative<size_t>(data); }
 template <typename C, typename T>
-size_t lit<C, T>::n() const { return std::get<size_t>(*this); }
+size_t lit<C, T>::n() const { return std::get<size_t>(data); }
 template <typename C, typename T>
-T lit<C, T>::t() const { return std::get<T>(*this); }
+T lit<C, T>::t() const { return std::get<T>(data); }
 template <typename C, typename T>
 bool lit<C, T>::is_null() const { return is_null_; }
 template <typename C, typename T>

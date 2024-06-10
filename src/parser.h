@@ -54,9 +54,8 @@ private:
 
 // literal containing terminal (c where if c = 0 then null) or nonterminal (n)
 template <typename C = char, typename T = C>
-struct lit : public std::variant<size_t, T> {
-	typedef std::variant<size_t, T> lit_t;
-	using typename lit_t::variant;
+struct lit {
+	std::variant<size_t, T> data;
 	nonterminals<C, T>* nts = 0;
 	bool is_null_ = false;
 	lit();
