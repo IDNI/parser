@@ -11,3 +11,4 @@ graph_grammar_rules*.tml
 forest_grammar_rules*.tml
 .local
 .*_history
+./tau-lang
