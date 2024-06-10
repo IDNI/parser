@@ -392,7 +392,7 @@ void tgf_repl_evaluator::update_opts_by_grammar_opts() {
 	for (const auto& tp : g->opt.shaping.to_inline) {
 		vector<string> v;
 		for (const auto& s : tp) v.push_back(nts->get(s));
-		opt.to_inline.insert(v);
+		opt.to_inline.insert(std::move(v));
 	}
 	if (opt.start.size() == 0)
 		opt.start = g->start_literal().to_std_string();
@@ -835,7 +835,7 @@ void help(size_t nt = tgf_repl_parser::help_sym) {
 		<< "  delete                       remove value from the list\n"
 		<< "\n"
 		<< "grammar commands:\n"
-		<< "  grammar or n                 show TGF grammar\n"
+		<< "  grammar or g                 show TGF grammar\n"
 		<< "  internal-grammar or ig or i  show TGF grammar\n"
 		<< "  start or s                   show or change start symbol\n"
 		<< "  unreachable or u             show unreachable productions\n"

@@ -1,8 +1,6 @@
 set(EXAMPLES
 	basic_arithmetic
 	basic_arithmetic_tgf
-	#tml_parser
-	#bitparser
 	csv_parser
 	csv_parser1
 	csv_parser2
