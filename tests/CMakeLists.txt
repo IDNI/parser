@@ -4,6 +4,7 @@ set(TESTS
 	parser
 	tgf
 	cli
+	bintree
 )
 
 foreach(X IN LISTS TESTS)
