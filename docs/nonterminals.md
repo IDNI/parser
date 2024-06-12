@@ -24,6 +24,18 @@ nonterminals<char32_t> nts32;
 nonterminals<char, char32_t> nts_utf8;
 ```
 
+### nonterminals(const std::vector<std::basic_string<C>>& list);
+### nonterminals(std::initializer_list<std::basic_string<C>> init_list);
+
+Create a container and initialize it with the provided list.
+
+```
+nonterminals nts({ "start", "sym", "char" });
+nonterminals<char32_t> nts32({ U"start", U"expr" });
+nonterminals<char, char32_t> nts_utf8(std::vector<std::string>>{ "start", "a", "b" });
+```
+
+
 ## methods
 
 ### size_t get(const std::basic_string\<C>& s);
@@ -49,4 +61,12 @@ this operator returns a non-terminal literal by it's name. If the name does not 
 
 ```
 lit l_identifier = nts("identifier");
+```
+
+### lit<C, T> operator()(size_t nt);
+
+this operator returns a non-terminal literal by it's id.
+
+```
+lit l_identifier = nts(1);
 ```

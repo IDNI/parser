@@ -20,45 +20,44 @@ parser<> parser_with_binarization(g, o);
 
 ## methods
 
-### std::unique_ptr<parser<C, T>::forest> parse(..., size_t size, int_type eof);
+### parser<C, T>::result parse(..., parse_options po);
+
+Depending on your input source there are several parse methods available:
 
 ```
-std::unique_ptr<parser<C, T>::forest> parse(const C* data,
-	size_t size, size_t max_length, int_type eof);
+parser<C, T>::result parse(const C* data, size_t size, parse_options po);
 ```
 ```
-std::unique_ptr<parser<C, T>::forest> parse(int filedescriptor,
-	size_t max_length, int_type eof);
+parser<C, T>::result parse(std::basic_istream<C>& is, parse_options po);
 ```
 ```
-std::unique_ptr<parser<C, T>::forest> parse(std::basic_istream<C>& is,
-	size_t max_length, int_type eof);
+parser<C, T>::result parse(const std::string& filename, parse_options po);
+```
+```
+parser<C, T>::result parse(int filedescriptor, parse_options po); // WIN32 only
 ```
 
-`parse` accepts an input `data` pointer, a `filedescriptor` of an input file or an input stream `is`
+`parse` accepts an input `data` pointer with its `size`, an input stream `is`, a `filename` or a windows `filedescriptor`.
 
-Other two parameters are optional:
+Another argument is `parser::parse_options` and it's optional.
 - `size` length of the data
 - `max_length` to specify a maximum length of the parsed input or 0 if not limiting (defaults to 0)
 - `eof`, ie end of file character (defaults to `std::char_traits<C>::eof()`)
 
-`parse` returns unique pointer to the parsed forest `std::unique_ptr<parser<C, T>::forest>`
+`parse` method call returns `parse<C, T>::result`
 
 ```
 parser p(g); // g is a grammar created before
 
 // parse data from a data pointer
-auto f1 = p.parse("1+2/1", 5);
+auto r1 = p.parse("1+2/1", 5);
 
 // parse up to 5 characters from a file (by provided file descriptor)
-int fd = open("input.txt", O_RDONLY);
-auto f2 = p.parse(fd, 5);
-close(fd);
+auto r2 = p.parse("input.txt");
 
 // parse up to 10 characters from an input stream
 // terminating if an end of line reached
-std::ifstream is("input.txt");
-auto f3 = p.parse(is, 10, '\n');
+auto r3 = p.parse(is, { .max_length = 10, .eof = '\n' });
 ```
 
 ### bool found();

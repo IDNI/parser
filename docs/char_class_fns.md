@@ -55,6 +55,15 @@ Checks if the non-terminal with the id `nt` is a character class function.
 cc.is_fn(binary_digit);
 ```
 
+### bool is_eof_fn(size_t nt) const;
+
+Checks if the non-terminal with the id `nt` is the `eof` character class function.
+
+```
+cc.is_eof_fn(1);
+```
+
+
 ## predefined character class functions
 
 Library provides common [character classes](charclasses.md) and it offers a helper function which can return a `char_class_fns` container with one or more of these predefined functions.

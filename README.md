@@ -75,27 +75,53 @@ Click on the type name in the following list to see more detailed documentation 
 - [`nonterminals`](docs/nonterminals.md) - id map of non-terminals to their names
 - [`lit`](docs/lit.md), [`lits`](docs/lits.md), [`conjs`](docs/conjs.md), [`disjs`](docs/disjs.md), [`prod`](docs/prod.md) and [`prods`](docs/prods.md) - basic building blocks for creating a grammar programatically. `prods` represents a grammar containing production rules as disjunctions of conjunctions of sequences of literals.
 - [`char_class_fn`, `char_class_fns`](docs/char_class_fns.md) - Character class function is an alternative way to create a production rule. It is a function returning true if a terminal character is a member of a character class. It can be custom or there are predefined cctype-like functions (isalnum, isdigit...) provided. `char_class_fns` is a container for such functions.
+- [`shaping_options`](docs/shaping_options.md) - options for shaping a parsed tree
+- [`grammar::options`](docs/grammar_options.md) - options for grammar
 - [`grammar`](docs/grammar.md) - represents a grammar created from production rules `prods` and character class functions `char_class_fns`.
-- [`parser`](docs/parser.md) - uses a `grammar` for parsing input which produces a `forest`
 - [`parser::options`](docs/parser_options.md) - plain struct of options changing behavior of the parser
-- [`parser::input`](docs/parser_input.md) - wraper for an input data pointer, an input stream or a file (by filedescriptor) which provides an API to access it from a parser or a decoder
+- [`parser`](docs/parser.md) - uses a `grammar` for parsing an input and produces a `result`
+- [`parser::result`](docs/parser_result.md) - result of parsing containing the parsed forest
 - [`parser::error`](docs/parser_error.md) - detailed information about a parse error
+- [`parser::input`](docs/parser_input.md) - wraper for an input data pointer, an input stream or a file. It provides an API to access it from a parser or a decoder
+- [`parser::pnode`](docs/parser_pnode.md) - parser's forest node
 - [`forest`](docs/forest.md) - a result of parsing containing all the parsed trees. Provides means of traversal or extraction of trees or graphs.
 - [`forest::graph`](docs/forest_graph.md) - a graph extracted from a forest
 - [`forest::tree`](docs/forest_tree.md) - a tree extracted from a graph
-- [`tgf`](docs/tgf.md) - Tau Grammar form parser - reads a grammar in TGF format from a string or a file. An alternative way to describe grammar instead of creating it programatically.
+- [`tgf`](docs/tgf.md) - Tau Grammar Form parser - reads a grammar in TGF format from a string or a file. An alternative way to describe a grammar instead of creating it programatically.
+- [`traverser`](docs/traverser.md) - struct for traversing and accessing rewriter trees
+- rewriting - API for rewriting a resulting parse tree
+- measure - simple struct for measuring time
 
+### Classes and structs usable for building command line interfaces
+
+- cli - provides CLI arguments management and processing
+- repl - provides terminal (currently only Linux is supported) REPL UI
+- term_colors - provides terminal color escape codes
 
 ## Functions
 
 There are several areas covered by functions provided by this library
 
 - [predefined character class functions](docs/charclasses.md) - cctype-like predefined character class functions
-- [terminals extraction](docs/terminals_extraction.md) - conversion of forest terminals to int or string
 - [recoders](docs/recoders.md) - decoder and encoder for UTF-8 in `char` <-> Unicode in `char32_t`
 - [UTF-8](docs/utf8.md) - UTF-8 and Unicode support
 - [devhelpers](docs/devhelpers.md) - helper forest transformations to various formats (TML facts, TML rules, DOT) useful when developing a parser
 
+
+<a name="tau-grammar-form"></a>
+
+## TGF - Tau Grammar Form
+
+TGF is an EBNF-based form to describe grammars. Specification of the form can be found on page [`Tau Grammar Form`](docs/tau_grammar_form.md)
+
+
+<a name="tgf-tool"></a>
+
+## TGF tool
+
+This library comes with a CLI executable `tgf` which features viewing, testing and debugging grammars written in TGF and it can also generate a C++ code from TGF grammar which is then usable in a C++ project.
+
+More detailed information about this CLI can be found on page [`TGF tool`](docs/tgf_tool.md)
 
 ## Tutorials
 
