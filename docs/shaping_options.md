@@ -1,4 +1,4 @@
-[back to index](../README.md#overview-of-types)
+[back to index](../README.md#classes-and-structs)
 
 # shaping_options
 
@@ -55,7 +55,7 @@ This can be populated by `@inline` directive.
 
 ### bool inline_char_classes;
 
-If `inline_char_classes` is `true`. Shaping will also inline all character class functions. Is a short alternative to adding them into `to_inline` or `@inline` one by one.
+If `inline_char_classes` is `true` shaping will also inline all character class functions. Is a short alternative to adding them into `to_inline` or `@inline` one by one.
 
 Default value is `false`.
 

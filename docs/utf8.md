@@ -1,4 +1,4 @@
-[back to index](../README.md#overview-of-types)
+[back to index](../README.md#classes-and-structs)
 
 # UTF-8
 

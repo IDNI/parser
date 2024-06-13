@@ -1,4 +1,4 @@
-[back to index](../README.md#overview-of-types)
+[back to index](../README.md#classes-and-structs)
 
 # lit
 
@@ -139,4 +139,3 @@ lit<char> l_identifier = nts("identifier"),
 Returns the literal as a standard string (basic_string\<char>). This is useful for printing literals into standard output.
 
 This method works in a same way as the previous method `to_string()` and converts the result into a `std::string` if it isn't already.
-

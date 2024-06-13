@@ -24,7 +24,6 @@
 #include <stdio.h>
 #include <termios.h>
 
-// TODO (HIGH) support inputs longer then terminal width (currently breaks the input line)
 // TODO (MEDIUM) support multiline input (containing '\n') - escape new lines?
 // TODO (MEDIUM) windows support (+ test on mac since it should work on POSIX)
 // TODO (LOW) implement clear directly (not by calling system(clear/cls) and
