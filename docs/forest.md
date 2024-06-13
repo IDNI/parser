@@ -1,4 +1,4 @@
-[back to index](../README.md#overview-of-types)
+[back to index](../README.md#classes-and-structs)
 
 # forest
 
@@ -8,18 +8,23 @@ template <typename NodeT> struct forest;
 
 `forest` is a structure which can contain multiple trees. Nodes can have multiple sets of children where more than one set represents splitting of trees meaning the part from root to the node is shared among all trees splitted.
 
-It offers methods for traversal or tree or graph extractions.
+It offers methods counting trees, traversal or tree or graph extractions.
 
-`forest` is a generic structure since the type of nodes is templated.
+`forest` is a generic structure since the type of nodes `NodeT` is templated.
 
 ### parse forest
 
-This library uses `forest` to represent all parse trees parsed from a given input. Each `parser<C, T>::parse(...)` call produces a `forest` with a type `std::pair<lit<C, T>, std::array<size_t, 2>>` where `lit<C, T>` is a parsed literal and the array contains starting and ending position of a literal in an input string.
+This library uses `forest` to represent all parse trees parsed from a given input. Each `parser<C, T>::parse(...)` call produces a `parser<C, T>::result` which contins a parsed forest (accessible with `get_forest()`). Parse nodes uses type (`NodeT`) `std::pair<lit<C, T>, std::array<size_t, 2>>` where `lit<C, T>` is a parsed literal and the array contains position span of a literal in an input string.
 
-`parser` declares types `pnode` for a parse node and `pforest` for a parse forest:
+`parser` provides type [`pnode`](parser_pnode.md) for used as `NodeT` templated type and type `pforest` for a parse forest:
+
 ```
-typedef typename std::pair<lit<C, T>, std::array<size_t, 2>> pnode;
-typedef forest<pnode> pforest;
+class parser {
+	// ...
+public:
+	using pforest forest<pnode>;
+	// ...
+}
 ```
 
 ## constructor
@@ -64,11 +69,6 @@ For a given node `p` sets the new set of subforests with children nodes and retu
 For a given node `p` returns set of subforests with children nodes.
 
 
-### bool is_binarized() const;
-
-Returns true if the forest is binarized, ie. each node has up to 2 children.
-
-
 ### size_t count_trees(const NodeT& p) const;
 
 Counts and returns a number of trees under a `p` node.
@@ -77,6 +77,22 @@ Counts and returns a number of trees under a `p` node.
 ### size_t count_trees() const;
 
 Counts and returns a number of trees in a whole forest.
+
+
+### bool is_binarized() const;
+
+Returns true if the forest is binarized, ie. each node has up to 2 children.
+
+
+### template<typename TraversableT> bool detect_cycle(TraversableT& g) const;
+
+Returns true if there exist a cycle in a `g`.
+
+```
+// having a forest f and a graph fg
+if (f->detect_cycle(fg)) cout << "cycle detected\n";
+else cout << "no cycles\n";
+```
 
 
 ### std::vector<graph> extract_graphs(const NodeT& root, cb_next_graph_t cb_next_graph, bool unique_edge = true) const;
@@ -93,15 +109,6 @@ auto next_g = [](parser<C, T>::pforest::graph& fg) {
 f->extract_graphs(f->root(), next_g);
 ```
 
-### template<typename TraversableT> bool detect_cycle(TraversableT& g) const;
-
-Returns true if there exist a cycle in a `g`.
-
-```
-// having a forest f and a graph fg
-if (f->detect_cycle(fg)) cout << "cycle detected\n";
-else cout << "no cycles\n";
-```
 
 ### bool traverse(...)
 
@@ -146,8 +153,8 @@ Traverses the whole forest.
 
 `cb_ambig` is called after entering a node which splits into more than one tree. The node is passed as a first argument, a set of vectors of nodes is passed as a second argument representing sets of children nodes where each set member represents a different tree.
 
+Example of a traversal printing nodes and ambiguities of a parsed forest
 ```
-
 function print_node(ostream& os, parser<>::pnode& n) {
 	return os << n.first << " [" << n.second[0] << ", " << n.second[1] << "]";
 };
@@ -155,12 +162,12 @@ function print_node(ostream& os, parser<>::pnode& n) {
 void main() {
 	grammar g(tgf<>::from_file("arithmetic.tgf"));
 	parser p(g);
-	auto f = p.parse("1+2*3");
-	if (!p.found()) {
-		cerr << p.get_error().to_str() << endl;
+	auto r = p.parse("1+2*3");
+	if (r.found) {
+		cerr << r.parse_error.to_str() << endl;
 		return;
 	}
-	f->traverse(
+	r.get_forest()->traverse(
 		[](const parser<>::pnode& n) {
 			print_node(cout << "entering node: ", n) << "\n";
 		},
@@ -183,3 +190,13 @@ void main() {
 	);
 }
 ```
+
+
+### bool replace_nodes(graph& g, nodes& s);
+
+Replace each node with its immediate children, assuming its only one pack (unambigous) the caller to ensure the right order to avoid cyclic dependency if any. deletes from graph g as well. return true if any one of the nodes' replacement succeeds
+
+
+### bool replace_node(graph& g, const node& torep,const nodes& replacement);
+
+Replaces node 'torep' in one pass with the given nodes 'replacement' everywhere in the forest and returns true if changed. Does not care if its recursive or cyclic, its caller's responsibility to ensure

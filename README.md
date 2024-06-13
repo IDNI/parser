@@ -89,8 +89,8 @@ Click on the type name in the following list to see more detailed documentation 
 - [`forest::tree`](docs/forest_tree.md) - a tree extracted from a graph
 - [`tgf`](docs/tgf.md) - Tau Grammar Form parser - reads a grammar in TGF format from a string or a file. An alternative way to describe a grammar instead of creating it programatically.
 - [`traverser`](docs/traverser.md) - struct for traversing and accessing rewriter trees
-- rewriting - API for rewriting a resulting parse tree
-- measure - simple struct for measuring time
+- [`rewriting`](docs/rewriting.md) - API for rewriting a resulting parse tree
+- [`measure`](docs/measure.md) - simple struct for measuring time
 
 ### Classes and structs usable for building command line interfaces
 
@@ -108,20 +108,17 @@ There are several areas covered by functions provided by this library
 - [devhelpers](docs/devhelpers.md) - helper forest transformations to various formats (TML facts, TML rules, DOT) useful when developing a parser
 
 
-<a name="tau-grammar-form"></a>
-
 ## TGF - Tau Grammar Form
 
 TGF is an EBNF-based form to describe grammars. Specification of the form can be found on page [`Tau Grammar Form`](docs/tau_grammar_form.md)
 
-
-<a name="tgf-tool"></a>
 
 ## TGF tool
 
 This library comes with a CLI executable `tgf` which features viewing, testing and debugging grammars written in TGF and it can also generate a C++ code from TGF grammar which is then usable in a C++ project.
 
 More detailed information about this CLI can be found on page [`TGF tool`](docs/tgf_tool.md)
+
 
 ## Tutorials
 

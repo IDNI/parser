@@ -1,8 +1,8 @@
-[back to index](../README.md#tau-grammar-form)
+[back to index](../README.md#tgf---tau-grammar-form)
 
 # Tau Grammar Form
 
-TGF is a form for describing grammars. This library also provides a [`tgf`](docs/tgf.md) parser, [`tgf tool`](docs/tgf-tool.md) CLI for viewing, testing and debugging TGF grammars and generating C++ parsers.
+TGF is a form for describing grammars. This library also provides a [`tgf`](tgf.md) parser, [`tgf tool`](tgf-tool.md) CLI for viewing, testing and debugging TGF grammars and generating C++ parsers.
 
 ## TGF syntax
 
@@ -124,17 +124,22 @@ bin_digit  => '0' | '1'.
 
 Literals surrounded with `[ ]` or a literal or group `(...)` followed by `?` are considered optional. They can occur but they do not have to.
 
-End of line `eol` can be just `\n` or it can be `\r\n`
+End of line `eol` can be just `\n` or it can be `\r\n`:
 ```
 eol              => ['\r'] '\n'.
 eol              => '\r'? '\n'.
-disambig_symbol  => ["auto" sep] "disambig" "uation"?.
+```
+Symbol for disambiguation can be "disambig", "auto-disambig", "disambiguation", "autodisambiguation":
+```
+sep              => '-' | '_' | space | null.
+disambig_symbol  => ["auto" '-'?] "disambig" "uation"?.
 ```
 Non-EBNF equivalent:
 ```
 eol              => '\r' '\n' | '\n'.
 disambig_symbol  => disambig_prefix "disambig" disambig_postfix.
 disambig_prefix  => "auto" sep | null.
+sep              => '-' | null.
 disambig_postfix => "uation" | null.
 ```
 
@@ -207,7 +212,7 @@ repeat_group   => '{' _ alternation _ '}'.
 #### @use
 
 This directive is supposed to load rules from other grammars or predefined rule lists.
-Currenlty it takes comma separated list of predefined character class function names used after a keyword `char class` or `char classes`.
+Currently it takes comma separated list of predefined character class function names used after a keyword `char class` or `char classes`.
 
 Usable names are the same names usable in `predefined_character_classes()` (see [character class functions](char_class_fns.md) for more information).
 
