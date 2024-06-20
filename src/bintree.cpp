@@ -8,10 +8,8 @@ htree::sp htree::get(int_t h) {
     DBG(assert(h >= -1);)
     if (h == -1) return null();
     auto res = M.emplace(h, wp()); //done with one search
-    if (res.second) {
-        sp nsp(new htree(h));
-        return res.first->second = nsp, nsp;		
-    }
+    if (res.second)
+        return res.first->second = nsp(new htree(h));
     assert(!res.first->second.expired());
     return res.first->second.lock(); 
 }
