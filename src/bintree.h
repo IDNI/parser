@@ -61,6 +61,12 @@ struct bintree {
 	
 	public:
 	static const bintree& get(const htree::sp &h);
+	// there's a problem here. get() shouldnt return a handle, it'll create
+	// a ptr with each call. normally the user has to keep a handle only to
+	// the root of the tree of interest. functions that recurse over trees
+	// and return new trees, should get a handle to the root, but internally
+	// work only with the ids, not with the handles, then return a single
+	// handle to the result.
 	static htree::sp get(const T& v, const htree::sp &l = htree::null(),
 						const htree::sp &r = htree::null());
 	bool operator<(const bintree& o) const {
@@ -89,6 +95,13 @@ struct lcrs_tree : protected bintree<T> {
 	}
 	auto get_kary_child() const {
 		htree::sp curp = htree::get(this->l);
+		// having a vector here misses the whole point. got to be
+		// something like get_next_child, or, get_nchilds and then
+		// the user provides an array (ptr alloced with alloca()) to
+		// fill all childs.
+		// that's problem #1. problem #2 is that we shouldn't return
+		// handles, only ids. we definitely dont want to create handles
+		// for all trees in the system.
 		std::vector<htree::sp> childs;
 		while (curp != htree::null())
 			childs.push_back(curp), curp = htree::get(get(curp).r);
@@ -99,6 +112,7 @@ struct lcrs_tree : protected bintree<T> {
 
 template <typename T>
 struct tree : protected lcrs_tree<T> {
+	// same comments as get() in bin_tree
 	static const htree::sp get( const T& v, std::vector<T>&& child = {});
 	static const tree& get(const htree::sp& h);
 	auto get_child() const;
@@ -208,7 +222,8 @@ void bintree<T>::gc() {
         }
 
     V = std::move(nv); //gc from V
-    M = std::move(nm);
+    M = std::move(nm); // you can clear M right at the beginning and then
+		       // reconstruct M directly, without nm
 
     //update  htree handle as well
     decltype(htree::M) hm;
