@@ -9,12 +9,14 @@ set(PARSER_HEADERS
 	parser.tmpl.h
 	recoders.h
 	tgf.h
+	bintree.h
 )
 set(PARSER_SOURCES
 	characters.cpp
 	charclasses.cpp
 	parser.cpp
 	recoders.cpp
+	bintree.cpp
 )
 
 # object library
