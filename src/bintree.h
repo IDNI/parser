@@ -186,7 +186,7 @@ void bintree<T>::gc() {
     //mark all
     std::unordered_set<int_t> next;
     auto mark = [&next](int_t r, auto &mark)->void {
-        if(!next.insert(r).second) return;
+        if (!next.insert(r).second) return;
         auto &bn = get(r);
         if (bn.r != -1) mark(bn.r, mark);
         if (bn.l != -1) mark(bn.l, mark);
