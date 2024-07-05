@@ -563,7 +563,7 @@ std::vector<node_t> select_subnodes(const node_t& input, predicate_t& query,
 }
 
 
-// select all top nodes that satisfy a predicate and return them.
+// select all nodes that satisfy a predicate and return them.
 template <typename predicate_t, typename node_t>
 std::vector<node_t> select_all(const node_t& input, predicate_t& query) {
 	std::vector<node_t> selected;
@@ -573,6 +573,39 @@ std::vector<node_t> select_all(const node_t& input, predicate_t& query) {
 			select_all_predicate<predicate_t, node_t>,
 			node_t>(
 		identity<node_t>, select)(input);
+	return selected;
+}
+
+// Select all nodes in input that satisfy query ignoring subtrees under a node satisfying until
+template<typename node_t>
+std::vector<node_t> select_all_until (const node_t& input, const auto& query, const auto& until) {
+	std::vector<node_t> selected;
+	auto select = [&](const node_t& n) {
+		if (query(n)) selected.push_back(n);
+		// we always return true until a node satisfies until.
+		if (until(n)) return false;
+		else return true;
+	};
+	post_order_traverser<identity_t<node_t>, decltype(select), node_t>
+		(identity<node_t>, select)(input);
+	return selected;
+}
+
+// Select top nodes in input that satisfy query ignoring subtrees under a node satisfying until
+template<typename node_t>
+std::vector<node_t> select_top_until (const node_t& input, const auto& query, const auto& until) {
+	std::vector<node_t> selected;
+	auto select = [&](const node_t& n) {
+		if (until(n)) return false;
+		if (!query(n)) return true;
+		// we return false to avoid visiting the children of the node
+		// since we are only interested in the top nodes.
+		if (std::find(selected.begin(), selected.end(), n) == selected.end())
+			selected.push_back(n);
+		return false;
+	};
+	post_order_traverser<identity_t<node_t>, decltype(select), node_t>
+		(identity<node_t>, select)(input);
 	return selected;
 }
 
