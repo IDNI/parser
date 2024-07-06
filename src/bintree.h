@@ -52,7 +52,7 @@ struct htree {
 template <typename T>
 struct bintree {
 	protected: 
-	static std::vector<bintree> V;
+	static std::vector<const bintree*> V;
 	static std::map<bintree, int_t> M;
 	bintree( const T& _val, int_t _l = null_ref, int_t _r = null_ref): 
 		val(_val), l(_l), r(_r) {}
@@ -158,7 +158,7 @@ struct tree : public lcrs_tree<T> {
 };
 
 template <typename T>
-std::vector<bintree<T>> bintree<T>::V;
+std::vector<const bintree<T>*> bintree<T>::V;
 template <typename T>
 std::map<bintree<T>, int_t> bintree<T>::M;
 
@@ -174,7 +174,7 @@ int_t bintree<T>::get(const T& v, int_t l, int_t r) {
     bintree bn(v, l, r);		
     auto res = M.emplace( bn , V.size());
     if (!res.second) return res.first->second;
-    V.push_back(bn);
+    V.push_back(&(res.first->first));
     return V.size() - 1;
 }
 
@@ -186,7 +186,7 @@ template<typename T>
 const bintree<T>& bintree<T>::get(const int_t id) { 
     //std::cout<< id <<"\n";
     assert( id >=0 && (size_t)id < V.size());
-    return V[id]; 
+    return *V[id]; 
 }
 
 template<typename T>
@@ -256,9 +256,10 @@ void bintree<T>::gc() {
     //reconstruct new V and M with updated handles
     for (size_t i = 0; i < V.size(); i++) 
         if (next.count(i)) {
-            auto &bn = V[i];
-            nv.push_back(bintree(bn.val, shift[bn.l], shift[bn.r]));
-            M.emplace(nv.back(), nv.size()-1);
+            auto &bn = *V[i];
+            bintree nbn(bn.val, shift[bn.l], shift[bn.r]);
+            auto res = M.emplace(nbn, nv.size());
+            nv.push_back(&(res.first->first));
         }
 
     V = std::move(nv); //gc from V
