@@ -26,23 +26,25 @@ namespace idni {
 template <typename T>
 struct bintree;
 
+using tref = const intptr_t*;
+
 struct htree {
 	using sp =  std::shared_ptr<htree>; 
 	using wp = 	std::weak_ptr<htree>;
 	inline bool	operator==(const htree& r) const { return hnd == r.hnd; }
 	inline bool operator< (const htree& r) const { return hnd <  r.hnd; }
 	static const sp& null() { 
-		static const sp hnull(new htree(-1));
+		static const sp hnull(new htree(NULL));
 		return hnull; 
 	}
-	static sp get(int_t h);
-	inline int_t get() const { return hnd; }
-	~htree() { if (hnd >= 0) M.erase(hnd); }
+	static sp get(tref h);
+	inline tref get() const { return hnd; }
+	~htree() { if (hnd != NULL) M.erase(hnd); }
 
 	private:
-    int_t hnd;
-	explicit htree(int_t h = -1) : hnd(h) { }
-	static std::unordered_map<int_t, wp> M;
+    tref hnd;
+	explicit htree(tref h = NULL) : hnd(h) { }
+	static std::unordered_map<tref, wp> M;
 	static void dump();
 	template <typename U>
 	friend struct bintree;
@@ -52,13 +54,13 @@ struct htree {
 template <typename T>
 struct bintree {
 	protected: 
-	static std::vector<const bintree*> V;
-	static std::map<bintree, int_t> M;
-	bintree( const T& _val, int_t _l = null_ref, int_t _r = null_ref): 
+	//static std::vector<const bintree*> V;
+	static std::map<bintree, const bintree*> M;
+	bintree( const T& _val, tref _l = NULL, tref _r = NULL): 
 		val(_val), l(_l), r(_r) {}
 	
 	public:
-    static const int_t null_ref = -1;
+    //static const int_t null_ref = -1;
 	static const bintree& get(const htree::sp &h);
 	// there's a problem here. get() shouldnt return a handle, it'll create
 	// a ptr with each call. normally the user has to keep a handle only to
@@ -74,8 +76,8 @@ struct bintree {
     
     // This function(made public now) uses and returns ids only instead of handle
     // to address the previous concern
-    static int_t get(const T& v, int_t l, int_t r);
-    static const bintree& get(const int_t id);
+    static tref get(const T& v, tref l, tref r);
+    static const bintree& get(const tref id);
 
 	bool operator<(const bintree& o) const {
 		if (val != o.val) return val < o.val;
@@ -86,7 +88,7 @@ struct bintree {
 		return val == o.val && l == o.l && r == o.r;
 	}
 	const T val;
-	const int_t l, r;
+	const tref l, r;
 	void print(size_t s = 0) const;
 	const std::string str() const;
 	static void dump() ;
@@ -98,7 +100,7 @@ template <typename T>
 struct lcrs_tree : public bintree<T> {
     protected:
 	//static const htree::sp get( const T& v, std::vector<T>&& child = {});
-    static int_t get( const T& v, const T* child, size_t len);
+    static tref get( const T& v, const T* child, size_t len);
 	static lcrs_tree<T>& get(const htree::sp& h) {
 		return (lcrs_tree<T>&)bintree<T>::get(h); 
 	}
@@ -112,7 +114,7 @@ struct lcrs_tree : public bintree<T> {
     //with child ids. If child is nullptr, then just 
     //calculates number of children in len.
     //caller's responsibility to free allocated memory
-	bool get_kary_child(int_t* child, size_t &len) const {
+	bool get_kary_child(tref* child, size_t &len) const {
 		/*
         htree::sp curp = htree::get(this->l);
 		// having a vector here misses the whole point. got to be
@@ -131,8 +133,8 @@ struct lcrs_tree : public bintree<T> {
         */
         if (len > 0 && child == nullptr) return false;
         len = 0;
-        int_t cur = this->l;
-        while (cur != bintree<T>::null_ref) {
+        tref cur = this->l;
+        while (cur != NULL) {
             if (child != nullptr) child[len] = cur;
             ++len, 
             cur = bintree<T>::get(cur).r;
@@ -145,22 +147,25 @@ struct lcrs_tree : public bintree<T> {
 template <typename T>
 struct tree : public lcrs_tree<T> {
 	//static const htree::sp get( const T& v, std::vector<T>&& child = {});
-	static int_t get( const T& v, const T* child, size_t len);
+	static tref get( const T& v, const T* child, size_t len);
     static const tree& get(const htree::sp& h);
-    static const tree& get(const int_t id);
+    static const tree& get(const tref id);
     //fills caller allocated child array upto len size 
     //with child ids. If child is nullptr, then just 
     //calculates number of children in len.
     //caller's responsibility to free allocated memory
-	bool get_child(int_t *child, size_t &len) const;
+	bool get_child(tref *child, size_t &len) const;
     size_t get_child_size() const;
 	void print(size_t s = 0) const;
 };
 
-template <typename T>
+
+/*template <typename T>
 std::vector<const bintree<T>*> bintree<T>::V;
+*/
+
 template <typename T>
-std::map<bintree<T>, int_t> bintree<T>::M;
+std::map<bintree<T>, const bintree<T>*> bintree<T>::M;
 
 
 template <typename T>
@@ -170,12 +175,10 @@ htree::sp bintree<T>::get(const T& v, const htree::sp &l,
 }
 
 template <typename T>
-int_t bintree<T>::get(const T& v, int_t l, int_t r) {
+tref bintree<T>::get(const T& v, tref l, tref r) {
     bintree bn(v, l, r);		
-    auto res = M.emplace( bn , V.size());
-    if (!res.second) return res.first->second;
-    V.push_back(&(res.first->first));
-    return V.size() - 1;
+    auto res = M.emplace( bn , nullptr);
+    return reinterpret_cast<tref>(&res.first->first);
 }
 
 template <typename T>
@@ -183,10 +186,12 @@ const bintree<T>& bintree<T>::get(const htree::sp &h) {
     return get(h->get()); }
 
 template<typename T>
-const bintree<T>& bintree<T>::get(const int_t id) { 
+const bintree<T>& bintree<T>::get(const tref id) { 
     //std::cout<< id <<"\n";
-    assert( id >=0 && (size_t)id < V.size());
-    return *V[id]; 
+    assert(  id != NULL &&
+        sizeof(bintree<T>*) == sizeof(tref));
+
+    return *(bintree<T>*)id; 
 }
 
 template<typename T>
@@ -194,17 +199,16 @@ void bintree<T>::print(size_t s) const {
     for (size_t i = 0; i < s; i++)
         std::cout<<" ";	
     std::cout<<str()<< std::endl;
-    if (l != -1) get(l).print(s + 1);
-    if (r != -1) get(r).print(s + 1);
+    if (l != NULL) get(l).print(s + 1);
+    if (r != NULL) get(r).print(s + 1);
 }
 
 template<typename T>
 const std::string bintree<T>::str() const {
     std::stringstream ss;
     ss << val;
-    return "{" + ss.str() + "," + 
-    std::to_string(l) + "," + std::to_string(r) + "} <-" + 
-        std::to_string(M[*this]) ;
+    ss << "{" << val << "," << l << "," << r << "} <-" << this;
+    return ss.str();
 }
 
 template<typename T>
@@ -213,36 +217,42 @@ void bintree<T>::dump() {
     std::cout<<"MB:"<<M.size()<<"\n";
     std::cout<<"VB:"<<M.size()<<"\n";
     for (auto &x : M){
-        std::cout<<x.first.str() << " " <<x.second<<"\n";
+        std::cout<<x.first.str() << " " <<(tref)x.second<<"\n";
     }
     std::cout<<"-----\n";
 }
 
+
 template<typename T>
 void bintree<T>::gc() {
+    
+
     DBG(dump();)
     DBG(htree::dump();)
 
     //mark all
-    std::unordered_set<int_t> next;
-    auto mark = [&next](int_t r, auto &mark)->void {
+    std::unordered_set<tref> next;
+    auto mark = [&next](tref r, auto &mark)->void {
         if (!next.insert(r).second) return;
         auto &bn = get(r);
-        if (bn.r != -1) mark(bn.r, mark);
-        if (bn.l != -1) mark(bn.l, mark);
+        if (bn.r != NULL) mark(bn.r, mark);
+        if (bn.l != NULL) mark(bn.l, mark);
     };
     //check if any handle expired and needs to be garbaged
     // otherwise mark all to be retained live
+    std::cout<<"start"<<std::endl;
     for (auto &x: htree::M)
         if (!x.second.expired()) mark(x.first, mark);
 
-    // do not run gc, if no handle expired or V empty.
-    if (!V.size() || (next.size() == V.size()) ) 
+    std::cout<<"done"<<std::endl;
+    // do not run gc, if no handle expired or empty.
+    if (!M.size() || (next.size() == M.size()) ) 
         return 
             DBG(std::cout<<"gc-do nothing:"<<next.size()<<"\n"), 
             void();
     
-    DBG(assert(next.size() != V.size()));
+    /*
+    DBG(assert(next.size() != M.size()));
     decltype(V) nv;
     std::unordered_map<int_t, int_t> shift;
     shift.emplace(-1,-1); // just for null
@@ -273,10 +283,18 @@ void bintree<T>::gc() {
             hm.emplace(psp->hnd = shift[x.first], psp);
         }
     htree::M = std::move(hm);
+    */
+    decltype(next) rm;
+    for ( auto const &[k,v]: M)
+        if(!next.count((tref)&k)) rm.insert((tref)&k);
+    for (auto r: rm)
+        M.erase(*reinterpret_cast<const bintree*>(r));
+
 		
     DBG(dump();)
     DBG(htree::dump();)
 }
+
 
 /*
 template< typename T>
@@ -288,12 +306,12 @@ const htree::sp lcrs_tree<T>::get( const T& v, std::vector<T>&& child) {
 }
 */
 template<typename T>
-int_t lcrs_tree<T>::get( const T& v, const T* child, size_t len) {
-    int_t nul = bintree<T>::null_ref;
-    int_t pr = nul; 
+tref lcrs_tree<T>::get( const T& v, const T* child, size_t len) {
+    //int_t nul = bintree<T>::null_ref;
+    tref pr = NULL; 
     for ( int_t i = len-1; i >=0; i--)
-        pr = bintree<T>::get(child[i], nul, pr);
-    return bintree<T>::get(v, pr, nul);
+        pr = bintree<T>::get(child[i], NULL, pr);
+    return bintree<T>::get(v, pr, NULL);
 }
 
 /*
@@ -303,7 +321,7 @@ const htree::sp tree<T>::get( const T& v, std::vector<T>&& child){
 }
 */
 template<typename T>
-int_t tree<T>::get( const T& v, const T* child, size_t len) {
+tref tree<T>::get( const T& v, const T* child, size_t len) {
 	return lcrs_tree<T>::get(v, child, len );
 }
 
@@ -318,12 +336,12 @@ const tree<T>& tree<T>::get(const htree::sp& h) {
 }
 
 template<typename T>
-const tree<T>& tree<T>::get(const int_t id) {
+const tree<T>& tree<T>::get(const tref id) {
 	return (const tree&)bintree<T>::get(id);
 }
 
 template<typename T>
-bool tree<T>::get_child(int_t *child, size_t &len) const {
+bool tree<T>::get_child(tref *child, size_t &len) const {
 	return lcrs_tree<T>::get_kary_child(child, len);
 }
 
@@ -334,7 +352,7 @@ void tree<T>::print(size_t s) const {
     std::cout<<this->str()<< std::endl;		
     size_t nc = get_child_size();
     if (nc > 0) {
-        int_t *ch_id = new int_t[nc];
+        tref *ch_id = new tref[nc];
         get_child(ch_id, nc);
         assert(ch_id != nullptr);
         for (size_t i=0 ; i < nc ; i++)
