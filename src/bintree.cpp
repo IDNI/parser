@@ -2,11 +2,11 @@
 
 namespace idni {
 
-std::unordered_map<int_t, htree::wp> htree::M;
+std::unordered_map<tref, htree::wp> htree::M;
 
-htree::sp htree::get(int_t h) {
-    DBG(assert(h >= -1);)
-    if (h == -1) return null();
+htree::sp htree::get(tref h) {
+    DBG(assert(h != NULL);)
+    if (h == NULL) return null();
     auto res = M.emplace(h, wp()); //done with one search
     sp ret; 
     if (res.second) 
