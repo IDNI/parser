@@ -19,11 +19,12 @@ int main()
     nd_t arr [] = { n1,n2 ,n3,n4 };
     auto id = tree<nd_t>::get(n2, arr, 4);
     //get shared handle for id to avoid being gced.
-    auto sh = htree::get(id);
+    auto sh = tree<nd_t>::geth(id);
     //print though id
     tree<nd_t>::get(id).print();
     // prev tree handle that was out of scope is garbage out
     bintree<nd_t>::gc();
+    
     // print through sh handle (different id) but same tree
     tree<nd_t>::get(sh).print();
     // create a new tree
@@ -51,7 +52,7 @@ int main()
     nd_t2 arr [] = { n1,n2 ,n3,n4 };
     auto id = tree<nd_t2>::get(n2, arr, sizeof(arr)/sizeof(nd_t2));
     //get shared handle for id to avoid being gced.
-    auto sh = htree::get(id);
+    auto sh = bintree<nd_t2>::geth(id);
     //print though id
     tree<nd_t2>::get(id).print();
     // prev tree handle that was out of scope is garbage out
