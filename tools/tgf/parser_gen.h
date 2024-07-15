@@ -176,6 +176,11 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		}
 		os << "\t\t.trim_terminals = "
 			<< pbool[g.opt.shaping.trim_terminals] << ",\n";
+		if (g.opt.shaping.dont_trim_terminals_of.size()) {
+			os << "\t\t.dont_trim_terminals_of = {";
+			plist(os, g.opt.shaping.dont_trim_terminals_of)
+				<< "\n\t\t},\n";
+		}
 		if (g.opt.shaping.to_inline.size()) {
 			os << "\t\t.to_inline = {";
 			pvlist(os, g.opt.shaping.to_inline) << "\n\t\t},\n";

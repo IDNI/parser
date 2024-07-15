@@ -386,6 +386,8 @@ void tgf_repl_evaluator::update_opts_by_grammar_opts() {
 	};
 	opt.to_trim          = ntids2strs(g->opt.shaping.to_trim);
 	opt.to_trim_children = ntids2strs(g->opt.shaping.to_trim_children);
+	opt.dont_trim_terminals_of =
+		ntids2strs(g->opt.shaping.dont_trim_terminals_of);
 	opt.to_trim_children_terminals =
 		ntids2strs(g->opt.shaping.to_trim_children_terminals);
 	opt.to_inline.clear();
@@ -438,14 +440,16 @@ void tgf_repl_evaluator::parsed(parser_type::result& r) {
 		if (opt.to_trim.size())
 			sopt.to_trim          = str2ntids(opt.to_trim);
 		else sopt.to_trim = g->opt.shaping.to_trim;
-		if (opt.to_trim.size())
-			sopt.to_trim_children = str2ntids(opt.to_trim_children);
-		else sopt.to_trim_children = g->opt.shaping.to_trim_children;
-		if (opt.to_trim_children_terminals.size())
-			sopt.to_trim_children_terminals =
-				str2ntids(opt.to_trim_children_terminals);
-		else sopt.to_trim_children_terminals =
-				g->opt.shaping.to_trim_children_terminals;
+		sopt.to_trim_children = opt.to_trim_children.size()
+			? str2ntids(opt.to_trim_children)
+			: g->opt.shaping.to_trim_children;
+		sopt.dont_trim_terminals_of = opt.dont_trim_terminals_of.size()
+			? str2ntids(opt.dont_trim_terminals_of)
+			: g->opt.shaping.dont_trim_terminals_of;
+		sopt.to_trim_children_terminals =
+				opt.to_trim_children_terminals.size()
+			? str2ntids(opt.to_trim_children_terminals)
+			: g->opt.shaping.to_trim_children_terminals;
 		if (opt.to_inline.size()) {
 			for (const auto& tp : opt.to_inline) {
 				vector<size_t> v;
@@ -1065,7 +1069,7 @@ int tgf_repl_evaluator::eval(const string& src) {
 		auto t  = traverser_t(source);
 		//cout << "t.has_value(): " << t.has_value() << "\n";
 		//cout << "t.size(): " << t.values().size() << "\n";
-		auto ts = t | get_terminals;
+		//auto ts = t | get_terminals;
 		//cout << "parsed terminals: " << ts << "\n";
 		auto statements = t || tgf_repl_parser::statement;
 		//cout << "statements.has_value(): " << statements.has_value() << "\n";

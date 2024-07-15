@@ -222,8 +222,11 @@ private:
 				start = prods_t(nts(d
 					| tgf_parser::sym | get_terminals));
 				break;
-			case tgf_parser::trim_terminals_dir:
+			case tgf_parser::trim_all_terminals_dir:
 				opt.shaping.trim_terminals = true;
+				for (auto& n : (d || tgf_parser::sym)())
+					opt.shaping.dont_trim_terminals_of
+						.insert(node2nt(n));
 				break;
 			case tgf_parser::trim_dir:
 				for (auto& n : (d || tgf_parser::sym)())

@@ -45,7 +45,7 @@ template <typename C, typename T>
 bool trimmable_node(const typename parser<C, T>::pnode& n,
 	const shaping_options& opts)
 {
-	if (!n.first.nt()) return n.first.is_null() || opts.trim_terminals;
+	if (!n.first.nt()) return n.first.is_null();
 	if (opts.to_trim.find(n.first.n()) != opts.to_trim.end()) return true;
 	return false;
 }
@@ -259,8 +259,11 @@ typename parser<C, T>::psptree parser<C, T>::result::trim_children_terminals(
 	if (!t) return r;
 	auto& l = t->value->first;
 	if (!l.nt()) return r = t, r;
-	bool trim = opts.to_trim_children_terminals.find(l.n())
-			!= opts.to_trim_children_terminals.end();
+	bool trim = (opts.trim_terminals
+				&& opts.dont_trim_terminals_of.find(l.n())
+					== opts.dont_trim_terminals_of.end())
+			|| opts.to_trim_children_terminals.find(l.n())
+				!= opts.to_trim_children_terminals.end();
 	r = std::make_shared<ptree>(t->value);
 	for (auto& c : t->child) {
 		auto& cl = c->value->first;

@@ -3,17 +3,8 @@
 @inline char classes.
 
 @trim _, __.
-@trim children grammar_sym, internal_grammar_sym, unreachable_sym,
-        start_sym, parse_sym, parse_file_sym, load_sym, reload_sym,
-        help_sym, quit_sym, version_sym, clear_sym,
-        get_sym, set_sym, add_sym, del_sym, toggle_sym, enable_sym, disable_sym,
-        true_value, false_value, basic_sym, detailed_sym, root_cause_sym,
-        error_verbosity_opt, status_opt, colors_opt, print_ambiguity_opt,
-        print_graphs_opt, print_rules_opt, print_facts_opt, print_terminals_opt,
-        measure_parsing_opt, measure_each_pos_opt, measure_forest_opt,
-        measure_preprocess_opt, debug_opt, auto_disambiguate_opt,
-        trim_terminals_opt, inline_cc_opt, nodisambig_list_opt, trim_opt,
-        trim_children_opt, inline_opt.
+@trim all terminals except children of
+	symbol, quoted_string, unescaped_s, escaped_s, parse_input_char_seq.
 
 # TGF grammar
 start                  => _ [ statement (_ '.' _ statement)* _ ].

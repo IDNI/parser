@@ -1,13 +1,9 @@
 @use char class eof, alnum, alpha, space, printable.
 
 @trim __, _, sep.
-@trim children terminals
-	cc_sym, production, directive, tree_path, shorthand_rule,
-	optional, repeat, none_or_repeat, neg,
-	group, optional_group, repeat_group,
-	start_dir, inline_dir, trim_children_dir, trim_children_terminals_dir,
-	trim_terminals_dir, trim_dir, use_dir, disable_ad_dir, ambiguous_dir.
-@inline char classes.
+@trim all terminals except children of
+	sym, cc_name, escaped_s, unescaped_s, escaped_c, unescaped_c.
+@inline char classes, syms.
 
 # start symbol
 start                  => (_ statement)* _.
@@ -47,17 +43,20 @@ directive              => '@' _ directive_body _ '.'.
 directive_body         =>
 	  ("start" __ sym)                                  :start_dir
 	| ("inline" __ inline_arg (_ ',' _ inline_arg)*)    :inline_dir
-	| ("trim" sep "children" __ sym (_ ',' _ sym)*)     :trim_children_dir
-	| ("trim" sep "children" sep "terminals" __ sym (_ ',' _ sym)*)
-	                                        :trim_children_terminals_dir
-	| ("trim" sep "all" sep "terminals")                :trim_terminals_dir
-	| ("trim" __ sym (_ ',' _ sym)*)                    :trim_dir
+	| ("trim" sep "children" __ syms)                   :trim_children_dir
+	| ("trim" sep "children" sep "terminals" __ syms)
+	                			:trim_children_terminals_dir
+	| ("trim" sep "all" sep "terminals"
+		[sep "except" [sep "children" sep "of"] __ syms])
+						:trim_all_terminals_dir
+	| ("trim" __ syms)                                  :trim_dir
 	| ("use" __ cc_sym:use_from __ use_param (_ ',' _ use_param)*)
 	                                                    :use_dir
 	| ("disable" __ ["auto" sep] "disambig" "uation"?)  :disable_ad_dir
 	| ("ambiguous" _ sym (_ ',' _ sym)*)                :ambiguous_dir
 	.
 
+syms                   => sym (_ ',' _ sym)*.
 inline_arg             => tree_path | ("char" sep "class" "es"?):cc_sym.
 tree_path              => sym (_ '>' _ sym)*.
 use_param              => ("eof"   | "alnum" | "alpha" | "blank"

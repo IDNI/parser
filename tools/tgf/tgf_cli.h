@@ -59,6 +59,7 @@ struct tgf_repl_evaluator {
 			parser_type::error::info_lvl::INFO_BASIC;
 		std::set<std::string> nodisambig_list{};
 		std::set<std::string> to_trim{};
+		std::set<std::string> dont_trim_terminals_of{};
 		std::set<std::string> to_trim_children{};
 		std::set<std::string> to_trim_children_terminals{};
 		std::set<std::vector<std::string>> to_inline{};
