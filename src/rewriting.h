@@ -444,12 +444,10 @@ struct find_top_predicate {
 // one of them.
 // Check if we have other cases like this one
 template<typename node_t>
-struct true_predicate {
-	bool operator()(const node_t&) const { return true; }
-};
+auto true_predicate = [](const node_t&) { return true; };
 
 template <typename node_t>
-using true_predicate_t = true_predicate<node_t>;
+using true_predicate_t = decltype(true_predicate<node_t>);
 
 // always false predicate
 //
@@ -457,12 +455,10 @@ using true_predicate_t = true_predicate<node_t>;
 // it in all the code.
 // Check if we have other cases like this one
 template<typename node_t>
-struct false_predicate {
-	bool operator()(const node_t&) const { return false; }
-};
+auto false_predicate = [](const node_t&) { return false; };
 
 template <typename node_t>
-using false_predicate_t = false_predicate<node_t>;
+using false_predicate_t = decltype(false_predicate<node_t>);
 
 // disjuction of the wrapped predicates.
 //
@@ -765,6 +761,77 @@ private:
 	}
 };
 
+template <typename node_t, typename is_capture_t>
+struct pattern_matcher2 {
+	using pattern_t = node_t;
+
+	pattern_matcher2(const rule<node_t>& r,	const is_capture_t& is_capture)
+		: r(r), is_capture(is_capture) {}
+
+	node_t operator()(const node_t& n) {
+		// if we have matched the pattern, we never try again to unify
+		// if (matched) return false;
+		// we clear previous environment attempts
+		env.clear();
+		// then we try to match the pattern against the node and if the match
+		// was successful, we save the node that matched.
+		if (auto it = changes.find(n); it != changes.end())
+			return it->second;
+
+		auto [pattern, body] = r;
+		if (match(pattern, n)) {
+			auto nn = replace<node_t>(body, env);
+			changes[n] = nn;
+			return nn;
+		}
+		std::vector<node_t> child;
+		for (const auto& c : n->child)
+			if (auto it = changes.find(c); it != changes.end())
+				child.push_back(it->second);
+			else child.push_back(c);
+		return changes[n] = make_node(n->value, child);
+	}
+
+	const rule<node_t>& r;
+	environment<node_t> env;
+	environment<node_t> changes;
+	const is_capture_t& is_capture;
+
+private:
+	node_t replace_root(const node_t& n) {
+
+		auto it = changes.find(n);
+		return it != changes.end() ? it->second : n;
+	}
+
+	bool match(const pattern_t& p, const node_t& n) {
+		// if we already have captured a node associated to the current capture
+		// we check if it is the same as the current node, if it is not, we
+		// return false...
+		if (is_capture(p)) {
+			if (auto it = env.find(p);
+				it != env.end() && it->second != n) return false;
+			// ...otherwise we save the current node as the one associated to the
+			// current capture and return true.
+			else return env.emplace(p, n), true;
+		}
+		// otherwise, we check the symbol of the current node and if it is the
+		// same as the one of the current pattern, we check if the children
+		// match recursively.
+		if (auto tn = changes.contains(n) ? changes[n] : n; p->value == tn->value) {
+			if (p->child.size() != tn->child.size()) return false;
+			for (size_t i = 0; i < p->child.size(); ++i)
+				if (p->child[i] == tn->child[i]) continue;
+				else if (match(p->child[i], tn->child[i]))
+					continue;
+				else return false;
+			return true;
+		}
+		return false;
+	}
+};
+
+
 // this predicate matches when there exists a environment that makes the
 // pattern match the node ignoring the nodes detected as skippable.
 //
@@ -829,9 +896,8 @@ private:
 template <typename node_t, typename is_capture_t>
 node_t apply_rule(const rule<node_t>& r, const node_t& n, const is_capture_t& c) {
 	auto [p , s] = r;
-	environment<node_t> u;
-	pattern_matcher<node_t, is_capture_t> matcher {p, u, c};
-	auto nn = apply(s, n, matcher);
+	pattern_matcher2<node_t, is_capture_t> matcher {r, c};
+	auto nn = apply(n, matcher);
 #ifdef LOG_REWRITING
 	if (nn != n) {
 		LOG_INFO << "(R) " << p << " := " << s << LOG_END;
@@ -872,6 +938,16 @@ node_t apply(const node_t& s, const node_t& n, matcher_t& matcher) {
 		return replace<node_t>(n, nenv);
 	}
 	return n;
+}
+
+// apply a substitution to a rule according to a given matcher, this method is
+// use internaly by apply and apply with skip.
+template <typename node_t, typename matcher_t>
+node_t apply(const node_t& n, matcher_t& matcher) {
+	return post_order_query_traverser<matcher_t, false_predicate_t<node_t>, node_t>(
+		matcher, false_predicate<node_t>)(n);
+	//if (matcher.matched) return replace<node_t>(n, matcher.changes);
+	//return n;
 }
 
 // drop unnecessary information from the parse tree nodes
