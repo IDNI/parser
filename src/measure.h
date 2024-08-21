@@ -16,6 +16,8 @@
 #include <iostream>
 #include <iomanip>
 
+#include "rewriting.h"
+
 namespace idni::measures {
 
 struct timer {
@@ -62,6 +64,12 @@ struct timer {
 
 static std::map<std::string, timer> timers;
 static std::map<std::string, size_t> counters;
+
+template<typename node_t>
+using rule = std::pair<node_t, node_t>;
+
+template<typename node_t>
+static std::map<rule<node_t>, size_t> rule_counters;
 
 static void start_timer(const std::string& name, bool silent = false) {
 	if (timers.find(name) == timers.end()) timers[name] = timer(silent);
@@ -123,6 +131,27 @@ static void remove_counter(const std::string& name) {
 }
 
 static void remove_all_counters() { counters.clear(); }
+
+template<typename node_t>
+static size_t increase_rule_counter(const rule<node_t>& r) {
+	if (rule_counters<node_t>.find(r) == rule_counters<node_t>.end()) rule_counters<node_t>[r] = 0;
+	return ++rule_counters<node_t>[r];
+}
+
+template<typename node_t>
+static size_t get_rule_counter(const rule<node_t>& r) {
+	if (rule_counters<node_t>.find(r) == rule_counters<node_t>.end()) rule_counters<node_t>[r] = 0;
+	return rule_counters<node_t>[r];
+}
+
+template<typename node_t>
+static void remove_rule_counter(const rule<node_t>& r) {
+	if (rule_counters<node_t>.find(r) == rule_counters<node_t>.end()) return;
+	rule_counters<node_t>.erase(r);
+}
+
+template<typename node_t>
+static void remove_all_rule_counters() { rule_counters<node_t>.clear(); }
 
 } // namespace idni::measures
 #endif // __IDNI__PARSER__MEASURE_H__
