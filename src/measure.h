@@ -34,7 +34,7 @@ struct timer {
 	double restart() {
 		if (!started_) return start(), 0;
 		double ms = pause();
-
+		start();
 		return ms;
 	}
 
@@ -71,65 +71,69 @@ using rule = std::pair<node_t, node_t>;
 template<typename node_t>
 static std::map<rule<node_t>, size_t> rule_counters;
 
+[[maybe_unused]]
 static void start_timer(const std::string& name, bool silent = false) {
 	if (timers.find(name) == timers.end()) timers[name] = timer(silent);
 	else timers[name].start();
 }
 
+[[maybe_unused]]
 static void restart_timer(const std::string& name) {
-	if (timers.find(name) == timers.end()) return;
-	timers[name].restart();
+	if (timers.find(name) != timers.end()) timers[name].restart();
 }
 
+[[maybe_unused]]
 static void pause_timer(const std::string& name) {
-	if (timers.find(name) == timers.end()) return;
-	timers[name].pause();
+	if (timers.find(name) != timers.end()) timers[name].pause();
 }
 
+[[maybe_unused]]
 static void unpause_timer(const std::string& name) {
-	if (timers.find(name) == timers.end()) return;
-	timers[name].unpause();
+	if (timers.find(name) != timers.end()) timers[name].unpause();
 }
 
+[[maybe_unused]]
 static double get_timer(const std::string& name) {
-	if (timers.find(name) == timers.end()) return 0;
-	return timers[name].get();
+	return (timers.find(name) != timers.end()) ? timers[name].get() : 0;
 }
 
+[[maybe_unused]]
 static void stop_timer(const std::string& name) {
-	if (timers.find(name) == timers.end()) return;
-	timers[name].stop();
+	if (timers.find(name) != timers.end()) timers[name].stop();
 }
 
+[[maybe_unused]]
 static void print_timer(const std::string& name) {
-	if (timers.find(name) == timers.end()) return;
-	if (!timers[name].silent_) return;
-	std::cout << std::fixed << std::setprecision(2)
-		<< name << " time: " << timers[name].get() << " ms\n";
+	if (timers.find(name) != timers.end() && !timers[name].silent_)
+		std::cout << std::fixed << std::setprecision(2)
+			<< name << " time: " << timers[name].get() << " ms\n";
 }
 
+[[maybe_unused]]
 static void remove_timer(const std::string& name) {
-	if (timers.find(name) == timers.end()) return;
-	timers.erase(name);
+	if (timers.find(name) != timers.end()) timers.erase(name);
 }
 
+[[maybe_unused]]
 static void remove_all_timers() { timers.clear(); }
 
+[[maybe_unused]]
 static size_t increase_counter(const std::string& name) {
 	if (counters.find(name) == counters.end()) counters[name] = 0;
 	return ++counters[name];
 }
 
+[[maybe_unused]]
 static size_t get_counter(const std::string& name) {
-	if (counters.find(name) == counters.end()) counters[name] = 0;
-	return counters[name];
+	return (counters.find(name) == counters.end()) ? counters[name] = 0 : counters[name];
 }
 
+[[maybe_unused]]
 static void remove_counter(const std::string& name) {
-	if (counters.find(name) == counters.end()) return;
-	counters.erase(name);
+	if (counters.find(name) != counters.end()) counters.erase(name);
 }
 
+[[maybe_unused]]
 static void remove_all_counters() { counters.clear(); }
 
 template<typename node_t>
@@ -140,14 +144,13 @@ static size_t increase_rule_counter(const rule<node_t>& r) {
 
 template<typename node_t>
 static size_t get_rule_counter(const rule<node_t>& r) {
-	if (rule_counters<node_t>.find(r) == rule_counters<node_t>.end()) rule_counters<node_t>[r] = 0;
-	return rule_counters<node_t>[r];
+	return (rule_counters<node_t>.find(r) == rule_counters<node_t>.end())
+		? rule_counters<node_t>[r] = 0 : rule_counters<node_t>[r];
 }
 
 template<typename node_t>
 static void remove_rule_counter(const rule<node_t>& r) {
-	if (rule_counters<node_t>.find(r) == rule_counters<node_t>.end()) return;
-	rule_counters<node_t>.erase(r);
+	if (rule_counters<node_t>.find(r) != rule_counters<node_t>.end()) rule_counters<node_t>.erase(r);
 }
 
 template<typename node_t>

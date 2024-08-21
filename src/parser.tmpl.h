@@ -865,7 +865,7 @@ void parser<C, T>::pre_process(const item& i) {
 
 template <typename C, typename T>
 bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
-	const parse_options& po)
+	[[maybe_unused]] const parse_options& po)
 {
 	bool ret = false;
 	bin_tnt.clear();
