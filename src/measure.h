@@ -16,20 +16,26 @@
 #include <iostream>
 #include <iomanip>
 
-namespace idni {
+namespace idni::measures {
 
-struct measure {
-	std::string label_;
-	bool silent_ = false;
+struct timer {
+
 	clock_t start_time_;
 	bool started_ = false;
+	bool silent_ = false;
 	double ms_ = 0;
-	measure(const std::string& label = "", bool start_measure = false,
-		bool silent = false) : label_(label), silent_(silent)
-	{
-		if (start_measure) start();
-	}
+
+	timer(bool silent = false) : silent_(silent) { }
+
 	void start() { if (!started_) started_ = true, start_time_ = clock(); }
+
+	double restart() {
+		if (!started_) return start(), 0;
+		double ms = pause();
+
+		return ms;
+	}
+
 	double pause() {
 		if (!started_) return 0;
 		double ms = ((double(clock() - start_time_)
@@ -37,19 +43,72 @@ struct measure {
 		ms_ += ms;
 		return ms;
 	}
+
 	double unpause() {
 		if (!started_) return start(), 0;
 		return start_time_ = clock(), 0;
 	}
+
 	double stop() {
 		if (!started_) return 0;
 		pause();
-		if (!silent_) std::cout << std::fixed << std::setprecision(2)
-			<< label_ << (label_.size() ? "::" : "") << "time: "
-			<< ms_ << " ms\n";
 		return started_ = false, ms_;
 	}
-	~measure() { stop(); }
+
+	double get() { return pause(); }
+
+	~timer() { stop(); }
 };
-} // idni namespace
+
+static std::map<std::string, timer> timers;
+static std::map<std::string, size_t> counters;
+
+static void start_timer(const std::string& name, bool silent = false) {
+	if (timers.find(name) == timers.end()) timers[name] = timer(silent);
+	else timers[name].start();
+}
+
+static void restart_timer(const std::string& name) {
+	if (timers.find(name) == timers.end()) return;
+	timers[name].restart();
+}
+
+static void pause_timer(const std::string& name) {
+	if (timers.find(name) == timers.end()) return;
+	timers[name].pause();
+}
+
+static void unpause_timer(const std::string& name) {
+	if (timers.find(name) == timers.end()) return;
+	timers[name].unpause();
+}
+
+static double get_timer(const std::string& name) {
+	if (timers.find(name) == timers.end()) return 0;
+	return timers[name].get();
+}
+
+static void stop_timer(const std::string& name) {
+	if (timers.find(name) == timers.end()) return;
+	timers[name].stop();
+}
+
+static void print_timer(const std::string& name) {
+	if (timers.find(name) == timers.end()) return;
+	if (!timers[name].silent_) return;
+	std::cout << std::fixed << std::setprecision(2)
+		<< name << " time: " << timers[name].get() << " ms\n";
+}
+
+static size_t increase_counter(const std::string& name) {
+	if (counters.find(name) == counters.end()) counters[name] = 0;
+	return ++counters[name];
+}
+
+static size_t get_counter(const std::string& name) {
+	if (counters.find(name) == counters.end()) counters[name] = 0;
+	return counters[name];
+}
+
+} // namespace idni::measures
 #endif // __IDNI__PARSER__MEASURE_H__
