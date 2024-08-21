@@ -34,7 +34,7 @@ struct timer {
 	double restart() {
 		if (!started_) return start(), 0;
 		double ms = pause();
-		start();
+		start_time_ = clock();
 		return ms;
 	}
 
@@ -74,7 +74,7 @@ static std::map<rule<node_t>, size_t> rule_counters;
 [[maybe_unused]]
 static void start_timer(const std::string& name, bool silent = false) {
 	if (timers.find(name) == timers.end()) timers[name] = timer(silent);
-	else timers[name].start();
+	timers[name].start();
 }
 
 [[maybe_unused]]
@@ -155,6 +155,13 @@ static void remove_rule_counter(const rule<node_t>& r) {
 
 template<typename node_t>
 static void remove_all_rule_counters() { rule_counters<node_t>.clear(); }
+
+template<typename node_t>
+static void remove_all() {
+	remove_all_timers();
+	remove_all_counters();
+	remove_all_rule_counters<node_t>();
+}
 
 } // namespace idni::measures
 #endif // __IDNI__PARSER__MEASURE_H__
