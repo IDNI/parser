@@ -16,11 +16,6 @@ set(PARSER_SOURCES
 	parser.cpp
 	recoders.cpp
 )
-set(PARSER_DEFINITIONS
-	WITH_DEVHELPERS
-	MEASURE
-	MEASURE_EACH_POS
-)
 
 # object library
 ################
@@ -30,7 +25,6 @@ target_setup(${PARSER_OBJECT_LIB_NAME})
 if(NOT WIN32)
  	target_compile_options(${PARSER_OBJECT_LIB_NAME} PRIVATE -fPIC)
 endif()
-target_compile_definitions_if(${PARSER_OBJECT_LIB_NAME} PRIVATE "${PARSER_DEFINITIONS}")
 target_include_directories(${PARSER_OBJECT_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
 )

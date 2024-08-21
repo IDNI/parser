@@ -36,10 +36,16 @@ endif()
 
 set(PARSER_DEBUG_OPTIONS "-O0;-DDEBUG;-ggdb3")
 set(PARSER_RELEASE_OPTIONS "-O3;-DNDEBUG")
-set(PARSER_COMPILE_OPTIONS
-	"$<IF:$<CONFIG:Debug>,${PARSER_DEBUG_OPTIONS},${PARSER_RELEASE_OPTIONS}>"
-	"$<$<CONFIG:Release>:-flto=auto>"
-)
+set(PARSER_RELWITHDEBINFO_OPTIONS "-O3;-DNDEBUG;-g")
+
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+	set(COMPILE_OPTIONS "${PARSER_DEBUG_OPTIONS}")
+elseif (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+	set(COMPILE_OPTIONS "${PARSER_RELWITHDEBINFO_OPTIONS}")
+elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
+	set(COMPILE_OPTIONS "${PARSER_RELEASE_OPTIONS}")
+endif()
+
 set(PARSER_LINK_OPTIONS "-flto=auto")
 
 include(git-defs) # for ${GIT_DEFINITIONS}
@@ -51,6 +57,15 @@ endfunction()
 set(PARSER_OBJECT_LIB_NAME "${PROJECT_NAME}o")
 set(PARSER_STATIC_LIB_NAME "${PROJECT_NAME}_static")
 set(PARSER_SHARED_LIB_NAME "${PROJECT_NAME}")
+
+# passes definitions if they exist
+function(target_compile_definitions_if target access project_definitions)
+	foreach(X IN LISTS project_definitions)
+		if(${X})
+			target_compile_definitions(${target} ${access} "-D${X}")
+		endif()
+	endforeach()
+endfunction()
 
 # setups a target: sets COMPILE and LINK options, adds warnings, c++20 req...
 function(target_setup target)
@@ -71,6 +86,7 @@ function(target_setup target)
 		target_compile_options(${target} PRIVATE /W4)
 	endif()
 	target_compile_options(${target} PRIVATE "${PARSER_COMPILE_OPTIONS}")
+	target_compile_definitions_if(${target} PRIVATE "${PARSER_DEFINITIONS}")
 	target_link_libraries(${target} ${CMAKE_THREAD_LIBS_INIT})
 	target_link_options(${target} PRIVATE "${PARSER_LINK_OPTIONS}")
 	target_git_definitions(${target})
@@ -86,13 +102,4 @@ function(exclude target)
 	set_target_properties(${target} PROPERTIES
 		EXCLUDE_FROM_ALL 1
 		EXCLUDE_FROM_DEFAULT_BUILD 1)
-endfunction()
-
-# passes definitions if they exist
-function(target_compile_definitions_if target access project_definitions)
-	foreach(X IN LISTS project_definitions)
-		if(${X})
-			target_compile_definitions(${target} ${access} "-D${X}")
-		endif()
-	endforeach()
 endfunction()

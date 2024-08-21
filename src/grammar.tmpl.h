@@ -750,7 +750,7 @@ std::set<size_t> grammar<C, T>::unreachable_productions(const lit<C, T>& l)
 	return diff;
 }
 
-#if defined(DEBUG) || defined(WITH_DEVHELPERS)
+#ifdef DEBUG
 template <typename C, typename T>
 std::ostream& grammar<C, T>::print_data(std::ostream& os, std::string prep)
 	const
@@ -769,8 +769,9 @@ std::ostream& grammar<C, T>::print_data(std::ostream& os, std::string prep)
 	}
 	return os;
 }
-#endif
-#if defined(DEBUG) || defined(WITH_DEVHELPERS)
+#endif // DEBUG
+
+#ifdef DEBUG
 template<typename C, typename T>
 std::ostream& print_grammar(std::ostream& os, const grammar<C, T>& g) {
 	for (size_t i = 0; i != g.size(); ++i) {

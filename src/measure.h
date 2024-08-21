@@ -15,7 +15,9 @@
 #include <string>
 #include <iostream>
 #include <iomanip>
+
 namespace idni {
+
 struct measure {
 	std::string label_;
 	bool silent_ = false;
