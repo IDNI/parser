@@ -100,6 +100,13 @@ static void print_timer(const std::string& name) {
 		<< name << " time: " << timers[name].get() << " ms\n";
 }
 
+static void remove_timer(const std::string& name) {
+	if (timers.find(name) == timers.end()) return;
+	timers.erase(name);
+}
+
+static void remove_all_timers() { timers.clear(); }
+
 static size_t increase_counter(const std::string& name) {
 	if (counters.find(name) == counters.end()) counters[name] = 0;
 	return ++counters[name];
@@ -109,6 +116,13 @@ static size_t get_counter(const std::string& name) {
 	if (counters.find(name) == counters.end()) counters[name] = 0;
 	return counters[name];
 }
+
+static void remove_counter(const std::string& name) {
+	if (counters.find(name) == counters.end()) return;
+	counters.erase(name);
+}
+
+static void remove_all_counters() { counters.clear(); }
 
 } // namespace idni::measures
 #endif // __IDNI__PARSER__MEASURE_H__
