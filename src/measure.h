@@ -71,6 +71,9 @@ using rule = std::pair<node_t, node_t>;
 template<typename node_t>
 static std::map<rule<node_t>, size_t> rule_counters;
 
+template<typename node_t>
+static std::map<rule<node_t>, size_t> rule_hits;
+
 [[maybe_unused]]
 static void start_timer(const std::string& name, bool silent = false) {
 	if (timers.find(name) == timers.end()) timers[name] = timer(silent);
@@ -157,10 +160,32 @@ template<typename node_t>
 static void remove_all_rule_counters() { rule_counters<node_t>.clear(); }
 
 template<typename node_t>
+static size_t increase_rule_hit(const rule<node_t>& r) {
+	if (rule_hits<node_t>.find(r) == rule_hits<node_t>.end()) rule_hits<node_t>[r] = 0;
+	return ++rule_hits<node_t>[r];
+}
+
+template<typename node_t>
+static size_t get_rule_hit(const rule<node_t>& r) {
+	return (rule_hits<node_t>.find(r) == rule_hits<node_t>.end())
+		? rule_hits<node_t>[r] = 0 : rule_hits<node_t>[r];
+}
+
+template<typename node_t>
+static void remove_rule_hit(const rule<node_t>& r) {
+	if (rule_hits<node_t>.find(r) != rule_hits<node_t>.end()) rule_hits<node_t>.erase(r);
+}
+
+template<typename node_t>
+static void remove_all_rule_hits() { rule_hits<node_t>.clear(); }
+
+
+template<typename node_t>
 static void remove_all() {
 	remove_all_timers();
 	remove_all_counters();
 	remove_all_rule_counters<node_t>();
+	remove_all_rule_hits<node_t>();
 }
 
 } // namespace idni::measures
