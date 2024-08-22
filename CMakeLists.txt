@@ -8,7 +8,7 @@ project("${namespace}_${PROJECT_SHORT_NAME}"
 	DESCRIPTION "IDNI's parser library"
 )
 
-option(PARSER_MEASURE              "Allow performance measures"           false)
+option(PARSER_MEASURE              "Allow performance measures"             OFF)
 option(PARSER_ADDRESS_SANITIZER    "Enable address sanitizer"               OFF)
 option(PARSER_BUILD_STATIC_LIBRARY "Build static library"                   OFF)
 option(PARSER_BUILD_SHARED_LIBRARY "Build shared library"                   OFF)
