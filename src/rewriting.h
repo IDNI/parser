@@ -92,7 +92,7 @@ using sp_node = std::shared_ptr<node<symbol_t>>;
 template <typename symbol_t>
 struct make_node_hook {
 	// node factory method
-	std::optional<sp_node<symbol_t>> operator()(const node<symbol_t>& n) {
+	std::optional<sp_node<symbol_t>> operator()(const node<symbol_t>& /* n */) {
 		return std::optional<sp_node<symbol_t>>{};
 	}
 };
