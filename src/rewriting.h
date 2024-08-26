@@ -252,15 +252,16 @@ struct post_order_recursive_traverser {
 		if (query(n))
 			return traverse(n, query, wrapped);
 		else {
-			std::vector<node_t> c;
-			return wrapped(n, c);
+			return wrapped(n, n->child);
 		}
 	}
 private:
 	node_t traverse (const node_t n, auto& query, auto& wrapped) {
 		std::vector<node_t> children;
-		for (const auto& c : n->child)
+		for (const auto& c : n->child) {
 			if (query(c)) children.push_back(traverse(c, query, wrapped));
+			else children.push_back(wrapped(c, c->child));
+		}
 		return wrapped(n, children);
 	}
 };
