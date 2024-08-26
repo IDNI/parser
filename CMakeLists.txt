@@ -8,21 +8,20 @@ project("${namespace}_${PROJECT_SHORT_NAME}"
 	DESCRIPTION "IDNI's parser library"
 )
 
-################################################################################
-option(MEASURE "measure and print various parsing times" FALSE)
-option(MEASURE_EACH_POS
-	"measure and print time spent on each position of the input string"
-	FALSE)
-option(WITH_DEVHELPERS "add to_dot, to_tml and to_tml_rules functions" FALSE)
-option(PARSER_ADDRESS_SANITIZER "enable address sanitizer" FALSE)
-################################################################################
-option(PARSER_BUILD_STATIC_LIBRARY "build static library" FALSE)
-option(PARSER_BUILD_SHARED_LIBRARY "build shared library" FALSE)
-option(PARSER_BUILD_TESTS "build library tests" FALSE)
-option(PARSER_BUILD_EXAMPLES "build examples" FALSE)
-option(PARSER_BUILD_TOOLS "build library tools" FALSE)
-set(PARSER_BUILD_EXECUTABLE FALSE)
-set(PARSER_BUILD_SHARED_EXECUTABLE FALSE)
+option(PARSER_MEASURE              "Allow performance measures"             OFF)
+option(PARSER_ADDRESS_SANITIZER    "Enable address sanitizer"               OFF)
+option(PARSER_BUILD_STATIC_LIBRARY "Build static library"                   OFF)
+option(PARSER_BUILD_SHARED_LIBRARY "Build shared library"                   OFF)
+option(PARSER_BUILD_TESTS          "Build library tests"                    OFF)
+option(PARSER_BUILD_EXAMPLES       "Build examples"                         OFF)
+option(PARSER_BUILD_TOOLS          "Build library tools"                    OFF)
+set_property(CACHE PARSER_ADDRESS_SANITIZER         PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE PARSER_BUILD_STATIC_LIBRARY      PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE PARSER_BUILD_SHARED_LIBRARY      PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE PARSER_BUILD_TESTS               PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE PARSER_BUILD_EXAMPLES            PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE PARSER_BUILD_TOOLS               PROPERTY STRINGS "OFF" "ON")
+
 if(NOT PARSER_BUILD_STATIC_LIBRARY AND NOT PARSER_BUILD_SHARED_LIBRARY AND
 	NOT PARSER_BUILD_TESTS AND NOT PARSER_BUILD_TOOLS AND NOT PARSER_BUILD_EXAMPLES)
 		set(PARSER_BUILD_STATIC_LIBRARY true)
@@ -31,13 +30,19 @@ if(NOT PARSER_BUILD_STATIC_LIBRARY AND NOT PARSER_BUILD_SHARED_LIBRARY AND
 		set(PARSER_BUILD_EXAMPLES true)
 endif()
 
-if(PARSER_BUILD_TESTS)
-	set(WITH_DEVHELPERS true)
+# fine tuning definitions according to build type
+if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+	set(PARSER_MEASURE true)
+elseif (CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT PARSER_MEASURE)
+	set(PARSER_MEASURE true)
 endif()
-################################################################################
-message(STATUS "MEASURE: ${MEASURE}")
-message(STATUS "MEASURE_EACH_POS: ${MEASURE_EACH_POS}")
-message(STATUS "WITH_DEVHELPERS: ${WITH_DEVHELPERS}")
+
+# defining available definitions
+set(PARSER_DEFINITIONS
+	PARSER_MEASURE
+)
+
+message(STATUS "PARSER_MEASURE: ${PARSER_MEASURE}")
 message(STATUS "PARSER_BUILD_STATIC_LIBRARY: ${PARSER_BUILD_STATIC_LIBRARY}")
 message(STATUS "PARSER_BUILD_SHARED_LIBRARY: ${PARSER_BUILD_SHARED_LIBRARY}")
 message(STATUS "PARSER_BUILD_TESTS: ${PARSER_BUILD_TESTS}")

@@ -189,9 +189,9 @@ struct grammar {
 		const std::string& nt,	std::string prep = {},
 		bool print_ids = false,
 		const term::colors& TC = {false}) const;
-#if defined(DEBUG) || defined(WITH_DEVHELPERS)
+#ifdef DEBUG
 	std::ostream& print_data(std::ostream& os, std::string prep = {}) const;
-#endif
+#endif // DEBUG
 	lit<C, T> nt(size_t n);
 	lit<C, T> nt(const std::basic_string<C>& s);
 	const lit<C, T>& get_start() const;
@@ -600,23 +600,26 @@ prods<C, T> operator+(const prods<C, T>& x,const std::basic_string<C>& s);
 prods<char32_t> operator+(const prods<char32_t>& x,
 	const std::basic_string<char>& s);
 
-#if defined(DEBUG) || defined(WITH_DEVHELPERS)
+#ifdef DEBUG
 template<typename C = char, typename T = C>
 std::ostream& print_grammar(std::ostream& os, const grammar<C, T>& g);
 template<typename C>
 std::ostream& print_dictmap(std::ostream& os,
 	const std::map<std::basic_string<C>, size_t>& dm);
-#endif
+#endif // DEBUG
 
 } // idni namespace
+
 // template definitions
 #include "grammar.tmpl.h"       // for grammar and related
 #include "parser.tmpl.h"        // for parser
 #include "parser_result.tmpl.h" // for parse::result
 #include "tgf.h"                // Tau Grammar Form
-#ifdef WITH_DEVHELPERS
+
+#ifdef DEBUG
 #include "devhelpers.h"   // various helpers for converting forest
-#endif
+#endif // DEBUG
+
 // undef local macros
 #undef DEFAULT_BINARIZE
 #undef DEFAULT_INCR_GEN_FOREST

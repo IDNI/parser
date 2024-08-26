@@ -88,12 +88,23 @@ struct node {
 template <typename symbol_t>
 using sp_node = std::shared_ptr<node<symbol_t>>;
 
-// node factory method
+// injecting preprocessing logic into the node factory method
 template <typename symbol_t>
+struct make_node_hook {
+	// node factory method
+	std::optional<sp_node<symbol_t>> operator()(const node<symbol_t>& /* n */) {
+		return std::optional<sp_node<symbol_t>>{};
+	}
+};
+
+// node factory method
+template <typename symbol_t, class hook_t = make_node_hook<symbol_t>>
 sp_node<symbol_t> make_node(const symbol_t& s,
 	const std::vector<sp_node<symbol_t>>& ns) {
 	static std::map<node<symbol_t>, sp_node<symbol_t>> cache;
+	static hook_t hook{};
 	node<symbol_t> key{s, ns};
+	if (auto h = hook(key); h) return h.value();
 	if (auto it = cache.find(key); it != cache.end()) return it->second;
 	return cache.emplace(key, std::make_shared<node<symbol_t>>(s, ns))
 			.first->second;

@@ -14,7 +14,10 @@
 #define __IDNI__PARSER__PARSER_TMPL_H__
 #include "parser.h"
 #include "term_colors.h"
+
+#ifdef PARSER_MEASURE
 #include "measure.h"
+#endif // PARSER_MEASURE
 
 namespace idni {
 
@@ -450,7 +453,9 @@ parser<C, T>::result parser<C, T>::parse(int fd, parse_options po) {
 #endif
 template <typename C, typename T>
 parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
-	measure measure_parsing("parsing", po.measure);
+	#ifdef PARSER_MEASURE
+	measures::start_timer("parsing", po.measure);
+	#endif // PARSER_MEASURE
 	debug = po.debug;
 	if (debug) {
 		std::basic_string<C> tmp = in->get_string();
@@ -474,7 +479,6 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 		for (size_t c = 0; c != g.n_conjs(p); ++c)
 			++refi[*add(t, { 0, p, c, 0, 0 }).first];
 	size_t r = 1, cb = 0; // row and cel beginning
-	measure measure_each_pos("current character parsing");
 	size_t proc = 0;
 	T ch = 0;
 	size_t n = 0, cn = -1;
@@ -493,7 +497,9 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 			<< TC.CLEAR() <<std::endl;)
 		if (po.measure_each_pos && new_pos) {
 			if (in->cur() == (C)'\n') (cb = n), r++;
-			measure_each_pos.start();
+			#ifdef PARSER_MEASURE
+			measures::start_timer("current character parsing");
+			#endif // PARSER_MEASURE
 		}
 
 		do {
@@ -535,7 +541,10 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 		if (po.measure_each_pos && new_pos) {
 			std::cout << in->pos() << " \tln: " << r << " col: "
 				<< (n - cb + 1) << " :: ";
-			measure_each_pos.stop();
+			#ifdef PARSER_MEASURE
+			measures::print_timer("current character parsing");
+			measures::restart_timer("current character parsing");
+			#endif // PARSER_MEASURE
 		}
 
 		if (o.incr_gen_forest) {
@@ -567,7 +576,11 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 
 	} while (in->tnext());
 
-	measure_parsing.stop();
+	#ifdef PARSER_MEASURE
+	measures::print_timer("parsing");
+	measures::stop_timer("parsing");
+	#endif // PARSER_MEASURE
+
 	in->clear();
 	// remaining total items
 	size_t count = 0;
@@ -849,9 +862,10 @@ void parser<C, T>::pre_process(const item& i) {
 		}
 	}
 }
+
 template <typename C, typename T>
 bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
-	const parse_options& po)
+	[[maybe_unused]] const parse_options& po)
 {
 	bool ret = false;
 	bin_tnt.clear();
@@ -861,19 +875,35 @@ bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
 	// set the start root node
 	pnode root(start_lit, { 0, in->tpos() });
 	f.root(root);
+
 	// preprocess parser items for faster retrieval
-	measure measure_preprocess("preprocess", po.measure_preprocess);
+	#ifdef PARSER_MEASURE
+	measures::start_timer("preprocess", po.measure_preprocess);
+	#endif // PARSER_MEASURE
+
 	int count = 0;
 	for (size_t n = 0; n < in->tpos() + 1; n++)
 		for (const item& i : S[n]) count++, pre_process(i);
-	if (po.measure_preprocess) measure_preprocess.stop();
-	MS(std::cout << "preprocess size: " count << "\n";)
-	MS(std::cout << "sorted sizes : " << sorted_citem.size() << " " <<
-						rsorted_citem.size() << " \n";)
+
+	#ifdef PARSER_MEASURE
+	measures::print_timer("preprocess");
+	measures::stop_timer("preprocess");
+	std::cout << "preprocess size: " << count << "\n";
+	std::cout << "sorted sizes : " << sorted_citem.size()
+		<< " " << rsorted_citem.size() << " \n";
+	#endif // PARSER_MEASURE
 
 	// build forest
-	measure measure_forest("forest building", po.measure_forest);
+	#ifdef PARSER_MEASURE
+	measures::start_timer("forest building", po.measure_forest);
+	#endif // PARSER_MEASURE
+
 	ret = build_forest(f, root);
+
+	#ifdef PARSER_MEASURE
+	measures::print_timer("forest building");
+	measures::stop_timer("forest building");
+	#endif // PARSER_MEASURE
 
 	return ret;
 }

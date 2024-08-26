@@ -22,11 +22,11 @@ namespace idni {
 #else
 #	define DBG(x)
 #endif
-#ifdef MEASURE
+#ifdef PARSER_MEASURE
 #	define MS(x) x
 #else
 #	define MS(x)
-#endif
+#endif // PARSER_MEASURE
 
 #define DBGP(x) if (debug) { x }
 #define DEBUG_POS_FROM 0

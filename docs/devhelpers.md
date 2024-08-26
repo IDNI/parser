@@ -6,7 +6,7 @@
 
 These functions shouldn't be necessary for your parser's production build but they can be helpful when debugging your implementation of a language parser, since it provides the parsed forest in a human readable forms or in a form which can be processed.
 
-`devhelper` functions are available only when `WITH_DEVHELPERS` macro is defined when compiling the parser library.
+`devhelper` functions are available only on `Debug` target when compiling the parser library.
 
 ## functions
 
