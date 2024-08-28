@@ -111,23 +111,14 @@ sp_node<symbol_t> make_node(const symbol_t& s,
 }
 
 // simple function objects to be used as default values for the traversers.
-template <typename node_t>
-static const auto all = [](const node_t&) { return true; };
+static const auto all = [](const auto&) { return true; };
+using all_t = decltype(all);
 
-template <typename node_t>
-using all_t = decltype(all<node_t>);
+static const auto none = [](const auto&) { return false; };
+using none_t = decltype(none);
 
-template <typename node_t>
-static const auto none = [](const node_t&) { return false; };
-
-template <typename node_t>
-using none_t = decltype(none<node_t>);
-
-template <typename node_t>
-static const auto identity = [](const node_t& n) { return n; };
-
-template <typename node_t>
-using identity_t = decltype(identity<node_t>);
+static const auto identity = [](const auto& n) { return n; };
+using identity_t = decltype(identity);
 
 // visitor that traverse the tree in post-order (avoiding visited nodes).
 template <typename wrapped_t, typename predicate_t, typename input_node_t,
@@ -533,9 +524,9 @@ template <typename predicate_t, typename symbol_t,
 	typename node_t = sp_node<symbol_t>>
 node_t trim_top(const node_t& input, predicate_t& query) {
 	neg_predicate<predicate_t> neg(query);
-	map_transformer<identity_t<symbol_t>, node_t> map(identity<symbol_t>);
+	map_transformer<identity_t, node_t> map(identity);
 	return post_order_traverser<
-			map_transformer<identity_t<symbol_t>, node_t>,
+			map_transformer<identity_t, node_t>,
 			neg_predicate_t<predicate_t>,
 			node_t>(
 		map, neg)(input);
@@ -547,10 +538,10 @@ std::vector<node_t> select_top(const node_t& input, predicate_t& query) {
 	std::vector<node_t> selected;
 	select_top_predicate<predicate_t, node_t> select(query, selected);
 	post_order_traverser<
-			identity_t<node_t>,
+			identity_t,
 			select_top_predicate<predicate_t, node_t>,
 			node_t>(
-		identity<node_t>, select)(input);
+		identity, select)(input);
 	return selected;
 }
 
@@ -563,10 +554,10 @@ std::vector<node_t> select_subnodes(const node_t& input, predicate_t& query,
 	select_subnodes_predicate<predicate_t, extractor_t, node_t> select(
 		query, extractor, selected);
 	post_order_traverser<
-			identity_t<node_t>,
+			identity_t,
 			select_top_predicate<predicate_t, node_t>,
 			node_t>(
-		identity<node_t>, select)(input);
+		identity, select)(input);
 	return selected;
 }
 
@@ -577,10 +568,10 @@ std::vector<node_t> select_all(const node_t& input, predicate_t& query) {
 	std::vector<node_t> selected;
 	select_all_predicate<predicate_t, node_t> select(query, selected);
 	post_order_traverser<
-			identity_t<node_t>,
+			identity_t,
 			select_all_predicate<predicate_t, node_t>,
 			node_t>(
-		identity<node_t>, select)(input);
+		identity, select)(input);
 	return selected;
 }
 
@@ -594,8 +585,8 @@ std::vector<node_t> select_all_until (const node_t& input, const auto& query, co
 		if (until(n)) return false;
 		else return true;
 	};
-	post_order_traverser<identity_t<node_t>, decltype(select), node_t>
-		(identity<node_t>, select)(input);
+	post_order_traverser<identity_t, decltype(select), node_t>
+		(identity, select)(input);
 	return selected;
 }
 
@@ -612,8 +603,8 @@ std::vector<node_t> select_top_until (const node_t& input, const auto& query, co
 			selected.push_back(n);
 		return false;
 	};
-	post_order_traverser<identity_t<node_t>, decltype(select), node_t>
-		(identity<node_t>, select)(input);
+	post_order_traverser<identity_t, decltype(select), node_t>
+		(identity, select)(input);
 	return selected;
 }
 
@@ -623,10 +614,10 @@ std::optional<node_t> find_top(const node_t& input, predicate_t& query) {
 	std::optional<node_t> found;
 	find_top_predicate<predicate_t, node_t> find_top(query, found);
 	post_order_traverser<
-			identity_t<node_t>,
+			identity_t,
 			find_top_predicate<predicate_t, node_t>,
 			node_t>(
-		identity<node_t>, find_top)(input);
+		identity, find_top)(input);
 	return found;
 }
 
@@ -636,9 +627,9 @@ node_t replace(const node_t& n, std::map<node_t, node_t>& changes) {
 	replace_transformer<node_t> replace{changes};
 	return post_order_traverser<
 			replace_transformer<node_t>,
-			all_t<node_t>,
+			all_t,
 			node_t>
-		(replace , all<node_t>)(n);
+		(replace , all)(n);
 }
 
 
@@ -942,8 +933,8 @@ node_t apply_if(const rule<node_t>& r, const node_t& n,
 // use internaly by apply and apply with skip.
 template <typename node_t, typename matcher_t>
 node_t apply(const node_t& s, const node_t& n, matcher_t& matcher) {
-	post_order_query_traverser<identity_t<node_t>, matcher_t, node_t>(
-		identity<node_t>, matcher)(n);
+	post_order_query_traverser<identity_t, matcher_t, node_t>(
+		identity, matcher)(n);
 	if (matcher.matched) {
 		auto nn = replace<node_t>(s, matcher.env);
 		environment<node_t> nenv { {matcher.matched.value(), nn} };
@@ -985,9 +976,9 @@ sp_node<symbol_t> make_node_from_tree(
 			drop_location_t<parse_symbol_t, symbol_t>,
 			sp_parse_tree,
 			sp_node<symbol_t>>,
-		all_t<sp_parse_tree>,
+		all_t,
 		sp_parse_tree,
-		sp_node<symbol_t>>(transform, all<sp_parse_tree>)(t);
+		sp_node<symbol_t>>(transform, all)(t);
 
 }
 
