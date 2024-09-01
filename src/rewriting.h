@@ -104,10 +104,11 @@ sp_node<symbol_t> make_node(const symbol_t& s,
 	static std::map<node<symbol_t>, sp_node<symbol_t>> cache;
 	static hook_t hook{};
 	node<symbol_t> key{s, ns};
-	if (auto h = hook(key); h) return h.value();
 	if (auto it = cache.find(key); it != cache.end()) return it->second;
+	if (auto h = hook(key); h) return cache.emplace(key, h.value())
+		.first->second;
 	return cache.emplace(key, std::make_shared<node<symbol_t>>(s, ns))
-			.first->second;
+		.first->second;
 }
 
 // simple function objects to be used as default values for the traversers.
