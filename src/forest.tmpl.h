@@ -415,11 +415,11 @@ template <typename NodeT>
 std::ostream& forest<NodeT>::print_data(std::ostream& os) const {
 	os << "number of nodes: " << g.size() << std::endl;
 	for (const auto& n : g) {
-		os << n.first.first.to_std_string() << "\n";
+		os << n.first->first.to_std_string() << "\n";
 		for (const auto& p : n.second) {
 			os << "\t";
 			for (const auto& c : p)
-				os << " `" << c.first.to_std_string() << "`";
+				os << " `" << c->first.to_std_string() << "`";
 			os << "\n";
 		}
 	}

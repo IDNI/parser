@@ -899,6 +899,7 @@ bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
 	#endif // PARSER_MEASURE
 
 	ret = build_forest(f, root);
+	f.print_data(std::cout) << "\n";
 
 	#ifdef PARSER_MEASURE
 	measures::print_timer("forest building");
