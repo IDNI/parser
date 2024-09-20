@@ -62,7 +62,7 @@ typename forest<NodeT>::sptree forest<NodeT>::graph::_extract_trees(
 		auto& ns = fit->second;
 		if (!ns.size()) continue;
 		auto it = ns.begin();
-		if (ns.size() > 1) {
+		if (ns.size() >= 1) {
 			// select which descendants to traverse not already done;
 			if (edgcount[cur->value] == ns.size()) continue;
 			for (size_t i = 0; i < edgcount[cur->value]; i++, ++it);

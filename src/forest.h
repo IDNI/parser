@@ -44,8 +44,12 @@ template <typename NodeT>
 struct forest { 
 	struct nptr_t {
 		const NodeT *id;	
+		size_t hash;
 	
-		nptr_t(const NodeT *_id = nullptr) : id(_id) { }
+		nptr_t(const NodeT *_id = nullptr) : id(_id) {
+			hash = 0;
+			if(id) hash = id->hashit();
+		 }
 
 		inline operator NodeT() const{
 			return *id;
@@ -53,10 +57,15 @@ struct forest {
 		//inline const NodeT& getobj() const { return *id; }
 		inline const NodeT* operator->() const { return id;}
 		inline bool operator<(const nptr_t& rhs) const {
-			return id < rhs.id;
+			return hash <rhs.hash;
+			//return id < rhs.id;
 		}
 		inline bool operator == (const nptr_t& rhs) const {
-			return id == rhs.id;
+			if (hash == rhs.hash) {
+				DBG(assert(id == rhs.id));
+				return true;
+			}
+			return false;
 		}
 		//inline lit<C,T> &first() const { DBG(assert(id!=0)); return id->first; }
 		//inline std::array<size_t, 2>& second() const { DBG(assert(id!=0)); return id->second; } 	

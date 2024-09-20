@@ -66,6 +66,15 @@ struct lit : public std::variant<size_t, T> {
 	size_t n() const;
 	T      t() const;
 	bool is_null() const;
+	size_t hashit() const {
+		std::size_t seed = 0;
+		if (std::holds_alternative<size_t>(*this)) {
+			seed ^= std::hash<size_t>{}(std::get<size_t>(*this)) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		} else {
+			seed ^= std::hash<T>{}(std::get<T>(*this)) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		}
+		return seed;
+	}
 
 	// IDEA maybe we could use directly the default operator<=> for lit
 	auto operator<=>(const lit<C, T>& l) const;
@@ -220,21 +229,29 @@ public:
 	using node_type       = std::pair<symbol_type, location_type>;
 	using parser_type     = idni::parser<char_type, terminal_type>;
 
-	struct pnode : public node_type {
-		//using pnodebase::pnodebase;
-		private:
-	  	//static std::vector<const pnode*> rnid;
-       	static typename forest<pnode>::node ptrof(const pnode& p);
-		//static pnode& pndof(const nptr_t& );
-		public:
-		pnode(){}
-		pnode(const lit<C,T> &_f, const std::array<size_t,2> &_s):
-			node_type(_f,_s) {}
-			// every pnode object has its pointer
-       	static std::map<const pnode, typename forest<pnode>::node> nid;
+	struct pnode: public node_type {
+		friend forest<pnode>;
+	private:
+		static typename forest<pnode>::node ptrof(const pnode& p);
+	
+	public:
+		pnode() {}
+		pnode(const lit<C, T>& _f, const std::array<size_t, 2>& _s)
+			: node_type(_f, _s) {}
+		static std::map<const pnode, typename forest<pnode>::node> nid;
+
 		inline operator typename forest<pnode>::node() const {
 			return ptrof(*this);
 		}
+
+		inline size_t _mpsize() const {
+			return nid.size();
+		}
+		std::size_t hashit() const {
+            std::size_t h1 = this->first.hashit();
+			hashCombine(h1, this->second[0], this->second[1]);
+            return h1;
+        }
 		//inline lit<C,T> &first() const { return this->first; }
 		//inline std::array<size_t, 2>& second() const { return this->second; }
 	};
