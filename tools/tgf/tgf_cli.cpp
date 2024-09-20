@@ -16,6 +16,7 @@
 #include <fstream>
 #include <algorithm>
 #include <ranges>
+#include <utility>
 
 #include "parser.h"
 #include "tgf_cli.h"
@@ -426,8 +427,11 @@ void tgf_repl_evaluator::parsed(parser_type::result& r) {
 			ss << "TML rules:\n", g), ss << "\n";
 		return true;
 	};
+	to_tml_rules<char>(ss, std::as_const(*f));
+
 	if (opt.tml_rules) f->extract_graphs(f->root(), cb_next_g);
 	if (opt.tml_facts) to_tml_facts<char, char>(ss << "TML facts:\n", r);
+	/*
 	if (opt.print_graphs) {
 		auto str2ntids = [this](const set<string>& list) {
 			set<size_t> r;
@@ -462,6 +466,7 @@ void tgf_repl_evaluator::parsed(parser_type::result& r) {
 		pretty_print(ss << "parsed graph:\n",
 			r.get_shaped_tree(sopt), {}, false, 1);
 	}
+	*/
 	cout << ss.str();
 }
 

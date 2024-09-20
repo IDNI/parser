@@ -406,6 +406,14 @@ int main(int argc, char **argv)
 	run_test<char>(ps, nt, start, "b", {}, o);
 	ps.clear();
 
+	TEST("bug", "dynamic_forest")
+	ps(A,  start + A);
+	ps(A , a);
+	ps(start, A);
+	ps(start, start );
+	o = {}, o.ambiguity_fails = false;
+	run_test<char>(ps, nt, start, "aaa", {}, o);
+	ps.clear();
 /*******************************************************************************
 *       STRESS
 *******************************************************************************/

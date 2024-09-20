@@ -50,14 +50,19 @@ private:
 		friend NodeT;
 	private:
 		const NodeT *id; // points to pnode
+		size_t hash;
 		static size_t nc; // maintains a refcount for # of id pointers
 		// to NodeT obj in NodeT::nid map both externally and from inside nid
 	public:
 		nptr_t(const NodeT *_id = nullptr) : id(_id) { //if(id)
+			hash = 0;
+			if(id) hash = id->hashit();
 			nc++; }
 		nptr_t(const nptr_t& rhs) {  id = rhs.id; //if(id)
+			hash = rhs.hash;
 			nc++; }
 		nptr_t(const nptr_t&& rhs) { id = rhs.id; //if(id)
+			hash = rhs.hash;
 			nc++; }
 		// did not define conversion constructor.
 		// as we use NodeT::nptr_t aka NodeT::node() operator
@@ -69,21 +74,26 @@ private:
 			//if(  !id && rhs.id)
 			//if(&rhs != this) nc++;
 			//else if( id && !rhs.id) nc--;
-			if (&rhs != this) id = rhs.id;
+			if (&rhs != this) id = rhs.id, hash = rhs.hash;
 			return *this;
 		}
 		inline nptr_t& operator=(const nptr_t&& rhs) {
 			//if( //!id && 	rhs.id)
 			//if(&rhs != this) nc++;
 			//else if( id && !rhs.id) nc--;
-			if (&rhs != this) id = rhs.id;
+			if (&rhs != this) id = rhs.id, hash = rhs.hash;
 			return *this;
 		}
 		inline bool operator<(const nptr_t& rhs) const {
-			return id < rhs.id;
+			return hash <rhs.hash;
+			//return id < rhs.id;
 		}
-		inline bool operator==(const nptr_t& rhs) const {
-			return id == rhs.id;
+		inline bool operator == (const nptr_t& rhs) const {
+			if (hash == rhs.hash) {
+				DBG(assert(id == rhs.id));
+				return true;
+			}
+			return false;
 		}
 		~nptr_t() {
 			//DBG(std::cout <<"-"<< NodeT::nid().size() <<" "<<nc );
