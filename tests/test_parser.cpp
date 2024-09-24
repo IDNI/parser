@@ -49,7 +49,7 @@ int main(int argc, char **argv)
 		parser<>::pnode n1, n2,n3;
 		{
 			cout<<"START Ref counting tests "<<std::endl;
-			n2.second ={ 1,1};
+			n1.second ={ 1,1};
 			const parser<>::forest_type::node p1 = n1;
 			parser<>::forest_type::node p4, p2 = n1;
 			*(&p2) = 0;
@@ -62,7 +62,7 @@ int main(int argc, char **argv)
 				
 			};
 			p4 = f(p1);
-			n3 = p4;
+			//n3 = ) p4;
 		}
 		cout<<"End , GCed:"<<(assert( n1._mpsize() == 0),"yes");
 
@@ -406,6 +406,14 @@ int main(int argc, char **argv)
 	run_test<char>(ps, nt, start, "b", {}, o);
 	ps.clear();
 
+	TEST("bug", "dynamic_forest")
+	ps(A,  start + A);
+	ps(A , a);
+	ps(start, A);
+	ps(start, start );
+	o = {}, o.ambiguity_fails = false;
+	run_test<char>(ps, nt, start, "aaa", {}, o);
+	ps.clear();
 /*******************************************************************************
 *       STRESS
 *******************************************************************************/

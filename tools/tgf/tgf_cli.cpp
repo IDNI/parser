@@ -426,6 +426,7 @@ void tgf_repl_evaluator::parsed(parser_type::result& r) {
 			ss << "TML rules:\n", g), ss << "\n";
 		return true;
 	};
+	// to_tml_rules<char>(ss, std::as_const(*f));
 	if (opt.tml_rules) f->extract_graphs(f->root(), cb_next_g);
 	if (opt.tml_facts) to_tml_facts<char, char>(ss << "TML facts:\n", r);
 	if (opt.print_graphs) {

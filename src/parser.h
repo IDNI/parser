@@ -65,6 +65,15 @@ struct lit {
 	size_t n() const;
 	T      t() const;
 	bool is_null() const;
+	size_t hashit() const {
+		std::size_t seed = 0x9e3779b9;
+		if (std::holds_alternative<size_t>(data)) 
+			seed ^= std::hash<size_t>{}(std::get<size_t>(data)) + 
+							0x9e3779b9 + (seed << 6) + (seed >> 2);
+		else seed ^= std::hash<T>{}(std::get<T>(data)) + 
+							0x9e3779b9 + (seed << 6) + (seed >> 2);
+		return seed;
+	}
 
 	// IDEA maybe we could use directly the default operator<=> for lit
 	auto operator<=>(const lit<C, T>& l) const;
@@ -242,6 +251,11 @@ public:
 		inline size_t _mpsize() const {
 			return nid().size();
 		}
+		std::size_t hashit() const {
+            std::size_t h1 = this->first.hashit();
+			hashCombine(h1, this->second[0], this->second[1]);
+            return h1;
+        }
 		//inline lit<C,T> &first() const { return this->first; }
 		//inline std::array<size_t, 2>& second() const { return this->second; }
 	};

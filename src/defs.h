@@ -14,6 +14,7 @@
 #define __IDNI__PARSER__DEFS_H__
 #include <cstdint>
 #include <iomanip>
+#include <functional>
 
 namespace idni {
 
@@ -53,6 +54,12 @@ typedef int32_t int_t;
 #ifndef GIT_BRANCH
 #define GIT_BRANCH      "n/a"
 #endif
+
+template <typename T, typename... Rest>
+void hashCombine(size_t& seed, const T& v, Rest... rest) {
+    seed ^= std::hash<T>()(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    (hashCombine(seed, rest), ...);
+}
 
 } // idni namespace
 #endif // __IDNI__PARSER__DEFS_H__

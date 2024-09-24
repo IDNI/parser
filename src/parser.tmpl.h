@@ -30,9 +30,8 @@ typename forest<typename parser<C,T>::pnode>::node
 	parser<C,T>::pnode::ptrof(
 		const typename parser<C,T>::pnode& pn) {
 	auto r = nid().emplace( pn, nullptr );
-	if (r.second) r.first->second.id = &(r.first->first);
-		// r.first->second = typename
-		// forest<typename parser<C,T>::pnode>::node(&(r.first->first));
+	if (r.second) r.first->second = typename
+	forest<typename parser<C,T>::pnode>::node(&(r.first->first));
 	return r.first->second;
 }
 
