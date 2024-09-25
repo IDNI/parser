@@ -58,7 +58,7 @@ extern const std::size_t grcprime;
 
 template <typename T, typename... Rest>
 void hashCombine(size_t& seed, const T& v, Rest... rest) {
-    seed ^= std::hash<T>()(v) + grcprime + (seed << 6) + (seed >> 2);
+    seed ^= std::hash<T>()(v) + grcprime + (seed << 12) + (seed >> 4);
     (hashCombine(seed, rest), ...);
 }
 

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 if [[ "$1" = "all" ]]; then
 	rm -rf build build-* tau-lang
