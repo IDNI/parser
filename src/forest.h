@@ -67,7 +67,7 @@ private:
 		// did not define conversion constructor.
 		// as we use NodeT::nptr_t aka NodeT::node() operator
 		inline operator NodeT() const {
-			//DBG(assert(id != nullptr);)
+			DBG(assert(id != nullptr);)
 			return *id;
 		}
 		inline const NodeT* operator->() const { return id;}
@@ -103,7 +103,7 @@ private:
 					//DBG(std::cout<<"GCing nodes:  "<< nc-1 <<std::endl);
 					nc--;
 					NodeT::nid().clear();
-					//DBG(std::cout <<"-D"<< NodeT::nid().size() <<" "<<nc) ;
+					DBG(std::cout <<"-D"<< NodeT::nid().size() <<" "<<nc) ;
 				}
 				else if (nc > 0) nc--;
 				id = 0; //dont delete as nid.clear takes responsibility

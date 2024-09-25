@@ -66,12 +66,12 @@ struct lit {
 	T      t() const;
 	bool is_null() const;
 	size_t hashit() const {
-		std::size_t seed = 0x9e3779b9;
+		std::size_t seed = grcprime;
 		if (std::holds_alternative<size_t>(data)) 
 			seed ^= std::hash<size_t>{}(std::get<size_t>(data)) + 
-							0x9e3779b9 + (seed << 6) + (seed >> 2);
+							grcprime + (seed << 12) + (seed >> 4);
 		else seed ^= std::hash<T>{}(std::get<T>(data)) + 
-							0x9e3779b9 + (seed << 6) + (seed >> 2);
+							grcprime + (seed << 12) + (seed >> 4);
 		return seed;
 	}
 
