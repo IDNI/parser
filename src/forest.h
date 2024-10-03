@@ -96,6 +96,9 @@ private:
 			}
 			return false;
 		}
+		size_t operator()( const nptr_t & h) const {
+			return h.hash;
+		}
 		~nptr_t() {
 			//DBG(std::cout <<"-"<< NodeT::nid().size() <<" "<<nc );
 			//if(id){
@@ -107,6 +110,7 @@ private:
 				}
 				else if (nc > 0) nc--;
 				id = 0; //dont delete as nid.clear takes responsibility
+				hash = 0;
 			//}
 		}
 		//inline lit<C,T> &first() const { DBG(assert(id!=0)); return id->first; }
@@ -116,7 +120,7 @@ public:
 	using node       = nptr_t;
 	using nodes      = std::vector<node>;
 	using nodes_set  = std::set<nodes>;
-	using node_graph = std::map<node, nodes_set>;
+	using node_graph = std::unordered_map<node, nodes_set, node>;
 	using edge       = std::pair<size_t, size_t>;
 	struct tree {
 		node value;

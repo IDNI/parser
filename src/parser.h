@@ -23,6 +23,7 @@
 #include <cassert>
 #include <algorithm>
 #include <initializer_list>
+#include <unordered_map>
 #include "memory_map.h"
 #include "defs.h"
 #include "characters.h"
@@ -234,11 +235,11 @@ public:
 		friend forest<pnode>;
 	private:
 		static typename forest<pnode>::node ptrof(const pnode& p);
-		static std::map<const pnode,
-			typename forest<pnode>::node>& nid()
+		static std::unordered_map<const pnode,
+			typename forest<pnode>::node, pnode>& nid()
 		{
-			static std::map<const pnode,
-					typename forest<pnode>::node> instance;
+			static std::unordered_map<const pnode,
+					typename forest<pnode>::node, pnode> instance;
 			return instance;
 		}
 	public:
@@ -247,6 +248,9 @@ public:
 			: node_type(_f, _s) {}
 		inline operator typename forest<pnode>::node() const {
 			return ptrof(*this);
+		}
+		size_t operator()(const pnode& h) const{
+			return h.hashit();
 		}
 		inline size_t _mpsize() const {
 			return nid().size();
