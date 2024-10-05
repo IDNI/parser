@@ -54,9 +54,9 @@ private:
 		static size_t nc; // maintains a refcount for # of id pointers
 		// to NodeT obj in NodeT::nid map both externally and from inside nid
 	public:
-		nptr_t(const NodeT *_id = nullptr) : id(_id) { //if(id)
-			hash = 0;
-			if(id) hash = id->hashit();
+		nptr_t(const NodeT *_id = nullptr, size_t _hash = 0) : id(_id), hash(_hash) { //if(id)
+			//hash = 0;
+			//if(id) hash = id->hashit();
 			nc++; }
 		nptr_t(const nptr_t& rhs) {  id = rhs.id; //if(id)
 			hash = rhs.hash;
