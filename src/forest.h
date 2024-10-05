@@ -50,7 +50,9 @@ private:
 		friend NodeT;
 	private:
 		const NodeT *id; // points to pnode
-		size_t hash; 
+		size_t hash; // should be unique value for each nptr-pnode, either 
+					 // use the order of insertion in nid or 
+					 // costly hashit() of pnode
 		static size_t nc; // maintains a refcount for # of id pointers
 		// to NodeT obj in NodeT::nid map both externally and from inside nid
 	public:
