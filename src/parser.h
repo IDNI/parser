@@ -93,7 +93,12 @@ using conjs = std::set<lits<C, T>>; // conjunctions of literals
 template <typename C = char, typename T = C>
 using disjs = std::set<conjs<C, T>>; // disjunctions of literal conjunctions
 template <typename C = char, typename T = C>
-using prod = std::pair<lit<C, T>, disjs<C, T>>; // production rule
+struct prod { // production rule
+	lit<C, T>                  first;
+	disjs<C, T>                second;
+	std::optional<std::string> guard;
+	bool operator==(const prod& p) const;
+};
 template <typename C = char, typename T = C>
 struct prods : public std::vector<prod<C, T>> { // productions
 	typedef std::vector<prod<C, T>> prods_t;
@@ -155,11 +160,16 @@ struct grammar {
 		bool auto_disambiguate = true; // @enable/disable disambig.
 		std::set<size_t> nodisambig_list{}; // @nodisambig nonterminal ids.
 		shaping_options shaping = {};
+		std::set<std::string> enabled_guards = {}; // production guard names
 	} opt;
 	grammar(nonterminals<C, T>& nts, options opt = {});
 	grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
 		const prods<C, T>& start, const char_class_fns<T>& cc_fns,
 		options opt = {});
+	// sets guards of enabled productions
+	void set_enabled_productions(const std::set<std::string>&);
+	void productions_enable(const std::string& guard);
+	void productions_disable(const std::string& guard);
 	// returns number of productions (every disjunction has a prod rule)
 	size_t size() const;
 	// returns head of the prod rule - literal
@@ -210,6 +220,8 @@ private:
 	lit<C, T> start;
 	char_class_fns<T> cc_fns = {};
 	std::map<lit<C, T>, std::set<size_t>> ntsm = {};
+	std::map<size_t, size_t> grdm = {};
+	std::vector<std::string> guards = {};
 	std::set<size_t> nullables = {};
 	std::set<size_t> conjunctives = {};
 	std::vector<production> G;

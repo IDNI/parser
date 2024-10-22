@@ -294,6 +294,15 @@ disjs<C, T> operator~(const disjs<C, T>& x) {
 	//cout << "\nnegating disjs d: " << x << " to: `" << r << "`" << std::endl;
 	return simplify<C, T>(r); // is simplify needed here?
 }
+
+//-----------------------------------------------------------------------------
+
+template <typename C, typename T>
+bool prod<C, T>::operator==(const prod<C, T>& p) const  {
+	return first == p.first && second == p.second
+		&& guard == p.guard;
+}
+
 //-----------------------------------------------------------------------------
 template <typename C, typename T>
 void simplify(prods<C, T>& p) {
@@ -419,6 +428,7 @@ void prods<C, T>::operator()(const std::vector<T>& s) {
 template <typename C, typename T>
 void prods<C, T>::operator()(const prods<C, T>& l, const prods<C, T>& p) {
 	(*this)(l.to_lit(), p);
+	if (l.back().guard) this->back().guard = l.back().guard;
 }
 template <typename C, typename T>
 void prods<C, T>::operator()(const lit<C, T>& l, const prods<C, T>& p) {
@@ -523,9 +533,20 @@ grammar<C, T>::grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
 		} else new_conjs.push_back(l);
 		G.emplace_back(p.first, new_conjs);
 		if (c.size() > 1) conjunctives.insert(G.size()-1);
+		if (p.guard) {
+			//DBG(std::cout << "\tguard: " << p.guard.value() << "\n";)
+			size_t gid;
+			auto it = std::find(guards.begin(), guards.end(),
+							p.guard.value());
+			if (it != guards.end())
+				gid = std::distance(guards.begin(), it);
+			else    guards.push_back(p.guard.value()),
+				gid = guards.size() - 1;
+			grdm[G.size()-1] = gid;
+		}
 	}
-	// create ntsm: nt -> prod rule map
-	for (size_t n = 0; n != G.size(); ++n) ntsm[G[n].first].insert(n);
+	// set guards to create ntsm: nt -> prod rule map
+	set_enabled_productions(opt.enabled_guards);
 	size_t k;
 	do { // find all nullables
 		k = nullables.size();
@@ -534,6 +555,30 @@ grammar<C, T>::grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
 				if (all_nulls(a)) nullables.insert(p.first.n());
 	} while (k != nullables.size());
 	//DBG(print_data(std::cout << "\n", "\t") << "\n\n";)
+}
+template <typename C, typename T>
+void grammar<C, T>::set_enabled_productions(const std::set<std::string>& grds) {
+	opt.enabled_guards = grds;
+	std::set<size_t> gids; // ids of enabled guards
+	for (size_t gid = 0; gid != guards.size(); ++gid)
+		if (opt.enabled_guards.count(guards[gid]))
+			gids.insert(gid);
+	ntsm.clear();
+	for (size_t n = 0; n != G.size(); ++n) {
+		auto it = grdm.find(n); // if not guarded or guard is enabled
+		if (it == grdm.end() || gids.count(it->second))
+			ntsm[G[n].first].insert(n);
+	}
+}
+template <typename C, typename T>
+void grammar<C, T>::productions_enable(const std::string& guard) {
+	opt.enabled_guards.insert(guard);
+	set_enabled_productions(opt.enabled_guards);
+}
+template <typename C, typename T>
+void grammar<C, T>::productions_disable(const std::string& guard) {
+	opt.enabled_guards.erase(guard);
+	set_enabled_productions(opt.enabled_guards);
 }
 template <typename C, typename T>
 size_t grammar<C, T>::size() const { return G.size(); }
@@ -694,6 +739,8 @@ std::ostream& grammar<C, T>::print_production(std::ostream& os,
 	}
 	os << ".";
 	if (conjunctive(p)) os << "\t "<< TC_NULL<<"# conjunctive" <<TC_DEFAULT;
+	if (grdm.find(p) != grdm.end()) os << "\t "<< TC_NULL << "# guarded: "
+					<< guards[grdm.at(p)] << TC_DEFAULT;
 	return os;
 }
 template <typename C, typename T>

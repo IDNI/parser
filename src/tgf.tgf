@@ -12,7 +12,8 @@ statement              => directive | production.
 start_statement	       => _ statement _.
 
 # productions
-production             => sym _ "=>" _ alternation _ '.'.
+production             => sym [ _ '[' _ sym:production_guard _ ']' ]
+                                                    _ "=>" _ alternation _ '.'.
 alternation            => conjunction   (_ '|' _ conjunction)*.
 conjunction            => concatenation (_ '&' _ concatenation)*.
 concatenation          => factor (__ factor)*.
@@ -53,7 +54,8 @@ directive_body         =>
 	| ("use" __ cc_sym:use_from __ use_param (_ ',' _ use_param)*)
 	                                                    :use_dir
 	| ("disable" __ ["auto" sep] "disambig" "uation"?)  :disable_ad_dir
-	| ("ambiguous" _ sym (_ ',' _ sym)*)                :ambiguous_dir
+	| ("enable" __ "productions" __ syms)               :enable_prods_dir
+	| ("ambiguous" __ syms)                             :ambiguous_dir
 	.
 
 syms                   => sym (_ ',' _ sym)*.

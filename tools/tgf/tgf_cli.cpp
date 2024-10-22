@@ -561,6 +561,8 @@ void tgf_repl_evaluator::get_cmd(const traverser_t& n) {
 		return ss.str();
 	};
 	static map<size_t,	function<void()>> printers = {
+	{ tgf_repl_parser::enabled_prods_opt, [this]() { cout <<
+		"enabled_productions:    " << plist(g->opt.enabled_guards) << "\n"; } },
 	{ tgf_repl_parser::debug_opt,   [this]() { cout <<
 		"show debug:             " << pbool(opt.debug) << "\n"; } },
 	{ tgf_repl_parser::status_opt,   [this]() { cout <<
@@ -675,6 +677,14 @@ void tgf_repl_evaluator::set_cmd(const traverser_t& n) {
 		for (const auto& s : (v || tgf_repl_parser::symbol)())
 			opt.to_trim.insert(s | get_terminals);
 		break;
+	case tgf_repl_parser::enabled_prods_opt: {
+		std::set<std::string> grds;
+		for (const auto& s : (v || tgf_repl_parser::symbol)())
+			grds.insert(s | get_terminals);
+		if (grds != g->opt.enabled_guards)
+			g->set_enabled_productions(grds);
+		break;
+	}
 	case tgf_repl_parser::trim_children_opt:
 		opt.to_trim_children.clear();
 		for (const auto& s : (v || tgf_repl_parser::symbol)())
@@ -729,6 +739,13 @@ void tgf_repl_evaluator::add_cmd(const traverser_t& n) {
 		get_cmd(n);
 		return;
 	}
+	if (o == tgf_repl_parser::enabled_prods_opt) {
+		for (const auto& s : (v || tgf_repl_parser::symbol)())
+			g->opt.enabled_guards.insert(s | get_terminals);
+		g->set_enabled_productions(g->opt.enabled_guards);
+		get_cmd(n);
+		return;
+	}
 	auto& l(o == tgf_repl_parser::nodisambig_list_opt ? opt.nodisambig_list :
 		o == tgf_repl_parser::trim_opt            ? opt.to_trim :
 		o == tgf_repl_parser::trim_children_opt   ? opt.to_trim_children :
@@ -745,6 +762,13 @@ void tgf_repl_evaluator::del_cmd(const traverser_t& n) {
 	if (o == tgf_repl_parser::inline_opt) {
 		for (const auto& tp : (v || tgf_repl_parser::treepath)())
 			opt.to_inline.erase(treepath(tp));
+		get_cmd(n);
+		return;
+	}
+	if (o == tgf_repl_parser::enabled_prods_opt) {
+		for (const auto& s : (v || tgf_repl_parser::symbol)())
+			g->opt.enabled_guards.erase(s | get_terminals);
+		g->set_enabled_productions(g->opt.enabled_guards);
 		get_cmd(n);
 		return;
 	}

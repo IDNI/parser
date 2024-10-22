@@ -249,13 +249,23 @@ private:
 				for (auto& n : (d || tgf_parser::sym)())
 					opt.nodisambig_list.insert(node2nt(n));
 				break;
+			case tgf_parser::enable_prods_dir:
+				for (auto& n : (d || tgf_parser::sym)())
+					opt.enabled_guards
+						.insert(n | get_terminals);
+				break;
 			default: return;
 			}
 		}
 		void production(const traverser_t& t) {
 			//print_node(std::cout, t.value()) << "\n";
 			prods_t sym(nts(t | tgf_parser::sym | get_terminals));
-			//std::cout << "sym: " << sym << std::endl;
+			std::string guard(t | tgf_parser::production_guard
+				| tgf_parser::sym | get_terminals);
+			if (guard.size()) {
+				sym.back().guard = guard;
+				// DBG(std::cout << "sym: (" << sym << ") guard: " << guard << "\n";)
+			}
 			alternation(sym, t | tgf_parser::alternation);
 		}
 		void alternation(const prods_t& sym, const traverser_t& t) {
