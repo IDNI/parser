@@ -123,7 +123,7 @@ struct repl {
 	}
 	// sets the prompt
 	void prompt(const std::string& p) { prompt_ = p, refresh_input(); }
-	void clear() { std::system(
+	void clear() { [[maybe_unused]] int result = std::system(
 #ifdef _WIN32
 		"cls"
 #else

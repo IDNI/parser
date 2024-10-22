@@ -103,7 +103,7 @@ private:
 					//DBG(std::cout<<"GCing nodes:  "<< nc-1 <<std::endl);
 					nc--;
 					NodeT::nid().clear();
-					DBG(std::cout <<"-D"<< NodeT::nid().size() <<" "<<nc) ;
+					//DBG(std::cout <<"-D"<< NodeT::nid().size() <<" "<<nc) ;
 				}
 				else if (nc > 0) nc--;
 				id = 0; //dont delete as nid.clear takes responsibility
