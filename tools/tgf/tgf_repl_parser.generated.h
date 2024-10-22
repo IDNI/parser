@@ -64,6 +64,8 @@ inline struct ::idni::grammar<char_type, terminal_type>::options
 			8, 9, 10, 11, 12
 		},
 		.inline_char_classes = true
+	},
+	.enabled_guards = {
 	}
 };
 
