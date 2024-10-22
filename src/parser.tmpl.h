@@ -109,7 +109,7 @@ C parser<C, T>::input::cur() {
 }
 template <typename C, typename T>
 bool parser<C, T>::input::next() {
-	C ch;
+	C ch{0};
 	if (isstream())	return !s.good() ? false
 		: n = s.tellg(), s.get(ch), l = n + (ch == e ? 0 : 1), true;
 	return n < l && (max_l == 0 || n < max_l) ? ++n, true : false;
