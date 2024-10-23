@@ -189,13 +189,16 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		}
 		os << "\t\t.inline_char_classes = "
 			<< pbool[g.opt.shaping.inline_char_classes] << "\n";
-		os << "\t},\n";
-		os << "\t.enabled_guards = {";
-		size_t i = 0;
-		for (const auto& s : g.opt.enabled_guards) os << (i ? "," : "")
-			<< (i % 10 == 0 ? "\n\t\t" : " ")
-			<< "\"" << s << "\"", i++;
-		os << "\n\t}\n";
+		os << "\t}";
+		if (g.opt.enabled_guards.size()) {
+			os << ",\n\t.enabled_guards = {";
+			size_t i = 0;
+			for (const auto& s : g.opt.enabled_guards) os << (i ? "," : "")
+				<< (i % 10 == 0 ? "\n\t\t" : " ")
+				<< "\"" << s << "\"", i++;
+			os << "\n\t}";
+		}
+		os << "\n";
 		return os.str();
 	};
 	auto gen_opts = [&opt]() {
