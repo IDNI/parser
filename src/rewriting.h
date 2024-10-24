@@ -101,12 +101,20 @@ struct make_node_hook {
 template <typename symbol_t, class hook_t = make_node_hook<symbol_t>>
 sp_node<symbol_t> make_node(const symbol_t& s,
 	const std::vector<sp_node<symbol_t>>& ns) {
+#ifdef DEBUG
+	for (const auto& el: ns)
+		 assert(el != nullptr);
+#endif // DEBUG
 	static std::map<node<symbol_t>, sp_node<symbol_t>> cache;
 	static hook_t hook{};
 	node<symbol_t> key{s, ns};
 	if (auto it = cache.find(key); it != cache.end()) return it->second;
-	if (auto h = hook(key); h) return cache.emplace(key, h.value())
-		.first->second;
+	if (auto h = hook(key); h) {
+#ifdef DEBUG
+	assert(h.value() != nullptr);
+#endif // DEBUG
+		return cache.emplace(key, h.value()) .first->second;
+	}
 	return cache.emplace(key, std::make_shared<node<symbol_t>>(s, ns))
 		.first->second;
 }
