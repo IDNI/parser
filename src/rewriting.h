@@ -911,9 +911,11 @@ node_t apply_rule(const rule<node_t>& r, const node_t& n, const is_capture_t& c)
 	pattern_matcher2<node_t, is_capture_t> matcher {r, c};
 	auto nn = apply(n, matcher);
 #ifdef LOG_REWRITING
-	if (nn != n) {
-		LOG_INFO << "(R) " << p << " := " << s << LOG_END;
-		LOG_INFO << "(F) " << nn << LOG_END;
+	if constexpr (LOG_REWRITING) {
+		if (nn != n) {
+			LOG_DEBUG << "(R) " << p << " := " << s << LOG_END;
+			LOG_DEBUG << "(F) " << nn << LOG_END;
+		}
 	}
 #endif // LOG_REWRITING
 	return nn;
@@ -930,9 +932,11 @@ node_t apply_if(const rule<node_t>& r, const node_t& n,
 	pattern_matcher_if<node_t, is_capture_t, predicate_t> matcher {p, u, c, predicate};
 	auto nn = apply(s, n, matcher);
 #ifdef LOG_REWRITING
-	if (nn != n) {
-		LOG_INFO << "(R) " << p << " := " << s << LOG_END;
-		LOG_INFO << "(F) " << nn << LOG_END;
+	if constexpr (LOG_REWRITING) {
+		if (nn != n) {
+			LOG_DEBUG << "(R) " << p << " := " << s << LOG_END;
+			LOG_DEBUG << "(F) " << nn << LOG_END;
+		}
 	}
 #endif // LOG_REWRITING
 	return nn;
