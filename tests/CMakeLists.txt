@@ -11,7 +11,17 @@ foreach(X IN LISTS TESTS)
 	add_executable(${N} "${N}.cpp")
 	target_setup(${N})
 	target_compile_options(${N} PUBLIC "-Wno-parentheses")
-	target_link_libraries(${N} ${PARSER_OBJECT_LIB_NAME} ${TEST_FRAMEWORK})
+	if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
+		CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+			target_link_libraries(${N}
+				${PARSER_OBJECT_LIB_NAME}
+				${TEST_FRAMEWORK}
+				-static-libgcc
+				-static-libstdc++
+			)
+	else()
+		target_link_libraries(${N} ${PARSER_OBJECT_LIB_NAME} ${TEST_FRAMEWORK})
+	endif()
 	target_include_directories(${N} PUBLIC
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
 	)

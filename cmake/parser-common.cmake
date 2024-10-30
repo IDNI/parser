@@ -87,7 +87,16 @@ function(target_setup target)
 	endif()
 	target_compile_options(${target} PRIVATE "${PARSER_COMPILE_OPTIONS}")
 	target_compile_definitions_if(${target} PRIVATE "${PARSER_DEFINITIONS}")
-	target_link_libraries(${target} ${CMAKE_THREAD_LIBS_INIT})
+	if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
+		CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+			target_link_libraries(${target}
+				${CMAKE_THREAD_LIBS_INIT}
+				-static-libgcc
+				-static-libstdc++
+			)
+	else()
+		target_link_libraries(${target} ${CMAKE_THREAD_LIBS_INIT})
+	endif()
 	target_link_options(${target} PRIVATE "${PARSER_LINK_OPTIONS}")
 	target_git_definitions(${target})
 	set_target_properties(${target} PROPERTIES
