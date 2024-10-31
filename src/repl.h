@@ -43,6 +43,7 @@ struct repl {
 		std::string history_file = ".history")
 		: re_(re), prompt_(prompt), history_file_(history_file)
 	{
+		// load history from file if exists
 		if (std::filesystem::exists(history_file_)) {
 			std::ifstream hf(history_file_);
 			std::string s;
@@ -52,13 +53,6 @@ struct repl {
 		}
 		re.r = this; // link evaluator to this repl
 		term::open();
-		// reset_terminal = true;
-		// load history from file if exists
-		if (!std::filesystem::exists(history_file_)) return;
-		std::ifstream hf(history_file_);
-		std::string s;
-		while (std::getline(hf, s)) if (s.size()) history_.push_back(s);
-		hpos_ = history_.size();
 	}
 	~repl() { term::close(); }
 	int run() {
@@ -75,19 +69,16 @@ struct repl {
 				else if (ch == 8 || ch == 127) backspace();
 				else if (ch == 27) { // escape seq
 					char c;
-					if (term::in(c) != 1 || c != 91 || term::in(c) != 1)
-						continue;
+					if (term::in(c) != 1 || c != 91
+						|| term::in(c) != 1) continue;
 					if (c == 49) { // ctrl
-						if (term::in(c) != 1 || c != 59 ||
-							term::in(c) != 1 || c != 53 ||
-							term::in(c) != 1) continue;
+						if (term::in(c)!=1 || c != 59 ||
+						    term::in(c)!=1 || c != 53 ||
+						    term::in(c)!=1) continue;
 						if      (c == 65) ctrl_up();
 						else if (c == 66) ctrl_down();
 						else if (c == 67) ctrl_right();
 						else if (c == 68) ctrl_left();
-					}
-					else if (c == 51) {
-						if (term::in(c)==1 && c==126) del();
 					}
 					else if (c == 65) up();
 					else if (c == 66) down();
@@ -95,6 +86,9 @@ struct repl {
 					else if (c == 68) left();
 					else if (c == 70) end();
 					else if (c == 72) home();
+					else if (c == 51)
+						if (term::in(c) == 1
+							&& c == 126) del();
 					//#ifdef DEBUG
 					//else std::cerr << "unknown escape seq: "
 					//	<< (int)c << "\n";
