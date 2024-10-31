@@ -1,0 +1,241 @@
+// LICENSE
+// This software is free for use and redistribution while including this
+// license notice, unless:
+// 1. is used for commercial or non-personal purposes, or
+// 2. used for a product which includes or associated with a blockchain or other
+// decentralized database technology, or
+// 3. used for a product which includes or associated with the issuance or use
+// of cryptographic or electronic currencies/coins/tokens.
+// On all of the mentioned cases, an explicit and written permission is required
+// from the Author (Ohad Asor).
+// Contact ohad@idni.org for requesting a permission. This license may be
+// modified over time by the Author.
+#include <iostream>
+#include <sstream>
+#ifndef _WIN32
+#	include <unistd.h>
+#	include <stdio.h>
+#	include <termios.h>
+#	include <sys/ioctl.h>
+#else
+#	include <map>
+#	include <deque>
+#	include <vector>
+#	include <windows.h>
+#endif
+
+#include "term.h"
+
+namespace idni::term {
+
+bool opened = false;
+
+#ifndef _WIN32
+	struct termios orig_attrs, raw_attrs;
+#else
+	HANDLE hIn = INVALID_HANDLE_VALUE;
+	HANDLE hOut = INVALID_HANDLE_VALUE;
+	DWORD orig_in_mode = 0;
+	DWORD orig_out_mode = 0;
+#endif
+
+bool open() {
+	if (opened) return true;
+
+#ifndef _WIN32
+	tcgetattr(STDIN_FILENO, &orig_attrs);
+	raw_attrs = orig_attrs;
+	raw_attrs.c_lflag &= ~(ECHO | ICANON | ISIG);
+	raw_attrs.c_iflag &= ~(IXON);
+	raw_attrs.c_cc[VMIN] = 0;
+	raw_attrs.c_cc[VTIME] = 1;
+	tcsetattr(STDIN_FILENO, TCSANOW, &raw_attrs);
+#else
+	hIn = GetStdHandle(STD_INPUT_HANDLE);
+	hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (hIn == INVALID_HANDLE_VALUE || hOut == INVALID_HANDLE_VALUE) {
+		std::cerr << "Error getting standard handles\n";
+		return opened = false;
+	}
+	// Get original console input mode
+	if (!GetConsoleMode(hIn, &orig_in_mode)) {
+		std::cerr << "Error getting console input mode\n";
+		return opened = false;
+	}
+	// Disable echo input, line input, and processed input
+	DWORD new_in_mode = orig_in_mode;
+	new_in_mode &= ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT);
+	// new_in_mode |= ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
+
+	if (!SetConsoleMode(hIn, new_in_mode)) {
+		std::cerr << "Error setting console input mode\n";
+		return opened = false;
+	}
+	// Get original console output mode
+	if (!GetConsoleMode(hOut, &orig_out_mode)) {
+		std::cerr << "Error getting console output mode\n";
+		return opened = false;
+	}
+	// Enable virtual terminal processing to support ANSI escape codes
+	DWORD new_out_mode = orig_out_mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+	if (!SetConsoleMode(hOut, new_out_mode)) {
+		std::cerr << "Error setting console output mode\n";
+		return opened = false;
+	}
+#endif
+
+	return opened = true;
+}
+
+void close() {
+	if (!opened) return;
+
+#ifndef _WIN32
+	tcsetattr(STDIN_FILENO, TCSANOW, &orig_attrs);
+#else
+	// Restore original console modes
+	SetConsoleMode(hIn, orig_in_mode);
+	SetConsoleMode(hOut, orig_out_mode);
+#endif
+
+	opened = false;
+}
+
+void clear() { [[maybe_unused]] int result = std::system(
+#ifndef _WIN32
+	"clear"
+#else
+	"cls"
+#endif
+); }
+
+#ifdef _WIN32
+std::deque<char> input_buffer;
+std::vector<char> translate_virtual_key(WORD vk, DWORD controlState) {
+	static std::map<WORD, std::vector<char>> vk_map = {
+		{ VK_HOME,       { 1 } },
+		{ VK_END,        { 5 } },
+		{ VK_BACK,       { 8 } },
+		{ VK_RETURN,     { 10 } },
+		{ VK_DELETE,     { 27, 91, 51, 126 } },
+		{ VK_UP,         { 27, 91, 65 } },
+		{ VK_DOWN,       { 27, 91, 66 } },
+		{ VK_RIGHT,      { 27, 91, 67 } },
+		{ VK_LEFT,       { 27, 91, 68 } }
+	};
+	static std::map<WORD, std::vector<char>> ctrl_vk_map = {
+		{ VK_UP,         { 27, 91, 49, 59, 53, 65 } },
+		{ VK_DOWN,       { 27, 91, 49, 59, 53, 66 } },
+		{ VK_RIGHT,      { 27, 91, 49, 59, 53, 67 } },
+		{ VK_LEFT,       { 27, 91, 49, 59, 53, 68 } }
+	};
+	if ((controlState & (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED)) != 0) {
+		if (auto it = ctrl_vk_map.find(vk); it != ctrl_vk_map.end())
+			return it->second;
+	} else if (auto it = vk_map.find(vk); it != vk_map.end())
+		return it->second;
+	return {};
+}
+#endif
+
+int in(char& c) {
+#ifndef _WIN32
+	return read(STDIN_FILENO, &c, 1);
+#else
+	if (!input_buffer.empty()) {
+		c = input_buffer.front();
+		input_buffer.pop_front();
+		return 1;
+	}
+	DWORD read;
+	INPUT_RECORD record;
+	while (true) {
+		if (!ReadConsoleInput(hIn, &record, 1, &read) || read == 0)
+			return 0;
+		if (record.EventType == KEY_EVENT
+			&& record.Event.KeyEvent.bKeyDown)
+		{
+			c = record.Event.KeyEvent.uChar.AsciiChar;
+			if (c) return 1;
+			// Special key without an ASCII representation
+			std::vector<char> seq = translate_virtual_key(
+					record.Event.KeyEvent.wVirtualKeyCode,
+					record.Event.KeyEvent.dwControlKeyState);
+			if (!seq.empty()) {
+				input_buffer.insert(input_buffer.end(),
+					seq.begin(), seq.end());
+				c = input_buffer.front();
+				input_buffer.pop_front();
+				return 1;
+			}
+		}
+	}
+#endif
+}
+
+int in(char* s, size_t l) {
+#ifndef _WIN32
+	return read(STDIN_FILENO, &s, l);
+#else
+	size_t count = 0;
+	while (count < l) {
+		char c;
+		if (in(c) != 1) break;
+		s[count++] = c;
+	}
+	return static_cast<int>(count);
+#endif
+}
+
+void out(const char* data, size_t size) {
+	// TODO (HIGH) handle write errors
+#ifndef _WIN32
+	size_t written = write(STDOUT_FILENO, data, size);
+	if (written != size)
+#else
+	DWORD written;
+	if (!WriteFile(hOut, data, static_cast<DWORD>(size), &written, NULL)
+		|| written != size)
+#endif
+		std::cerr << "write error\n";
+}
+
+void out(const std::string& str) {
+	out(str.c_str(), str.size());
+}
+
+void clear_line() { out("\r\033[K", 4); }
+
+void cursor_up(int n) {
+	std::stringstream ss;
+	bool down = n < 0; n = abs(n);
+	ss << "\033[" << (n ? n : 1) << (down ? "B" : "A");
+	out(ss.str().c_str(), ss.str().size());
+}
+
+void cursor_down(int n) { cursor_up(-n); }
+
+void cursor_right(int n) {
+	std::stringstream ss;
+	bool left = n < 0; n = abs(n);
+	ss << "\033[" << (n ? n : 1) << (left ? "C" : "D");
+	out(ss.str().c_str(), ss.str().size());
+}
+
+void cursor_left(int n) { cursor_right(-n); }
+
+std::pair<unsigned short, unsigned short> get_termsize() {
+#ifndef _WIN32
+	struct winsize w;
+	ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+	return { w.ws_row, w.ws_col };
+#else
+	CONSOLE_SCREEN_BUFFER_INFO csbi;
+	if (!GetConsoleScreenBufferInfo(hOut, &csbi)) return { 0, 0 };
+	unsigned short rows = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
+	unsigned short cols = csbi.srWindow.Right - csbi.srWindow.Left + 1;
+	return { rows, cols };
+#endif
+}
+
+} // namespace idni::term

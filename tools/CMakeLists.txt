@@ -13,6 +13,6 @@ foreach(X IN LISTS TOOLS)
 endforeach()
 
 # add required sources to tgf tool
-target_sources("tgf" PRIVATE
+target_sources(tgf PRIVATE
 	"${CMAKE_CURRENT_SOURCE_DIR}/../src/cli.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/tgf/tgf_cli.cpp")

@@ -13,7 +13,6 @@
 #ifndef __IDNI__PARSER__PARSER_TMPL_H__
 #define __IDNI__PARSER__PARSER_TMPL_H__
 #include "parser.h"
-#include "term_colors.h"
 
 #ifdef PARSER_MEASURE
 #include "measure.h"
@@ -21,9 +20,7 @@
 
 namespace idni {
 
-using namespace idni::term;
-
-static inline term::colors TC;
+static inline idni::term::colors TC;
 
 template <typename C, typename T>
 typename forest<typename parser<C,T>::pnode>::node
@@ -1167,6 +1164,7 @@ std::basic_string<T> parser<C, T>::input::get_terminals(
 
 template <typename C, typename T>
 std::ostream& parser<C, T>::print(std::ostream& os, const item& i) const {
+	using namespace idni::term;
 	os << (completed(i) ? TC(color::BRIGHT, color::GREEN)
 		: i.dot == 0 ? TC.BLACK() : TC(color::BRIGHT, color::CLEAR));
 	os << "(G" << (10 >= i.prod ? " " : "") << i.prod;

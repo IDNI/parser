@@ -15,6 +15,7 @@ set(PARSER_SOURCES
 	charclasses.cpp
 	parser.cpp
 	recoders.cpp
+	term.cpp
 )
 
 # object library
