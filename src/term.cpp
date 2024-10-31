@@ -62,10 +62,10 @@ bool open() {
 		std::cerr << "Error getting console input mode\n";
 		return opened = false;
 	}
-	// Disable echo input, line input, and processed input
+	// Disable echo input, line input, and enable window/mouse input
 	DWORD new_in_mode = orig_in_mode;
 	new_in_mode &= ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT);
-	// new_in_mode |= ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
+	new_in_mode |= ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
 
 	if (!SetConsoleMode(hIn, new_in_mode)) {
 		std::cerr << "Error setting console input mode\n";
@@ -93,7 +93,6 @@ void close() {
 #ifndef _WIN32
 	tcsetattr(STDIN_FILENO, TCSANOW, &orig_attrs);
 #else
-	// Restore original console modes
 	SetConsoleMode(hIn, orig_in_mode);
 	SetConsoleMode(hOut, orig_out_mode);
 #endif
