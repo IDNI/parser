@@ -30,6 +30,7 @@ void cursor_down(int n = 0);
 void cursor_right(int n = 0);
 void cursor_left(int n = 0);
 std::pair<unsigned short, unsigned short> get_termsize();
+bool is_tty();
 
 } // namespace idni::term
 

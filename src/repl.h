@@ -57,10 +57,12 @@ struct repl {
 	~repl() { term::close(); }
 	int run() {
 		refresh_input();
+		bool is_pipe = !term::is_tty();
 		while (1) {
 			std::string s;
 			char ch;
-			while (term::in(ch) == 1) {
+			int read;
+			while ((read = term::in(ch)) == 1) {
 				//DBG(std::cerr << "pressed '" << ch << "' = " << (int)ch << "\n";)
 				// control characters
 				if (ch == 3 || ch == 4) return 0; // ctrl-c or d
@@ -104,9 +106,11 @@ struct repl {
 						input_.begin() + pos_++, ch),
 					refresh_input();
 			}
-			if (s.empty()) continue;
-			if (re_.eval(s)) break; // exit loop if nonzero
-			clear_input();
+			if (!s.empty()) {
+				if (re_.eval(s)) break; // exit loop if nonzero
+				clear_input();
+			}
+			if (read == 0 && is_pipe) break;
 		}
 		return 0;
 	}

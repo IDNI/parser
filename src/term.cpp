@@ -31,17 +31,26 @@ namespace idni::term {
 bool opened = false;
 
 #ifndef _WIN32
-	struct termios orig_attrs, raw_attrs;
+struct termios orig_attrs, raw_attrs;
 #else
-	HANDLE hIn = INVALID_HANDLE_VALUE;
-	HANDLE hOut = INVALID_HANDLE_VALUE;
-	DWORD orig_in_mode = 0,  raw_in_mode = 0;
-	DWORD orig_out_mode = 0, raw_out_mode = 0;
+DWORD orig_in_mode = 0,  raw_in_mode = 0;
+DWORD orig_out_mode = 0, raw_out_mode = 0;
+HANDLE hIn = INVALID_HANDLE_VALUE;
+HANDLE hOut = INVALID_HANDLE_VALUE;
+bool init() {
+	if (hIn == INVALID_HANDLE_VALUE)  hIn  = GetStdHandle(STD_INPUT_HANDLE);
+	if (hOut == INVALID_HANDLE_VALUE) hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (hIn == INVALID_HANDLE_VALUE || hOut == INVALID_HANDLE_VALUE) {
+		std::cerr << "Error getting standard handles\n";
+		return false;
+	}
+	return true;
+}
 #endif
 
 bool open() {
-	if (opened) return true;
-
+	if (opened)    return true;
+	if (!is_tty()) return false;
 #ifndef _WIN32
 	tcgetattr(STDIN_FILENO, &orig_attrs);
 	raw_attrs = orig_attrs;
@@ -51,16 +60,10 @@ bool open() {
 	raw_attrs.c_cc[VTIME] = 1;
 	tcsetattr(STDIN_FILENO, TCSANOW, &raw_attrs);
 #else
-	hIn = GetStdHandle(STD_INPUT_HANDLE);
-	hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-	if (hIn == INVALID_HANDLE_VALUE || hOut == INVALID_HANDLE_VALUE) {
-		std::cerr << "Error getting standard handles\n";
-		return opened = false;
-	}
 	// Get original console input mode
 	if (!GetConsoleMode(hIn, &orig_in_mode)) {
 		std::cerr << "Error getting console input mode\n";
-		return opened = false;
+		return false;
 	}
 	// Disable echo input, line input, and enable window/mouse input
 	raw_in_mode = orig_in_mode;
@@ -69,18 +72,18 @@ bool open() {
 
 	if (!SetConsoleMode(hIn, raw_in_mode)) {
 		std::cerr << "Error setting console input mode\n";
-		return opened = false;
+		return false;
 	}
 	// Get original console output mode
 	if (!GetConsoleMode(hOut, &orig_out_mode)) {
 		std::cerr << "Error getting console output mode\n";
-		return opened = false;
+		return false;
 	}
 	// Enable virtual terminal processing to support ANSI escape codes
 	raw_out_mode = orig_out_mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
 	if (!SetConsoleMode(hOut, raw_out_mode)) {
 		std::cerr << "Error setting console output mode\n";
-		return opened = false;
+		return false;
 	}
 #endif
 
@@ -93,7 +96,7 @@ void close() {
 #ifndef _WIN32
 	tcsetattr(STDIN_FILENO, TCSANOW, &orig_attrs);
 #else
-	SetConsoleMode(hIn, orig_in_mode);
+	SetConsoleMode(hIn,  orig_in_mode);
 	SetConsoleMode(hOut, orig_out_mode);
 #endif
 
@@ -101,7 +104,7 @@ void close() {
 }
 
 void enable_getline_mode() {
-	if (!opened) open();
+	if (!opened || !open()) return;
 #ifndef _WIN32
 	termios attrs;
 	tcgetattr(STDIN_FILENO, &attrs);
@@ -172,9 +175,10 @@ int in(char& c) {
 		input_buffer.pop_front();
 		return 1;
 	}
+	if (!init()) return 0;
 	DWORD read;
-	INPUT_RECORD record;
-	while (true) {
+	if (is_tty()) while (true) {
+		INPUT_RECORD record;
 		if (!ReadConsoleInput(hIn, &record, 1, &read) || read == 0)
 			return 0;
 		if (record.EventType == KEY_EVENT
@@ -194,6 +198,14 @@ int in(char& c) {
 				return 1;
 			}
 		}
+	} else { // pipe or file input
+		char buffer[1024];
+		if (!ReadFile(hIn, buffer, sizeof(buffer) - 1, &read, NULL)
+			|| read == 0) return 0;
+		input_buffer.insert(input_buffer.end(), buffer, buffer + read);
+		c = input_buffer.front();
+		input_buffer.pop_front();
+		return 1;
 	}
 #endif
 }
@@ -219,6 +231,7 @@ void out(const char* data, size_t size) {
 	if (written != size)
 #else
 	DWORD written;
+	if (!init()) return;
 	if (!WriteFile(hOut, data, static_cast<DWORD>(size), &written, NULL)
 		|| written != size)
 #endif
@@ -256,10 +269,20 @@ std::pair<unsigned short, unsigned short> get_termsize() {
 	return { w.ws_row, w.ws_col };
 #else
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
+	if (!init()) return { 0, 0 };
 	if (!GetConsoleScreenBufferInfo(hOut, &csbi)) return { 0, 0 };
 	unsigned short rows = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
 	unsigned short cols = csbi.srWindow.Right - csbi.srWindow.Left + 1;
 	return { rows, cols };
+#endif
+}
+
+bool is_tty() {
+#ifndef _WIN32
+	return isatty(STDIN_FILENO);
+#else
+	if (!init()) return false;
+	return GetFileType(hIn) == FILE_TYPE_CHAR;
 #endif
 }
 
