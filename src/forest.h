@@ -17,9 +17,11 @@
 #include <map>
 #include <memory>
 #include <functional>
+#include <ranges>
 #include <deque>
 #include <sstream>
 #include "defs.h"
+#include "bintree.h"
 
 #ifdef DEBUG
 #include <cassert>
@@ -126,6 +128,9 @@ public:
 	};
 	using sptree = std::shared_ptr<tree>;
 	struct graph : public node_graph {
+		static const forest forest_inst(){ 
+			static forest sf;
+			return sf;}
 		node root;
 		/// nodes that lead to cycle
 		std::set<node> cycles;
@@ -173,7 +178,7 @@ public:
 	bool traverse(const node_graph& gr, const node& root,
 		cb_enter_t cb_enter, cb_exit_t cb_exit = NO_EXIT,
 		cb_revisit_t cb_revisit = NO_REVISIT,
-		cb_ambig_t cb_ambig = NO_AMBIG) const;
+		cb_ambig_t cb_ambig = NO_AMBIG, bool post_ord = false) const;
 	template <typename cb_enter_t, typename cb_exit_t = exit_t,
 		typename cb_revisit_t = revisit_t, typename cb_ambig_t =ambig_t>
 	bool traverse(cb_enter_t cb_enter,
@@ -201,7 +206,7 @@ private:
 		typename cb_revisit_t, typename cb_ambig_t>
 	bool _traverse(const node_graph& g, const node& root,
 		std::set<node>& done, cb_enter_t cb_enter, cb_exit_t cb_exit,
-		cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const;
+		cb_revisit_t cb_revisit, cb_ambig_t cb_ambig, bool post_ord = false) const;
 	bool _extract_graph_uniq_edge(std::map<node,size_t>& ndmap,
 		std::set<edge>& done, std::vector<node>& todo, graphv& graphs,
 		size_t gid, cb_next_graph_t g, bool& no_stop) const;

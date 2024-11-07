@@ -1104,9 +1104,9 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 				auto apack = *next(ambset.begin(), packidx);
 				pnode lt = apack[k];
 				int span = lt.second[1] - lt.second[0];
-				if (gspan == span) gi.push_back(k);
+				if (gspan == span) gi.push_back(packidx);
 				if (gspan < span) gspan = span,
-						gi.clear(), gi.push_back(k);
+						gi.clear(), gi.push_back(packidx);
 
 			}
 			k++;
