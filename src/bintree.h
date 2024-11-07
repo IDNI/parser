@@ -21,8 +21,8 @@
 #include <iostream>
 #include <cassert>
 #include "defs.h"
-namespace idni {
-
+namespace idni2 {
+using namespace idni;
 template <typename T>
 struct bintree;
 
@@ -99,7 +99,8 @@ template <typename T>
 struct lcrs_tree : public bintree<T> {
     protected:
 	//static const htree::sp get( const T& v, std::vector<T>&& child = {});
-    static tref get( const T& v, const T* child, size_t len);
+    template<typename U = T>
+    static tref get( const T& v, const U* child, size_t len);
     static const htree::sp geth(tref h);
 	static lcrs_tree<T>& get(const htree::sp& h) {
 		return (lcrs_tree<T>&)bintree<T>::get(h); 
@@ -131,14 +132,17 @@ struct lcrs_tree : public bintree<T> {
 
         //resp: now no vector, and only ids returned in user defined array
         */
-        if (len > 0 && child == nullptr) return false;
+       // DBG(std::cout<<"\n----");
+        if (len > 0 && child == nullptr) return len = 0, false;
         len = 0;
         tref cur = this->l;
         while (cur != NULL) {
-            if (child != nullptr) child[len] = cur;
+            //DBG(std::cout<<"\n"<<bintree<T>::get(cur).str()<<"\n");
+            if ((child + len) != nullptr) child[len] = cur;
             ++len, 
             cur = bintree<T>::get(cur).r;
         }
+       // DBG(std::cout<<"\n----");
         return true;
 	}
 	auto get_lcrs_child() { return {this->l , this->r}; }	
@@ -147,7 +151,8 @@ struct lcrs_tree : public bintree<T> {
 template <typename T>
 struct tree : public lcrs_tree<T> {
 	//static const htree::sp get( const T& v, std::vector<T>&& child = {});
-	static tref get( const T& v, const T* child, size_t len);
+    template<typename U = T>
+	static tref get( const T& v, const U* child, size_t len);
     static const htree::sp geth(tref h);
     static const tree& get(const htree::sp& h);
     static const tree& get(const tref id);
@@ -326,12 +331,16 @@ const htree::sp lcrs_tree<T>::get( const T& v, std::vector<T>&& child) {
 }
 */
 template<typename T>
-tref lcrs_tree<T>::get( const T& v, const T* child, size_t len) {
-    //int_t nul = bintree<T>::null_ref;
-    tref pr = NULL; 
-    for ( int_t i = len-1; i >=0; i--)
-        pr = bintree<T>::get(child[i], NULL, pr);
+template<typename U>
+tref lcrs_tree<T>::get( const T& v, const U* child, size_t len) {
+    if constexpr (std::is_same<U, tref>::value) 
+        return  bintree<T>::get(v, child[0], child[1]);
+    else {
+    tref pr = NULL;     
+    for ( int_t i = int_t(len)-1; i >=0; i--) 
+            pr = bintree<T>::get(child[i], NULL, pr);
     return bintree<T>::get(v, pr, NULL);
+    }
 }
 
 /*
@@ -341,9 +350,11 @@ const htree::sp tree<T>::get( const T& v, std::vector<T>&& child){
 }
 */
 template<typename T>
-tref tree<T>::get( const T& v, const T* child, size_t len) {
+template<typename U>
+tref tree<T>::get( const T& v, const U* child, size_t len) {
 	return lcrs_tree<T>::get(v, child, len );
 }
+
 
 template<typename T>
 size_t tree<T>::get_child_size() const {
@@ -371,10 +382,11 @@ void tree<T>::print(size_t s) const {
         std::cout<<" ";
     std::cout<<this->str()<< std::endl;		
     size_t nc = get_child_size();
+   /// std::cout<<"\nchild_size:"<<nc << "\n";
     if (nc > 0) {
         tref *ch_id = new tref[nc];
+        DBG(assert(ch_id != nullptr));
         get_child(ch_id, nc);
-        assert(ch_id != nullptr);
         for (size_t i=0 ; i < nc ; i++)
             get(ch_id[i]).print(s + 1);    
         if (ch_id != nullptr) delete [] ch_id;

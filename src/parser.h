@@ -248,6 +248,12 @@ public:
 		inline operator typename forest<pnode>::node() const {
 			return ptrof(*this);
 		}
+		friend std::ostream& operator<<(std::ostream& os, const pnode& obj) {
+			os << obj.first<<"-"<< obj.second[0]<<
+			"-"<<obj.second[1];
+			return os;
+		}
+
 		inline size_t _mpsize() const {
 			return nid().size();
 		}

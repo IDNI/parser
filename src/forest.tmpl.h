@@ -74,6 +74,31 @@ typename forest<NodeT>::sptree forest<NodeT>::graph::_extract_trees(
 		// pushing in stack in reverse order to keep left to right child dfs
 		stk.insert(stk.end(), cur->child.rbegin(), cur->child.rend());
 	}
+
+	idni2::tref tid = NULL;
+	std::vector<idni2::tref> stk2;
+	auto cb_exit = [&stk2, &tid] (auto& root, auto &ambset) {		
+		idni2::tref l= NULL, r= NULL;
+			if(stk2.size() && ambset.size() == 0) r = stk2.back(), stk2.pop_back();
+			else if(stk2.size() && ambset.size()) {
+				l = stk2.back();
+				stk2.pop_back();
+				if(stk2.size()) r = stk2.back(), stk2.pop_back();
+			}
+			idni2::tref chd [] =  {l, r};
+			tid = idni2::tree<NodeT>::get((NodeT)root, chd, 2);
+			stk2.push_back(tid);
+	
+		
+	};
+
+	//idni2::bintree<NodeT>::dump();
+	forest_inst().traverse(*this, this->root, NO_ENTER, cb_exit, NO_REVISIT, NO_AMBIG, true);
+	DBG(std::cout<<"\n--\n");
+	idni2::tree<NodeT>::get(tid).print();
+	DBG(std::cout<<"\n--\n");
+	//idni2::bintree<NodeT>::dump();
+
 	return troot;
 }
 
@@ -299,11 +324,11 @@ template <typename cb_enter_t, typename cb_exit_t,
 	typename cb_revisit_t, typename cb_ambig_t>
 bool forest<NodeT>::traverse(const node_graph& gr, const node& root,
 	cb_enter_t cb_enter, cb_exit_t cb_exit,
-	cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const
+	cb_revisit_t cb_revisit, cb_ambig_t cb_ambig, bool post_ord) const
 {
 	std::set<node> done;
 	return _traverse(gr, root, done, cb_enter, cb_exit, cb_revisit,
-		cb_ambig);
+		cb_ambig, post_ord);
 }
 
 template <typename NodeT>
@@ -311,15 +336,15 @@ template <typename cb_enter_t, typename cb_exit_t,
 	typename cb_revisit_t, typename cb_ambig_t>
 bool forest<NodeT>::_traverse(const node_graph& g, const node& root,
 	std::set<node>& done, cb_enter_t cb_enter, cb_exit_t cb_exit,
-	cb_revisit_t cb_revisit, cb_ambig_t cb_ambig) const
+	cb_revisit_t cb_revisit, cb_ambig_t cb_ambig, bool post_ord) const
 {
 //#define DEBUG_TRAVERSE
 #ifdef DEBUG_TRAVERSE
-	std::cout << "enter: \t\t" << root.first.to_std_string() << "\n";
-	std::cout << "\t" << (root.first.nt() ? "NT" : " T") << " ";
-	if (root.first.nt()) std::cout << "n: " << root.first.n()
-		<< " `" << root.first.to_std_string();
-	else std::cout << "t: `" << to_std_string(root.first.t()) << "`";
+	std::cout << "enter: \t\t" << root->first.to_std_string() << "\n";
+	std::cout << "\t" << (root->first.nt() ? "NT" : " T") << " ";
+	if (root->first.nt()) std::cout << "n: " << root->first.n()
+		<< " `" << root->first.to_std_string();
+	else std::cout << "t: `" << to_std_string(root->first.t()) << "`";
 	std::cout << "\n";
 #endif
 	bool ret = true;
@@ -329,18 +354,34 @@ bool forest<NodeT>::_traverse(const node_graph& g, const node& root,
 		if (it == g.end()) return false;
 		pack = it->second;
 	}
-	cb_enter(root);
-	done.insert(root);
+	auto visit_root = [&](){
+		cb_enter(root);
+		done.insert(root);
+	};
+	if(!post_ord) visit_root();
+
 	nodes_set choosen_pack = pack.size() > 1
 		? cb_ambig(root, pack) : pack;
-	for (auto& nodes : choosen_pack)
-		for (auto& chd : nodes)
-			if (done.find(chd) == done.end() || cb_revisit(chd))
-				ret &= _traverse(g, chd, done, cb_enter,
-					cb_exit, cb_revisit, cb_ambig);
+	for (auto& nodes : choosen_pack) {
+		if (!post_ord) {
+			for (auto& chd : nodes)
+				if (done.find(chd) == done.end() || cb_revisit(chd))
+					ret &= _traverse(g, chd, done, cb_enter,
+						cb_exit, cb_revisit, cb_ambig);
+		}
+		else {
+			for (auto chd = nodes.rbegin(); chd != nodes.rend(); chd++)
+				if (done.find(*chd) == done.end() || cb_revisit(*chd))
+					ret &= _traverse(g, *chd, done, cb_enter,
+						cb_exit, cb_revisit, cb_ambig);
+
+		}
+
+	}
 #ifdef DEBUG_TRAVERSE
-	std::cout << "exit: \t" << root.first.to_std_string() << "\n";
+	std::cout << "exit: \t" << root->first.to_std_string() << "\n";
 #endif
+	if(post_ord) visit_root();
 	cb_exit(root, choosen_pack);
 	return ret;
 }
