@@ -35,8 +35,8 @@ bool opened = false;
 #else
 	HANDLE hIn = INVALID_HANDLE_VALUE;
 	HANDLE hOut = INVALID_HANDLE_VALUE;
-	DWORD orig_in_mode = 0;
-	DWORD orig_out_mode = 0;
+	DWORD orig_in_mode = 0,  raw_in_mode = 0;
+	DWORD orig_out_mode = 0, raw_out_mode = 0;
 #endif
 
 bool open() {
@@ -63,11 +63,11 @@ bool open() {
 		return opened = false;
 	}
 	// Disable echo input, line input, and enable window/mouse input
-	DWORD new_in_mode = orig_in_mode;
-	new_in_mode &= ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT);
-	new_in_mode |= ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
+	raw_in_mode = orig_in_mode;
+	raw_in_mode &= ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT);
+	raw_in_mode |= ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
 
-	if (!SetConsoleMode(hIn, new_in_mode)) {
+	if (!SetConsoleMode(hIn, raw_in_mode)) {
 		std::cerr << "Error setting console input mode\n";
 		return opened = false;
 	}
@@ -77,8 +77,8 @@ bool open() {
 		return opened = false;
 	}
 	// Enable virtual terminal processing to support ANSI escape codes
-	DWORD new_out_mode = orig_out_mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-	if (!SetConsoleMode(hOut, new_out_mode)) {
+	raw_out_mode = orig_out_mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+	if (!SetConsoleMode(hOut, raw_out_mode)) {
 		std::cerr << "Error setting console output mode\n";
 		return opened = false;
 	}
@@ -98,6 +98,32 @@ void close() {
 #endif
 
 	opened = false;
+}
+
+void enable_getline_mode() {
+	if (!opened) open();
+#ifndef _WIN32
+	termios attrs;
+	tcgetattr(STDIN_FILENO, &attrs);
+	attrs.c_lflag |= ICANON;
+	attrs.c_lflag |= ECHO;
+	tcsetattr(STDIN_FILENO, TCSANOW, &attrs);
+#else
+	DWORD in_mode;
+	GetConsoleMode(hIn, &in_mode);
+	in_mode |= ENABLE_LINE_INPUT;
+	in_mode |= ENABLE_ECHO_INPUT;
+	SetConsoleMode(hIn, in_mode);
+#endif
+}
+
+void disable_getline_mode() {
+	if (!opened) return;
+#ifndef _WIN32
+	tcsetattr(STDIN_FILENO, TCSANOW, &raw_attrs);
+#else
+	SetConsoleMode(hIn, raw_in_mode);
+#endif
 }
 
 void clear() { [[maybe_unused]] int result = std::system(

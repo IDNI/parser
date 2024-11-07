@@ -17,6 +17,8 @@ namespace idni::term {
 
 bool open();
 void close();
+void enable_getline_mode();
+void disable_getline_mode();
 void clear();
 int in(char& c);
 int in(char* s, size_t l);
