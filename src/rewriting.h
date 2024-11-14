@@ -129,6 +129,15 @@ using none_t = decltype(none);
 static const auto identity = [](const auto& n) { return n; };
 using identity_t = decltype(identity);
 
+// trait for specifying a value of an error node for any plugged node type
+template<typename T>
+struct error_node;
+
+template<typename T>
+struct error_node<std::shared_ptr<T>> {
+	inline static const std::shared_ptr<T> value = nullptr;
+};
+
 // visitor that traverse the tree in post-order (avoiding visited nodes).
 template <typename wrapped_t, typename predicate_t, typename input_node_t,
 	typename output_node_t = input_node_t>
@@ -160,7 +169,9 @@ private:
 			// we skip already visited nodes and nodes that do not match the
 			// query predicate if it is present.
 			if (!visited.contains(c) && query(c)) {
-				traverse(c, visited);
+				if (traverse(c, visited)
+					== error_node<output_node_t>::value)
+					return error_node<output_node_t>::value;
 				// we assume we have no cycles, i.e. there is no way we could
 				// visit the same node again down the tree.
 				// thus we can safely add the node to the visited set after
@@ -206,7 +217,9 @@ private:
 			// we skip already visited nodes and nodes that do not match the
 			// query predicate if it is present.
 			if (!visited.contains(c) && !found) {
-				traverse(c, visited);
+				if (traverse(c, visited)
+					== error_node<output_node_t>::value)
+					return error_node<output_node_t>::value;
 				// we assume we have no cycles, i.e. there is no way we could
 				// visit the same node again down the tree.
 				// thus we can safely add the node to the visited set after
@@ -251,7 +264,9 @@ private:
 		for (const auto& c : n->child)
 			// we skip already visited nodes and nodes that do not match the
 			// query predicate if it is present.
-			if (query(c)) traverse(c);
+			if (query(c)) if (traverse(c)
+				== error_node<output_node_t>::value)
+					return error_node<output_node_t>::value;
 		// finally we apply the wrapped visitor to the node if it is present.
 		return wrapped(n);
 	}
