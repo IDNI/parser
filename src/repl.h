@@ -113,40 +113,44 @@ struct repl {
 				}
 				else {  // not a control char or ENTER
 					term::out(std::string{ ch });
+					pos_++;
 					// add to input
-					if (ch == 10 || ch == 13) { // enter
-						TDBG(std::cerr << " <ENTER>";)
+					if (ch == 10 || ch == 13) {
 						if (input_.empty()) continue;
-						s = get();
-						new_line();
-						TDBG(std::cerr << "\n";)
-						TDBG(print_debug();)
+						s = enter();
 						break; // exit input loop to evaluate
-					} else {
-						TDBG(std::cerr << " <CH: "
-								<< ch << ">";)
-						if (c_ >= term_w_) new_line();
-						else lws_[r_] = ++c_;
-						input_.insert(input_.begin()
-								+ pos_++, ch);
-					}
+					} else write(ch);
 				}
 				TDBG(std::cerr << "\n";) TDBG(print_debug();)
 			}
-			if (!s.empty()) {
-				auto ret = re_.eval(s);
-				TDBG(std::cerr << " <EVAL: " << ret << ">";)
-				if (ret == 2) { // Unexpected end of file, continue
-					input_.insert(input_.begin()
-								+ pos_++, '\n');
-					continue;
+			if (!s.empty()) { // evaluate input
+				if (pos_ - 1 < input_.size()) split_line();
+				else {
+					auto ret = evaluate(s);
+					if (ret == 1) break;
+					if (ret == 2) continue;
 				}
-				store(s);
-				if (ret == 1) break; // exit loop if 1
-				reset_input();
 			}
 			if (read == 0 && is_pipe) break;
 		}
+		return 0;
+	}
+	void split_line() {
+		size_t r = r_;
+		clear_input();
+		input_.insert(input_.begin() + pos_ - 1, '\n');
+		print_input(), go(r, 0);
+	}
+	int evaluate(const std::string& s) {
+		auto ret = re_.eval(s);
+		TDBG(std::cerr << " <EVAL: " << ret << ">";)
+		if (ret == 2) { // Unexpected end of file, continue
+			input_.insert(input_.begin() + pos_ - 1, '\n');
+			return ret;
+		}
+		store(s);
+		if (ret == 1) return ret; // exit loop if 1
+		reset_input();
 		return 0;
 	}
 	// sets the prompt
@@ -155,6 +159,27 @@ struct repl {
 		update_widths(), clear_input();
 		prompt_ = p, print_input();
 		TDBG(std::cerr << " <PROMPT PRINTED>";)
+	}
+	std::string enter() {
+		TDBG(std::cerr << " <ENTER>";)
+		auto s = get();
+		new_line();
+		TDBG(std::cerr << "\n";) TDBG(print_debug();)
+		return s;
+	}
+	void write(char ch) {
+		TDBG(std::cerr << " <WRITE: '" << ch << "' = "
+			<< static_cast<int>(ch) << ">";)
+		size_t r = r_, c = c_;
+		TDBG(print_debug();)
+		clear_input();
+		input_.insert(input_.begin() + pos_ - 1, ch);
+		print_input();
+		go(r, c);
+		TDBG(print_debug();)
+		if (c_ >= lws_[r_]) next_line();
+		else c_++, term::cursor_right();
+		TDBG(print_debug();)
 	}
 	void set_prompt(const std::string& p) { prompt_ = p; }
 	void clear() { term::clear(); }
@@ -176,14 +201,15 @@ private:
 	void set() { clear_input(), input_.clear(), pos_ = 0, print_input(); }
 #ifdef TERM_DEBUG
 	void print_debug() {
-		std::cerr << " <POS: " << pos_
-			<< " LWS:";
+		std::cerr << " <POS: " << pos_ << ", IN.SIZE: " << input_.size()
+			<< ", R: " << r_ << ", C: " << c_ << " LWS:";
 		for (size_t i = 0; i != lws_.size(); ++i)
 			std::cerr << " " << lws_[i];
 		std::cerr << " >";
 	}
 #endif // TERM_DEBUG	
 	void prev_line() {
+		TDBG(std::cerr << " <PREV LINE: [" << r_ << ", " << c_ << "]>";)
 		if (r_) {
 			TDBG(print_debug();) TDBG(std::cerr << " <PREV LINE: ["
 				<< r_ << ", " << c_ << "] -> ";)
@@ -194,12 +220,14 @@ private:
 		}
 	}
 	void next_line() {
+		TDBG(std::cerr << " <NEXT LINE: [" << r_ << ", " << c_ << "]>";)
 		term::cursor_left(c_);
 		term::cursor_down();
 		new_line();
 	}
 	void new_line() {
 		lws_[r_++] = c_, c_ = 0;
+		TDBG(std::cerr << " <NEW LINE: [" << r_ << ", " << c_ << "]>";)
 		while (lws_.size() <= r_) lws_.push_back(0);
 	}
 	void go(size_t r, size_t c) {
@@ -215,11 +243,11 @@ private:
 	void backspace() { // delete character before the cursor
 		if (pos_ == 0) return;
 		size_t r = r_, c = c_;
+		if (c) c--;
+		else if (r) c = lws_[--r];
 		clear_input();
 		input_.erase(input_.begin() + --pos_);
 		print_input();
-		if (c) c--;
-		else if (r) c = lws_[--r];
 		go(r, c);
 	}
 	void del() { // delete character after the cursor
@@ -321,23 +349,24 @@ private:
 		term_h_ = h, term_w_ = w, r_ = c_ = 0;
 		size_t ps = printed_size(prompt_);
 		if (ps > 0) r_ = (ps - 1) / term_w_, c_ = ps % term_w_;
-		lws_.reserve(r_);
+		lws_.clear(), lws_.reserve(r_);
 		if (r_ > 1) for (size_t i = 0; i != r_ - 1; ++i)
-				lws_.push_back(term_w_);
+				lws_.push_back(term_w_ - 1);
+		lws_.push_back(c_);
 		size_t x = 0;
 		TDBG(std::cerr << " <PROMPT SIZE: " << ps
 			<< ", R: " << r_ << ", C: " << c_ << ">";)
-		lws_.clear(), lws_.push_back(c_);
 		while (x <= input_.size()) {
 			TDBG(std::cerr << " <POS: " << pos_
 				<< ", x: " << x << ">";)
 			if (x == input_.size()) break;
 			if (input_[x++] == '\n') new_line();
 			else {
-				if (c_ >= term_w_) new_line();
-				else c_++, lws_[r_] = c_;
+				if (c_ + 1 >= term_w_) new_line();
+				else lws_[r_] = ++c_;
 			}
 		}
+		TDBG(print_debug();)
 	}
 	void clear_input() {
 		TDBG(std::cerr << " <CLEAR INPUT";)
@@ -351,18 +380,16 @@ private:
 		TDBG(std::cerr << " <REFRESH INPUT ";)
 		auto [h, w] = term::get_termsize();
 		term_h_ = h, term_w_ = w;
-#ifdef TERM_DEBUG
 		size_t ps = printed_size(prompt_);
 		size_t l = input_.size() + ps;
-		std::cerr << "POS: " << pos_ << ", DIM[" << w << "," << h << "]"
-			<< ", SIZE: " << l << "(" << ps << ")" << "\n`"
-			<< get() << "`\n";
-#endif // TERM_DEBUG
-		// last_n_ = n;
-		TDBG(std::cerr << " <PRINTING " << prompt_.size() << " + "
-			<< input_.size() << ">";)
+		TDBG(std::cerr << "POS: " << pos_ << ", DIM[" << w << "," << h
+			<< "]" << ", SIZE: " << l << "(" << ps << ")" << "\n`"
+			<< get() << "`\n";)
+		TDBG(std::cerr << " <PRINTING " << printed_size(prompt_)
+			<< " + " << input_.size() << ">";)
 		term::out(prompt_.c_str(), prompt_.size());
 		term::out(input_.data(), input_.size());
+		if (l % term_w_ == 0) term::out("\n");
 		update_widths();
 // #ifdef TERM_DEBUG
 // 		std::stringstream ss;
