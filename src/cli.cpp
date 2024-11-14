@@ -11,6 +11,7 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include "cli.h"
+#include <fstream>
 
 #define PBOOL(bval) (( bval ) ? "true" : "false")
 
@@ -69,7 +70,10 @@ ostream& info_new_line(ostream& os, size_t indent) {
 };
 
 ostream& print_options(ostream& os, const cli::options& opts) {
-	for (auto& [_, opt] : opts) os << "\t--" << opt.name() << "\t-"
+	for (auto& [_, opt]: opts)
+		os << "\t--" << opt.name() << ((opt.name().length() < 5)
+						       ? "\t\t-"
+						       : "\t-")
 		<< opt.short_name() << "\t" << opt.description() << "\n";
 	return os;
 }
@@ -240,10 +244,26 @@ ostream& cli::help(ostream& os, command cmd) const {
 	if (cmds_.size()) {
 		os << "Commands:\n";
 		for (auto it : cmds_) os << "\t" << it.first
-				<< "\t\t" << it.second.description() << "\n";
+				<< "\t\t\t" << it.second.description() << "\n";
 	}
 	return os << "\n";
 }
+
+void cli::version() const {
+	*out_ << "Tau version: " << GIT_DESCRIBED << "\n";
+}
+
+void cli::license() const {
+	std::ifstream f("../LICENSE.txt");
+	if (f.is_open())
+		*out_ << f.rdbuf() << "\n";
+	else *out_ <<
+	     "Please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt to view the license"
+	     << "\n";
+}
+
+
+
 
 // processes an option argument and returns 0 if successful
 // if it is a known error returns 1
