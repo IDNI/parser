@@ -333,7 +333,7 @@ void tgf_repl_evaluator::reprompt() {
 		<< TC_STATUS_START << opt.start << TC.CLEAR()
 		<< TC_STATUS << " ]" << TC.CLEAR() << " ";
 	ss << TC_PROMPT << "tgf>" << TC.CLEAR() << " ";
-	if (r) r->prompt(ss.str());
+	if (r) r->set_prompt(ss.str());
 }
 
 ostream& tgf_repl_evaluator::pretty_print(ostream& os,
@@ -1101,9 +1101,10 @@ int tgf_repl_evaluator::eval(const string& src) {
 		//cout << "statements.size(): " << statements.values().size() << "\n";
 
 		for (const auto& statement : statements())
-			if ((quit = eval(statement | get_only_child)))
+			if (quit = eval(statement | get_only_child); quit == 1)
 				return quit;
 	}
+	std::cout << std::endl;
 	if (quit == 0) reprompt();
 	return quit;
 }
