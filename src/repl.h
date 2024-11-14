@@ -112,7 +112,8 @@ struct repl {
 					//#endif // DEBUG
 				}
 				else {  // not a control char or ENTER
-					term::out(std::string{ ch });
+					if (!is_pipe_)
+						term::out(std::string{ ch });
 					pos_++;
 					// add to input
 					if (ch == 10 || ch == 13) {
@@ -136,6 +137,7 @@ struct repl {
 		return 0;
 	}
 	void split_line() {
+		if (is_pipe_) return;
 		size_t r = r_;
 		clear_input();
 		input_.insert(input_.begin() + pos_ - 1, '\n');
@@ -155,6 +157,7 @@ struct repl {
 	}
 	// sets the prompt
 	void prompt(const std::string& p) {
+		if (is_pipe_) return;
 		TDBG(std::cerr << " <PROMPT: `" << p << "`>";)
 		update_widths(), clear_input();
 		prompt_ = p, print_input();
@@ -345,6 +348,7 @@ private:
 		input_.clear(), pos_ = 0, print_input();
 	}
 	void update_widths() {
+		if (is_pipe_) return;
 		auto [h, w] = term::get_termsize();
 		term_h_ = h, term_w_ = w, r_ = c_ = 0;
 		size_t ps = printed_size(prompt_);
@@ -369,6 +373,7 @@ private:
 		TDBG(print_debug();)
 	}
 	void clear_input() {
+		if (is_pipe_) return;
 		TDBG(std::cerr << " <CLEAR INPUT";)
 		if (r_ < lws_.size() - 1) term::cursor_down(lws_.size() - 1 - r_);
 		r_ = lws_.size() - 1;
@@ -377,6 +382,7 @@ private:
 		TDBG(std::cerr << ">";)
 	}
 	void print_input() { // refresh input line
+		if (is_pipe_) return;
 		TDBG(std::cerr << " <REFRESH INPUT ";)
 		auto [h, w] = term::get_termsize();
 		term_h_ = h, term_w_ = w;
@@ -414,6 +420,7 @@ private:
 	size_t term_h_ = 0, term_w_ = 0; // term height and width
 	size_t r_ = 0, c_ = 0; // current cursor's row and column
 	std::vector<size_t> lws_{ 0 }; // input line widths
+	bool is_pipe_ = !term::is_tty();
 };
 
 } // idni namespace
