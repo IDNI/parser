@@ -226,6 +226,7 @@ int in(char* s, size_t l) {
 
 void out(const char* data, size_t size) {
 	// TODO (HIGH) handle write errors
+	if (size == 0) return;
 #ifndef _WIN32
 	size_t written = write(STDOUT_FILENO, data, size);
 	if (written != size)
@@ -242,11 +243,17 @@ void out(const std::string& str) {
 	out(str.c_str(), str.size());
 }
 
-void clear_line() { out("\r\033[K", 4); }
+void clear_line() {
+	TDBG(std::cerr << " <CLEAR LINE>";)
+	out("\r\033[K", 4);
+}
 
 void cursor_up(int n) {
+	TDBG(std::cerr << " <UP: " << n << ">";)
+	if (n == 0) return;
+	bool down = n < 0;
+	n = abs(n);
 	std::stringstream ss;
-	bool down = n < 0; n = abs(n);
 	ss << "\033[" << (n ? n : 1) << (down ? "B" : "A");
 	out(ss.str().c_str(), ss.str().size());
 }
@@ -254,9 +261,12 @@ void cursor_up(int n) {
 void cursor_down(int n) { cursor_up(-n); }
 
 void cursor_right(int n) {
+	TDBG(std::cerr << " <RIGHT: " << n << ">";)
+	if (n == 0) return;
+	bool left = n < 0;
+	n = abs(n);
 	std::stringstream ss;
-	bool left = n < 0; n = abs(n);
-	ss << "\033[" << (n ? n : 1) << (left ? "C" : "D");
+	ss << "\033[" << (n ? n : 1) << (left ? "D" : "C");
 	out(ss.str().c_str(), ss.str().size());
 }
 
