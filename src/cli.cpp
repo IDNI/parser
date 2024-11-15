@@ -72,7 +72,7 @@ ostream& info_new_line(ostream& os, size_t indent) {
 
 ostream& print_options(ostream& os, const cli::options& opts) {
 	for (auto& [_, opt]: opts)
-		os << "\t--" << opt.name() << ((opt.name().length() < 5)
+		os << "\t--" << opt.name() << ((opt.name().length() < 6)
 						       ? "\t\t-"
 						       : "\t-")
 		<< opt.short_name() << "\t" << opt.description() << "\n";

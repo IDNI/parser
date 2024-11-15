@@ -24,11 +24,6 @@
 
 #include "term.h"
 
-// TODO (MEDIUM) support multiline input (containing '\n') - escape new lines?
-// TODO (MEDIUM) windows support (+ test on mac since it should work on POSIX)
-// TODO (LOW) implement clear directly (not by calling system(clear/cls) and
-//            make evaluators call it instead of clearing the screen themselves
-
 namespace idni {
 
 // evaluator_t must be a class with:
