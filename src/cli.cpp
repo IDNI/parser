@@ -255,7 +255,7 @@ ostream& cli::help(ostream& os, command cmd) const {
 }
 
 void cli::version() const {
-	*out_ << "Tau version: " << GIT_DESCRIBED << "\n";
+	*out_ << "Tau version: 0.7 (" << GIT_DESCRIBED << ")\n";
 }
 
 void cli::license() const {
