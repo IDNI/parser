@@ -352,7 +352,8 @@ private:
 		auto [h, w] = term::get_termsize();
 		term_h_ = h, term_w_ = w, r_ = c_ = 0;
 		size_t ps = printed_size(prompt_);
-		if (ps > 0) r_ = (ps - 1) / term_w_, c_ = ps % term_w_;
+		if (ps > 0 && term_w_) r_ = (ps - 1) / term_w_, c_ = ps % term_w_;
+		else r_ = 0, c_ = 0;
 		lws_.clear(), lws_.reserve(r_);
 		if (r_ > 1) for (size_t i = 0; i != r_ - 1; ++i)
 				lws_.push_back(term_w_ - 1);
@@ -395,7 +396,7 @@ private:
 			<< " + " << input_.size() << ">";)
 		term::out(prompt_.c_str(), prompt_.size());
 		term::out(input_.data(), input_.size());
-		if (l % term_w_ == 0) term::out("\n");
+		if (term_w_ && l % term_w_ == 0) term::out("\n");
 		update_widths();
 // #ifdef TERM_DEBUG
 // 		std::stringstream ss;
