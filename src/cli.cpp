@@ -267,9 +267,6 @@ void cli::license() const {
 	     << "\n";
 }
 
-
-
-
 // processes an option argument and returns 0 if successful
 // if it is a known error returns 1
 // if it is a command, returns 2
@@ -377,7 +374,7 @@ int cli::process_args() {
 	if (status_ == 1) return status_;
 	if (status_ == 3 && (dflt_cmd_ == ""
 			|| (files_.size() && dflt_cmd_when_files_ == "")))
-		return error("Invalid option: " + args_[arg], true);
+		return 1;
 
 	// get command
 	string cmdarg = status_ == 2 ? args_[arg++]
@@ -397,11 +394,7 @@ int cli::process_args() {
 		for ( ; arg < argc; ) if ((status_
 			= process_arg(arg, has_cmd, cmd_.opts_)) != 0) break;
 		//DBG(cout << "status: " << status_ << endl;)
-		if (status_) {
-			stringstream ss;
-			ss << "Invalid option: " << args_[arg];
-			return error(ss.str(), true);
-		}
+		if (status_) return status_;
 		//DBG(cmd_.print(cout << "command:\n") << endl;)
 		cmd_.ok_ = true;
 	}
