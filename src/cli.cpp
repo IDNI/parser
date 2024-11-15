@@ -10,8 +10,9 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#include "cli.h"
+#include <filesystem>
 #include <fstream>
+#include "cli.h"
 
 #define PBOOL(bval) (( bval ) ? "true" : "false")
 
@@ -184,6 +185,9 @@ cli& cli::set_options(const options& opts) {
 cli& cli::set_default_command(const string& cmd_name) {
 	return dflt_cmd_ = cmd_name,
 		status_ = 2, processed_ = false, *this; }
+cli& cli::set_default_command_when_files(const string& cmd_name) {
+	return dflt_cmd_when_files_ = cmd_name,
+		status_ = 2, processed_ = false, *this; }
 cli& cli::set_description(const string& desc) {
 	return desc_ = desc, status_ = 2, processed_ = false, *this; }
 cli& cli::set_help_header(const string& header) {
@@ -199,6 +203,7 @@ cli::command cli::get_processed_command() {
 	if (!processed_) status_ = process_args();
 	return cmd_;
 }
+const vector<string>& cli::get_files() const { return files_; }
 
 ostream& cli::info(ostream& os, const string& msg, size_t indent) const {
 	info_new_line(os, indent);
@@ -277,8 +282,12 @@ int cli::process_arg(int& arg, bool& has_cmd, options& opts) {
 	bool isshort;
 	// if its command return 2 as we are done with CLI options
 	if (cmds_.find(opt) != cmds_.end()) return has_cmd = true, 2;
-	if (!opt_prefix(opt, isshort))
-		return error("Invalid command: " + opt, true);
+	if (!opt_prefix(opt, isshort)) {
+		if (filesystem::exists(opt))
+			return files_.push_back(opt), ++arg, 0;
+		else return error("Invalid command or file not exists: "
+								+ opt, true);
+	}
 	//DBG(cout << "opt: " << opt << " isshort: " << PBOOL(isshort) << endl;)
 	if (isshort) for (size_t o = 0; o != opt.size(); ++o) {
 		string n = long_for(opt[o], opts);
@@ -366,12 +375,14 @@ int cli::process_args() {
 		if ((status_ = process_arg(arg, has_cmd, opts_)) != 0) break;
 	//DBG(cout << "status: " << status_ << endl;)
 	if (status_ == 1) return status_;
-	if (status_ == 3 && dflt_cmd_ == "")
+	if (status_ == 3 && (dflt_cmd_ == ""
+			|| (files_.size() && dflt_cmd_when_files_ == "")))
 		return error("Invalid option: " + args_[arg], true);
 
 	// get command
 	string cmdarg = status_ == 2 ? args_[arg++]
-		: (status_ == 3 || status_ == 0) ? dflt_cmd_
+		: (status_ == 3 || status_ == 0)
+			? (files_.size() ? dflt_cmd_when_files_ : dflt_cmd_)
 			: "";
 	status_ = 0;
 	//DBG(cout << "cmdarg: " << cmdarg << "\n";)
