@@ -31,9 +31,8 @@ typename forest<typename parser<C,T>::pnode>::node
 		const typename parser<C,T>::pnode& pn) {
 	auto r = nid().emplace( pn, nullptr );
 	if (r.second) {
-		static size_t gid = 0;
 		r.first->second = typename
-		forest<typename parser<C,T>::pnode>::node(&(r.first->first), gid++);
+		forest<typename parser<C,T>::pnode>::node(&(r.first->first), nid().size());
 	}
 	return r.first->second;
 }
