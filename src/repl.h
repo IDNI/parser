@@ -67,10 +67,10 @@ struct repl {
 		term::open();
 	}
 	~repl() { term::close(); }
+	bool echo = true;
 	int run() {
 		clear_input();
-		print_input();
-		bool is_pipe = !term::is_tty();
+		reset_input();
 		while (1) {
 			std::string s;
 			char ch;
@@ -112,12 +112,13 @@ struct repl {
 					//#endif // DEBUG
 				}
 				else {  // not a control char or ENTER
-					if (!is_pipe_)
-						term::out(std::string{ ch });
+					if (input_.empty()
+						&& (ch == 10 || ch == 13))
+							continue;
+					if (echo) term::out(std::string{ ch });
 					pos_++;
 					// add to input
 					if (ch == 10 || ch == 13) {
-						if (input_.empty()) continue;
 						s = enter();
 						break; // exit input loop to evaluate
 					} else write(ch);
@@ -125,14 +126,15 @@ struct repl {
 				TDBG(std::cerr << "\n";) TDBG(print_debug();)
 			}
 			if (!s.empty()) { // evaluate input
-				if (pos_ - 1 < input_.size()) split_line();
-				else {
+				//TDBG(std::cerr << " <input_size(): " << input_.size() << " post: " << (pos_-1) << ">";)
+				//if (pos_ - 1 < input_.size()) split_line();
+				//else {
 					auto ret = evaluate(s);
 					if (ret == 1) break;
 					if (ret == 2) continue;
-				}
+				//}
 			}
-			if (read == 0 && is_pipe) break;
+			if (read == 0 && is_pipe_) break;
 		}
 		return 0;
 	}
@@ -157,7 +159,6 @@ struct repl {
 	}
 	// sets the prompt
 	void prompt(const std::string& p) {
-		if (is_pipe_) return;
 		TDBG(std::cerr << " <PROMPT: `" << p << "`>";)
 		update_widths(), clear_input();
 		prompt_ = p, print_input();
@@ -177,6 +178,7 @@ struct repl {
 		TDBG(print_debug();)
 		clear_input();
 		input_.insert(input_.begin() + pos_ - 1, ch);
+		if (is_pipe_) return;
 		print_input();
 		go(r, c);
 		TDBG(print_debug();)
@@ -185,7 +187,7 @@ struct repl {
 		TDBG(print_debug();)
 	}
 	void set_prompt(const std::string& p) { prompt_ = p; }
-	void clear() { term::clear(); }
+	void clear() { if (!is_pipe_) term::clear(); }
 	// returns the current prompt
 	std::string prompt() const { return prompt_; }
 private:
@@ -229,11 +231,13 @@ private:
 		new_line();
 	}
 	void new_line() {
+		if (is_pipe_) return;
 		lws_[r_++] = c_, c_ = 0;
 		TDBG(std::cerr << " <NEW LINE: [" << r_ << ", " << c_ << "]>";)
 		while (lws_.size() <= r_) lws_.push_back(0);
 	}
 	void go(size_t r, size_t c) {
+		if (is_pipe_) return;
 		int up   = static_cast<int>(r_) - static_cast<int>(r);
 		int left = static_cast<int>(c_) - static_cast<int>(c);
 		TDBG(std::cerr << " <GO: [" << r << ", " << c << "] -> "
@@ -346,6 +350,7 @@ private:
 	void reset_input() {
 		TDBG(std::cerr << " <RESET INPUT>";)
 		input_.clear(), pos_ = 0, print_input();
+		if (is_pipe_) term::out(prompt_.c_str(), prompt_.size());
 	}
 	void update_widths() {
 		if (is_pipe_) return;
