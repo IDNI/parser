@@ -130,8 +130,6 @@ struct cli {
 	// prints help
 	std::ostream& help(std::ostream& os, command cmd = {}) const;
 	std::ostream& help(command cmd = {}) const;
-	void version() const;
-	void license() const;
 
 	// processes arguments and populates options and commands
 	// returns 0 if ok, 1 if error, 2 if not processed
