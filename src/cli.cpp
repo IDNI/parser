@@ -155,7 +155,8 @@ cli::option& cli::command::operator[](char c) {
 ostream& cli::command::help(ostream& os) const {
 	os << name();
 	if (opts_.size()) os << " [ options ]";
-	os << "\n" << description() << "\n\n";
+	os << "\n";
+	if (description().size()) os << description() << "\n\n";
 	return print_options(os << "Command options:\n", opts_);
 }
 
@@ -267,7 +268,7 @@ int cli::process_arg(int& arg, bool& has_cmd, options& opts) {
 	// if its command return 2 as we are done with CLI options
 	if (cmds_.find(opt) != cmds_.end()) return has_cmd = true, 2;
 	if (!opt_prefix(opt, isshort)) {
-		if (filesystem::exists(opt))
+		if (opt == "-" || filesystem::exists(opt))
 			return files_.push_back(opt), ++arg, 0;
 		else return error("Invalid command or file not exists: "
 								+ opt, true);
