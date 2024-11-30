@@ -13,7 +13,7 @@ int main()
         nd_t child [] = {n2, n3};
         auto tid = tree<nd_t>::get(n1, child, 2);
         auto handle = tree<nd_t>::get(tid);
-        tree<nd_t>::get(tid).print();
+        tree<nd_t>::get(tid).print(std::cout);
     }
     // above handle goes out of scope
     {
@@ -22,15 +22,15 @@ int main()
     //get shared handle for id to avoid being gced.
     auto sh = tree<nd_t>::geth(id);
     //print though id
-    tree<nd_t>::get(id).print();
+    tree<nd_t>::get(id).print(std::cout);
     // prev tree handle that was out of scope is garbage out
     bintree<nd_t>::gc();
     
     // print through sh handle (different id) but same tree
-    tree<nd_t>::get(sh).print();
+    tree<nd_t>::get(sh).print(std::cout);
     // create a new tree
     auto h3 = bintree<nd_t>::get('C', sh->get(), sh->get());
-    tree<nd_t>::get(h3).print();
+    tree<nd_t>::get(h3).print(std::cout);
     // dont save its handle
     }
 
@@ -46,7 +46,7 @@ int main()
         nd_t2 child [] = {n2, n3};
         auto tid = tree<nd_t2>::get(n1, child, sizeof(child)/sizeof(nd_t2));
         auto handle = tree<nd_t2>::get(tid);
-        tree<nd_t2>::get(tid).print();
+        tree<nd_t2>::get(tid).print(std::cout);
     }
     // above handle goes out of scope
     {
@@ -55,14 +55,14 @@ int main()
     //get shared handle for id to avoid being gced.
     auto sh = bintree<nd_t2>::geth(id);
     //print though id
-    tree<nd_t2>::get(id).print();
+    tree<nd_t2>::get(id).print(std::cout);
     // prev tree handle that was out of scope is garbage out
     bintree<nd_t2>::gc();
     // print through sh handle (different id) but same tree
-    tree<nd_t2>::get(sh).print();
+    tree<nd_t2>::get(sh).print(std::cout);
     // create a new tree through bintree
     auto h3 = bintree<nd_t2>::get("C", sh->get(), sh->get());
-    tree<nd_t2>::get(h3).print();
+    tree<nd_t2>::get(h3).print(std::cout);
     // dont save its handle
     }
 

@@ -88,7 +88,7 @@ struct bintree {
 	}
 	const T val;
 	const tref l, r;
-	void print(size_t s = 0) const;
+	std::ostream& print(std::ostream &o, size_t s = 0) const;
 	const std::string str() const;
 	static void dump() ;
 	static void gc();
@@ -138,7 +138,7 @@ struct lcrs_tree : public bintree<T> {
         tref cur = this->l;
         while (cur != NULL) {
             //DBG(std::cout<<"\n"<<bintree<T>::get(cur).str()<<"\n");
-            if ((child + len) != nullptr) child[len] = cur;
+            if (child != nullptr) child[len] = cur;
             ++len, 
             cur = bintree<T>::get(cur).r;
         }
@@ -162,7 +162,7 @@ struct tree : public lcrs_tree<T> {
     //caller's responsibility to free allocated memory
 	bool get_child(tref *child, size_t &len) const;
     size_t get_child_size() const;
-	void print(size_t s = 0) const;
+	std::ostream& print(std::ostream& o, size_t s = 0) const;
 };
 
 
@@ -222,12 +222,13 @@ const bintree<T>& bintree<T>::get(const tref id) {
 }
 
 template<typename T>
-void bintree<T>::print(size_t s) const {
+std::ostream& bintree<T>::print(std::ostream &o, size_t s) const {
     for (size_t i = 0; i < s; i++)
-        std::cout<<" ";	
-    std::cout<<str()<< std::endl;
-    if (l != NULL) get(l).print(s + 1);
-    if (r != NULL) get(r).print(s + 1);
+        o<<" ";	
+    o<<str()<< std::endl;
+    if (l != NULL) get(l).print(o, s + 1);
+    if (r != NULL) get(r).print(o, s + 1);
+    return o;
 }
 
 template<typename T>
@@ -377,10 +378,10 @@ bool tree<T>::get_child(tref *child, size_t &len) const {
 }
 
 template<typename T>
-void tree<T>::print(size_t s) const {
+std::ostream& tree<T>::print(std::ostream &o, size_t s) const {
     for (size_t i=0; i< s; i++)
-        std::cout<<" ";
-    std::cout<<this->str()<< std::endl;		
+        o<<" ";
+    o<<this->str()<< std::endl;		
     size_t nc = get_child_size();
    /// std::cout<<"\nchild_size:"<<nc << "\n";
     if (nc > 0) {
@@ -388,9 +389,10 @@ void tree<T>::print(size_t s) const {
         DBG(assert(ch_id != nullptr));
         get_child(ch_id, nc);
         for (size_t i=0 ; i < nc ; i++)
-            get(ch_id[i]).print(s + 1);    
+            get(ch_id[i]).print(o, s + 1);    
         if (ch_id != nullptr) delete [] ch_id;
     }    		
+    return o;
 }
 
 } // idni namespace

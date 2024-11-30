@@ -43,6 +43,60 @@ typename forest<NodeT>::sptree forest<NodeT>::graph::extract_trees() {
 	return _extract_trees(root);
 }
 
+template<typename NodeT>
+typename idni2::htree::sp forest<NodeT>::graph::extract_tree2() {
+	return _extract_tree2(root);
+
+}
+
+template <typename NodeT>
+typename idni2::htree::sp forest<NodeT>::graph::_extract_tree2(
+	node& r) {
+
+	std::map<node,size_t> edgcount;
+   	auto post_trav = [&edgcount, this](const node& root, idni2::tref rchd, 
+					auto &post_trav)->idni2::tref {
+		nodes_set pack;
+		auto &g = *this;
+		if (root->first.nt()) {
+			auto it = g.find(root);
+			if (it == g.end()) return nullptr;
+			pack = it->second;
+		}
+		else {
+			// leaf terminal
+			idni2::tref children [] = {0, rchd};
+			idni2::tref tid = idni2::tree<NodeT>::get((NodeT)root, children, 2);
+			return tid;
+		}
+		//DBG( assert(! (pack.size()>1) ));
+		auto nodesit = pack.begin();
+		idni2::tref crchd = nullptr;    // child's right child
+		if (pack.size() >= 1) {
+			// select pack to traverse not already done;
+			if (edgcount[root] >= pack.size()) {
+				//have fully explored before, so just return 
+				//non terminal with no children
+				idni2::tref children [] = {nullptr, rchd};
+				return idni2::tree<NodeT>::get((NodeT)root, children, 2);
+			}
+			//still an edge to children unexplored
+			for (size_t i = 0; i < edgcount[root]; i++) 
+				++nodesit;
+			edgcount[root]++;
+			for (auto chdit = nodesit->rbegin(); chdit != nodesit->rend(); chdit++)
+				crchd = post_trav((NodeT)*chdit, crchd, post_trav);
+		}
+		
+		idni2::tref children [] = {crchd, rchd};
+		return idni2::tree<NodeT>::get((NodeT)root, children, 2);
+    };
+	//idni2::bintree<NodeT>::dump();
+	idni2::tref tid = post_trav(r, 0, post_trav);
+	return idni2::tree<NodeT>::geth(tid);
+}
+
+
 template <typename NodeT>
 typename forest<NodeT>::sptree forest<NodeT>::graph::_extract_trees(
 	node& r, int_t)
@@ -74,30 +128,6 @@ typename forest<NodeT>::sptree forest<NodeT>::graph::_extract_trees(
 		// pushing in stack in reverse order to keep left to right child dfs
 		stk.insert(stk.end(), cur->child.rbegin(), cur->child.rend());
 	}
-
-	idni2::tref tid = NULL;
-	std::vector<idni2::tref> stk2;
-	auto cb_exit = [&stk2, &tid] (auto& root, auto &ambset) {		
-		idni2::tref l= NULL, r= NULL;
-			if(stk2.size() && ambset.size() == 0) r = stk2.back(), stk2.pop_back();
-			else if(stk2.size() && ambset.size()) {
-				l = stk2.back();
-				stk2.pop_back();
-				if(stk2.size()) r = stk2.back(), stk2.pop_back();
-			}
-			idni2::tref chd [] =  {l, r};
-			tid = idni2::tree<NodeT>::get((NodeT)root, chd, 2);
-			stk2.push_back(tid);
-	
-		
-	};
-
-	//idni2::bintree<NodeT>::dump();
-	forest_inst().traverse(*this, this->root, NO_ENTER, cb_exit, NO_REVISIT, NO_AMBIG, true);
-	DBG(std::cout<<"\n--\n");
-	idni2::tree<NodeT>::get(tid).print();
-	DBG(std::cout<<"\n--\n");
-	//idni2::bintree<NodeT>::dump();
 
 	return troot;
 }
@@ -367,13 +397,13 @@ bool forest<NodeT>::_traverse(const node_graph& g, const node& root,
 			for (auto& chd : nodes)
 				if (done.find(chd) == done.end() || cb_revisit(chd))
 					ret &= _traverse(g, chd, done, cb_enter,
-						cb_exit, cb_revisit, cb_ambig);
+						cb_exit, cb_revisit, cb_ambig, post_ord);
 		}
 		else {
 			for (auto chd = nodes.rbegin(); chd != nodes.rend(); chd++)
 				if (done.find(*chd) == done.end() || cb_revisit(*chd))
 					ret &= _traverse(g, *chd, done, cb_enter,
-						cb_exit, cb_revisit, cb_ambig);
+						cb_exit, cb_revisit, cb_ambig, post_ord);
 
 		}
 
