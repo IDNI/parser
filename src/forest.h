@@ -136,8 +136,10 @@ public:
 		std::set<node> cycles;
 		/// builds and returns a tree with nodes
 		sptree extract_trees();
+		idni2::htree::sp extract_tree2();
 	private:
 		sptree _extract_trees(node& r, int_t choice = 0);
+		idni2::htree::sp _extract_tree2(node& r);
 	};
 	//vector of graph with callback
 	using graphv = std::vector<graph>;

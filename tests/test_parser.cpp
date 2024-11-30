@@ -414,6 +414,15 @@ int main(int argc, char **argv)
 	o = {}, o.ambiguity_fails = false;
 	run_test<char>(ps, nt, start, "aaa", {}, o);
 	ps.clear();
+
+	TEST("bug", "repeating_node")
+	ps(B,  X);
+	ps(A , B | a);
+	ps(X,  A);
+	ps(start, A);
+	o = {}, o.ambiguity_fails = false;
+	run_test<char>(ps, nt, start, "a", {}, o);
+	ps.clear();
 /*******************************************************************************
 *       STRESS
 *******************************************************************************/

@@ -121,7 +121,7 @@ int test_out(int c, const grammar<T>& g, const std::basic_string<T>& inputstr,
 	std::string s = ssf.str();
 	ssf.str({});
 
-	ssf << "forest" << c << ".dot";
+	ssf << "forest"<<"_"<<testing::test_name <<"_" << c << ".dot";
 	std::ofstream file(ssf.str());
 	to_dot<T>(ptd, std::as_const(f), to_std_string(inputstr), s);
 	file << ptd.str();
@@ -129,7 +129,7 @@ int test_out(int c, const grammar<T>& g, const std::basic_string<T>& inputstr,
 	ssf.str({});
 	ptd.str({});
 
-	ssf << "forest_facts" << c << ".tml";
+	ssf << "forest_facts"<<"_"<<testing::test_name <<"_" << c << ".tml";
 	std::ofstream file1(ssf.str());
 	to_tml_facts<T>(ptd, r);
 	file1 << ptd.str();
@@ -137,7 +137,7 @@ int test_out(int c, const grammar<T>& g, const std::basic_string<T>& inputstr,
 	ssf.str({});
 	ptd.str({});
 
-	ssf << "forest_grammar_rules" << c << ".tml";
+	ssf << "forest_grammar_rules"<<"_"<<testing::test_name <<"_"  << c << ".tml";
 	std::ofstream file2(ssf.str());
 	to_tml_rules<T>(ptd, as_const(f));
 	file2 << ptd.str();
@@ -149,7 +149,7 @@ int test_out(int c, const grammar<T>& g, const std::basic_string<T>& inputstr,
 	{
 		ssf.str({});
 		ptd.str({});
-		ssf << "graph" << c << "_" << i << suffix << ".dot";
+		ssf << "graph"<<"_"<<testing::test_name <<"_"  << c << "_" << i << suffix << ".dot";
 		std::ofstream filet(ssf.str());
 		to_dot<T, T, typename parser<T>::pgraph>(ptd, g,
 			to_std_string(inputstr), s);
@@ -157,7 +157,7 @@ int test_out(int c, const grammar<T>& g, const std::basic_string<T>& inputstr,
 		filet.close();
 		ssf.str({});
 		ptd.str({});
-		ssf << "graph_grammar_rules" << c << "_" << i <<suffix<< ".tml";
+		ssf << "graph_grammar_rules"<<"_"<<testing::test_name <<"_"  << c << "_" << i <<suffix<< ".tml";
 		filet.open(ssf.str());
 		to_tml_rules<T>(ptd, g);
 		filet << ptd.str();
@@ -166,9 +166,28 @@ int test_out(int c, const grammar<T>& g, const std::basic_string<T>& inputstr,
 		typename parser<T>::psptree tr= g.extract_trees();
 		ssf.str({});
 		ptd.str({});
-		ssf << "tree" << c << "_" << i << suffix << ".dot";
+		ssf << "tree"<<"_"<<testing::test_name <<"_"  << c << "_" << i << suffix << ".dot";
 		filet.open(ssf.str());
 		to_dot<T>(ptd, tr, to_std_string(inputstr), s);
+		filet << ptd.str();
+		filet.close();
+		using ndtype = typename parser<T>::pnode;
+
+		idni2::htree::sp lcrs_tr = g.extract_tree2();
+		static std::vector<idni2::htree::sp> storesp;
+		storesp.push_back(lcrs_tr);
+	
+		if(storesp.size() >2 ) {
+			int ind = std::rand() % (storesp.size());
+			storesp.erase(storesp.begin()+ind);
+			idni2::bintree<ndtype>::gc();
+		}
+		ssf.str({});
+		ptd.str({});
+		ssf << "tree_lcrs"<<"_"<<testing::test_name << c << "_" << i << suffix << ".txt";
+		filet.open(ssf.str());
+		idni2::tree<ndtype>::get(lcrs_tr).print(ptd);
+		
 		filet << ptd.str();
 		filet.close();
 	};
