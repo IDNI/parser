@@ -25,6 +25,8 @@ struct grammar_inspector { // provides access to private grammar members
 	const std::vector<std::pair<lit<C, T>, std::vector<lits<C, T>>>>& G() {
 		return g.G; }
 	const char_class_fns<C>& cc_fns() { return g.cc_fns; }
+	const std::map<size_t, size_t>& grdm() { return g.grdm; }
+	const std::vector<std::string>& guards() { return g.guards; }
 };
 
 struct parser_gen_options {
@@ -187,7 +189,16 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		}
 		os << "\t\t.inline_char_classes = "
 			<< pbool[g.opt.shaping.inline_char_classes] << "\n";
-		os << "\t}\n";
+		os << "\t}";
+		if (g.opt.enabled_guards.size()) {
+			os << ",\n\t.enabled_guards = {";
+			size_t i = 0;
+			for (const auto& s : g.opt.enabled_guards) os << (i ? "," : "")
+				<< (i % 10 == 0 ? "\n\t\t" : " ")
+				<< "\"" << s << "\"", i++;
+			os << "\n\t}";
+		}
+		os << "\n";
 		return os.str();
 	};
 	auto gen_opts = [&opt]() {
@@ -226,6 +237,9 @@ void generate_parser_cpp(const std::string& tgf_filename,
 				os << ')';
 			}
 			os << ");\n";
+			if (auto it = gi.grdm().find(i); it != gi.grdm().end())
+				os << "\tp.back().guard = \""
+					<< gi.guards()[it->second] << "\";\n";
 		}
 		return os.str();
 	};

@@ -17,6 +17,7 @@ set(PARSER_SOURCES
 	parser.cpp
 	recoders.cpp
 	bintree.cpp
+	term.cpp
 )
 
 # object library

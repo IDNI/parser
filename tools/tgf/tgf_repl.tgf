@@ -77,6 +77,7 @@ bool_option            => ("s" | "status"):status_opt
                         | ("icc" | "inline-cc" | "inline-char-classes")
                                                         :inline_cc_opt.
 list_option            => ("nd" | "ndl" | "nodisambig-list"):nodisambig_list_opt
+                        | ("guards" | "enabled-productions"):enabled_prods_opt
                         | "trim":trim_opt
                         | ("tc" | "trim-children"):trim_children_opt
                         | ("tct" | "trim-children-terminals")

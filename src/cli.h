@@ -104,6 +104,7 @@ struct cli {
 	cli& set_commands(const commands& cmds);
 	cli& set_options(const options& opts);
 	cli& set_default_command(const std::string& cmd_name);
+	cli& set_default_command_when_files(const std::string& cmd_name);
 	cli& set_description(const std::string& desc);
 	cli& set_help_header(const std::string& header);
 	cli& set_output_stream(std::ostream& os);
@@ -113,6 +114,8 @@ struct cli {
 	options get_processed_options();
 	// get command with populated values from args
 	command get_processed_command();
+	// get files
+	const std::vector<std::string>& get_files() const;
 
 	// helpers for printing info
 	std::ostream& info(std::ostream& os, const std::string& msg,
@@ -145,9 +148,11 @@ private:
 	bool processed_ = false;
 	commands cmds_{}, cmds_default_{};
 	std::string dflt_cmd_ = "";
+	std::string dflt_cmd_when_files_ = "";
 	options opts_{}, opts_default_{};
 	std::string help_header_ = "";
 	int status_ = 2; // 0 ok, 1 error, 2 not processed
+	std::vector<std::string> files_{};
 
 	std::ostream* out_ = &std::cout;
 	std::ostream* err_ = &std::cerr;

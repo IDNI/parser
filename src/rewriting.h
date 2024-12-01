@@ -101,12 +101,20 @@ struct make_node_hook {
 template <typename symbol_t, class hook_t = make_node_hook<symbol_t>>
 sp_node<symbol_t> make_node(const symbol_t& s,
 	const std::vector<sp_node<symbol_t>>& ns) {
+#ifdef DEBUG
+	for (const auto& el: ns)
+		 assert(el != nullptr);
+#endif // DEBUG
 	static std::map<node<symbol_t>, sp_node<symbol_t>> cache;
 	static hook_t hook{};
 	node<symbol_t> key{s, ns};
 	if (auto it = cache.find(key); it != cache.end()) return it->second;
-	if (auto h = hook(key); h) return cache.emplace(key, h.value())
-		.first->second;
+	if (auto h = hook(key); h) {
+#ifdef DEBUG
+	assert(h.value() != nullptr);
+#endif // DEBUG
+		return cache.emplace(key, h.value()) .first->second;
+	}
 	return cache.emplace(key, std::make_shared<node<symbol_t>>(s, ns))
 		.first->second;
 }
@@ -120,6 +128,15 @@ using none_t = decltype(none);
 
 static const auto identity = [](const auto& n) { return n; };
 using identity_t = decltype(identity);
+
+// trait for specifying a value of an error node for any plugged node type
+template<typename T>
+struct error_node;
+
+template<typename T>
+struct error_node<std::shared_ptr<T>> {
+	inline static const std::shared_ptr<T> value = nullptr;
+};
 
 // visitor that traverse the tree in post-order (avoiding visited nodes).
 template <typename wrapped_t, typename predicate_t, typename input_node_t,
@@ -152,7 +169,9 @@ private:
 			// we skip already visited nodes and nodes that do not match the
 			// query predicate if it is present.
 			if (!visited.contains(c) && query(c)) {
-				traverse(c, visited);
+				if (traverse(c, visited)
+					== error_node<output_node_t>::value)
+					return error_node<output_node_t>::value;
 				// we assume we have no cycles, i.e. there is no way we could
 				// visit the same node again down the tree.
 				// thus we can safely add the node to the visited set after
@@ -198,7 +217,9 @@ private:
 			// we skip already visited nodes and nodes that do not match the
 			// query predicate if it is present.
 			if (!visited.contains(c) && !found) {
-				traverse(c, visited);
+				if (traverse(c, visited)
+					== error_node<output_node_t>::value)
+					return error_node<output_node_t>::value;
 				// we assume we have no cycles, i.e. there is no way we could
 				// visit the same node again down the tree.
 				// thus we can safely add the node to the visited set after
@@ -243,7 +264,9 @@ private:
 		for (const auto& c : n->child)
 			// we skip already visited nodes and nodes that do not match the
 			// query predicate if it is present.
-			if (query(c)) traverse(c);
+			if (query(c)) if (traverse(c)
+				== error_node<output_node_t>::value)
+					return error_node<output_node_t>::value;
 		// finally we apply the wrapped visitor to the node if it is present.
 		return wrapped(n);
 	}
@@ -903,9 +926,11 @@ node_t apply_rule(const rule<node_t>& r, const node_t& n, const is_capture_t& c)
 	pattern_matcher2<node_t, is_capture_t> matcher {r, c};
 	auto nn = apply(n, matcher);
 #ifdef LOG_REWRITING
-	if (nn != n) {
-		LOG_INFO << "(R) " << p << " := " << s << LOG_END;
-		LOG_INFO << "(F) " << nn << LOG_END;
+	if constexpr (LOG_REWRITING) {
+		if (nn != n) {
+			LOG_DEBUG << "(R) " << p << " := " << s << LOG_END;
+			LOG_DEBUG << "(F) " << nn << LOG_END;
+		}
 	}
 #endif // LOG_REWRITING
 	return nn;
@@ -922,9 +947,11 @@ node_t apply_if(const rule<node_t>& r, const node_t& n,
 	pattern_matcher_if<node_t, is_capture_t, predicate_t> matcher {p, u, c, predicate};
 	auto nn = apply(s, n, matcher);
 #ifdef LOG_REWRITING
-	if (nn != n) {
-		LOG_INFO << "(R) " << p << " := " << s << LOG_END;
-		LOG_INFO << "(F) " << nn << LOG_END;
+	if constexpr (LOG_REWRITING) {
+		if (nn != n) {
+			LOG_DEBUG << "(R) " << p << " := " << s << LOG_END;
+			LOG_DEBUG << "(F) " << nn << LOG_END;
+		}
 	}
 #endif // LOG_REWRITING
 	return nn;
@@ -991,7 +1018,7 @@ sp_node<symbol_t> make_node_from_parse_result(
 	if (r.found) return make_node_from_tree<
 		parser_t, transformer_t, symbol_t>(
 			transformer, r.get_shaped_tree());
-	LOG_ERROR << r.parse_error << LOG_END;
+	LOG_ERROR << "(Error) " << r.parse_error << LOG_END;
 	return 0;
 }
 

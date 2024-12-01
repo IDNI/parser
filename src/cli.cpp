@@ -10,6 +10,8 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+#include <filesystem>
+#include <fstream>
 #include "cli.h"
 
 #define PBOOL(bval) (( bval ) ? "true" : "false")
@@ -69,7 +71,10 @@ ostream& info_new_line(ostream& os, size_t indent) {
 };
 
 ostream& print_options(ostream& os, const cli::options& opts) {
-	for (auto& [_, opt] : opts) os << "\t--" << opt.name() << "\t-"
+	for (auto& [_, opt]: opts)
+		os << "\t--" << opt.name() << ((opt.name().length() < 6)
+						       ? "\t\t-"
+						       : "\t-")
 		<< opt.short_name() << "\t" << opt.description() << "\n";
 	return os;
 }
@@ -150,7 +155,8 @@ cli::option& cli::command::operator[](char c) {
 ostream& cli::command::help(ostream& os) const {
 	os << name();
 	if (opts_.size()) os << " [ options ]";
-	os << "\n" << description() << "\n\n";
+	os << "\n";
+	if (description().size()) os << description() << "\n\n";
 	return print_options(os << "Command options:\n", opts_);
 }
 
@@ -180,6 +186,9 @@ cli& cli::set_options(const options& opts) {
 cli& cli::set_default_command(const string& cmd_name) {
 	return dflt_cmd_ = cmd_name,
 		status_ = 2, processed_ = false, *this; }
+cli& cli::set_default_command_when_files(const string& cmd_name) {
+	return dflt_cmd_when_files_ = cmd_name,
+		status_ = 2, processed_ = false, *this; }
 cli& cli::set_description(const string& desc) {
 	return desc_ = desc, status_ = 2, processed_ = false, *this; }
 cli& cli::set_help_header(const string& header) {
@@ -195,6 +204,7 @@ cli::command cli::get_processed_command() {
 	if (!processed_) status_ = process_args();
 	return cmd_;
 }
+const vector<string>& cli::get_files() const { return files_; }
 
 ostream& cli::info(ostream& os, const string& msg, size_t indent) const {
 	info_new_line(os, indent);
@@ -240,7 +250,7 @@ ostream& cli::help(ostream& os, command cmd) const {
 	if (cmds_.size()) {
 		os << "Commands:\n";
 		for (auto it : cmds_) os << "\t" << it.first
-				<< "\t\t" << it.second.description() << "\n";
+				<< "\t\t\t" << it.second.description() << "\n";
 	}
 	return os << "\n";
 }
@@ -257,8 +267,12 @@ int cli::process_arg(int& arg, bool& has_cmd, options& opts) {
 	bool isshort;
 	// if its command return 2 as we are done with CLI options
 	if (cmds_.find(opt) != cmds_.end()) return has_cmd = true, 2;
-	if (!opt_prefix(opt, isshort))
-		return error("Invalid command: " + opt, true);
+	if (!opt_prefix(opt, isshort)) {
+		if (opt == "-" || filesystem::exists(opt))
+			return files_.push_back(opt), ++arg, 0;
+		else return error("Invalid command or file not exists: "
+								+ opt, true);
+	}
 	//DBG(cout << "opt: " << opt << " isshort: " << PBOOL(isshort) << endl;)
 	if (isshort) for (size_t o = 0; o != opt.size(); ++o) {
 		string n = long_for(opt[o], opts);
@@ -346,12 +360,14 @@ int cli::process_args() {
 		if ((status_ = process_arg(arg, has_cmd, opts_)) != 0) break;
 	//DBG(cout << "status: " << status_ << endl;)
 	if (status_ == 1) return status_;
-	if (status_ == 3 && dflt_cmd_ == "")
-		return error("Invalid option: " + args_[arg], true);
+	if (status_ == 3 && (dflt_cmd_ == ""
+			|| (files_.size() && dflt_cmd_when_files_ == "")))
+		return 1;
 
 	// get command
 	string cmdarg = status_ == 2 ? args_[arg++]
-		: (status_ == 3 || status_ == 0) ? dflt_cmd_
+		: (status_ == 3 || status_ == 0)
+			? (files_.size() ? dflt_cmd_when_files_ : dflt_cmd_)
 			: "";
 	status_ = 0;
 	//DBG(cout << "cmdarg: " << cmdarg << "\n";)
@@ -366,11 +382,7 @@ int cli::process_args() {
 		for ( ; arg < argc; ) if ((status_
 			= process_arg(arg, has_cmd, cmd_.opts_)) != 0) break;
 		//DBG(cout << "status: " << status_ << endl;)
-		if (status_) {
-			stringstream ss;
-			ss << "Invalid option: " << args_[arg];
-			return error(ss.str(), true);
-		}
+		if (status_) return status_;
 		//DBG(cmd_.print(cout << "command:\n") << endl;)
 		cmd_.ok_ = true;
 	}
