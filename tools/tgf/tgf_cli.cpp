@@ -21,6 +21,7 @@
 #include "tgf_cli.h"
 #include "parser_gen.h"
 #include "parser_term_color_macros.h"
+#include "tgf_test.h"
 
 #define PBOOL(bval) (( bval ) ? "true" : "false")
 
@@ -148,7 +149,7 @@ cli::commands tgf_commands() {
 
 	// ---------------------------------------------------------------------
 
-	CMD(cli::command("repl",  "run TGF repl"));
+	CMD(cli::command("repl", "run TGF repl"));
 
 	OPT(help);
 	OPT(start);
@@ -164,6 +165,11 @@ cli::commands tgf_commands() {
 		DESC("report possible nullable ambiguity");
 	//OPT(char_type);
 	//OPT(terminal_type);
+
+	// ---------------------------------------------------------------------
+
+	CMD(cli::command("test", "run tester (with provided tgf.test file)"));
+	OPT(help);
 
 	return cs;
 }
@@ -195,6 +201,19 @@ parser<char>::error::info_lvl str2error_verbosity(const string& str) {
 	if (str != "basic") cerr << "error: invalid error-verbosity: "
 				"\"" << str << "\". setting to \"basic\"\n";
 	return lvl::INFO_BASIC;
+}
+
+int run_tests(shared_ptr<tgf_repl_evaluator::parser_type> p,
+	const vector<string>& files)
+{
+	tgf_test<char> t;
+	int ret = 0;
+	for (const auto& file : files) {
+		std::cout << "running test: " << file << std::endl;
+		auto r = t.run_from_file(p, file);
+		if (r) ret = r;
+	}
+	return ret;
 }
 
 int tgf_run(int argc, char** argv) {
@@ -271,6 +290,13 @@ int tgf_run(int argc, char** argv) {
 	if (cmd.has("start"))                   tgf_repl_opt.start =
 		cmd.get<string>("start");
 	tgf_repl_evaluator re(tgf_file, tgf_repl_opt);
+
+	if (cmd.name() == "test") {
+		auto files = cl.get_files();
+		if (files.size()) return run_tests(re.p, files);
+		else return cl.error(
+			"test command needs at least one file as an argument");
+	}
 
 	if (cmd.name() == "repl") {
 		if (cmd.get<string>("evaluate").size())
