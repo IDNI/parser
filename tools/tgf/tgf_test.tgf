@@ -1,0 +1,20 @@
+@use char class eof, alpha, alnum, space, graph, printable.
+
+@trim __, _.
+@trim all terminals except children of symbol, string, unescaped_s, escaped_s.
+@inline char classes.
+
+start              => _ (test _ '.' _)*.
+test               => symbol _ ":" _ test_string (_ ',' _ test_string)*.
+symbol             => (alpha | '_') (alnum | '_')*.
+test_string        => quoted_string | string.
+
+string             => graph+.
+quoted_string      => '"' quoted_string_char* '"'.
+quoted_string_char => unescaped_s | escaped_s.
+unescaped_s        => (space | printable) & ~( '"' | '\\' ).
+escaped_s          => '\\' ('"' | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't').
+
+_                  => [ __ ].
+__                 => (space | comment) _.
+comment            => '#' (printable | '\t')* ('\r' | '\n' | eof).

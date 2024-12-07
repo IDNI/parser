@@ -1,0 +1,21 @@
+comment            : "# comment", "#", "##".
+__                 : " ", "\n", "# comment", " #", " ## ".
+_                  : " ", "\n", "# comment", " #", " ## ", "".
+
+escaped_s          : "\\\"", "\\\\", "\\/", "\\b", "\\f", "\\n", "\\r", "\\t".
+unescaped_s        : " ", ".", "a", "A", "1".
+quoted_string_char : "\\\"", "\\\\", "\\/", "\\b", "\\f", "\\n", "\\r", "\\t",
+                     " ", ".", "a", "A", "1".
+quoted_string      : "\" .aA1\"",
+                     "\"\\\"\\\\\\/\\b\\f\\n\\r\\t\"",
+                     "\"\\\"\\\\\\/\\b\\f\\n\\r\\t .aA1\"".
+test_string        : "simple_symbol_string",
+                     "\"quoted string with \\n escape\"".
+
+symbol             : _symbol, a_symbol1, a1, Z952, _123.
+
+test               : "symbol : test_string",
+                     "_123   : \"1\\n2\\t3\"".
+
+start              : "sym1:value.\nsym2:value2.\nsym3 : \"value2\".",
+                     "sym1:value.".

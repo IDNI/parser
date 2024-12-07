@@ -172,7 +172,7 @@ typename parser<C, T>::psptree parser<C, T>::result::inline_tree_nodes(
 	if (l.is_null()) return r;
 	if (!l.nt()) return r = std::make_shared<ptree>(t->value), r;
 	//std::cerr << "inlining tree for node: `" << l.to_std_string() << "`" << std::endl;
-	bool do_inline = node_to_inline<C, T>(t->value, opts);
+	bool do_inline = (t != parent) && node_to_inline<C, T>(t->value, opts);
 	//std::cerr << "do_inline: " << do_inline << std::endl;
 	if (!do_inline) r = std::make_shared<ptree>(t->value);
 	psptree& rf = do_inline ? parent : r;
@@ -234,7 +234,7 @@ template <typename C, typename T>
 typename parser<C, T>::psptree parser<C, T>::result::inline_tree_paths(
 	const psptree& t) const
 {
-	return inline_tree_pathse(t, shaping);
+	return inline_tree_paths(t, shaping);
 }
 
 template <typename C, typename T>
