@@ -272,10 +272,10 @@ void bintree<T>::gc() {
         if (!x.second.expired()) mark(x.second.lock()->get(), mark);
 
     // do not run gc, if no handle expired or empty.
-    if (!M.size() || (next.size() == M.size()) ) 
-        return 
-            DBG(std::cout<<"gc-do nothing:"<<next.size()<<"\n"), 
-            void();
+    if (!M.size() || (next.size() == M.size())) {
+        DBG(std::cout<<"gc-do nothing:"<<next.size()<<"\n";)
+        return;
+    }
     
     /*
     DBG(assert(next.size() != M.size()));
