@@ -107,7 +107,7 @@ private:
 			else if (n.first == str)
 					r.push_back(res.get_terminals(n));
 			// if null, push the bool
-			else if (n.first == nullvalue) r.push_back(true);
+			else if (n.first == nullvalue) r.emplace_back(true);
 		};
 		// run traversal with the enter callback
 		res.get_forest()->traverse(cb_enter);
