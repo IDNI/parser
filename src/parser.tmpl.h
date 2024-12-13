@@ -1091,7 +1091,7 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 		// resolve ambiguity if WITHIN production, where same production with same symbols
 		// of different individual span
 		std::vector<int> gi;
-		int gspan = -1;
+		int gspan = INT_MAX;
 		int k = 0;
 		std::vector<int> idxs;
 		for(size_t i = 0; i < ambset.size(); i++)
@@ -1105,7 +1105,7 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 				pnode lt = apack[k];
 				int span = lt.second[1] - lt.second[0];
 				if (gspan == span) gi.push_back(packidx);
-				if (gspan < span) gspan = span,
+				if (gspan > span) gspan = span,
 						gi.clear(), gi.push_back(packidx);
 
 			}
