@@ -65,17 +65,7 @@ namespace idni::rewriter {
 // node of a tree.
 template <typename symbol_t>
 struct node {
-	// equality operators and ordering
-	bool operator==(const node& that) const = default;
-	bool operator!=(const node& that) const = default;
-
-	// TODO (HIGH) give a proper implementation of ==, != and <=> operators
-	auto operator <=> (const node& that) const noexcept {
-		if (auto cmp = value <=> that.value; cmp != 0) { return cmp; }
-		return std::lexicographical_compare_three_way(
-			child.begin(), child.end(),
-			that.child.begin(), that.child.end());
-	}
+	auto operator<=>(const node& that) const = default;
 
 	// the value of the node and pointers to the children, we follow the same
 	// notation as in forest<...>::tree to be able to reuse the code with
