@@ -65,13 +65,48 @@ namespace idni::rewriter {
 // node of a tree.
 template <typename symbol_t>
 struct node {
-	auto operator<=>(const node& that) const = default;
+	using child_type = std::vector<std::shared_ptr<node>>;
+	node (const symbol_t v, const child_type& c) :
+		value(v), child(c), hash(calc_hash(v,c)) {}
+
+	auto operator<=>(const node& that) const {
+		if (value != that.value) return value <=> that.value;
+		return child <=> that.child;
+	}
+	// We list all ordering operators explicitly
+	bool operator<(const node& that) {
+		return (*this <=> that) < 0;
+	}
+	bool operator<=(const node& that) {
+		return (*this <=> that) <= 0;
+	}
+	bool operator>(const node& that) {
+		return (*this <=> that) > 0;
+	}
+	bool operator>=(const node& that) {
+		return (*this <=> that) >= 0;
+	}
+	auto operator==(const node& that) const {
+		return value == that.value && child == that.child;
+	}
+	auto operator!=(const node& that) const {
+		return !(*this == that);
+	}
 
 	// the value of the node and pointers to the children, we follow the same
 	// notation as in forest<...>::tree to be able to reuse the code with
 	// forest<...>::tree.
-	symbol_t value;
-	std::vector<std::shared_ptr<node>> child;
+	const symbol_t value;
+	const child_type child;
+	// Hash of the node
+	const size_t hash;
+private:
+	size_t calc_hash (const symbol_t v, const child_type& c) const {
+		size_t seed = 0;
+		hashCombine(seed, v);
+		for (const std::shared_ptr<node>& _c : c) hashCombine(seed, *_c);
+		return seed;
+	}
 };
 
 // pointer to a node
@@ -1045,6 +1080,14 @@ sp_node<symbol_t> make_node_from_file(const transformer_t& transformer,
 }
 
 } // namespace idni::rewriter
+
+// Hash for node using specialization to std::hash
+template<typename symbol_t>
+struct std::hash<idni::rewriter::node<symbol_t>> {
+	size_t operator()(const idni::rewriter::node<symbol_t>& n) const noexcept {
+		return n.hash;
+	}
+};
 
 //
 // operators << to pretty print the tau language related types
