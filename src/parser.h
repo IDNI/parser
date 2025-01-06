@@ -642,6 +642,14 @@ std::ostream& print_dictmap(std::ostream& os,
 
 } // idni namespace
 
+// Hash specialization for lit
+template<typename C, typename T>
+struct std::hash<idni::lit<C, T>> {
+	size_t operator()(const idni::lit<C,T>& l) const noexcept {
+		return l.hashit();
+	}
+};
+
 // template definitions
 #include "grammar.tmpl.h"       // for grammar and related
 #include "parser.tmpl.h"        // for parser
