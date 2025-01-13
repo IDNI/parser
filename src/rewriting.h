@@ -670,6 +670,22 @@ std::optional<node_t> find_top(const node_t& input, predicate_t& query) {
 	return found;
 }
 
+// Select single top node in input that satisfy query ignoring subtrees under a node satisfying until
+template<typename node_t>
+std::optional<node_t> find_top_until (const node_t& input, const auto& query, const auto& until) {
+	std::optional<node_t> node;
+	auto select = [&](const node_t& n) {
+		if (until(n)) return false;
+		if (!query(n)) return true;
+		if (node.has_value()) return false;
+		// Query is true and node has not been found, hence set node to n
+		return node = n, false;
+	};
+	post_order_traverser<identity_t, decltype(select), node_t>
+		(identity, select)(input);
+	return node;
+}
+
 // find the first node that satisfy a predicate and return it.
 template <typename node_t>
 node_t replace(const node_t& n, std::map<node_t, node_t>& changes) {
