@@ -135,10 +135,8 @@ sp_node<symbol_t> make_node(const symbol_t& s,
 	node<symbol_t> key{s, ns};
 	if (auto it = cache.find(key); it != cache.end()) return it->second;
 	if (auto h = hook(key); h) {
-#ifdef DEBUG
-	assert(h.value() != nullptr);
-#endif // DEBUG
-		return cache.emplace(key, h.value()) .first->second;
+		// If simplification fails, return a nullptr
+		return cache.emplace(key, h.value()).first->second;
 	}
 	return cache.emplace(key, std::make_shared<node<symbol_t>>(s, ns))
 		.first->second;
@@ -871,7 +869,9 @@ struct pattern_matcher2 {
 			if (auto it = changes.find(c); it != changes.end())
 				child.push_back(it->second);
 			else child.push_back(c);
-		return changes[n] = make_node(n->value, child);
+		auto res = make_node(n->value, child);
+		if (res == nullptr) return error_node<node_t>::value;
+		return changes[n] = res;
 	}
 
 	const rule<node_t>& r;
@@ -1030,8 +1030,11 @@ node_t apply(const node_t& s, const node_t& n, matcher_t& matcher) {
 // use internaly by apply and apply with skip.
 template <typename node_t, typename matcher_t>
 node_t apply(const node_t& n, matcher_t& matcher) {
-	return post_order_query_traverser<matcher_t, false_predicate_t<node_t>, node_t>(
+	auto r = post_order_query_traverser<matcher_t, false_predicate_t<node_t>, node_t>(
 		matcher, false_predicate<node_t>)(n);
+	// If there is an error, return the original node
+	if (r == error_node<node_t>::value) return n;
+	else return r;
 	//if (matcher.matched) return replace<node_t>(n, matcher.changes);
 	//return n;
 }
