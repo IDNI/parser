@@ -35,6 +35,18 @@ template <typename node_variant_t, typename parser_t>
 using filter = extractor<node_variant_t, parser_t>;
 
 template <typename node_variant_t, typename parser_t>
+const auto children_extractor = extractor<node_variant_t, parser_t>(
+	[](const traverser<node_variant_t, parser_t>& t) {
+		using node_t = idni::rewriter::sp_node<node_variant_t>;
+		if (!t.has_value())
+			return traverser<node_variant_t, parser_t>();
+		std::vector<node_t> nv;
+		for (const auto& n : t.values())
+			for (const auto& c : n->child) nv.push_back(c);
+		return traverser<node_variant_t, parser_t>(nv);
+	});
+
+template <typename node_variant_t, typename parser_t>
 const auto only_child_extractor = extractor<node_variant_t, parser_t>(
 	[](const traverser<node_variant_t, parser_t>& t) {
 		using node_t = idni::rewriter::sp_node<node_variant_t>;
@@ -177,6 +189,11 @@ struct traverser {
 	{
 		if (!has_value_) return result_t();
 		return e(*this);
+	}
+	static constexpr const extractor<node_variant_t, parser_t>&
+		get_children_extractor()
+	{
+		return children_extractor<node_variant_t, parser_t>;
 	}
 	static constexpr const extractor<node_variant_t, parser_t>&
 		get_only_child_extractor()
