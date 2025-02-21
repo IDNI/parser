@@ -42,6 +42,7 @@ static size_t stop_after = SIZE_MAX;
 bool print_only_failed = false;
 // if true enables stress tests
 bool stress = false;
+bool benchmark = false;
 bool measure = false;
 
 // current group, name, id of a test and previous test name
@@ -387,6 +388,7 @@ void help(const std::string& opt) {
 "	-only_failed -f         prints info only for failed tests\n" <<
 "	-measure     -m         measure parsing time and TGF parsing time\n" <<
 "	-stress      -s         run also stress tests\n" <<
+"	-benchmark	 -b			runs benchmark\n" <<
 "	-verbose     -v         increase verbosity\n" <<
 "	-vv                     increase verbosity +2\n" <<
 "	-vvv                    increase verbosity +3\n" <<
@@ -445,6 +447,8 @@ void process_args(int argc, char **argv) {
 			stop_after = 5;
 		else if (opt == "-stress" || opt == "-s")
 			stress = true;
+		else if (opt == "-benchmark" || opt == "-b")
+			benchmark = true;
 		else if (opt == "-measure" || opt == "-m")
 			measure = true;
 		else if (opt == "-print_all" || opt == "-p")

@@ -349,9 +349,9 @@ void parser<C, T>::predict(const item& i, container_t& t) {
 			item j(i.set, p, c, i.set, 0);
 			if (add(t, j).second) {
 				DBGP(print(std::cout <<" +  adding to t \t\t\t",
-					j) << "\n";)
-				++refi[i]; //insert and increment
+					j) << "\n";
 			}
+			++refi[i]; //insert and increment
 		}
 	}
 }
@@ -368,7 +368,10 @@ void parser<C, T>::scan(const item& i, size_t n, T ch) {
 		const container_t& cont = S[i.from];
 		for (auto it = cont.begin(); it != cont.end(); ++it)
 			if (!completed(*it) && get_lit(*it) == get_nt(i) &&
-				refi.count(*it) && refi[*it] > 0) --refi[*it];
+				refi.count(*it) && refi[*it] > 0) {
+					--refi[*it];
+					if(refi[*it] == 0 ) gcready.insert(*it);
+				}
 		//DBG(std::cout<< "GC: adding failing scan\n");
 		gcready.insert(i);
 		return;
@@ -556,16 +559,19 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 		}
 
 		if (o.enable_gc) {
-			for (auto& rm : gcready) {
-				if (refi[rm] == 0 &&
-					(rm.set + o.gc_lag) <= n)
-				{
-					// since the refi is zero, remove it from the
-					// main container
-					S[rm.set].erase(rm);
-					refi.erase(rm);
-					MS(gcnt++;)
+			for (auto it = gcready.begin(); it != gcready.end();) {
+				auto rm = *it;
+				if ((rm.set + o.gc_lag) <= n) {
+					if(refi.find(rm) != refi.end() && refi[rm] <= 0)
+						refi.erase(rm);
+					auto its= S[rm.set].find(rm);
+					if( its != S[rm.set].end() ){
+						S[rm.set].erase(its);
+						MS(gcnt++;)
+					}
+					it = gcready.erase(it);
 				}
+				else it++;
 			}
 		}
 		//DBGP(print_S(std::cout << "\n") << "\n";)
@@ -584,6 +590,7 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 	MS(std::cout << "\nGC: total input size = " << n;)
 	MS(std::cout << "\nGC: total remaining  = " << count;)
 	MS(std::cout << "\nGC: total collected  = " << gcnt;)
+	MS(std::cout << "\nGC: readysize = " << gcready.size();)
 	MS(if (count + gcnt)
 		std::cout << "\nGC: % = " << 100*gcnt/(count+gcnt) <<std::endl);
 

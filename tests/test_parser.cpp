@@ -474,6 +474,118 @@ int main(int argc, char **argv)
 		if (testing::verbosity > 0)
 			cout << "stress test finished" << endl;
 	}
+
+	/*******************************************************************************
+*       BENCHMARK
+*******************************************************************************/
+
+	if (testing::benchmark) {
+		if (testing::verbosity > 0)
+			cout << "benchmark test started..." << c << endl;
+
+		o = {}, o.ambiguity_fails = false;
+
+		TEST("benchmark", "UBDA") // Jay Earley 1970 Paper, UBDA, O(n^3)
+		ps(start, a | (start + start));
+
+		run_test<char>(ps, nt, start, string(10,'a'), {}, o);
+		run_test<char>(ps, nt, start, string(25,'a'), {}, o);
+		run_test<char>(ps, nt, start, string(50,'a'), {}, o);
+		run_test<char>(ps, nt, start, string(100,'a'), {}, o);
+		run_test<char>(ps, nt, start, string(250,'a'), {}, o);
+		run_test<char>(ps, nt, start, string(500,'a'), {}, o);
+
+		TEST("benchmark", "BK") // Jay Earley 1970 paper, BK, unbounded ambiguity O(n)
+		ps(start, nll | (start + X));
+		ps(X, A | B);
+		ps(A, a);
+		ps(B, a);
+
+		run_test<char>(ps, nt, start, string(10,'a'), {}, o);
+		run_test<char>(ps, nt, start, string(25,'a'), {}, o);
+		run_test<char>(ps, nt, start, string(50,'a'), {}, o);
+		run_test<char>(ps, nt, start, string(100,'a'), {}, o);
+		run_test<char>(ps, nt, start, string(250,'a'), {}, o);
+		run_test<char>(ps, nt, start, string(500,'a'), {}, o);
+
+		ps.clear();
+
+		TEST("benchmark", "PAL") // Jay Earley 1970 paper, PAL, unambigious O(n^2)
+		ps(start, a | (a + start + a));
+
+		run_test<char>(ps, nt, start, string(11,'a'));
+		run_test<char>(ps, nt, start, string(25,'a'));
+		run_test<char>(ps, nt, start, string(51,'a'));
+		run_test<char>(ps, nt, start, string(101,'a'));
+		run_test<char>(ps, nt, start, string(251,'a'));
+		run_test<char>(ps, nt, start, string(501,'a'));
+
+		ps.clear();
+
+		TEST("benchmark", "ABAMBG") // O(n^3) with ambiguity
+		ps(start, (A + start) | (B + start) | (start + A) | (start + B) | nll);
+		ps(A, a | nll);
+		ps(B, b | nll);
+
+		auto gen_abambg=[](int n){
+			string s;
+			for(int i=0;i<n;i++)s+=i&1?'b':'a';
+			return s;
+		};
+
+		run_test<char>(ps, nt, start, gen_abambg(10), {}, o);
+		run_test<char>(ps, nt, start, gen_abambg(25), {}, o);
+		run_test<char>(ps, nt, start, gen_abambg(50), {}, o);
+		run_test<char>(ps, nt, start, gen_abambg(100), {}, o);
+		run_test<char>(ps, nt, start, gen_abambg(250), {}, o);
+		run_test<char>(ps, nt, start, gen_abambg(500), {}, o);
+
+		ps.clear();
+
+		TEST("benchmark", "advparsing")
+		ps(start, (a + X + X + c) | start);
+		ps(X, (X + b) | nll);
+
+		run_test<char>(ps, nt, start, 'a'+string(10, 'b')+'c', {}, o);
+		run_test<char>(ps, nt, start, 'a'+string(25, 'b')+'c', {}, o);
+		run_test<char>(ps, nt, start, 'a'+string(50, 'b')+'c', {}, o);
+		run_test<char>(ps, nt, start, 'a'+string(100, 'b')+'c', {}, o);
+		run_test<char>(ps, nt, start, 'a'+string(250, 'b')+'c', {}, o);
+		run_test<char>(ps, nt, start, 'a'+string(500, 'b')+'c', {}, o);
+
+		ps.clear();
+
+		TEST("benchmark", "npnmn")
+		ps(start, n);
+		ps(start,  start + p + start);
+		ps(start, start + m + start );
+		ps(start, start + e + start);
+
+		auto gen_npnmn = [](int n){
+			string s="n";
+			string ch = "pme";
+			for(int i = 0; i < n - 2; i++){
+				if (i&1) s += 'n';
+				else s += ch[rand() % 3];
+			}
+			if (~s.size()&1) s += 'n';
+			return s;
+		};
+		o = {}, o.ambiguity_fails = false;
+
+		srand(1); // fix seed for deterministic testing
+		run_test<char>(ps, nt, start, gen_npnmn(10), {}, o);
+		run_test<char>(ps, nt, start, gen_npnmn(25), {}, o);
+		run_test<char>(ps, nt, start, gen_npnmn(50), {}, o);
+		run_test<char>(ps, nt, start, gen_npnmn(100), {}, o);
+		run_test<char>(ps, nt, start, gen_npnmn(250), {}, o);
+		run_test<char>(ps, nt, start, gen_npnmn(500), {}, o);
+
+		ps.clear();
+
+		if (testing::verbosity > 0)
+			cout << "benchmark test finished" << endl;
+	}
 	
 	cout << endl;
 	if (testing::failed) cout << "FAILED\n";
