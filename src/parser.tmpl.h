@@ -349,7 +349,7 @@ void parser<C, T>::predict(const item& i, container_t& t) {
 			item j(i.set, p, c, i.set, 0);
 			if (add(t, j).second) {
 				DBGP(print(std::cout <<" +  adding to t \t\t\t",
-					j) << "\n";
+					j) << "\n";)
 			}
 			++refi[i]; //insert and increment
 		}
