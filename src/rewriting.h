@@ -347,7 +347,7 @@ private:
 		stack.push_back(n);
 		upos.push_back(0);
 		while (true) {
-			// If position 0 is processed, we are done
+			// If no unprocessed position exists, we are done
 			if (upos.empty()) return stack[0];
 			auto& c_node = stack[upos.back()];
 			// First check if node has children
@@ -405,7 +405,7 @@ private:
 		stack.push_back(n);
 		upos.push_back(0);
 		while (true) {
-			// If position 0 is processed, we are done
+			// If no unprocessed position exists, we are done
 			if (upos.empty()) return;
 			// Find first unprocessed position
 			auto& c_node = stack[upos.back()];
@@ -484,18 +484,16 @@ private:
 			const bool break_on_change) {
 		std::vector<node_t> stack;
 		std::vector<size_t> upos;
-		{ // limit scope of r and no_change
-			// Apply f and save on stack
-			node_t r = f(n);
-			if (r == error_node<node_t>::value)
-				return error_node<node_t>::value;
-			const bool no_change = r == n;
-			stack.emplace_back(std::move(r));
-			if (const bool p = !break_on_change || !no_change; !p)
-				upos.push_back(0);
-		}
+		// Apply f and save on stack
+		node_t r = f(n);
+		if (r == error_node<node_t>::value)
+			return error_node<node_t>::value;
+		bool no_change = r == n;
+		stack.emplace_back(std::move(r));
+		if (const bool p = !break_on_change || !no_change; !p)
+			upos.push_back(0);
 		while (true) {
-			// If position 0 is processed, we are done
+			// If no unprocessed position exists, we are done
 			if (upos.empty()) return stack[0];
 			// Find first unprocessed position
 			auto& c_node = stack[upos.back()];
@@ -532,21 +530,16 @@ private:
 				// Add next child
 				const node_t& c = c_node->child[c_pos];
 				if (visit_subtree(c)) {
-					{ // limit scope of r and no_change
-						// Apply f and save on stack
-						node_t r = f(c);
-						if (r == error_node<node_t>::value)
-							return error_node<node_t>::value;
-						const bool no_change = r == c;
-						stack.emplace_back(std::move(r));
-						if (const bool p = !break_on_change || !no_change; !p)
-							upos.push_back(stack.size() - 1);
-					}
+					// Apply f and save on stack
+					r = f(c);
+					if (r == error_node<node_t>::value)
+						return error_node<node_t>::value;
+					no_change = r == c;
+					stack.emplace_back(std::move(r));
+					if (const bool p = !break_on_change || !no_change; !p)
+						upos.push_back(stack.size() - 1);
 				}
-				else {
-					stack.push_back(c);
-					upos.pop_back();
-				}
+				else stack.push_back(c);
 			}
 		}
 	}
@@ -556,14 +549,12 @@ private:
 		std::vector<node_t> stack;
 		std::vector<size_t> upos;
 		// visit n and save on stack
-		{
-			const bool ret = !visit(n);
-			if (search && ret) return;
-			stack.push_back(n);
-			if (!ret) upos.push_back(0);
-		}
+		bool ret = !visit(n);
+		if (search && ret) return;
+		stack.push_back(n);
+		if (!ret) upos.push_back(0);
 		while (true) {
-			// If position 0 is processed, we are done
+			// If no unprocessed position exists, we are done
 			if (upos.empty()) return;
 			// Find first unprocessed position
 			auto& c_node = stack[upos.back()];
@@ -585,12 +576,10 @@ private:
 				const node_t& c = c_node->child[c_pos];
 				if (visit_subtree(c)) {
 					// visit c and save on stack
-					{
-						const bool ret = !visit(c);
-						if (search && ret) return;
-						stack.push_back(c);
-						if (!ret) upos.push_back(stack.size() - 1);
-					}
+					ret = !visit(c);
+					if (search && ret) return;
+					stack.push_back(c);
+					if (!ret) upos.push_back(stack.size() - 1);
 				}
 				else stack.push_back(c);
 			}
@@ -870,7 +859,14 @@ node_t trim_top(const node_t& input, predicate_t& query) {
 template <typename predicate_t, typename node_t>
 std::vector<node_t> select_top(const node_t& input, predicate_t& query) {
 	std::vector<node_t> selected;
-	select_top_predicate<predicate_t, node_t> select(query, selected);
+	auto select = [&query, &selected](const auto& n) {
+		if (!query(n)) return true;
+		// we return false to avoid visiting the children of the node
+		// since we are only interested in the top nodes.
+		if (std::find(selected.begin(), selected.end(), n)
+				== selected.end()) selected.push_back(n);
+		return false;
+	};
 	pre_order(input).visit(select);
 	return selected;
 }
@@ -891,7 +887,11 @@ std::vector<node_t> select_subnodes(const node_t& input, predicate_t& query,
 template <typename predicate_t, typename node_t>
 std::vector<node_t> select_all(const node_t& input, predicate_t& query) {
 	std::vector<node_t> selected;
-	select_all_predicate<predicate_t, node_t> select(query, selected);
+	auto select = [&query, &selected](const auto& n) {
+		if (query(n)) selected.push_back(n);
+		// we always return true to visit all the nodes.
+		return true;
+	};
 	pre_order(input).visit(select);
 	return selected;
 }
@@ -931,7 +931,10 @@ std::vector<node_t> select_top_until (const node_t& input, const auto& query, co
 template <typename predicate_t, typename node_t>
 std::optional<node_t> find_top(const node_t& input, predicate_t& query) {
 	std::optional<node_t> found;
-	find_top_predicate<predicate_t, node_t> find_top(query, found);
+	auto find_top = [&query, &found](const auto& n) {
+		if (!found && query(n)) found = n;
+		return !found;
+	};
 	pre_order(input).search(find_top);
 	return found;
 }
@@ -1033,7 +1036,10 @@ struct find_visitor {
 template <typename predicate_t, typename node_t>
 std::optional<node_t> find_bottom(const node_t& input, predicate_t& query) {
 	std::optional<node_t> found;
-	find_top_predicate<predicate_t, node_t> find_top(query, found);
+	auto find_top = [&query, &found](const auto& n){
+		if (!found && query(n)) found = n;
+		return !found;
+	};
 	post_order(input).search(find_top);
 	return found;
 }
