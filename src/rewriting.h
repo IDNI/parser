@@ -319,15 +319,13 @@ template<typename node_t>
 struct post_order {
 	explicit post_order(const node_t& n) : root(n) {}
 
-	auto apply (auto& f, auto& visit_subtree) {
+	node_t apply (auto& f, auto& visit_subtree) {
 		if (visit_subtree(root))
 			return traverse(root, f, visit_subtree);
-		else {
-			return root;
-		}
+		else return root;
 	}
 
-	auto apply (auto& f) {
+	node_t apply (auto& f) {
 		return traverse(root, f, all);
 	}
 
@@ -345,41 +343,30 @@ private:
 	node_t traverse (const node_t& n, auto& f, auto& visit_subtree) {
 		std::vector<node_t> stack;
 		std::vector<bool> processed;
-		std::vector<size_t> last_unprocessed;
-		// std::cout << "push " << n->value << "\n";
+		std::vector<size_t> upos;
 		stack.push_back(n);
 		processed.push_back(false);
-		last_unprocessed.push_back(0);
-		size_t pos = 0;
+		upos.push_back(0);
 		while (true) {
 			// If position 0 is processed, we are done
-			if (pos == 0 && processed[0]) break;
-			// Find first unprocessed position
-			while (processed[pos] == true) --pos;
-			if (pos != last_unprocessed.back())
-				std::cout << "error" << "\n";
-			// std::cout << "new pos: " << pos << "\n";
-			// std::cout << "stack size: " << stack.size() << "\n";
-			auto& c_node = stack[pos];
-			// std::cout << "current node: " << c_node << "\n";
+			if (processed[0]) break;
+			auto& c_node = stack[upos.back()];
 			// First check if node has children
 			if (c_node->child.empty()) {
 				// Process node and move to next
 				c_node = f(c_node);
 				if (c_node == error_node<node_t>::value)
 					return error_node<node_t>::value;
-				processed[pos] = true;
-				last_unprocessed.pop_back();
+				processed[upos.back()] = true;
+				upos.pop_back();
 				continue;
 			}
 			// Get child position
-			size_t c_pos = (stack.size() - 1) - pos;
-			// std::cout << "c_pos: " << c_pos << "\n";
+			size_t c_pos = (stack.size() - 1) - upos.back();
 			// Are all children visited?
 			if (c_pos == c_node->child.size()) {
-				// std::cout << "children ready.\n";
 				// Check if children actually changed
-				if (std::equal(stack.begin() + (pos + 1), stack.end(),
+				if (std::equal(stack.begin() + (upos.back() + 1), stack.end(),
 					c_node->child.begin(), c_node->child.end())) {
 					c_node = f(c_node);
 					if (c_node == error_node<node_t>::value)
@@ -388,13 +375,13 @@ private:
 					stack.erase(stack.end() - c_pos, stack.end());
 					processed.erase(processed.end() - c_pos, processed.end());
 					// mark processed
-					processed[pos] = true;
-					last_unprocessed.pop_back();
+					processed[upos.back()] = true;
+					upos.pop_back();
 					continue;
 				}
 				// Make new node if children are different
 				std::vector<node_t> children;
-				for (size_t i = pos+1; i < stack.size(); ++i)
+				for (size_t i = upos.back() + 1; i < stack.size(); ++i)
 					children.emplace_back(std::move(stack[i]));
 				// Pop children from stacks
 				stack.erase(stack.end() - c_pos, stack.end());
@@ -406,21 +393,17 @@ private:
 				c_node = f(new_node);
 				if (c_node == error_node<node_t>::value)
 					return error_node<node_t>::value;
-				processed[pos] = true;
-				last_unprocessed.pop_back();
+				processed[upos.back()] = true;
+				upos.pop_back();
 			} else {
 				// Add next child
-				// std::cout << "push: " << c_node->child[c_pos] << "\n";
 				const auto& c = c_node->child[c_pos];
 				stack.push_back(c);
 				// c_node can become invalid due to push_back
 				if (visit_subtree(c)) {
 					processed.push_back(false);
-					last_unprocessed.push_back(processed.size() - 1);
-				}
-				else
-					processed.push_back(true);
-				pos += (c_pos + 1);
+					upos.push_back(processed.size() - 1);
+				} else processed.push_back(true);
 			}
 		}
 		return stack[0];
@@ -429,24 +412,25 @@ private:
 	void const_traverse (const node_t& n, auto& visit, auto& visit_subtree) {
 		std::vector<node_t> stack;
 		std::vector<bool> processed;
+		std::vector<size_t> upos;
 		stack.push_back(n);
 		processed.push_back(false);
-		size_t pos = 0;
+		upos.push_back(0);
 		while (true) {
 			// If position 0 is processed, we are done
-			if (pos == 0 && processed[0]) break;
+			if (processed[0]) break;
 			// Find first unprocessed position
-			while (processed[pos] == true) --pos;
-			auto& c_node = stack[pos];
+			auto& c_node = stack[upos.back()];
 			// First check if node has children
 			if (c_node->child.empty()) {
 				// Process node and move to next
 				if (!visit(c_node)) return;
-				processed[pos] = true;
+				processed[upos.back()] = true;
+				upos.pop_back();
 				continue;
 			}
 			// Get child position
-			size_t c_pos = (stack.size() - 1) - pos;
+			size_t c_pos = (stack.size() - 1) - upos.back();
 			// Are all children visited?
 			if (c_pos == c_node->child.size()) {
 				if (!visit(c_node)) return;
@@ -454,17 +438,17 @@ private:
 				stack.erase(stack.end() - c_pos, stack.end());
 				processed.erase(processed.end() - c_pos, processed.end());
 				// mark processed
-				processed[pos] = true;
+				processed[upos.back()] = true;
+				upos.pop_back();
 			} else {
 				// Add next child
 				const auto& c = c_node->child[c_pos];
 				stack.push_back(c);
 				// c_node can become invalid due to push_back
-				if (visit_subtree(c))
+				if (visit_subtree(c)) {
 					processed.push_back(false);
-				else
-					processed.push_back(true);
-				pos += (c_pos + 1);
+					upos.push_back(processed.size() - 1);
+				} else processed.push_back(true);
 			}
 		}
 	}
@@ -474,27 +458,23 @@ template<typename node_t>
 struct pre_order {
 	explicit pre_order(const node_t& n) : root(n) {}
 
-	auto apply (auto& f, auto& visit_subtree) {
+	node_t apply (auto& f, auto& visit_subtree) {
 		if (visit_subtree(root))
 			return traverse(root, f, visit_subtree, false);
-		else {
-			return root;
-		}
+		else return root;
 	}
 
-	auto apply (auto& f) {
+	node_t apply (auto& f) {
 		return traverse(root, f, all, false);
 	}
 
-	auto apply_until_change (auto& f, auto& visit_subtree) {
+	node_t apply_until_change (auto& f, auto& visit_subtree) {
 		if (visit_subtree(root))
 			return traverse(root, f, visit_subtree, true);
-		else {
-			return root;
-		}
+		else return root;
 	}
 
-	auto apply_until_change (auto& f) {
+	node_t apply_until_change (auto& f) {
 		return traverse(root, f, all, true);
 	}
 
@@ -522,7 +502,7 @@ private:
 			const bool break_on_change) {
 		std::vector<node_t> stack;
 		std::vector<bool> processed;
-		std::vector<size_t> last_unprocessed;
+		std::vector<size_t> upos;
 		{ // limit scope of r and no_change
 			// Apply f and save on stack
 			node_t r = f(n);
@@ -532,42 +512,38 @@ private:
 			stack.emplace_back(std::move(r));
 			const bool p = !break_on_change || !no_change;
 			processed.push_back(p);
-			if (!p) last_unprocessed.push_back(0);
+			if (!p) upos.push_back(0);
 		}
-		size_t pos = 0;
 		while (true) {
 			// If position 0 is processed, we are done
-			if (pos == 0 && processed[0]) break;
+			if (processed[0]) break;
 			// Find first unprocessed position
-			while (processed[pos] == true) --pos;
-			if (last_unprocessed.back() != pos)
-				std::cout << "error pre_order\n";
-			auto& c_node = stack[pos];
+			auto& c_node = stack[upos.back()];
 			// First check if node has children
 			if (c_node->child.empty()) {
 				// Process node and move to next
-				processed[pos] = true;
-				last_unprocessed.pop_back();
+				processed[upos.back()] = true;
+				upos.pop_back();
 				continue;
 			}
 			// Get child position
-			size_t c_pos = (stack.size() - 1) - pos;
+			size_t c_pos = (stack.size() - 1) - upos.back();
 			// Are all children visited?
 			if (c_pos == c_node->child.size()) {
 				// Check if children actually changed
-				if (std::equal(stack.begin() + (pos + 1), stack.end(),
+				if (std::equal(stack.begin() + (upos.back() + 1), stack.end(),
 					c_node->child.begin(), c_node->child.end())) {
 					// Pop children from stacks
 					stack.erase(stack.end() - c_pos, stack.end());
 					processed.erase(processed.end() - c_pos, processed.end());
 					// mark processed
-					processed[pos] = true;
-					last_unprocessed.pop_back();
+					processed[upos.back()] = true;
+					upos.pop_back();
 					continue;
 				}
 				// Make new node if children are different
 				std::vector<node_t> children;
-				for (size_t i = pos+1; i < stack.size(); ++i)
+				for (size_t i = upos.back() + 1; i < stack.size(); ++i)
 					children.emplace_back(std::move(stack[i]));
 				// Pop children from stacks
 				stack.erase(stack.end() - c_pos, stack.end());
@@ -576,8 +552,8 @@ private:
 				c_node = make_node(c_node->value, children);
 				if (c_node == error_node<node_t>::value)
 					return error_node<node_t>::value;
-				processed[pos] = true;
-				last_unprocessed.pop_back();
+				processed[upos.back()] = true;
+				upos.pop_back();
 			} else {
 				// Add next child
 				const node_t& c = c_node->child[c_pos];
@@ -591,15 +567,14 @@ private:
 						stack.emplace_back(std::move(r));
 						const bool p = !break_on_change || !no_change;
 						processed.push_back(p);
-						if (!p) last_unprocessed.push_back(processed.size() - 1);
+						if (!p) upos.push_back(processed.size() - 1);
 					}
 				}
 				else {
 					stack.push_back(c);
 					processed.push_back(true);
-					last_unprocessed.pop_back();
+					upos.pop_back();
 				}
-				pos += (c_pos + 1);
 			}
 		}
 		return stack[0];
@@ -609,35 +584,37 @@ private:
 			const bool search) {
 		std::vector<node_t> stack;
 		std::vector<bool> processed;
+		std::vector<size_t> upos;
 		// visit n and save on stack
 		{
 			const bool ret = !visit(n);
 			if (search && ret) return;
 			stack.push_back(n);
 			processed.push_back(ret);
+			if (!ret) upos.push_back(0);
 		}
-		size_t pos = 0;
 		while (true) {
 			// If position 0 is processed, we are done
-			if (pos == 0 && processed[0]) break;
+			if (processed[0]) break;
 			// Find first unprocessed position
-			while (processed[pos] == true) --pos;
-			auto& c_node = stack[pos];
+			auto& c_node = stack[upos.back()];
 			// First check if node has children
 			if (c_node->child.empty()) {
 				// Process node and move to next
-				processed[pos] = true;
+				processed[upos.back()] = true;
+				upos.pop_back();
 				continue;
 			}
 			// Get child position
-			size_t c_pos = (stack.size() - 1) - pos;
+			size_t c_pos = (stack.size() - 1) - upos.back();
 			// Are all children visited?
 			if (c_pos == c_node->child.size()) {
 				// Pop children from stacks
 				stack.erase(stack.end() - c_pos, stack.end());
 				processed.erase(processed.end() - c_pos, processed.end());
 				// mark processed
-				processed[pos] = true;
+				processed[upos.back()] = true;
+				upos.pop_back();
 			} else {
 				// Add next child
 				const node_t& c = c_node->child[c_pos];
@@ -648,13 +625,13 @@ private:
 						if (search && ret) return;
 						stack.push_back(c);
 						processed.push_back(ret);
+						if (!ret) upos.push_back(processed.size() - 1);
 					}
 				}
 				else {
 					stack.push_back(c);
 					processed.push_back(true);
 				}
-				pos += (c_pos + 1);
 			}
 		}
 	}
@@ -915,8 +892,6 @@ using neg_predicate_t = neg_predicate<predicate_t>;
 template <typename predicate_t, typename symbol_t,
 	typename node_t = sp_node<symbol_t>>
 node_t trim_top(const node_t& input, predicate_t& query) {
-	// neg_predicate<predicate_t> neg(query);
-	// map_transformer<identity_t, node_t> map(identity);
 	const auto t = [&query](const auto& n){
 		for (size_t i = 0; i < n->child.size(); ++i) {
 			if (query(n->child[i])) {
@@ -928,11 +903,6 @@ node_t trim_top(const node_t& input, predicate_t& query) {
 		return n;
 	};
 	return pre_order(input).apply_until_change(t);
-	// return post_order_traverser<
-	// 		map_transformer<identity_t, node_t>,
-	// 		neg_predicate_t<predicate_t>,
-	// 		node_t>(
-	// 	map, neg)(input);
 }
 
 // select all top nodes that satisfy a predicate and return them.
@@ -941,11 +911,6 @@ std::vector<node_t> select_top(const node_t& input, predicate_t& query) {
 	std::vector<node_t> selected;
 	select_top_predicate<predicate_t, node_t> select(query, selected);
 	pre_order(input).visit(select);
-	// post_order_traverser<
-	// 		identity_t,
-	// 		select_top_predicate<predicate_t, node_t>,
-	// 		node_t>(
-	// 	identity, select)(input);
 	return selected;
 }
 
@@ -958,11 +923,6 @@ std::vector<node_t> select_subnodes(const node_t& input, predicate_t& query,
 	select_subnodes_predicate<predicate_t, extractor_t, node_t> select(
 		query, extractor, selected);
 	pre_order(input).visit(select);
-	// post_order_traverser<
-	// 		identity_t,
-	// 		select_top_predicate<predicate_t, node_t>,
-	// 		node_t>(
-	// 	identity, select)(input);
 	return selected;
 }
 
@@ -972,11 +932,6 @@ std::vector<node_t> select_all(const node_t& input, predicate_t& query) {
 	std::vector<node_t> selected;
 	select_all_predicate<predicate_t, node_t> select(query, selected);
 	pre_order(input).visit(select);
-	// post_order_traverser<
-	// 		identity_t,
-	// 		select_all_predicate<predicate_t, node_t>,
-	// 		node_t>(
-	// 	identity, select)(input);
 	return selected;
 }
 
@@ -991,8 +946,6 @@ std::vector<node_t> select_all_until (const node_t& input, const auto& query, co
 		else return true;
 	};
 	pre_order(input).visit(select);
-	// post_order_traverser<identity_t, decltype(select), node_t>
-	// 	(identity, select)(input);
 	return selected;
 }
 
@@ -1010,8 +963,6 @@ std::vector<node_t> select_top_until (const node_t& input, const auto& query, co
 		return false;
 	};
 	pre_order(input).visit(select);
-	// post_order_traverser<identity_t, decltype(select), node_t>
-	// 	(identity, select)(input);
 	return selected;
 }
 
@@ -1021,11 +972,6 @@ std::optional<node_t> find_top(const node_t& input, predicate_t& query) {
 	std::optional<node_t> found;
 	find_top_predicate<predicate_t, node_t> find_top(query, found);
 	pre_order(input).search(find_top);
-	// post_order_traverser<
-	// 		identity_t,
-	// 		find_top_predicate<predicate_t, node_t>,
-	// 		node_t>(
-	// 	identity, find_top)(input);
 	return found;
 }
 
@@ -1043,8 +989,6 @@ std::optional<node_t> find_top_until (const node_t& input, const auto& query, co
 		return !until(p);
 	};
 	pre_order(input).search(select, neg_until);
-	// post_order_traverser<identity_t, decltype(select), node_t>
-	// 	(identity, select)(input);
 	return node;
 }
 
@@ -1056,12 +1000,6 @@ node_t replace(const node_t& n, const std::map<node_t, node_t>& changes) {
 		else return el;
 	};
 	return pre_order(n).apply_until_change(r);
-	// replace_transformer<node_t> replace{copy};
-	// return post_order_traverser<
-	// 		replace_transformer<node_t>,
-	// 		all_t,
-	// 		node_t>
-	// 	(replace , all)(n);
 }
 
 template <typename node_t>
@@ -1082,12 +1020,6 @@ node_t replace_if(const node_t& n, std::map<node_t, node_t>& changes, predicate_
 		else return el;
 	};
 	return pre_order(n).apply_until_change(r, query);
-	// replace_transformer<node_t> replace{changes};
-	// return post_order_traverser<
-	// 		replace_transformer<node_t>,
-	// 		predicate_t,
-	// 		node_t>
-	// 	(replace , query)(n);
 }
 
 // Replace nodes in n according to changes while skipping subtrees that satisfy query
@@ -1098,16 +1030,10 @@ node_t replace_until(const node_t& n, std::map<node_t, node_t>& changes, predica
 			return it->second;
 		else return el;
 	};
-	// replace_transformer<node_t> replace{changes};
 	auto neg_query = [&query](const auto& el) {
 		return !query(el);
 	};
 	return pre_order(n).apply_until_change(r, neg_query);
-	// return post_order_traverser<
-	// 		replace_transformer<node_t>,
-	// 		decltype(neg_query),
-	// 		node_t>
-	// 	(replace , neg_query)(n);
 }
 
 // TODO (LOW) consider adding a similar functino for replace_node...
@@ -1148,11 +1074,6 @@ std::optional<node_t> find_bottom(const node_t& input, predicate_t& query) {
 	std::optional<node_t> found;
 	find_top_predicate<predicate_t, node_t> find_top(query, found);
 	post_order(input).search(find_top);
-	// post_order_traverser<
-	// 		identity_t,
-	// 		find_top_predicate<predicate_t, node_t>,
-	// 		node_t>(
-	// 	identity, find_top)(input);
 	return found;
 }
 
