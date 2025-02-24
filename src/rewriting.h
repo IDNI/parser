@@ -295,6 +295,7 @@ private:
 	}
 };
 
+// Do not use. Use post_order or pre_order instead depending on the needs.
 template<typename node_t>
 struct post_order_recursive_traverser {
 	auto operator() (const node_t n, auto& query, auto& wrapped) {
@@ -342,14 +343,12 @@ struct post_order {
 private:
 	node_t traverse (const node_t& n, auto& f, auto& visit_subtree) {
 		std::vector<node_t> stack;
-		std::vector<bool> processed;
 		std::vector<size_t> upos;
 		stack.push_back(n);
-		processed.push_back(false);
 		upos.push_back(0);
 		while (true) {
 			// If position 0 is processed, we are done
-			if (processed[0]) break;
+			if (upos.empty()) return stack[0];
 			auto& c_node = stack[upos.back()];
 			// First check if node has children
 			if (c_node->child.empty()) {
@@ -357,7 +356,6 @@ private:
 				c_node = f(c_node);
 				if (c_node == error_node<node_t>::value)
 					return error_node<node_t>::value;
-				processed[upos.back()] = true;
 				upos.pop_back();
 				continue;
 			}
@@ -373,9 +371,6 @@ private:
 						return error_node<node_t>::value;
 					// Pop children from stacks
 					stack.erase(stack.end() - c_pos, stack.end());
-					processed.erase(processed.end() - c_pos, processed.end());
-					// mark processed
-					processed[upos.back()] = true;
 					upos.pop_back();
 					continue;
 				}
@@ -385,7 +380,6 @@ private:
 					children.emplace_back(std::move(stack[i]));
 				// Pop children from stacks
 				stack.erase(stack.end() - c_pos, stack.end());
-				processed.erase(processed.end() - c_pos, processed.end());
 				// Apply wrapped and mark processed
 				node_t new_node = make_node(c_node->value, children);
 				if (new_node == error_node<node_t>::value)
@@ -393,39 +387,32 @@ private:
 				c_node = f(new_node);
 				if (c_node == error_node<node_t>::value)
 					return error_node<node_t>::value;
-				processed[upos.back()] = true;
 				upos.pop_back();
 			} else {
 				// Add next child
 				const auto& c = c_node->child[c_pos];
 				stack.push_back(c);
 				// c_node can become invalid due to push_back
-				if (visit_subtree(c)) {
-					processed.push_back(false);
-					upos.push_back(processed.size() - 1);
-				} else processed.push_back(true);
+				if (visit_subtree(c))
+					upos.push_back(stack.size() - 1);
 			}
 		}
-		return stack[0];
 	}
 
 	void const_traverse (const node_t& n, auto& visit, auto& visit_subtree) {
 		std::vector<node_t> stack;
-		std::vector<bool> processed;
 		std::vector<size_t> upos;
 		stack.push_back(n);
-		processed.push_back(false);
 		upos.push_back(0);
 		while (true) {
 			// If position 0 is processed, we are done
-			if (processed[0]) break;
+			if (upos.empty()) return;
 			// Find first unprocessed position
 			auto& c_node = stack[upos.back()];
 			// First check if node has children
 			if (c_node->child.empty()) {
 				// Process node and move to next
 				if (!visit(c_node)) return;
-				processed[upos.back()] = true;
 				upos.pop_back();
 				continue;
 			}
@@ -436,19 +423,14 @@ private:
 				if (!visit(c_node)) return;
 				// Pop children from stacks
 				stack.erase(stack.end() - c_pos, stack.end());
-				processed.erase(processed.end() - c_pos, processed.end());
-				// mark processed
-				processed[upos.back()] = true;
 				upos.pop_back();
 			} else {
 				// Add next child
 				const auto& c = c_node->child[c_pos];
 				stack.push_back(c);
 				// c_node can become invalid due to push_back
-				if (visit_subtree(c)) {
-					processed.push_back(false);
-					upos.push_back(processed.size() - 1);
-				} else processed.push_back(true);
+				if (visit_subtree(c))
+					upos.push_back(stack.size() - 1);
 			}
 		}
 	}
@@ -501,7 +483,6 @@ private:
 	node_t traverse(const node_t& n, auto& f, auto& visit_subtree,
 			const bool break_on_change) {
 		std::vector<node_t> stack;
-		std::vector<bool> processed;
 		std::vector<size_t> upos;
 		{ // limit scope of r and no_change
 			// Apply f and save on stack
@@ -510,19 +491,17 @@ private:
 				return error_node<node_t>::value;
 			const bool no_change = r == n;
 			stack.emplace_back(std::move(r));
-			const bool p = !break_on_change || !no_change;
-			processed.push_back(p);
-			if (!p) upos.push_back(0);
+			if (const bool p = !break_on_change || !no_change; !p)
+				upos.push_back(0);
 		}
 		while (true) {
 			// If position 0 is processed, we are done
-			if (processed[0]) break;
+			if (upos.empty()) return stack[0];
 			// Find first unprocessed position
 			auto& c_node = stack[upos.back()];
 			// First check if node has children
 			if (c_node->child.empty()) {
 				// Process node and move to next
-				processed[upos.back()] = true;
 				upos.pop_back();
 				continue;
 			}
@@ -535,9 +514,6 @@ private:
 					c_node->child.begin(), c_node->child.end())) {
 					// Pop children from stacks
 					stack.erase(stack.end() - c_pos, stack.end());
-					processed.erase(processed.end() - c_pos, processed.end());
-					// mark processed
-					processed[upos.back()] = true;
 					upos.pop_back();
 					continue;
 				}
@@ -547,12 +523,10 @@ private:
 					children.emplace_back(std::move(stack[i]));
 				// Pop children from stacks
 				stack.erase(stack.end() - c_pos, stack.end());
-				processed.erase(processed.end() - c_pos, processed.end());
 				// mark processed
 				c_node = make_node(c_node->value, children);
 				if (c_node == error_node<node_t>::value)
 					return error_node<node_t>::value;
-				processed[upos.back()] = true;
 				upos.pop_back();
 			} else {
 				// Add next child
@@ -565,43 +539,37 @@ private:
 							return error_node<node_t>::value;
 						const bool no_change = r == c;
 						stack.emplace_back(std::move(r));
-						const bool p = !break_on_change || !no_change;
-						processed.push_back(p);
-						if (!p) upos.push_back(processed.size() - 1);
+						if (const bool p = !break_on_change || !no_change; !p)
+							upos.push_back(stack.size() - 1);
 					}
 				}
 				else {
 					stack.push_back(c);
-					processed.push_back(true);
 					upos.pop_back();
 				}
 			}
 		}
-		return stack[0];
 	}
 
 	void const_traverse(const node_t& n, auto& visit, auto& visit_subtree,
 			const bool search) {
 		std::vector<node_t> stack;
-		std::vector<bool> processed;
 		std::vector<size_t> upos;
 		// visit n and save on stack
 		{
 			const bool ret = !visit(n);
 			if (search && ret) return;
 			stack.push_back(n);
-			processed.push_back(ret);
 			if (!ret) upos.push_back(0);
 		}
 		while (true) {
 			// If position 0 is processed, we are done
-			if (processed[0]) break;
+			if (upos.empty()) return;
 			// Find first unprocessed position
 			auto& c_node = stack[upos.back()];
 			// First check if node has children
 			if (c_node->child.empty()) {
 				// Process node and move to next
-				processed[upos.back()] = true;
 				upos.pop_back();
 				continue;
 			}
@@ -611,9 +579,6 @@ private:
 			if (c_pos == c_node->child.size()) {
 				// Pop children from stacks
 				stack.erase(stack.end() - c_pos, stack.end());
-				processed.erase(processed.end() - c_pos, processed.end());
-				// mark processed
-				processed[upos.back()] = true;
 				upos.pop_back();
 			} else {
 				// Add next child
@@ -624,14 +589,10 @@ private:
 						const bool ret = !visit(c);
 						if (search && ret) return;
 						stack.push_back(c);
-						processed.push_back(ret);
-						if (!ret) upos.push_back(processed.size() - 1);
+						if (!ret) upos.push_back(stack.size() - 1);
 					}
 				}
-				else {
-					stack.push_back(c);
-					processed.push_back(true);
-				}
+				else stack.push_back(c);
 			}
 		}
 	}
@@ -1013,7 +974,7 @@ node_t replace(const node_t& n, const node_t& replace, const node_t& with) {
 
 // Replace nodes in n according to changes while skipping subtrees that don't satisfy query
 template <typename node_t, typename predicate_t>
-node_t replace_if(const node_t& n, std::map<node_t, node_t>& changes, predicate_t& query) {
+node_t replace_if(const node_t& n, const std::map<node_t, node_t>& changes, predicate_t& query) {
 	const auto r = [&changes](const auto& el) {
 		if (const auto it = changes.find(el); it != changes.end())
 			return it->second;
@@ -1024,7 +985,7 @@ node_t replace_if(const node_t& n, std::map<node_t, node_t>& changes, predicate_
 
 // Replace nodes in n according to changes while skipping subtrees that satisfy query
 template <typename node_t, typename predicate_t>
-node_t replace_until(const node_t& n, std::map<node_t, node_t>& changes, predicate_t& query) {
+node_t replace_until(const node_t& n, const std::map<node_t, node_t>& changes, predicate_t& query) {
 	const auto r = [&changes](const auto& el) {
 		if (const auto it = changes.find(el); it != changes.end())
 			return it->second;
