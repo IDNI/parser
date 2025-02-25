@@ -35,7 +35,7 @@
 #	define LOG_INFO  BOOST_LOG_TRIVIAL(info)
 #	define LOG_ERROR BOOST_LOG_TRIVIAL(error)
 #	define LOG_END  ""
-#	define LOG_REWRITING true
+#	define LOG_REWRITING false
 #else
 #	define LOG_DEBUG std::cout
 #	define LOG_INFO  std::cout
@@ -1125,21 +1125,19 @@ struct pattern_matcher2 {
 	pattern_matcher2(const rule<node_t>& r,	const is_capture_t& is_capture)
 		: r(r), is_capture(is_capture) {}
 
-	node_t operator()(const node_t& n) {
-		// if we have matched the pattern, we never try again to unify
-		// if (matched) return false;
+	bool operator()(const node_t& n) {
+		const auto it = changes.find(n);
+		if (it != changes.end()) return true;
 		// we clear previous environment attempts
 		env.clear();
 		// then we try to match the pattern against the node and if the match
 		// was successful, we save the node that matched.
-		if (auto it = changes.find(n); it != changes.end())
-			return it->second;
-
 		auto [pattern, body] = r;
 		if (match(pattern, n)) {
 			auto nn = replace<node_t>(body, env);
+			if (nn == nullptr) return false;
 			changes[n] = nn;
-			return nn;
+			return true;
 		}
 		std::vector<node_t> child;
 		for (const auto& c : n->child)
@@ -1147,8 +1145,8 @@ struct pattern_matcher2 {
 				child.push_back(it->second);
 			else child.push_back(c);
 		auto res = make_node(n->value, child);
-		if (res == nullptr) return error_node<node_t>::value;
-		return changes[n] = res;
+		if (res == nullptr) return false;
+		return changes[n] = res, true;
 	}
 
 	const rule<node_t>& r;
@@ -1156,13 +1154,12 @@ struct pattern_matcher2 {
 	environment<node_t> changes;
 	const is_capture_t& is_capture;
 
-private:
 	node_t replace_root(const node_t& n) {
-
 		auto it = changes.find(n);
 		return it != changes.end() ? it->second : n;
 	}
 
+private:
 	bool match(const pattern_t& p, const node_t& n) {
 		// if we already have captured a node associated to the current capture
 		// we check if it is the same as the current node, if it is not, we
@@ -1254,12 +1251,13 @@ private:
 // apply a rule to a tree using the predicate to pattern_matcher.
 template <typename node_t, typename is_capture_t>
 node_t apply_rule(const rule<node_t>& r, const node_t& n, const is_capture_t& c) {
-	auto [p , s] = r;
 	pattern_matcher2<node_t, is_capture_t> matcher {r, c};
-	auto nn = apply(n, matcher);
+	post_order(n).search(matcher);
+	auto nn = matcher.replace_root(n);
 #ifdef LOG_REWRITING
 	if constexpr (LOG_REWRITING) {
 		if (nn != n) {
+			auto [p , s] = r;
 			LOG_DEBUG << "(R) " << p << " := " << s << LOG_END;
 			LOG_DEBUG << "(F) " << nn << LOG_END;
 		}
@@ -1301,19 +1299,6 @@ node_t apply(const node_t& s, const node_t& n, matcher_t& matcher) {
 		return replace<node_t>(n, nenv);
 	}
 	return n;
-}
-
-// apply a substitution to a rule according to a given matcher, this method is
-// use internaly by apply and apply with skip.
-template <typename node_t, typename matcher_t>
-node_t apply(const node_t& n, matcher_t& matcher) {
-	auto r = post_order_query_traverser<matcher_t, false_predicate_t<node_t>, node_t>(
-		matcher, false_predicate<node_t>)(n);
-	// If there is an error, return the original node
-	if (r == error_node<node_t>::value) return n;
-	else return r;
-	//if (matcher.matched) return replace<node_t>(n, matcher.changes);
-	//return n;
 }
 
 // drop unnecessary information from the parse tree nodes
