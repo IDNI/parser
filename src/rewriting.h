@@ -490,7 +490,7 @@ private:
 			return error_node<node_t>::value;
 		bool no_change = r == n;
 		stack.emplace_back(std::move(r));
-		if (const bool p = !break_on_change || !no_change; !p)
+		if (!break_on_change || no_change)
 			upos.push_back(0);
 		while (true) {
 			// If no unprocessed position exists, we are done
@@ -536,7 +536,7 @@ private:
 						return error_node<node_t>::value;
 					no_change = r == c;
 					stack.emplace_back(std::move(r));
-					if (const bool p = !break_on_change || !no_change; !p)
+					if (!break_on_change || no_change)
 						upos.push_back(stack.size() - 1);
 				}
 				else stack.push_back(c);
