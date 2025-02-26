@@ -46,6 +46,11 @@
 #	endif
 #endif
 
+/**
+ * @brief Controls if measuring depth and size
+ * during looped traversal is enabled
+ */
+//#define MEASURE_TRAVERSER_DEPTH
 
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //
@@ -130,15 +135,15 @@ sp_node<symbol_t> make_node(const symbol_t& s,
 	for (const auto& el: ns)
 		 assert(el != nullptr);
 #endif // DEBUG
-	static std::map<node<symbol_t>, sp_node<symbol_t>> cache;
+	static std::unordered_map<node<symbol_t>, sp_node<symbol_t>> cache;
 	static hook_t hook{};
 	node<symbol_t> key{s, ns};
 	if (auto it = cache.find(key); it != cache.end()) return it->second;
 	if (auto h = hook(key); h) {
 		// If simplification fails, return a nullptr
-		return cache.emplace(key, h.value()).first->second;
+		return cache.emplace(std::move(key), std::move(h.value())).first->second;
 	}
-	return cache.emplace(key, std::make_shared<node<symbol_t>>(s, ns))
+	return cache.emplace(std::move(key), std::make_shared<node<symbol_t>>(s, ns))
 		.first->second;
 }
 
@@ -316,35 +321,91 @@ private:
 	}
 };
 
+#ifdef MEASURE_TRAVERSER_DEPTH
+static size_t depth = 0;
+static size_t max_depth = 0;
+
+static void inc_depth () {
+	++depth;
+	static bool printed = false;
+	if (depth > max_depth) {
+		max_depth = depth;
+		if (max_depth % 5000 != 0) printed = false;
+		else if (!printed) {
+			std::cout << "max_depth: " << max_depth << "\n";
+			printed = true;
+		}
+	}
+}
+
+static void dec_depth () {
+	--depth;
+}
+#endif // MEASURE_TRAVERSER_DEPTH
+
+/**
+ * @brief Struct for tree traversals in post order
+ * @tparam node_t Tree node type
+ */
 template<typename node_t>
 struct post_order {
 	explicit post_order(const node_t& n) : root(n) {}
 
-	node_t apply (auto& f, auto& visit_subtree, const size_t slot = 0) {
+	/**
+	 * @brief Apply f in post order to root according to visit_subtree.
+	 * If f is applied to a node, its children are already transformed by f
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @return The tree obtained after applying f to root
+	 */
+	template <size_t slot = 0>
+	node_t apply (auto& f, auto& visit_subtree) {
 		if (visit_subtree(root))
-			return traverse(root, f, visit_subtree, slot);
+			return traverse<slot>(root, f, visit_subtree);
 		else return root;
 	}
 
-	node_t apply (auto& f, const size_t slot = 0) {
-		return traverse(root, f, all, slot);
+	/**
+	 * @brief Apply f in post order to root.
+	 * If f is applied to a node, its children are already transformed by f.
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node
+	 * @return The tree obtained after applying f to root
+	 */
+	template <size_t slot = 0>
+	node_t apply (auto& f) {
+		return traverse<slot>(root, f, all);
 	}
 
+	/**
+	 * @brief Call visit in post order on the nodes of root according to visit_subtree.
+	 * If visit returns false on a node, the traversal is terminated
+	 * @param visit Function to call on each node
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 */
 	void search (auto& visit, auto& visit_subtree) {
 		if (visit_subtree(root))
 			const_traverse(root, visit, visit_subtree);
 	}
 
+	/**
+	 * @brief Call visit in post order on the nodes of root.
+	 * If visit returns false on a node, the traversal is terminated
+	 * @param visit Function to call on each node
+	 */
 	void search (auto& visit) {
 		const_traverse(root, visit, all);
 	}
 
-	const node_t& root;
-	static std::unordered_map<std::pair<node_t, size_t>, node_t> m;
 private:
-	node_t traverse (const node_t& n, auto& f, auto& visit_subtree, const size_t slot) {
+	const node_t& root;
+	inline static std::unordered_map<std::pair<node_t, size_t>, node_t> m;
+
+	template <size_t slot>
+	node_t traverse (const node_t& n, auto& f, auto& visit_subtree) {
 		// Check cache first
-		if (slot != 0) {
+		if constexpr (slot != 0) {
 			const auto it = m.find(std::make_pair(n, slot));
 			if (it != m.end()) return it->second;
 		}
@@ -352,16 +413,22 @@ private:
 		std::vector<size_t> upos;
 		stack.push_back(n);
 		upos.push_back(0);
+#ifdef MEASURE_TRAVERSER_DEPTH
+		inc_depth();
+#endif //MEASURE_TRAVERSER_DEPTH
 		while (true) {
 			// If no unprocessed position exists, we are done
 			if (upos.empty()) return stack[0];
 			auto& c_node = stack[upos.back()];
 			// Check cache first
-			if (slot != 0) {
+			if constexpr (slot != 0) {
 				const auto it = m.find(std::make_pair(c_node, slot));
 				if (it != m.end()) {
 					c_node = it->second;
 					upos.pop_back();
+#ifdef MEASURE_TRAVERSER_DEPTH
+					dec_depth();
+#endif //MEASURE_TRAVERSER_DEPTH
 					continue;
 				}
 			}
@@ -372,6 +439,9 @@ private:
 				if (c_node == error_node<node_t>::value)
 					return error_node<node_t>::value;
 				upos.pop_back();
+#ifdef MEASURE_TRAVERSER_DEPTH
+				dec_depth();
+#endif //MEASURE_TRAVERSER_DEPTH
 				continue;
 			}
 			// Get child position
@@ -384,11 +454,14 @@ private:
 					auto res = f(c_node);
 					if (res == error_node<node_t>::value)
 						return error_node<node_t>::value;
-					if (slot != 0) m.emplace(std::make_pair(c_node, slot), res);
+					if constexpr (slot != 0) m.emplace(std::make_pair(c_node, slot), res);
 					c_node = std::move(res);
 					// Pop children from stacks
 					stack.erase(stack.end() - c_pos, stack.end());
 					upos.pop_back();
+#ifdef MEASURE_TRAVERSER_DEPTH
+					dec_depth();
+#endif //MEASURE_TRAVERSER_DEPTH
 					continue;
 				}
 				// Make new node if children are different
@@ -404,16 +477,23 @@ private:
 				auto res = f(new_node);
 				if (res == error_node<node_t>::value)
 					return error_node<node_t>::value;
-				if (slot != 0) m.emplace(std::make_pair(c_node, slot), res);
+				if constexpr (slot != 0) m.emplace(std::make_pair(c_node, slot), res);
 				c_node = std::move(res);
 				upos.pop_back();
+#ifdef MEASURE_TRAVERSER_DEPTH
+				dec_depth();
+#endif //MEASURE_TRAVERSER_DEPTH
 			} else {
 				// Add next child
 				const auto& c = c_node->child[c_pos];
 				stack.push_back(c);
 				// c_node can become invalid due to push_back
-				if (visit_subtree(c))
+				if (visit_subtree(c)) {
+#ifdef MEASURE_TRAVERSER_DEPTH
+					inc_depth();
+#endif //MEASURE_TRAVERSER_DEPTH
 					upos.push_back(stack.size() - 1);
+				}
 			}
 		}
 	}
@@ -423,6 +503,9 @@ private:
 		std::vector<size_t> upos;
 		stack.push_back(n);
 		upos.push_back(0);
+#ifdef MEASURE_TRAVERSER_DEPTH
+		inc_depth();
+#endif //MEASURE_TRAVERSER_DEPTH
 		while (true) {
 			// If no unprocessed position exists, we are done
 			if (upos.empty()) return;
@@ -433,6 +516,9 @@ private:
 				// Process node and move to next
 				if (!visit(c_node)) return;
 				upos.pop_back();
+#ifdef MEASURE_TRAVERSER_DEPTH
+				dec_depth();
+#endif //MEASURE_TRAVERSER_DEPTH
 				continue;
 			}
 			// Get child position
@@ -443,25 +529,41 @@ private:
 				// Pop children from stacks
 				stack.erase(stack.end() - c_pos, stack.end());
 				upos.pop_back();
+#ifdef MEASURE_TRAVERSER_DEPTH
+				dec_depth();
+#endif //MEASURE_TRAVERSER_DEPTH
 			} else {
 				// Add next child
 				const auto& c = c_node->child[c_pos];
 				stack.push_back(c);
 				// c_node can become invalid due to push_back
-				if (visit_subtree(c))
+				if (visit_subtree(c)) {
+#ifdef MEASURE_TRAVERSER_DEPTH
+					inc_depth();
+#endif //MEASURE_TRAVERSER_DEPTH
 					upos.push_back(stack.size() - 1);
+				}
 			}
 		}
 	}
 };
 
-template<typename node_t>
-std::unordered_map<std::pair<node_t, size_t>, node_t> post_order<node_t>::m;
-
+/**
+ * @brief Struct for tree traversals in pre order
+ * @tparam node_t Tree node type
+ */
 template<typename node_t>
 struct pre_order {
 	explicit pre_order(const node_t& n) : root(n) {}
 
+	/**
+	 * @brief Apply f in pre order to root according to visit_subtree.
+	 * If f is applied to a node, the traversal will continue with the children of the transformed node
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @return The tree obtained after applying f to root
+	 */
 	template<size_t slot = 0>
 	node_t apply (auto& f, auto& visit_subtree) {
 		if (visit_subtree(root))
@@ -469,11 +571,26 @@ struct pre_order {
 		else return root;
 	}
 
+	/**
+	 * @brief Apply f in pre order to root.
+	 * If f is applied to a node, the traversal will continue with the children of the transformed node
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node
+	 * @return The tree obtained after applying f to root
+	 */
 	template<size_t slot = 0>
 	node_t apply (auto& f) {
 		return traverse<false, slot>(root, f, all);
 	}
 
+	/**
+	 * @brief Apply f in pre order to root.
+	 * If f is applied to a node resulting in a change, its children are not traversed
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @return The tree obtained after applying f to root
+	 */
 	template<size_t slot = 0>
 	node_t apply_until_change (auto& f, auto& visit_subtree) {
 		if (visit_subtree(root))
@@ -481,32 +598,78 @@ struct pre_order {
 		else return root;
 	}
 
+	/**
+	 * @brief Apply f in pre order to root.
+	 * If f is applied to a node resulting in a change, its children are not traversed
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node
+	 * @return The tree obtained after applying f to root
+	 */
 	template<size_t slot = 0>
 	node_t apply_until_change (auto& f) {
 		return traverse<true, slot>(root, f, all);
 	}
 
+	/**
+	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
+	 * If visit returns false on a node, its children are not visited
+	 * @param visit The function called on nodes
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 */
 	void visit (auto&visit, auto& visit_subtree) {
 		if (visit_subtree(root))
-			const_traverse(root, visit, visit_subtree, false);
+			const_traverse<false>(root, visit, visit_subtree);
 	}
 
+	/**
+	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
+	 * If visit returns false on a node, its children are not visited
+	 * @param visit The function called on nodes
+	 */
 	void visit (auto&visit) {
-		const_traverse(root, visit, all, false);
+		const_traverse<false>(root, visit, all);
 	}
 
+	/**
+	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
+	 * If visit returns false on a node, the traversal terminates
+	 * @param visit The function called on nodes
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 */
 	void search (auto&visit, auto& visit_subtree) {
 		if (visit_subtree(root))
-			const_traverse(root, visit, visit_subtree, true);
+			const_traverse<true>(root, visit, visit_subtree);
 	}
 
+	/**
+	 * @brief Call visit in pre order on the nodes of root.
+	 * If visit returns false on a node, the traversal terminates
+	 * @param visit The function called on nodes
+	 */
 	void search (auto&visit) {
-		const_traverse(root, visit, all, true);
+		const_traverse<true>(root, visit, all);
 	}
 
-	const node_t& root;
-	static std::unordered_map<std::pair<node_t, size_t>, node_t> m;
+#ifdef MEASURE_TRAVERSER_DEPTH
+	std::pair<size_t, size_t> get_tree_depth_and_size () {
+		size_t c_depth = depth;
+		size_t t_max_depth = depth;
+		size_t size;
+		auto find_max_depth = [&t_max_depth, &size] (const auto&){
+			++size;
+			if (depth > t_max_depth)
+				t_max_depth = depth;
+			return true;
+		};
+		visit(find_max_depth);
+		return {t_max_depth - c_depth, size};
+	}
+#endif //MEASURE_TRAVERSER_DEPTH
+
 private:
+	const node_t& root;
+	inline static std::unordered_map<std::pair<node_t, size_t>, node_t> m;
+
 	template<bool break_on_change, size_t slot>
 	node_t traverse(const node_t& n, auto& f, auto& visit_subtree) {
 		std::vector<node_t> stack;
@@ -515,10 +678,21 @@ private:
 		node_t r = f(n);
 		if (r == error_node<node_t>::value)
 			return error_node<node_t>::value;
-		bool no_change = r == n;
-		stack.emplace_back(std::move(r));
-		if (!break_on_change || no_change)
+		if constexpr (break_on_change) {
+			if (r == n) {
+#ifdef MEASURE_TRAVERSER_DEPTH
+				inc_depth();
+#endif //MEASURE_TRAVERSER_DEPTH
+				upos.push_back(0);
+			}
+		}
+		else {
+#ifdef MEASURE_TRAVERSER_DEPTH
+			inc_depth();
+#endif //MEASURE_TRAVERSER_DEPTH
 			upos.push_back(0);
+		}
+		stack.emplace_back(std::move(r));
 		while (true) {
 			// If no unprocessed position exists, we are done
 			if (upos.empty()) return stack[0];
@@ -530,6 +704,9 @@ private:
 				if (it != m.end()) {
 					c_node = it->second;
 					upos.pop_back();
+#ifdef MEASURE_TRAVERSER_DEPTH
+					dec_depth();
+#endif //MEASURE_TRAVERSER_DEPTH
 					continue;
 				}
 			}
@@ -537,6 +714,9 @@ private:
 			if (c_node->child.empty()) {
 				// Process node and move to next
 				upos.pop_back();
+#ifdef MEASURE_TRAVERSER_DEPTH
+				dec_depth();
+#endif //MEASURE_TRAVERSER_DEPTH
 				continue;
 			}
 			// Get child position
@@ -550,6 +730,9 @@ private:
 					// Pop children from stacks
 					stack.erase(stack.end() - c_pos, stack.end());
 					upos.pop_back();
+#ifdef MEASURE_TRAVERSER_DEPTH
+					dec_depth();
+#endif //MEASURE_TRAVERSER_DEPTH
 					continue;
 				}
 				// Make new node if children are different
@@ -565,6 +748,9 @@ private:
 				if constexpr (slot != 0) m.emplace(std::make_pair(c_node, slot), res);
 				c_node = std::move(res);
 				upos.pop_back();
+#ifdef MEASURE_TRAVERSER_DEPTH
+				dec_depth();
+#endif //MEASURE_TRAVERSER_DEPTH
 			} else {
 				// Add next child
 				const node_t& c = c_node->child[c_pos];
@@ -573,25 +759,41 @@ private:
 					r = f(c);
 					if (r == error_node<node_t>::value)
 						return error_node<node_t>::value;
-					no_change = r == c;
+					if constexpr (break_on_change) {
+						if (r == c) {
+#ifdef MEASURE_TRAVERSER_DEPTH
+							inc_depth();
+#endif //MEASURE_TRAVERSER_DEPTH
+							upos.push_back(stack.size());
+						}
+					}
+					else {
+#ifdef MEASURE_TRAVERSER_DEPTH
+						inc_depth();
+#endif //MEASURE_TRAVERSER_DEPTH
+						upos.push_back(stack.size());
+					}
 					stack.emplace_back(std::move(r));
-					if (!break_on_change || no_change)
-						upos.push_back(stack.size() - 1);
 				}
 				else stack.push_back(c);
 			}
 		}
 	}
 
-	void const_traverse(const node_t& n, auto& visit, auto& visit_subtree,
-			const bool search) {
+	template<bool search>
+	void const_traverse(const node_t& n, auto& visit, auto& visit_subtree) {
 		std::vector<node_t> stack;
 		std::vector<size_t> upos;
 		// visit n and save on stack
 		bool ret = !visit(n);
-		if (search && ret) return;
+		if constexpr (search) { if (ret) return; }
 		stack.push_back(n);
-		if (!ret) upos.push_back(0);
+		if (!ret) {
+#ifdef MEASURE_TRAVERSER_DEPTH
+			inc_depth();
+#endif //MEASURE_TRAVERSER_DEPTH
+			upos.push_back(0);
+		}
 		while (true) {
 			// If no unprocessed position exists, we are done
 			if (upos.empty()) return;
@@ -601,6 +803,9 @@ private:
 			if (c_node->child.empty()) {
 				// Process node and move to next
 				upos.pop_back();
+#ifdef MEASURE_TRAVERSER_DEPTH
+				dec_depth();
+#endif //MEASURE_TRAVERSER_DEPTH
 				continue;
 			}
 			// Get child position
@@ -610,24 +815,29 @@ private:
 				// Pop children from stacks
 				stack.erase(stack.end() - c_pos, stack.end());
 				upos.pop_back();
+#ifdef MEASURE_TRAVERSER_DEPTH
+				dec_depth();
+#endif //MEASURE_TRAVERSER_DEPTH
 			} else {
 				// Add next child
 				const node_t& c = c_node->child[c_pos];
 				if (visit_subtree(c)) {
 					// visit c and save on stack
 					ret = !visit(c);
-					if (search && ret) return;
+					if constexpr (search) { if (ret) return; }
 					stack.push_back(c);
-					if (!ret) upos.push_back(stack.size() - 1);
+					if (!ret) {
+#ifdef MEASURE_TRAVERSER_DEPTH
+						inc_depth();
+#endif //MEASURE_TRAVERSER_DEPTH
+						upos.push_back(stack.size() - 1);
+					}
 				}
 				else stack.push_back(c);
 			}
 		}
 	}
 };
-
-template<typename node_t>
-std::unordered_map<std::pair<node_t, size_t>, node_t> pre_order<node_t>::m;
 
 // visitor that produces nodes transformed accordingly to the
 // given transformer. It only works with post order traversals.
