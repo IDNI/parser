@@ -320,14 +320,14 @@ template<typename node_t>
 struct post_order {
 	explicit post_order(const node_t& n) : root(n) {}
 
-	node_t apply (auto& f, auto& visit_subtree) {
+	node_t apply (auto& f, auto& visit_subtree, const size_t slot = 0) {
 		if (visit_subtree(root))
-			return traverse(root, f, visit_subtree);
+			return traverse(root, f, visit_subtree, slot);
 		else return root;
 	}
 
-	node_t apply (auto& f) {
-		return traverse(root, f, all);
+	node_t apply (auto& f, const size_t slot = 0) {
+		return traverse(root, f, all, slot);
 	}
 
 	void search (auto& visit, auto& visit_subtree) {
@@ -340,8 +340,14 @@ struct post_order {
 	}
 
 	const node_t& root;
+	static std::unordered_map<std::pair<node_t, size_t>, node_t> m;
 private:
-	node_t traverse (const node_t& n, auto& f, auto& visit_subtree) {
+	node_t traverse (const node_t& n, auto& f, auto& visit_subtree, const size_t slot) {
+		// Check cache first
+		if (slot != 0) {
+			const auto it = m.find(std::make_pair(n, slot));
+			if (it != m.end()) return it->second;
+		}
 		std::vector<node_t> stack;
 		std::vector<size_t> upos;
 		stack.push_back(n);
@@ -350,7 +356,16 @@ private:
 			// If no unprocessed position exists, we are done
 			if (upos.empty()) return stack[0];
 			auto& c_node = stack[upos.back()];
-			// First check if node has children
+			// Check cache first
+			if (slot != 0) {
+				const auto it = m.find(std::make_pair(c_node, slot));
+				if (it != m.end()) {
+					c_node = it->second;
+					upos.pop_back();
+					continue;
+				}
+			}
+			// Check if node has children
 			if (c_node->child.empty()) {
 				// Process node and move to next
 				c_node = f(c_node);
@@ -366,9 +381,11 @@ private:
 				// Check if children actually changed
 				if (std::equal(stack.begin() + (upos.back() + 1), stack.end(),
 					c_node->child.begin(), c_node->child.end())) {
-					c_node = f(c_node);
-					if (c_node == error_node<node_t>::value)
+					auto res = f(c_node);
+					if (res == error_node<node_t>::value)
 						return error_node<node_t>::value;
+					if (slot != 0) m.emplace(std::make_pair(c_node, slot), res);
+					c_node = std::move(res);
 					// Pop children from stacks
 					stack.erase(stack.end() - c_pos, stack.end());
 					upos.pop_back();
@@ -384,9 +401,11 @@ private:
 				node_t new_node = make_node(c_node->value, children);
 				if (new_node == error_node<node_t>::value)
 					return error_node<node_t>::value;
-				c_node = f(new_node);
-				if (c_node == error_node<node_t>::value)
+				auto res = f(new_node);
+				if (res == error_node<node_t>::value)
 					return error_node<node_t>::value;
+				if (slot != 0) m.emplace(std::make_pair(c_node, slot), res);
+				c_node = std::move(res);
 				upos.pop_back();
 			} else {
 				// Add next child
@@ -437,27 +456,34 @@ private:
 };
 
 template<typename node_t>
+std::unordered_map<std::pair<node_t, size_t>, node_t> post_order<node_t>::m;
+
+template<typename node_t>
 struct pre_order {
 	explicit pre_order(const node_t& n) : root(n) {}
 
+	template<size_t slot = 0>
 	node_t apply (auto& f, auto& visit_subtree) {
 		if (visit_subtree(root))
-			return traverse(root, f, visit_subtree, false);
+			return traverse<false, slot>(root, f, visit_subtree);
 		else return root;
 	}
 
+	template<size_t slot = 0>
 	node_t apply (auto& f) {
-		return traverse(root, f, all, false);
+		return traverse<false, slot>(root, f, all);
 	}
 
+	template<size_t slot = 0>
 	node_t apply_until_change (auto& f, auto& visit_subtree) {
 		if (visit_subtree(root))
-			return traverse(root, f, visit_subtree, true);
+			return traverse<true, slot>(root, f, visit_subtree);
 		else return root;
 	}
 
+	template<size_t slot = 0>
 	node_t apply_until_change (auto& f) {
-		return traverse(root, f, all, true);
+		return traverse<true, slot>(root, f, all);
 	}
 
 	void visit (auto&visit, auto& visit_subtree) {
@@ -479,9 +505,10 @@ struct pre_order {
 	}
 
 	const node_t& root;
+	static std::unordered_map<std::pair<node_t, size_t>, node_t> m;
 private:
-	node_t traverse(const node_t& n, auto& f, auto& visit_subtree,
-			const bool break_on_change) {
+	template<bool break_on_change, size_t slot>
+	node_t traverse(const node_t& n, auto& f, auto& visit_subtree) {
 		std::vector<node_t> stack;
 		std::vector<size_t> upos;
 		// Apply f and save on stack
@@ -497,7 +524,16 @@ private:
 			if (upos.empty()) return stack[0];
 			// Find first unprocessed position
 			auto& c_node = stack[upos.back()];
-			// First check if node has children
+			// Check cache first
+			if constexpr (slot != 0) {
+				const auto it = m.find(std::make_pair(c_node, slot));
+				if (it != m.end()) {
+					c_node = it->second;
+					upos.pop_back();
+					continue;
+				}
+			}
+			// Check if node has children
 			if (c_node->child.empty()) {
 				// Process node and move to next
 				upos.pop_back();
@@ -510,6 +546,7 @@ private:
 				// Check if children actually changed
 				if (std::equal(stack.begin() + (upos.back() + 1), stack.end(),
 					c_node->child.begin(), c_node->child.end())) {
+					if constexpr (slot != 0) m.emplace(std::make_pair(c_node, slot), c_node);
 					// Pop children from stacks
 					stack.erase(stack.end() - c_pos, stack.end());
 					upos.pop_back();
@@ -522,9 +559,11 @@ private:
 				// Pop children from stacks
 				stack.erase(stack.end() - c_pos, stack.end());
 				// mark processed
-				c_node = make_node(c_node->value, children);
-				if (c_node == error_node<node_t>::value)
+				auto res = make_node(c_node->value, children);
+				if (res == error_node<node_t>::value)
 					return error_node<node_t>::value;
+				if constexpr (slot != 0) m.emplace(std::make_pair(c_node, slot), res);
+				c_node = std::move(res);
 				upos.pop_back();
 			} else {
 				// Add next child
@@ -586,6 +625,9 @@ private:
 		}
 	}
 };
+
+template<typename node_t>
+std::unordered_map<std::pair<node_t, size_t>, node_t> pre_order<node_t>::m;
 
 // visitor that produces nodes transformed accordingly to the
 // given transformer. It only works with post order traversals.
