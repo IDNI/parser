@@ -73,6 +73,8 @@ struct node {
 	using child_type = std::vector<std::shared_ptr<node>>;
 	node (const symbol_t v, const child_type& c) :
 		value(v), child(c), hash(calc_hash(v,c)) {}
+	node (const symbol_t v, child_type&& c) :
+		value(v), child(std::move(c)), hash(calc_hash(v,child)) {}
 
 	auto operator<=>(const node& that) const {
 		if (value != that.value) return value <=> that.value;
@@ -127,24 +129,44 @@ struct make_node_hook {
 	}
 };
 
-// node factory method
+template <typename symbol_t>
+struct make_node_cache_equality {
+	bool
+	operator() (const node<symbol_t>& l, const node<symbol_t>& r) const {
+		return l == r;
+	}
+};
+
+// Implements perfect forwarding for children of the new node
 template <typename symbol_t, class hook_t = make_node_hook<symbol_t>>
 sp_node<symbol_t> make_node(const symbol_t& s,
-	const std::vector<sp_node<symbol_t>>& ns) {
+	std::vector<sp_node<symbol_t>>&& ns) {
 #ifdef DEBUG
 	for (const auto& el: ns)
-		 assert(el != nullptr);
+		assert(el != nullptr);
 #endif // DEBUG
-	static std::unordered_map<node<symbol_t>, sp_node<symbol_t>> cache;
+	static std::unordered_map<node<symbol_t>, sp_node<symbol_t>,
+			std::hash<node<symbol_t>>,
+			make_node_cache_equality<symbol_t>> cache;
 	static hook_t hook{};
-	node<symbol_t> key{s, ns};
+	node<symbol_t> key{s, std::move(ns)};
 	if (auto it = cache.find(key); it != cache.end()) return it->second;
 	if (auto h = hook(key); h) {
 		// If simplification fails, return a nullptr
 		return cache.emplace(std::move(key), std::move(h.value())).first->second;
 	}
-	return cache.emplace(std::move(key), std::make_shared<node<symbol_t>>(s, ns))
-		.first->second;
+	auto [it, _] = cache.emplace(std::move(key), sp_node<symbol_t>());
+	it->second = std::make_shared<node<symbol_t>>(it->first);
+	return it->second;
+}
+
+// node factory method copying children
+template <typename symbol_t, class hook_t = make_node_hook<symbol_t>>
+sp_node<symbol_t> make_node(const symbol_t& s,
+	const std::vector<sp_node<symbol_t>>& ns) {
+	// Copy children
+	auto children = ns;
+	return make_node(s, std::move(children));
 }
 
 // simple function objects to be used as default values for the traversers.
@@ -471,7 +493,7 @@ private:
 				// Pop children from stacks
 				stack.erase(stack.end() - c_pos, stack.end());
 				// Apply wrapped and mark processed
-				node_t new_node = make_node(c_node->value, children);
+				node_t new_node = make_node(c_node->value, std::move(children));
 				if (new_node == error_node<node_t>::value)
 					return error_node<node_t>::value;
 				auto res = f(new_node);
@@ -742,7 +764,7 @@ private:
 				// Pop children from stacks
 				stack.erase(stack.end() - c_pos, stack.end());
 				// mark processed
-				auto res = make_node(c_node->value, children);
+				auto res = make_node(c_node->value, std::move(children));
 				if (res == error_node<node_t>::value)
 					return error_node<node_t>::value;
 				if constexpr (slot != 0) m.emplace(std::make_pair(c_node, slot), res);
@@ -852,7 +874,7 @@ struct map_transformer {
 		for (const auto& c : n->child)
 			if (auto it = changes.find(c); it != changes.end())
 				child.push_back(it->second);
-		return changes[n] = make_node(wrapped(n->value), child);
+		return changes[n] = make_node(wrapped(n->value), std::move(child));
 	}
 
 	std::map<input_node_t, output_node_t> changes;
@@ -876,7 +898,7 @@ struct map_node_transformer {
 			if (auto it = changes.find(c); it != changes.end())
 				child.push_back(it->second);
 			else child.push_back(c);
-		auto nn2 = make_node(nn->value, child);
+		auto nn2 = make_node(nn->value, std::move(child));
 		return changes[n] = nn2;
 	}
 
@@ -926,7 +948,7 @@ private:
 			if (auto it = changes.find(c); it != changes.end())
 				child.push_back(it->second);
 			else child.push_back(c);
-		return changes[n] = make_node(n->value, child);
+		return changes[n] = make_node(n->value, std::move(child));
 	}
 };
 
@@ -1099,7 +1121,7 @@ node_t trim_top(const node_t& input, predicate_t& query) {
 			if (query(n->child[i])) {
 				auto c = n->child;
 				std::erase_if(c, query);
-				return make_node(n->value, c);
+				return make_node(n->value, std::move(c));
 			}
 		}
 		return n;
@@ -1396,7 +1418,7 @@ struct pattern_matcher2 {
 			if (auto it = changes.find(c); it != changes.end())
 				child.push_back(it->second);
 			else child.push_back(c);
-		auto res = make_node(n->value, child);
+		auto res = make_node(n->value, std::move(child));
 		if (res == nullptr) return false;
 		return changes[n] = res, true;
 	}
