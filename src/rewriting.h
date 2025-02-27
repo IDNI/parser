@@ -365,6 +365,21 @@ static void dec_depth () {
 }
 #endif // MEASURE_TRAVERSER_DEPTH
 
+template <typename node_t>
+struct traverser_cache_equality {
+	bool operator() (const node_t& l, const node_t& r) const {
+		return l == r;
+	}
+};
+
+template <typename node_t>
+struct traverser_pair_cache_equality {
+	using p = std::pair<node_t, size_t>;
+	bool operator() (const p& l, const p& r) const {
+		return l == r;
+	}
+};
+
 /**
  * @brief Struct for tree traversals in post order
  * @tparam node_t Tree node type
@@ -422,7 +437,9 @@ struct post_order {
 
 private:
 	const node_t& root;
-	inline static std::unordered_map<std::pair<node_t, size_t>, node_t> m;
+	inline static std::unordered_map<std::pair<node_t, size_t>, node_t,
+	std::hash<std::pair<node_t, size_t>>,
+	traverser_pair_cache_equality<node_t>> m;
 
 	template <size_t slot>
 	node_t traverse (const node_t& n, auto& f, auto& visit_subtree) {
@@ -431,6 +448,8 @@ private:
 			const auto it = m.find(std::make_pair(n, slot));
 			if (it != m.end()) return it->second;
 		}
+		std::unordered_map<node_t, node_t, std::hash<node_t>,
+			traverser_cache_equality<node_t>> cache;
 		std::vector<node_t> stack;
 		std::vector<size_t> upos;
 		stack.push_back(n);
@@ -446,6 +465,16 @@ private:
 			if constexpr (slot != 0) {
 				const auto it = m.find(std::make_pair(c_node, slot));
 				if (it != m.end()) {
+					c_node = it->second;
+					upos.pop_back();
+#ifdef MEASURE_TRAVERSER_DEPTH
+					dec_depth();
+#endif //MEASURE_TRAVERSER_DEPTH
+					continue;
+				}
+			} else {
+				const auto it = cache.find(c_node);
+				if (it != cache.end()) {
 					c_node = it->second;
 					upos.pop_back();
 #ifdef MEASURE_TRAVERSER_DEPTH
@@ -477,6 +506,7 @@ private:
 					if (res == error_node<node_t>::value)
 						return error_node<node_t>::value;
 					if constexpr (slot != 0) m.emplace(std::make_pair(c_node, slot), res);
+					else cache.emplace(c_node, res);
 					c_node = std::move(res);
 					// Pop children from stacks
 					stack.erase(stack.end() - c_pos, stack.end());
@@ -500,6 +530,7 @@ private:
 				if (res == error_node<node_t>::value)
 					return error_node<node_t>::value;
 				if constexpr (slot != 0) m.emplace(std::make_pair(c_node, slot), res);
+				else cache.emplace(c_node, res);
 				c_node = std::move(res);
 				upos.pop_back();
 #ifdef MEASURE_TRAVERSER_DEPTH
@@ -690,10 +721,14 @@ struct pre_order {
 
 private:
 	const node_t& root;
-	inline static std::unordered_map<std::pair<node_t, size_t>, node_t> m;
+	inline static std::unordered_map<std::pair<node_t, size_t>, node_t,
+	std::hash<std::pair<node_t, size_t>>,
+	traverser_pair_cache_equality<node_t>> m;
 
 	template<bool break_on_change, size_t slot>
 	node_t traverse(const node_t& n, auto& f, auto& visit_subtree) {
+		std::unordered_map<node_t, node_t, std::hash<node_t>,
+			traverser_cache_equality<node_t>> cache;
 		std::vector<node_t> stack;
 		std::vector<size_t> upos;
 		// Apply f and save on stack
@@ -731,6 +766,16 @@ private:
 #endif //MEASURE_TRAVERSER_DEPTH
 					continue;
 				}
+			} else {
+				const auto it = cache.find(c_node);
+				if (it != cache.end()) {
+					c_node = it->second;
+					upos.pop_back();
+#ifdef MEASURE_TRAVERSER_DEPTH
+					dec_depth();
+#endif //MEASURE_TRAVERSER_DEPTH
+					continue;
+				}
 			}
 			// Check if node has children
 			if (c_node->child.empty()) {
@@ -749,6 +794,7 @@ private:
 				if (std::equal(stack.begin() + (upos.back() + 1), stack.end(),
 					c_node->child.begin(), c_node->child.end())) {
 					if constexpr (slot != 0) m.emplace(std::make_pair(c_node, slot), c_node);
+					else cache.emplace(c_node, c_node);
 					// Pop children from stacks
 					stack.erase(stack.end() - c_pos, stack.end());
 					upos.pop_back();
@@ -768,6 +814,7 @@ private:
 				if (res == error_node<node_t>::value)
 					return error_node<node_t>::value;
 				if constexpr (slot != 0) m.emplace(std::make_pair(c_node, slot), res);
+				else cache.emplace(c_node, res);
 				c_node = std::move(res);
 				upos.pop_back();
 #ifdef MEASURE_TRAVERSER_DEPTH
