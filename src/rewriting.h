@@ -170,13 +170,13 @@ sp_node<symbol_t> make_node(const symbol_t& s,
 }
 
 // simple function objects to be used as default values for the traversers.
-static const auto all = [](const auto&) { return true; };
+static const auto all = [](const auto&) static { return true; };
 using all_t = decltype(all);
 
-static const auto none = [](const auto&) { return false; };
+static const auto none = [](const auto&) static { return false; };
 using none_t = decltype(none);
 
-static const auto identity = [](const auto& n) { return n; };
+static const auto identity = [](const auto& n) static { return n; };
 using identity_t = decltype(identity);
 
 // trait for specifying a value of an error node for any plugged node type
@@ -392,12 +392,12 @@ struct post_order {
 	 * @brief Apply f in post order to root according to visit_subtree.
 	 * If f is applied to a node, its children are already transformed by f
 	 * @tparam slot Memory slot to use for memorization, disabled by default
-	 * @param f Function to apply on each node
+	 * @param f Function to apply on each node. Must not have side effects due to memorization
 	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
 	 * @return The tree obtained after applying f to root
 	 */
 	template <size_t slot = 0>
-	node_t apply (auto& f, auto& visit_subtree) {
+	node_t apply_unique (auto& f, auto& visit_subtree) {
 		if (visit_subtree(root))
 			return traverse<slot>(root, f, visit_subtree);
 		else return root;
@@ -405,13 +405,13 @@ struct post_order {
 
 	/**
 	 * @brief Apply f in post order to root.
-	 * If f is applied to a node, its children are already transformed by f.
+	 * If f is applied to a node, its children are already transformed by f
 	 * @tparam slot Memory slot to use for memorization, disabled by default
-	 * @param f Function to apply on each node
+	 * @param f Function to apply on each node. Must not have side effects due to memorization
 	 * @return The tree obtained after applying f to root
 	 */
 	template <size_t slot = 0>
-	node_t apply (auto& f) {
+	node_t apply_unique (auto& f) {
 		return traverse<slot>(root, f, all);
 	}
 
@@ -423,7 +423,7 @@ struct post_order {
 	 */
 	void search (auto& visit, auto& visit_subtree) {
 		if (visit_subtree(root))
-			const_traverse(root, visit, visit_subtree);
+			const_traverse<false>(root, visit, visit_subtree);
 	}
 
 	/**
@@ -432,7 +432,29 @@ struct post_order {
 	 * @param visit Function to call on each node
 	 */
 	void search (auto& visit) {
-		const_traverse(root, visit, all);
+		const_traverse<false>(root, visit, all);
+	}
+
+	/**
+	 * @brief Call visit in post order on each node of root according to visit_subtree.
+	 * Equal nodes are not visited twice.
+	 * If visit returns false on a node, the traversal is terminated
+	 * @param visit Function to call on each node
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 */
+	void search_unique (auto& visit, auto& visit_subtree) {
+		if (visit_subtree(root))
+			const_traverse<true>(root, visit, visit_subtree);
+	}
+
+	/**
+	 * @brief Call visit in post order on each node of root.
+	 * Equal nodes are not visited twice.
+	 * If visit returns false on a node, the traversal is terminated
+	 * @param visit Function to call on each node
+	 */
+	void search_unique (auto& visit) {
+		const_traverse<true>(root, visit, all);
 	}
 
 private:
@@ -551,11 +573,15 @@ private:
 		}
 	}
 
+	template<bool unique>
 	void const_traverse (const node_t& n, auto& visit, auto& visit_subtree) {
+		std::unordered_set<node_t, std::hash<node_t>,
+			traverser_cache_equality<node_t>> cache;
 		std::vector<node_t> stack;
 		std::vector<size_t> upos;
 		stack.push_back(n);
 		upos.push_back(0);
+		if constexpr (unique) cache.emplace(n);
 #ifdef MEASURE_TRAVERSER_DEPTH
 		inc_depth();
 #endif //MEASURE_TRAVERSER_DEPTH
@@ -589,6 +615,10 @@ private:
 				// Add next child
 				const auto& c = c_node->child[c_pos];
 				stack.push_back(c);
+				if constexpr (unique) {
+					if (cache.contains(c))
+						continue;
+				}
 				// c_node can become invalid due to push_back
 				if (visit_subtree(c)) {
 #ifdef MEASURE_TRAVERSER_DEPTH
@@ -596,6 +626,7 @@ private:
 #endif //MEASURE_TRAVERSER_DEPTH
 					upos.push_back(stack.size() - 1);
 				}
+				if constexpr (unique) cache.emplace(c);
 			}
 		}
 	}
@@ -613,14 +644,15 @@ struct pre_order {
 	 * @brief Apply f in pre order to root according to visit_subtree.
 	 * If f is applied to a node, the traversal will continue with the children of the transformed node
 	 * @tparam slot Memory slot to use for memorization, disabled by default
-	 * @param f Function to apply on each node
+	 * @param f Function to apply on each node. Must not have side effects due to memorization
 	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param up Function to apply to processed node in post order
 	 * @return The tree obtained after applying f to root
 	 */
 	template<size_t slot = 0>
-	node_t apply (auto& f, auto& visit_subtree) {
+	node_t apply_unique (auto& f, auto& visit_subtree, auto& up) {
 		if (visit_subtree(root))
-			return traverse<false, slot>(root, f, visit_subtree);
+			return traverse<false, slot, true>(root, f, visit_subtree, up);
 		else return root;
 	}
 
@@ -628,26 +660,43 @@ struct pre_order {
 	 * @brief Apply f in pre order to root.
 	 * If f is applied to a node, the traversal will continue with the children of the transformed node
 	 * @tparam slot Memory slot to use for memorization, disabled by default
-	 * @param f Function to apply on each node
+	 * @param f Function to apply on each node. Must not have side effects due to memorization
 	 * @return The tree obtained after applying f to root
 	 */
 	template<size_t slot = 0>
-	node_t apply (auto& f) {
-		return traverse<false, slot>(root, f, all);
+	node_t apply_unique (auto& f) {
+		return traverse<false, slot, true>(root, f, all, identity);
 	}
 
 	/**
-	 * @brief Apply f in pre order to root.
-	 * If f is applied to a node resulting in a change, its children are not traversed
+	 * @brief Apply f in pre order to root according to visit_subtree.
+	 * If f is applied to a node, the traversal will continue with the children of the transformed node
 	 * @tparam slot Memory slot to use for memorization, disabled by default
-	 * @param f Function to apply on each node
+	 * @param f Function to apply on each node. The function can have side effects
 	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param up Function to apply to processed node in post order
 	 * @return The tree obtained after applying f to root
 	 */
 	template<size_t slot = 0>
-	node_t apply_until_change (auto& f, auto& visit_subtree) {
+	node_t apply (auto& f, auto& visit_subtree, auto& up) {
 		if (visit_subtree(root))
-			return traverse<true, slot>(root, f, visit_subtree);
+			return traverse<false, slot, false>(root, f, visit_subtree, up);
+		else return root;
+	}
+
+	/**
+	 * @brief Apply f in pre order to root according to visit_subtree.
+	 * If f is applied to a node resulting in a change, its children are not traversed
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node. Must not have side effects due to memorization
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param up Function to apply to processed node in post order
+	 * @return The tree obtained after applying f to root
+	 */
+	template<size_t slot = 0>
+	node_t apply_unique_until_change (auto& f, auto& visit_subtree, auto& up) {
+		if (visit_subtree(root))
+			return traverse<true, slot, true>(root, f, visit_subtree, up);
 		else return root;
 	}
 
@@ -655,12 +704,28 @@ struct pre_order {
 	 * @brief Apply f in pre order to root.
 	 * If f is applied to a node resulting in a change, its children are not traversed
 	 * @tparam slot Memory slot to use for memorization, disabled by default
-	 * @param f Function to apply on each node
+	 * @param f Function to apply on each node. Must not have side effects due to memorization
 	 * @return The tree obtained after applying f to root
 	 */
 	template<size_t slot = 0>
-	node_t apply_until_change (auto& f) {
-		return traverse<true, slot>(root, f, all);
+	node_t apply_unique_until_change (auto& f) {
+		return traverse<true, slot, true>(root, f, all, identity);
+	}
+
+	/**
+	 * @brief Apply f in pre order to root according to visit_subtree.
+	 * If f is applied to a node resulting in a change, its children are not traversed
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node. The function can have side effects
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param up Function to apply to processed node in post order
+	 * @return The tree obtained after applying f to root
+	 */
+	template<size_t slot = 0>
+	node_t apply_until_change (auto& f, auto& visit_subtree, auto& up) {
+		if (visit_subtree(root))
+			return traverse<true, slot, false>(root, f, visit_subtree, up);
+		else return root;
 	}
 
 	/**
@@ -668,39 +733,87 @@ struct pre_order {
 	 * If visit returns false on a node, its children are not visited
 	 * @param visit The function called on nodes
 	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param up Function called on visited nodes in post order
 	 */
-	void visit (auto&visit, auto& visit_subtree) {
+	void visit (auto&visit, auto& visit_subtree, auto& up) {
 		if (visit_subtree(root))
-			const_traverse<false>(root, visit, visit_subtree);
-	}
-
-	/**
-	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
-	 * If visit returns false on a node, its children are not visited
-	 * @param visit The function called on nodes
-	 */
-	void visit (auto&visit) {
-		const_traverse<false>(root, visit, all);
-	}
-
-	/**
-	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
-	 * If visit returns false on a node, the traversal terminates
-	 * @param visit The function called on nodes
-	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
-	 */
-	void search (auto&visit, auto& visit_subtree) {
-		if (visit_subtree(root))
-			const_traverse<true>(root, visit, visit_subtree);
+			const_traverse<false, false>(root, visit, visit_subtree, up);
 	}
 
 	/**
 	 * @brief Call visit in pre order on the nodes of root.
+	 * If visit returns false on a node, its children are not visited
+	 * @param visit The function called on nodes
+	 */
+	void visit (auto&visit) {
+		const_traverse<false, false>(root, visit, all, identity);
+	}
+
+	/**
+	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
+	 * If visit returns false on a node, the traversal terminates
+	 * @param visit The function called on nodes
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param up Function called on visited nodes in post order
+	 */
+	void search (auto&visit, auto& visit_subtree, auto& up) {
+		if (visit_subtree(root))
+			const_traverse<true, false>(root, visit, visit_subtree, up);
+	}
+
+	/**
+	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
 	 * If visit returns false on a node, the traversal terminates
 	 * @param visit The function called on nodes
 	 */
 	void search (auto&visit) {
-		const_traverse<true>(root, visit, all);
+		const_traverse<true, false>(root, visit, all, identity);
+	}
+
+	/**
+	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
+	 * Equal nodes are not visited twice.
+	 * If visit returns false on a node, its children are not visited
+	 * @param visit The function called on nodes
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param up Function called on visited nodes in post order
+	 */
+	void visit_unique (auto&visit, auto& visit_subtree, auto& up) {
+		if (visit_subtree(root))
+			const_traverse<false, true>(root, visit, visit_subtree, up);
+	}
+
+	/**
+	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
+	 * Equal nodes are not visited twice.
+	 * If visit returns false on a node, its children are not visited
+	 * @param visit The function called on nodes
+	 */
+	void visit_unique (auto&visit) {
+		const_traverse<false, true>(root, visit, all, identity);
+	}
+
+	/**
+	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
+	 * Equal nodes are not visited twice.
+	 * If visit returns false on a node, the traversal terminates
+	 * @param visit The function called on nodes
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param up Function called on visited nodes in post order
+	 */
+	void search_unique (auto&visit, auto& visit_subtree, auto& up) {
+		if (visit_subtree(root))
+			const_traverse<true, true>(root, visit, visit_subtree, up);
+	}
+
+	/**
+	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
+	 * Equal nodes are not visited twice.
+	 * If visit returns false on a node, the traversal terminates
+	 * @param visit The function called on nodes
+	 */
+	void search_unique (auto&visit) {
+		const_traverse<true, true>(root, visit, all, identity);
 	}
 
 #ifdef MEASURE_TRAVERSER_DEPTH
@@ -725,8 +838,8 @@ private:
 	std::hash<std::pair<node_t, size_t>>,
 	traverser_pair_cache_equality<node_t>> m;
 
-	template<bool break_on_change, size_t slot>
-	node_t traverse(const node_t& n, auto& f, auto& visit_subtree) {
+	template<bool break_on_change, size_t slot, bool unique>
+	node_t traverse(const node_t& n, auto& f, auto& visit_subtree, auto& up) {
 		std::unordered_map<node_t, node_t, std::hash<node_t>,
 			traverser_cache_equality<node_t>> cache;
 		std::vector<node_t> stack;
@@ -756,30 +869,36 @@ private:
 			// Find first unprocessed position
 			auto& c_node = stack[upos.back()];
 			// Check cache first
-			if constexpr (slot != 0) {
-				const auto it = m.find(std::make_pair(c_node, slot));
-				if (it != m.end()) {
-					c_node = it->second;
-					upos.pop_back();
+			// If we want to visit all nodes, deactivate caching/memory
+			if constexpr (unique) {
+				if constexpr (slot != 0) {
+					const auto it = m.find(std::make_pair(c_node, slot));
+					if (it != m.end()) {
+						c_node = it->second;
+						upos.pop_back();
 #ifdef MEASURE_TRAVERSER_DEPTH
-					dec_depth();
+						dec_depth();
 #endif //MEASURE_TRAVERSER_DEPTH
-					continue;
-				}
-			} else {
-				const auto it = cache.find(c_node);
-				if (it != cache.end()) {
-					c_node = it->second;
-					upos.pop_back();
+						continue;
+					}
+				} else {
+					const auto it = cache.find(c_node);
+					if (it != cache.end()) {
+						c_node = it->second;
+						upos.pop_back();
 #ifdef MEASURE_TRAVERSER_DEPTH
-					dec_depth();
+						dec_depth();
 #endif //MEASURE_TRAVERSER_DEPTH
-					continue;
+						continue;
+					}
 				}
 			}
 			// Check if node has children
 			if (c_node->child.empty()) {
-				// Process node and move to next
+				// Call up and move to next
+				c_node = up(c_node);
+				if (c_node == error_node<node_t>::value)
+					return error_node<node_t>::value;
 				upos.pop_back();
 #ifdef MEASURE_TRAVERSER_DEPTH
 				dec_depth();
@@ -793,8 +912,14 @@ private:
 				// Check if children actually changed
 				if (std::equal(stack.begin() + (upos.back() + 1), stack.end(),
 					c_node->child.begin(), c_node->child.end())) {
-					if constexpr (slot != 0) m.emplace(std::make_pair(c_node, slot), c_node);
-					else cache.emplace(c_node, c_node);
+					// Call up
+					c_node = up(c_node);
+					if (c_node == error_node<node_t>::value)
+						return error_node<node_t>::value;
+					if constexpr (unique) {
+						if constexpr (slot != 0) m.emplace(std::make_pair(c_node, slot), c_node);
+						else cache.emplace(c_node, c_node);
+					}
 					// Pop children from stacks
 					stack.erase(stack.end() - c_pos, stack.end());
 					upos.pop_back();
@@ -809,12 +934,18 @@ private:
 					children.emplace_back(std::move(stack[i]));
 				// Pop children from stacks
 				stack.erase(stack.end() - c_pos, stack.end());
-				// mark processed
+				// make new node
 				auto res = make_node(c_node->value, std::move(children));
 				if (res == error_node<node_t>::value)
 					return error_node<node_t>::value;
-				if constexpr (slot != 0) m.emplace(std::make_pair(c_node, slot), res);
-				else cache.emplace(c_node, res);
+				// Call up
+				res = up(res);
+				if (res == error_node<node_t>::value)
+					return error_node<node_t>::value;
+				if constexpr (unique) {
+					if constexpr (slot != 0) m.emplace(std::make_pair(c_node, slot), res);
+					else cache.emplace(c_node, res);
+				}
 				c_node = std::move(res);
 				upos.pop_back();
 #ifdef MEASURE_TRAVERSER_DEPTH
@@ -849,8 +980,10 @@ private:
 		}
 	}
 
-	template<bool search>
-	void const_traverse(const node_t& n, auto& visit, auto& visit_subtree) {
+	template<bool search, bool unique>
+	void const_traverse(const node_t& n, auto& visit, auto& visit_subtree, auto& up) {
+		std::unordered_set<node_t, std::hash<node_t>,
+			traverser_cache_equality<node_t>> cache;
 		std::vector<node_t> stack;
 		std::vector<size_t> upos;
 		// visit n and save on stack
@@ -863,6 +996,7 @@ private:
 #endif //MEASURE_TRAVERSER_DEPTH
 			upos.push_back(0);
 		}
+		if constexpr (unique) cache.emplace(n);
 		while (true) {
 			// If no unprocessed position exists, we are done
 			if (upos.empty()) return;
@@ -870,7 +1004,8 @@ private:
 			auto& c_node = stack[upos.back()];
 			// First check if node has children
 			if (c_node->child.empty()) {
-				// Process node and move to next
+				// Call up and move to next
+				up(c_node);
 				upos.pop_back();
 #ifdef MEASURE_TRAVERSER_DEPTH
 				dec_depth();
@@ -881,6 +1016,8 @@ private:
 			size_t c_pos = (stack.size() - 1) - upos.back();
 			// Are all children visited?
 			if (c_pos == c_node->child.size()) {
+				// Call up
+				up(c_node);
 				// Pop children from stacks
 				stack.erase(stack.end() - c_pos, stack.end());
 				upos.pop_back();
@@ -890,11 +1027,13 @@ private:
 			} else {
 				// Add next child
 				const node_t& c = c_node->child[c_pos];
+				stack.push_back(c);
+				if constexpr (unique)
+					if (cache.contains(c)) continue;
 				if (visit_subtree(c)) {
 					// visit c and save on stack
 					ret = !visit(c);
 					if constexpr (search) { if (ret) return; }
-					stack.push_back(c);
 					if (!ret) {
 #ifdef MEASURE_TRAVERSER_DEPTH
 						inc_depth();
@@ -902,7 +1041,7 @@ private:
 						upos.push_back(stack.size() - 1);
 					}
 				}
-				else stack.push_back(c);
+				if constexpr (unique) cache.emplace(n);
 			}
 		}
 	}
@@ -1173,7 +1312,7 @@ node_t trim_top(const node_t& input, predicate_t& query) {
 		}
 		return n;
 	};
-	return pre_order(input).apply_until_change(t);
+	return pre_order(input).apply_unique_until_change(t);
 }
 
 // select all top nodes that satisfy a predicate and return them.
@@ -1188,7 +1327,7 @@ std::vector<node_t> select_top(const node_t& input, predicate_t& query) {
 				== selected.end()) selected.push_back(n);
 		return false;
 	};
-	pre_order(input).visit(select);
+	pre_order(input).visit_unique(select);
 	return selected;
 }
 
@@ -1200,7 +1339,7 @@ std::vector<node_t> select_subnodes(const node_t& input, predicate_t& query,
 	std::vector<node_t> selected;
 	select_subnodes_predicate<predicate_t, extractor_t, node_t> select(
 		query, extractor, selected);
-	pre_order(input).visit(select);
+	pre_order(input).visit_unique(select);
 	return selected;
 }
 
@@ -1213,7 +1352,7 @@ std::vector<node_t> select_all(const node_t& input, predicate_t& query) {
 		// we always return true to visit all the nodes.
 		return true;
 	};
-	pre_order(input).visit(select);
+	pre_order(input).visit_unique(select);
 	return selected;
 }
 
@@ -1227,7 +1366,7 @@ std::vector<node_t> select_all_until (const node_t& input, const auto& query, co
 		if (until(n)) return false;
 		else return true;
 	};
-	pre_order(input).visit(select);
+	pre_order(input).visit_unique(select);
 	return selected;
 }
 
@@ -1244,7 +1383,7 @@ std::vector<node_t> select_top_until (const node_t& input, const auto& query, co
 			selected.push_back(n);
 		return false;
 	};
-	pre_order(input).visit(select);
+	pre_order(input).visit_unique(select);
 	return selected;
 }
 
@@ -1256,7 +1395,7 @@ std::optional<node_t> find_top(const node_t& input, predicate_t& query) {
 		if (!found && query(n)) found = n;
 		return !found;
 	};
-	pre_order(input).search(find_top);
+	pre_order(input).search_unique(find_top);
 	return found;
 }
 
@@ -1273,7 +1412,7 @@ std::optional<node_t> find_top_until (const node_t& input, const auto& query, co
 	const auto neg_until = [&until](const auto& p) {
 		return !until(p);
 	};
-	pre_order(input).search(select, neg_until);
+	pre_order(input).search_unique(select, neg_until);
 	return node;
 }
 
@@ -1284,7 +1423,7 @@ node_t replace(const node_t& n, const std::map<node_t, node_t>& changes) {
 			return it->second;
 		else return el;
 	};
-	return pre_order(n).apply_until_change(r);
+	return pre_order(n).apply_unique_until_change(r);
 }
 
 template <typename node_t>
@@ -1293,7 +1432,7 @@ node_t replace(const node_t& n, const node_t& replace, const node_t& with) {
 		if (el == replace) return with;
 		else return el;
 	};
-	return pre_order(n).apply_until_change(r);
+	return pre_order(n).apply_unique_until_change(r);
 }
 
 // Replace nodes in n according to changes while skipping subtrees that don't satisfy query
@@ -1304,7 +1443,7 @@ node_t replace_if(const node_t& n, const std::map<node_t, node_t>& changes, pred
 			return it->second;
 		else return el;
 	};
-	return pre_order(n).apply_until_change(r, query);
+	return pre_order(n).apply_unique_until_change(r, query);
 }
 
 // Replace nodes in n according to changes while skipping subtrees that satisfy query
@@ -1318,7 +1457,7 @@ node_t replace_until(const node_t& n, const std::map<node_t, node_t>& changes, p
 	auto neg_query = [&query](const auto& el) {
 		return !query(el);
 	};
-	return pre_order(n).apply_until_change(r, neg_query);
+	return pre_order(n).apply_unique_until_change(r, neg_query);
 }
 
 // TODO (LOW) consider adding a similar functino for replace_node...
@@ -1361,7 +1500,7 @@ std::optional<node_t> find_bottom(const node_t& input, predicate_t& query) {
 		if (!found && query(n)) found = n;
 		return !found;
 	};
-	post_order(input).search(find_top);
+	post_order(input).search_unique(find_top);
 	return found;
 }
 
@@ -1573,7 +1712,7 @@ private:
 template <typename node_t, typename is_capture_t>
 node_t apply_rule(const rule<node_t>& r, const node_t& n, const is_capture_t& c) {
 	pattern_matcher2<node_t, is_capture_t> matcher {r, c};
-	post_order(n).search(matcher);
+	post_order(n).search_unique(matcher);
 	auto nn = matcher.replace_root(n);
 #ifdef LOG_REWRITING
 	if constexpr (LOG_REWRITING) {
