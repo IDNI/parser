@@ -13,6 +13,7 @@
 #ifndef __IDNI__TREE_H__
 #define __IDNI__TREE_H__
 #include <vector>
+#include <utility>
 #include <set>
 #include <map>
 #include <unordered_map>
@@ -145,7 +146,10 @@ struct lcrs_tree : public bintree<T> {
        // DBG(std::cout<<"\n----");
         return true;
 	}
-	auto get_lcrs_child() { return {this->l , this->r}; }	
+	auto get_lcrs_child() { 
+        return std::make_pair<decltype(this->l), decltype(this->r)>
+        (this->l , this->r); 
+    }	
 };
 
 template <typename T>
@@ -198,7 +202,7 @@ const htree::sp tree<T>::geth(tref h) {
 template <typename T>
 htree::sp bintree<T>::get(const T& v, const htree::sp &l,
 						const htree::sp &r ) {
-	return htree::get(get(v, l->get(), r->get()));
+	return geth(get(v, l->get(), r->get()));
 }
 
 template <typename T>
