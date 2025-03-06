@@ -913,13 +913,14 @@ private:
 				if (std::equal(stack.begin() + (upos.back() + 1), stack.end(),
 					c_node->child.begin(), c_node->child.end())) {
 					// Call up
-					c_node = up(c_node);
-					if (c_node == error_node<node_t>::value)
+					auto res = up(c_node);
+					if (res == error_node<node_t>::value)
 						return error_node<node_t>::value;
 					if constexpr (unique) {
-						if constexpr (slot != 0) m.emplace(std::make_pair(c_node, slot), c_node);
-						else cache.emplace(c_node, c_node);
+						if constexpr (slot != 0) m.emplace(std::make_pair(c_node, slot), res);
+						else cache.emplace(c_node, res);
 					}
+					c_node = std::move(res);
 					// Pop children from stacks
 					stack.erase(stack.end() - c_pos, stack.end());
 					upos.pop_back();
