@@ -729,6 +729,18 @@ struct pre_order {
 	}
 
 	/**
+	 * @brief Apply f in pre order to root while revisiting already visited nodes.
+	 * If f is applied to a node resulting in a change, its children are not traversed
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node. The function can have side effects
+	 * @return The tree obtained after applying f to root
+	 */
+	template<size_t slot = 0>
+	node_t apply_until_change (auto& f) {
+		return traverse<true, slot, false>(root, f, all, identity);
+	}
+
+	/**
 	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
 	 * If visit returns false on a node, its children are not visited
 	 * @param visit The function called on nodes
@@ -1848,14 +1860,6 @@ struct std::hash<idni::rewriter::node<symbol_t>> {
 //
 // operators << to pretty print the tau language related types
 //
-
-// << for sp_node
-template <typename symbol_t>
-std::ostream& operator<<(std::ostream& stream,
-	const idni::rewriter::sp_node<symbol_t>& n)
-{
-	return stream << n << "\n";
-}
 
 // << for node (make it shared make use of the previous operator)
 template <typename symbol_t>
