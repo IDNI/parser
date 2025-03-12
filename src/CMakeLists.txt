@@ -16,7 +16,6 @@ set(PARSER_SOURCES
 	charclasses.cpp
 	parser.cpp
 	recoders.cpp
-	bintree.cpp
 	term.cpp
 )
 
