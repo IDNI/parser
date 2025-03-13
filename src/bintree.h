@@ -32,6 +32,8 @@ template <typename T>
 struct bintree;
 
 using tref = const intptr_t*;
+using opt_tref = std::optional<tref>;
+using trefs    = std::vector<tref>;
 
 struct htree {
 	using sp =  std::shared_ptr<htree>;
@@ -56,8 +58,8 @@ struct bintree {
 protected:
 	//static std::vector<const bintree*> V;
 	static std::map<const bintree, htree::wp> M;
-	bintree(const T& _val, tref _l = NULL, tref _r = NULL)
-		: val(_val), l(_l), r(_r) {}
+	bintree(const T& _value, tref _l = NULL, tref _r = NULL)
+		: value(_value), l(_l), r(_r) {}
 public:
 	//static const int_t null_ref = -1;
 	static const bintree& get(const htree::sp& h);
@@ -80,14 +82,14 @@ public:
 	static const bintree& get(const tref id);
 
 	bool operator<(const bintree& o) const {
-		if (val != o.val) return val < o.val;
+		if (value != o.value) return value < o.value;
 		if (l != o.l) return l < o.l;
 		return r < o.r;
 	}
 	bool operator==(const bintree& o) const {
-		return val == o.val && l == o.l && r == o.r;
+		return value == o.value && l == o.l && r == o.r;
 	}
-	const T val;
+	const T value;
 	const tref l, r;
 	std::ostream& print(std::ostream& o, size_t s = 0) const;
 	virtual const std::string str() const;
@@ -101,6 +103,7 @@ protected:
 	//static const htree::sp get( const T& v, std::vector<T>&& child = {});
 	template<typename U = T>
 	static tref get(const T& v, const U* child, size_t len);
+	static tref get(const T& v, const std::vector<tref>& child);
 	static const htree::sp geth(tref h);
 	static lcrs_tree<T>& get(const htree::sp& h) {
 		return (lcrs_tree<T>&) bintree<T>::get(h);
@@ -175,6 +178,11 @@ protected:
 	children_range get_children() const {
 		return children_range(this->l);
 	}
+	trefs get_children_trefs() const {
+		trefs ch;
+		for (const auto& c : get_children()) ch.push_back(c);
+		return std::move(ch);
+	}
 	const lcrs_tree<T>& get_child(size_t n) const {
 		size_t i = 0;
 		for (const auto& c : get_children()) {
@@ -188,9 +196,12 @@ protected:
 
 template <typename T>
 struct tree : public lcrs_tree<T> {
+	using base_t = lcrs_tree<T>;
+	using children_range = base_t::children_range;
 	//static const htree::sp get( const T& v, std::vector<T>&& child = {});
 	template<typename U = T>
-		static tref get(const T& v, const U* child, size_t len);
+	static tref get(const T& v, const U* child, size_t len);
+	static tref get(const T& v, const std::vector<tref>& child);
 	static const htree::sp geth(tref h);
 	static const tree& get(const htree::sp& h);
 	static const tree& get(const tref id);
@@ -201,7 +212,8 @@ struct tree : public lcrs_tree<T> {
 	size_t get_child_size() const;
 	bool get_child(tref *child, size_t& len) const;
 	const tree& get_child(size_t n) const;
-	lcrs_tree<T>::children_range get_children() const;
+	children_range get_children() const;
+	trefs get_children_trefs() const;
 	std::ostream& print(std::ostream& o, size_t s = 0) const;
 };
 
@@ -270,7 +282,7 @@ std::ostream& bintree<T>::print(std::ostream& o, size_t s) const {
 template<typename T>
 const std::string bintree<T>::str() const {
 	std::stringstream ss;
-	ss << val << " { " << l << ", " << r << " } <- " << this;
+	ss << value << " { " << l << ", " << r << " } <- " << this;
 	return ss.str();
 }
 
@@ -327,7 +339,7 @@ void bintree<T>::gc() {
 	for (size_t i = 0; i < V.size(); i++)
 		if (next.count(i)) {
 			auto& bn = *V[i];
-			bintree nbn(bn.val, shift[bn.l], shift[bn.r]);
+			bintree nbn(bn.value, shift[bn.l], shift[bn.r]);
 			auto res = M.emplace(nbn, nv.size());
 			nv.push_back(&(res.first->first));
 		}
@@ -346,7 +358,7 @@ void bintree<T>::gc() {
 	*/
 	//delete non-reachable garbage nodes from M
 	for (auto it = M.begin(); it != M.end(); )
-		if (!next.count(reinterpret_cast<tref>(&it->first)))
+		if (next.count(reinterpret_cast<tref>(&it->first)) == 0)
 			it = M.erase(it);
 		else it++;
 
@@ -376,6 +388,14 @@ tref lcrs_tree<T>::get(const T& v, const U* child, size_t len) {
 	}
 }
 
+template<typename T>
+tref lcrs_tree<T>::get(const T& v, const std::vector<tref>& children) {
+	tref pr = nullptr;
+	for (auto& ch : children)
+		pr = bintree<T>::get(get(ch).value, get(ch).l, pr);
+	return bintree<T>::get(v, pr, (tref) nullptr);
+}
+
 /*
 template<typename T>
 const htree::sp tree<T>::get( const T& v, std::vector<T>&& child){
@@ -385,7 +405,12 @@ const htree::sp tree<T>::get( const T& v, std::vector<T>&& child){
 template<typename T>
 template<typename U>
 tref tree<T>::get(const T& v, const U* child, size_t len) {
-	return lcrs_tree<T>::get(v, child, len );
+	return lcrs_tree<T>::get(v, child, len);
+}
+
+template<typename T>
+tref tree<T>::get(const T& v, const std::vector<tref>& children) {
+	return base_t::get(v, children);
 }
 
 template<typename T>
@@ -414,10 +439,14 @@ size_t tree<T>::get_child_size() const {
 }
 
 template<typename T>
-lcrs_tree<T>::children_range tree<T>::get_children() const {
+tree<T>::children_range tree<T>::get_children() const {
 	return lcrs_tree<T>::get_children();
 }
 
+template<typename T>
+trefs tree<T>::get_children_trefs() const {
+	return lcrs_tree<T>::get_children_trefs();
+}
 
 template<typename T>
 std::ostream& tree<T>::print(std::ostream& o, size_t s) const {
