@@ -32,7 +32,6 @@ template <typename T>
 struct bintree;
 
 using tref = const intptr_t*;
-using opt_tref = std::optional<tref>;
 using trefs    = std::vector<tref>;
 
 template <typename T>

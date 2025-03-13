@@ -12,7 +12,7 @@ int main()
     {
         nd_t child [] = {n2, n3};
         auto tid = tree<nd_t>::get(n1, child, 2);
-        auto handle = tree<nd_t>::get(tid);
+        // auto handle = tree<nd_t>::get(tid);
         tree<nd_t>::get(tid).print(std::cout);
     }
     // above handle goes out of scope
