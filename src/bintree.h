@@ -39,14 +39,14 @@ struct htree {
 	inline bool operator==(const htree& r) const { return hnd == r.hnd; }
 	inline bool operator< (const htree& r) const { return hnd <  r.hnd; }
 	static const sp& null() {
-		static const sp hnull(new htree(NULL));
+		static const sp hnull(new htree());
 		return hnull;
 	}
 	inline tref get() const { return hnd; }
 	//~htree() { if (hnd != NULL) M.erase(hnd); }
 private:
 	tref hnd;
-	explicit htree(tref h = NULL) : hnd(h) { }
+	explicit htree(tref h = nullptr) : hnd(h) { }
 	template <typename U>
 	friend struct bintree;
 };
@@ -90,7 +90,7 @@ public:
 	const T val;
 	const tref l, r;
 	std::ostream& print(std::ostream& o, size_t s = 0) const;
-	const std::string str() const;
+	virtual const std::string str() const;
 	static void dump();
 	static void gc();
 };
@@ -104,6 +104,9 @@ protected:
 	static const htree::sp geth(tref h);
 	static lcrs_tree<T>& get(const htree::sp& h) {
 		return (lcrs_tree<T>&) bintree<T>::get(h);
+	}
+	static const lcrs_tree<T>& get(const tref id) {
+		return (lcrs_tree<T>&) bintree<T>::get(id);
 	}
 
 	size_t get_child_size() const {
@@ -148,6 +151,39 @@ protected:
 		return std::make_pair<decltype(this->l), decltype(this->r)>(
 							this->l, this->r);
 	}
+	struct children_range {
+		tref first;
+		children_range(tref first) : first(first) {}
+		struct iterator {
+			tref current;
+			iterator(tref node) : current(node) {}
+			tref operator*() const {
+				return current;
+			}
+			iterator& operator++() {
+				if (current != nullptr)
+					current = bintree<T>::get(current).r;
+				return *this;
+			}
+			bool operator!=(const iterator& other) const {
+				return current != other.current;
+			}
+		};
+		iterator begin() const { return iterator(first); }
+		iterator end() const { return iterator(nullptr); }
+	};
+	children_range get_children() const {
+		return children_range(this->l);
+	}
+	const lcrs_tree<T>& get_child(size_t n) const {
+		size_t i = 0;
+		for (const auto& c : get_children()) {
+			if (n > i) break;
+			if (i == n) return c;
+			++i;
+		}
+		assert(false);	
+	}
 };
 
 template <typename T>
@@ -162,8 +198,10 @@ struct tree : public lcrs_tree<T> {
 	//with child ids. If child is nullptr, then just
 	//calculates number of children in len.
 	//caller's responsibility to free allocated memory
-	bool get_child(tref *child, size_t& len) const;
 	size_t get_child_size() const;
+	bool get_child(tref *child, size_t& len) const;
+	const tree& get_child(size_t n) const;
+	lcrs_tree<T>::children_range get_children() const;
 	std::ostream& print(std::ostream& o, size_t s = 0) const;
 };
 
@@ -232,8 +270,7 @@ std::ostream& bintree<T>::print(std::ostream& o, size_t s) const {
 template<typename T>
 const std::string bintree<T>::str() const {
 	std::stringstream ss;
-	ss << val;
-	ss << "{" << val << "," << l << "," << r << "} <-" << this;
+	ss << val << " { " << l << ", " << r << " } <- " << this;
 	return ss.str();
 }
 
@@ -352,11 +389,6 @@ tref tree<T>::get(const T& v, const U* child, size_t len) {
 }
 
 template<typename T>
-size_t tree<T>::get_child_size() const {
-	return lcrs_tree<T>::get_child_size();
-}
-
-template<typename T>
 const tree<T>& tree<T>::get(const htree::sp& h) {
 	return (const tree&) bintree<T>::get(h);
 }
@@ -370,6 +402,22 @@ template<typename T>
 bool tree<T>::get_child(tref *child, size_t& len) const {
 	return lcrs_tree<T>::get_kary_child(child, len);
 }
+
+template<typename T>
+const tree<T>& tree<T>::get_child(size_t n) const {
+	return lcrs_tree<T>::get_child(n);
+}
+
+template<typename T>
+size_t tree<T>::get_child_size() const {
+	return lcrs_tree<T>::get_child_size();
+}
+
+template<typename T>
+lcrs_tree<T>::children_range tree<T>::get_children() const {
+	return lcrs_tree<T>::get_children();
+}
+
 
 template<typename T>
 std::ostream& tree<T>::print(std::ostream& o, size_t s) const {
