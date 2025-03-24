@@ -1,0 +1,188 @@
+#include <algorithm>
+#include "parser.h"
+
+// TODO change all recursive transformations to post_order and pre_order traversals where applicable
+
+namespace idni {
+
+using tref = idni2::tref;
+
+template <typename C, typename T>
+tref parser<C, T>::result::get_trimmed_tree2(tref ref,
+	const shaping_options opts) const
+{
+	if (!ref) return nullptr;
+	const auto& t = tree::get(ref);
+	// std::cerr << "get_trimmed_tree for node: `" << t.value.first.to_std_string() << "`" << std::endl;
+	if (t.value.first.is_null()) return nullptr;
+	if (trimmable_node<C, T>(t.value, opts)) return nullptr;
+
+	if (!t.value.first.nt()) return tree::get(t.value); // terminal leaf node 
+
+	trefs ch;
+	for (tref c : t.children()) {
+		// std::cerr << "child: " << tree::get(c).value.first.to_std_string() << std::endl;
+		if (trimmable_child<C, T>(t.value, tree::get(c).value, opts)) {
+			// std::cerr << "\t is trimmable, skipping" << std::endl;
+			continue;
+		}
+		ch.push_back(get_trimmed_tree2(c, opts));
+	}
+	return tree::get(t.value, ch);
+}
+template <typename C, typename T>
+tref parser<C, T>::result::get_trimmed_tree2(tref n) const {
+	return get_trimmed_tree2(n, shaping);
+}
+
+template <typename C, typename T>
+tref parser<C, T>::result::inline_tree_nodes2(tref ref,
+	const shaping_options opts) const
+{
+	if (!ref) return nullptr;
+	auto& t = tree::get(ref);
+	if (t.value.first.is_null()) return nullptr;
+	if (!t.value.first.nt()) return tree::get(t.value);
+	// std::cerr << "inlining tree for node: `" << t.value.first.to_std_string() << "`" << std::endl;
+	trefs ch;
+	for (const auto c : t.children())
+		if (node_to_inline<C, T>(tree::get(c).value, opts))
+			// std::cerr << "inlining child: `" << tree::get(c).value.first.to_std_string() << "`" << std::endl;
+			for (auto c2 : tree::get(c).children())
+				ch.push_back(inline_tree_nodes2(c2, opts));
+		else  // std::cerr << "passed\t `" << tree::get(c).value.first.to_std_string() << "`" << std::endl,
+			ch.push_back(inline_tree_nodes2(c, opts));
+	return tree::get(t.value, ch);
+}
+template <typename C, typename T>
+tref parser<C, T>::result::inline_tree_nodes2(tref ref) const {
+	return inline_tree_nodes2(ref, shaping);
+}
+
+template <typename C, typename T>
+tref parser<C, T>::result::inline_tree_paths2(tref ref,
+	const shaping_options opts) const
+{
+	if (!ref) return nullptr;
+	auto& t = tree::get(ref);
+	if (t.value.first.is_null()) return nullptr;
+	if (!t.value.first.nt()) return tree::get(t.value);
+	//std::cerr << "inlining treepath for node: `" << t.value.first.to_std_string() << "`" << std::endl;
+	for (auto& tp : opts.to_inline) {
+		if (tp.size() < 2) continue;
+		std::function<tref(tref, size_t)> go =
+			[&](tref ref, size_t i) -> tref
+		{
+			auto& t = tree::get(ref);
+			if (!t.value.first.nt()
+				|| t.value.first.n() != tp[i]) return 0;
+			//std::cerr << "treepath go " << i << ": `"
+			//	<< t->value.first.to_std_string() << "`" << std::endl;
+			if (i == tp.size() - 1) return ref;
+			for (const auto& c : t.get_children()) {
+				if (auto y = go(c, i + 1); y) return y;
+			}
+			return nullptr;
+		};
+		if (auto p = go(ref, 0); p) return inline_tree_paths2(p, opts);
+	}
+	trefs ch;
+	for (const auto& c : t.children()) {
+		if (auto x = inline_tree_paths2(c, opts); x)
+			ch.push_back(x);
+	}
+	return tree::get(t.value, ch);
+}
+template <typename C, typename T>
+tref parser<C, T>::result::inline_tree_paths2(tref ref) const {
+	return inline_tree_paths2(ref, shaping);
+}
+
+template <typename C, typename T>
+tref parser<C, T>::result::inline_tree2(tref ref, const shaping_options opts)
+	const
+{
+	ref = inline_tree_nodes2(ref, opts);
+	return inline_tree_paths2(ref, opts);
+}
+template <typename C, typename T>
+tref parser<C, T>::result::inline_tree2(tref ref) const {
+	return inline_tree2(ref, shaping);
+}
+
+template <typename C, typename T>
+tref parser<C, T>::result::trim_children_terminals2(tref ref,
+	const shaping_options opts) const
+{
+	if (!ref) return nullptr;
+	const auto& t = tree::get(ref);
+	if (!t.value.first.nt()) return ref;
+	bool trim = (opts.trim_terminals
+			&& opts.dont_trim_terminals_of.find(t.value.first.n())
+					== opts.dont_trim_terminals_of.end())
+		|| opts.to_trim_children_terminals.find(t.value.first.n())
+				!= opts.to_trim_children_terminals.end();
+	trefs children;
+	for (const auto& c : t.children()) {
+		auto& cl = tree::get(c).value.first;
+		if (cl.nt() || cl.is_null() || !trim) {
+			auto x = trim_children_terminals2(c, opts);
+			if (x) children.push_back(x);
+		}
+	}
+	// std::reverse(children.begin(), children.end());
+	return tree::get(t.value, children);
+}
+template <typename C, typename T>
+tref parser<C, T>::result::trim_children_terminals2(tref ref) const {
+	return trim_children_terminals2(ref, shaping);
+}
+
+template <typename C, typename T>
+tref parser<C, T>::result::get_shaped_tree2(
+	const typename parser<C, T>::pnode& n, const shaping_options opts)
+{
+	//std::cout << "getting tree for " << n.first.to_std_string() << std::endl;
+	tref t = get_tree2(n);
+	// tree::get(t).print(std::cout << "all tree: ") << "\n\n";
+	t = get_trimmed_tree2(t, opts);
+	// tree::get(t).print(std::cout << "trimmed tree: ") << "\n\n";
+	t = inline_tree2(t, opts);
+	// tree::get(t).print(std::cout << "inlined tree: ") << "\n\n";
+	t = trim_children_terminals2(t, opts);
+	// tree::get(t).print(std::cout << "trimmed terminals: ") << "\n\n";
+	return t;
+}
+template <typename C, typename T>
+tref parser<C, T>::result::get_shaped_tree2(
+	const typename parser<C, T>::pnode& n)
+{
+	return get_shaped_tree2(n, shaping);
+}
+template <typename C, typename T>
+tref parser<C, T>::result::get_shaped_tree2(const shaping_options opts) {
+	return get_shaped_tree2(get_forest()->root(), opts);
+}
+template <typename C, typename T>
+tref parser<C, T>::result::get_shaped_tree2() {
+	return get_shaped_tree2(shaping);
+}
+
+// get a first parse tree from the parse_forest optionally provide root of the tree.
+template <typename C, typename T>
+tref parser<C, T>::result::get_tree2() {
+	return get_tree2(f->root());
+}
+
+template <typename C, typename T>
+tref parser<C, T>::result::get_tree2(const pnode& n) {
+	htree::sp t;
+	f->extract_graphs(n, [this, &t] (auto& g) {
+		inline_grammar_transformations(g);
+		t = g.extract_tree2();
+		return false;
+	});
+	return t->get();
+}
+
+}

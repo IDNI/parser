@@ -85,6 +85,18 @@ struct lit {
 	std::string to_std_string(const std::basic_string<C>& nll = {}) const;
 };
 
+template <typename C = char, typename T = C>
+std::ostream& operator<<(std::ostream& os,
+	const std::pair<idni::lit<C, T>, std::array<size_t, 2>>& obj);
+
+} // namespace idni
+
+template <typename C = char, typename T = C>
+std::ostream& operator<<(std::ostream& os,
+	const std::pair<idni::lit<C, T>, std::array<size_t, 2>>& obj);
+
+namespace idni {
+
 // production rules in a disjunctive normal form of conjunction clauses of lits
 template <typename C = char, typename T = C> //  literals
 struct lits : public std::vector<lit<C, T>> { bool neg = false; };
@@ -260,23 +272,170 @@ public:
 		inline operator typename forest<pnode>::node() const {
 			return ptrof(*this);
 		}
-		friend std::ostream& operator<<(std::ostream& os, const pnode& obj) {
-			os << obj.first<<"-"<< obj.second[0]<<
-			"-"<<obj.second[1];
-			return os;
-		}
+		friend std::ostream& ::operator<<<>(std::ostream& os, const node_type& n);
+
 
 		inline size_t _mpsize() const {
 			return nid().size();
 		}
 		std::size_t hashit() const {
-            std::size_t h1 = this->first.hashit();
+			std::size_t h1 = this->first.hashit();
 			hashCombine(h1, this->second[0], this->second[1]);
-            return h1;
-        }
+			return h1;
+		}
 		//inline lit<C,T> &first() const { return this->first; }
 		//inline std::array<size_t, 2>& second() const { return this->second; }
 	};
+
+	// TODO remove after tree moved from idni2 to idni
+	using tref            = idni2::tref;
+	using trefs           = idni2::trefs;
+	using htree           = idni2::htree;
+
+	struct tree : public idni2::tree<pnode> {
+		using base_t = idni2::tree<pnode>;
+
+		tref get() const;
+		static const tree& get(const tref id);
+		static const tree& get(const htree::sp& h);
+		static const htree::sp geth(tref h);
+
+		static tref get(const pnode& v, const tref* ch, size_t len);
+		static tref get(const pnode& v, const trefs& ch);
+		static tref get(const pnode& v, tref ch); // with single child
+		static tref get(const pnode& v, tref ch1, tref ch2); // with two children
+		static tref get(const pnode& v); // leaf node
+
+		static tref get(const pnode& v, const pnode* ch, size_t len);
+		static tref get(const pnode& v, const std::vector<pnode>& ch);
+		static tref get(const pnode& v, const pnode& ch);
+		static tref get(const pnode& v, const pnode& ch1, const pnode& ch2); 
+
+		size_t children_size() const;
+
+		bool get_children(tref *ch, size_t& len) const;
+		trefs get_children() const;
+		idni2::tref_range<pnode> children() const;
+		idni2::tree_range<tree> children_trees() const;
+
+		tref child(size_t n) const;
+		tref operator[](size_t n) const;
+		tref first()  const;
+		tref second() const;
+		tref third()  const;
+		tref only_child() const;
+
+		const tree& child_tree(size_t n) const;
+		const tree& first_tree()  const;
+		const tree& second_tree() const;
+		const tree& third_tree()  const;
+		const tree& only_child_tree() const;
+
+		std::ostream& print(std::ostream& o, size_t s = 0) const;
+
+		// fast access helpers
+		bool nt() const;
+		std::string get_terminals() const;
+		size_t get_nonterminal() const;
+
+		// tree wrapper for simple traversing using | and || operators
+		// and | extractor<result_type>
+		//                only_child, opt_nonterminal, nonterminal,
+		//                terminals, first, second, third)
+		struct traverser {
+			traverser();
+			traverser(tref r);
+			traverser(const trefs& n);
+			bool has_value() const;
+			explicit operator bool() const;
+			tref value() const;
+			const tree& value_tree() const;
+			const tree& operator[](size_t n) const;
+			const trefs& values() const;
+			std::vector<traverser> traversers() const;
+			std::vector<traverser> operator()() const;
+
+			template <typename result_type>
+			struct extractor {
+				using function = std::function<
+						result_type(const traverser&)>;
+				extractor(const function& e) : e(e) {}
+				result_type operator()(const traverser& t) const
+								{ return e(t); }
+			private:
+				function e;
+			};
+
+			static inline const extractor<traverser> only_child{
+				[](const traverser& t) {
+					if (!t) return traverser();
+					tref r = t.value_tree().only_child();
+					if (!r) return traverser();
+					return traverser(r);
+				}};
+			static inline const extractor<traverser> children{
+				[](const traverser& t) {
+					if (!t) return traverser();
+					return traverser(t.value_tree()
+							.get_children());
+				}};
+			static inline const extractor<traverser> first{
+				[](const traverser& t) {
+					if (!t) return traverser();
+					tref r = t.value_tree()[0];
+					if (!r) return traverser();
+					return traverser(r);
+				}};
+			static inline const extractor<traverser> second{
+				[](const traverser& t) {
+					if (!t) return traverser();
+					tref r = t.value_tree()[1];
+					if (!r) return traverser();
+					return traverser(r);
+				}};
+			static inline const extractor<traverser> third{
+				[](const traverser& t) {
+					if (!t) return traverser();
+					tref r = t.value_tree()[2];
+					if (!r) return traverser();
+					return traverser(r);
+				}};
+			static inline const extractor<std::string> terminals{
+				[](const traverser& t) {
+					if (!t) return std::string();
+					return t.value_tree().get_terminals();
+				}};
+			static inline const extractor<size_t> nonterminal{
+				[](const traverser& t) -> size_t {
+					if (!t) return 0;
+					return t.value_tree().get_nonterminal();
+				}};
+			static inline const extractor<std::optional<size_t>>
+							opt_nonterminal{
+				[](const traverser& t) {
+					if (!t) return std::optional<size_t>{};
+					const auto& x = t.value_tree();
+					if (x.value.first.nt())
+						return { x.value.first.n() };
+					return {};
+				}};
+
+			traverser operator|(size_t nt) const;
+			traverser operator||(size_t nt) const;
+			template <typename result_type>
+			result_type operator|(const extractor<result_type>&)
+									const;
+			template <typename result_type>
+			result_type operator||(const extractor<result_type>&)
+									const;
+		private:
+			bool has_value_ = true;
+			trefs values_{};
+		};
+		traverser operator|(size_t nt) const;
+		traverser operator||(size_t nt) const;
+	};
+
 	using pforest         = forest<pnode>;
 	using pnodes          = pforest::nodes;
 	using pnodes_set      = pforest::nodes_set;
@@ -446,6 +605,37 @@ public:
 		psptree get_tree();
 		psptree get_tree(const pnode& n);
 
+	// following methods2 use the new tree
+		// transforms forest into tree and applies trimming
+		// grammar shaping options are used by default
+		// also transforms ambiguous nodes as children of __AMB__ nodes
+		tref get_trimmed_tree2(tref ref) const;
+		tref get_trimmed_tree2(tref ref, const shaping_options opts)
+									const;
+		// applies inlining to a tree (w/o tree paths)
+		tref inline_tree_nodes2(tref t) const;
+		tref inline_tree_nodes2(tref t, const shaping_options opts)
+									const;
+		// applies tree paths inlining to a tree
+		tref inline_tree_paths2(tref t) const;
+		tref inline_tree_paths2(tref t, const shaping_options opts)
+									const;
+		// applies inlining to a tree
+		tref inline_tree2(tref t) const;
+		tref inline_tree2(tref t, const shaping_options opts) const;
+		tref trim_children_terminals2(tref ref) const;
+		tref trim_children_terminals2(tref ref,
+					const shaping_options opts) const;
+		// transforms forest into a tree and applies shaping
+		tref get_shaped_tree2();
+		tref get_shaped_tree2(const shaping_options opts);
+		tref get_shaped_tree2(const pnode& n);
+		tref get_shaped_tree2(const pnode& n,
+					const shaping_options opts);
+		// extracts the first parse tree from the parsed forest
+		tref get_tree2();
+		tref get_tree2(const pnode& n);
+
 		// is input good = stream is good or mmap is opened
 		bool good() const;
 		// returns the input as a string (input's char type, ie. C)
@@ -584,6 +774,11 @@ private:
 	size_t n_literals(const item& i) const;
 	std::pair<item, bool> get_conj(size_t set, size_t prod, size_t con) const;
 	void pre_process(const item& i);
+
+	// TODO implement these with the new tree
+	// tref init_forest(const lit<C, T>& start_lit, const parse_options& po);
+	// tref build_forest(const pnode& root);
+
 	bool init_forest(pforest& f, const lit<C, T>& start_lit,
 		const parse_options& po);
 	bool build_forest(pforest& f, const pnode& root);
@@ -654,7 +849,10 @@ struct std::hash<idni::lit<C, T>> {
 #include "grammar.tmpl.h"       // for grammar and related
 #include "parser.tmpl.h"        // for parser
 #include "parser_result.tmpl.h" // for parse::result
+#include "get_shaped_tree2.tmpl.h"
 #include "tgf.h"                // Tau Grammar Form
+#include "rewriting.h"          //
+#include "traverser.h"
 
 #ifdef DEBUG
 #include "devhelpers.h"   // various helpers for converting forest

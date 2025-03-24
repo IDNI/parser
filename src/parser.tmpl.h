@@ -18,7 +18,23 @@
 #include "measure.h"
 #endif // PARSER_MEASURE
 
+template <typename C, typename T>
+std::ostream& operator<<(std::ostream& os,
+	const std::pair<idni::lit<C, T>, std::array<size_t, 2>>& obj)
+{
+	return os << obj.first << "[" << obj.second[0] << ","
+					<< obj.second[1] << "]";
+
+}
+
 namespace idni {
+
+template <typename C, typename T>
+std::ostream& operator<<(std::ostream& os,
+	const std::pair<lit<C, T>, std::array<size_t, 2>>& obj)
+{
+	return ::operator<<<C, T>(os, obj);
+}
 
 static inline idni::term::colors TC;
 
@@ -28,10 +44,267 @@ typename forest<typename parser<C,T>::pnode>::node
 		const typename parser<C,T>::pnode& pn) {
 	auto r = nid().emplace( pn, nullptr );
 	if (r.second) r.first->second = typename
-	forest<typename parser<C,T>::pnode>::node(&(r.first->first));
+		forest<typename parser<C,T>::pnode>::node(&(r.first->first));
 	return r.first->second;
 }
+//------------------------------------------------------------------------------
 
+template <typename C, typename T>
+idni2::tref parser<C, T>::tree::get() const { return base_t::get(); }
+
+template <typename C, typename T>
+const parser<C, T>::tree& parser<C, T>::tree::get(const tref id) {
+	return static_cast<const tree&>(base_t::get(id));
+}
+
+template <typename C, typename T>
+const parser<C, T>::tree& parser<C, T>::tree::get(const htree::sp& h) {
+	return static_cast<const tree&>(base_t::get(h));
+}
+
+template <typename C, typename T>
+const idni2::htree::sp parser<C, T>::tree::geth(tref id) {
+	return base_t::geth(id);
+}
+
+template <typename C, typename T>
+idni2::tref parser<C, T>::tree::get(const pnode& v, const tref* ch, size_t len){
+	return base_t::get(v, child, len);
+}
+
+template <typename C, typename T>
+idni2::tref parser<C, T>::tree::get(const pnode& v, const trefs& children) {
+	return base_t::get(v, children);
+}
+
+template <typename C, typename T>
+idni2::tref parser<C, T>::tree::get(const pnode& v, tref ch) {
+	return base_t::get(v, ch);
+}
+
+template <typename C, typename T>
+idni2::tref parser<C, T>::tree::get(const pnode& v, tref ch1, tref ch2) {
+	return base_t::get(v, ch1, ch2);
+}
+
+template <typename C, typename T>
+idni2::tref parser<C, T>::tree::get(const pnode& v) { return base_t::get(v); }
+
+template <typename C, typename T>
+idni2::tref parser<C, T>::tree::get(const pnode& v, const pnode* ch,
+	size_t len)
+{
+	return base_t::get(v, ch, len);
+}
+
+template <typename C, typename T>
+idni2::tref parser<C, T>::tree::get(const pnode& v,
+	const std::vector<pnode>& ch)
+{
+	return base_t::get(v, ch);
+}
+
+template <typename C, typename T>
+idni2::tref parser<C, T>::tree::get(const pnode& v, const pnode& child) {
+	return base_t::get(v, child);
+}
+
+template <typename C, typename T>
+idni2::tref parser<C, T>::tree::get(const pnode& v,
+	const pnode& ch1, const pnode& ch2)
+{
+	return get(v, ch1, ch2);
+}
+
+template <typename C, typename T>
+size_t parser<C, T>::tree::children_size() const {
+	return base_t::children_size();
+}
+
+template <typename C, typename T>
+bool parser<C, T>::tree::get_children(tref *child, size_t& len) const {
+	return base_t::get_children(child, len);
+}
+
+template <typename C, typename T>
+idni2::trefs parser<C, T>::tree::get_children() const {
+	return base_t::get_children();
+}
+
+template <typename C, typename T>
+idni2::tref_range<typename parser<C, T>::pnode> parser<C, T>::tree::children()
+	const
+{
+	return base_t::children();
+}
+
+template <typename C, typename T>
+typename idni2::tree_range<typename parser<C, T>::tree>
+	parser<C, T>::tree::children_trees() const
+{
+	return tree_range<tree>(this->l);
+}
+
+template <typename C, typename T>
+idni2::tref parser<C, T>::tree::child(size_t n) const {return base_t::child(n);}
+
+template <typename C, typename T>
+idni2::tref parser<C, T>::tree::operator[](size_t n) const { return base_t::child(n); }
+
+template <typename C, typename T>
+idni2::tref parser<C, T>::tree::first() const { return base_t::first(); }
+
+template <typename C, typename T>
+idni2::tref parser<C, T>::tree::second() const { return base_t::second(); }
+
+template <typename C, typename T>
+idni2::tref parser<C, T>::tree::third() const { return base_t::third(); }
+
+template <typename C, typename T>
+idni2::tref parser<C, T>::tree::only_child() const {
+	return base_t::only_child();
+}
+
+template <typename C, typename T>
+const parser<C, T>::tree& parser<C, T>::tree::child_tree(size_t n) const {
+	return tree::get(base_t::child(n));
+}
+
+template <typename C, typename T>
+const parser<C, T>::tree& parser<C, T>::tree::first_tree() const {
+	return child_tree(0);
+}
+
+template <typename C, typename T>
+const parser<C, T>::tree& parser<C, T>::tree::second_tree() const {
+	return child_tree(1);
+}
+
+template <typename C, typename T>
+const parser<C, T>::tree& parser<C, T>::tree::third_tree() const {
+	return child_tree(2);
+}
+
+template <typename C, typename T>
+const parser<C, T>::tree& parser<C, T>::tree::only_child_tree() const {
+	return tree::get(base_t::only_child());
+}
+
+template <typename C, typename T>
+std::ostream& parser<C, T>::tree::print(std::ostream& o, size_t s) const {
+	for (size_t i = 0; i < s; i++) o << "\t";
+	o << this->value << "\n";
+	for (const auto& ch : this->get_children()) get(ch).print(o, s + 1);
+	return o;
+}
+
+template <typename C, typename T>
+bool parser<C, T>::tree::nt() const { return this->value.first.nt(); }
+
+template <typename C, typename T>
+std::string parser<C, T>::tree::get_terminals() const {
+	std::stringstream ss;
+	auto collector = [&ss](tref n) {
+		if (n && !get(n).value.first.nt()) ss << get(n).value.first.t();
+		return true;
+	};
+	tref this_ = (tref) this;
+	idni2::post_order<pnode>(this_).search(collector);
+	return ss.str();
+}
+
+template <typename C, typename T>
+size_t parser<C, T>::tree::get_nonterminal() const {
+	if (this->value.first.nt()) return this->value.first.n();
+	return 0;
+}
+
+template <typename C, typename T>
+parser<C, T>::tree::traverser::traverser() : has_value_(false) {}
+template <typename C, typename T>
+parser<C, T>::tree::traverser::traverser(tref r) : has_value_(true), values_({ r }) {}
+template <typename C, typename T>
+parser<C, T>::tree::traverser::traverser(const trefs& n)
+				: has_value_(n.size()), values_(n) {}
+template <typename C, typename T>
+bool parser<C, T>::tree::traverser::has_value() const { return has_value_; }
+
+template <typename C, typename T>
+parser<C, T>::tree::traverser::operator bool() const { return has_value(); }
+
+template <typename C, typename T>
+idni2::tref parser<C, T>::tree::traverser::value() const { return values_.front(); }
+
+template <typename C, typename T>
+const typename parser<C, T>::tree& parser<C, T>::tree::traverser::value_tree()
+	const { return tree::get(values_.front()); }
+
+template <typename C, typename T>
+const typename parser<C, T>::tree& parser<C, T>::tree::traverser::operator[](
+	size_t n) const { return value_tree()[n]; }
+
+template <typename C, typename T>
+const idni2::trefs& parser<C, T>::tree::traverser::values() const { return values_; }
+
+template <typename C, typename T>
+std::vector<typename parser<C, T>::tree::traverser>
+	parser<C, T>::tree::traverser::traversers() const
+{
+	std::vector<traverser> tv;
+	for (const auto& v : values_) tv.emplace_back(v);
+	return tv;
+}
+
+template <typename C, typename T>
+std::vector<typename parser<C, T>::tree::traverser>
+	parser<C, T>::tree::traverser::operator()() const
+{
+	return traversers();
+}
+
+template <typename C, typename T>
+typename parser<C, T>::tree::traverser
+	parser<C, T>::tree::traverser::operator|(size_t nt) const
+{
+	if (!has_value()) return traverser();
+	for (tref c : tree::get(value()).get_children()) {
+		const auto& n = tree::get(c).value.first;
+		if (n.nt() && n.n() == nt) return { c }; 
+	}
+	return {};
+}
+
+template <typename C, typename T>
+typename parser<C, T>::tree::traverser
+	parser<C, T>::tree::traverser::operator||(size_t nt) const
+{
+	trefs r;
+	for (const auto& v : values())
+		for (const tref& c : tree::get(v).get_children()) {
+			const auto& n = tree::get(c).value.first;
+			if (n.nt() && n.n() == nt) r.push_back(c); 
+		}
+	return traverser(r);
+}
+
+template <typename C, typename T>
+template <typename result_type>
+result_type parser<C, T>::tree::traverser::operator|(
+	const extractor<result_type>& e) const
+{
+	return e(*this);
+}
+
+template <typename C, typename T>
+template <typename result_type>
+result_type parser<C, T>::tree::traverser::operator||(
+	const extractor<result_type>& e) const
+{
+	return e(*this);
+}
+
+
+//------------------------------------------------------------------------------
 template <typename C, typename T>
 parser<C, T>::item::item(size_t set, size_t prod, size_t con, size_t from,
 	size_t dot) : set(set), prod(prod), con(con), from(from), dot(dot) {}
@@ -850,7 +1123,7 @@ void parser<C, T>::pre_process(const item& i) {
 		// each temporary represents a partial rhs production with
 		// atleast 3 symbols
 		if (i.dot >= 2) {
-						std::vector<lit<C, T>> v(g[i.prod][i.con].begin(),
+			std::vector<lit<C, T>> v(g[i.prod][i.con].begin(),
 					g[i.prod][i.con].begin() + i.dot);
 			lit<C, T> l;
 			if (bin_tnt.find(v) == bin_tnt.end()) {

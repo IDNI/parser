@@ -16,32 +16,14 @@
 #include <streambuf>
 
 #include "tgf_parser.generated.h"
-#include "traverser.h"
 #include "devhelpers.h"
 
 namespace idni {
 
-static inline std::ostream& print_node(std::ostream& os,
-	const idni::rewriter::sp_node<std::variant<tgf_parser::symbol_type>>& n,
-	size_t indent = 0)
-{
-	for (size_t i = 0; i != indent; ++i) os << "\t";
-	if (std::holds_alternative<tgf_parser::symbol_type>(n->value)) {
-		auto& l = std::get<tgf_parser::symbol_type>(n->value);
-		if (l.nt()) os << "`" << l << "`";
-		else if (!l.is_null()) os << l;
-	}
-	os << "\n";
-	for (const auto& c : n->child) print_node(os, c, indent + 1);
-	return os;
-}
-
 template <typename C = char, typename T = C>
 struct tgf {
-	using symbol_t       = tgf_parser::symbol_type;
-	using node_variant_t = std::variant<symbol_t>;
-	using node_t         = idni::rewriter::sp_node<node_variant_t>;
-	using traverser_t    = traverser<node_variant_t, tgf_parser>;
+	using tree           = tgf_parser::tree;
+	using trv            = tree::traverser;
 	using lit_t          = lit<C, T>;
 	using prods_t        = prods<C, T>;
 
@@ -127,12 +109,6 @@ struct tgf {
 
 private:
 	struct grammar_builder {
-		static constexpr const auto& get_only_child =
-			traverser_t::get_only_child_extractor();
-		static constexpr const auto& get_terminals =
-			traverser_t::get_terminal_extractor();
-		static constexpr const auto& get_nonterminal =
-			traverser_t::get_nonterminal_extractor();
 		prods_t ps, nul{ lit_t{} };
 		nonterminals<C, T>& nts;
 		// set by @start ...
@@ -143,9 +119,9 @@ private:
 		grammar<C, T>::options opt{};
 		char_class_fns<T> cc;
 		grammar_builder(nonterminals<C, T>& nts) : nts(nts) {}
-		grammar_builder(nonterminals<C, T>& nts, const traverser_t& t)
+		grammar_builder(nonterminals<C, T>& nts, const trv& t)
 			: nts(nts) { build(t); }
-		void build(const traverser_t& t) {
+		void build(const trv& t) {
 			auto statements  = t || tgf_parser::statement;
 			auto directives  = statements || tgf_parser::directive;
 			for (const auto& d : directives()) directive(d);
@@ -161,12 +137,7 @@ private:
 			if (!r.found) return std::cerr << "TGF: "
 				<< r.parse_error.to_str(tgf_parser::error::
 					info_lvl::INFO_BASIC, line) << "\n",1;
-			char dummy = '\0';
-			auto source = idni::rewriter::make_node_from_tree<
-				tgf_parser, char, node_variant_t>(
-					dummy, r.get_shaped_tree());
-			//print_node(std::cout << "source: `", source) << "`\n";
-			build(traverser_t(source));
+			build(trv(r.get_shaped_tree2()));
 			return 0;
 		}
 		grammar<C, T> g() {
@@ -186,13 +157,13 @@ private:
 		}
 	private:
 		size_t id = 0;
-		size_t node2nt(const traverser_t& t) {
-			return nts.get(t | get_terminals);
+		size_t node2nt(const trv& t) {
+			return nts.get(t | trv::terminals);
 		}
-		void inline_dir(const traverser_t& t) {
+		void inline_dir(const trv& t) {
 			for (auto& n : (t || tgf_parser::inline_arg)())
-			if ((n | get_only_child
-				| get_nonterminal) == tgf_parser::cc_sym)
+			if ((n | trv::only_child
+				| trv::nonterminal) == tgf_parser::cc_sym)
 					opt.shaping.inline_char_classes = true;
 			else {
 				std::vector<size_t> tree_path{};
@@ -202,10 +173,10 @@ private:
 				opt.shaping.to_inline.insert(tree_path);
 			}
 		}
-		void directive(const traverser_t& t) {
+		void directive(const trv& t) {
 			//print_node(std::cout << "directive: ", t.value()) << "\n";
-			auto d = t | tgf_parser::directive_body | get_only_child;
-			auto nt = d | get_nonterminal;
+			auto d = t | tgf_parser::directive_body | trv::only_child;
+			auto nt = d | trv::nonterminal;
 			//print_node(std::cout << "nt: " << nt << " directive_body: ", d.value()) << "\n";
 			switch (nt) {
 			case tgf_parser::use_dir:
@@ -213,14 +184,14 @@ private:
 					|| tgf_parser::use_param
 					|| tgf_parser::cc_name)())
 				{
-					auto s = cc | get_terminals;
+					auto s = cc | trv::terminals;
 					//std::cout << "use char class: `" << s << "`\n";
 					cc_names.push_back(s);
 				}
 				break;
 			case tgf_parser::start_dir:
 				start = prods_t(nts(d
-					| tgf_parser::sym | get_terminals));
+					| tgf_parser::sym | trv::terminals));
 				break;
 			case tgf_parser::trim_all_terminals_dir:
 				opt.shaping.trim_terminals = true;
@@ -252,23 +223,23 @@ private:
 			case tgf_parser::enable_prods_dir:
 				for (auto& n : (d || tgf_parser::sym)())
 					opt.enabled_guards
-						.insert(n | get_terminals);
+						.insert(n | trv::terminals);
 				break;
 			default: return;
 			}
 		}
-		void production(const traverser_t& t) {
+		void production(const trv& t) {
 			//print_node(std::cout, t.value()) << "\n";
-			prods_t sym(nts(t | tgf_parser::sym | get_terminals));
+			prods_t sym(nts(t | tgf_parser::sym | trv::terminals));
 			std::string guard(t | tgf_parser::production_guard
-				| tgf_parser::sym | get_terminals);
+				| tgf_parser::sym | trv::terminals);
 			if (guard.size()) {
 				sym.back().guard = guard;
 				// DBG(std::cout << "sym: (" << sym << ") guard: " << guard << "\n";)
 			}
 			alternation(sym, t | tgf_parser::alternation);
 		}
-		void alternation(const prods_t& sym, const traverser_t& t) {
+		void alternation(const prods_t& sym, const trv& t) {
 			//print_node(std::cout << "alternation: ", t.value()) << "\n";
 			for (auto& c : (t || tgf_parser::conjunction)())
 				ps(sym, conjunction(sym, c));
@@ -286,18 +257,18 @@ private:
 			auto nn = get_new_name(sym);
 			return ps(nn, (t + nn) | nul), nn;
 		}
-		prods_t group(const prods_t& sym, const traverser_t& t) {
+		prods_t group(const prods_t& sym, const trv& t) {
 			auto nn = get_new_name(sym);
 			alternation(nn.to_lit(), t | tgf_parser::alternation);
 			return nn;
 		}
-		prods_t optional_group(const prods_t& sym, const traverser_t& t)
+		prods_t optional_group(const prods_t& sym, const trv& t)
 		{
 			auto nn = get_new_name(sym);
 			alternation(nn.to_lit(), t | tgf_parser::alternation);
 			return ps(nn, nul), nn;
 		}
-		prods_t repeat_group(const prods_t& sym, const traverser_t& t) {
+		prods_t repeat_group(const prods_t& sym, const trv& t) {
 			auto nn = get_new_name(sym);
 			auto nr = get_new_name(sym);
 			alternation(nr.to_lit(), t | tgf_parser::alternation);
@@ -322,45 +293,45 @@ private:
 			//std::cout << "\t: `" << ss.str() << "`\n";
 			return ss.str();
 		}
-		prods_t terminal_char(const traverser_t& t) {
+		prods_t terminal_char(const trv& t) {
 			//print_node(std::cout << "terminal_char: ", t.value()) << "\n";
 			auto c = t | tgf_parser::unescaped_c;
 			if (c.has_value()) {
-				//std::cout << "unescaped_c: `" << (c | get_terminals) << "`\n";
-				return prods_t(c | get_terminals);
+				//std::cout << "unescaped_c: `" << (c | trv::terminals) << "`\n";
+				return prods_t(c | trv::terminals);
 			}
 			c = t | tgf_parser::escaped_c;
-			return prods_t(unescape(c | get_terminals));
+			return prods_t(unescape(c | trv::terminals));
 		}
-		prods_t terminal_string(const traverser_t& t) {
+		prods_t terminal_string(const trv& t) {
 			prods_t r{};
 			auto cs = t || tgf_parser::terminal_string_char;
 			for (auto& ch : cs()) {
 				auto c = ch | tgf_parser::unescaped_s;
 				if (c.has_value())
-					r = r + prods_t(c | get_terminals);
+					r = r + prods_t(c | trv::terminals);
 				else {
 					c = ch | tgf_parser::escaped_s;
 					r = r + prods_t(unescape(
-							c | get_terminals));
+							c | trv::terminals));
 				}
 			}
 			return r;
 		}
-		prods_t terminal(const traverser_t& t) {
+		prods_t terminal(const trv& t) {
 			//print_node(std::cout << "terminal: ", t.value()) << "\n";
-			auto c = t | get_only_child;
-			if ((c | get_nonterminal) == tgf_parser::terminal_char)
+			auto c = t | trv::only_child;
+			if ((c | trv::nonterminal) == tgf_parser::terminal_char)
 				return terminal_char(c);
 			else return terminal_string(c);
 		}
-		prods_t term(const prods_t& sym, const traverser_t& t) {
+		prods_t term(const prods_t& sym, const trv& t) {
 			//print_node(std::cout << "term: ", t.value()) << "\n";
-			auto x = t | get_only_child;
-			//std::cout << "term: " << (x | get_nonterminal) << std::endl;
-			switch (x | get_nonterminal) {
+			auto x = t | trv::only_child;
+			//std::cout << "term: " << (x | trv::nonterminal) << std::endl;
+			switch (x | trv::nonterminal) {
 			case tgf_parser::sym: {
-				auto s = x | get_terminals;
+				auto s = x | trv::terminals;
 				if (s == "null") return nul;
 				return prods_t(nts(s));
 			}
@@ -372,18 +343,18 @@ private:
 			}
 			return {};
 		}
-		prods_t shorthand_rule(const prods_t& sym, const traverser_t& t) {
+		prods_t shorthand_rule(const prods_t& sym, const trv& t) {
 			//print_node(std::cout << "shorthand_rule: ", t.value()) << "\n";
 			auto f = t | tgf_parser::factor;
-			auto s = t | tgf_parser::sym | get_terminals;
+			auto s = t | tgf_parser::sym | trv::terminals;
 			auto nt = nts(s);
 			ps(nt, factor(sym, f));
 			return nt;
 		}
-		prods_t factor(const prods_t& sym, const traverser_t& t) {
+		prods_t factor(const prods_t& sym, const trv& t) {
 			//print_node(std::cout << "factor: ", t.value()) << "\n";
-			auto f = t | get_only_child;
-			auto nt = f | get_nonterminal;
+			auto f = t | trv::only_child;
+			auto nt = f | trv::nonterminal;
 			if (nt == tgf_parser::shorthand_rule)
 				return shorthand_rule(sym, f);
 			if (nt == tgf_parser::term) return term(sym, f);
@@ -397,14 +368,14 @@ private:
 			}
 			return {};
 		}
-		prods_t concatenation(const prods_t& sym, const traverser_t& t){
+		prods_t concatenation(const prods_t& sym, const trv& t){
 			//print_node(std::cout << "concatenation: ", t.value()) << "\n";
 			prods_t r{};
 			for (auto& f : (t || tgf_parser::factor)())
 				r = r + factor(sym, f);
 			return r;
 		}
-		prods_t conjunction(const prods_t& sym,	const traverser_t& t) {
+		prods_t conjunction(const prods_t& sym,	const trv& t) {
 			//print_node(std::cout << "conjunction: ", t.value()) << "\n";
 			prods_t r{};
 			for (auto& c : (t || tgf_parser::concatenation)())

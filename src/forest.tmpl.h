@@ -63,12 +63,8 @@ typename idni2::htree::sp forest<NodeT>::graph::_extract_tree2(
 			if (it == g.end()) return nullptr;
 			pack = it->second;
 		}
-		else {
-			// leaf terminal
-			idni2::tref children [] = {0, rchd};
-			idni2::tref tid = idni2::tree<NodeT>::get((NodeT)root, children, 2);
-			return tid;
-		}
+		else // leaf terminal
+			return idni2::bintree<NodeT>::get(root, 0, rchd);
 		//DBG( assert(! (pack.size()>1) ));
 		auto nodesit = pack.begin();
 		idni2::tref crchd = nullptr;    // child's right child
@@ -77,19 +73,17 @@ typename idni2::htree::sp forest<NodeT>::graph::_extract_tree2(
 			if (edgcount[root] >= pack.size()) {
 				//have fully explored before, so just return 
 				//non terminal with no children
-				idni2::tref children [] = {nullptr, rchd};
-				return idni2::tree<NodeT>::get((NodeT)root, children, 2);
+				return idni2::bintree<NodeT>::get(root, nullptr, rchd);
 			}
 			//still an edge to children unexplored
 			for (size_t i = 0; i < edgcount[root]; i++) 
 				++nodesit;
 			edgcount[root]++;
 			for (auto chdit = nodesit->rbegin(); chdit != nodesit->rend(); chdit++)
-				crchd = post_trav((NodeT)*chdit, crchd, post_trav);
+				crchd = post_trav(*chdit, crchd, post_trav);
 		}
 		
-		idni2::tref children [] = {crchd, rchd};
-		return idni2::tree<NodeT>::get((NodeT)root, children, 2);
+		return idni2::bintree<NodeT>::get((NodeT)root, crchd, rchd);
     };
 	//idni2::bintree<NodeT>::dump();
 	idni2::tref tid = post_trav(r, 0, post_trav);

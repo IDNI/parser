@@ -28,19 +28,28 @@ namespace idni2 {
 
 using namespace idni;
 
-template <typename T>
-struct bintree;
+//------------------------------------------------------------------------------
 
-using tref = const intptr_t*;
-using trefs    = std::vector<tref>;
+// @brief tree node reference
+using tref  = const intptr_t*;
+// @brief vector of tree node reference handles
+using trefs = std::vector<tref>;
 
+// @brief tref -> tref map used in caching
+// TODO unordered_map needs hash for std::pair<T1, T2> when compiled with tau
+// TODO note that cache must survive gc
+using tref_cache_map = std::map<tref, tref>;
+// @brief tref set used in caching
+using tref_cache_set = std::set<tref>;
+
+// @brief range of tree node reference handles usable in range-based for loops
 template <typename T>
 struct tref_range {
 	tref first;
 	tref_range(tref first);
 	struct iterator {
 		tref current;
-		iterator(tref node);
+		iterator(tref id);
 		tref operator*() const;
 		iterator& operator++();
 		bool operator!=(const iterator& other) const;
@@ -49,112 +58,686 @@ struct tref_range {
 	iterator end() const;
 };
 
-struct htree {
-	using sp =  std::shared_ptr<htree>;
-	using wp =  std::weak_ptr<htree>;
-	inline bool operator==(const htree& r) const { return hnd == r.hnd; }
-	inline bool operator< (const htree& r) const { return hnd <  r.hnd; }
-	static const sp& null() {
-		static const sp hnull(new htree());
-		return hnull;
-	}
-	inline tref get() const { return hnd; }
-	//~htree() { if (hnd != NULL) M.erase(hnd); }
-private:
-	tref hnd;
-	explicit htree(tref h = nullptr) : hnd(h) { }
-	template <typename U>
-	friend struct bintree;
+// @brief range of tree nodes usable in range-based for loops returning tree nodes
+template <typename T>
+struct tree_range {
+	tref first;
+	tree_range(tref first);
+	struct iterator {
+		tref current;
+		iterator(tref id);
+		const T& operator*() const;
+		iterator& operator++();
+		bool operator!=(const iterator& other) const;
+	};
+	iterator begin() const;
+	iterator end() const;
 };
 
+//------------------------------------------------------------------------------
+
+template <typename T>
+struct bintree;
+
+// @brief tree handle wrapping a tref. htree::sp prevents tree from being gc-ed
+struct htree {
+	using sp = std::shared_ptr<htree>;
+	using wp = std::weak_ptr<htree>;
+	static const sp& null();
+	inline tref get() const;
+	inline bool operator==(const htree& r) const;
+	inline bool operator< (const htree& r) const;
+	//~htree();
+private:
+	tref hnd;
+	explicit htree(tref id = nullptr);
+	template <typename N> friend struct bintree;
+};
+
+/**
+ * @brief Binary tree (each node has left and right child)
+ * @tparam T The type of the tree node stored as a value
+ */
 template <typename T>
 struct bintree {
+	/**
+	 * @brief Value of a node of node type T
+	 */
 	const T value;
-	const tref l, r;
+	/**
+	 * @brief Left child of the binary tree node
+	 */
+	const tref l;
+	
+	/**
+	 * @brief Right child of the binary tree node
+	 */
+	const tref r;
 
-	static const htree::sp geth(tref id);
+	/**
+	 * @brief Get nodes's tref id
+	 * @return The tree node's tref
+	 */
+	tref get() const;
+
+	/**
+	 * @brief Get the tree node from its tref id
+	 * @param id The tree node
+	 * @return The tree node's id
+	 */
 	static const bintree& get(const tref id);
-	static const bintree& get(const htree::sp& h);
-	// there's a problem here. get() shouldnt return a handle, it'll create
-	// a ptr with each call. normally the user has to keep a handle only to
-	// the root of the tree of interest. functions that recurse over trees
-	// and return new trees, should get a handle to the root, but internally
-	// work only with the ids, not with the handles, then return a single
-	// handle to the result.
 
-	// resp:actually this internally uses id only to get. We make it available only
-	// so user can use or maintain tree of interest to build.
-	static htree::sp get(const T& v, const htree::sp& l = htree::null(),
-					const htree::sp& r = htree::null());
-	// This function(made public now) uses and returns ids only instead of handle
-	// to address the previous concern
+	/**
+	 * @brief Get the tree node from handle
+	 * @param h The tree node handle
+	 * @return The tree node
+	 */
+	static const bintree& get(const htree::sp& h);
+
+	/**
+	 * @brief Get the tree node shared handle preventing it from gc
+	 * @param id The tree node's ref
+	 * @return The tree node's shared handle (preventing from gc)
+	 */
+	static const htree::sp geth(tref id);
+
+	/**
+	 * @brief Create a new tree node from value and left and right children
+	 * @param v The value
+	 * @param l The left child
+	 * @param r The right child
+	 * @return The new tree node's tref id
+	 */
 	static tref get(const T& v, tref l, tref r);
 
+	/**
+	 * @brief Dump the tree (including all its nodes) to stdout
+	 */
 	static void dump();
+
+	/**
+	 * @brief Garbage collect tree nodes
+	 */
 	static void gc();
+
+	/**
+	 * @brief Print the tree to an ostream.
+	 * @param os The ostream to print to.
+	 * @param l The indentation level.
+	 * @return The ostream.
+	 */
+	std::ostream& print(std::ostream& os, size_t l = 0) const;
 
 	bool operator<(const bintree& o) const;
 	bool operator==(const bintree& o) const;
 protected:
-	bintree(const T& _value, tref _l = NULL, tref _r = NULL);
-	std::ostream& print(std::ostream& o, size_t s = 0) const;
-	virtual const std::string str() const;
+	/**
+	 * @brief Constructor for a new tree node from value and left and right children
+	 * @param _value The value
+	 * @param _l The left child
+	 * @param _r The right child
+	 */
+	bintree(const T& _value, tref _l = nullptr, tref _r = nullptr);
 
-	//static std::vector<const bintree*> V;
+	/**
+	 * @brief Get the string representation of the node (for debugging)
+	 * @return The string representation of the node.
+	 */
+	const std::string str() const;
+
+	/**
+	 * @brief Map of tree nodes to their handles
+	 */
 	static std::map<const bintree, htree::wp> M;
 };
 
+template <typename T> struct pre_order;
+template <typename T> struct post_order;
+
+/**
+ * @brief Left child right sibling tree
+ * @tparam T The type of the tree node value
+ */
 template <typename T>
 struct lcrs_tree : public bintree<T> {
-protected:
-	static const htree::sp geth(tref h);
-	static lcrs_tree<T>& get(const htree::sp& h);
-	static const lcrs_tree<T>& get(const tref id);
+	/**
+	 * @brief Get node's tref
+	 * @return The tree node reference
+	 */
+	tref get() const;
 
-	//static const htree::sp get( const T& v, std::vector<T>&& child = {});
-	template<typename U = T>
-	static tref get(const T& v, const U* child, size_t len);
-	static tref get(const T& v, const std::vector<tref>& child);
+	/**
 
-	size_t get_child_size() const;
-	//fills caller allocated child array upto len size
-	//with child ids. If child is nullptr, then just
-	//calculates number of children in len.
-	//caller's responsibility to free allocated memory
-	bool get_kary_child(tref* child, size_t& len) const;
-	auto get_lcrs_child();
-	trefs get_children_trefs() const;
-	const lcrs_tree<T>& get_child(size_t n) const;
-	tref_range<T> get_children() const;
+	 * @brief Get the tree node from its tref id
+	 * @param id The tree node's tref id
+	 * @return The tree node's id
+	 */
+	static const lcrs_tree<T>& get(tref id);
+
+	/**
+	 * @brief Get the tree node from its handle
+	 * @param h The tree node handle
+	 * @return The tree node
+	 */
+	static const lcrs_tree<T>& get(const htree::sp& h);
+
+	/**
+	 * @brief Get the tree node shared handle
+	 * @param h The tree node handle
+	 * @return The tree node shared handle
+	 */
+	static const htree::sp geth(tref id);
+
+	/**
+	 * @brief Creates new tree node from value and children)
+	 * @param v The value
+	 * @param ch The children pointer / array
+	 * @param len The number of children
+	 * @return The new tree node's tref id
+	 */
+	static tref get(const T& v, const tref* ch, size_t len);
+
+	/**
+	 * @brief Creates new tree node from value and children)
+	 * @param v The value
+	 * @param ch The children vector
+	 * @return The new tree node's tref id
+	 */
+	static tref get(const T& v, const trefs& ch);
+
+	/**
+	 * @brief Creates new tree node from value and tref of a child
+	 * @param v The node
+	 * @param ch The child's tref
+	 * @return The new tree node's tref id
+	 */
+	static tref get(const T& v, tref ch);
+
+	/**
+	 * @brief Creates new tree node from value and two children trefs
+	 * @param v The node
+	 * @param ch1 The first child
+	 * @param ch2 The second child
+	 * @return The new tree node's tref id
+	 */
+	static tref get(const T& v, tref ch1, tref ch2);
+
+	/**
+	 * @brief Creates new tree leaf node from value
+	 * @param v The value
+	 * @return The new tree node's tref id
+	 */
+	static tref get(const T& v);
+
+	/**
+	 * @brief Creates new tree node from value and childdren array / pointer
+	 * @param v The node
+	 * @param ch Children pointer / array
+	 * @param len The number of children
+	 * @return The new tree node's tref id
+	 */
+	static tref get(const T& v, const T* ch, size_t len);
+
+	/**
+	 * @brief Creates new tree node from value and children vector of nodes
+	 * @param v The node
+	 * @param ch Children nodes vector
+	 * @return The new tree node's tref id
+	 */
+	static tref get(const T& v, const std::vector<T>& children);
+
+	/**
+	 * @brief Creates new tree node from value and child node
+	 * @param v The node
+	 * @param ch The child node
+	 * @return The new tree node's tref id
+	 */
+	static tref get(const T& v, const T& ch);
+
+	/**
+	 * @brief Creates new tree node from value and two child nodes
+	 * @param v The node
+	 * @param ch1 The first child node
+	 * @param ch2 The second child node
+	 * @return The new tree node's tref id
+	 */
+	static tref get(const T& v, const T& ch1, const T& ch2); 
+
+	/**
+	 * @brief Get the number of children
+	 * @return The number of children
+	 */
+	size_t children_size() const;
+
+	/**
+	 * @brief Return children trefs or calculate size
+	 * @param ch Data pointer to fill with children trefs or nullptr to get size
+	 * @param len Reference to the number of children to populate or to be populated with size
+	 * @return The new tree node's tref id
+	 * Fills caller allocated child array upto len size with child ids.
+	 * If child is nullptr, then just calculates number of children in len.
+	 * Caller's responsibility to free allocated memory.
+	 */
+	bool get_kary_children(tref* ch, size_t& len) const;
+	bool get_children(tref* ch, size_t& len) const;
+
+	/**
+	 * @brief Get the children trefs
+	 * @return The children trefs
+	 */
+	trefs get_children() const;
+
+	/**
+	 * @brief Get the children tref range usable in range-based for loops
+	 * @return tref_range with iterator
+	 */
+	tref_range<T> children() const;
+
+	/**
+	 * @brief Get the children tree nodes range usable in range-based for loops
+	 * @return tree_range with iterator
+	 */
+	tree_range<lcrs_tree<T>> children_trees() const;
+
+	/**
+	 * @brief Get the child node's tref id
+	 * @param n The index of the child
+	 * @return The child node's tref id
+	 */
+	tref child(size_t n) const;
+
+	/**
+	 * @brief Get the child node's tref id (alias for child(n))
+	 * @param n The index of the child
+	 * @return The child node's tref id
+	 */
+	tref operator[](size_t n) const;
+
+	/**
+	 * @brief Get the first child node's tref id
+	 * @return The first child node's tref id
+	 */
+	tref first()  const;
+
+	/**
+	 * @brief Get the second child node's tref id
+	 * @return The second child node's tref id
+	 */
+	tref second() const;
+
+	/**
+	 * @brief Get the third child node's tref id
+	 * @return The third child node's tref id
+	 */
+	tref third()  const;
+
+	/**
+	 * @brief Get the only child's tref id. Return nullptr if not only
+	 * @return The only child node's tref id or nullptr
+	 */
+	tref only_child() const;
+
+	/**
+	 * @brief Get the child tree node from its index without checks for safety!
+	 * @param n The index of the child
+	 * @return The child tree node
+	 */
+	const lcrs_tree<T>& child_tree(size_t n) const;
+
+	/**
+	 * @brief Get the first child tree node without checks for safety!
+	 * @param id The child node's tref id
+	 * @return The child tree node
+	 */
+	const lcrs_tree<T>& first_tree()  const;
+
+	/**
+	 * @brief Get the second child tree node without checks for safety!
+	 * @param id The child node's tref id
+	 * @return The child tree node
+	 */
+	const lcrs_tree<T>& second_tree() const;
+
+	/**
+	 * @brief Get the third child tree node without checks for safety!
+	 * @param id The child node's tref id
+	 * @return The child tree node
+	 */
+	const lcrs_tree<T>& third_tree()  const;
+
+	/**
+	 * @brief Get the only child's tree node without checks for safety!
+	 * @return The only child tree node
+	 */
+	const lcrs_tree<T>& only_child_tree() const;
+
+	/**
+	 * @brief Print the tree to an ostream
+	 * @param os The ostream to print to
+	 * @param l The indentation level
+	 * @return The ostream
+	 */
+	std::ostream& print(std::ostream& os, size_t l = 0) const;
+
+	friend post_order<T>;
+	friend pre_order<T>;
 };
 
 template <typename T>
-struct tree : public lcrs_tree<T> {
-	using base_t = lcrs_tree<T>;
+using tree = lcrs_tree<T>;
 
-	static const htree::sp geth(tref h);
-	static const tree& get(const htree::sp& h);
-	static const tree& get(const tref id);
+// TODO remove the commented out tree struct if its API differs from lcrs_tree
+// or use above alias if API is the same 
 
-	//fills caller allocated child array upto len size
-	//with child ids. If child is nullptr, then just
-	//calculates number of children in len.
-	//caller's responsibility to free allocated memory
-	template<typename U = T>
-	static tref get(const T& v, const U* child, size_t len);
-	//static const htree::sp get(const T& v, std::vector<T>&& child = {});
-	static tref get(const T& v, const std::vector<tref>& child);
+// template <typename T>
+// struct tree : public lcrs_tree<T> {
+// 	using base_t = lcrs_tree<T>;
 
-	size_t get_child_size() const;
-	bool get_child(tref *child, size_t& len) const;
-	const tree& get_child(size_t n) const;
-	tref_range<T> get_children() const;
-	trefs get_children_trefs() const;
-	std::ostream& print(std::ostream& o, size_t s = 0) const;
+// 	tref get() const { return base_t::get(); }
+// 	static const htree::sp geth(tref h);
+// 	static const tree& get(const htree::sp& h);
+// 	static const tree& get(const tref id);
+
+// 	static tref get(const T& v, const tref* children, size_t len);
+// 	//static const htree::sp get(const T& v, std::vector<T>&& child = {});
+// 	static tref get(const T& v, const std::vector<tref>& children);
+// 	static tref get(const T& v, tref child); // with single child
+// 	static tref get(const T& v, tref ch1, tref ch2); // with two children
+// 	static tref get(const T& v); // leaf node
+
+// 	static tref get(const T& v, const T* children, size_t len);
+// 	static tref get(const T& v, const std::vector<T>& children);
+// 	static tref get(const T& v, const T& ch);
+// 	static tref get(const T& v, const T& ch1, const T& ch2); 
+
+// 	//fills caller allocated child array upto len size
+// 	//with child ids. If child is nullptr, then just
+// 	//calculates number of children in len.
+// 	//caller's responsibility to free allocated memory
+// 	bool get_children(tref *child, size_t& len) const;
+
+// 	size_t children_size() const;
+// 	trefs get_children() const;
+// 	tref child(size_t n) const;
+// 	tref_range<T> children() const;
+// 	tref only_child() const;
+
+// 	const tree<T>& child_tree(size_t n) const;
+// 	tree_range<tree<T>> children_trees() const;
+// 	const tree<T>& only_child_tree() const;
+
+// 	std::ostream& print(std::ostream& o, size_t s = 0) const;
+// };
+
+
+//------------------------------------------------------------------------------
+// post_order and pre_order traversals
+// - can be used with lcrs_tree, tree and their descendants
+// - does not work with bintree
+
+// TODO handle traversals and gc
+
+/**
+ * @brief Struct for tree traversals in post order
+ * @tparam node_t Tree node type
+ */
+template <typename node_t>
+struct post_order {
+
+	explicit post_order(tref n);
+	explicit post_order(const htree::sp& h);
+
+	/**
+	 * @brief Apply f in post order to root according to visit_subtree.
+	 * If f is applied to a node, its children are already transformed by f
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node. Must not have side effects due to memorization
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @return The tree obtained after applying f to root
+	 */
+	template <size_t slot = 0>
+	tref apply_unique(auto& f, auto& visit_subtree);
+
+	/**
+	 * @brief Apply f in post order to root.
+	 * If f is applied to a node, its children are already transformed by f
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node. Must not have side effects due to memorization
+	 * @return The tree obtained after applying f to root
+	 */
+	template <size_t slot = 0>
+	tref apply_unique(auto& f);
+
+	/**
+	 * @brief Call visit in post order on the nodes of root according to visit_subtree.
+	 * If visit returns false on a node, the traversal is terminated
+	 * @param visit Function to call on each node
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 */
+	void search(auto& visit, auto& visit_subtree);
+
+	/**
+	 * @brief Call visit in post order on the nodes of root.
+	 * If visit returns false on a node, the traversal is terminated
+	 * @param visit Function to call on each node
+	 */
+	void search(auto& visit);
+
+	/**
+	 * @brief Call visit in post order on each node of root according to visit_subtree.
+	 * Equal nodes are not visited twice.
+	 * If visit returns false on a node, the traversal is terminated
+	 * @param visit Function to call on each node
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 */
+	void search_unique(auto& visit, auto& visit_subtree);
+
+	/**
+	 * @brief Call visit in post order on each node of root.
+	 * Equal nodes are not visited twice.
+	 * If visit returns false on a node, the traversal is terminated
+	 * @param visit Function to call on each node
+	 */
+	void search_unique(auto& visit);
+
+private:
+	tref root;
+	// inline static std::unordered_map<std::pair<node_t, size_t>, node_t,
+	// 	std::hash<std::pair<node_t, size_t>>,
+	// 	traverser_pair_cache_equality<node_t>> m;
+	inline static std::unordered_map<std::pair<tref, size_t>, tref> m;
+
+	template <size_t slot>
+	tref traverse(tref n, auto& f, auto& visit_subtree);
+
+	template<bool unique>
+	void const_traverse(tref n, auto& visit, auto& visit_subtree);
+};
+
+/**
+ * @brief Struct for tree traversals in pre order
+ * @tparam node_t Tree node type
+ */
+template<typename node_t>
+struct pre_order {
+	explicit pre_order(tref n);
+	explicit pre_order(const htree::sp& h);
+
+	/**
+	 * @brief Apply f in pre order to root according to visit_subtree.
+	 * If f is applied to a node, the traversal will continue with the children of the transformed node
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node. Must not have side effects due to memorization
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param up Function to apply to processed node in post order
+	 * @return The tree obtained after applying f to root
+	 */
+	template<size_t slot = 0>
+	tref apply_unique(auto& f, auto& visit_subtree, auto& up);
+
+	/**
+	 * @brief Apply f in pre order to root.
+	 * If f is applied to a node, the traversal will continue with the children of the transformed node
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node. Must not have side effects due to memorization
+	 * @return The tree obtained after applying f to root
+	 */
+	template<size_t slot = 0>
+	tref apply_unique(auto& f);
+
+	/**
+	 * @brief Apply f in pre order to root according to visit_subtree.
+	 * If f is applied to a node, the traversal will continue with the children of the transformed node
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node. The function can have side effects
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param up Function to apply to processed node in post order
+	 * @return The tree obtained after applying f to root
+	 */
+	template<size_t slot = 0>
+	tref apply(auto& f, auto& visit_subtree, auto& up);
+
+	/**
+	 * @brief Apply f in pre order to root according to visit_subtree.
+	 * If f is applied to a node resulting in a change, its children are not traversed
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node. Must not have side effects due to memorization
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param up Function to apply to processed node in post order
+	 * @return The tree obtained after applying f to root
+	 */
+	template<size_t slot = 0>
+	tref apply_unique_until_change(auto& f, auto& visit_subtree, auto& up);
+
+	/**
+	 * @brief Apply f in pre order to root.
+	 * If f is applied to a node resulting in a change, its children are not traversed
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node. Must not have side effects due to memorization
+	 * @return The tree obtained after applying f to root
+	 */
+	template<size_t slot = 0>
+	tref apply_unique_until_change(auto& f);
+
+	/**
+	 * @brief Apply f in pre order to root according to visit_subtree.
+	 * If f is applied to a node resulting in a change, its children are not traversed
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node. The function can have side effects
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param up Function to apply to processed node in post order
+	 * @return The tree obtained after applying f to root
+	 */
+	template<size_t slot = 0>
+	tref apply_until_change(auto& f, auto& visit_subtree, auto& up);
+
+	/**
+	 * @brief Apply f in pre order to root while revisiting already visited nodes.
+	 * If f is applied to a node resulting in a change, its children are not traversed
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node. The function can have side effects
+	 * @return The tree obtained after applying f to root
+	 */
+	template<size_t slot = 0>
+	tref apply_until_change(auto& f);
+
+	/**
+	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
+	 * If visit returns false on a node, its children are not visited
+	 * @param visit The function called on nodes
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param up Function called on visited nodes in post order
+	 */
+	void visit(auto& visit, auto& visit_subtree, auto& up);
+
+	/**
+	 * @brief Call visit in pre order on the nodes of root.
+	 * If visit returns false on a node, its children are not visited
+	 * @param visit The function called on nodes
+	 */
+	void visit(auto& visit);
+
+	/**
+	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
+	 * If visit returns false on a node, the traversal terminates
+	 * @param visit The function called on nodes
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param up Function called on visited nodes in post order
+	 */
+	void search(auto& visit, auto& visit_subtree, auto& up);
+
+	/**
+	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
+	 * If visit returns false on a node, the traversal terminates
+	 * @param visit The function called on nodes
+	 */
+	void search(auto& visit);
+
+	/**
+	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
+	 * Equal nodes are not visited twice.
+	 * If visit returns false on a node, its children are not visited
+	 * @param visit The function called on nodes
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param up Function called on visited nodes in post order
+	 */
+	void visit_unique(auto& visit, auto& visit_subtree, auto& up);
+
+	/**
+	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
+	 * Equal nodes are not visited twice.
+	 * If visit returns false on a node, its children are not visited
+	 * @param visit The function called on nodes
+	 */
+	void visit_unique(auto& visit);
+
+	/**
+	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
+	 * Equal nodes are not visited twice.
+	 * If visit returns false on a node, the traversal terminates
+	 * @param visit The function called on nodes
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param up Function called on visited nodes in post order
+	 */
+	void search_unique(auto& visit, auto& visit_subtree, auto& up);
+
+	/**
+	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
+	 * Equal nodes are not visited twice.
+	 * If visit returns false on a node, the traversal terminates
+	 * @param visit The function called on nodes
+	 */
+	void search_unique(auto& visit);
+
+#ifdef MEASURE_TRAVERSER_DEPTH
+	std::pair<size_t, size_t> get_tree_depth_and_size();
+#endif //MEASURE_TRAVERSER_DEPTH
+
+private:
+	tref root;
+	// inline static std::unordered_map<std::pair<node_t, size_t>, node_t,
+	// 		std::hash<std::pair<node_t, size_t>>,
+	// 		traverser_pair_cache_equality<node_t>> m;
+	inline static std::unordered_map<std::pair<tref, size_t>, tref> m;
+
+	template<bool break_on_change, size_t slot, bool unique>
+	tref traverse(tref n, auto& f, auto& visit_subtree, auto& up);
+
+	template<bool search, bool unique>
+	void const_traverse(tref n, auto& visit, auto& visit_subtree, auto& up);
+};
+
+template<typename T>
+struct error_node;
+
+template <>
+struct error_node<tref> {
+	inline static const tref value = nullptr;
 };
 
 } // idni2 namespace
 
 #include "bintree.tmpl.h"
+#include "bintree_traversals.tmpl.h"
 
 #endif // __IDNI__TREE_H__
