@@ -20,7 +20,7 @@
 #include <ranges>
 #include <deque>
 #include <sstream>
-#include "defs.h"
+#include "../defs.h"
 #include "bintree.h"
 
 #ifdef DEBUG

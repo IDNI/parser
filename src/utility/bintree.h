@@ -22,7 +22,7 @@
 #include <memory>
 #include <iostream>
 #include <cassert>
-#include "defs.h"
+#include "../defs.h"
 
 namespace idni {
 

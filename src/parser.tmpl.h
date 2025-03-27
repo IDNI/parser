@@ -15,7 +15,7 @@
 #include "parser.h"
 
 #ifdef PARSER_MEASURE
-#include "measure.h"
+#include "utility/measure.h"
 #endif // PARSER_MEASURE
 
 template <typename C, typename T>

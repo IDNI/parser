@@ -28,15 +28,15 @@
 
 // #define PARSER_BINTREE_FOREST true
 
-#include "memory_map.h"
 #include "defs.h"
-#include "characters.h"
-#include "charclasses.h"
-#include "term_colors.h"
-#include "bintree.h"
+#include "utility/memory_map.h"
+#include "utility/characters.h"
+#include "utility/charclasses.h"
+#include "utility/term_colors.h"
+#include "utility/bintree.h"
 
 #ifndef PARSER_BINTREE_FOREST
-#include "forest.h"
+#include "utility/forest.h"
 #endif
 
 #define DEFAULT_BINARIZE false
@@ -868,7 +868,7 @@ struct std::hash<idni::lit<C, T>> {
 #endif
 
 #ifdef DEBUG
-#include "devhelpers.h"   // various helpers for converting forest
+#include "utility/devhelpers.h"   // various helpers for converting forest
 #endif // DEBUG
 
 // undef local macros

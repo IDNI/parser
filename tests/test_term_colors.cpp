@@ -11,7 +11,7 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include <iostream>
-#include "term_colors.h"
+#include "utility/term_colors.h"
 
 using namespace std;
 using namespace idni::term;

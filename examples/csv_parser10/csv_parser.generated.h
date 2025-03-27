@@ -1,4 +1,4 @@
-// This file is generated from a file ./csv.tgf by
+// This file is generated from a file examples/csv_parser10/csv.tgf by
 //       https://github.com/IDNI/parser/tools/tgf
 //
 #ifndef __CSV_PARSER_H__
@@ -150,16 +150,6 @@ struct csv_parser : public idni::parser<char, char> {
 	}
 	symbol_type literal(const nonterminal& nt) {
 		return symbol_type(nt, &csv_parser_data::nts);
-	}
-private:
-	static ::idni::grammar<char_type, terminal_type>& get_grammar() {
-		static ::idni::grammar<char_type, terminal_type> grammar(
-			csv_parser_data::nts,
-			csv_parser_data::productions(),
-			csv_parser_data::start_symbol,
-			csv_parser_data::char_classes,
-			csv_parser_data::grammar_options);
-		return grammar;
 	}
 };
 

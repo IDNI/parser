@@ -14,7 +14,7 @@
 #define __IDNI__PARSER__DEVHELPERS_H__
 #include <sstream>
 #include <iomanip>
-#include "parser.h"
+#include "../parser.h"
 
 namespace idni {
 

@@ -1,7 +1,5 @@
 # public headers and sources
 set(PARSER_HEADERS
-	characters.h
-	charclasses.h
 	defs.h
 	devhelpers.h
 	forest.h
@@ -9,14 +7,16 @@ set(PARSER_HEADERS
 	parser.tmpl.h
 	recoders.h
 	tgf.h
-	bintree.h
+	utility/characters.h
+	utility/charclasses.h
+	utility/bintree.h
 )
 set(PARSER_SOURCES
-	characters.cpp
-	charclasses.cpp
 	parser.cpp
 	recoders.cpp
-	term.cpp
+	utility/characters.cpp
+	utility/charclasses.cpp
+	utility/term.cpp
 )
 
 # object library

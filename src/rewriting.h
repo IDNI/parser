@@ -27,7 +27,7 @@
 #include <compare>
 
 #ifndef PARSER_BINTREE_FOREST
-#include "forest.h"
+#include "utility/forest.h"
 #endif
 #include "parser.h"
 
@@ -1812,7 +1812,7 @@ sp_node<symbol_t> make_node_from_parse_result(
 {
 	if (r.found) return make_node_from_tree<
 		parser_t, transformer_t, symbol_t>(
-			transformer, r.get_shaped_tree2());
+			transformer, r.get_shaped_tree());
 	LOG_ERROR << "(Error) " << r.parse_error << LOG_END;
 	return 0;
 }

@@ -30,5 +30,5 @@ endforeach()
 
 # add required sources to test_cli
 target_sources("test_cli" PRIVATE
-	"${CMAKE_CURRENT_SOURCE_DIR}/../src/cli.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/../src/utility/cli.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../tools/tgf/tgf_cli.cpp")

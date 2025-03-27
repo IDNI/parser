@@ -15,9 +15,9 @@
 #include <string>
 #include <vector>
 
-#include "cli.h"
-#include "repl.h"
-#include "term_colors.h"
+#include "utility/cli.h"
+#include "utility/repl.h"
+#include "utility/term_colors.h"
 #include "tgf_repl_parser.generated.h"
 
 namespace idni {

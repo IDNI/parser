@@ -16,7 +16,7 @@
 #include <streambuf>
 
 #include "tgf_parser.generated.h"
-#include "devhelpers.h"
+#include "utility/devhelpers.h"
 
 namespace idni {
 

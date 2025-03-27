@@ -1,4 +1,4 @@
-#include "bintree.h"
+#include "utility/bintree.h"
 #include <iostream>
 
 using namespace idni;
