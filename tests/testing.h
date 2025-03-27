@@ -114,6 +114,7 @@ template <typename T>
 int test_out(int c, const grammar<T>& g, const std::basic_string<T>& inputstr,
 	typename parser<T>::result& r)
 {
+#ifndef PARSER_BINTREE_FOREST
 	std::stringstream ptd;
 	std::stringstream ssf;
 
@@ -174,20 +175,20 @@ int test_out(int c, const grammar<T>& g, const std::basic_string<T>& inputstr,
 		filet.close();
 		using ndtype = typename parser<T>::pnode;
 
-		idni2::htree::sp lcrs_tr = g.extract_tree2();
-		static std::vector<idni2::htree::sp> storesp;
+		htree::sp lcrs_tr = g.extract_tree2();
+		static std::vector<htree::sp> storesp;
 		storesp.push_back(lcrs_tr);
 	
 		if(storesp.size() >2 ) {
 			int ind = std::rand() % (storesp.size());
 			storesp.erase(storesp.begin()+ind);
-			idni2::bintree<ndtype>::gc();
+			bintree<ndtype>::gc();
 		}
 		ssf.str({});
 		ptd.str({});
 		ssf << "tree_lcrs"<<"_"<<testing::test_name << c << "_" << i << suffix << ".txt";
 		filet.open(ssf.str());
-		idni2::tree<ndtype>::get(lcrs_tr).print(ptd);
+		tree<ndtype>::get(lcrs_tr).print(ptd);
 		
 		filet << ptd.str();
 		filet.close();
@@ -203,6 +204,7 @@ int test_out(int c, const grammar<T>& g, const std::basic_string<T>& inputstr,
 	};
 
 	f.extract_graphs(f.root(), cb_next_graph, opt_edge);
+#endif
 	return 1;
 }
 
@@ -236,12 +238,17 @@ bool run_test_(grammar<T>& g, parser<T>& p, const std::basic_string<T>& input,
 	}
 	bool found = r.found;
 	bool found_orig = found;
+#ifdef PARSER_BINTREE_FOREST
+	tref froot = r.get_tree2();
+#else
 	auto* f = r.get_forest();
+#endif
 
 	std::string msg{};
 	if (!found) msg = r.parse_error
 			.to_str(parser<T>::error::info_lvl::INFO_BASIC);
 	//if (!found and opts.dump) p.print_S(ss << "\t# S:\n") << "\n";
+#ifndef PARSER_BINTREE_FOREST
 	bool ambiguity = found && r.is_ambiguous();
 	if (ambiguity && opts.ambiguity_fails) {
 		expect_fail = found = false;
@@ -262,6 +269,17 @@ bool run_test_(grammar<T>& g, parser<T>& p, const std::basic_string<T>& input,
 		};
 		f->traverse(cb_enter, cb_exit);
 	}
+#else
+	bool ambiguity = false;
+	bool contained = false;
+	auto check_contained = [&opts, &contained](tref n) {
+		if (opts.contains == parser<T>::tree::get(n).value
+							.first.to_std_string())
+			return contained = true, false;
+		return true;
+	};
+	post_order<typename parser<T>::pnode>(froot).search(check_contained);
+#endif
 	if (verbosity > 0) {
 		ss << "\t# found: " << found_orig << " " << (found ? "yes => SUCCESS" : "no => FAIL");
 		if (ambiguity) ss << " because of ambiguity";
@@ -272,17 +290,27 @@ bool run_test_(grammar<T>& g, parser<T>& p, const std::basic_string<T>& input,
 					opts.error_expected <<"\"\n";
 		ss << "\n";
 	}
+#ifndef PARSER_BINTREE_FOREST
 	if (found) {
 		if (verbosity > 0)
+
 			ss << "\t# is_ambiguous " << (r.is_ambiguous()
 				? "yes" : "no") << "\n",
 			ss << "\t# count_trees "
 				<< f->count_trees() << "\n";
 	}
+#endif
 	if (found && verbosity > 1) {
 		struct {
 			bool graphs = false, facts = false, rules = false;
 		} print;
+#ifdef PARSER_BINTREE_FOREST
+		if (print.graphs) {
+			ss << "\n\t# parsed tree:\n\n";
+			tree<typename parser<T>::pnode>::get(froot).print(ss);
+			ss << "\n\n";
+		}
+#else
 		auto cb_next_g = [&r, &print, &ss](parser<T>::pgraph& g) {
 			r.inline_grammar_transformations(g);
 			if (print.graphs) {
@@ -302,14 +330,15 @@ bool run_test_(grammar<T>& g, parser<T>& p, const std::basic_string<T>& input,
 			f->extract_graphs(f->root(), cb_next_g);
 		if (print.facts) to_tml_facts<T,T>(ss << "\n\t# TML facts:\n\n",
 			r), ss << "\n";
+#endif
 		ss << "\t# terminals parsed: `" << to_string(
 			r.get_terminals()) << "`\n";
 		if (verbosity > 2) test_out<T>(c, g,
 			input.size() > 100 ? input.substr(0, 100) : input, r);
 	}
-
-
+#ifndef PARSER_BINTREE_FOREST
 	if (ambiguity && verbosity > 0) r.print_ambiguous_nodes(ss);
+#endif
 	if (expect_fail) found = msg.find(opts.error_expected) ==
 					decltype(opts.error_expected)::npos;
 	bool fail = false;

@@ -24,9 +24,7 @@
 #include <cassert>
 #include "defs.h"
 
-namespace idni2 {
-
-using namespace idni;
+namespace idni {
 
 //------------------------------------------------------------------------------
 
@@ -38,7 +36,7 @@ using trefs = std::vector<tref>;
 // @brief tref -> tref map used in caching
 // TODO unordered_map needs hash for std::pair<T1, T2> when compiled with tau
 // TODO note that cache must survive gc
-using tref_cache_map = std::map<tref, tref>;
+using tref_cache_map = std::unordered_map<tref, tref>;
 // @brief tref set used in caching
 using tref_cache_set = std::set<tref>;
 
@@ -735,7 +733,7 @@ struct error_node<tref> {
 	inline static const tref value = nullptr;
 };
 
-} // idni2 namespace
+} // idni namespace
 
 #include "bintree.tmpl.h"
 #include "bintree_traversals.tmpl.h"

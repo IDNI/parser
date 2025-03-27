@@ -46,6 +46,7 @@ int main(int argc, char **argv)
 		number(nt("number")),  digits(nt("digits")),
 		q_str(lit<>{'"'}), esc(lit<>{'\\'}), escape(nt("escape"));
 	
+#ifndef PARSER_BINTREE_FOREST
 		parser<>::pnode n1, n2,n3;
 		{
 			cout<<"START Ref counting tests "<<std::endl;
@@ -65,7 +66,7 @@ int main(int argc, char **argv)
 			//n3 = ) p4;
 		}
 		cout<<"End , GCed:"<<(assert( n1._mpsize() == 0),"ok");
-
+#endif
 
 
 /*******************************************************************************

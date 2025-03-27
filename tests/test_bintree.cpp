@@ -1,10 +1,9 @@
 #include "bintree.h"
 #include <iostream>
 
-int main()
-{
-    using namespace idni;
-    using namespace idni2;
+using namespace idni;
+
+int main() {
     using nd_t = char;
     nd_t n1,n2, n3, n4;
     n1 = '1';

@@ -72,7 +72,7 @@ private:
 			DBG(assert(id != nullptr);)
 			return *id;
 		}
-		inline const NodeT* operator->() const { return id;}
+		inline const NodeT* operator->() const { return id; }
 		inline nptr_t& operator=(const nptr_t& rhs) {
 			//if(  !id && rhs.id)
 			//if(&rhs != this) nc++;
@@ -88,10 +88,10 @@ private:
 			return *this;
 		}
 		inline bool operator<(const nptr_t& rhs) const {
-			return hash <rhs.hash;
+			return hash < rhs.hash;
 			//return id < rhs.id;
 		}
-		inline bool operator == (const nptr_t& rhs) const {
+		inline bool operator==(const nptr_t& rhs) const {
 			if (hash == rhs.hash) {
 				DBG(assert(id == rhs.id));
 				return true;
@@ -136,10 +136,10 @@ public:
 		std::set<node> cycles;
 		/// builds and returns a tree with nodes
 		sptree extract_trees();
-		idni2::htree::sp extract_tree2();
+		htree::sp extract_tree2();
 	private:
 		sptree _extract_trees(node& r, int_t choice = 0);
-		idni2::htree::sp _extract_tree2(node& r);
+		htree::sp _extract_tree2(node& r);
 	};
 	//vector of graph with callback
 	using graphv = std::vector<graph>;

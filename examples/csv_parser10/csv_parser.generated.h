@@ -1,4 +1,4 @@
-// This file is generated from a file examples/csv_parser10/csv.tgf by
+// This file is generated from a file ./csv.tgf by
 //       https://github.com/IDNI/parser/tools/tgf
 //
 #ifndef __CSV_PARSER_H__
@@ -11,7 +11,8 @@ namespace csv_parser_data {
 using char_type     = char;
 using terminal_type = char;
 
-inline std::vector<std::string> symbol_names{
+inline static constexpr size_t nt_bits = 5;
+inline const std::vector<std::string> symbol_names{
 	"", "digit", "printable", "integer", "__E_integer_0", "__E_integer_1", "quote", "esc", "escaping", "unescaped", 
 	"escaped", "strchar", "str", "__E_str_2", "nullvalue", "val", "eol", "__E_eol_3", "row", "__E_row_4", 
 	"__E_row_5", "rows", "__E_rows_6", "__E_rows_7", "start", "__N_0", 
@@ -149,6 +150,16 @@ struct csv_parser : public idni::parser<char, char> {
 	}
 	symbol_type literal(const nonterminal& nt) {
 		return symbol_type(nt, &csv_parser_data::nts);
+	}
+private:
+	static ::idni::grammar<char_type, terminal_type>& get_grammar() {
+		static ::idni::grammar<char_type, terminal_type> grammar(
+			csv_parser_data::nts,
+			csv_parser_data::productions(),
+			csv_parser_data::start_symbol,
+			csv_parser_data::char_classes,
+			csv_parser_data::grammar_options);
+		return grammar;
 	}
 };
 

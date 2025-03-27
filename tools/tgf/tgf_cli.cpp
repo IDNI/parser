@@ -430,12 +430,17 @@ void tgf_repl_evaluator::parsed(parser_type::result& r) {
 		cerr << r.parse_error.to_str(opt.error_verbosity) << endl;
 		return;
 	}
+#ifndef PARSER_BINTREE_FOREST
 	auto f = r.get_forest();
+#endif
 	stringstream ss;
 	if (opt.print_input) ss << "input: \"" << r.get_input() << "\"\n";
+#ifndef PARSER_BINTREE_FOREST
 	if (opt.print_ambiguity) r.print_ambiguous_nodes(ss);
 	if (opt.print_terminals) ss << "parsed terminals: "
 		<< TC_T << r.get_terminals() << TC_CLEARED_DEFAULT << "\n";
+#endif
+#ifndef PARSER_BINTREE_FOREST
 	auto cb_next_g = [&r, &ss, this](parser_type::pgraph& g) {
 		r.inline_grammar_transformations(g);
 		auto t = g.extract_trees();
@@ -448,6 +453,7 @@ void tgf_repl_evaluator::parsed(parser_type::result& r) {
 	// to_tml_rules<char>(ss, std::as_const(*f));
 	if (opt.tml_rules) f->extract_graphs(f->root(), cb_next_g);
 	if (opt.tml_facts) to_tml_facts<char, char>(ss << "TML facts:\n", r);
+#endif
 	if (opt.print_graphs) {
 		auto str2ntids = [this](const set<string>& list) {
 			set<size_t> r;
@@ -457,8 +463,7 @@ void tgf_repl_evaluator::parsed(parser_type::result& r) {
 		shaping_options sopt;
 		sopt.trim_terminals = g->opt.shaping.trim_terminals;
 		sopt.inline_char_classes = g->opt.shaping.inline_char_classes;
-		if (opt.to_trim.size())
-			sopt.to_trim          = str2ntids(opt.to_trim);
+		if (opt.to_trim.size()) sopt.to_trim = str2ntids(opt.to_trim);
 		else sopt.to_trim = g->opt.shaping.to_trim;
 		sopt.to_trim_children = opt.to_trim_children.size()
 			? str2ntids(opt.to_trim_children)
@@ -1106,7 +1111,9 @@ int tgf_repl_evaluator::eval(const string& src) {
 	auto r = rp.parse(src.c_str(), src.size());
 	if (!r.found) cout << "invalid command: " << r.parse_error << "\n";
 	else {
+#ifndef PARSER_BINTREE_FOREST
 		r.print_ambiguous_nodes(cout);
+#endif
 		if (opt.debug) {
 			pretty_print(cout << "input command graph:\n",
 				r.get_shaped_tree2(), {}, false, 1);

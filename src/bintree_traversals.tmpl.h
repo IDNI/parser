@@ -13,7 +13,7 @@
 
 #include "bintree.h"
 
-namespace idni2 {
+namespace idni {
 
 static const auto all = [](const auto&) static { return true; };
 static const auto none = [](const auto&) static { return false; };
@@ -216,10 +216,11 @@ tref post_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree) {
 template <typename node_t>
 template<bool unique>
 void post_order<node_t>::const_traverse(tref n, auto& visit, auto& visit_subtree) {
+	if (n == nullptr) return;
 	// std::unordered_set<node_t, std::hash<node_t>,
 	// 	traverser_cache_equality<node_t>> cache;
 	tref_cache_set cache;
-	std::vector<tref> stack;
+	trefs stack;
 	std::vector<size_t> upos;
 	stack.push_back(n);
 	upos.push_back(0);
@@ -397,8 +398,8 @@ template<bool break_on_change, size_t slot, bool unique>
 tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up) {
 	// std::unordered_map<node_t, node_t, std::hash<node_t>,
 	// 	traverser_cache_equality<node_t>> cache;
-	std::unordered_map<tref, tref> cache;
-	std::vector<tref> stack;
+	tref_cache_map cache;
+	trefs stack;
 	std::vector<size_t> upos;
 	// Apply f and save on stack
 	tref r = f(n);
@@ -609,4 +610,4 @@ void pre_order<node_t>::const_traverse(tref n, auto& visit, auto& visit_subtree,
 	}
 }
 
-}
+} // idni namespace

@@ -38,19 +38,21 @@ std::ostream& operator<<(std::ostream& os,
 
 static inline idni::term::colors TC;
 
+#ifndef PARSER_BINTREE_FOREST
 template <typename C, typename T>
 typename forest<typename parser<C,T>::pnode>::node
-	parser<C,T>::pnode::ptrof(
-		const typename parser<C,T>::pnode& pn) {
+	parser<C,T>::pnode::ptrof(const typename parser<C,T>::pnode& pn)
+{
 	auto r = nid().emplace( pn, nullptr );
 	if (r.second) r.first->second = typename
 		forest<typename parser<C,T>::pnode>::node(&(r.first->first));
 	return r.first->second;
 }
+#endif
 //------------------------------------------------------------------------------
 
 template <typename C, typename T>
-idni2::tref parser<C, T>::tree::get() const { return base_t::get(); }
+tref parser<C, T>::tree::get() const { return base_t::get(); }
 
 template <typename C, typename T>
 const parser<C, T>::tree& parser<C, T>::tree::get(const tref id) {
@@ -63,54 +65,54 @@ const parser<C, T>::tree& parser<C, T>::tree::get(const htree::sp& h) {
 }
 
 template <typename C, typename T>
-const idni2::htree::sp parser<C, T>::tree::geth(tref id) {
+const htree::sp parser<C, T>::tree::geth(tref id) {
 	return base_t::geth(id);
 }
 
 template <typename C, typename T>
-idni2::tref parser<C, T>::tree::get(const pnode& v, const tref* ch, size_t len){
+tref parser<C, T>::tree::get(const pnode& v, const tref* ch, size_t len){
 	return base_t::get(v, child, len);
 }
 
 template <typename C, typename T>
-idni2::tref parser<C, T>::tree::get(const pnode& v, const trefs& children) {
+tref parser<C, T>::tree::get(const pnode& v, const trefs& children) {
 	return base_t::get(v, children);
 }
 
 template <typename C, typename T>
-idni2::tref parser<C, T>::tree::get(const pnode& v, tref ch) {
+tref parser<C, T>::tree::get(const pnode& v, tref ch) {
 	return base_t::get(v, ch);
 }
 
 template <typename C, typename T>
-idni2::tref parser<C, T>::tree::get(const pnode& v, tref ch1, tref ch2) {
+tref parser<C, T>::tree::get(const pnode& v, tref ch1, tref ch2) {
 	return base_t::get(v, ch1, ch2);
 }
 
 template <typename C, typename T>
-idni2::tref parser<C, T>::tree::get(const pnode& v) { return base_t::get(v); }
+tref parser<C, T>::tree::get(const pnode& v) { return base_t::get(v); }
 
 template <typename C, typename T>
-idni2::tref parser<C, T>::tree::get(const pnode& v, const pnode* ch,
+tref parser<C, T>::tree::get(const pnode& v, const pnode* ch,
 	size_t len)
 {
 	return base_t::get(v, ch, len);
 }
 
 template <typename C, typename T>
-idni2::tref parser<C, T>::tree::get(const pnode& v,
+tref parser<C, T>::tree::get(const pnode& v,
 	const std::vector<pnode>& ch)
 {
 	return base_t::get(v, ch);
 }
 
 template <typename C, typename T>
-idni2::tref parser<C, T>::tree::get(const pnode& v, const pnode& child) {
+tref parser<C, T>::tree::get(const pnode& v, const pnode& child) {
 	return base_t::get(v, child);
 }
 
 template <typename C, typename T>
-idni2::tref parser<C, T>::tree::get(const pnode& v,
+tref parser<C, T>::tree::get(const pnode& v,
 	const pnode& ch1, const pnode& ch2)
 {
 	return get(v, ch1, ch2);
@@ -127,41 +129,41 @@ bool parser<C, T>::tree::get_children(tref *child, size_t& len) const {
 }
 
 template <typename C, typename T>
-idni2::trefs parser<C, T>::tree::get_children() const {
+trefs parser<C, T>::tree::get_children() const {
 	return base_t::get_children();
 }
 
 template <typename C, typename T>
-idni2::tref_range<typename parser<C, T>::pnode> parser<C, T>::tree::children()
+tref_range<typename parser<C, T>::pnode> parser<C, T>::tree::children()
 	const
 {
 	return base_t::children();
 }
 
 template <typename C, typename T>
-typename idni2::tree_range<typename parser<C, T>::tree>
-	parser<C, T>::tree::children_trees() const
+tree_range<typename parser<C, T>::tree> parser<C, T>::tree::children_trees()
+	const
 {
-	return tree_range<tree>(this->l);
+	return tree_range<typename parser<C, T>::tree>(this->l);
 }
 
 template <typename C, typename T>
-idni2::tref parser<C, T>::tree::child(size_t n) const {return base_t::child(n);}
+tref parser<C, T>::tree::child(size_t n) const {return base_t::child(n);}
 
 template <typename C, typename T>
-idni2::tref parser<C, T>::tree::operator[](size_t n) const { return base_t::child(n); }
+tref parser<C, T>::tree::operator[](size_t n) const { return base_t::child(n); }
 
 template <typename C, typename T>
-idni2::tref parser<C, T>::tree::first() const { return base_t::first(); }
+tref parser<C, T>::tree::first() const { return base_t::first(); }
 
 template <typename C, typename T>
-idni2::tref parser<C, T>::tree::second() const { return base_t::second(); }
+tref parser<C, T>::tree::second() const { return base_t::second(); }
 
 template <typename C, typename T>
-idni2::tref parser<C, T>::tree::third() const { return base_t::third(); }
+tref parser<C, T>::tree::third() const { return base_t::third(); }
 
 template <typename C, typename T>
-idni2::tref parser<C, T>::tree::only_child() const {
+tref parser<C, T>::tree::only_child() const {
 	return base_t::only_child();
 }
 
@@ -209,7 +211,7 @@ std::string parser<C, T>::tree::get_terminals() const {
 		return true;
 	};
 	tref this_ = (tref) this;
-	idni2::post_order<pnode>(this_).search(collector);
+	post_order<pnode>(this_).search(collector);
 	return ss.str();
 }
 
@@ -233,7 +235,7 @@ template <typename C, typename T>
 parser<C, T>::tree::traverser::operator bool() const { return has_value(); }
 
 template <typename C, typename T>
-idni2::tref parser<C, T>::tree::traverser::value() const { return values_.front(); }
+tref parser<C, T>::tree::traverser::value() const { return values_.front(); }
 
 template <typename C, typename T>
 const typename parser<C, T>::tree& parser<C, T>::tree::traverser::value_tree()
@@ -244,7 +246,7 @@ const typename parser<C, T>::tree& parser<C, T>::tree::traverser::operator[](
 	size_t n) const { return value_tree()[n]; }
 
 template <typename C, typename T>
-const idni2::trefs& parser<C, T>::tree::traverser::values() const { return values_; }
+const trefs& parser<C, T>::tree::traverser::values() const { return values_; }
 
 template <typename C, typename T>
 std::vector<typename parser<C, T>::tree::traverser>
@@ -279,11 +281,12 @@ typename parser<C, T>::tree::traverser
 	parser<C, T>::tree::traverser::operator||(size_t nt) const
 {
 	trefs r;
-	for (const auto& v : values())
-		for (const tref& c : tree::get(v).get_children()) {
+	for (tref v : values()) {
+		for (tref c : tree::get(v).children()) {
 			const auto& n = tree::get(c).value.first;
 			if (n.nt() && n.n() == nt) r.push_back(c); 
 		}
+	}
 	return traverser(r);
 }
 
@@ -737,7 +740,9 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 		g.print_internal_grammar(std::cout << "grammar: \n", "\t", true)
 			<< "\n";
 	}
+#ifndef PARSER_BINTREE_FOREST
 	auto f = std::make_unique<pforest>();
+#endif
 	S.clear(), U.clear(), bin_tnt.clear(), refi.clear(),
 		gcready.clear(), sorted_citem.clear(), rsorted_citem.clear();
 	//pnode::nid().clear();
@@ -819,6 +824,7 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 			#endif // PARSER_MEASURE
 		}
 
+#ifndef PARSER_BINTREE_FOREST
 		if (o.incr_gen_forest) {
 			const auto& cont = S[n];
 			for (auto it = cont.begin(); it != cont.end(); ++it)
@@ -830,7 +836,7 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 					build_forest(*f, curroot);
 				}
 		}
-
+#endif
 		if (o.enable_gc) {
 			for (auto it = gcready.begin(); it != gcready.end();) {
 				auto rm = *it;
@@ -867,13 +873,27 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 	MS(if (count + gcnt)
 		std::cout << "\nGC: % = " << 100*gcnt/(count+gcnt) <<std::endl);
 
+#ifdef PARSER_BINTREE_FOREST
+	tref fr;
+	if (!o.incr_gen_forest) {
+		fr = init_forest(start_lit, po);
+		// tree::get(fr).print(std::cout << "forest in tree: ") << std::endl;
+	}
+#else
 	if (!o.incr_gen_forest) init_forest(*f, start_lit, po);
-	else f->root(pnode(start_lit, { 0, in->tpos() }));
+		else f->root(pnode(start_lit, { 0, in->tpos() }));
+#endif
+
 	if (debug) debug = false;
 
 	bool fnd = found(po.start);
 	error err = fnd ? error{} : get_error();
+
+#ifdef PARSER_BINTREE_FOREST
+	return result(g, std::move(in), fr, fnd, err);
+#else
 	return result(g, std::move(in), std::move(f), fnd, err);
+#endif
 }
 template <typename C, typename T>
 bool parser<C, T>::found(size_t start) {
@@ -1139,6 +1159,53 @@ void parser<C, T>::pre_process(const item& i) {
 	}
 }
 
+#ifdef PARSER_BINTREE_FOREST
+// build forest directly into tree (skip forest struct)
+template <typename C, typename T>
+tref parser<C, T>::init_forest(const lit<C, T>& start_lit,
+	[[maybe_unused]] const parse_options& po)
+{
+	bin_tnt.clear();
+	sorted_citem.clear();
+	rsorted_citem.clear();
+	tid = 0;
+	// set the start root node
+	pnode root(start_lit, { 0, in->tpos() });
+	// f.root(root);
+
+	// preprocess parser items for faster retrieval
+	#ifdef PARSER_MEASURE
+	measures::start_timer("preprocess", po.measure_preprocess);
+	#endif // PARSER_MEASURE
+
+	int count = 0;
+	for (size_t n = 0; n < in->tpos() + 1; n++)
+		for (const item& i : S[n]) count++, pre_process(i);
+
+	#ifdef PARSER_MEASURE
+	measures::print_timer("preprocess");
+	measures::stop_timer("preprocess");
+	std::cout << "preprocess size: " << count << "\n";
+	std::cout << "sorted sizes : " << sorted_citem.size()
+		<< " " << rsorted_citem.size() << " \n";
+	#endif // PARSER_MEASURE
+
+	// build forest
+	#ifdef PARSER_MEASURE
+	measures::start_timer("forest building", po.measure_forest);
+	#endif // PARSER_MEASURE
+
+	tref ret = build_forest(root);
+	// f.print_data(std::cout) << "\n";
+
+	#ifdef PARSER_MEASURE
+	measures::print_timer("forest building");
+	measures::stop_timer("forest building");
+	#endif // PARSER_MEASURE
+
+	return ret;
+}
+#else
 template <typename C, typename T>
 bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
 	[[maybe_unused]] const parse_options& po)
@@ -1184,6 +1251,7 @@ bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
 
 	return ret;
 }
+#endif
 // collects all possible variations of the given item's rhs while respecting the
 // span of the item and stores them in the set ambset.
 template <typename C, typename T>
@@ -1194,8 +1262,12 @@ void parser<C, T>::sbl_chd_forest(const item& eitem,
 	//check if we have reached the end of the rhs of prod
 	if (g.len(eitem.prod, eitem.con) <= curchd.size())  {
 		// match the end of the span we are searching in.
-		if ( curchd.back()->second[1] == eitem.set)
-			ambset.insert(curchd);
+#ifdef PARSER_BINTREE_FOREST
+		static auto loc = [](pnode& n) -> location_type& { return n.second; };
+		if (loc(curchd.back())[1] == eitem.set) ambset.insert(curchd);
+#else
+		if (curchd.back()->second[1] == eitem.set) ambset.insert(curchd);
+#endif
 		return;
 	}
 	// curchd.size() refers to index of cur literal to process in the rhs of production
@@ -1310,18 +1382,139 @@ bool parser<C, T>::binarize_comb(const item& eitem,
 	}
 	return true;
 }
+#ifdef PARSER_BINTREE_FOREST
+// builds the forest from root
+template <typename C, typename T>
+tref parser<C, T>::build_forest(const pnode& root) {
+
+	// checks if disambiguation is allowed for a node
+	auto check_allowed = [this](const pnode &cnode) {
+		if (g.opt.auto_disambiguate == false) return false;
+		for (auto &nt : g.opt.nodisambig_list)
+			if (cnode.first.nt() && cnode.first.n() == nt)
+				return false;
+		return true;
+	};
+
+	// find all relevant parse items for the node
+	auto find_items = [&](const pnode& node) -> pnodes_set{
+		auto &nxtset = sorted_citem[{ node.first.n(), node.second[0] }];
+		if (nxtset.empty()) return {};
+
+		pnodes_set ambset, cambset;
+		std::set<pnode> snodes;
+		size_t last_p = SIZE_MAX;
+
+		for (auto& curp : nxtset) {
+			auto& cur = *curp;
+			// print(std::cout << "cur: ", cur) << "\n";
+			if (cur.set != node.second[1]) continue;
+			
+			pnode cnode(completed(cur) /*&& !negative(cur)*/
+				? g(cur.prod) : g.nt(node.first.n()),
+				{ cur.from, cur.set });			
+			cambset.clear();
+			bool allowed_disambg = check_allowed(cnode);
+			if (o.binarize) binarize_comb(cur,
+					allowed_disambg ? cambset : ambset);
+			else {
+				pnodes nxtlits;
+				// std::cout << "\n" << cur.prod << " " << last_p << " " << ambset.size();
+				sbl_chd_forest(cur, nxtlits, cur.from,
+					allowed_disambg ? cambset : ambset);
+			}
+
+			// resolve ambiguity across productions, due to different earley items
+			// with different prod id
+			if (allowed_disambg) {
+				if (cambset.size()) { // any new sub forest
+					if (ambset.size() == 0) // first time if
+						last_p = cur.prod, ambset = cambset;
+					else // get the smallest one
+						if (last_p > cur.prod) ambset.clear(),
+							last_p = cur.prod,
+							ambset = cambset;
+				}
+				snodes.insert(cnode);
+			}
+		}
+
+		// resolve ambiguity within the same production
+		if (snodes.size() && check_allowed(*snodes.begin())) {
+			std::vector<int> gi;
+			int gspan = INT_MAX;
+			int k = 0;
+			std::vector<int> idxs;
+			for(size_t i = 0; i < ambset.size(); i++)
+				idxs.push_back(static_cast<int>(i));
+
+			// choose the one with the smallest span for each level
+			do {
+				gi.clear();
+				for (auto packidx : idxs) {
+					auto apack = *next(ambset.begin(), packidx);
+					pnode lt = apack[k];
+					int span = static_cast<int>(lt.second[1] - lt.second[0]);					
+					if (gspan == span) gi.push_back(packidx);
+					if (gspan > span) gspan = span,
+						gi.clear(),gi.push_back(packidx);
+				}
+				k++;
+				idxs.clear();
+				idxs.insert(idxs.begin(), gi.begin(), gi.end());
+			} while (k < static_cast<int>(ambset.size()) && gi.size() > 1);
+
+			cambset.clear();
+			if (ambset.size() && gi.size())
+				cambset.insert(*next(ambset.begin(), gi[0]));
+		}
+
+		// choose which set to use for building
+		return (snodes.size() && check_allowed(*snodes.begin())) 
+			? cambset : ambset;
+	};
+
+	auto is_ebnf = [](const pnode& node) -> bool {
+		std::string name = node.first.to_std_string();
+		return name.size() >= 4 && name.substr(0, 4) == "__E_";
+	};
+
+	std::set<pnode> visited;
+	std::function<void(const pnode&, trefs&)> build_children;
+	build_children = [&visited, &find_items, &is_ebnf, &build_children]
+		(const pnode& node, trefs& children)
+	{
+		// std::cout << "build_children for node: `" << node << "`" << std::endl;
+		if (!node.first.nt() || visited.count(node)) return;
+		visited.insert(node);
+		for (const auto& aset : find_items(node))
+			for (const auto &nxt : aset)
+				if (is_ebnf(nxt))
+					build_children(nxt, children);
+				else {
+					trefs ch;
+					build_children(nxt, ch);
+					children.push_back(tree::get(nxt, ch));
+				}
+	};
+	trefs ch;
+	build_children(root, ch);
+	return tree::get(root, ch);
+}
+#else
 // builds the forest starting with root
 template <typename C, typename T>
 bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 	if (!root.first.nt()) return false;
 	if (f.contains(root)) return false;
+	// std::cout << "build_forest for node: `" << root << "`" << std::endl;
 	//auto& nxtset = sorted_citem[root.n()][root.second[0]];
 	auto &nxtset = sorted_citem[{ root.first.n(), root.second[0] }];
 
 	pnodes_set ambset, cambset;
 	std::set<pnode> snodes;
 	size_t last_p = SIZE_MAX;
-	auto check_allowed = [this] (const pnode &cnode) {
+	auto check_allowed = [this](const pnode &cnode) {
 		if (g.opt.auto_disambiguate == false) return false;
 		for (auto &nt : g.opt.nodisambig_list)
 			if (cnode.first.nt() && cnode.first.n() == nt)
@@ -1331,6 +1524,7 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 
 	for (auto& curp : nxtset) {
 		auto& cur = *curp;
+		// print(std::cout << "cur: ", cur) << std::endl;
 		if (cur.set != root.second[1]) continue;
 		pnode cnode(completed(cur) /*&& !negative(cur)*/
 			? g(cur.prod) : g.nt(root.first.n()),
@@ -1374,8 +1568,7 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 		int gspan = INT_MAX;
 		int k = 0;
 		std::vector<int> idxs;
-		for(size_t i = 0; i < ambset.size(); i++)
-			idxs.push_back(i);
+		for(size_t i = 0; i < ambset.size(); i++) idxs.push_back(i);
 
 		//choose the one with the first smallest span
 		do {
@@ -1413,6 +1606,7 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 
 	return true;
 }
+#endif
 template <typename C, typename T>
 std::basic_string<C> parser<C, T>::input::get_string() {
 	if (!isstream()) return std::basic_string<C>(d, l);

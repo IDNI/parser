@@ -16,6 +16,14 @@
 #include "parser.h"
 namespace idni {
 
+#ifdef PARSER_BINTREE_FOREST
+template <typename C, typename T>
+parser<C, T>::result::result(grammar<C, T>& g, std::unique_ptr<input> in,
+	tref f, bool fnd, error err) :
+		found(fnd), parse_error(err), shaping(g.opt.shaping),
+		in(std::move(in)), froot(tree::geth(f))
+{}
+#else
 template <typename C, typename T>
 parser<C, T>::result::result(grammar<C, T>& g, std::unique_ptr<input> in,
 	std::unique_ptr<pforest> f, bool fnd, error err) :
@@ -30,8 +38,10 @@ parser<C, T>::result::result(grammar<C, T>& g, std::unique_ptr<input> in,
 
 template <typename C, typename T>
 typename parser<C, T>::pforest* parser<C, T>::result::get_forest() const {
-	return f.get();
+	if (f) return f.get();
+	return nullptr;
 }
+#endif
 
 template <typename C, typename T>
 bool parser<C, T>::result::good() const { return in->good(); }
@@ -98,7 +108,7 @@ bool node_to_inline(const typename parser<C, T>::pnode& n,
 	return false;
 }
 
-
+#ifndef PARSER_BINTREE_FOREST
 template <typename C, typename T>
 typename parser<C, T>::psptree parser<C, T>::result::get_trimmed_tree(
 	const typename parser<C, T>::pnode& n, const shaping_options opts) const
@@ -326,9 +336,15 @@ parser<C, T>::psptree parser<C, T>::result::get_tree(const pnode& n) {
 	return t;
 }
 
+#endif // not PARSER_BINTREE_FOREST
+
 template <typename C, typename T>
 std::basic_string<T> parser<C, T>::result::get_terminals() const {
+#ifdef PARSER_BINTREE_FOREST
+	return in->get_terminals(tree::get(froot).value.second);
+#else
 	return in->get_terminals(f->root()->second);
+#endif
 }
 
 template <typename C, typename T>
@@ -346,8 +362,10 @@ std::optional<int_t> parser<C, T>::result::get_terminals_to_int(const pnode& n)
 	return result;
 }
 
+#ifndef PARSER_BINTREE_FOREST
 template <typename C, typename T>
 bool parser<C, T>::result::is_ambiguous() const {
+	if (!f) return false;
 	for (auto& kv : f->g) if (kv.second.size() > 1) return true;
 	return false;
 }
@@ -362,6 +380,7 @@ std::set<std::pair<typename parser<C, T>::pnode,
 	typename parser<C, T>::pnodes_set>>
 		parser<C, T>::result::ambiguous_nodes() const
 {
+	if (!f) return {};
 	std::set<std::pair<pnode, pnodes_set>> r;
 	for (auto& kv : f->g) if (kv.second.size() > 1) r.insert(kv);
 	return r;
@@ -397,6 +416,7 @@ typename parser<C, T>::result::nodes_and_edges
 	pnodes n;
 	edges es;
 	size_t id = 0;
+	if (!f) return nodes_and_edges{ n, es };
 	for (auto& it : f->g) {
 		nid[it.first] = id;
 		// skip ids for one child ambig node
@@ -450,6 +470,7 @@ bool parser<C, T>::result::inline_prefixed_nodes(pgraph& g,
 	}
 	return f->replace_nodes(g, s);
 }
+#endif
 
 } // idni namespace
 #endif // __IDNI__PARSER__PARSER_RESULT_TMPL_H__

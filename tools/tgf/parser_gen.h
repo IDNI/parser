@@ -13,6 +13,7 @@
 #ifndef __IDNI__PARSER__PARSER_GEN_H__
 #define __IDNI__PARSER__PARSER_GEN_H__
 #include <filesystem>
+#include <cmath>
 #include "parser.h"
 namespace idni {
 
@@ -255,11 +256,13 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		"\n";
 	if (opt.ns.size()) os << "namespace " << opt.ns << " {\n\n";
 	os << "namespace " << opt.name << "_data {\n\n";
+	size_t nt_bits = std::ceil(std::log2(gi.nts().size()));
 	os <<
 		"using char_type     = " << opt.char_type << ";\n"
 		"using terminal_type = " << opt.terminal_type << ";\n"
 		"\n"
-		"inline std::vector<std::string> symbol_names{"
+		"inline static constexpr size_t nt_bits = " << nt_bits << ";\n"
+		"inline const std::vector<std::string> symbol_names{"
 			<< gen_nts() <<
 		"};\n"
 		"\n"
@@ -309,7 +312,7 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		"struct " << opt.name << " : public idni::parser<"
 			<< opt.char_type << ", " << opt.terminal_type << "> {\n"
 		"	enum nonterminal {"
-				<< gen_nts_enum_cte() <<
+			<< gen_nts_enum_cte() <<
 		"	};\n"
 		"	static " << opt.name << "& instance() {\n"
 		"		static " << opt.name << " inst;\n"

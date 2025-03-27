@@ -5,8 +5,6 @@
 
 namespace idni {
 
-using tref = idni2::tref;
-
 template <typename C, typename T>
 tref parser<C, T>::result::get_trimmed_tree2(tref ref,
 	const shaping_options opts) const
@@ -139,12 +137,9 @@ tref parser<C, T>::result::trim_children_terminals2(tref ref) const {
 }
 
 template <typename C, typename T>
-tref parser<C, T>::result::get_shaped_tree2(
-	const typename parser<C, T>::pnode& n, const shaping_options opts)
-{
-	//std::cout << "getting tree for " << n.first.to_std_string() << std::endl;
-	tref t = get_tree2(n);
-	// tree::get(t).print(std::cout << "all tree: ") << "\n\n";
+tref parser<C, T>::result::get_shaped_tree2(tref t, const shaping_options opts){
+	// if (!t) return std::cerr << "error getting shaped tree. tree is null" << "\n", nullptr;
+	// tree::get(t).print(std::cout << "parsed tree: ") << "\n\n";
 	t = get_trimmed_tree2(t, opts);
 	// tree::get(t).print(std::cout << "trimmed tree: ") << "\n\n";
 	t = inline_tree2(t, opts);
@@ -154,26 +149,39 @@ tref parser<C, T>::result::get_shaped_tree2(
 	return t;
 }
 template <typename C, typename T>
-tref parser<C, T>::result::get_shaped_tree2(
-	const typename parser<C, T>::pnode& n)
+tref parser<C, T>::result::get_shaped_tree2(tref t)
 {
-	return get_shaped_tree2(n, shaping);
+	return get_shaped_tree2(t, shaping);
 }
 template <typename C, typename T>
 tref parser<C, T>::result::get_shaped_tree2(const shaping_options opts) {
-	return get_shaped_tree2(get_forest()->root(), opts);
+#ifdef PARSER_BINTREE_FOREST
+	return get_shaped_tree2(froot->get(), opts);
+#else
+	return get_shaped_tree2(get_tree2(), opts);
+#endif // PARSER_BINTREE_FOREST
 }
 template <typename C, typename T>
 tref parser<C, T>::result::get_shaped_tree2() {
 	return get_shaped_tree2(shaping);
 }
 
-// get a first parse tree from the parse_forest optionally provide root of the tree.
 template <typename C, typename T>
 tref parser<C, T>::result::get_tree2() {
+#ifdef PARSER_BINTREE_FOREST
+	return froot->get();
+#else
 	return get_tree2(f->root());
+#endif // PARSER_BINTREE_FOREST
 }
 
+#ifdef PARSER_BINTREE_FOREST
+template <typename C, typename T>
+tref parser<C, T>::result::get_tree2(const pnode&) {
+	// TODO get tree from pnode
+	return froot->get();
+}
+#else
 template <typename C, typename T>
 tref parser<C, T>::result::get_tree2(const pnode& n) {
 	htree::sp t;
@@ -184,5 +192,6 @@ tref parser<C, T>::result::get_tree2(const pnode& n) {
 	});
 	return t->get();
 }
+#endif // PARSER_BINTREE_FOREST
 
-}
+} // idni namespace

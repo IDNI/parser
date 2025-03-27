@@ -13,7 +13,7 @@
 
 #include "bintree.h"
 
-namespace idni2 {
+namespace idni {
 
 //------------------------------------------------------------------------------
 
@@ -53,7 +53,7 @@ tree_range<T>::iterator::iterator(tref node) : current(node) {}
 
 template <typename T>
 const T& tree_range<T>::iterator::operator*() const {
-	return current;
+	return T::get(current);
 }
 
 template <typename T>
@@ -98,14 +98,14 @@ const htree::sp bintree<T>::geth(tref h) {
 	auto res = M.find(*reinterpret_cast<const bintree*>(h)); //done with one search
 	htree::sp ret;
 	if (res != M.end()) res->second = ret = htree::sp(new htree(h));
-	assert(!res->second.expired());
+	DBG(assert(!res->second.expired());)
 	return res->second.lock();
 }
 
 template <typename T>
 const bintree<T>& bintree<T>::get(const tref id) {
 	//std::cout<< id <<"\n";
-	assert(id != NULL && sizeof(bintree<T>*) == sizeof(tref));
+	DBG(assert(id != NULL && sizeof(bintree<T>*) == sizeof(tref));)
 	return *(bintree<T>*)id;
 }
 
@@ -186,7 +186,7 @@ void bintree<T>::gc() {
 	for( auto& x : htree::M)
 	if (!x.second.expired()) {
 		auto psp = x.second.lock();
-		assert(psp->hnd == x.first);
+		DBG(assert(psp->hnd == x.first);)
 		hm.emplace(psp->hnd = shift[x.first], psp);
 	}
 	htree::M = std::move(hm);
@@ -266,7 +266,7 @@ tref lcrs_tree<T>::get(const T& v, const tref* ch, size_t len) {
 }
 
 template <typename T>
-tref lcrs_tree<T>::get(const T& v, const std::vector<tref>& ch) {
+tref lcrs_tree<T>::get(const T& v, const trefs& ch) {
 	return get(v, ch.data(), ch.size());
 }
 
@@ -504,4 +504,4 @@ std::ostream& lcrs_tree<T>::print(std::ostream& os, size_t s) const {
 // 	return base_t::print(o, s);
 // }
 
-}
+} // idni namespace

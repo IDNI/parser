@@ -44,18 +44,19 @@ typename forest<NodeT>::sptree forest<NodeT>::graph::extract_trees() {
 }
 
 template<typename NodeT>
-typename idni2::htree::sp forest<NodeT>::graph::extract_tree2() {
+typename htree::sp forest<NodeT>::graph::extract_tree2() {
 	return _extract_tree2(root);
 
 }
 
 template <typename NodeT>
-typename idni2::htree::sp forest<NodeT>::graph::_extract_tree2(
+typename htree::sp forest<NodeT>::graph::_extract_tree2(
 	node& r) {
 
 	std::map<node,size_t> edgcount;
-   	auto post_trav = [&edgcount, this](const node& root, idni2::tref rchd, 
-					auto &post_trav)->idni2::tref {
+   	auto post_trav = [&edgcount, this](const node& root, tref rchd,
+		auto &post_trav) -> tref
+	{
 		nodes_set pack;
 		auto &g = *this;
 		if (root->first.nt()) {
@@ -64,30 +65,33 @@ typename idni2::htree::sp forest<NodeT>::graph::_extract_tree2(
 			pack = it->second;
 		}
 		else // leaf terminal
-			return idni2::bintree<NodeT>::get(root, 0, rchd);
+			return bintree<NodeT>::get(root, 0, rchd);
 		//DBG( assert(! (pack.size()>1) ));
 		auto nodesit = pack.begin();
-		idni2::tref crchd = nullptr;    // child's right child
+		tref crchd = nullptr;    // child's right child
 		if (pack.size() >= 1) {
 			// select pack to traverse not already done;
 			if (edgcount[root] >= pack.size()) {
 				//have fully explored before, so just return 
 				//non terminal with no children
-				return idni2::bintree<NodeT>::get(root, nullptr, rchd);
+				return bintree<NodeT>::get(root, nullptr, rchd);
 			}
 			//still an edge to children unexplored
 			for (size_t i = 0; i < edgcount[root]; i++) 
 				++nodesit;
 			edgcount[root]++;
-			for (auto chdit = nodesit->rbegin(); chdit != nodesit->rend(); chdit++)
+			for (auto chdit = nodesit->rbegin();
+				chdit != nodesit->rend(); chdit++)
+			{
 				crchd = post_trav(*chdit, crchd, post_trav);
+			}
 		}
 		
-		return idni2::bintree<NodeT>::get((NodeT)root, crchd, rchd);
+		return bintree<NodeT>::get((NodeT)root, crchd, rchd);
     };
-	//idni2::bintree<NodeT>::dump();
-	idni2::tref tid = post_trav(r, 0, post_trav);
-	return idni2::tree<NodeT>::geth(tid);
+	//bintree<NodeT>::dump();
+	tref tid = post_trav(r, 0, post_trav);
+	return idni::tree<NodeT>::geth(tid);
 }
 
 

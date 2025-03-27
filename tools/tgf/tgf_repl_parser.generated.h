@@ -11,7 +11,8 @@ namespace tgf_repl_parser_data {
 using char_type     = char;
 using terminal_type = char;
 
-inline std::vector<std::string> symbol_names{
+inline static constexpr size_t nt_bits = 8;
+inline const std::vector<std::string> symbol_names{
 	"", "eof", "alnum", "alpha", "space", "printable", "_", "__", "symbol", "quoted_string", 
 	"unescaped_s", "escaped_s", "parse_input_char_seq", "start", "__E_start_0", "statement", "__E___E_start_0_1", "__E___E_start_0_2", "grammar_cmd", "igrammar_cmd", 
 	"unreachable_cmd", "reload_cmd", "load_cmd", "start_cmd", "help", "version", "quit", "clear", "get", "set", 

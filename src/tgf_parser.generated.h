@@ -11,7 +11,8 @@ namespace tgf_parser_data {
 using char_type     = char;
 using terminal_type = char;
 
-inline std::vector<std::string> symbol_names{
+inline static constexpr size_t nt_bits = 7;
+inline const std::vector<std::string> symbol_names{
 	"", "eof", "alnum", "alpha", "space", "printable", "__", "_", "sep", "sym", 
 	"cc_name", "escaped_s", "unescaped_s", "escaped_c", "unescaped_c", "syms", "start", "__E_start_0", "statement", "__E_start_1", 
 	"directive", "production", "start_statement", "__E_production_2", "production_guard", "alternation", "conjunction", "__E_alternation_3", "__E_alternation_4", "concatenation", 

@@ -48,8 +48,5 @@ rm -rf external/parser/*
 # copy current parser source to place where tau expects it
 cp -r ../cmake ../src ../tools ../CMakeLists.txt external/parser
 
-# build tau with tests
-./$BUILD_TYPE.sh -DTAU_BUILD_TESTS=ON
-
-# run tests
-./test-$BUILD_TYPE.sh
+# build tau with tests and run them
+./$BUILD_TYPE.sh -DTAU_BUILD_TESTS=ON && ./test-$BUILD_TYPE.sh

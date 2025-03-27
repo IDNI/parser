@@ -15,9 +15,6 @@
 using namespace std;
 
 namespace idni {
-const std::size_t grcprime = sizeof(std::size_t) == 8
-                           ? 0x9e3779b97f4a7c15  // 64-bit golden ratio constant
-                           : 0x9e3779b9;
 
 prods<char32_t, char32_t> operator+(const prods<char32_t, char32_t>& x,
 	const string& s)
