@@ -201,7 +201,11 @@ std::ostream& parser<C, T>::tree::print(std::ostream& o, size_t s) const {
 }
 
 template <typename C, typename T>
-bool parser<C, T>::tree::nt() const { return this->value.first.nt(); }
+bool parser<C, T>::tree::is_nt() const { return this->value.first.nt(); }
+
+template <typename C, typename T>
+bool parser<C, T>::tree::is(size_t nt) const { return is_nt()
+					&& this->value.first.n() == nt; }
 
 template <typename C, typename T>
 std::string parser<C, T>::tree::get_terminals() const {
@@ -216,8 +220,9 @@ std::string parser<C, T>::tree::get_terminals() const {
 }
 
 template <typename C, typename T>
-size_t parser<C, T>::tree::get_nonterminal() const {
-	if (this->value.first.nt()) return this->value.first.n();
+size_t parser<C, T>::tree::get_nt() const {
+	if (is_nt()) return this->value.first.n();
+	DBG(assert(false);)
 	return 0;
 }
 
@@ -269,7 +274,7 @@ typename parser<C, T>::tree::traverser
 	parser<C, T>::tree::traverser::operator|(size_t nt) const
 {
 	if (!has_value()) return traverser();
-	for (tref c : tree::get(value()).get_children()) {
+	for (tref c : tree::get(value()).children()) {
 		const auto& n = tree::get(c).value.first;
 		if (n.nt() && n.n() == nt) return { c }; 
 	}
@@ -698,7 +703,7 @@ template <typename C, typename T>
 parser<C, T>::result parser<C, T>::parse(const C* data, size_t size,
 	parse_options po)
 {
-	in = std::make_unique<input>(data, size,
+	in_ = std::make_unique<input>(data, size,
 		po.max_length, o.chars_to_terminals, po.eof);
 	return _parse(po);
 }
@@ -706,7 +711,7 @@ template <typename C, typename T>
 parser<C, T>::result parser<C, T>::parse(std::basic_istream<C>& is,
 	parse_options po)
 {
-	in = std::make_unique<input>(is,
+	in_ = std::make_unique<input>(is,
 		po.max_length, o.chars_to_terminals, po.eof);
 	return _parse(po);
 }
@@ -714,14 +719,14 @@ template <typename C, typename T>
 parser<C, T>::result  parser<C, T>::parse(const std::string& fn,
 	parse_options po)
 {
-	in = std::make_unique<input>(fn,
+	in_ = std::make_unique<input>(fn,
 		po.max_length, o.chars_to_terminals, po.eof);
 	return _parse(po);
 }
 #ifndef _WIN32
 template <typename C, typename T>
 parser<C, T>::result parser<C, T>::parse(int fd, parse_options po) {
-	in = std::make_unique<input>(fd,
+	in_ = std::make_unique<input>(fd,
 		po.max_length, o.chars_to_terminals, po.eof);
 	return _parse(po);
 }
@@ -733,7 +738,7 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 	#endif // PARSER_MEASURE
 	debug = po.debug;
 	if (debug) {
-		std::basic_string<C> tmp = in->get_string();
+		std::basic_string<C> tmp = in_->get_string();
 		std::cout << "parse: `" << to_std_string(tmp) << "`"
 			<< "`[" << tmp.size() << "] start sym:" << g.get_start()
 			<< "(" << g.get_start().nt() << ")" << "\n";
@@ -762,8 +767,8 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 	bool new_pos = true;
 	DBGP(print(std::cout << "\ninitial t:\n", t);)
 	do {
-		if ((new_pos = (cn != in->pos()))) cn = in->pos();
-		ch = in->tcur(), n = in->tpos();
+		if ((new_pos = (cn != in_->pos()))) cn = in_->pos();
+		ch = in_->tcur(), n = in_->tpos();
 		if (n >= S.size()) S.resize(n + 1);
 		if (debug && debug_at.second > 0) debug =
 			debug_at.first <= n && n <= debug_at.second;
@@ -773,7 +778,7 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 			<< to_std_string(ch) << "' (" << ((int) ch) << ") "
 			<< TC.CLEAR() <<std::endl;)
 		if (po.measure_each_pos && new_pos) {
-			if (in->cur() == (C)'\n') (cb = n), r++;
+			if (in_->cur() == (C)'\n') (cb = n), r++;
 			#ifdef PARSER_MEASURE
 			measures::start_timer("current character parsing");
 			#endif // PARSER_MEASURE
@@ -816,7 +821,7 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 		} while (!t.empty());
 
 		if (po.measure_each_pos && new_pos) {
-			std::cout << in->pos() << " \tln: " << r << " col: "
+			std::cout << in_->pos() << " \tln: " << r << " col: "
 				<< (n - cb + 1) << " :: ";
 			#ifdef PARSER_MEASURE
 			measures::print_timer("current character parsing");
@@ -855,14 +860,14 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 		}
 		//DBGP(print_S(std::cout << "\n") << "\n";)
 
-	} while (in->tnext());
+	} while (in_->tnext());
 
 	#ifdef PARSER_MEASURE
 	measures::print_timer("parsing");
 	measures::stop_timer("parsing");
 	#endif // PARSER_MEASURE
 
-	in->clear();
+	in_->clear();
 	// remaining total items
 	size_t count = 0;
 	for (size_t i = 0; i < S.size(); i++) count += S[i].size();
@@ -877,11 +882,11 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 	tref fr;
 	if (!o.incr_gen_forest) {
 		fr = init_forest(start_lit, po);
-		// tree::get(fr).print(std::cout << "forest in tree: ") << std::endl;
+		// tree::get(fr).print(std::cout << "forest in_ tree: ") << std::endl;
 	}
 #else
 	if (!o.incr_gen_forest) init_forest(*f, start_lit, po);
-		else f->root(pnode(start_lit, { 0, in->tpos() }));
+		else f->root(pnode(start_lit, { 0, in_->tpos() }));
 #endif
 
 	if (debug) debug = false;
@@ -890,26 +895,26 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 	error err = fnd ? error{} : get_error();
 
 #ifdef PARSER_BINTREE_FOREST
-	return result(g, std::move(in), fr, fnd, err);
+	return result(g, std::move(in_), fr, fnd, err);
 #else
-	return result(g, std::move(in), std::move(f), fnd, err);
+	return result(g, std::move(in_), std::move(f), fnd, err);
 #endif
 }
 template <typename C, typename T>
 bool parser<C, T>::found(size_t start) {
-	//DBGP(print(std::cout << "Slast:\n", S[in->tpos()]) << std::endl;)
+	//DBGP(print(std::cout << "Slast:\n", S[in_->tpos()]) << std::endl;)
 	bool f = false;
 	for (size_t n : g.prod_ids_of_literal(start != SIZE_MAX ? g.nt(start)
 							: g.start_literal()))
 	{
 		f = true;
-		item all(in->tpos(), n, 0, 0, 0);
+		item all(in_->tpos(), n, 0, 0, 0);
 		for (size_t c = 0; c != g.n_conjs(n); ++c) {
 			all.con = c, all.dot = g.len(n, c);
 			bool neg = g[n][c].neg;
 			//DBG(print(std::cout << "search: ", all) << "\n";)
 			//DBG(std::cout << "neg: " << neg << "\n";)
-			f = S[in->tpos()].find(all) != S[in->tpos()].end();
+			f = S[in_->tpos()].find(all) != S[in_->tpos()].end();
 			f = f != neg;
 			if (!f)	break;
 		}
@@ -1041,7 +1046,7 @@ typename parser<C, T>::error parser<C, T>::get_error() {
 		std::vector<T> errctxt;
 		// using from as delimiter..
 		while (pos >= from)
-			errctxt.push_back(in->tat(pos--));
+			errctxt.push_back(in_->tat(pos--));
 		return errctxt;
 	};
 	std::stringstream es;
@@ -1060,10 +1065,10 @@ typename parser<C, T>::error parser<C, T>::get_error() {
 		ept.prod_body = es.str();
 		return ept;
 	};	// find error location and build error stream
-	in->clear();
-	//DBGP(std::cout << "tpos: " << in->tpos() << "\n";)
+	in_->clear();
+	//DBGP(std::cout << "tpos: " << in_->tpos() << "\n";)
 	//DBGP(print_S(std::cout << "S:\n") << "\n";)
-	for (int_t i = (int_t) in->tpos(); i >= 0; i--) if (S[i].size()) {
+	for (int_t i = (int_t) in_->tpos(); i >= 0; i--) if (S[i].size()) {
 		//DBG(std::cout << "get_error i pos = " << i << "\n";)
 		size_t from = 0;
 		bool unexp_neg = false;
@@ -1100,7 +1105,7 @@ typename parser<C, T>::error parser<C, T>::get_error() {
 				{
 					err.unexp = {};
 					for (size_t i = t.from; i < t.set; ++i)
-						err.unexp.emplace_back(in->tat(i));
+						err.unexp.emplace_back(in_->tat(i));
 					err.loc = t.from, unexp_neg = true;
 				}
 				if (completed(t) || (get_lit(t).nt()
@@ -1119,14 +1124,14 @@ typename parser<C, T>::error parser<C, T>::get_error() {
 			}
 		}
 		if (!unexp_neg)
-			err.unexp = lits<C, T>{ { in->tat(i) } }, err.loc = i;
+			err.unexp = lits<C, T>{ { in_->tat(i) } }, err.loc = i;
 
 		break;
 	}
 	err.line = 1;
 	size_t line_loc = 0;
 	for (int_t j = 0; err.loc > -1 && j != err.loc; ++j)
-		if (in->tat(j) == (T)'\n') err.line++, line_loc = j;
+		if (in_->tat(j) == (T)'\n') err.line++, line_loc = j;
 	err.col = err.loc - line_loc + 1;
 	err.ctxt = near_ctxt(line_loc, err.loc + 1);
 	return err;
@@ -1170,7 +1175,7 @@ tref parser<C, T>::init_forest(const lit<C, T>& start_lit,
 	rsorted_citem.clear();
 	tid = 0;
 	// set the start root node
-	pnode root(start_lit, { 0, in->tpos() });
+	pnode root(start_lit, { 0, in_->tpos() });
 	// f.root(root);
 
 	// preprocess parser items for faster retrieval
@@ -1179,7 +1184,7 @@ tref parser<C, T>::init_forest(const lit<C, T>& start_lit,
 	#endif // PARSER_MEASURE
 
 	int count = 0;
-	for (size_t n = 0; n < in->tpos() + 1; n++)
+	for (size_t n = 0; n < in_->tpos() + 1; n++)
 		for (const item& i : S[n]) count++, pre_process(i);
 
 	#ifdef PARSER_MEASURE
@@ -1216,7 +1221,7 @@ bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
 	rsorted_citem.clear();
 	tid = 0;
 	// set the start root node
-	pnode root(start_lit, { 0, in->tpos() });
+	pnode root(start_lit, { 0, in_->tpos() });
 	f.root(root);
 
 	// preprocess parser items for faster retrieval
@@ -1225,7 +1230,7 @@ bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
 	#endif // PARSER_MEASURE
 
 	int count = 0;
-	for (size_t n = 0; n < in->tpos() + 1; n++)
+	for (size_t n = 0; n < in_->tpos() + 1; n++)
 		for (const item& i : S[n]) count++, pre_process(i);
 
 	#ifdef PARSER_MEASURE
@@ -1278,8 +1283,8 @@ void parser<C, T>::sbl_chd_forest(const item& eitem,
 		// for empty, use same span edge as from
 		if (nxtl.first.is_null()) nxtl.second[1] = xfrom;
 		// ensure well-formed combination (matching input) early
-		else if (xfrom < in->tpos()
-			 && in->tat(xfrom) == nxtl.first.t())
+		else if (xfrom < in_->tpos()
+			 && in_->tat(xfrom) == nxtl.first.t())
 				nxtl.second[1] = ++xfrom;
 		else // if not building the correction variation, prune this path quickly
 			return;
@@ -1318,7 +1323,7 @@ bool parser<C, T>::binarize_comb(const item& eitem,
 		right.second[1] = eitem.set;
 		if (right.first.is_null())
 			right.second[0] = right.second[1];
-		else if (in->tat(eitem.set - 1) == right.first.t())
+		else if (in_->tat(eitem.set - 1) == right.first.t())
 			right.second[0] = eitem.set - 1;
 		else return false;
 		rcomb.emplace_back(right);
@@ -1356,7 +1361,7 @@ bool parser<C, T>::binarize_comb(const item& eitem,
 		if (!l.nt()) {
 			left.second[0] = eitem.from;
 			if (l.is_null()) left.second[1] = left.second[0];
-			else if (in->tat(eitem.from) == l.t() )
+			else if (in_->tat(eitem.from) == l.t() )
 				left.second[1] = eitem.from + 1;
 			else return false;
 			//do Left right optimisation

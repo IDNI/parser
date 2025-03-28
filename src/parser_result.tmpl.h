@@ -18,17 +18,17 @@ namespace idni {
 
 #ifdef PARSER_BINTREE_FOREST
 template <typename C, typename T>
-parser<C, T>::result::result(grammar<C, T>& g, std::unique_ptr<input> in,
+parser<C, T>::result::result(grammar<C, T>& g, std::unique_ptr<input> in_,
 	tref f, bool fnd, error err) :
 		found(fnd), parse_error(err), shaping(g.opt.shaping),
-		in(std::move(in)), froot(tree::geth(f))
+		in_(std::move(in_)), froot(tree::geth(f))
 {}
 #else
 template <typename C, typename T>
-parser<C, T>::result::result(grammar<C, T>& g, std::unique_ptr<input> in,
+parser<C, T>::result::result(grammar<C, T>& g, std::unique_ptr<input> in_,
 	std::unique_ptr<pforest> f, bool fnd, error err) :
 		found(fnd), parse_error(err), shaping(g.opt.shaping),
-		in(std::move(in)), f(std::move(f))
+		in_(std::move(in_)), f(std::move(f))
 {
 	// if is ambiguous add __AMB__ node to the nonterminals dict so it can
 	// be added to the resulting parse tree when get_shaped_tree() is called
@@ -44,11 +44,11 @@ typename parser<C, T>::pforest* parser<C, T>::result::get_forest() const {
 #endif
 
 template <typename C, typename T>
-bool parser<C, T>::result::good() const { return in->good(); }
+bool parser<C, T>::result::good() const { return in_->good(); }
 
 template <typename C, typename T>
 std::basic_string<C> parser<C, T>::result::get_input() {
-	return in->get_string();
+	return in_->get_string();
 }
 
 template <typename C, typename T>
@@ -341,15 +341,15 @@ parser<C, T>::psptree parser<C, T>::result::get_tree(const pnode& n) {
 template <typename C, typename T>
 std::basic_string<T> parser<C, T>::result::get_terminals() const {
 #ifdef PARSER_BINTREE_FOREST
-	return in->get_terminals(tree::get(froot).value.second);
+	return in_->get_terminals(tree::get(froot).value.second);
 #else
-	return in->get_terminals(f->root()->second);
+	return in_->get_terminals(f->root()->second);
 #endif
 }
 
 template <typename C, typename T>
 std::basic_string<T> parser<C, T>::result::get_terminals(const pnode& n) const {
-	return in->get_terminals(n.second);
+	return in_->get_terminals(n.second);
 }
 
 template <typename C, typename T>

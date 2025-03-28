@@ -129,12 +129,15 @@ inline ::idni::grammar<char_type, terminal_type> grammar(
 
 } // namespace csv_parser_data
 
-struct csv_parser : public idni::parser<char, char> {
+struct csv_parser_nonterminals {
 	enum nonterminal {
 		nul, digit, printable, integer, __E_integer_0, __E_integer_1, quote, esc, escaping, unescaped, 
 		escaped, strchar, str, __E_str_2, nullvalue, val, eol, __E_eol_3, row, __E_row_4, 
 		__E_row_5, rows, __E_rows_6, __E_rows_7, start, __N_0, 
 	};
+};
+
+struct csv_parser : public idni::parser<char, char>, public csv_parser_nonterminals {
 	static csv_parser& instance() {
 		static csv_parser inst;
 		return inst;

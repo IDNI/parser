@@ -335,9 +335,10 @@ public:
 		std::ostream& print(std::ostream& o, size_t s = 0) const;
 
 		// fast access helpers
-		bool nt() const;
+		bool is_nt() const;
+		bool is(size_t nt) const;
 		std::string get_terminals() const;
-		size_t get_nonterminal() const;
+		size_t get_nt() const;
 
 		// tree wrapper for simple traversing using | and || operators
 		// and | extractor<result_type>
@@ -367,6 +368,10 @@ public:
 				function e;
 			};
 
+			static inline const extractor<tref> ref{
+				[](const traverser& t) -> tref {
+					return t.value();
+				}};
 			static inline const extractor<traverser> only_child{
 				[](const traverser& t) {
 					if (!t) return traverser();
@@ -379,6 +384,20 @@ public:
 					if (!t) return traverser();
 					return traverser(t.value_tree()
 							.get_children());
+				}};
+			static inline const extractor<tref_range<pnode>>
+							children_range{
+				[](const traverser& t) {
+					if (!t) return traverser();
+					return traverser(t.value_tree()
+							.children());
+				}};
+			static inline const extractor<tree_range<tree>>
+							children_trees_range{
+				[](const traverser& t) {
+					if (!t) return traverser();
+					return traverser(t.value_tree()
+							.children());
 				}};
 			static inline const extractor<traverser> first{
 				[](const traverser& t) {
@@ -409,7 +428,7 @@ public:
 			static inline const extractor<size_t> nonterminal{
 				[](const traverser& t) -> size_t {
 					if (!t) return 0;
-					return t.value_tree().get_nonterminal();
+					return t.value_tree().get_nt();
 				}};
 			static inline const extractor<std::optional<size_t>>
 							opt_nonterminal{
@@ -436,6 +455,7 @@ public:
 		traverser operator|(size_t nt) const;
 		traverser operator||(size_t nt) const;
 	};
+	using tt = tree::traverser;
 #ifdef PARSER_BINTREE_FOREST
 	using pnodes          = std::vector<pnode>;
 	using pnodes_set      = std::set<pnodes>;
@@ -687,7 +707,7 @@ public:
 		friend parser<C, T>;
 	private:
 		// input moved here from the parse call
-		std::unique_ptr<input> in = 0;
+		std::unique_ptr<input> in_ = 0;
 		// forest moved here from the parse call
 #ifdef PARSER_BINTREE_FOREST
 		htree::sp froot = 0;
@@ -744,7 +764,7 @@ public:
 private:
 	grammar<C, T>& g;
 	options o;
-	std::unique_ptr<input> in = 0;
+	std::unique_ptr<input> in_ = 0;
 	std::vector<container_t> S;
 	std::vector<container_t> U; // uncompleted
 		//mapping from to position of end in S for items

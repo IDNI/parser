@@ -766,7 +766,7 @@ inline ::idni::grammar<char_type, terminal_type> grammar(
 
 } // namespace tgf_repl_parser_data
 
-struct tgf_repl_parser : public idni::parser<char, char> {
+struct tgf_repl_parser_nonterminals {
 	enum nonterminal {
 		nul, eof, alnum, alpha, space, printable, _, __, symbol, quoted_string, 
 		unescaped_s, escaped_s, parse_input_char_seq, start, __E_start_0, statement, __E___E_start_0_1, __E___E_start_0_2, grammar_cmd, igrammar_cmd, 
@@ -787,6 +787,9 @@ struct tgf_repl_parser : public idni::parser<char, char> {
 		__E_treepath_list_67, quoted_string_char, __E_quoted_string_68, __E_unescaped_s_69, __E_unescaped_s_70, __E_escaped_s_71, __E___72, __E____73, comment, __E_comment_74, 
 		__E_comment_75, __E_comment_76, __N_0, 
 	};
+};
+
+struct tgf_repl_parser : public idni::parser<char, char>, public tgf_repl_parser_nonterminals {
 	static tgf_repl_parser& instance() {
 		static tgf_repl_parser inst;
 		return inst;
