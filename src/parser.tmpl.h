@@ -204,24 +204,34 @@ template <typename C, typename T>
 bool parser<C, T>::tree::is_nt() const { return this->value.first.nt(); }
 
 template <typename C, typename T>
-bool parser<C, T>::tree::is(size_t nt) const { return is_nt()
-					&& this->value.first.n() == nt; }
+bool parser<C, T>::tree::is(size_t nt) const {
+	return is_nt() && get_nt() == nt;
+}
+
+template <typename C, typename T>
+bool parser<C, T>::tree::is_t() const { return !this->value.first.nt(); }
 
 template <typename C, typename T>
 std::string parser<C, T>::tree::get_terminals() const {
 	std::stringstream ss;
-	auto collector = [&ss](tref n) {
-		if (n && !get(n).value.first.nt()) ss << get(n).value.first.t();
+	auto terminal_printer = [&ss](tref n) {
+		if (n && get(n).is_t()) ss << get(n).get_t();
 		return true;
 	};
-	tref this_ = (tref) this;
-	post_order<pnode>(this_).search(collector);
+	pre_order<pnode>(get()).visit(terminal_printer);
 	return ss.str();
 }
 
 template <typename C, typename T>
 size_t parser<C, T>::tree::get_nt() const {
 	if (is_nt()) return this->value.first.n();
+	DBG(assert(false);)
+	return 0;
+}
+
+template <typename C, typename T>
+char parser<C, T>::tree::get_t() const {
+	if (is_t()) return this->value.first.t();
 	DBG(assert(false);)
 	return 0;
 }
@@ -275,8 +285,8 @@ typename parser<C, T>::tree::traverser
 {
 	if (!has_value()) return traverser();
 	for (tref c : tree::get(value()).children()) {
-		const auto& n = tree::get(c).value.first;
-		if (n.nt() && n.n() == nt) return { c }; 
+		const auto& n = tree::get(c);
+		if (n.is_nt() && n.get_nt() == nt) return { c }; 
 	}
 	return {};
 }
@@ -288,8 +298,8 @@ typename parser<C, T>::tree::traverser
 	trefs r;
 	for (tref v : values()) {
 		for (tref c : tree::get(v).children()) {
-			const auto& n = tree::get(c).value.first;
-			if (n.nt() && n.n() == nt) r.push_back(c); 
+			const auto& n = tree::get(c);
+			if (n.is_nt() && n.get_nt() == nt) r.push_back(c); 
 		}
 	}
 	return traverser(r);

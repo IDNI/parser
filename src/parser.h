@@ -337,8 +337,10 @@ public:
 		// fast access helpers
 		bool is_nt() const;
 		bool is(size_t nt) const;
+		bool is_t() const;
 		std::string get_terminals() const;
 		size_t get_nt() const;
+		char get_t() const;
 
 		// tree wrapper for simple traversing using | and || operators
 		// and | extractor<result_type>
