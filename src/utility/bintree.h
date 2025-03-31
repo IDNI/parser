@@ -51,6 +51,7 @@ struct tref_range {
 		tref operator*() const;
 		iterator& operator++();
 		bool operator!=(const iterator& other) const;
+		bool operator==(const iterator& other) const;
 	};
 	iterator begin() const;
 	iterator end() const;
@@ -67,6 +68,7 @@ struct tree_range {
 		const T& operator*() const;
 		iterator& operator++();
 		bool operator!=(const iterator& other) const;
+		bool operator==(const iterator& other) const;
 	};
 	iterator begin() const;
 	iterator end() const;
@@ -300,6 +302,18 @@ struct lcrs_tree : public bintree<T> {
 	 * @return The new tree node's tref id
 	 */
 	static tref get(const T& v, const T& ch1, const T& ch2); 
+
+	/**
+	 * @brief Check if the node has a right sibling
+	 * @return True if the node has a right sibling, false otherwise
+	 */
+	bool has_right_sibling() const;
+
+	/**
+	 * @brief Check if the node has a child
+	 * @return True if the node has a child, false otherwise
+	 */
+	bool has_child() const;
 
 	/**
 	 * @brief Get the number of children
@@ -645,6 +659,16 @@ struct pre_order {
 	 * @param visit The function called on nodes
 	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
 	 * @param up Function called on visited nodes in post order
+	 * @param between Function called between children of a node
+	 */
+	void visit(auto& visit, auto& visit_subtree, auto& up, auto& between);
+
+	/**
+	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
+	 * If visit returns false on a node, its children are not visited
+	 * @param visit The function called on nodes
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param up Function called on visited nodes in post order
 	 */
 	void visit(auto& visit, auto& visit_subtree, auto& up);
 
@@ -654,6 +678,16 @@ struct pre_order {
 	 * @param visit The function called on nodes
 	 */
 	void visit(auto& visit);
+
+	/**
+	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
+	 * If visit returns false on a node, the traversal terminates
+	 * @param visit The function called on nodes
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param up Function called on visited nodes in post order
+	 * @param between Function called between children of a node
+	 */
+	void search(auto& visit, auto& visit_subtree, auto& up, auto& between);
 
 	/**
 	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
@@ -722,7 +756,8 @@ private:
 	tref traverse(tref n, auto& f, auto& visit_subtree, auto& up);
 
 	template<bool search, bool unique>
-	void const_traverse(tref n, auto& visit, auto& visit_subtree, auto& up);
+	void const_traverse(tref n, auto& visit, auto& visit_subtree,
+						auto& up, auto& between);
 };
 
 template<typename T>

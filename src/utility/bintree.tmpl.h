@@ -40,6 +40,11 @@ bool tref_range<T>::iterator::operator!=(const iterator& other) const {
 }
 
 template <typename T>
+bool tref_range<T>::iterator::operator==(const iterator& other) const {
+	return current == other.current;
+}
+
+template <typename T>
 tref_range<T>::iterator tref_range<T>::begin() const { return iterator(first); }
 
 template <typename T>
@@ -66,6 +71,11 @@ tree_range<T>::iterator& tree_range<T>::iterator::operator++() {
 template <typename T>
 bool tree_range<T>::iterator::operator!=(const iterator& other) const {
 	return current != other.current;
+}
+
+template <typename T>
+bool tree_range<T>::iterator::operator==(const iterator& other) const {
+	return current == other.current;
 }
 
 template <typename T>
@@ -307,6 +317,12 @@ template <typename T>
 tref lcrs_tree<T>::get(const T& v, const T& ch1, const T& ch2) {
 	return get(v, std::vector<T>{ ch1, ch2 });
 }
+
+template <typename T>
+bool lcrs_tree<T>::has_right_sibling() const { return this->r != nullptr; }
+
+template <typename T>
+bool lcrs_tree<T>::has_child() const { return this->l != nullptr; }
 
 template <typename T>
 size_t lcrs_tree<T>::children_size() const {
