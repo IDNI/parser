@@ -29,7 +29,7 @@ using namespace std;
 
 namespace idni {
 
-using trv = tgf_repl_parser::tree::traverser;
+using tt = tgf_repl_parser::tree::traverser;
 
 // configure CLI options and descriptions
 //
@@ -535,7 +535,7 @@ void tgf_repl_evaluator::reload() {
 	reload(tgf_file);
 }
 
-pair<tgf_repl_parser::nonterminal, trv> get_opt(const trv& t) {
+pair<tgf_repl_parser::nonterminal, tt> get_opt(const tt& t) {
 	using p = tgf_repl_parser;
 	static const map<p::nonterminal, p::nonterminal> ov{
 		{ p::bool_option,      p::bool_value },
@@ -546,12 +546,12 @@ pair<tgf_repl_parser::nonterminal, trv> get_opt(const trv& t) {
 	for (auto it = ov.begin(); it != ov.end(); ++it)
 		if (auto x = t | it->first; x.has_value())
 			return { static_cast<p::nonterminal>(
-					x | trv::only_child | trv::nonterminal),
+					x | tt::only_child | tt::nonterminal),
 				t | it->second };
 	return { p::nul, t };
 }
 
-void tgf_repl_evaluator::get_cmd(const trv& n) {
+void tgf_repl_evaluator::get_cmd(const tt& n) {
 	using p = tgf_repl_parser;
 	using lvl = parser_type::error::info_lvl;
 	static auto pbool = [] (bool b) { return b ? "on" : "off"; };
@@ -634,8 +634,8 @@ void tgf_repl_evaluator::get_cmd(const trv& n) {
 	printers[o]();
 }
 
-bool get_bool_value(const trv& t) {
-	return (t | trv::only_child | trv::nonterminal)
+bool get_bool_value(const tt& t) {
+	return (t | tt::only_child | tt::nonterminal)
 			== tgf_repl_parser::true_value;
 }
 
@@ -658,14 +658,14 @@ string unquote(const string& s) {
 	return ss.str();
 };
 
-vector<string> tgf_repl_evaluator::treepath(const trv& tp) const {
+vector<string> tgf_repl_evaluator::treepath(const tt& tp) const {
 	vector<string> v;
 	for (const auto& s : (tp || tgf_repl_parser::symbol)())
-		v.push_back(s | trv::terminals);
+		v.push_back(s | tt::terminals);
 	return v;
 }
 
-void tgf_repl_evaluator::set_cmd(const trv& n) {
+void tgf_repl_evaluator::set_cmd(const tt& n) {
 	using p = tgf_repl_parser;
 	auto [o, v] = get_opt(n);
 	switch (o) {
@@ -700,12 +700,12 @@ void tgf_repl_evaluator::set_cmd(const trv& n) {
 	case p::trim_opt:
 		opt.to_trim.clear();
 		for (const auto& s : (v || p::symbol)())
-			opt.to_trim.insert(s | trv::terminals);
+			opt.to_trim.insert(s | tt::terminals);
 		break;
 	case p::enabled_prods_opt: {
 		std::set<std::string> grds;
 		for (const auto& s : (v || p::symbol)())
-			grds.insert(s | trv::terminals);
+			grds.insert(s | tt::terminals);
 		if (grds != g->opt.enabled_guards)
 			g->set_enabled_productions(grds);
 		break;
@@ -713,12 +713,12 @@ void tgf_repl_evaluator::set_cmd(const trv& n) {
 	case p::trim_children_opt:
 		opt.to_trim_children.clear();
 		for (const auto& s : (v || p::symbol)())
-			opt.to_trim_children.insert(s | trv::terminals);
+			opt.to_trim_children.insert(s | tt::terminals);
 		break;
 	case p::trim_children_terminals_opt:
 		opt.to_trim_children_terminals.clear();
 		for (const auto& s : (v || p::symbol)())
-			opt.to_trim_children_terminals.insert(s | trv::terminals);
+			opt.to_trim_children_terminals.insert(s | tt::terminals);
 		break;
 	case p::inline_opt:
 		opt.to_inline.clear();
@@ -730,13 +730,13 @@ void tgf_repl_evaluator::set_cmd(const trv& n) {
 	case p::nodisambig_list_opt:
 		g->opt.nodisambig_list.clear();
 		for (const auto& s : (v || p::symbol)())
-			opt.nodisambig_list.insert(s | trv::terminals);
+			opt.nodisambig_list.insert(s | tt::terminals);
 		break;
 	case p::error_verbosity_opt: {
 		auto vrb = v | p::error_verbosity;
 		if (!vrb.has_value()) {
 			cout << "error: invalid error verbosity value\n"; return; }
-		auto vrb_type = vrb | trv::only_child | trv::nonterminal;
+		auto vrb_type = vrb | tt::only_child | tt::nonterminal;
 		using lvl = p::parser_type::error::info_lvl;
 		switch (vrb_type) {
 		case p::basic_sym:
@@ -755,7 +755,7 @@ void tgf_repl_evaluator::set_cmd(const trv& n) {
 	get_cmd(n);
 }
 
-void tgf_repl_evaluator::add_cmd(const trv& n) {
+void tgf_repl_evaluator::add_cmd(const tt& n) {
 	using p = tgf_repl_parser;
 	auto [o, v] = get_opt(n);
 	set<string> empty{};
@@ -767,7 +767,7 @@ void tgf_repl_evaluator::add_cmd(const trv& n) {
 	}
 	if (o == p::enabled_prods_opt) {
 		for (const auto& s : (v || p::symbol)())
-			g->opt.enabled_guards.insert(s | trv::terminals);
+			g->opt.enabled_guards.insert(s | tt::terminals);
 		g->set_enabled_productions(g->opt.enabled_guards);
 		get_cmd(n);
 		return;
@@ -779,11 +779,11 @@ void tgf_repl_evaluator::add_cmd(const trv& n) {
 						? opt.to_trim_children_terminals
 						: empty);
 	for (const auto& s : (v || p::symbol)())
-		l.insert(s | trv::terminals);
+		l.insert(s | tt::terminals);
 	get_cmd(n);
 }
 
-void tgf_repl_evaluator::del_cmd(const trv& n) {
+void tgf_repl_evaluator::del_cmd(const tt& n) {
 	using p = tgf_repl_parser;
 	auto [o, v] = get_opt(n);
 	if (o == p::inline_opt) {
@@ -794,7 +794,7 @@ void tgf_repl_evaluator::del_cmd(const trv& n) {
 	}
 	if (o == p::enabled_prods_opt) {
 		for (const auto& s : (v || p::symbol)())
-			g->opt.enabled_guards.erase(s | trv::terminals);
+			g->opt.enabled_guards.erase(s | tt::terminals);
 		g->set_enabled_productions(g->opt.enabled_guards);
 		get_cmd(n);
 		return;
@@ -807,17 +807,17 @@ void tgf_repl_evaluator::del_cmd(const trv& n) {
 						? opt.to_trim_children_terminals
 						: empty);
 	for (const auto& s : (n || p::symbol)())
-		l.erase(s | trv::terminals);
+		l.erase(s | tt::terminals);
 	get_cmd(n);
 }
 
 void tgf_repl_evaluator::update_bool_opt_cmd(
-	const trv& n,
+	const tt& n,
 	const function<bool(bool&)>& update_fn)
 {
 	using p = tgf_repl_parser;
 	auto option_type = n | tgf_repl_parser::bool_option
-		| trv::only_child | trv::nonterminal;
+		| tt::only_child | tt::nonterminal;
 	switch (option_type) {
 	case p::debug_opt:             update_fn(opt.debug); break;
 	case p::status_opt:            update_fn(opt.status); break;
@@ -1004,33 +1004,33 @@ void help(size_t nt = tgf_repl_parser::help_sym) {
 	}
 }
 
-int tgf_repl_evaluator::eval(const trv& s) {
+int tgf_repl_evaluator::eval(const tt& s) {
 	using p = tgf_repl_parser;
-	switch (s | trv::nonterminal) {
-	case p::quit: return cout << "Quit.\n", 1;
-	case p::clear: if (r) r->clear(); break;
-	case p::help: {
+	switch (s | tt::nonterminal) {
+	case p::quit_cmd: return cout << "Quit.\n", 1;
+	case p::clear_cmd: if (r) r->clear(); break;
+	case p::help_cmd: {
 		auto optarg = s | p::help_arg
-				| trv::only_child | trv::nonterminal;
+				| tt::only_child | tt::nonterminal;
 		if (optarg) help(optarg);
 		else help();
 		break;
 	}
-	case p::version: version(); break;
-	case p::get:     get_cmd(s | p::option); break;
-	case p::set:     set_cmd(s); break;
-	case p::toggle:
+	case p::version_cmd: version(); break;
+	case p::get_cmd:     get_cmd(s | p::option); break;
+	case p::set_cmd:     set_cmd(s); break;
+	case p::toggle_cmd:
 		update_bool_opt_cmd(s, [](bool& b){ return b = !b; }); break;
-	case p::enable:
+	case p::enable_cmd:
 		update_bool_opt_cmd(s, [](bool& b){ return b = true; }); break;
-	case p::disable:
+	case p::disable_cmd:
 		update_bool_opt_cmd(s, [](bool& b){ return b = false; }); break;
-	case p::add:     add_cmd(s); break;
-	case p::del:     del_cmd(s); break;
+	case p::add_cmd:     add_cmd(s); break;
+	case p::del_cmd:     del_cmd(s); break;
 	case p::reload_cmd: reload(); break;
 	case p::load_cmd: {
 		auto n = s | p::filename;
-		auto filename = unquote(n | trv::terminals);
+		auto filename = unquote(n | tt::terminals);
 		DBG(assert(filename.size());)
 		reload(filename);
 		break;
@@ -1038,7 +1038,7 @@ int tgf_repl_evaluator::eval(const trv& s) {
 	case p::start_cmd: {
 		auto n = s | p::symbol;
 		string start;
-		if (n.has_value() && (start = n | trv::terminals).size())
+		if (n.has_value() && (start = n | tt::terminals).size())
 			cout << "start symbol set: " << TC_NT
 				<< (opt.start = start) << TC_DEFAULT << "\n";
 		else
@@ -1048,7 +1048,7 @@ int tgf_repl_evaluator::eval(const trv& s) {
 	}
 	case p::igrammar_cmd: {
 		auto n = s | p::symbol;
-		string start = n.has_value() ? n | trv::terminals : opt.start;
+		string start = n.has_value() ? n | tt::terminals : opt.start;
 		g->print_internal_grammar_for(cout
 			<< "\ninternal grammar for symbol "
 		 	<< TC_NT << start << TC_DEFAULT << ":\n",
@@ -1068,7 +1068,7 @@ int tgf_repl_evaluator::eval(const trv& s) {
 	}
 	case p::unreachable_cmd: {
 		auto n = s | p::symbol;
-		string start = n.has_value() ? n | trv::terminals : opt.start;
+		string start = n.has_value() ? n | tt::terminals : opt.start;
 		auto unreachable = g->unreachable_productions(g->nt(start));
 		if (unreachable.size()) {
 			cout << "unreachable production rules for symbol: "
@@ -1084,18 +1084,18 @@ int tgf_repl_evaluator::eval(const trv& s) {
 		string input{};
 		auto i = s | p::parse_input;
 		if (auto seq = i | p::parse_input_char_seq;
-			seq.has_value()) input = seq | trv::terminals;
+			seq.has_value()) input = seq | tt::terminals;
 		else if (auto qstr = i | p::quoted_string;
 			qstr.has_value()) input = unquote(qstr
 				|| p::quoted_string_char
-				|| trv::terminals);
+				|| tt::terminals);
 		//if (opt.debug) cout << "input: " << input << "\n";
 		parse(input.c_str(), input.size());
 		break;
 	}
 	case p::parse_file_cmd: {
 		auto n = s | p::filename;
-		auto filename = unquote(n | trv::terminals);
+		auto filename = unquote(n | tt::terminals);
 		DBG(assert(filename.size());)
 		parse(filename);
 		break;
@@ -1120,10 +1120,10 @@ int tgf_repl_evaluator::eval(const string& src) {
 			//g->print_internal_grammar(cout << "\ngrammar:\n\n", "  ");
 		}
 		tref ref = r.get_shaped_tree2();
-		auto t = trv(ref);
+		auto t = tt(ref);
 		auto statements = t || tgf_repl_parser::statement;
 		for (const auto& statement : statements())
-			if (quit = eval(statement | trv::only_child); quit == 1)
+			if (quit = eval(statement | tt::only_child); quit == 1)
 				return quit;
 	}
 	std::cout << std::endl;

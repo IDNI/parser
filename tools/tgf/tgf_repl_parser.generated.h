@@ -15,14 +15,14 @@ inline static constexpr size_t nt_bits = 8;
 inline const std::vector<std::string> symbol_names{
 	"", "eof", "alnum", "alpha", "space", "printable", "_", "__", "symbol", "quoted_string", 
 	"unescaped_s", "escaped_s", "parse_input_char_seq", "start", "__E_start_0", "statement", "__E___E_start_0_1", "__E___E_start_0_2", "grammar_cmd", "igrammar_cmd", 
-	"unreachable_cmd", "reload_cmd", "load_cmd", "start_cmd", "help", "version", "quit", "clear", "get", "set", 
-	"toggle", "enable", "disable", "add", "del", "parse_file_cmd", "parse_cmd", "parse_sym", "__E_parse_cmd_3", "parse_input", 
+	"unreachable_cmd", "reload_cmd", "load_cmd", "start_cmd", "help_cmd", "version_cmd", "quit_cmd", "clear_cmd", "get_cmd", "set_cmd", 
+	"toggle_cmd", "enable_cmd", "disable_cmd", "add_cmd", "del_cmd", "parse_file_cmd", "parse_cmd", "parse_sym", "__E_parse_cmd_3", "parse_input", 
 	"parse_file_sym", "__E_parse_file_cmd_4", "filename", "grammar_sym", "__E_grammar_cmd_5", "igrammar_sym", "__E_igrammar_cmd_6", "__E_igrammar_cmd_7", "start_sym", "__E_start_cmd_8", 
-	"__E_start_cmd_9", "unreachable_sym", "__E_unreachable_cmd_10", "__E_unreachable_cmd_11", "reload_sym", "__E_reload_cmd_12", "load_sym", "__E_load_cmd_13", "help_sym", "__E_help_14", 
-	"__E_help_15", "help_arg", "version_sym", "__E_version_16", "quit_sym", "__E_quit_17", "clear_sym", "__E_clear_18", "get_sym", "__E_get_19", 
-	"option", "add_sym", "__E_add_20", "list_option", "symbol_list", "treepaths_option", "treepath_list", "del_sym", "__E_del_21", "__E_del_22", 
-	"toggle_sym", "__E_toggle_23", "bool_option", "enable_sym", "__E_enable_24", "disable_sym", "__E_disable_25", "set_sym", "__E_set_26", "__E___E_set_26_27", 
-	"bool_value", "__E___E_set_26_28", "__E___E_set_26_29", "enum_ev_option", "__E___E_set_26_30", "error_verbosity", "__E_parse_input_31", "__E_parse_input_32", "error_verbosity_opt", "__E_enum_ev_option_33", 
+	"__E_start_cmd_9", "unreachable_sym", "__E_unreachable_cmd_10", "__E_unreachable_cmd_11", "reload_sym", "__E_reload_cmd_12", "load_sym", "__E_load_cmd_13", "help_sym", "__E_help_cmd_14", 
+	"__E_help_cmd_15", "help_arg", "version_sym", "__E_version_cmd_16", "quit_sym", "__E_quit_cmd_17", "clear_sym", "__E_clear_cmd_18", "get_sym", "__E_get_cmd_19", 
+	"option", "add_sym", "__E_add_cmd_20", "list_option", "symbol_list", "treepaths_option", "treepath_list", "del_sym", "__E_del_cmd_21", "__E_del_cmd_22", 
+	"toggle_sym", "__E_toggle_cmd_23", "bool_option", "enable_sym", "__E_enable_cmd_24", "disable_sym", "__E_disable_cmd_25", "set_sym", "__E_set_cmd_26", "__E___E_set_cmd_26_27", 
+	"bool_value", "__E___E_set_cmd_26_28", "__E___E_set_cmd_26_29", "enum_ev_option", "__E___E_set_cmd_26_30", "error_verbosity", "__E_parse_input_31", "__E_parse_input_32", "error_verbosity_opt", "__E_enum_ev_option_33", 
 	"status_opt", "__E_bool_option_34", "colors_opt", "__E_bool_option_35", "print_ambiguity_opt", "__E_bool_option_36", "print_graphs_opt", "__E_bool_option_37", "print_rules_opt", "__E_bool_option_38", 
 	"print_facts_opt", "__E_bool_option_39", "print_terminals_opt", "__E_bool_option_40", "measure_parsing_opt", "__E_bool_option_41", "measure_each_pos_opt", "__E_bool_option_42", "measure_forest_opt", "__E_bool_option_43", 
 	"measure_preprocess_opt", "__E_bool_option_44", "debug_opt", "__E_bool_option_45", "auto_disambiguate_opt", "__E_bool_option_46", "trim_terminals_opt", "__E_bool_option_47", "inline_cc_opt", "__E_bool_option_48", 
@@ -104,27 +104,27 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(15), (NT(22)));
 //G11:  statement(15)        => start_cmd(23).
 	p(NT(15), (NT(23)));
-//G12:  statement(15)        => help(24).
+//G12:  statement(15)        => help_cmd(24).
 	p(NT(15), (NT(24)));
-//G13:  statement(15)        => version(25).
+//G13:  statement(15)        => version_cmd(25).
 	p(NT(15), (NT(25)));
-//G14:  statement(15)        => quit(26).
+//G14:  statement(15)        => quit_cmd(26).
 	p(NT(15), (NT(26)));
-//G15:  statement(15)        => clear(27).
+//G15:  statement(15)        => clear_cmd(27).
 	p(NT(15), (NT(27)));
-//G16:  statement(15)        => get(28).
+//G16:  statement(15)        => get_cmd(28).
 	p(NT(15), (NT(28)));
-//G17:  statement(15)        => set(29).
+//G17:  statement(15)        => set_cmd(29).
 	p(NT(15), (NT(29)));
-//G18:  statement(15)        => toggle(30).
+//G18:  statement(15)        => toggle_cmd(30).
 	p(NT(15), (NT(30)));
-//G19:  statement(15)        => enable(31).
+//G19:  statement(15)        => enable_cmd(31).
 	p(NT(15), (NT(31)));
-//G20:  statement(15)        => disable(32).
+//G20:  statement(15)        => disable_cmd(32).
 	p(NT(15), (NT(32)));
-//G21:  statement(15)        => add(33).
+//G21:  statement(15)        => add_cmd(33).
 	p(NT(15), (NT(33)));
-//G22:  statement(15)        => del(34).
+//G22:  statement(15)        => del_cmd(34).
 	p(NT(15), (NT(34)));
 //G23:  statement(15)        => parse_file_cmd(35).
 	p(NT(15), (NT(35)));
@@ -210,131 +210,131 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(56), (NT(57)));
 //G64:  load_cmd(22)         => load_sym(56) __(7) filename(42).
 	p(NT(22), (NT(56)+NT(7)+NT(42)));
-//G65:  __E_help_14(59)      => 'h'.
+//G65:  __E_help_cmd_14(59)  => 'h'.
 	p(NT(59), (T(18)));
-//G66:  __E_help_14(59)      => 'h' 'e' 'l' 'p'.
+//G66:  __E_help_cmd_14(59)  => 'h' 'e' 'l' 'p'.
 	p(NT(59), (T(18)+T(6)+T(10)+T(2)));
-//G67:  help_sym(58)         => __E_help_14(59).
+//G67:  help_sym(58)         => __E_help_cmd_14(59).
 	p(NT(58), (NT(59)));
-//G68:  __E_help_15(60)      => __(7) help_arg(61).
+//G68:  __E_help_cmd_15(60)  => __(7) help_arg(61).
 	p(NT(60), (NT(7)+NT(61)));
-//G69:  __E_help_15(60)      => null.
+//G69:  __E_help_cmd_15(60)  => null.
 	p(NT(60), (nul));
-//G70:  help(24)             => help_sym(58) __E_help_15(60).
+//G70:  help_cmd(24)         => help_sym(58) __E_help_cmd_15(60).
 	p(NT(24), (NT(58)+NT(60)));
-//G71:  __E_version_16(63)   => 'v'.
+//G71:  __E_version_cmd_16(63) => 'v'.
 	p(NT(63), (T(22)));
-//G72:  __E_version_16(63)   => 'v' 'e' 'r' 's' 'i' 'o' 'n'.
+//G72:  __E_version_cmd_16(63) => 'v' 'e' 'r' 's' 'i' 'o' 'n'.
 	p(NT(63), (T(22)+T(6)+T(4)+T(5)+T(9)+T(20)+T(13)));
-//G73:  version_sym(62)      => __E_version_16(63).
+//G73:  version_sym(62)      => __E_version_cmd_16(63).
 	p(NT(62), (NT(63)));
-//G74:  version(25)          => version_sym(62).
+//G74:  version_cmd(25)      => version_sym(62).
 	p(NT(25), (NT(62)));
-//G75:  __E_quit_17(65)      => 'q'.
+//G75:  __E_quit_cmd_17(65)  => 'q'.
 	p(NT(65), (T(23)));
-//G76:  __E_quit_17(65)      => 'q' 'u' 'i' 't'.
+//G76:  __E_quit_cmd_17(65)  => 'q' 'u' 'i' 't'.
 	p(NT(65), (T(23)+T(16)+T(9)+T(14)));
-//G77:  __E_quit_17(65)      => 'e'.
+//G77:  __E_quit_cmd_17(65)  => 'e'.
 	p(NT(65), (T(6)));
-//G78:  __E_quit_17(65)      => 'e' 'x' 'i' 't'.
+//G78:  __E_quit_cmd_17(65)  => 'e' 'x' 'i' 't'.
 	p(NT(65), (T(6)+T(24)+T(9)+T(14)));
-//G79:  quit_sym(64)         => __E_quit_17(65).
+//G79:  quit_sym(64)         => __E_quit_cmd_17(65).
 	p(NT(64), (NT(65)));
-//G80:  quit(26)             => quit_sym(64).
+//G80:  quit_cmd(26)         => quit_sym(64).
 	p(NT(26), (NT(64)));
-//G81:  __E_clear_18(67)     => 'c' 'l' 's'.
+//G81:  __E_clear_cmd_18(67) => 'c' 'l' 's'.
 	p(NT(67), (T(17)+T(10)+T(5)));
-//G82:  __E_clear_18(67)     => 'c' 'l' 'e' 'a' 'r'.
+//G82:  __E_clear_cmd_18(67) => 'c' 'l' 'e' 'a' 'r'.
 	p(NT(67), (T(17)+T(10)+T(6)+T(3)+T(4)));
-//G83:  clear_sym(66)        => __E_clear_18(67).
+//G83:  clear_sym(66)        => __E_clear_cmd_18(67).
 	p(NT(66), (NT(67)));
-//G84:  clear(27)            => clear_sym(66).
+//G84:  clear_cmd(27)        => clear_sym(66).
 	p(NT(27), (NT(66)));
 //G85:  get_sym(68)          => 'g' 'e' 't'.
 	p(NT(68), (T(11)+T(6)+T(14)));
-//G86:  __E_get_19(69)       => __(7) option(70).
+//G86:  __E_get_cmd_19(69)   => __(7) option(70).
 	p(NT(69), (NT(7)+NT(70)));
-//G87:  __E_get_19(69)       => null.
+//G87:  __E_get_cmd_19(69)   => null.
 	p(NT(69), (nul));
-//G88:  get(28)              => get_sym(68) __E_get_19(69).
+//G88:  get_cmd(28)          => get_sym(68) __E_get_cmd_19(69).
 	p(NT(28), (NT(68)+NT(69)));
 //G89:  add_sym(71)          => 'a' 'd' 'd'.
 	p(NT(71), (T(3)+T(21)+T(21)));
-//G90:  __E_add_20(72)       => list_option(73) __(7) symbol_list(74).
+//G90:  __E_add_cmd_20(72)   => list_option(73) __(7) symbol_list(74).
 	p(NT(72), (NT(73)+NT(7)+NT(74)));
-//G91:  __E_add_20(72)       => treepaths_option(75) __(7) treepath_list(76).
+//G91:  __E_add_cmd_20(72)   => treepaths_option(75) __(7) treepath_list(76).
 	p(NT(72), (NT(75)+NT(7)+NT(76)));
-//G92:  add(33)              => add_sym(71) __(7) __E_add_20(72).
+//G92:  add_cmd(33)          => add_sym(71) __(7) __E_add_cmd_20(72).
 	p(NT(33), (NT(71)+NT(7)+NT(72)));
-//G93:  __E_del_21(78)       => 'd' 'e' 'l'.
+//G93:  __E_del_cmd_21(78)   => 'd' 'e' 'l'.
 	p(NT(78), (T(21)+T(6)+T(10)));
-//G94:  __E_del_21(78)       => 'd' 'e' 'l' 'e' 't' 'e'.
+//G94:  __E_del_cmd_21(78)   => 'd' 'e' 'l' 'e' 't' 'e'.
 	p(NT(78), (T(21)+T(6)+T(10)+T(6)+T(14)+T(6)));
-//G95:  __E_del_21(78)       => 'r' 'm'.
+//G95:  __E_del_cmd_21(78)   => 'r' 'm'.
 	p(NT(78), (T(4)+T(12)));
-//G96:  __E_del_21(78)       => 'r' 'e' 'm'.
+//G96:  __E_del_cmd_21(78)   => 'r' 'e' 'm'.
 	p(NT(78), (T(4)+T(6)+T(12)));
-//G97:  __E_del_21(78)       => 'r' 'e' 'm' 'o' 'v' 'e'.
+//G97:  __E_del_cmd_21(78)   => 'r' 'e' 'm' 'o' 'v' 'e'.
 	p(NT(78), (T(4)+T(6)+T(12)+T(20)+T(22)+T(6)));
-//G98:  del_sym(77)          => __E_del_21(78).
+//G98:  del_sym(77)          => __E_del_cmd_21(78).
 	p(NT(77), (NT(78)));
-//G99:  __E_del_22(79)       => list_option(73) __(7) symbol_list(74).
+//G99:  __E_del_cmd_22(79)   => list_option(73) __(7) symbol_list(74).
 	p(NT(79), (NT(73)+NT(7)+NT(74)));
-//G100: __E_del_22(79)       => treepaths_option(75) __(7) treepath_list(76).
+//G100: __E_del_cmd_22(79)   => treepaths_option(75) __(7) treepath_list(76).
 	p(NT(79), (NT(75)+NT(7)+NT(76)));
-//G101: del(34)              => del_sym(77) __(7) __E_del_22(79).
+//G101: del_cmd(34)          => del_sym(77) __(7) __E_del_cmd_22(79).
 	p(NT(34), (NT(77)+NT(7)+NT(79)));
-//G102: __E_toggle_23(81)    => 't' 'o' 'g'.
+//G102: __E_toggle_cmd_23(81) => 't' 'o' 'g'.
 	p(NT(81), (T(14)+T(20)+T(11)));
-//G103: __E_toggle_23(81)    => 't' 'o' 'g' 'g' 'l' 'e'.
+//G103: __E_toggle_cmd_23(81) => 't' 'o' 'g' 'g' 'l' 'e'.
 	p(NT(81), (T(14)+T(20)+T(11)+T(11)+T(10)+T(6)));
-//G104: toggle_sym(80)       => __E_toggle_23(81).
+//G104: toggle_sym(80)       => __E_toggle_cmd_23(81).
 	p(NT(80), (NT(81)));
-//G105: toggle(30)           => toggle_sym(80) __(7) bool_option(82).
+//G105: toggle_cmd(30)       => toggle_sym(80) __(7) bool_option(82).
 	p(NT(30), (NT(80)+NT(7)+NT(82)));
-//G106: __E_enable_24(84)    => 'e' 'n' __(7).
+//G106: __E_enable_cmd_24(84) => 'e' 'n' __(7).
 	p(NT(84), (T(6)+T(13)+NT(7)));
-//G107: __E_enable_24(84)    => 'e' 'n' 'a' 'b' 'l' 'e' __(7).
+//G107: __E_enable_cmd_24(84) => 'e' 'n' 'a' 'b' 'l' 'e' __(7).
 	p(NT(84), (T(6)+T(13)+T(3)+T(19)+T(10)+T(6)+NT(7)));
-//G108: enable_sym(83)       => __E_enable_24(84).
+//G108: enable_sym(83)       => __E_enable_cmd_24(84).
 	p(NT(83), (NT(84)));
-//G109: enable(31)           => enable_sym(83) bool_option(82).
+//G109: enable_cmd(31)       => enable_sym(83) bool_option(82).
 	p(NT(31), (NT(83)+NT(82)));
-//G110: __E_disable_25(86)   => 'd' 'i' 's' __(7).
+//G110: __E_disable_cmd_25(86) => 'd' 'i' 's' __(7).
 	p(NT(86), (T(21)+T(9)+T(5)+NT(7)));
-//G111: __E_disable_25(86)   => 'd' 'i' 's' 'a' 'b' 'l' 'e' __(7).
+//G111: __E_disable_cmd_25(86) => 'd' 'i' 's' 'a' 'b' 'l' 'e' __(7).
 	p(NT(86), (T(21)+T(9)+T(5)+T(3)+T(19)+T(10)+T(6)+NT(7)));
-//G112: disable_sym(85)      => __E_disable_25(86).
+//G112: disable_sym(85)      => __E_disable_cmd_25(86).
 	p(NT(85), (NT(86)));
-//G113: disable(32)          => disable_sym(85) bool_option(82).
+//G113: disable_cmd(32)      => disable_sym(85) bool_option(82).
 	p(NT(32), (NT(85)+NT(82)));
 //G114: set_sym(87)          => 's' 'e' 't'.
 	p(NT(87), (T(5)+T(6)+T(14)));
-//G115: __E___E_set_26_27(89) => __(7).
+//G115: __E___E_set_cmd_26_27(89) => __(7).
 	p(NT(89), (NT(7)));
-//G116: __E___E_set_26_27(89) => _(6) '=' _(6).
+//G116: __E___E_set_cmd_26_27(89) => _(6) '=' _(6).
 	p(NT(89), (NT(6)+T(25)+NT(6)));
-//G117: __E_set_26(88)       => bool_option(82) __E___E_set_26_27(89) bool_value(90).
+//G117: __E_set_cmd_26(88)   => bool_option(82) __E___E_set_cmd_26_27(89) bool_value(90).
 	p(NT(88), (NT(82)+NT(89)+NT(90)));
-//G118: __E___E_set_26_28(91) => __(7).
+//G118: __E___E_set_cmd_26_28(91) => __(7).
 	p(NT(91), (NT(7)));
-//G119: __E___E_set_26_28(91) => _(6) '=' _(6).
+//G119: __E___E_set_cmd_26_28(91) => _(6) '=' _(6).
 	p(NT(91), (NT(6)+T(25)+NT(6)));
-//G120: __E_set_26(88)       => list_option(73) __E___E_set_26_28(91) symbol_list(74).
+//G120: __E_set_cmd_26(88)   => list_option(73) __E___E_set_cmd_26_28(91) symbol_list(74).
 	p(NT(88), (NT(73)+NT(91)+NT(74)));
-//G121: __E___E_set_26_29(92) => __(7).
+//G121: __E___E_set_cmd_26_29(92) => __(7).
 	p(NT(92), (NT(7)));
-//G122: __E___E_set_26_29(92) => _(6) '=' _(6).
+//G122: __E___E_set_cmd_26_29(92) => _(6) '=' _(6).
 	p(NT(92), (NT(6)+T(25)+NT(6)));
-//G123: __E_set_26(88)       => treepaths_option(75) __E___E_set_26_29(92) treepath_list(76).
+//G123: __E_set_cmd_26(88)   => treepaths_option(75) __E___E_set_cmd_26_29(92) treepath_list(76).
 	p(NT(88), (NT(75)+NT(92)+NT(76)));
-//G124: __E___E_set_26_30(94) => __(7).
+//G124: __E___E_set_cmd_26_30(94) => __(7).
 	p(NT(94), (NT(7)));
-//G125: __E___E_set_26_30(94) => _(6) '=' _(6).
+//G125: __E___E_set_cmd_26_30(94) => _(6) '=' _(6).
 	p(NT(94), (NT(6)+T(25)+NT(6)));
-//G126: __E_set_26(88)       => enum_ev_option(93) __E___E_set_26_30(94) error_verbosity(95).
+//G126: __E_set_cmd_26(88)   => enum_ev_option(93) __E___E_set_cmd_26_30(94) error_verbosity(95).
 	p(NT(88), (NT(93)+NT(94)+NT(95)));
-//G127: set(29)              => set_sym(87) __(7) __E_set_26(88).
+//G127: set_cmd(29)          => set_sym(87) __(7) __E_set_cmd_26(88).
 	p(NT(29), (NT(87)+NT(7)+NT(88)));
 //G128: parse_input(39)      => quoted_string(9).
 	p(NT(39), (NT(9)));
@@ -770,14 +770,14 @@ struct tgf_repl_parser_nonterminals {
 	enum nonterminal {
 		nul, eof, alnum, alpha, space, printable, _, __, symbol, quoted_string, 
 		unescaped_s, escaped_s, parse_input_char_seq, start, __E_start_0, statement, __E___E_start_0_1, __E___E_start_0_2, grammar_cmd, igrammar_cmd, 
-		unreachable_cmd, reload_cmd, load_cmd, start_cmd, help, version, quit, clear, get, set, 
-		toggle, enable, disable, add, del, parse_file_cmd, parse_cmd, parse_sym, __E_parse_cmd_3, parse_input, 
+		unreachable_cmd, reload_cmd, load_cmd, start_cmd, help_cmd, version_cmd, quit_cmd, clear_cmd, get_cmd, set_cmd, 
+		toggle_cmd, enable_cmd, disable_cmd, add_cmd, del_cmd, parse_file_cmd, parse_cmd, parse_sym, __E_parse_cmd_3, parse_input, 
 		parse_file_sym, __E_parse_file_cmd_4, filename, grammar_sym, __E_grammar_cmd_5, igrammar_sym, __E_igrammar_cmd_6, __E_igrammar_cmd_7, start_sym, __E_start_cmd_8, 
-		__E_start_cmd_9, unreachable_sym, __E_unreachable_cmd_10, __E_unreachable_cmd_11, reload_sym, __E_reload_cmd_12, load_sym, __E_load_cmd_13, help_sym, __E_help_14, 
-		__E_help_15, help_arg, version_sym, __E_version_16, quit_sym, __E_quit_17, clear_sym, __E_clear_18, get_sym, __E_get_19, 
-		option, add_sym, __E_add_20, list_option, symbol_list, treepaths_option, treepath_list, del_sym, __E_del_21, __E_del_22, 
-		toggle_sym, __E_toggle_23, bool_option, enable_sym, __E_enable_24, disable_sym, __E_disable_25, set_sym, __E_set_26, __E___E_set_26_27, 
-		bool_value, __E___E_set_26_28, __E___E_set_26_29, enum_ev_option, __E___E_set_26_30, error_verbosity, __E_parse_input_31, __E_parse_input_32, error_verbosity_opt, __E_enum_ev_option_33, 
+		__E_start_cmd_9, unreachable_sym, __E_unreachable_cmd_10, __E_unreachable_cmd_11, reload_sym, __E_reload_cmd_12, load_sym, __E_load_cmd_13, help_sym, __E_help_cmd_14, 
+		__E_help_cmd_15, help_arg, version_sym, __E_version_cmd_16, quit_sym, __E_quit_cmd_17, clear_sym, __E_clear_cmd_18, get_sym, __E_get_cmd_19, 
+		option, add_sym, __E_add_cmd_20, list_option, symbol_list, treepaths_option, treepath_list, del_sym, __E_del_cmd_21, __E_del_cmd_22, 
+		toggle_sym, __E_toggle_cmd_23, bool_option, enable_sym, __E_enable_cmd_24, disable_sym, __E_disable_cmd_25, set_sym, __E_set_cmd_26, __E___E_set_cmd_26_27, 
+		bool_value, __E___E_set_cmd_26_28, __E___E_set_cmd_26_29, enum_ev_option, __E___E_set_cmd_26_30, error_verbosity, __E_parse_input_31, __E_parse_input_32, error_verbosity_opt, __E_enum_ev_option_33, 
 		status_opt, __E_bool_option_34, colors_opt, __E_bool_option_35, print_ambiguity_opt, __E_bool_option_36, print_graphs_opt, __E_bool_option_37, print_rules_opt, __E_bool_option_38, 
 		print_facts_opt, __E_bool_option_39, print_terminals_opt, __E_bool_option_40, measure_parsing_opt, __E_bool_option_41, measure_each_pos_opt, __E_bool_option_42, measure_forest_opt, __E_bool_option_43, 
 		measure_preprocess_opt, __E_bool_option_44, debug_opt, __E_bool_option_45, auto_disambiguate_opt, __E_bool_option_46, trim_terminals_opt, __E_bool_option_47, inline_cc_opt, __E_bool_option_48, 

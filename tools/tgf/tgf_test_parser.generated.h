@@ -183,13 +183,16 @@ inline ::idni::grammar<char_type, terminal_type> grammar(
 
 } // namespace tgf_test_parser_data
 
-struct tgf_test_parser : public idni::parser<char, char> {
+struct tgf_test_parser_nonterminals {
 	enum nonterminal {
 		nul, eof, alpha, alnum, space, graph, printable, __, _, symbol, 
 		string, unescaped_s, escaped_s, start, __E_start_0, test, __E_start_1, test_string, __E_test_2, __E_test_3, 
 		__E_symbol_4, __E_symbol_5, __E_symbol_6, quoted_string, __E_string_7, quoted_string_char, __E_quoted_string_8, __E_unescaped_s_9, __E_unescaped_s_10, __E_escaped_s_11, 
 		__E___12, __E____13, comment, __E_comment_14, __E_comment_15, __E_comment_16, __N_0, 
 	};
+};
+
+struct tgf_test_parser : public idni::parser<char, char>, public tgf_test_parser_nonterminals {
 	static tgf_test_parser& instance() {
 		static tgf_test_parser inst;
 		return inst;
