@@ -419,7 +419,9 @@ const lcrs_tree<T>& lcrs_tree<T>::only_child_tree() const {
 template <typename T>
 std::ostream& lcrs_tree<T>::print(std::ostream& os, size_t s) const {
 	for (size_t i = 0; i < s; i++) os << "\t";
-	os << this->value << "\n";
+	os << this->value;
+	// DBG(os << " *" << get();)
+	os << "\n";
 	for (const auto& c : children()) get(c).print(os, s + 1);
 	return os;
 }

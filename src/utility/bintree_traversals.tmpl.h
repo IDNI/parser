@@ -297,9 +297,7 @@ void post_order<node_t>::const_traverse(tref n, auto& visitor,
 			stack.push_back(c);
 			// Remember parent if is required by any of the callbacks
 			if constexpr (std::is_invocable_v<decltype(visitor), tref, tref>
-				|| std::is_invocable_v<decltype(visit_subtree), tref, tref>
-				|| std::is_invocable_v<decltype(up), tref, tref>
-				|| std::is_invocable_v<decltype(between), tref, tref>)
+				|| std::is_invocable_v<decltype(visit_subtree), tref, tref>)
 				parent.emplace(c, c_node);
 			if constexpr (unique) if (cache.contains(c)) continue;
 			// c_node can become invalid due to push_back
@@ -625,7 +623,7 @@ void pre_order<node_t>::const_traverse(tref n, auto& visitor,
 							? nullptr : it->second);
 			else cb(x, it == parent.end() ? nullptr : it->second);
 		} else if constexpr (std::is_invocable_r_v<
-					bool, decltype(cb), tref>) return cb(x);
+				bool, decltype(cb), tref>) return cb(x);
 		else cb(x);
 		return true;
 	};
@@ -644,7 +642,7 @@ void pre_order<node_t>::const_traverse(tref n, auto& visitor,
 		// If no unprocessed position exists, we are done
 		if (upos.empty()) return;
 		// Find first unprocessed position
-		auto& c_node = stack[upos.back()];
+		tref c_node = stack[upos.back()];
 		auto c_tree = lcrs_tree<node_t>::get(c_node);
 		if (ch_its.find(c_node) == ch_its.end()) {
 			// Get child iterator
@@ -686,7 +684,7 @@ void pre_order<node_t>::const_traverse(tref n, auto& visitor,
 				|| std::is_invocable_v<decltype(visit_subtree), tref, tref>
 				|| std::is_invocable_v<decltype(up), tref, tref>
 				|| std::is_invocable_v<decltype(between), tref, tref>)
-				parent.emplace(c, c_node);
+					parent.emplace(c, c_node);
 			if constexpr (unique)
 				if (cache.contains(c)) continue;
 			if (call(visit_subtree, c)) {
