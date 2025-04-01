@@ -495,6 +495,7 @@ using tree = lcrs_tree<T>;
  */
 template <typename node_t>
 struct post_order {
+	using tree = lcrs_tree<node_t>;
 
 	explicit post_order(tref n);
 	explicit post_order(const htree::sp& h);
@@ -572,6 +573,8 @@ private:
  */
 template<typename node_t>
 struct pre_order {
+	using tree = lcrs_tree<node_t>;
+
 	explicit pre_order(tref n);
 	explicit pre_order(const htree::sp& h);
 
@@ -758,14 +761,6 @@ private:
 	template<bool search, bool unique>
 	void const_traverse(tref n, auto& visit, auto& visit_subtree,
 						auto& up, auto& between);
-};
-
-template<typename T>
-struct error_node;
-
-template <>
-struct error_node<tref> {
-	inline static const tref value = nullptr;
 };
 
 } // idni namespace

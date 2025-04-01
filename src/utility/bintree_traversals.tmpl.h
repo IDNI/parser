@@ -20,6 +20,17 @@ static const auto none = [](tref) static { return false; };
 static const auto identity = [](tref n) static { return n; };
 static const auto do_nothing = [](tref) static {};
 
+// Helper type traits to check callback properties
+template<typename Cb>
+using bool_accepts_tref = std::is_invocable_r<bool, Cb, tref>;
+
+template<typename Cb>
+using bool_accepts_tref_tref = std::is_invocable_r<bool, Cb, tref, tref>;
+
+template<typename Cb>
+using accepts_tref_tref = std::is_invocable<Cb, tref, tref>;
+
+
 #ifdef MEASURE_TRAVERSER_DEPTH
 static size_t depth = 0;
 static size_t max_depth = 0;
@@ -122,7 +133,7 @@ tref post_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree) {
 	while (true) {
 		// If no unprocessed position exists, we are done
 		if (upos.empty()) return stack[0];
-		auto& c_node = stack[upos.back()];
+		tref c_node = stack[upos.back()];
 		// Check cache first
 		if constexpr (slot != 0) {
 			const auto it = m.find(std::make_pair(c_node, slot));
@@ -145,7 +156,7 @@ tref post_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree) {
 				continue;
 			}
 		}
-		auto c_tree = lcrs_tree<node_t>::get(c_node);
+		const auto& c_tree = tree::get(c_node);
 		// Check if node has children
 		if (ch_its.find(c_node) == ch_its.end()) {
 			if (ch_its.emplace(c_node, c_tree.children().begin())
@@ -153,8 +164,7 @@ tref post_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree) {
 			{
 				// Process node and move to next
 				c_node = f(c_node);
-				if (c_node == error_node<tref>::value)
-					return error_node<tref>::value;
+				if (c_node == nullptr) return nullptr;
 				upos.pop_back();
 #ifdef MEASURE_TRAVERSER_DEPTH
 				dec_depth();
@@ -172,9 +182,8 @@ tref post_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree) {
 			auto ch_range = c_tree.children();
 			if (std::equal(stack.begin() + (upos.back() + 1), stack.end(),
 				ch_range.begin(), ch_range.end())) {
-				auto res = f(c_node);
-				if (res == error_node<tref>::value)
-					return error_node<tref>::value;
+				tref res = f(c_node);
+				if (res == nullptr) return nullptr;
 				if constexpr (slot != 0) m.emplace(
 					std::make_pair(c_node, slot), res);
 				else cache.emplace(c_node, res);
@@ -188,18 +197,14 @@ tref post_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree) {
 				continue;
 			}
 			// Make new node if children are different
-			trefs children;
-			for (size_t i = upos.back() + 1; i < stack.size(); ++i)
-				children.emplace_back(std::move(stack[i]));
+			tref res = tree::get(c_tree.value,
+				&stack[upos.back() + 1], stack.end(),
+				stack.size() - upos.back() - 1);
 			// Pop children from stacks
 			stack.erase(stack.end() - c_pos, stack.end());
-			// Apply wrapped and mark processed
-			tref new_node = lcrs_tree<node_t>::get(c_tree.value, children);
-			if (new_node == error_node<tref>::value)
-				return error_node<tref>::value;
-			auto res = f(new_node);
-			if (res == error_node<tref>::value)
-				return error_node<tref>::value;
+			if (res == nullptr) return nullptr;
+			res = f(res);
+			if (res == nullptr) return nullptr;
 			if constexpr (slot != 0) m.emplace(std::make_pair(c_node, slot), res);
 			else cache.emplace(c_node, res);
 			c_node = std::move(res);
@@ -235,22 +240,22 @@ void post_order<node_t>::const_traverse(tref n, auto& visitor,
 	std::vector<size_t> upos;
 	std::unordered_map<tref, typename tref_range<node_t>::iterator> ch_its;
 	std::unordered_map<tref, tref> parent;
+	auto get_parent = [&parent, &upos, &stack](tref n) -> tref {
+		auto it = parent.find(n);
+		return it == parent.end() ? nullptr : it->second;
+	};
 	// Call callback with parent if it is invocable with tref, tref
 	// Otherwise, call it just with tref
-	auto call = [&parent](auto& cb, tref x) -> bool {
-		if constexpr (std::is_invocable_v<decltype(cb), tref, tref>) {
-			auto it = parent.find(x);
-			if constexpr (std::is_invocable_r_v<
-				bool, decltype(cb), tref, tref>)
-					return cb(x, it == parent.end()
-							? nullptr : it->second);
-			else cb(x, it == parent.end() ? nullptr : it->second);
-		} else if constexpr (std::is_invocable_r_v<
-					bool, decltype(cb), tref>) return cb(x);
-		else cb(x);
+	auto call = [&get_parent](auto& cb, tref x) -> bool {
+		if constexpr (accepts_tref_tref<decltype(cb)>::value) {
+			if constexpr (bool_accepts_tref_tref<decltype(cb)>::value)
+				return cb(x, get_parent(x));
+			else cb(x, get_parent(x));
+		} else if constexpr (bool_accepts_tref<decltype(cb)>::value) {
+			return cb(x);
+		} else cb(x);
 		return true;
 	};
-
 	stack.push_back(n);
 	upos.push_back(0);
 	if constexpr (unique) cache.emplace(n);
@@ -262,7 +267,7 @@ void post_order<node_t>::const_traverse(tref n, auto& visitor,
 		if (upos.empty()) return;
 		// Find first unprocessed position
 		tref c_node = stack[upos.back()];
-		auto c_tree = lcrs_tree<node_t>::get(c_node);
+		const auto& c_tree = tree::get(c_node);
 		if (ch_its.find(c_node) == ch_its.end()) {
 			if (ch_its.emplace(c_node, c_tree.children().begin())
 				.first == nullptr)
@@ -457,7 +462,7 @@ tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 	std::unordered_map<tref, typename tref_range<node_t>::iterator> ch_its;
 	// Apply f and save on stack
 	tref r = f(n);
-	if (r == error_node<tref>::value) return error_node<tref>::value;
+	if (r == nullptr) return nullptr;
 	if constexpr (break_on_change) {
 		if (r == n) {
 #ifdef MEASURE_TRAVERSER_DEPTH
@@ -503,7 +508,7 @@ tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				}
 			}
 		}
-		auto c_tree = lcrs_tree<node_t>::get(c_node);
+		const auto& c_tree = tree::get(c_node);
 		// // Check if node has children
 		if (ch_its.find(c_node) == ch_its.end()) {
 			if (ch_its.emplace(c_node, c_tree.children().begin())
@@ -511,8 +516,7 @@ tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 			{
 				// Call up and move to next
 				c_node = up(c_node);
-				if (c_node == error_node<tref>::value)
-					return error_node<tref>::value;
+				if (c_node == nullptr) return nullptr;
 				upos.pop_back();
 #ifdef MEASURE_TRAVERSER_DEPTH
 				dec_depth();
@@ -530,9 +534,8 @@ tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 			if (std::equal(stack.begin() + (upos.back() + 1), stack.end(),
 				ch_range.begin(), ch_range.end())) {
 				// Call up
-				auto res = up(c_node);
-				if (res == error_node<tref>::value)
-					return error_node<tref>::value;
+				tref res = up(c_node);
+				if (res == nullptr) return nullptr;
 				if constexpr (unique) {
 					if constexpr (slot != 0) m.emplace(std::make_pair(c_node, slot), res);
 					else cache.emplace(c_node, res);
@@ -547,19 +550,15 @@ tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				continue;
 			}
 			// Make new node if children are different
-			trefs children;
-			for (size_t i = upos.back() + 1; i < stack.size(); ++i)
-				children.emplace_back(std::move(stack[i]));
+			tref res = tree::get(c_tree.value,
+				&stack[upos.back() + 1], stack.end(),
+				stack.size() - upos.back() - 1);
 			// Pop children from stacks
 			stack.erase(stack.end() - c_pos, stack.end());
-			// make new node
-			auto res = lcrs_tree<node_t>::get(c_tree.value, children);
-			if (res == error_node<tref>::value)
-				return error_node<tref>::value;
+			if (res == nullptr) return nullptr;
 			// Call up
 			res = up(res);
-			if (res == error_node<tref>::value)
-				return error_node<tref>::value;
+			if (res == nullptr) return nullptr;
 			if constexpr (unique) {
 				if constexpr (slot != 0) m.emplace(std::make_pair(c_node, slot), res);
 				else cache.emplace(c_node, res);
@@ -576,8 +575,7 @@ tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 			if (visit_subtree(c)) {
 				// Apply f and save on stack
 				r = f(c);
-				if (r == error_node<tref>::value)
-					return error_node<tref>::value;
+				if (r == nullptr) return nullptr;
 				if constexpr (break_on_change) {
 					if (r == c) {
 #ifdef MEASURE_TRAVERSER_DEPTH
@@ -612,19 +610,25 @@ void pre_order<node_t>::const_traverse(tref n, auto& visitor,
 	std::vector<size_t> upos;
 	std::unordered_map<tref, typename tref_range<node_t>::iterator> ch_its;
 	std::unordered_map<tref, tref> parent;
+	auto get_parent = [&parent, &upos, &stack](tref n) -> tref {
+		auto it = parent.find(n);
+		tref p = (it == parent.end() ? nullptr : it->second);
+		// tree::get(n).print(std::cerr << "get_parent of: ") << std::endl;
+		// std::cerr << "parent of " << n << " is " << p << std::endl;
+		return p;
+	};
 	// Call callback with parent if it is invocable with tref, tref
 	// Otherwise, call it just with tref
-	auto call = [&parent](auto& cb, tref x) -> bool {
-		if constexpr (std::is_invocable_v<decltype(cb), tref, tref>) {
-			auto it = parent.find(x);
-			if constexpr (std::is_invocable_r_v<
-				bool, decltype(cb), tref, tref>)
-					return cb(x, it == parent.end()
-							? nullptr : it->second);
-			else cb(x, it == parent.end() ? nullptr : it->second);
-		} else if constexpr (std::is_invocable_r_v<
-				bool, decltype(cb), tref>) return cb(x);
-		else cb(x);
+	auto call = [&get_parent](auto& cb, tref x) -> bool {
+		if constexpr (accepts_tref_tref<decltype(cb)>::value) {
+			if constexpr (
+				bool_accepts_tref_tref<decltype(cb)>::value)
+					return cb(x, get_parent(x));
+			else cb(x, get_parent(x));
+		} else
+			if constexpr (bool_accepts_tref<decltype(cb)>::value) {
+				return cb(x);
+			} else cb(x);
 		return true;
 	};
 	// visit n and save on stack
@@ -643,7 +647,7 @@ void pre_order<node_t>::const_traverse(tref n, auto& visitor,
 		if (upos.empty()) return;
 		// Find first unprocessed position
 		tref c_node = stack[upos.back()];
-		auto c_tree = lcrs_tree<node_t>::get(c_node);
+		const auto& c_tree = lcrs_tree<node_t>::get(c_node);
 		if (ch_its.find(c_node) == ch_its.end()) {
 			// Get child iterator
 			if (ch_its.emplace(c_node, c_tree.children().begin())
