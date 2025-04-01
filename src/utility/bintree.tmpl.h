@@ -325,6 +325,12 @@ template <typename T>
 bool lcrs_tree<T>::has_child() const { return this->l != nullptr; }
 
 template <typename T>
+tref lcrs_tree<T>::right_sibling() const { return this->r; }
+
+template <typename T>
+tref lcrs_tree<T>::first_child() const { return this->l; }
+
+template <typename T>
 size_t lcrs_tree<T>::children_size() const {
 	size_t len = 0;
 	get_kary_children(nullptr, len);

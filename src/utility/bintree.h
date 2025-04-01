@@ -316,6 +316,18 @@ struct lcrs_tree : public bintree<T> {
 	bool has_child() const;
 
 	/**
+	 * @brief Get the left sibling of the node
+	 * @return The left sibling of the node
+	 */
+	tref right_sibling() const;
+
+	/**
+	 * @brief Get the child of the node
+	 * @return The child of the node
+	 */
+	tref first_child() const;
+
+	/**
 	 * @brief Get the number of children
 	 * @return The number of children
 	 */
