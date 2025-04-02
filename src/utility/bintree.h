@@ -22,6 +22,7 @@
 #include <memory>
 #include <iostream>
 #include <cassert>
+#include <iterator>
 #include "../defs.h"
 
 namespace idni {
@@ -46,6 +47,12 @@ struct tref_range {
 	tref first;
 	tref_range(tref first);
 	struct iterator {
+		using iterator_category = std::forward_iterator_tag;
+		using value_type = tref;
+		using difference_type = std::ptrdiff_t;
+		using pointer = tref*;
+		using reference = tref&;
+        
 		tref current;
 		iterator(tref id);
 		tref operator*() const;
@@ -63,6 +70,12 @@ struct tree_range {
 	tref first;
 	tree_range(tref first);
 	struct iterator {
+		using iterator_category = std::forward_iterator_tag;
+		using value_type = const T&;
+		using difference_type = std::ptrdiff_t;
+		using pointer = const T*;
+		using reference = const T&;
+        
 		tref current;
 		iterator(tref id);
 		const T& operator*() const;
