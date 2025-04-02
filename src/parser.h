@@ -342,6 +342,16 @@ public:
 		size_t get_nt() const;
 		char get_t() const;
 
+		// provide also same api as literal
+		bool nt() const { return this->value.first.nt(); }
+		char t() const { return this->value.first.t(); }
+		size_t n() const { return this->value.first.n(); }
+		bool is_null() const { return this->value.first.is_null(); }
+
+		// const pnode& get_value() const { return this->value; }
+		lit<C, T> get_literal() const { return this->value.first; }
+		location_type get_location() const { return this->value.second; }
+
 		// tree wrapper for simple traversing using | and || operators
 		// and | extractor<result_type>
 		//                only_child, opt_nonterminal, nonterminal,
