@@ -450,49 +450,9 @@ struct lcrs_tree : public bintree<T> {
 template <typename T>
 using tree = lcrs_tree<T>;
 
-// TODO remove the commented out tree struct if its API differs from lcrs_tree
-// or use above alias if API is the same 
-
-// template <typename T>
-// struct tree : public lcrs_tree<T> {
-// 	using base_t = lcrs_tree<T>;
-
-// 	tref get() const { return base_t::get(); }
-// 	static const htree::sp geth(tref h);
-// 	static const tree& get(const htree::sp& h);
-// 	static const tree& get(const tref id);
-
-// 	static tref get(const T& v, const tref* children, size_t len);
-// 	//static const htree::sp get(const T& v, std::vector<T>&& child = {});
-// 	static tref get(const T& v, const std::vector<tref>& children);
-// 	static tref get(const T& v, tref child); // with single child
-// 	static tref get(const T& v, tref ch1, tref ch2); // with two children
-// 	static tref get(const T& v); // leaf node
-
-// 	static tref get(const T& v, const T* children, size_t len);
-// 	static tref get(const T& v, const std::vector<T>& children);
-// 	static tref get(const T& v, const T& ch);
-// 	static tref get(const T& v, const T& ch1, const T& ch2); 
-
-// 	//fills caller allocated child array upto len size
-// 	//with child ids. If child is nullptr, then just
-// 	//calculates number of children in len.
-// 	//caller's responsibility to free allocated memory
-// 	bool get_children(tref *child, size_t& len) const;
-
-// 	size_t children_size() const;
-// 	trefs get_children() const;
-// 	tref child(size_t n) const;
-// 	tref_range<T> children() const;
-// 	tref only_child() const;
-
-// 	const tree<T>& child_tree(size_t n) const;
-// 	tree_range<tree<T>> children_trees() const;
-// 	const tree<T>& only_child_tree() const;
-
-// 	std::ostream& print(std::ostream& o, size_t s = 0) const;
-// };
-
+using rule = std::pair<htree::sp, htree::sp>;
+using rules = std::vector<rule>;
+using library = rules;
 
 //------------------------------------------------------------------------------
 // post_order and pre_order traversals
