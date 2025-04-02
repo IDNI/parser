@@ -12,10 +12,10 @@ tref parser<C, T>::result::get_trimmed_tree2(tref ref,
 	if (!ref) return nullptr;
 	const auto& t = tree::get(ref);
 	// std::cerr << "get_trimmed_tree for node: `" << t.value.first.to_std_string() << "`" << std::endl;
-	if (t.value.first.is_null()) return nullptr;
+	if (t.is_null()) return nullptr;
 	if (trimmable_node<C, T>(t.value, opts)) return nullptr;
 
-	if (!t.value.first.nt()) return tree::get(t.value); // terminal leaf node 
+	if (t.is_t()) return tree::get(t.value); // terminal leaf node 
 
 	trefs ch;
 	for (tref c : t.children()) {
@@ -38,19 +38,22 @@ tref parser<C, T>::result::inline_tree_nodes2(tref ref,
 	const shaping_options opts) const
 {
 	if (!ref) return nullptr;
-	auto& t = tree::get(ref);
-	if (t.value.first.is_null()) return nullptr;
-	if (!t.value.first.nt()) return tree::get(t.value);
-	// std::cerr << "inlining tree for node: `" << t.value.first.to_std_string() << "`" << std::endl;
-	trefs ch;
-	for (const auto c : t.children())
-		if (node_to_inline<C, T>(tree::get(c).value, opts))
-			// std::cerr << "inlining child: `" << tree::get(c).value.first.to_std_string() << "`" << std::endl;
-			for (auto c2 : tree::get(c).children())
-				ch.push_back(inline_tree_nodes2(c2, opts));
-		else  // std::cerr << "passed\t `" << tree::get(c).value.first.to_std_string() << "`" << std::endl,
-			ch.push_back(inline_tree_nodes2(c, opts));
-	return tree::get(t.value, ch);
+	auto inliner = [&opts](tref n) {
+		const auto& t = tree::get(n);
+		trefs ch;
+		bool changed = false;
+		for (tref c : t.children()) {
+			const auto& ct = tree::get(c);
+			if (node_to_inline<C, T>(ct.value, opts)) {
+				for (auto cc : ct.children()) ch.push_back(cc);
+				changed = true;
+			} else ch.push_back(c);
+		}
+		if (!changed) return n;
+		auto nn = tree::get(t.value, ch);
+		return nn;
+	};
+	return post_order<pnode>(ref).apply_unique(inliner);
 }
 template <typename C, typename T>
 tref parser<C, T>::result::inline_tree_nodes2(tref ref) const {
@@ -62,24 +65,22 @@ tref parser<C, T>::result::inline_tree_paths2(tref ref,
 	const shaping_options opts) const
 {
 	if (!ref) return nullptr;
-	auto& t = tree::get(ref);
-	if (t.value.first.is_null()) return nullptr;
-	if (!t.value.first.nt()) return tree::get(t.value);
+	const auto& t = tree::get(ref);
+	if (t.is_null()) return nullptr;
+	if (t.is_t()) return tree::get(t.value);
 	//std::cerr << "inlining treepath for node: `" << t.value.first.to_std_string() << "`" << std::endl;
 	for (auto& tp : opts.to_inline) {
 		if (tp.size() < 2) continue;
 		std::function<tref(tref, size_t)> go =
 			[&](tref ref, size_t i) -> tref
 		{
-			auto& t = tree::get(ref);
-			if (!t.value.first.nt()
-				|| t.value.first.n() != tp[i]) return 0;
+			const auto& t = tree::get(ref);
+			if (!t.is_nt() || !t.is(tp[i])) return nullptr;
 			//std::cerr << "treepath go " << i << ": `"
 			//	<< t->value.first.to_std_string() << "`" << std::endl;
 			if (i == tp.size() - 1) return ref;
-			for (const auto& c : t.get_children()) {
+			for (tref c : t.children())
 				if (auto y = go(c, i + 1); y) return y;
-			}
 			return nullptr;
 		};
 		if (auto p = go(ref, 0); p) return inline_tree_paths2(p, opts);
@@ -101,6 +102,7 @@ tref parser<C, T>::result::inline_tree2(tref ref, const shaping_options opts)
 	const
 {
 	ref = inline_tree_nodes2(ref, opts);
+	// tree::get(ref).print(std::cout << "inlined tree nodes: ") << "\n\n";
 	return inline_tree_paths2(ref, opts);
 }
 template <typename C, typename T>
@@ -114,22 +116,21 @@ tref parser<C, T>::result::trim_children_terminals2(tref ref,
 {
 	if (!ref) return nullptr;
 	const auto& t = tree::get(ref);
-	if (!t.value.first.nt()) return ref;
+	if (t.is_t()) return ref;
 	bool trim = (opts.trim_terminals
-			&& opts.dont_trim_terminals_of.find(t.value.first.n())
+			&& opts.dont_trim_terminals_of.find(t.get_nt())
 					== opts.dont_trim_terminals_of.end())
-		|| opts.to_trim_children_terminals.find(t.value.first.n())
+		|| opts.to_trim_children_terminals.find(t.get_nt())
 				!= opts.to_trim_children_terminals.end();
-	trefs children;
+	trefs ch;
 	for (const auto& c : t.children()) {
-		auto& cl = tree::get(c).value.first;
-		if (cl.nt() || cl.is_null() || !trim) {
+		auto& ct = tree::get(c);
+		if (ct.is_nt() || ct.is_null() || !trim) {
 			auto x = trim_children_terminals2(c, opts);
-			if (x) children.push_back(x);
+			if (x) ch.push_back(x);
 		}
 	}
-	// std::reverse(children.begin(), children.end());
-	return tree::get(t.value, children);
+	return tree::get(t.value, ch);
 }
 template <typename C, typename T>
 tref parser<C, T>::result::trim_children_terminals2(tref ref) const {
