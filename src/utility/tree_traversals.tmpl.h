@@ -11,7 +11,7 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
-#include "bintree.h"
+#include "tree.h"
 
 namespace idni {
 

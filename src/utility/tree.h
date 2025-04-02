@@ -760,7 +760,7 @@ private:
 
 } // idni namespace
 
-#include "bintree.tmpl.h"
-#include "bintree_traversals.tmpl.h"
+#include "tree.tmpl.h"
+#include "tree_traversals.tmpl.h"
 
 #endif // __IDNI__TREE_H__

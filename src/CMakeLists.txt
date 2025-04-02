@@ -9,7 +9,7 @@ set(PARSER_HEADERS
 	tgf.h
 	utility/characters.h
 	utility/charclasses.h
-	utility/bintree.h
+	utility/tree.h
 )
 set(PARSER_SOURCES
 	parser.cpp

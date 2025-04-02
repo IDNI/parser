@@ -21,7 +21,7 @@
 #include <deque>
 #include <sstream>
 #include "../defs.h"
-#include "bintree.h"
+#include "tree.h"
 
 #ifdef DEBUG
 #include <cassert>

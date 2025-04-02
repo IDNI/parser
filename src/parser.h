@@ -33,7 +33,7 @@
 #include "utility/characters.h"
 #include "utility/charclasses.h"
 #include "utility/term_colors.h"
-#include "utility/bintree.h"
+#include "utility/tree.h"
 
 #ifndef PARSER_BINTREE_FOREST
 #include "utility/forest.h"
