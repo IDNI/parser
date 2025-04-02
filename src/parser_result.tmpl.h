@@ -77,32 +77,26 @@ bool node_to_inline(const typename parser<C, T>::pnode& n,
 	const shaping_options& opts)
 {
 	if (!n.first.nt()) return false;
-	auto matches_inline_prefix = [](const parser<C, T>::pnode& n) {
+	auto name = n.first.to_std_string();
+	auto matches_inline_prefix = [&name]() {
 		static const std::vector<std::string> prefixes = {
 			"__E_", // ebnf prefix
 			"__B_"  // binarization prefix
 		};
-		if (n.first.nt()) {
-			auto s = n.first.to_std_string();
-			for (auto& prefix : prefixes)
-				if (s.find(prefix) != decltype(s)::npos)
-					return true;
-		}
+		for (auto& prefix : prefixes)
+			if (name.find(prefix) != std::string::npos) return true;
 		return false;
 	};
-	static const std::vector<std::string> cc_names = {
-		"eof",  "alnum", "alpha", "blank",
-                        "cntrl", "digit", "graph", "lower", "printable",
-                        "punct", "space", "upper", "xdigit"
+	auto is_char_class = [&name]() {
+		static const std::vector<std::string> list = {
+			"eof",  "alnum", "alpha", "blank",
+				"cntrl", "digit", "graph", "lower", "printable",
+				"punct", "space", "upper", "xdigit"
+		};
+		return std::find(list.begin(), list.end(), name) != list.end();
 	};
-	auto one_of_str = [](const parser<C, T>::pnode& n,
-		const std::vector<std::string>& list)
-	{
-		return std::find(list.begin(), list.end(),
-			n.first.to_std_string()) != list.end();
-	};
-	if ((opts.inline_char_classes && one_of_str(n, cc_names))
-		|| matches_inline_prefix(n)) return true;
+	if ((opts.inline_char_classes && is_char_class())
+		|| matches_inline_prefix()) return true;
 	for (const auto& i : opts.to_inline)
 		if (i.size() == 1 && i[0] == n.first.n()) return true;
 	return false;
