@@ -15,10 +15,10 @@
 
 namespace idni {
 
-static const auto all = [](tref) static { return true; };
-static const auto none = [](tref) static { return false; };
-static const auto identity = [](tref n) static { return n; };
-static const auto do_nothing = [](tref) static {};
+static const auto all = [](const auto&) static { return true; };
+static const auto none = [](const auto&) static { return false; };
+static const auto identity = [](const auto& n) static { return n; };
+static const auto do_nothing = [](const auto&) static {};
 
 // Helper type traits to check callback properties
 template<typename Cb>

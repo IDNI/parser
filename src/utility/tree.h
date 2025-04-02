@@ -473,10 +473,6 @@ struct lcrs_tree : public bintree<T> {
 template <typename T>
 using tree = lcrs_tree<T>;
 
-using rule = std::pair<htree::sp, htree::sp>;
-using rules = std::vector<rule>;
-using library = rules;
-
 //------------------------------------------------------------------------------
 // post_order and pre_order traversals
 // - can be used with lcrs_tree, tree and their descendants
@@ -758,9 +754,42 @@ private:
 						auto& up, auto& between);
 };
 
+//------------------------------------------------------------------------------
+// former rewriter predicate API and rule rewriter
+
+// TODO consider namespacing these to idni::rewriter after replacing the old one
+
+using rule = std::pair<htree::sp, htree::sp>;
+using rules = std::vector<rule>;
+using library = rules;
+
+// visitor that traverse the tree in post-order (avoiding visited nodes).
+template <typename tree_t, typename wrapped_t, typename predicate_t>
+struct post_order_traverser {
+	post_order_traverser(wrapped_t& wrapped, predicate_t& query);
+	tref operator()(tref n);
+	wrapped_t& wrapped;
+	predicate_t& query;
+private:
+	tref traverse(tref n, std::set<tref>& visited);
+};
+
+// visitor that selects top nodes that satisfy a predicate and stores them in the
+// supplied vector. It only works with post order traversals and never produces
+// duplicates.
+// TODO (MEDIUM) replace vector by set
+template <typename predicate_t>
+struct select_top_predicate {
+	select_top_predicate(predicate_t& query, trefs& selected);
+	bool operator()(tref n);
+	predicate_t& query;
+	trefs& selected;
+};
+
+
 } // idni namespace
 
 #include "tree.tmpl.h"
 #include "tree_traversals.tmpl.h"
-
+#include "tree_rewriter.tmpl.h"
 #endif // __IDNI__TREE_H__
