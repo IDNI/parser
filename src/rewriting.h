@@ -59,7 +59,7 @@
 // We should talk about of sp_tau_node, rule,...
 
 
-namespace idni::rewriter {
+namespace idni::depreciating::rewriter {
 
 // IDEA this is very similar to idni::forest<...>::tree, but it
 // also defines equality operators and ordering (important during hashing).
@@ -1849,12 +1849,12 @@ sp_node<symbol_t> make_node_from_file(const transformer_t& transformer,
 		transformer, result);
 }
 
-} // namespace idni::rewriter
+} // namespace idni::depreciating::rewriter
 
 // Hash for node using specialization to std::hash
 template<typename symbol_t>
-struct std::hash<idni::rewriter::node<symbol_t>> {
-	size_t operator()(const idni::rewriter::node<symbol_t>& n) const noexcept {
+struct std::hash<idni::depreciating::rewriter::node<symbol_t>> {
+	size_t operator()(const idni::depreciating::rewriter::node<symbol_t>& n) const noexcept {
 		return n.hash;
 	}
 };
@@ -1866,9 +1866,9 @@ struct std::hash<idni::rewriter::node<symbol_t>> {
 // << for node (make it shared make use of the previous operator)
 template <typename symbol_t>
 std::ostream& operator<<(std::ostream& stream,
-	const idni::rewriter::node<symbol_t>& n)
+	const idni::depreciating::rewriter::node<symbol_t>& n)
 {
-	return stream << make_shared<idni::rewriter::sp_node<symbol_t>>(n);
+	return stream << make_shared<idni::depreciating::rewriter::sp_node<symbol_t>>(n);
 }
 
 #undef LOG_DEBUG

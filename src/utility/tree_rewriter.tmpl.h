@@ -13,7 +13,7 @@
 
 #include "tree.h"
 
-namespace idni {
+namespace idni::rewriter {
 
 // former rewriter predicate API
 // ---------------------------------------------------------------------
@@ -69,4 +69,4 @@ bool select_top_predicate<predicate_t>::operator()(tref n) {
 }
 
 
-} // namespace idni
+} // idni::rewriter namespace

@@ -757,7 +757,7 @@ private:
 //------------------------------------------------------------------------------
 // former rewriter predicate API and rule rewriter
 
-// TODO consider namespacing these to idni::rewriter after replacing the old one
+namespace rewriter {
 
 using rule = std::pair<htree::sp, htree::sp>;
 using rules = std::vector<rule>;
@@ -785,8 +785,7 @@ struct select_top_predicate {
 	predicate_t& query;
 	trefs& selected;
 };
-
-
+} // rewriter namespace
 } // idni namespace
 
 #include "tree.tmpl.h"

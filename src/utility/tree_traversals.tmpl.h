@@ -429,7 +429,7 @@ void pre_order<node_t>::search(auto& visit, auto& visit_subtree, auto& up) {
 
 template<typename node_t>
 void pre_order<node_t>::search(auto& visit) {
-	const_traverse<true, false>(root, visit, all, identity,	do_nothing);
+	const_traverse<true, false>(root, visit, all, identity, do_nothing);
 }
 
 template<typename node_t>
