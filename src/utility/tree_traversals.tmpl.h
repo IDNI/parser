@@ -15,21 +15,6 @@
 
 namespace idni {
 
-static const auto all = [](const auto&) static { return true; };
-static const auto none = [](const auto&) static { return false; };
-static const auto identity = [](const auto& n) static { return n; };
-static const auto do_nothing = [](const auto&) static {};
-
-// Helper type traits to check callback properties
-template<typename Cb>
-using bool_accepts_tref = std::is_invocable_r<bool, Cb, tref>;
-
-template<typename Cb>
-using bool_accepts_tref_tref = std::is_invocable_r<bool, Cb, tref, tref>;
-
-template<typename Cb>
-using accepts_tref_tref = std::is_invocable<Cb, tref, tref>;
-
 
 #ifdef MEASURE_TRAVERSER_DEPTH
 static size_t depth = 0;
@@ -53,25 +38,23 @@ static void dec_depth() {
 }
 #endif // MEASURE_TRAVERSER_DEPTH
 
-// template <typename node_t>
-// struct traverser_cache_equality {
-// 	bool operator() (const node_t& l, const node_t& r) const {
-// 		return l == r;
-// 	}
-// };
+struct traverser_cache_equality {
+	bool operator() (tref l, tref r) const {
+		return l == r;
+	}
+};
 
-// template <typename node_t>
-// struct traverser_pair_cache_equality {
-// 	using p = std::pair<node_t, size_t>;
-// 	bool operator() (const p& l, const p& r) const {
-// 		return l == r;
-// 	}
-// };
+struct traverser_pair_cache_equality {
+	using p = std::pair<tref, size_t>;
+	bool operator() (const p& l, const p& r) const {
+		return l == r;
+	}
+};
 
 template <typename node_t>
 post_order<node_t>::post_order(tref n) : root(n) {}
 
-template<typename node_t>
+template <typename node_t>
 post_order<node_t>::post_order(const htree::sp& h) : root(h->get()) {}
 
 template <typename node_t>
@@ -119,8 +102,8 @@ tref post_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree) {
 		const auto it = m.find(std::make_pair(n, slot));
 		if (it != m.end()) return it->second;
 	}
-	// std::unordered_map<node_t, node_t, std::hash<node_t>,
-	// 	traverser_cache_equality<node_t>> cache;
+	// std::unordered_map<tref, tref, std::hash<tref>,
+	// 	traverser_cache_equality> cache;
 	tref_cache_map cache;
 	std::vector<tref> stack;
 	std::vector<size_t> upos;
@@ -338,13 +321,13 @@ void post_order<node_t>::const_traverse(tref n, auto& visitor,
 	}
 }
 
-template<typename node_t>
+template <typename node_t>
 pre_order<node_t>::pre_order(tref n) : root(n) {}
 
-template<typename node_t>
+template <typename node_t>
 pre_order<node_t>::pre_order(const htree::sp& h) : root(h->get()) {}
 
-template<typename node_t>
+template <typename node_t>
 template<size_t slot>
 tref pre_order<node_t>::apply_unique(auto& f, auto& visit_subtree, auto& up) {
 	if (visit_subtree(root))
@@ -352,13 +335,13 @@ tref pre_order<node_t>::apply_unique(auto& f, auto& visit_subtree, auto& up) {
 	else return root;
 }
 
-template<typename node_t>
+template <typename node_t>
 template<size_t slot>
 tref pre_order<node_t>::apply_unique(auto& f) {
 	return traverse<false, slot, true>(root, f, all, identity);
 }
 
-template<typename node_t>
+template <typename node_t>
 template<size_t slot>
 tref pre_order<node_t>::apply(auto& f, auto& visit_subtree, auto& up) {
 	if (visit_subtree(root))
@@ -366,7 +349,7 @@ tref pre_order<node_t>::apply(auto& f, auto& visit_subtree, auto& up) {
 	else return root;
 }
 
-template<typename node_t>
+template <typename node_t>
 template<size_t slot>
 tref pre_order<node_t>::apply_unique_until_change(auto& f, auto& visit_subtree, auto& up) {
 	if (visit_subtree(root))
@@ -374,13 +357,13 @@ tref pre_order<node_t>::apply_unique_until_change(auto& f, auto& visit_subtree, 
 	else return root;
 }
 
-template<typename node_t>
+template <typename node_t>
 template<size_t slot>
 tref pre_order<node_t>::apply_unique_until_change(auto& f) {
 	return traverse<true, slot, true>(root, f, all, identity);
 }
 
-template<typename node_t>
+template <typename node_t>
 template<size_t slot>
 tref pre_order<node_t>::apply_until_change(auto& f, auto& visit_subtree, auto& up) {
 	if (visit_subtree(root))
@@ -388,75 +371,71 @@ tref pre_order<node_t>::apply_until_change(auto& f, auto& visit_subtree, auto& u
 	else return root;
 }
 
-template<typename node_t>
+template <typename node_t>
 template<size_t slot>
 tref pre_order<node_t>::apply_until_change(auto& f) {
 	return traverse<true, slot, false>(root, f, all, identity);
 }
 
-template<typename node_t>
+template <typename node_t>
 void pre_order<node_t>::visit(auto& visit, auto& visit_subtree, auto& up, auto& between) {
-	if (visit_subtree(root))
-		const_traverse<false, false>(root, visit, visit_subtree, up, between);
+	if (visit_subtree(root)) const_traverse<false, false>(root,
+					visit, visit_subtree, up, between);
 }
 
-template<typename node_t>
+template <typename node_t>
 void pre_order<node_t>::visit(auto& visit, auto& visit_subtree, auto& up) {
-	if (visit_subtree(root))
-		const_traverse<false, false>(root, visit, visit_subtree,
-						up, do_nothing);
+	if (visit_subtree(root)) const_traverse<false, false>(root,
+					visit, visit_subtree, up, do_nothing);
 }
 
-template<typename node_t>
+template <typename node_t>
 void pre_order<node_t>::visit(auto& visit) {
-	const_traverse<false, false>(root, visit, all, identity,
-						do_nothing);
+	const_traverse<false, false>(root, visit, all, identity, do_nothing);
 }
 
-template<typename node_t>
+template <typename node_t>
 void pre_order<node_t>::search(auto& visit, auto& visit_subtree, auto& up, auto& between) {
-	if (visit_subtree(root))
-		const_traverse<true, false>(root, visit, visit_subtree,
-						up, between);
+	if (visit_subtree(root)) const_traverse<true, false>(root,
+					visit, visit_subtree, up, between);
 }
 
-template<typename node_t>
+template <typename node_t>
 void pre_order<node_t>::search(auto& visit, auto& visit_subtree, auto& up) {
-	if (visit_subtree(root))
-		const_traverse<true, false>(root, visit, visit_subtree,
-						up, do_nothing);
+	if (visit_subtree(root)) const_traverse<true, false>(root,
+					visit, visit_subtree, up, do_nothing);
 }
 
-template<typename node_t>
+template <typename node_t>
 void pre_order<node_t>::search(auto& visit) {
 	const_traverse<true, false>(root, visit, all, identity, do_nothing);
 }
 
-template<typename node_t>
-void pre_order<node_t>::visit_unique (auto& visit, auto& visit_subtree, auto& up) {
-	if (visit_subtree(root))
-		const_traverse<false, true>(root, visit, visit_subtree, up);
+template <typename node_t>
+void pre_order<node_t>::visit_unique(auto& visit, auto& visit_subtree, auto& up) {
+	if (visit_subtree(root)) const_traverse<false, true>(root,
+					visit, visit_subtree, up, do_nothing);
 }
 
-template<typename node_t>
-void pre_order<node_t>::visit_unique (auto&visit) {
-	const_traverse<false, true>(root, visit, all, identity);
+template <typename node_t>
+void pre_order<node_t>::visit_unique(auto& visit) {
+	const_traverse<false, true>(root, visit, all, identity, do_nothing);
 }
 
-template<typename node_t>
-void pre_order<node_t>::search_unique (auto&visit, auto& visit_subtree, auto& up) {
-	if (visit_subtree(root))
-		const_traverse<true, true>(root, visit, visit_subtree, up);
+template <typename node_t>
+void pre_order<node_t>::search_unique(auto&visit, auto& visit_subtree, auto& up) {
+	if (visit_subtree(root)) const_traverse<true, true>(root,
+					visit, visit_subtree, up, do_nothing);
 }
 
-template<typename node_t>
-void pre_order<node_t>::search_unique (auto&visit) {
-	const_traverse<true, true>(root, visit, all, identity);
+template <typename node_t>
+void pre_order<node_t>::search_unique(auto&visit) {
+	const_traverse<true, true>(root, visit, all, identity, do_nothing);
 }
 
 #ifdef MEASURE_TRAVERSER_DEPTH
-template<typename node_t>
-std::pair<size_t, size_t> pre_order<node_t>::get_tree_depth_and_size () {
+template <typename node_t>
+std::pair<size_t, size_t> pre_order<node_t>::get_tree_depth_and_size() {
 	size_t c_depth = depth;
 	size_t t_max_depth = depth;
 	size_t size;
@@ -471,7 +450,7 @@ std::pair<size_t, size_t> pre_order<node_t>::get_tree_depth_and_size () {
 }
 #endif //MEASURE_TRAVERSER_DEPTH
 
-template<typename node_t>
+template <typename node_t>
 template<bool break_on_change, size_t slot, bool unique>
 tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up) {
 	if (n == nullptr) return nullptr;
@@ -615,7 +594,7 @@ tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 	}
 }
 
-template<typename node_t>
+template <typename node_t>
 template<bool search, bool unique>
 void pre_order<node_t>::const_traverse(tref n, auto& visitor,
 	auto& visit_subtree, auto& up, auto& between)
@@ -659,7 +638,7 @@ void pre_order<node_t>::const_traverse(tref n, auto& visitor,
 		if (upos.empty()) return;
 		// Find first unprocessed position
 		tref c_node = stack[upos.back()];
-		const auto& c_tree = lcrs_tree<node_t>::get(c_node);
+		const auto& c_tree = tree::get(c_node);
 		if (!c_tree.has_child()) { // If node has no children
 			// Call up and move to next
 			upos.pop_back();

@@ -293,8 +293,8 @@ public:
 		//inline std::array<size_t, 2>& second() const { return this->second; }
 	};
 #endif
-	struct tree : public idni::tree<pnode> {
-		using base_t = idni::tree<pnode>;
+	struct tree : public lcrs_tree<pnode> {
+		using base_t = lcrs_tree<pnode>;
 
 		tref get() const;
 		static const tree& get(const tref id);

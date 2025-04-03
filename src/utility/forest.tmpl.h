@@ -91,7 +91,7 @@ typename htree::sp forest<NodeT>::graph::_extract_tree2(
     };
 	//bintree<NodeT>::dump();
 	tref tid = post_trav(r, 0, post_trav);
-	return idni::tree<NodeT>::geth(tid);
+	return bintree<NodeT>::geth(tid);
 }
 
 
