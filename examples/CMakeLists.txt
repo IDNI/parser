@@ -12,6 +12,7 @@ set(EXAMPLES
 	csv_parser8
 	csv_parser9
 	csv_parser10
+	json_parser
 )
 
 foreach(X IN LISTS EXAMPLES)
