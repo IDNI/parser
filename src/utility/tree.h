@@ -772,6 +772,19 @@ private:
 	void const_traverse(tref n, auto& visit, auto& visit_subtree);
 };
 
+template <typename node_t>
+struct morris_post_order
+{
+	morris_post_order(tref root);
+	void search(auto &visit);
+private:
+	tref root;
+	void traverse(tref &n, auto &f);
+	void traverse_right_list(tref from, tref& root, auto &f);
+};
+
+
+
 /**
  * @brief Struct for tree traversals in pre order
  * @tparam node_t Tree node type
