@@ -14,6 +14,7 @@
 #define __IDNI__TREE_H__
 
 #include <vector>
+#include <initializer_list>
 #include <utility>
 #include <set>
 #include <map>
@@ -323,6 +324,14 @@ struct lcrs_tree : public bintree<T> {
 	static tref get(const T& v, const trefs& ch);
 
 	/**
+	 * @brief Creates new tree node from value and children
+	 * @param v The value
+	 * @param ch The children trefs in an initializer list
+	 * @return The new tree node's tref id
+	 */
+	static tref get(const T& v, const std::initializer_list<tref>& ch);
+
+	/**
 	 * @brief Creates new tree node from value and tref of a child
 	 * @param v The node
 	 * @param ch The child's tref
@@ -362,6 +371,14 @@ struct lcrs_tree : public bintree<T> {
 	 * @return The new tree node's tref id
 	 */
 	static tref get(const T& v, const std::vector<T>& children);
+
+	/**
+	 * @brief Creates new tree node from value and children tref initializer list
+	 * @param v The node
+	 * @param ch Children tref initializer list
+	 * @return The new tree node's tref id
+	 */
+	static tref get(const T& v, const std::initializer_list<T>& children);
 
 	/**
 	 * @brief Creates new tree node from value and child node
