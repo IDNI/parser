@@ -112,6 +112,14 @@ tref post_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree) {
 #ifdef MEASURE_TRAVERSER_DEPTH
 	inc_depth();
 #endif //MEASURE_TRAVERSER_DEPTH
+
+	auto reget_with_right_sibling = [&](tref nn, tref orig) {
+		const auto& c_tree = tree::get(nn);
+		return bintree<node_t>::get(c_tree.value,
+			c_tree.left_child(),
+			tree::get(orig).right_sibling());
+	};
+
 	while (true) {
 		// If no unprocessed position exists, we are done
 		if (upos.empty()) return stack[0];
@@ -141,7 +149,10 @@ tref post_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree) {
 		// Check if node has children
 		if (!tree::get(c_node).has_child()) {
 			// Process node and move to next
-			c_node = f(c_node);
+			auto nn = f(c_node);
+			if (nn == nullptr) return nullptr;
+			if (c_node != nn)
+				c_node = reget_with_right_sibling(nn, c_node);
 			if (c_node == nullptr) return nullptr;
 			upos.pop_back();
 #ifdef MEASURE_TRAVERSER_DEPTH
@@ -197,6 +208,8 @@ tref post_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree) {
 				// std::cerr << "\tno change" << std::endl;
 				tref res = f(c_node);
 				if (res == nullptr) return nullptr;
+				if (c_node != res)
+					res = reget_with_right_sibling(res, c_node);
 				if constexpr (slot != 0) m.emplace(
 					std::make_pair(c_node, slot), res);
 				else cache.emplace(c_node, res);
@@ -220,6 +233,8 @@ tref post_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree) {
 			stack.erase(stack.end() - c_pos, stack.end());
 			res = f(res);
 			if (res == nullptr) return nullptr;
+			if (c_node != res)
+				res = reget_with_right_sibling(res, c_node);
 			if constexpr (slot != 0)
 				m.emplace(std::make_pair(c_node, slot), res);
 			else cache.emplace(c_node, res);
@@ -489,6 +504,7 @@ tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 			c_tree.left_child(),
 			tree::get(orig).right_sibling());
 	};
+
 	while (true) {
 		// If no unprocessed position exists, we are done
 		if (upos.empty()) return stack[0];
@@ -579,8 +595,8 @@ tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 			// Call up
 			auto nn = up(res);
 			if (nn == nullptr) return nullptr;
-			res = c_node == nn ? c_node
-				: reget_with_right_sibling(nn, c_node);
+			if (res != nn)
+				res = reget_with_right_sibling(nn, c_node);
 			if constexpr (unique) {
 				if constexpr (slot != 0)
 					m.emplace(std::make_pair(c_node, slot),
