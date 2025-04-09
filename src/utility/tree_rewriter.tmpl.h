@@ -70,7 +70,7 @@ find_top_predicate<predicate_t>::find_top_predicate(predicate_t& query, tref& fo
 template <typename predicate_t>	
 bool find_top_predicate<predicate_t>::operator()(tref n) {
 	if (found == nullptr && query(n)) found = n;
-	return found != nullptr;
+	return found == nullptr;
 }
 
 // -----------------------------------------------------------------------------
@@ -246,7 +246,7 @@ tref map_node_transformer<node_t, wrapped_t>::operator()(tref n) {
 		if (auto it = changes.find(c); it != changes.end())
 			ch.push_back(it->second);
 		else ch.push_back(c);
-	return changes[n] = lcrs_tree<node_t>::get(nt.value, std::move(ch));
+	return changes[n] = lcrs_tree<node_t>::get(nt.value, ch);
 }
 
 // visitor that produces nodes transformed accordingly to the
@@ -264,19 +264,25 @@ tref replace_node_transformer<node_t, wrapped_t>::operator()(tref n) {
 	for (tref c : nt.children())
 		if (auto it = changes.find(c); it != changes.end())
 			ch.push_back(it->second);
-	return changes[n] = lcrs_tree<node_t>::get(wrapped(nt.value), std::move(ch));
+	return changes[n] = lcrs_tree<node_t>::get(wrapped(nt.value), ch);
 }
 
 // visitor that produces nodes transformed accordingly to the
 // given transformer. It only works with post order traversals.
 template <typename node_t>
-replace_transformer<node_t>::replace_transformer(std::map<tref, tref>& changes)
-	: changes(changes) {}
+replace_transformer<node_t>::replace_transformer(
+	typename lcrs_tree<node_t>::subtree_map& changes) : changes(changes) {}
 
 template <typename node_t>
 tref replace_transformer<node_t>::operator()(tref n) {
-	auto it = changes.find(n);
-	return it != changes.end() ? it->second : replace(n);
+	// std::cout << "----------------------------------\n";
+	// std::cout << "replace_transformer: " << lcrs_tree<node_t>::get(n).value << "\n";
+	tref nn = get_cached<node_t>(n, changes);
+	// std::cout << "was changed and already replaced to: " << lcrs_tree<node_t>::get(nn).value << "\n";
+	// std::cout << "nn: " << nn << " n: " << n << "\n";
+	if (nn != n) return nn;
+	// std::cout << "replacing\n";
+	return replace(n);
 }
 
 template <typename node_t>
@@ -284,24 +290,33 @@ tref replace_transformer<node_t>::replace(tref n) {
 	trefs ch;
 	const auto& nt = lcrs_tree<node_t>::get(n);
 	for (tref c : nt.children())
-		if (auto it = changes.find(c); it != changes.end())
-			ch.push_back(it->second);
-		else ch.push_back(c);
-	return changes[n] = lcrs_tree<node_t>::get(nt.value, std::move(ch));
+		ch.push_back(get_cached<node_t>(c, changes));
+	auto nn = lcrs_tree<node_t>::get(nt.value, ch);
+	// std::cout << "nt: " << nt.value << " ";
+	// std::cout << "replaced to: " << lcrs_tree<node_t>::get(nn).value << "\n";
+	return changes[n] = nn;
 }
 
 // delete all top nodes that satisfy a predicate.
 template <typename node_t, typename predicate_t>
 tref trim_top(tref input, predicate_t& query) {
+	// std::cout << "trim_top: " << lcrs_tree<node_t>::get(input).value << " " << input << "\n";
 	const auto t = [&query](tref n) {
+		// std::cout << "trim_top: " << lcrs_tree<node_t>::get(n).value << " " << n << "\n";
 		trefs ch; size_t l = 0;
 		const auto& nt = lcrs_tree<node_t>::get(n);
 		for (tref c : nt.children()) {
 			l++;
-			if (!query(c)) ch.push_back(c);
+			if (!query(c))
+				// std::cout << "storing child: " << lcrs_tree<node_t>::get(c).value << " " << c << "\n",
+				ch.push_back(c);
 		}
-		if (l != ch.size()) return lcrs_tree<node_t>::get(nt.value, std::move(ch));
-		return n;
+		if (l == ch.size()) return
+			// std::cout << "not trimmed\n",
+			n;
+		return
+			// std::cout << "trimmed\n",
+			lcrs_tree<node_t>::get(nt.value, ch);
 	};
 	return pre_order<node_t>(input).apply_unique_until_change(t);
 }
@@ -410,22 +425,32 @@ tref find_top_until(tref input, const auto& query, const auto& until) {
 	return node;
 }
 
-
 template <typename node_t>
 tref replace(tref n, const std::map<tref, tref>& changes) {
 	const auto r = [&changes](tref el) {
-		if (const auto it = changes.find(el); it != changes.end())
-			return it->second;
-		else return el;
+		// lcrs_tree<node_t>::dump(std::cout << "el: ", el) << "\n";
+		auto ret = get_cached<node_t>(el, changes);
+		// lcrs_tree<node_t>::dump(std::cout << "\tret: ", ret) << "\n";
+		return ret;
 	};
 	return pre_order<node_t>(n).apply_unique_until_change(r);
 }
 
+template <typename node_t>
+tref replace(tref n, const typename lcrs_tree<node_t>::subtree_map& changes) {
+	const auto r = [&changes](tref el) {
+		// lcrs_tree<node_t>::dump(std::cout << "el: ", el) << "\n";
+		auto ret = get_cached<node_t>(el, changes);
+		// lcrs_tree<node_t>::dump(std::cout << "\tret: ", ret) << "\n";
+		return ret;
+	};
+	return pre_order<node_t>(n).apply_unique_until_change(r);
+}
 
 template <typename node_t>
 tref replace(tref n, tref replace, tref with) {
 	const auto r = [&](tref el) {
-		if (el == replace) return with;
+		if (lcrs_tree<node_t>::subtree_equals(el, replace)) return with;
 		else return el;
 	};
 	return pre_order<node_t>(n).apply_unique_until_change(r);
@@ -434,22 +459,18 @@ tref replace(tref n, tref replace, tref with) {
 
 // Replace nodes in n according to changes while skipping subtrees that don't satisfy query
 template <typename node_t, typename predicate_t>
-tref replace_if(tref n, const std::map<tref, tref>& changes, predicate_t& query) {
+tref replace_if(tref n, const typename lcrs_tree<node_t>::tref_map& changes, predicate_t& query) {
 	const auto r = [&changes](tref el) {
-		if (const auto it = changes.find(el); it != changes.end())
-			return it->second;
-		else return el;
+		return get_cached<node_t>(el, changes);
 	};
 	return pre_order<node_t>(n).apply_unique_until_change(r, query);
 }
 
 // Replace nodes in n according to changes while skipping subtrees that satisfy query
 template <typename node_t, typename predicate_t>
-tref replace_until(tref n, const std::map<tref, tref>& changes, predicate_t& query) {
+tref replace_until(tref n, const typename lcrs_tree<node_t>::tref_map& changes, predicate_t& query) {
 	const auto r = [&changes](tref el) {
-		if (const auto it = changes.find(el); it != changes.end())
-			return it->second;
-		else return el;
+		return get_cached<node_t>(el, changes);
 	};
 	auto neg_query = [&query](tref el) {
 		return !query(el);
@@ -463,74 +484,78 @@ tref replace_until(tref n, const std::map<tref, tref>& changes, predicate_t& que
 // find the first node that satisfy a predicate and return it.
 template <typename node_t, typename predicate_t>
 tref find_bottom(tref input, predicate_t& query) {
-	tref found;
+	tref found = nullptr;
 	auto find_top = [&query, &found](const auto& n){
-		if (found != nullptr && query(n)) found = n;
-		return found != nullptr;
+		if (found == nullptr && query(n)) found = n;
+		return found == nullptr;
 	};
 	post_order<node_t>(input).search_unique(find_top);
 	return found;
 }
 
-// TODO (MEDIUM) simplify matchers code and extract common code.
+// // TODO (MEDIUM) simplify matchers code and extract common code.
 
-// this predicate matches when there exists a environment that makes the
-// pattern match the node.
-//
-// TODO (LOW) create and env in operator() and pass it as a parameter to match, if
-// a  match occurs, copy the data from the temp env to the env passed as
-// parameter.
-//
-// It should allow to detects matches in the middle of a tree.
-template <typename node_t, typename is_capture_t>
-pattern_matcher<node_t, is_capture_t>::pattern_matcher(tref pattern,
-	rewriter::environment& env, const is_capture_t& is_capture)
-	: pattern(pattern), env(env), is_capture(is_capture) {}
+// // this predicate matches when there exists a environment that makes the
+// // pattern match the node.
+// //
+// // TODO (LOW) create and env in operator() and pass it as a parameter to match, if
+// // a  match occurs, copy the data from the temp env to the env passed as
+// // parameter.
+// //
+// // It should allow to detects matches in the middle of a tree.
+// template <typename node_t, typename is_capture_t>
+// pattern_matcher<node_t, is_capture_t>::pattern_matcher(tref pattern,
+// 	tree::structural_tref_map& env,
+// 	const is_capture_t& is_capture)
+// 	: pattern(pattern), env(env), is_capture(is_capture) {}
 
-template <typename node_t, typename is_capture_t>
-bool pattern_matcher<node_t, is_capture_t>::operator()(tref n) {
-	// if we have matched the pattern, we never try again to unify
-	if (matched) return false;
-	// we clear previous environment attempts
-	env.clear();
-	// then we try to match the pattern against the node and if the match
-	// was successful, we save the node that matched.
-	if (match(pattern, n)) matched = n;
-	else env.clear();
-	// we continue visiting until we found a match.
-	return matched != nullptr;
-}
+// template <typename node_t, typename is_capture_t>
+// bool pattern_matcher<node_t, is_capture_t>::operator()(tref n) {
+// 	// if we have matched the pattern, we never try again to unify
+// 	if (matched) return false;
+// 	// we clear previous environment attempts
+// 	env.clear();
+// 	// then we try to match the pattern against the node and if the match
+// 	// was successful, we save the node that matched.
+// 	if (match(pattern, n)) matched = n;
+// 	else env.clear();
+// 	// we continue visiting until we found a match.
+// 	return matched != nullptr;
+// }
 
-template <typename node_t, typename is_capture_t>
-bool pattern_matcher<node_t, is_capture_t>::match(tref p, tref n) {
-	// if we already have captured a node associated to the current capture
-	// we check if it is the same as the current node, if it is not, we
-	// return false...
-	if (is_capture(p))
-		if (auto it = env.find(p);
-			it != env.end() && it->second != n) return false;
-		// ...otherwise we save the current node as the one associated to the
-		// current capture and return true.
-		else return env.emplace(p, n), true;
-	// otherwise, we check the symbol of the current node and if it is the
-	// same as the one of the current pattern, we check if the children
-	// match recursively.
-	else {
-		const auto& pt = lcrs_tree<node_t>::get(p);
-		const auto& nt = lcrs_tree<node_t>::get(n);
-		if (pt.value == nt.value) {
-			auto n_it = nt.children().begin();
-			for (tref ptc : pt.children()) {
-				if (n_it == nt.children().end()) return false;
-				if (ptc == *n_it) { ++n_it; continue; }
-				else if (match(ptc, *n_it)) { ++n_it; continue; }
-				else return false;
-			}
-			return true;
-		}
-	}
-	return false;
-}
+// template <typename node_t, typename is_capture_t>
+// bool pattern_matcher<node_t, is_capture_t>::match(tref p, tref n) {
+// 	// if we already have captured a node associated to the current capture
+// 	// we check if it is the same as the current node, if it is not, we
+// 	// return false...
+// 	if (is_capture(p)) {
+// 		auto nn = get_cached<node_t>(n, env);
+// 		if (nn == nullptr) return false;
+// 		if (tree::subtree_equals(p, nn)) return true;
+// 		// ...otherwise we save the current node as the one associated to the
+// 		// current capture and return true.
+// 		else return changes.emplace(p, n), true;
+// 	}
+// 	// otherwise, we check the symbol of the current node and if it is the
+// 	// same as the one of the current pattern, we check if the children
+// 	// match recursively.
+// 	else {
+// 		const auto& pt = tree::get(p);
+// 		const auto& nt = tree::get(n);
+// 		if (pt.value == nt.value) {
+// 			auto n_it = nt.children().begin();
+// 			for (tref ptc : pt.children()) {
+// 				if (n_it == nt.children().end()) return false;
+// 				if (tree::subtree_equals(ptc, *n_it)) {
+// 						++n_it; continue; }
+// 				else if (match(ptc, *n_it)) { ++n_it; continue; }
+// 				else return false;
+// 			}
+// 			return true;
+// 		}
+// 	}
+// 	return false;
+// }
 
 template <typename node_t, typename is_capture_t>
 pattern_matcher2<node_t, is_capture_t>::pattern_matcher2(
@@ -547,26 +572,32 @@ bool pattern_matcher2<node_t, is_capture_t>::operator()(tref n) {
 	// was successful, we save the node that matched.
 	auto [pattern, body] = r;
 	if (match(pattern->get(), n)) {
+		// tree::get(body->get()).dump(std::cout << "body: ", true) << "\n";
+		// dump<node_t>(std::cout << "env: ", env);
 		auto nn = replace<node_t>(body->get(), env);
+		// tree::get(nn).dump(std::cout << "nn: ", true) << "\n";
 		if (nn == nullptr) return false;
 		changes[n] = nn;
+		// tree::get(changes[n]).dump(std::cout << "changes: ", true) << "\n";
 		return true;
 	}
 	trefs ch;
 	const auto& nt = lcrs_tree<node_t>::get(n);
 	for (tref c : nt.children())
-		if (auto it = changes.find(c); it != changes.end())
-			ch.push_back(it->second);
-		else ch.push_back(c);
-	auto res = lcrs_tree<node_t>::get(nt.value, std::move(ch));
+		ch.push_back(get_cached<node_t>(c, changes));
+	auto res = lcrs_tree<node_t>::get(nt.value, ch);
 	if (res == nullptr) return false;
 	return changes[n] = res, true;
 }
 
 template <typename node_t, typename is_capture_t>
 tref pattern_matcher2<node_t, is_capture_t>::replace_root(tref n) {
-	auto it = changes.find(n);
-	return it != changes.end() ? it->second : n;
+	auto x = get_cached<node_t>(n, changes);
+	// std::cout << "replace_root: ";
+	// lcrs_tree<node_t>::get(n).dump();
+	// lcrs_tree<node_t>::get(x).dump();
+	// std::cout << "\n";
+	return x;
 }
 
 template <typename node_t, typename is_capture_t>
@@ -574,9 +605,13 @@ bool pattern_matcher2<node_t, is_capture_t>::match(tref p, tref n) {
 	// if we already have captured a node associated to the current capture
 	// we check if it is the same as the current node, if it is not, we
 	// return false...
+	// std::cout << "match: ";
+	// tree::get(p).dump(std::cout, true);
+	// tree::get(n).dump(std::cout << "   ", true);
+	// std::cout << "\n";
 	if (is_capture(p)) {
-		if (auto it = env.find(p);
-			it != env.end() && it->second != n) return false;
+		if (auto it = env.find(p); it != env.end()
+			&& !tree::subtree_equals(it->second, n)) return false;
 		// ...otherwise we save the current node as the one associated to the
 		// current capture and return true.
 		else return env.emplace(p, n), true;
@@ -584,14 +619,14 @@ bool pattern_matcher2<node_t, is_capture_t>::match(tref p, tref n) {
 	// otherwise, we check the symbol of the current node and if it is the
 	// same as the one of the current pattern, we check if the children
 	// match recursively.
-	const auto& pt = lcrs_tree<node_t>::get(p);
-	const auto& nt = lcrs_tree<node_t>::get(changes.contains(n)
-						? changes[n] : n);
+	const auto& pt = tree::get(p);
+	const auto& nt = tree::get(get_cached<node_t>(n, changes));
 	if (pt.value == nt.value) {
 		auto n_it = nt.children().begin();
 		for (tref ptc : pt.children()) {
 			if (n_it == nt.children().end()) return false;
-			if (ptc == *n_it) { ++n_it; continue; }
+			if (tree::subtree_equals(ptc, *n_it)) {
+					++n_it; continue; }
 			else if (match(ptc, *n_it)) { ++n_it; continue; }
 			else return false;
 		}
@@ -610,9 +645,10 @@ bool pattern_matcher2<node_t, is_capture_t>::match(tref p, tref n) {
 
 template <typename node_t, typename is_capture_t, typename predicate_t>
 pattern_matcher_if<node_t, is_capture_t, predicate_t>::pattern_matcher_if(
-	tref pattern, rewriter::environment& env, is_capture_t& is_capture,
-	predicate_t& predicate) : pattern(pattern), env(env),
-		is_capture(is_capture), predicate(predicate) {}
+	tref pattern, typename lcrs_tree<node_t>::subtree_map& env,
+	is_capture_t& is_capture, predicate_t& predicate)
+	: pattern(pattern), env(env), is_capture(is_capture),
+		predicate(predicate) {}
 
 template <typename node_t, typename is_capture_t, typename predicate_t>
 bool pattern_matcher_if<node_t, is_capture_t, predicate_t>::operator()(tref n) {
@@ -637,7 +673,8 @@ bool pattern_matcher_if<node_t, is_capture_t, predicate_t>::match(tref p, tref n
 	// return false...
 	if (is_capture(p))
 		if (auto it = env.find(p); it != env.end()
-			&& it->second != n) return false;
+			&& lcrs_tree<node_t>::get(it->second) != nt)
+				return false;
 		// ...otherwise we save the current node as the one associated to the
 		// current capture and return true.
 		else return env.emplace(p, n), true;
@@ -648,7 +685,8 @@ bool pattern_matcher_if<node_t, is_capture_t, predicate_t>::match(tref p, tref n
 	auto p_it = pt.children().begin();
 	auto n_it = nt.children().begin();
 	while (p_it != pt.children().end() && n_it != nt.children().end()) {
-		if (*p_it == *n_it) { ++p_it; ++n_it; continue; }
+		if (lcrs_tree<node_t>::subtree_equals(*p_it, *n_it)) {
+				++p_it; ++n_it; continue; }
 		if (match(*p_it, *n_it)) { ++p_it; ++n_it; continue; }
 		return false;
 	}
@@ -680,7 +718,7 @@ tref apply_if(const rewriter::rule& r, tref n, is_capture_t& c,
 	predicate_t& predicate)
 {
 	auto [p , s] = r;
-	rewriter::environment u;
+	rewriter::environment<node_t> u;
 	pattern_matcher_if<node_t, is_capture_t, predicate_t>
 						matcher{ p, u, c, predicate };
 	auto nn = apply(s, n, matcher);
@@ -703,7 +741,7 @@ tref apply(tref s, tref n, matcher_t& matcher) {
 		idni::identity, matcher)(n);
 	if (matcher.matched) {
 		auto nn = replace<node_t>(s, matcher.env);
-		rewriter::environment nenv { {matcher.matched, nn} };
+		rewriter::environment<node_t> nenv { {matcher.matched, nn} };
 		return replace<node_t>(n, nenv);
 	}
 	return n;
@@ -755,7 +793,7 @@ tref lcrs_tree<T>::find_top_until(const auto& query, const auto& until) {
 }
 
 template <typename T>
-tref lcrs_tree<T>::replace(const std::map<tref, tref>& changes) {
+tref lcrs_tree<T>::replace(const subtree_map& changes) {
 	return rewriter::replace<T>(get(), changes);
 }
 template <typename T>
@@ -765,13 +803,13 @@ tref lcrs_tree<T>::replace(tref replace, tref with) {
 
 template <typename T>
 template <typename predicate_t>
-tref lcrs_tree<T>::replace_if(const std::map<tref, tref>& changes, predicate_t& query) {
+tref lcrs_tree<T>::replace_if(const subtree_map& changes, predicate_t& query) {
 	return rewriter::replace_if<T>(get(), changes, query);
 }
 
 template <typename T>
 template <typename predicate_t>
-tref lcrs_tree<T>::replace_until(const std::map<tref, tref>& changes, predicate_t& query) {
+tref lcrs_tree<T>::replace_until(const subtree_map& changes, predicate_t& query) {
 	return rewriter::replace_until<T>(get(), changes, query);
 }
 

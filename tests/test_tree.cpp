@@ -3,6 +3,9 @@
 
 using namespace idni;
 
+template <typename T>
+using tree = lcrs_tree<T>;
+
 int main() {
     using nd_t = char;
     nd_t n1,n2, n3, n4;

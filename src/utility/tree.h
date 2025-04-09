@@ -34,13 +34,6 @@ using tref  = const intptr_t*;
 // @brief vector of tree node reference handles
 using trefs = std::vector<tref>;
 
-// @brief tref -> tref map used in caching
-// TODO unordered_map needs hash for std::pair<T1, T2> when compiled with tau
-// TODO note that cache must survive gc
-using tref_cache_map = std::unordered_map<tref, tref>;
-// @brief tref set used in caching
-using tref_cache_set = std::set<tref>;
-
 // @brief range of tree node reference handles usable in range-based for loops
 template <typename T>
 struct tref_range {
@@ -125,16 +118,19 @@ using bool_accepts_tref_tref = std::is_invocable_r<bool, Cb, tref, tref>;
 template<typename Cb>
 using accepts_tref_tref = std::is_invocable<Cb, tref, tref>;
 
+
+//------------------------------------------------------------------------------
+// rewriter types
+
+namespace rewriter {
+
+using rule = std::pair<htree::sp, htree::sp>;
+using rules = std::vector<rule>;
+using library = rules;
+
 }
 
 //------------------------------------------------------------------------------
-// include rewriter types and predicates
-
-#include "tree_rewriter.inc.h"
-
-//------------------------------------------------------------------------------
-
-namespace idni {
 
 /**
  * @brief Binary tree (each node has left and right child)
@@ -242,6 +238,36 @@ template <typename T> struct post_order;
  */
 template <typename T>
 struct lcrs_tree : public bintree<T> {
+
+	bool operator==(const lcrs_tree<T>& other) const;
+
+	bool operator<(const lcrs_tree<T>& other) const;
+
+	static bool subtree_equals(tref a, tref b);
+	static bool subtree_less(tref a, tref b);
+
+	struct subtree_equality {
+		bool operator() (tref a, tref b) const {
+			return lcrs_tree<T>::subtree_less(a, b);
+		}
+	};
+
+	template <typename PT>
+	struct subtree_pair_equality {
+		using p = std::pair<tref, PT>;
+		bool operator() (const p& a, const p& b) const {
+			return lcrs_tree<T>::subtree_less(a.first, b.first)
+				&& a.second < b.second;
+		}
+	};
+
+	using subtree_set = std::set<tref, subtree_equality>;
+	using subtree_map = std::map<tref, tref, subtree_equality>;
+	// using subtree_unordered_set = std::unordered_set<tref, subtree_equality>;
+	// using subtree_unordered_map = std::unordered_map<tref, tref, subtree_equality>;
+	using subtree_tref_size_t_map = std::map<tref, size_t,
+					subtree_pair_equality<size_t>>;
+
 	/**
 	 * @brief Get node's tref
 	 * @return The tree node reference
@@ -249,7 +275,6 @@ struct lcrs_tree : public bintree<T> {
 	tref get() const;
 
 	/**
-
 	 * @brief Get the tree node from its tref id
 	 * @param id The tree node's tref id
 	 * @return The tree node's id
@@ -271,7 +296,7 @@ struct lcrs_tree : public bintree<T> {
 	static const htree::sp geth(tref id);
 
 	/**
-	 * @brief Creates new tree node from value and children)
+	 * @brief Creates new tree node from value and children
 	 * @param v The value
 	 * @param ch The children pointer / array
 	 * @param len The number of children
@@ -374,10 +399,16 @@ struct lcrs_tree : public bintree<T> {
 	tref right_sibling() const;
 
 	/**
+	 * @brief Get the right sibling tree of the node without safety checks!
+	 * @return The right sibling tree of the node
+	 */
+	const lcrs_tree<T>& right_sibling_tree() const;
+
+	/**
 	 * @brief Get the child of the node
 	 * @return The child of the node
 	 */
-	tref first_child() const;
+	tref left_child() const;
 
 	/**
 	 * @brief Get the number of children
@@ -423,13 +454,6 @@ struct lcrs_tree : public bintree<T> {
 	tref child(size_t n) const;
 
 	/**
-	 * @brief Get the child node's tref id (alias for child(n))
-	 * @param n The index of the child
-	 * @return The child node's tref id
-	 */
-	tref operator[](size_t n) const;
-
-	/**
 	 * @brief Get the first child node's tref id
 	 * @return The first child node's tref id
 	 */
@@ -461,11 +485,18 @@ struct lcrs_tree : public bintree<T> {
 	const lcrs_tree<T>& child_tree(size_t n) const;
 
 	/**
+	 * @brief Get the child tree node from its index without checks for safety! (alias for child_tree(n))
+	 * @param n The index of the child
+	 * @return The child tree node
+	 */
+	const lcrs_tree<T>& operator[](size_t n) const;
+
+	/**
 	 * @brief Get the first child tree node without checks for safety!
 	 * @param id The child node's tref id
 	 * @return The child tree node
 	 */
-	const lcrs_tree<T>& first_tree()  const;
+	const lcrs_tree<T>& first_tree() const;
 
 	/**
 	 * @brief Get the second child tree node without checks for safety!
@@ -494,6 +525,48 @@ struct lcrs_tree : public bintree<T> {
 	 * @return The ostream
 	 */
 	std::ostream& print(std::ostream& os, size_t l = 0) const;
+
+	/**
+	 * @brief Print the tree to an ostream in line
+	 * @param os The ostream to print to
+	 * @param l The indentation level
+	 * @return The ostream
+	 */
+	std::ostream& print_in_line(std::ostream& os,
+		std::string open = " { ", std::string close = " }",
+		std::string sep = ", ") const;
+
+	/**
+	 * @brief Dump the node to an ostream
+	 * @param os The ostream to print to
+	 * @param n The tree node to dump
+	 * @param subtree with node's subtree
+	 * @return The ostream
+	 */
+	static std::ostream& dump(std::ostream& os, tref n, bool subtree = false);
+
+	/**
+	 * @brief Dump the node to an ostream
+	 * @param os The ostream to print to
+	 * @param subtree with node's subtree
+	 * @return The ostream
+	 */
+	std::ostream& dump(std::ostream& os, bool subtree = false) const;
+
+	/**
+	 * @brief Dump the node to std::cout
+	 * @param subtree with node's subtree
+	 * @return The node itself
+	 * This method can be used to simply add ".dump()" anywhere 
+	 * to lcrs_tree<T> instance for simple debugging. 
+	 * Example:
+	 *         auto t = lcrs_tree<int>::get(0);
+	 *         if (t.value == 1) ...
+	 * Dumping the node:
+	 *         if (t.dump().value == 1) ...
+	 */
+	const lcrs_tree<T>& dump(bool subtree = false) const;
+
 
 	friend post_order<T>;
 	friend pre_order<T>;
@@ -530,18 +603,18 @@ struct lcrs_tree : public bintree<T> {
 	tref find_top_until(const auto& query, const auto& until);
 
 	tref replace(const std::map<tref, tref>& changes);
-	tref replace(tref replace, tref with);
+	tref replace(const subtree_map& changes);
+	tref replace(tref what, tref with);
 
 	// Replace nodes in n according to changes while skipping subtrees that don't satisfy query
 	template <typename predicate_t>
-	tref replace_if(const std::map<tref, tref>& changes, predicate_t& query);
+	tref replace_if(const subtree_map& changes, predicate_t& query);
 
 	// Replace nodes in n according to changes while skipping subtrees that satisfy query
 	template <typename predicate_t>
-	tref replace_until(const std::map<tref, tref>& changes, predicate_t& query);
+	tref replace_until(const subtree_map& changes, predicate_t& query);
 
-	// TODO (LOW) consider adding a similar functino for replace_node...
-
+	// TODO (LOW) consider adding a similar function for replace_node...
 
 	// find the first node that satisfy a predicate and return it.
 	template <typename predicate_t>
@@ -563,6 +636,78 @@ struct lcrs_tree : public bintree<T> {
 	tref apply(tref s, matcher_t& matcher);
 
 };
+
+template <typename node_t>
+std::ostream& dump(std::ostream& os,
+	const std::map<tref, tref>& m)
+{
+	using tree = lcrs_tree<node_t>;
+	std::cout << "tref_map: " << m.size() << "\n";
+	for (const auto& [k, v] : m) {
+		os << "\t";
+		tree::dump(os, k);
+		os << " -> ";
+		tree::dump(os, v);
+		os << "\n";
+	}
+	return os << "----------------------------------\n";
+}
+
+template <typename node_t>
+std::ostream& dump(std::ostream& os,
+	const typename lcrs_tree<node_t>::subtree_map& m)
+{
+	using tree = lcrs_tree<node_t>;
+	std::cout << "subtree_map: " << m.size() << "\n";
+	for (const auto& [k, v] : m) {
+		os << "\t";
+		tree::dump(os, k);
+		os << " -> ";
+		tree::dump(os, v);
+		os << "\n";
+	}
+	return os << "----------------------------------\n";
+}
+
+
+// helper to get value from a cache
+template <typename node_t>
+tref get_cached(tref n, const std::map<tref, tref>& cache) {
+	if (auto it = cache.find(n); it != cache.end())
+		return it->second;
+	return n;
+}
+
+// helper to get value from a subtree cached map (using subtree_equality)
+template <typename node_t>
+tref get_cached(tref n, const typename lcrs_tree<node_t>::subtree_map& cache) {
+	if (auto it = cache.find(n); it != cache.end())
+		return it->second;
+	return n;
+}
+
+// helper to get a value from a cache using subtree_equality
+template <typename node_t>
+tref get_cached_subtree(tref n, const std::map<tref, tref>& cache) {
+	using tree = lcrs_tree<node_t>;
+	const auto& t = tree::get(n);
+	for (auto it = cache.begin(); it != cache.end(); ++it) {
+		if (tree::get(it->first) == t) {
+			n = it->second;
+			break;
+		}
+	}
+	return n;
+}
+
+template <typename node_t>
+bool is_cached_subtree(tref n, const std::unordered_set<tref>& cache) {
+	using tree = lcrs_tree<node_t>;
+	const auto& t = tree::get(n);
+	for (auto it = cache.begin(); it != cache.end(); ++it)
+		if (tree::get(*it) == t) return true;
+	return false;
+}
 
 //------------------------------------------------------------------------------
 // post_order and pre_order traversals
@@ -664,28 +809,6 @@ struct pre_order {
 	 * @brief Apply f in pre order to root according to visit_subtree.
 	 * If f is applied to a node, the traversal will continue with the children of the transformed node
 	 * @tparam slot Memory slot to use for memorization, disabled by default
-	 * @param f Function to apply on each node. Must not have side effects due to memorization
-	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
-	 * @param up Function to apply to processed node in post order
-	 * @return The tree obtained after applying f to root
-	 */
-	template<size_t slot = 0>
-	tref apply_unique(auto& f, auto& visit_subtree, auto& up);
-
-	/**
-	 * @brief Apply f in pre order to root.
-	 * If f is applied to a node, the traversal will continue with the children of the transformed node
-	 * @tparam slot Memory slot to use for memorization, disabled by default
-	 * @param f Function to apply on each node. Must not have side effects due to memorization
-	 * @return The tree obtained after applying f to root
-	 */
-	template<size_t slot = 0>
-	tref apply_unique(auto& f);
-
-	/**
-	 * @brief Apply f in pre order to root according to visit_subtree.
-	 * If f is applied to a node, the traversal will continue with the children of the transformed node
-	 * @tparam slot Memory slot to use for memorization, disabled by default
 	 * @param f Function to apply on each node. The function can have side effects
 	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
 	 * @param up Function to apply to processed node in post order
@@ -695,26 +818,14 @@ struct pre_order {
 	tref apply(auto& f, auto& visit_subtree, auto& up);
 
 	/**
-	 * @brief Apply f in pre order to root according to visit_subtree.
-	 * If f is applied to a node resulting in a change, its children are not traversed
-	 * @tparam slot Memory slot to use for memorization, disabled by default
-	 * @param f Function to apply on each node. Must not have side effects due to memorization
-	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
-	 * @param up Function to apply to processed node in post order
-	 * @return The tree obtained after applying f to root
-	 */
-	template<size_t slot = 0>
-	tref apply_unique_until_change(auto& f, auto& visit_subtree, auto& up);
-
-	/**
 	 * @brief Apply f in pre order to root.
-	 * If f is applied to a node resulting in a change, its children are not traversed
+	 * If f is applied to a node, the traversal will continue with the children of the transformed node
 	 * @tparam slot Memory slot to use for memorization, disabled by default
-	 * @param f Function to apply on each node. Must not have side effects due to memorization
+	 * @param f Function to apply on each node. The function can have side effects
 	 * @return The tree obtained after applying f to root
 	 */
 	template<size_t slot = 0>
-	tref apply_unique_until_change(auto& f);
+	tref apply(auto& f);
 
 	/**
 	 * @brief Apply f in pre order to root according to visit_subtree.
@@ -739,30 +850,48 @@ struct pre_order {
 	tref apply_until_change(auto& f);
 
 	/**
-	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
-	 * If visit returns false on a node, its children are not visited
-	 * @param visit The function called on nodes
+	 * @brief Apply f in pre order to root according to visit_subtree.
+	 * If f is applied to a node, the traversal will continue with the children of the transformed node
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node. Must not have side effects due to memorization
 	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
-	 * @param up Function called on visited nodes in post order
-	 * @param between Function called between children of a node
+	 * @param up Function to apply to processed node in post order
+	 * @return The tree obtained after applying f to root
 	 */
-	void visit(auto& visit, auto& visit_subtree, auto& up, auto& between);
+	template<size_t slot = 0>
+	tref apply_unique(auto& f, auto& visit_subtree, auto& up);
 
 	/**
-	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
-	 * If visit returns false on a node, its children are not visited
-	 * @param visit The function called on nodes
-	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
-	 * @param up Function called on visited nodes in post order
+	 * @brief Apply f in pre order to root.
+	 * If f is applied to a node, the traversal will continue with the children of the transformed node
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node. Must not have side effects due to memorization
+	 * @return The tree obtained after applying f to root
 	 */
-	void visit(auto& visit, auto& visit_subtree, auto& up);
+	template<size_t slot = 0>
+	tref apply_unique(auto& f);
 
 	/**
-	 * @brief Call visit in pre order on the nodes of root.
-	 * If visit returns false on a node, its children are not visited
-	 * @param visit The function called on nodes
+	 * @brief Apply f in pre order to root according to visit_subtree.
+	 * If f is applied to a node resulting in a change, its children are not traversed
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node. Must not have side effects due to memorization
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param up Function to apply to processed node in post order
+	 * @return The tree obtained after applying f to root
 	 */
-	void visit(auto& visit);
+	template<size_t slot = 0>
+	tref apply_unique_until_change(auto& f, auto& visit_subtree, auto& up);
+
+	/**
+	 * @brief Apply f in pre order to root.
+	 * If f is applied to a node resulting in a change, its children are not traversed
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node. Must not have side effects due to memorization
+	 * @return The tree obtained after applying f to root
+	 */
+	template<size_t slot = 0>
+	tref apply_unique_until_change(auto& f);
 
 	/**
 	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
@@ -793,24 +922,6 @@ struct pre_order {
 	/**
 	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
 	 * Equal nodes are not visited twice.
-	 * If visit returns false on a node, its children are not visited
-	 * @param visit The function called on nodes
-	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
-	 * @param up Function called on visited nodes in post order
-	 */
-	void visit_unique(auto& visit, auto& visit_subtree, auto& up);
-
-	/**
-	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
-	 * Equal nodes are not visited twice.
-	 * If visit returns false on a node, its children are not visited
-	 * @param visit The function called on nodes
-	 */
-	void visit_unique(auto& visit);
-
-	/**
-	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
-	 * Equal nodes are not visited twice.
 	 * If visit returns false on a node, the traversal terminates
 	 * @param visit The function called on nodes
 	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
@@ -825,6 +936,50 @@ struct pre_order {
 	 * @param visit The function called on nodes
 	 */
 	void search_unique(auto& visit);
+
+	/**
+	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
+	 * If visit returns false on a node, its children are not visited
+	 * @param visit The function called on nodes
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param up Function called on visited nodes in post order
+	 * @param between Function called between children of a node
+	 */
+	void visit(auto& visit, auto& visit_subtree, auto& up, auto& between);
+
+	/**
+	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
+	 * If visit returns false on a node, its children are not visited
+	 * @param visit The function called on nodes
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param up Function called on visited nodes in post order
+	 */
+	void visit(auto& visit, auto& visit_subtree, auto& up);
+
+	/**
+	 * @brief Call visit in pre order on the nodes of root.
+	 * If visit returns false on a node, its children are not visited
+	 * @param visit The function called on nodes
+	 */
+	void visit(auto& visit);
+
+	/**
+	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
+	 * Equal nodes are not visited twice.
+	 * If visit returns false on a node, its children are not visited
+	 * @param visit The function called on nodes
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param up Function called on visited nodes in post order
+	 */
+	void visit_unique(auto& visit, auto& visit_subtree, auto& up);
+
+	/**
+	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
+	 * Equal nodes are not visited twice.
+	 * If visit returns false on a node, its children are not visited
+	 * @param visit The function called on nodes
+	 */
+	void visit_unique(auto& visit);
 
 #ifdef MEASURE_TRAVERSER_DEPTH
 	std::pair<size_t, size_t> get_tree_depth_and_size();
@@ -845,7 +1000,25 @@ private:
 						auto& up, auto& between);
 };
 
+namespace rewriter {
+
+// a environment is a map from captures to tree nodes, it is used
+// to keep track of the captures that have been unified and their
+// corresponding tree nodes.
+template <typename node_t>
+using environment = lcrs_tree<node_t>::subtree_map;
+
+} // rewriter namespace
+
 } // idni namespace
+
+//------------------------------------------------------------------------------
+// include rewriter types and predicates
+
+#include "tree_rewriter.inc.h"
+
+//------------------------------------------------------------------------------
+
 
 #include "tree.tmpl.h"
 #include "tree_traversals.tmpl.h"

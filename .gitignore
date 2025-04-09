@@ -13,3 +13,4 @@ forest_grammar_rules*.tml
 .*_history
 ./tau-lang
 .gdbinit
+src/doctest.h

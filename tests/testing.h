@@ -188,7 +188,7 @@ int test_out(int c, const grammar<T>& g, const std::basic_string<T>& inputstr,
 		ptd.str({});
 		ssf << "tree_lcrs"<<"_"<<testing::test_name << c << "_" << i << suffix << ".txt";
 		filet.open(ssf.str());
-		tree<ndtype>::get(lcrs_tr).print(ptd);
+		lcrs_tree<ndtype>::get(lcrs_tr).print(ptd);
 		
 		filet << ptd.str();
 		filet.close();

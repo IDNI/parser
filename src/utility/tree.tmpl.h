@@ -145,7 +145,7 @@ void bintree<T>::dump() {
 template <typename T>
 void bintree<T>::gc() {
 
-	DBG(dump();)
+	// DBG(dump();)
 	//DBG(htree::dump();)
 
 	//mark all
@@ -207,7 +207,7 @@ void bintree<T>::gc() {
 			it = M.erase(it);
 		else it++;
 
-	DBG(dump();)
+	// DBG(dump();)
 	//DBG(htree::dump();)
 }
 
@@ -229,7 +229,7 @@ bintree<T>::bintree(const T& _value, tref _l, tref _r)
 template <typename T>
 std::ostream& bintree<T>::print(std::ostream& o, size_t s) const {
 	for (size_t i = 0; i < s; i++)
-	o << " " << str() << "\n";
+		o << " " << str() << "\n";
 	if (l != NULL) get(l).print(o, s + 1);
 	if (r != NULL) get(r).print(o, s + 1);
 	return o;
@@ -250,6 +250,31 @@ template <typename T>
 std::map<const bintree<T>, htree::wp> bintree<T>::M;
 
 //------------------------------------------------------------------------------
+
+template <typename T>
+bool lcrs_tree<T>::operator<(const lcrs_tree<T>& o) const {
+	if (this->value != o.value) return this->value < o.value;
+	return this->l < o.l;
+}
+template <typename T>
+bool lcrs_tree<T>::operator==(const lcrs_tree<T>& o) const {
+	return this->value == o.value && this->l == o.l;
+}
+
+template <typename T>
+bool lcrs_tree<T>::subtree_equals(tref a, tref b) {
+	if (a == b) return true;
+	if (a == nullptr || b == nullptr) return false;
+	return lcrs_tree<T>::get(a) == lcrs_tree<T>::get(b);
+}
+
+template <typename T>
+bool lcrs_tree<T>::subtree_less(tref a, tref b) {
+	if (a == b) return false;
+	if (a == nullptr) return true;
+	if (b == nullptr) return false;
+	return lcrs_tree<T>::get(a) < lcrs_tree<T>::get(b);
+}
 
 template <typename T>
 tref lcrs_tree<T>::get() const { return reinterpret_cast<tref>(this); }
@@ -333,7 +358,12 @@ template <typename T>
 tref lcrs_tree<T>::right_sibling() const { return this->r; }
 
 template <typename T>
-tref lcrs_tree<T>::first_child() const { return this->l; }
+const lcrs_tree<T>& lcrs_tree<T>::right_sibling_tree() const {
+	return get(this->r);
+}
+
+template <typename T>
+tref lcrs_tree<T>::left_child() const { return this->l; }
 
 template <typename T>
 size_t lcrs_tree<T>::children_size() const {
@@ -404,6 +434,18 @@ template <typename T>
 tref_range<T> lcrs_tree<T>::children() const { return tref_range<T>(this->l); }
 
 template <typename T>
+const lcrs_tree<T>& lcrs_tree<T>::operator[](size_t n) const { return child_tree(n); }
+
+template <typename T>
+tref lcrs_tree<T>::first() const { return this->l; }
+
+template <typename T>
+tref lcrs_tree<T>::second() const { return child(1); }
+
+template <typename T>
+tref lcrs_tree<T>::third() const { return child(2); }
+
+template <typename T>
 tref lcrs_tree<T>::only_child() const {
 	tref r = nullptr;
 	for (tref c : children())
@@ -423,6 +465,21 @@ tree_range<lcrs_tree<T>> lcrs_tree<T>::children_trees() const {
 }
 
 template <typename T>
+const lcrs_tree<T>& lcrs_tree<T>::first_tree() const {
+	return lcrs_tree<T>::get(first());
+}
+
+template <typename T>
+const lcrs_tree<T>& lcrs_tree<T>::second_tree() const {
+	return lcrs_tree<T>::get(second());
+}
+
+template <typename T>
+const lcrs_tree<T>& lcrs_tree<T>::third_tree() const {
+	return lcrs_tree<T>::get(third());
+}
+
+template <typename T>
 const lcrs_tree<T>& lcrs_tree<T>::only_child_tree() const {
 	return lcrs_tree<T>::get(only_child());
 }
@@ -436,6 +493,46 @@ std::ostream& lcrs_tree<T>::print(std::ostream& os, size_t s) const {
 	for (const auto& c : children()) get(c).print(os, s + 1);
 	return os;
 }
+
+template <typename T>
+std::ostream& lcrs_tree<T>::print_in_line(std::ostream& os,
+	std::string open, std::string close, std::string sep) const
+{
+	auto on_enter = [&os, open](tref n) {
+		os << get(n).value;
+		if (get(n).has_child()) os << open;
+	};
+	auto on_leave = [&os, close](tref n) {
+		if (get(n).has_child()) os << close;
+	};
+	auto on_between = [&os, sep](tref) {
+		os << sep;
+	};
+	pre_order<T>(get()).visit(on_enter, all, on_leave, on_between);
+	return os;
+}
+
+template <typename T>
+std::ostream& lcrs_tree<T>::dump(std::ostream& os, tref n, bool subtree) {
+	const auto& t = get(n);
+	os << t.value << " [" << n ;
+	if (t.has_right_sibling()) os << " >> " << t.right_sibling();
+	if (t.has_child())         os << " __ " << t.left_child();
+	os << "] ";
+	if (subtree) t.print_in_line(os);
+	return os;
+}
+
+template <typename T>
+std::ostream& lcrs_tree<T>::dump(std::ostream& os, bool subtree) const {
+	return dump(os, get(), subtree);
+}
+
+template <typename T>
+const lcrs_tree<T>& lcrs_tree<T>::dump(bool subtree) const {
+	return dump(std::cout, subtree), *this;
+}
+
 
 //------------------------------------------------------------------------------
 
