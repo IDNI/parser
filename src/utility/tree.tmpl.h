@@ -311,6 +311,11 @@ tref lcrs_tree<T>::get(const T& v, const trefs& ch) {
 }
 
 template <typename T>
+tref lcrs_tree<T>::get(const T& v, const trefs& ch, tref r) {
+	return get(v, ch.data(), ch.size(), r);
+}
+
+template <typename T>
 tref lcrs_tree<T>::get(const T& v, const std::initializer_list<tref>& ch) {
 	return get(v, ch.begin(), ch.size());
 }

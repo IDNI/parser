@@ -326,6 +326,16 @@ struct lcrs_tree : public bintree<T> {
 	static tref get(const T& v, const trefs& ch);
 
 	/**
+	 * @brief Creates new tree node from value and children and right sibling
+	 * @param v The value
+	 * @param ch The children vector
+	 * @param r The right sibling
+	 * @return The new tree node's tref id
+	 */
+	static tref get(const T& v, const trefs& ch, tref r);
+
+
+	/**
 	 * @brief Creates new tree node from value and children
 	 * @param v The value
 	 * @param ch The children trefs in an initializer list
