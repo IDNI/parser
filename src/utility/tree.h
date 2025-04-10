@@ -127,7 +127,9 @@ namespace rewriter {
 
 using rule = std::pair<htree::sp, htree::sp>;
 using rules = std::vector<rule>;
+
 using library = rules;
+using builder = rule;
 
 }
 
