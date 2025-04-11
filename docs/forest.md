@@ -155,7 +155,7 @@ Traverses the whole forest.
 
 Example of a traversal printing nodes and ambiguities of a parsed forest
 ```
-function print_node(ostream& os, parser<>::pnode& n) {
+function print_node(ostream& os, const parser<>::pnode& n) {
 	return os << n.first << " [" << n.second[0] << ", " << n.second[1] << "]";
 };
 
@@ -171,21 +171,21 @@ void main() {
 		[](const parser<>::pnode& n) {
 			print_node(cout << "entering node: ", n) << "\n";
 		},
-		[](const parser<>::pnode& n) {
+		[](const parser<>::pnode& n, forest<parser<>::pnode>::nodes_set& ns) {
 			print_node(cout << "exiting node: ", n) << "\n";
 		},
 		[](const parser<>::pnode& n) {
 			print_node(cout << "node revisited: ", n) << "\n";
 			return false;
 		},
-		[](const parser<>::pnode& n, std::set<std::vector<parser<>::pnode>>& ambset) {
+		[](const parser<>::pnode& n, forest<parser<>::pnode>::nodes_set& ambset) {
 			print_node(cout << "ambiguous node: ", n) << "\n";
 			size_t t = 1;
 			for (auto& a : ambset) {
 				cout << "tree " << t++ << ":\n";
 				for (auto& x : a) print_node(cout << "\t", x) << "\n";
 			}
-			return false;
+			return ambset;
 		}
 	);
 }
