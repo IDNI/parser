@@ -24,6 +24,44 @@ It also provides a `tgf` tool which takes a grammar described in a TGF file and 
 - no dependencies on other libraries
 
 
+## How to use
+
+To use the library or `tgf` tool you first have to compile this project. This requires CMake and compiler supporting C++23 with GNU extensions (`-std=gnu++23`).
+
+On Windows with Mingw-w64 you can use `w64-debug.sh` or `w64-release.sh` script, and for Linux there are `debug.sh` and `release.sh` scripts for compiling all source files. After successful compilation you can find the artifactis in `build-Debug` and `build-Release` folders.
+
+
+### TGF tool
+
+This library comes with a CLI executable `tgf` which features viewing, testing and debugging grammars written in TGF and it can also generate a C++ code from TGF grammar which is then usable in a C++ project.
+
+More detailed information about this CLI can be found on page [`TGF tool`](docs/tgf_tool.md)
+
+TGF is an EBNF-based form to describe grammars. Specification of the form can be found on page [`Tau Grammar Form`](docs/tau_grammar_form.md).
+
+## Tutorials
+
+### CSV parser
+
+Beginner tutorial to quick start using this library.
+
+You can learn how to use this library in a CSV parser tutorial.
+
+Part 1 shows a very simple parser with all it's required.
+Each following part expands the previous one.
+Read comments since they are always related to a new or a changed code.
+
+- [part 1](examples/csv_parser1/main.cpp) - minimal parser of positive integers
+- [part 2](examples/csv_parser2/main.cpp) - using predefined character classes
+- [part 3](examples/csv_parser3/main.cpp) - refactor parser into its struct
+- [part 4](examples/csv_parser4/main.cpp) - parse also negative integers
+- [part 5](examples/csv_parser5/main.cpp) - parse strings and nulls, traverse
+- [part 6](examples/csv_parser6/main.cpp) - parse comma separated values
+- [part 7](examples/csv_parser7/main.cpp) - parse new line separated rows
+- [part 8](examples/csv_parser8/main.cpp) - replace programmatically created grammar with a grammar in TGF
+- [part 9](examples/csv_parser9/main.cpp) - using EBNF syntax in TGF
+- [part 10](examples/csv_parser10/main.cpp), [csv.tgf](examples/csv_parser10/csv.tgf) - using tgf tool to generate a parser from a TGF file
+
 ## Basic terminology
 
 **Literal** refers to a specific value or sequence of characters that appears exactly as it is in the input or in the grammar rules. It represents a fixed, concrete element that must be matched in order for a particular rule or pattern to be satisfied.
@@ -106,39 +144,3 @@ There are several areas covered by functions provided by this library
 - [recoders](docs/recoders.md) - decoder and encoder for UTF-8 in `char` <-> Unicode in `char32_t`
 - [UTF-8](docs/utf8.md) - UTF-8 and Unicode support
 - [devhelpers](docs/devhelpers.md) - helper forest transformations to various formats (TML facts, TML rules, DOT) useful when developing a parser
-
-
-## TGF - Tau Grammar Form
-
-TGF is an EBNF-based form to describe grammars. Specification of the form can be found on page [`Tau Grammar Form`](docs/tau_grammar_form.md)
-
-
-## TGF tool
-
-This library comes with a CLI executable `tgf` which features viewing, testing and debugging grammars written in TGF and it can also generate a C++ code from TGF grammar which is then usable in a C++ project.
-
-More detailed information about this CLI can be found on page [`TGF tool`](docs/tgf_tool.md)
-
-
-## Tutorials
-
-### CSV parser
-
-Beginner tutorial to quick start using this library.
-
-You can learn how to use this library in a CSV parser tutorial.
-
-Part 1 shows a very simple parser with all it's required.
-Each following part expands the previous one.
-Read comments since they are always related to a new or a changed code.
-
-- [part 1](examples/csv_parser1/main.cpp) - minimal parser of positive integers
-- [part 2](examples/csv_parser2/main.cpp) - using predefined character classes
-- [part 3](examples/csv_parser3/main.cpp) - refactor parser into its struct
-- [part 4](examples/csv_parser4/main.cpp) - parse also negative integers
-- [part 5](examples/csv_parser5/main.cpp) - parse strings and nulls, traverse
-- [part 6](examples/csv_parser6/main.cpp) - parse comma separated values
-- [part 7](examples/csv_parser7/main.cpp) - parse new line separated rows
-- [part 8](examples/csv_parser8/main.cpp) - replace programmatically created grammar with a grammar in TGF
-- [part 9](examples/csv_parser9/main.cpp) - using EBNF syntax in TGF
-- [part 10](examples/csv_parser10/main.cpp), [csv.tgf](examples/csv_parser10/csv.tgf) - using tgf tool to generate a parser from a TGF file
