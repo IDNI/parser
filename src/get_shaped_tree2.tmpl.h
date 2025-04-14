@@ -15,7 +15,7 @@ tref parser<C, T>::result::get_trimmed_tree2(tref ref,
 	if (t.is_null()) return nullptr;
 	if (trimmable_node<C, T>(t.value, opts)) return nullptr;
 
-	if (t.is_t()) return tree::get(t.value); // terminal leaf node 
+	if (t.is_t()) return ref; // terminal leaf node 
 
 	trefs ch;
 	for (tref c : t.children()) {
@@ -24,7 +24,7 @@ tref parser<C, T>::result::get_trimmed_tree2(tref ref,
 			// std::cerr << "\t is trimmable, skipping" << std::endl;
 			continue;
 		}
-		ch.push_back(get_trimmed_tree2(c, opts));
+		if (auto x = get_trimmed_tree2(c, opts); x) ch.push_back(x);
 	}
 	return tree::get(t.value, ch);
 }

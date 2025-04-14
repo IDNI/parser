@@ -301,7 +301,7 @@ template <typename T>
 tref lcrs_tree<T>::get(const T& v, const tref* ch, size_t len, tref r) {
 	tref pr = nullptr;
 	for (size_t i = len; i > 0; ) --i,
-		pr = bintree<T>::get(get(ch[i]).value, get(ch[len-i]).l, pr);
+		pr = bintree<T>::get(get(ch[i]).value, get(ch[i]).l, pr);
 	return bintree<T>::get(v, pr, r);
 }
 
