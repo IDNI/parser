@@ -451,6 +451,12 @@ public:
 						return { x.value.first.n() };
 					return {};
 				}};
+			static inline const extractor<traverser> dump{
+				[](const traverser& t) {
+					if (!t) return t;
+					t.value_tree().dump(std::cout) << "\n";
+					return t;
+				}};
 
 			traverser operator|(size_t nt) const;
 			traverser operator||(size_t nt) const;
@@ -891,7 +897,8 @@ struct std::hash<idni::lit<C, T>> {
 // template definitions
 #include "grammar.tmpl.h"       // for grammar and related
 #include "parser.tmpl.h"        // for parser
-#include "parser_result.tmpl.h" // for parse::result
+#include "parser_tree.tmpl.h" // for parser::tree
+#include "parser_result.tmpl.h" // for parser::result
 #include "get_shaped_tree2.tmpl.h"
 #include "tgf.h"                // Tau Grammar Form
 #ifndef PARSER_BINTREE_FOREST

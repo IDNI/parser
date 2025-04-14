@@ -10,8 +10,6 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#ifndef __IDNI__PARSER__PARSER_RESULT_TMPL_H__
-#define __IDNI__PARSER__PARSER_RESULT_TMPL_H__
 #include <optional>
 #include "parser.h"
 namespace idni {
@@ -467,4 +465,3 @@ bool parser<C, T>::result::inline_prefixed_nodes(pgraph& g,
 #endif
 
 } // idni namespace
-#endif // __IDNI__PARSER__PARSER_RESULT_TMPL_H__
