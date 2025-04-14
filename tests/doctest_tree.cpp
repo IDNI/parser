@@ -25,8 +25,7 @@ struct is_capture_predicate {
 
 TEST_SUITE("structural equality") {
 
-	TEST_CASE("map") {
-		auto in = input();
+	TEST_CASE_FIXTURE(test_tree_fixture, "map") {
 		std::map<tref, tref> m;
 		m[in] = n('h'); // e
 		m[chtree::get(in).first()] = n('j'); // e b
@@ -46,8 +45,7 @@ TEST_SUITE("structural equality") {
 		CHECK(it->second == n('e'));
 	}
 
-	TEST_CASE("set") {
-		auto in = input();
+	TEST_CASE_FIXTURE(test_tree_fixture, "set") {
 		std::set<tref> s;
 		s.insert(in);
 		s.insert(chtree::get(in).first());
@@ -66,52 +64,51 @@ TEST_SUITE("structural equality") {
 		CHECK(s.contains(chtree::get(in)[1][1][1].get()));
 	}
 
-	TEST_CASE("unordered_map") {
+	TEST_CASE_FIXTURE(test_tree_fixture, "unordered_map") {
 	}
 
-	TEST_CASE("unordered_set") {
+	TEST_CASE_FIXTURE(test_tree_fixture, "unordered_set") {
 	}
 
 }
 
 TEST_SUITE("subtree equality") {
 
-	TEST_CASE("subtree_map") {
-		auto in = input();
+	TEST_CASE_FIXTURE(test_tree_fixture, "subtree_map") {
 		typename chtree::subtree_map m;
+		const auto& root = chtree::get(in);
 		m[in] = n('h'); // e
-		m[chtree::get(in).first()] = n('j'); // e b
-		m[chtree::get(in).second()] = n('c'); // e e
-		m[chtree::get(in)[0][0][1].get()] = n('e'); // e b d h
-		m[chtree::get(in)[0][2][0].get()] = n('p'); // e b c g
+		m[root.first()] = n('j'); // e b
+		m[root.second()] = n('c'); // e e
+		m[root[0][0][1].get()] = n('e'); // e b d h
+		m[root[0][2][0].get()] = n('p'); // e b c g
 		auto it = m.find(in);
 		CHECK(it != m.end());
 		CHECK(it->second == n('h'));
-		it = m.find(chtree::get(in).first());
+		it = m.find(root.first());
 		CHECK(it != m.end());
 		CHECK(it->second == n('j'));
-		it = m.find(chtree::get(in).second());
+		it = m.find(root.second());
 		CHECK(it != m.end());
 		CHECK(it->second == n('c'));
 		it = m.find(n('h'));
 		CHECK(it != m.end());
 		CHECK(it->second == n('e'));
-		it = m.find(chtree::get(in)[0][2][0].get());
+		it = m.find(root[0][2][0].get());
 		CHECK(it != m.end());
 		CHECK(it->second == n('p'));
 		CHECK(m.size() == 5);
-		m[chtree::get(in)[1][1][1].get()] = n('e'); // e e b g
+		m[root[1][1][1].get()] = n('e'); // e e b g
 		CHECK(m.size() == 5);
-		it = m.find(chtree::get(in)[1][1][1].get());
+		it = m.find(root[1][1][1].get());
 		CHECK(it != m.end());
 		CHECK(it->second == n('e'));
-		it = m.find(chtree::get(in)[0][2][0].get());
+		it = m.find(root[0][2][0].get());
 		CHECK(it != m.end());
 		CHECK(it->second == n('e'));
 	}
 
-	TEST_CASE("subtree_set") {
-		auto in = input();
+	TEST_CASE_FIXTURE(test_tree_fixture, "subtree_set") {
 		typename chtree::subtree_set s;
 		s.insert(in);
 		s.insert(chtree::get(in).first());

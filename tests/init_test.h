@@ -83,46 +83,47 @@ bool cmp(const environment<T>& a, const environment<T>& b) {
 	return true;
 }
 
-tref input() {
-        tref in = n('e', {
-                n('b', {
-                        n('d', {
-                                n('g'),
-                                n('h')
-                        }),
-                        n('e'),
-                        n('c', {
-                                n('g', {
-                                        n('o'),
-                                        n('p')
+struct test_tree_fixture {
+	test_tree_fixture() {
+		in = n('e', {
+                        n('b', {
+                                n('d', {
+                                        n('g'),
+                                        n('h')
                                 }),
-                                n('h'),
-                                n('b', {
-                                        n('d'),
-                                        n('e', {
-                                                n('i'),
-                                                n('j')
+                                n('e'),
+                                n('c', {
+                                        n('g', {
+                                                n('o'),
+                                                n('p')
+                                        }),
+                                        n('h'),
+                                        n('b', {
+                                                n('d'),
+                                                n('e', {
+                                                        n('i'),
+                                                        n('j')
+                                                })
                                         })
                                 })
+                        }),
+                        n('e', {
+                                n('f'),
+                                n('b', {
+                                        n('e', {
+                                                n('f'),
+                                                n('c')
+                                        }),
+                                        n('g', {
+                                                n('o'),
+                                                n('p')
+                                        }),
+                                        n('e')
+                                })
                         })
-                }),
-                n('e', {
-                        n('f'),
-                        n('b', {
-                                n('e', {
-                                        n('f'),
-                                        n('c')
-                                }),
-                                n('g', {
-                                        n('o'),
-                                        n('p')
-                                }),
-                                n('e')
-                        })
-                })
-        });
-        // chtree::get(in).print(std::cout);
-        return in;
-}
+                });
+	}
+	tref in;
+};
 
 #endif // __IDNI__PARSER__TESTS__INIT_TEST_H__
