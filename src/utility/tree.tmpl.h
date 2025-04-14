@@ -294,14 +294,14 @@ const lcrs_tree<T>& lcrs_tree<T>::get(tref id) {
 
 template <typename T>
 tref lcrs_tree<T>::get(const T& v, const tref* ch, size_t len) {
-	return get(v, ch, len, (tref) nullptr);
+	return get(v, ch, len, static_cast<tref>(nullptr));
 }
 
 template <typename T>
 tref lcrs_tree<T>::get(const T& v, const tref* ch, size_t len, tref r) {
 	tref pr = nullptr;
-	for (int_t i = int_t(len) - 1; i >= 0; --i)
-		pr = bintree<T>::get(get(ch[i]).value, get(ch[i]).l, pr);
+	for (size_t i = len; i > 0; ) --i,
+		pr = bintree<T>::get(get(ch[i]).value, get(ch[len-i]).l, pr);
 	return bintree<T>::get(v, pr, r);
 }
 

@@ -344,6 +344,9 @@ tref replace(tref n, const typename lcrs_tree<node_t>::subtree_map& changes);
 template <typename node_t>
 tref replace(tref n, tref replace, tref with);
 
+template <typename node_t>
+tref replace_with(tref n, tref with, tref inp);
+
 // Replace nodes in n according to changes while skipping subtrees that don't satisfy query
 template <typename node_t, typename predicate_t>
 tref replace_if(tref n, const typename lcrs_tree<node_t>::subtree_map& changes,
@@ -351,7 +354,8 @@ tref replace_if(tref n, const typename lcrs_tree<node_t>::subtree_map& changes,
 
 // Replace nodes in n according to changes while skipping subtrees that satisfy query
 template <typename node_t, typename predicate_t>
-tref replace_until(tref n, const std::map<tref, tref>& changes, predicate_t& query);
+tref replace_until(tref n, const typename lcrs_tree<node_t>::subtree_map& changes,
+	predicate_t& query);
 
 // TODO (LOW) consider adding a similar functino for replace_node...
 

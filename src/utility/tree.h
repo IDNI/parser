@@ -572,7 +572,7 @@ struct lcrs_tree : public bintree<T> {
 	 * @param subtree with node's subtree
 	 * @return The ostream
 	 */
-	static std::ostream& dump(std::ostream& os, tref n, bool subtree = false);
+	static std::ostream& dump(std::ostream& os, tref n, bool subtree = true);
 
 	/**
 	 * @brief Dump the node to an ostream
@@ -580,7 +580,7 @@ struct lcrs_tree : public bintree<T> {
 	 * @param subtree with node's subtree
 	 * @return The ostream
 	 */
-	std::ostream& dump(std::ostream& os, bool subtree = false) const;
+	std::ostream& dump(std::ostream& os, bool subtree = true) const;
 
 	/**
 	 * @brief Dump the node to std::cout
@@ -594,7 +594,7 @@ struct lcrs_tree : public bintree<T> {
 	 * Dumping the node:
 	 *         if (t.dump().value == 1) ...
 	 */
-	const lcrs_tree<T>& dump(bool subtree = false) const;
+	const lcrs_tree<T>& dump(bool subtree = true) const;
 
 
 	friend post_order<T>;
@@ -911,6 +911,17 @@ struct pre_order {
 	 */
 	template<size_t slot = 0>
 	tref apply_unique_until_change(auto& f, auto& visit_subtree, auto& up);
+
+	/**
+	 * @brief Apply f in pre order to root according to visit_subtree.
+	 * If f is applied to a node resulting in a change, its children are not traversed
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node. Must not have side effects due to memorization
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @return The tree obtained after applying f to root
+	 */
+	template<size_t slot = 0>
+	tref apply_unique_until_change(auto& f, auto& visit_subtree);
 
 	/**
 	 * @brief Apply f in pre order to root.

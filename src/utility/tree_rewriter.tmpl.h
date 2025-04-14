@@ -456,10 +456,16 @@ tref replace(tref n, tref replace, tref with) {
 	return pre_order<node_t>(n).apply_unique_until_change(r);
 }
 
+// TODO (LOW) move it to a more appropriate place (parser)
+template <typename node_t>
+tref replace_with(tref n, tref with, tref inp) {
+	typename lcrs_tree<node_t>::subtree_map changes = {{ n, with }};
+	return replace<node_t>(inp, changes);
+}
 
 // Replace nodes in n according to changes while skipping subtrees that don't satisfy query
 template <typename node_t, typename predicate_t>
-tref replace_if(tref n, const typename lcrs_tree<node_t>::tref_map& changes, predicate_t& query) {
+tref replace_if(tref n, const typename lcrs_tree<node_t>::subtree_map& changes, predicate_t& query) {
 	const auto r = [&changes](tref el) {
 		return get_cached<node_t>(el, changes);
 	};
@@ -468,7 +474,7 @@ tref replace_if(tref n, const typename lcrs_tree<node_t>::tref_map& changes, pre
 
 // Replace nodes in n according to changes while skipping subtrees that satisfy query
 template <typename node_t, typename predicate_t>
-tref replace_until(tref n, const typename lcrs_tree<node_t>::tref_map& changes, predicate_t& query) {
+tref replace_until(tref n, const typename lcrs_tree<node_t>::subtree_map& changes, predicate_t& query) {
 	const auto r = [&changes](tref el) {
 		return get_cached<node_t>(el, changes);
 	};
