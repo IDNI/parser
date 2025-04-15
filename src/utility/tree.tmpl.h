@@ -548,6 +548,75 @@ const lcrs_tree<T>& lcrs_tree<T>::dump(bool subtree) const {
 	return dump(std::cout, subtree), *this;
 }
 
+template <typename node_t>
+std::ostream& dump(std::ostream& os, const std::map<tref, tref>& m) {
+	using tree = lcrs_tree<node_t>;
+	std::cout << "tref_map: " << m.size() << "\n";
+	for (const auto& [k, v] : m) {
+		os << "\t";
+		tree::dump(os, k);
+		os << " -> ";
+		tree::dump(os, v);
+		os << "\n";
+	}
+	return os << "----------------------------------\n";
+}
+
+template <typename node_t>
+std::ostream& dump(std::ostream& os,
+	const typename lcrs_tree<node_t>::subtree_map& m)
+{
+	using tree = lcrs_tree<node_t>;
+	std::cout << "subtree_map: " << m.size() << "\n";
+	for (const auto& [k, v] : m) {
+		os << "\t";
+		tree::dump(os, k);
+		os << " -> ";
+		tree::dump(os, v);
+		os << "\n";
+	}
+	return os << "----------------------------------\n";
+}
+
+// helper to get value from a cache
+template <typename node_t>
+tref get_cached(tref n, const std::map<tref, tref>& cache) {
+	if (auto it = cache.find(n); it != cache.end())
+		return it->second;
+	return n;
+}
+
+// helper to get value from a subtree cached map (using subtree_equality)
+template <typename node_t>
+tref get_cached(tref n, const typename lcrs_tree<node_t>::subtree_map& cache) {
+	if (auto it = cache.find(n); it != cache.end())
+		return it->second;
+	return n;
+}
+
+// helper to get a value from a cache using subtree_equality
+template <typename node_t>
+tref get_cached_subtree(tref n, const std::map<tref, tref>& cache) {
+	using tree = lcrs_tree<node_t>;
+	const auto& t = tree::get(n);
+	for (auto it = cache.begin(); it != cache.end(); ++it) {
+		if (tree::get(it->first) == t) {
+			n = it->second;
+			break;
+		}
+	}
+	return n;
+}
+
+template <typename node_t>
+bool is_cached_subtree(tref n, const std::unordered_set<tref>& cache) {
+	using tree = lcrs_tree<node_t>;
+	const auto& t = tree::get(n);
+	for (auto it = cache.begin(); it != cache.end(); ++it)
+		if (tree::get(*it) == t) return true;
+	return false;
+}
+
 
 //------------------------------------------------------------------------------
 

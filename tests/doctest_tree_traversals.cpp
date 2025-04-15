@@ -17,9 +17,6 @@
 
 auto id = [] (tref n) { return n; };
 
-// auto all = [] (tref) { return true; };
-// auto none = [] (tref) { return false; };
-
 auto is_e = [] (tref n) {
         return chtree::get(n).value == 'e';
 };
@@ -44,8 +41,7 @@ auto tr_e_E = [] (tref n) {
 
 TEST_SUITE("post_order") {
 
-        TEST_CASE("apply_unique") {
-                auto in = input();
+        TEST_CASE_FIXTURE(test_tree_fixture, "apply_unique") {
                 auto result = post_order<char>(in).apply_unique(id);
                 CHECK(result == in);
 
@@ -67,8 +63,7 @@ TEST_SUITE("post_order") {
                 // bintree<char>::gc();
        }
 
-        TEST_CASE("search(visit, visit_subtree)") {
-                auto in = input();
+        TEST_CASE_FIXTURE(test_tree_fixture, "search(visit, visit_subtree)") {
                 trefs found;
                 auto search_f = [&found] (tref n) {
                         if (chtree::get(n).value == 'f') found.push_back(n);
@@ -87,8 +82,7 @@ TEST_SUITE("post_order") {
                 // bintree<char>::gc();
         }
 
-        TEST_CASE("search_unique(visit, visit_subtree)") {
-                auto in = input();
+        TEST_CASE_FIXTURE(test_tree_fixture, "search_unique(visit, visit_subtree)") {
                 trefs found;
                 auto search_f = [&found] (tref n) {
                         if (chtree::get(n).value == 'f') found.push_back(n);
@@ -115,8 +109,7 @@ TEST_SUITE("post_order") {
 
 TEST_SUITE("pre_order") {
 
-        TEST_CASE("apply(f, visit_subtree, up)") {
-                auto in = input();
+        TEST_CASE_FIXTURE(test_tree_fixture, "apply(f, visit_subtree, up)") {
                 auto result = pre_order<char>(in).apply_unique(id);
                 CHECK(result == in);
 
@@ -138,20 +131,19 @@ TEST_SUITE("pre_order") {
                 // bintree<char>::gc();
         }
 
-        TEST_CASE("apply_until_change(f, visit_subtree, up)") {
+        TEST_CASE_FIXTURE(test_tree_fixture, "apply_until_change(f, visit_subtree, up)") {
 
         }
 
-        TEST_CASE("apply_unique(f, visit_subtree)") {
+        TEST_CASE_FIXTURE(test_tree_fixture, "apply_unique(f, visit_subtree)") {
 
         }
 
-        TEST_CASE("apply_unique_until_change(f, visit_subtree, up)") {
+        TEST_CASE_FIXTURE(test_tree_fixture, "apply_unique_until_change(f, visit_subtree, up)") {
 
         }
 
-        TEST_CASE("search(visit, visit_subtree, up, between)") {
-                auto in = input();
+        TEST_CASE_FIXTURE(test_tree_fixture, "search(visit, visit_subtree, up, between)") {
                 trefs found;
                 auto search_f = [&found] (tref n) {
                         if (chtree::get(n).value == 'f') found.push_back(n);
@@ -170,9 +162,7 @@ TEST_SUITE("pre_order") {
                 // bintree<char>::gc();
         }
 
-        TEST_CASE("search_unique(visit, visit_subtree, up)") {
-                auto in = input();
-                // chtree::get(in).print(std::cout << "input: ") << std::endl;
+        TEST_CASE_FIXTURE(test_tree_fixture, "search_unique(visit, visit_subtree, up)") {
                 trefs found;
                 auto search_f = [&found] (tref n) {
                         if (chtree::get(n).value == 'f') found.push_back(n);
@@ -195,11 +185,11 @@ TEST_SUITE("pre_order") {
                 // bintree<char>::gc();
         }
         
-        TEST_CASE("visit(visit, visit_subtree, up, between)") {
+        TEST_CASE_FIXTURE(test_tree_fixture, "visit(visit, visit_subtree, up, between)") {
 
         }
 
-        TEST_CASE("visit_unique(visit, visit_subtree)") {
+        TEST_CASE_FIXTURE(test_tree_fixture, "visit_unique(visit, visit_subtree)") {
 
         }
 

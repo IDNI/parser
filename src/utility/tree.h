@@ -649,7 +649,6 @@ struct lcrs_tree : public bintree<T> {
 	template <typename predicate_t>
 	tref find_bottom(predicate_t& query);
 
-
 	// apply a rule to a tree using the predicate to pattern_matcher.
 	template <typename is_capture_t>
 	tref apply_rule(const rewriter::rule& r, const is_capture_t& c);
@@ -667,76 +666,26 @@ struct lcrs_tree : public bintree<T> {
 };
 
 template <typename node_t>
-std::ostream& dump(std::ostream& os,
-	const std::map<tref, tref>& m)
-{
-	using tree = lcrs_tree<node_t>;
-	std::cout << "tref_map: " << m.size() << "\n";
-	for (const auto& [k, v] : m) {
-		os << "\t";
-		tree::dump(os, k);
-		os << " -> ";
-		tree::dump(os, v);
-		os << "\n";
-	}
-	return os << "----------------------------------\n";
-}
+std::ostream& dump(std::ostream& os, const std::map<tref, tref>& m);
 
 template <typename node_t>
 std::ostream& dump(std::ostream& os,
-	const typename lcrs_tree<node_t>::subtree_map& m)
-{
-	using tree = lcrs_tree<node_t>;
-	std::cout << "subtree_map: " << m.size() << "\n";
-	for (const auto& [k, v] : m) {
-		os << "\t";
-		tree::dump(os, k);
-		os << " -> ";
-		tree::dump(os, v);
-		os << "\n";
-	}
-	return os << "----------------------------------\n";
-}
-
+	const typename lcrs_tree<node_t>::subtree_map& m);
 
 // helper to get value from a cache
 template <typename node_t>
-tref get_cached(tref n, const std::map<tref, tref>& cache) {
-	if (auto it = cache.find(n); it != cache.end())
-		return it->second;
-	return n;
-}
+tref get_cached(tref n, const std::map<tref, tref>& cache);
 
 // helper to get value from a subtree cached map (using subtree_equality)
 template <typename node_t>
-tref get_cached(tref n, const typename lcrs_tree<node_t>::subtree_map& cache) {
-	if (auto it = cache.find(n); it != cache.end())
-		return it->second;
-	return n;
-}
+tref get_cached(tref n, const typename lcrs_tree<node_t>::subtree_map& cache);
 
 // helper to get a value from a cache using subtree_equality
 template <typename node_t>
-tref get_cached_subtree(tref n, const std::map<tref, tref>& cache) {
-	using tree = lcrs_tree<node_t>;
-	const auto& t = tree::get(n);
-	for (auto it = cache.begin(); it != cache.end(); ++it) {
-		if (tree::get(it->first) == t) {
-			n = it->second;
-			break;
-		}
-	}
-	return n;
-}
+tref get_cached_subtree(tref n, const std::map<tref, tref>& cache);
 
 template <typename node_t>
-bool is_cached_subtree(tref n, const std::unordered_set<tref>& cache) {
-	using tree = lcrs_tree<node_t>;
-	const auto& t = tree::get(n);
-	for (auto it = cache.begin(); it != cache.end(); ++it)
-		if (tree::get(*it) == t) return true;
-	return false;
-}
+bool is_cached_subtree(tref n, const std::unordered_set<tref>& cache);
 
 //------------------------------------------------------------------------------
 // post_order and pre_order traversals
