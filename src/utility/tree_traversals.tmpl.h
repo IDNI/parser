@@ -767,7 +767,7 @@ void morris_post_order<node_t>::traverse(tref &root, auto &f) {
 				curr = curr_node.l;
 			} else {
 				const_cast<tref&>(pred_r)  = nullptr;
-				traverse_right_list(curr_node.l, root, f);
+				traverse_right_list(curr_node.l, f);
 				curr = curr_node.r;
 			}
 		}
@@ -775,7 +775,7 @@ void morris_post_order<node_t>::traverse(tref &root, auto &f) {
 	f(root);
 }
 template <typename node_t>
-void morris_post_order<node_t>::traverse_right_list(tref from, tref& root, auto &f) {
+void morris_post_order<node_t>::traverse_right_list(tref from, auto &f) {
 	if (!from) return;
 	tref prev = nullptr;
 	tref curr = from, next;
@@ -787,20 +787,14 @@ void morris_post_order<node_t>::traverse_right_list(tref from, tref& root, auto 
 		prev = curr;
 		curr = next;
 	}
-	// Process in reverse
-	curr = prev;
-	while (curr) {
-		if (curr != root) f(curr);
-		const auto& curr_node = bintree<node_t>::get(curr);
-		curr = curr_node.r;
-	}
-	// Restore right pointers
+	// Process in reverse while restoring right pointers
 	curr = prev;
 	prev = nullptr;
 	while (curr) {
 		const auto& curr_node = bintree<node_t>::get(curr);
 		next = curr_node.r;
-		const_cast<tref&>(curr_node.r)  = prev;
+		const_cast<tref&>(curr_node.r) = prev;
+		f(curr);
 		prev = curr;
 		curr = next;
 	}

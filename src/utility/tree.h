@@ -780,7 +780,7 @@ struct morris_post_order
 private:
 	tref root;
 	void traverse(tref &n, auto &f);
-	void traverse_right_list(tref from, tref& root, auto &f);
+	void traverse_right_list(tref from, auto &f);
 };
 
 
