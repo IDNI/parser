@@ -772,7 +772,6 @@ void morris_post_order<node_t>::traverse(tref &root, auto &f) {
 			}
 		}
 	}
-	f(root);
 }
 template <typename node_t>
 void morris_post_order<node_t>::traverse_right_list(tref from, auto &f) {
