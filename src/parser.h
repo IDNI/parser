@@ -436,7 +436,7 @@ public:
 				}};
 			static inline const extractor<std::optional<size_t>>
 							opt_nonterminal{
-				[](const traverser& t) {
+				[](const traverser& t) -> std::optional<size_t> {
 					if (!t) return std::optional<size_t>{};
 					const auto& x = t.value_tree();
 					if (x.value.first.nt())
