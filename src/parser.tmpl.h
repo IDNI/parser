@@ -18,22 +18,14 @@
 #include "utility/measure.h"
 #endif // PARSER_MEASURE
 
-template <typename C, typename T>
-std::ostream& operator<<(std::ostream& os,
-	const std::pair<idni::lit<C, T>, std::array<size_t, 2>>& obj)
-{
-	return os << obj.first << "[" << obj.second[0] << ","
-					<< obj.second[1] << "]";
-
-}
-
 namespace idni {
 
 template <typename C, typename T>
 std::ostream& operator<<(std::ostream& os,
 	const std::pair<lit<C, T>, std::array<size_t, 2>>& obj)
 {
-	return ::operator<<<C, T>(os, obj);
+	return os << obj.first << "[" << obj.second[0] << ","
+					<< obj.second[1] << "]";
 }
 
 static inline idni::term::colors TC;

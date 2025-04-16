@@ -16,6 +16,8 @@
 #include <iomanip>
 #include <functional>
 
+#include "utility/hashing.h"
+
 namespace idni {
 
 #ifdef DEBUG
@@ -55,8 +57,15 @@ typedef int32_t int_t;
 #define GIT_BRANCH      "n/a"
 #endif
 
-} // idni namespace
+template<typename T>
+std::ostream& operator<<(std::ostream& os, const std::vector<T>& vec) {
+	os << "[";
+	for (size_t i = 0; i < vec.size(); ++i)
+		if (i + 1 < vec.size()) os << vec[i] << ",";
+	if (vec.size()) os << vec.back();
+	return os << "]";
+}
 
-#include "utility/hashing.h"
+} // idni namespace
 
 #endif // __IDNI__PARSER__DEFS_H__

@@ -1859,18 +1859,6 @@ struct std::hash<idni::rewriter::depreciating::node<symbol_t>> {
 	}
 };
 
-//
-// operators << to pretty print the tau language related types
-//
-
-// << for node (make it shared make use of the previous operator)
-template <typename symbol_t>
-std::ostream& operator<<(std::ostream& stream,
-	const idni::rewriter::depreciating::node<symbol_t>& n)
-{
-	return stream << make_shared<idni::rewriter::depreciating::sp_node<symbol_t>>(n);
-}
-
 #undef LOG_DEBUG
 #undef LOG_INFO
 #undef LOG_ERROR

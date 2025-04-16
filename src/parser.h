@@ -94,15 +94,7 @@ struct lit {
 
 template <typename C = char, typename T = C>
 std::ostream& operator<<(std::ostream& os,
-	const std::pair<idni::lit<C, T>, std::array<size_t, 2>>& obj);
-
-} // namespace idni
-
-template <typename C = char, typename T = C>
-std::ostream& operator<<(std::ostream& os,
-	const std::pair<idni::lit<C, T>, std::array<size_t, 2>>& obj);
-
-namespace idni {
+	const std::pair<lit<C, T>, std::array<size_t, 2>>& obj);
 
 // production rules in a disjunctive normal form of conjunction clauses of lits
 template <typename C = char, typename T = C> //  literals
@@ -282,7 +274,7 @@ public:
 		inline operator typename forest<pnode>::node() const {
 			return ptrof(*this);
 		}
-		friend std::ostream& ::operator<<<>(std::ostream& os, const node_type& n);
+		friend std::ostream& operator<<<>(std::ostream& os, const node_type& n);
 		inline size_t _mpsize() const { return nid().size(); }
 		std::size_t hashit() const {
 			std::size_t seed = this->first.hashit();

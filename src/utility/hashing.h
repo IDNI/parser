@@ -12,12 +12,10 @@
 // modified over time by the Author.
 #ifndef __IDNI__PARSER__UTILS__HASHING_H__
 #define __IDNI__PARSER__UTILS__HASHING_H__
-#include <cstdint>
 #include <functional>
 #include <vector>
 #include <tuple>
 #include <utility>
-#include <ostream>
 
 namespace idni {
 
@@ -36,7 +34,7 @@ constexpr void hash_combine (size_t& seed, const T& v) {
 	seed ^= std::hash<T>{}(v) + grcprime + (seed << 12) + (seed >> 4);
 }
 
-}
+} // namespace idni
 
 namespace std {
 
@@ -69,15 +67,6 @@ struct hash<std::tuple<Ts...>> {
 	}
 };
 
-template<typename T>
-ostream& operator<<(ostream& os, const vector<T>& vec) {
-	os << "[";
-	for (size_t i = 0; i < vec.size(); ++i)
-		if (i + 1 < vec.size()) os << vec[i] << ",";
-	if (vec.size()) os << vec.back();
-	return os << "]";
-}
-
-}
+} // namespace std
 
 #endif // __IDNI__PARSER__UTILS__HASHING_H__
