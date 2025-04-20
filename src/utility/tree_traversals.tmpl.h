@@ -113,11 +113,14 @@ tref post_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree) {
 	inc_depth();
 #endif //MEASURE_TRAVERSER_DEPTH
 
-	auto reget_with_right_sibling = [&](tref nn, tref orig) {
+	auto call = [](auto& cb, tref n) -> tref {
+		tref nn = cb(n);
+		if (nn == n) return n;
+		if (nn == nullptr) return nullptr;
 		const auto& c_tree = tree::get(nn);
 		return bintree<node_t>::get(c_tree.value,
-			c_tree.left_child(),
-			tree::get(orig).right_sibling());
+						c_tree.left_child(),
+						tree::get(n).right_sibling());
 	};
 
 	while (true) {
@@ -149,10 +152,7 @@ tref post_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree) {
 		// Check if node has children
 		if (!tree::get(c_node).has_child()) {
 			// Process node and move to next
-			auto nn = f(c_node);
-			if (nn == nullptr) return nullptr;
-			if (c_node != nn)
-				c_node = reget_with_right_sibling(nn, c_node);
+			c_node = call(f, c_node);
 			if (c_node == nullptr) return nullptr;
 			upos.pop_back();
 #ifdef MEASURE_TRAVERSER_DEPTH
@@ -160,37 +160,6 @@ tref post_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree) {
 #endif //MEASURE_TRAVERSER_DEPTH
 			continue;
 		}
-
-		// DEBUG
-		// // tree::get(c_node).print(std::cerr << "c_node: ");
-		// std::cerr << "c_node: [" << tree::get(c_node).value << "]" << std::endl;
-		// std::cerr << "stack: ";
-		// for (auto& s : stack) {
-		// 	if (s == c_node) std::cerr << "[";
-		// 	const auto& t = tree::get(s);
-		// 	std::cerr << t.value.first << "*" << s
-		// 		<< (t.has_right_sibling() ? ">>" : "");
-		// 	if (s == c_node) std::cerr << "]";
-		// 	std::cerr << " ";
-		// }
-		// tref back = stack.back();
-		// std::cerr << std::endl;
-		// if (stack.back() == c_node) {
-		// 	std::cerr << "\t\t" << tree::get(c_node).value.first << " first child: " << tree::get(c_node).left_child() << std::endl << "\n";
-		// } else {
-		// 	// const auto& t = tree::get(c_node);
-		// 	// std::cerr << "\t\t\t\t[" << t.value.first << "] right sibling: " << t.right_sibling();
-		// 	// if (t.right_sibling() == nullptr) ;//std::cerr << " (nullptr)";
-		// 	// else std::cerr << " [" << tree::get(t.right_sibling()).value.first << "]";
-		// 	// std::cerr << std::endl;
-		// 	const auto& t2 = tree::get(back);
-		// 	std::cerr << "\t\t\t\t" << t2.value.first << " right sibling: " << t2.right_sibling();
-		// 	if (t2.right_sibling() == nullptr) ;//std::cerr << " (nullptr)";
-		// 	else std::cerr << " " << tree::get(t2.right_sibling()).value.first << "";
-		// 	std::cerr << std::endl;
-		// 	const auto& t = tree::get(c_node);
-		// 	t.print(std::cerr << "--------\n") << "\n";
-		// }
 
 		// Get next child
 		tref c = (stack.back() == c_node)
@@ -202,14 +171,11 @@ tref post_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree) {
 			size_t c_pos = (stack.size() - 1) - upos.back();
 			// Check if children actually changed
 			auto ch_range = tree::get(c_node).children();
-			if (std::equal(stack.begin() + (upos.back() + 1), stack.end(),
-				ch_range.begin(), ch_range.end()))
+			if (std::equal(stack.begin() + (upos.back() + 1),
+				stack.end(), ch_range.begin(), ch_range.end()))
 			{
-				// std::cerr << "\tno change" << std::endl;
-				tref res = f(c_node);
+				tref res = call(f, c_node);
 				if (res == nullptr) return nullptr;
-				if (c_node != res)
-					res = reget_with_right_sibling(res, c_node);
 				if constexpr (slot != 0) m.emplace(
 					std::make_pair(c_node, slot), res);
 				else cache.emplace(c_node, res);
@@ -222,7 +188,6 @@ tref post_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree) {
 #endif //MEASURE_TRAVERSER_DEPTH
 				continue;
 			}
-			// std::cerr << "\tCHANGED\n" << std::endl;
 			// Make new node if children are different
 			tref res = tree::get(tree::get(c_node).value,
 				&stack[upos.back() + 1],
@@ -231,10 +196,8 @@ tref post_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree) {
 			if (res == nullptr) return nullptr;
 			// Pop children from stacks
 			stack.erase(stack.end() - c_pos, stack.end());
-			res = f(res);
+			res = call(f, res);
 			if (res == nullptr) return nullptr;
-			if (c_node != res)
-				res = reget_with_right_sibling(res, c_node);
 			if constexpr (slot != 0)
 				m.emplace(std::make_pair(c_node, slot), res);
 			else cache.emplace(c_node, res);
@@ -273,8 +236,9 @@ void post_order<node_t>::const_traverse(tref n, auto& visitor,
 	// Otherwise, call it just with tref
 	auto call = [](auto& cb, tref x, tref parent) -> bool {
 		if constexpr (accepts_tref_tref<decltype(cb)>::value) {
-			if constexpr (bool_accepts_tref_tref<decltype(cb)>::value)
-				return cb(x, parent);
+			if constexpr (
+				bool_accepts_tref_tref<decltype(cb)>::value)
+							return cb(x, parent);
 			else cb(x, parent);
 		} else if constexpr (bool_accepts_tref<decltype(cb)>::value) {
 			return cb(x);
@@ -370,7 +334,9 @@ tref pre_order<node_t>::apply(auto& f) {
 
 template <typename node_t>
 template<size_t slot>
-tref pre_order<node_t>::apply_unique_until_change(auto& f, auto& visit_subtree, auto& up) {
+tref pre_order<node_t>::apply_unique_until_change(auto& f, auto& visit_subtree,
+	auto& up)
+{
 	if (visit_subtree(root))
 		return traverse<true, slot, true>(root, f, visit_subtree, up);
 	else return root;
@@ -378,9 +344,10 @@ tref pre_order<node_t>::apply_unique_until_change(auto& f, auto& visit_subtree, 
 
 template <typename node_t>
 template<size_t slot>
-tref pre_order<node_t>::apply_unique_until_change(auto& f, auto& visit_subtree) {
+tref pre_order<node_t>::apply_unique_until_change(auto& f, auto& visit_subtree){
 	if (visit_subtree(root))
-		return traverse<true, slot, true>(root, f, visit_subtree, identity);
+		return traverse<true, slot, true>(
+					root, f, visit_subtree, identity);
 	else return root;
 }
 
@@ -393,7 +360,9 @@ tref pre_order<node_t>::apply_unique_until_change(auto& f) {
 
 template <typename node_t>
 template<size_t slot>
-tref pre_order<node_t>::apply_until_change(auto& f, auto& visit_subtree, auto& up) {
+tref pre_order<node_t>::apply_until_change(auto& f, auto& visit_subtree,
+	auto& up)
+{
 	if (visit_subtree(root))
 		return traverse<true, slot, false>(root, f, visit_subtree, up);
 	else return root;
@@ -406,7 +375,9 @@ tref pre_order<node_t>::apply_until_change(auto& f) {
 }
 
 template <typename node_t>
-void pre_order<node_t>::visit(auto& visit, auto& visit_subtree, auto& up, auto& between) {
+void pre_order<node_t>::visit(auto& visit, auto& visit_subtree, auto& up,
+	auto& between)
+{
 	if (visit_subtree(root)) const_traverse<false, false>(root,
 					visit, visit_subtree, up, between);
 }
@@ -423,7 +394,9 @@ void pre_order<node_t>::visit(auto& visit) {
 }
 
 template <typename node_t>
-void pre_order<node_t>::search(auto& visit, auto& visit_subtree, auto& up, auto& between) {
+void pre_order<node_t>::search(auto& visit, auto& visit_subtree, auto& up,
+	auto& between)
+{
 	if (visit_subtree(root)) const_traverse<true, false>(root,
 					visit, visit_subtree, up, between);
 }
@@ -440,7 +413,8 @@ void pre_order<node_t>::search(auto& visit) {
 }
 
 template <typename node_t>
-void pre_order<node_t>::visit_unique(auto& visit, auto& visit_subtree, auto& up) {
+void pre_order<node_t>::visit_unique(auto& visit, auto& visit_subtree, auto& up)
+{
 	if (visit_subtree(root)) const_traverse<false, true>(root,
 					visit, visit_subtree, up, do_nothing);
 }
@@ -451,7 +425,8 @@ void pre_order<node_t>::visit_unique(auto& visit) {
 }
 
 template <typename node_t>
-void pre_order<node_t>::search_unique(auto&visit, auto& visit_subtree, auto& up) {
+void pre_order<node_t>::search_unique(auto&visit, auto& visit_subtree, auto& up)
+{
 	if (visit_subtree(root)) const_traverse<true, true>(root,
 					visit, visit_subtree, up, do_nothing);
 }
@@ -480,14 +455,14 @@ std::pair<size_t, size_t> pre_order<node_t>::get_tree_depth_and_size() {
 
 template <typename node_t>
 template<bool break_on_change, size_t slot, bool unique>
-tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up) {
+tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
+{
 	if (n == nullptr) return nullptr;
 	// std::unordered_map<node_t, node_t, std::hash<node_t>,
 	// 	traverser_cache_equality<node_t>> cache;
 	std::unordered_map<tref, tref> cache;
 	trefs stack;
 	std::vector<size_t> upos;
-	// tree::get(n).dump(std::cout << "traverse: ", true) << "\n";
 	// Apply f and save on stack
 	tref r = f(n);
 	if (r == nullptr) return nullptr;
@@ -507,11 +482,14 @@ tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 	}
 	stack.emplace_back(r);
 
-	auto reget_with_right_sibling = [&](tref nn, tref orig) {
+	auto call = [](auto& cb, tref n) -> tref {
+		tref nn = cb(n);
+		if (nn == n) return n;
+		if (nn == nullptr) return nullptr;
 		const auto& c_tree = tree::get(nn);
 		return bintree<node_t>::get(c_tree.value,
-			c_tree.left_child(),
-			tree::get(orig).right_sibling());
+						c_tree.left_child(),
+						tree::get(n).right_sibling());
 	};
 
 	while (true) {
@@ -523,7 +501,8 @@ tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 		// If we want to visit all nodes, deactivate caching/memory
 		if constexpr (unique) {
 			if constexpr (slot != 0) {
-				const auto it = m.find(std::make_pair(c_node, slot));
+				const auto it = m.find(
+						std::make_pair(c_node, slot));
 				if (it != m.end()) {
 					c_node = it->second;
 					upos.pop_back();
@@ -547,10 +526,8 @@ tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 		// // Check if node has children
 		if (!tree::get(c_node).has_child()) {
 			// Call up and move to next
-			auto nn = up(c_node);
-			if (nn == nullptr) return nullptr;
-			if (c_node != nn)
-				c_node = reget_with_right_sibling(nn, c_node);
+			c_node = call(up, c_node);
+			if (c_node == nullptr) return nullptr;
 			upos.pop_back();
 #ifdef MEASURE_TRAVERSER_DEPTH
 			dec_depth();
@@ -560,24 +537,22 @@ tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 		tref c = (stack.back() == c_node)
 				? tree::get(c_node).left_child()
 				: tree::get(stack.back()).right_sibling();
-		// std::cout << "stack: " << stack.size() << "\n";
-		// for (auto& el : stack)
-		// 	tree::get(el).dump(std::cout << "\t", true) << "\n";
 		// Are all children visited?
 		if (c == nullptr) {
 			// Get child position
 			size_t c_pos = (stack.size() - 1) - upos.back();
 			// Check if children actually changed
 			auto ch_range = tree::get(c_node).children();
-			if (std::equal(stack.begin() + (upos.back() + 1), stack.end(),
-				ch_range.begin(), ch_range.end())) {
+			if (std::equal(stack.begin() + (upos.back() + 1),
+				stack.end(), ch_range.begin(), ch_range.end()))
+			{
 				// Call up
-				auto nn = up(c_node);
-				if (nn == nullptr) return nullptr;
-				auto res = c_node == nn ? c_node
-					: reget_with_right_sibling(nn, c_node);
+				auto res = call(up, c_node);
+				if (res == nullptr) return nullptr;
 				if constexpr (unique) {
-					if constexpr (slot != 0) m.emplace(std::make_pair(c_node, slot), res);
+					if constexpr (slot != 0) m.emplace(
+						std::make_pair(c_node, slot),
+						res);
 					else cache.emplace(c_node, res);
 				}
 				c_node = res;
@@ -590,26 +565,20 @@ tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				continue;
 			}
 			// Make new node if children are different
-			// tree::get(c_node).dump(std::cout << "c_node changed: ", true) << "\n";
-			// if (tree::get(c_node).has_right_sibling())
-			// 	tree::get(tree::get(c_node).right_sibling()).dump(std::cout << "c_node right sibling: ", true) << "\n";
 			tref res = tree::get(tree::get(c_node).value,
 				&stack[upos.back() + 1],
 				stack.size() - upos.back() - 1,
 				tree::get(c_node).right_sibling());
-			// tree::get(res).dump(std::cout << "res: ", true) << "\n";
 			// Pop children from stacks
 			stack.erase(stack.end() - c_pos, stack.end());
 			if (res == nullptr) return nullptr;
 			// Call up
-			auto nn = up(res);
-			if (nn == nullptr) return nullptr;
-			if (res != nn)
-				res = reget_with_right_sibling(nn, c_node);
+			res = call(up, res);
+			if (res == nullptr) return nullptr;
 			if constexpr (unique) {
 				if constexpr (slot != 0)
 					m.emplace(std::make_pair(c_node, slot),
-							res);
+									res);
 				else cache.emplace(c_node, res);
 			}
 			c_node = res;
@@ -621,10 +590,8 @@ tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 			// Add next child
 			if (visit_subtree(c)) {
 				// Apply f and save on stack
-				r = f(c);
+				r = call(f, c);
 				if (r == nullptr) return nullptr;
-				if (c != r)
-					r = reget_with_right_sibling(r, c);
 				if constexpr (break_on_change) {
 					if (r == c) {
 #ifdef MEASURE_TRAVERSER_DEPTH
@@ -688,6 +655,7 @@ void pre_order<node_t>::const_traverse(tref n, auto& visitor,
 		if (upos.empty()) return;
 		// Find first unprocessed position
 		tref c_node = stack[upos.back()];
+		if (c_node == nullptr) return;
 		const auto& c_tree = tree::get(c_node);
 		if (!c_tree.has_child()) { // If node has no children
 			// Call up and move to next
@@ -711,6 +679,9 @@ void pre_order<node_t>::const_traverse(tref n, auto& visitor,
 			// Pop children from stacks
 			stack.erase(stack.end() - c_pos, stack.end());
 			upos.pop_back();
+			// Node is finished. Call between if has right sibling
+			if (c_tree.has_right_sibling())
+				call(between, c_node, get_parent());
 #ifdef MEASURE_TRAVERSER_DEPTH
 			dec_depth();
 #endif //MEASURE_TRAVERSER_DEPTH
@@ -728,9 +699,9 @@ void pre_order<node_t>::const_traverse(tref n, auto& visitor,
 #endif //MEASURE_TRAVERSER_DEPTH
 					upos.push_back(stack.size() - 1);
 				}
-				// Node is finished. Call between if has right sibling
-				if (tree::get(c).has_right_sibling())
-					call(between, c, get_parent());
+				// // Node is finished. Call between if has right sibling
+				// if (tree::get(c).has_right_sibling())
+				// 	call(between, c, get_parent());
 			}
 			if constexpr (unique) cache.emplace(c);
 		}
@@ -757,7 +728,8 @@ void morris_post_order<node_t>::traverse(tref &root, auto &f) {
 		} else {
 			tref pred = curr_node.l;
 			while (true) {
-				const auto& pred_node = bintree<node_t>::get(pred);
+				const auto& pred_node =
+						bintree<node_t>::get(pred);
 				if (!pred_node.r || pred_node.r == curr) break;
 				pred = pred_node.r;
 			}

@@ -372,6 +372,16 @@ struct lcrs_tree : public bintree<T> {
 	 * @param v The node
 	 * @param ch Children pointer / array
 	 * @param len The number of children
+	 * @param r The right sibling
+	 * @return The new tree node's tref id
+	 */
+	static tref get(const T& v, const T* ch, size_t len, tref r);
+
+	/**
+	 * @brief Creates new tree node from value and childdren array / pointer
+	 * @param v The node
+	 * @param ch Children pointer / array
+	 * @param len The number of children
 	 * @return The new tree node's tref id
 	 */
 	static tref get(const T& v, const T* ch, size_t len);

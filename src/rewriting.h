@@ -144,8 +144,7 @@ template <typename symbol_t, class hook_t = make_node_hook<symbol_t>>
 sp_node<symbol_t> make_node(const symbol_t& s,
 	std::vector<sp_node<symbol_t>>&& ns) {
 #ifdef DEBUG
-	for (const auto& el: ns)
-		assert(el != nullptr);
+	for (const auto& el : ns) assert(el != nullptr);
 #endif // DEBUG
 	static std::unordered_map<node<symbol_t>, sp_node<symbol_t>,
 			std::hash<node<symbol_t>>,

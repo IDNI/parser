@@ -68,7 +68,6 @@ int main(int argc, char **argv)
 		cout<<"End , GCed:"<<(assert( n1._mpsize() == 0),"ok");
 #endif
 
-
 /*******************************************************************************
 *       BASIC
 *******************************************************************************/
@@ -424,6 +423,7 @@ int main(int argc, char **argv)
 	o = {}, o.ambiguity_fails = false;
 	run_test<char>(ps, nt, start, "a", {}, o);
 	ps.clear();
+
 /*******************************************************************************
 *       STRESS
 *******************************************************************************/
@@ -476,7 +476,7 @@ int main(int argc, char **argv)
 			cout << "stress test finished" << endl;
 	}
 
-	/*******************************************************************************
+/*******************************************************************************
 *       BENCHMARK
 *******************************************************************************/
 
@@ -562,10 +562,10 @@ int main(int argc, char **argv)
 		ps(start, start + m + start );
 		ps(start, start + e + start);
 
-		auto gen_npnmn = [](int n){
+		auto gen_npnmn = [](size_t n){
 			string s="n";
 			string ch = "pme";
-			for(int i = 0; i < n - 2; i++){
+			for (size_t i = 0; i < n - 2; i++){
 				if (i&1) s += 'n';
 				else s += ch[rand() % 3];
 			}

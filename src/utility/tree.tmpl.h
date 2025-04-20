@@ -203,7 +203,7 @@ void bintree<T>::gc() {
 	*/
 	//delete non-reachable garbage nodes from M
 	for (auto it = M.begin(); it != M.end(); )
-		if (next.count(reinterpret_cast<tref>(&it->first)) == 0)
+		if (next.count(it->first.get()) == 0)
 			it = M.erase(it);
 		else it++;
 
@@ -294,7 +294,7 @@ const lcrs_tree<T>& lcrs_tree<T>::get(tref id) {
 
 template <typename T>
 tref lcrs_tree<T>::get(const T& v, const tref* ch, size_t len) {
-	return get(v, ch, len, static_cast<tref>(nullptr));
+	return get(v, ch, len, (tref) nullptr);
 }
 
 template <typename T>
@@ -337,10 +337,15 @@ tref lcrs_tree<T>::get(const T& v, tref ch1, tref ch2) {
 
 template <typename T>
 tref lcrs_tree<T>::get(const T& v, const T* ch, size_t len) {
+	return get(v, ch, len, (tref) nullptr);
+}
+
+template <typename T>
+tref lcrs_tree<T>::get(const T& v, const T* ch, size_t len, tref r) {
 	tref pr = nullptr;
-	for (int_t i = int_t(len) - 1; i >= 0; --i)
+	for (size_t i = len; i > 0; ) --i,
 		pr = bintree<T>::get(ch[i], (tref) nullptr, pr);
-	return bintree<T>::get(v, pr, (tref) nullptr);
+	return bintree<T>::get(v, pr, r);
 }
 
 template <typename T>
