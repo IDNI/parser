@@ -641,7 +641,6 @@ bool pattern_matcher2<node_t, is_capture_t>::match(tref p, tref n) {
 	return false;
 }
 
-
 // this predicate matches when there exists a environment that makes the
 // pattern match the node ignoring the nodes detected as skippable.
 //
@@ -756,93 +755,98 @@ tref apply(tref s, tref n, matcher_t& matcher) {
 } // rewriter namespace
 
 template <typename T>
-template <typename predicate_t>
-tref lcrs_tree<T>::trim_top(predicate_t& query) {
-	return rewriter::trim_top<T>(get(), query);
+tref lcrs_tree<T>::trim_top(const auto& query) const {
+	return rewriter::trim_top<T, decltype(query)>(get(), query);
 }
 
 template <typename T>
-template <typename predicate_t>
-trefs lcrs_tree<T>::select_top(predicate_t& query) {
-	return rewriter::select_top<T>(get(), query);
+trefs lcrs_tree<T>::select_top(const auto& query) const {
+	return rewriter::select_top<T, decltype(query)>(get(), query);
 }
 template <typename T>
-template <typename predicate_t, typename extractor_t>
-trefs lcrs_tree<T>::select_subnodes(predicate_t& query, extractor_t extractor) {
-	return rewriter::select_subnodes<T>(get(), query, extractor);
-}
-
-template <typename T>
-template <typename predicate_t>
-trefs lcrs_tree<T>::select_all(predicate_t& query) {
-	return rewriter::select_all<T>(get(), query);
+trefs lcrs_tree<T>::select_subnodes(const auto& query, const auto& extractor)
+	const
+{
+	return rewriter::select_subnodes<T,
+		decltype(query), decltype(extractor)>(get(), query, extractor);
 }
 
 template <typename T>
-trefs lcrs_tree<T>::select_all_until(const auto& query, const auto& until) {
+trefs lcrs_tree<T>::select_all(const auto& query) const {
+	return rewriter::select_all<T, decltype(query)>(get(), query);
+}
+
+template <typename T>
+trefs lcrs_tree<T>::select_all_until(const auto& query, const auto& until)
+	const
+{
 	return rewriter::select_all_until<T>(get(), query, until);
 }
 
 template <typename T>
-trefs lcrs_tree<T>::select_top_until(const auto& query, const auto& until) {
+trefs lcrs_tree<T>::select_top_until(const auto& query, const auto& until)
+	const
+{
 	return rewriter::select_top_until<T>(get(), query, until);
 }
 
 template <typename T>
-template <typename predicate_t>
-tref lcrs_tree<T>::find_top(predicate_t& query) {
-	return rewriter::find_top<T>(get(), query);
+tref lcrs_tree<T>::find_top(const auto& query) const {
+	return rewriter::find_top<T, decltype(query)>(get(), query);
 }
 template <typename T>
-tref lcrs_tree<T>::find_top_until(const auto& query, const auto& until) {
+tref lcrs_tree<T>::find_top_until(const auto& query, const auto& until) const {
 	return rewriter::find_top_until<T>(get(), query, until);
 }
 
 template <typename T>
-tref lcrs_tree<T>::replace(const subtree_map& changes) {
+tref lcrs_tree<T>::find_bottom(const auto& query) const {
+	return rewriter::find_bottom<T, decltype(query)>(get(), query);
+}
+
+template <typename T>
+tref lcrs_tree<T>::replace(const subtree_map& changes) const {
 	return rewriter::replace<T>(get(), changes);
 }
 template <typename T>
-tref lcrs_tree<T>::replace(tref replace, tref with) {
+tref lcrs_tree<T>::replace(tref replace, tref with) const {
 	return rewriter::replace<T>(get(), replace, with);
 }
 
 template <typename T>
-template <typename predicate_t>
-tref lcrs_tree<T>::replace_if(const subtree_map& changes, predicate_t& query) {
-	return rewriter::replace_if<T>(get(), changes, query);
-}
-
-template <typename T>
-template <typename predicate_t>
-tref lcrs_tree<T>::replace_until(const subtree_map& changes, predicate_t& query) {
-	return rewriter::replace_until<T>(get(), changes, query);
-}
-
-template <typename T>
-template <typename predicate_t>
-tref lcrs_tree<T>::find_bottom(predicate_t& query) {
-	return rewriter::find_bottom<T>(get(), query);
-}
-
-template <typename T>
-template <typename is_capture_t>
-tref lcrs_tree<T>::apply_rule(const rewriter::rule& r, const is_capture_t& c) {
-	return rewriter::apply_rule<T>(r, get(), c);
-}
-
-template <typename T>
-template <typename is_capture_t, typename predicate_t>
-tref lcrs_tree<T>::apply_if(const rewriter::rule& r, const is_capture_t& c,
-	predicate_t& predicate)
+tref lcrs_tree<T>::replace_if(const subtree_map& changes, const auto& query)
+	const
 {
-	return rewriter::apply_if<T>(r, get(), c, predicate);
+	return rewriter::replace_if<T, decltype(query)>(get(), changes, query);
 }
 
 template <typename T>
-template <typename matcher_t>
-tref lcrs_tree<T>::apply(tref s, matcher_t& matcher) {
-	return rewriter::apply<T>(s, get(), matcher);
+tref lcrs_tree<T>::replace_until(const subtree_map& changes, const auto& query)
+	const
+{
+	return rewriter::replace_until<T, decltype(query)>(get(), changes,
+									query);
+}
+
+template <typename T>
+tref lcrs_tree<T>::apply_rule(const rewriter::rule& r, const auto& is_capture)
+	const
+{
+	return rewriter::apply_rule<T, decltype(is_capture)>(r, get(),
+								is_capture);
+}
+
+template <typename T>
+tref lcrs_tree<T>::apply_if(const rewriter::rule& r,
+				const auto& is_capture, const auto& query) const
+{
+	return rewriter::apply_if<T, decltype(is_capture), decltype(query)>(
+						r, get(), is_capture, query);
+}
+
+template <typename T>
+tref lcrs_tree<T>::apply(tref s, const auto& matcher) const {
+	return rewriter::apply<T, decltype(matcher)>(s, get(), matcher);
 }
 
 } // idni::rewriter namespace

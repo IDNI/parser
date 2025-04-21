@@ -241,11 +241,11 @@ template <typename T> struct post_order;
  */
 template <typename T>
 struct lcrs_tree : public bintree<T> {
+	friend post_order<T>;
+	friend pre_order<T>;
 
 	bool operator==(const lcrs_tree<T>& other) const;
-
 	bool operator<(const lcrs_tree<T>& other) const;
-
 	static bool subtree_equals(tref a, tref b);
 	static bool subtree_less(tref a, tref b);
 
@@ -266,6 +266,7 @@ struct lcrs_tree : public bintree<T> {
 
 	using subtree_set = std::set<tref, subtree_equality>;
 	using subtree_map = std::map<tref, tref, subtree_equality>;
+	using subtree_string_map = std::map<tref, std::string, subtree_equality>;
 	// using subtree_unordered_set = std::unordered_set<tref, subtree_equality>;
 	// using subtree_unordered_map = std::unordered_map<tref, tref, subtree_equality>;
 	using subtree_tref_size_t_map = std::map<tref, size_t,
@@ -606,73 +607,58 @@ struct lcrs_tree : public bintree<T> {
 	 */
 	const lcrs_tree<T>& dump(bool subtree = true) const;
 
-
-	friend post_order<T>;
-	friend pre_order<T>;
-
 	// rewriter API available directly on the tree
 
 	// delete all top nodes that satisfy a predicate.
-	template <typename predicate_t>
-	tref trim_top(predicate_t& query);
+	tref trim_top(const auto& query) const;
 
 	// select all top nodes that satisfy a predicate and return them.
-	template <typename predicate_t>
-	trefs select_top(predicate_t& query);
+	trefs select_top(const auto& query) const;
 
 	// select all subnodes that satisfy a predicate according to the extractor and return them.
-	template <typename predicate_t, typename extractor_t>
-	trefs select_subnodes(predicate_t& query, extractor_t extractor);
+	trefs select_subnodes(const auto& query, const auto& extractor) const;
 
 	// select all nodes that satisfy a predicate and return them.
-	template <typename predicate_t>
-	trefs select_all(predicate_t& query);
+	trefs select_all(const auto& query) const;
 
 	// Select all nodes in input that satisfy query ignoring subtrees under a node satisfying until
-	trefs select_all_until(const auto& query, const auto& until);
+	trefs select_all_until(const auto& query, const auto& until) const;
 
 	// Select top nodes in input that satisfy query ignoring subtrees under a node satisfying until
-	trefs select_top_until(const auto& query, const auto& until);
+	trefs select_top_until(const auto& query, const auto& until) const;
 
 	// find the first node that satisfy a predicate and return it.
-	template <typename predicate_t>
-	tref find_top(predicate_t& query);
+	tref find_top(const auto& query) const;
 
 	// Select single top node in input that satisfy query ignoring subtrees under a node satisfying until
-	tref find_top_until(const auto& query, const auto& until);
+	tref find_top_until(const auto& query, const auto& until) const;
 
-	tref replace(const std::map<tref, tref>& changes);
-	tref replace(const subtree_map& changes);
-	tref replace(tref what, tref with);
+	// find the first node that satisfy a predicate and return it.
+	tref find_bottom(const auto& query) const;
+
+	tref replace(const std::map<tref, tref>& changes) const;
+	tref replace(const subtree_map& changes) const;
+	tref replace(tref what, tref with) const;
 
 	// Replace nodes in n according to changes while skipping subtrees that don't satisfy query
-	template <typename predicate_t>
-	tref replace_if(const subtree_map& changes, predicate_t& query);
+	tref replace_if(const subtree_map& changes, const auto& query) const;
 
 	// Replace nodes in n according to changes while skipping subtrees that satisfy query
-	template <typename predicate_t>
-	tref replace_until(const subtree_map& changes, predicate_t& query);
+	tref replace_until(const subtree_map& changes, const auto& query) const;
 
 	// TODO (LOW) consider adding a similar function for replace_node...
 
-	// find the first node that satisfy a predicate and return it.
-	template <typename predicate_t>
-	tref find_bottom(predicate_t& query);
-
 	// apply a rule to a tree using the predicate to pattern_matcher.
-	template <typename is_capture_t>
-	tref apply_rule(const rewriter::rule& r, const is_capture_t& c);
+	tref apply_rule(const rewriter::rule& r, const auto& is_capture) const;
 
 	// apply a rule to a tree using the predicate to pattern_matcher and skipping
 	// unnecessary subtrees
-	template <typename is_capture_t, typename predicate_t>
-	tref apply_if(const rewriter::rule& r, const is_capture_t& c, predicate_t& predicate);
+	tref apply_if(const rewriter::rule& r, const auto& is_capture,
+						const auto& predicate) const;
 
 	// apply a substitution to a rule according to a given matcher, this method is
 	// use internaly by apply and apply with skip.
-	template <typename matcher_t>
-	tref apply(tref s, matcher_t& matcher);
-
+	tref apply(tref s, const auto& matcher) const;
 };
 
 template <typename node_t>
