@@ -28,6 +28,7 @@ select_top_predicate<predicate_t>::select_top_predicate(predicate_t& query,
 
 template <typename predicate_t>
 bool select_top_predicate<predicate_t>::operator()(tref n) {
+	DBG(assert(n != nullptr);)
 	if (!query(n)) return true;
 	// we return false to avoid visiting the children of the node
 	// since we are only interested in the top nodes.
@@ -44,6 +45,7 @@ select_subnodes_predicate<predicate_t, extractor_t>::
 
 template <typename predicate_t, typename extractor_t>
 bool select_subnodes_predicate<predicate_t, extractor_t>::operator()(tref n) {
+	DBG(assert(n != nullptr);)
 	if (!query(n)) return true;
 	auto extracted = extractor(n);
 	for (tref e : extracted)
@@ -58,6 +60,7 @@ select_all_predicate<predicate_t>::select_all_predicate(predicate_t& query,
 
 template <typename predicate_t>
 bool select_all_predicate<predicate_t>::operator()(tref n) {
+	DBG(assert(n != nullptr);)
 	if (query(n)) selected.push_back(n);
 	// we always return true to visit all the nodes.
 	return true;
@@ -69,6 +72,7 @@ find_top_predicate<predicate_t>::find_top_predicate(predicate_t& query, tref& fo
 
 template <typename predicate_t>	
 bool find_top_predicate<predicate_t>::operator()(tref n) {
+	DBG(assert(n != nullptr);)
 	if (found == nullptr && query(n)) found = n;
 	return found == nullptr;
 }
@@ -96,6 +100,7 @@ template <typename node_t, typename wrapped_t, typename predicate_t>
 tref post_order_traverser<node_t, wrapped_t, predicate_t>::traverse(
 	tref n, std::set<tref>& visited)
 {
+	DBG(assert(n != nullptr);)
 	// we traverse the children of the node in post-order, i.e. we visit
 	// the children first and then the node itself.
 	for (tref c : lcrs_tree<node_t>::get(n).children())
@@ -123,6 +128,7 @@ template <typename node_t, typename wrapped_t, typename predicate_t>
 tref post_order_query_traverser<node_t, wrapped_t, predicate_t>::
 	operator()(tref n)
 {
+	DBG(assert(n != nullptr);)
 	// we kept track of the visited nodes to avoid visiting the same node
 	// twice. However, we do not need to keep track of the root node, since
 	// it is the one we start from and we will always be visited.
@@ -136,6 +142,7 @@ template <typename node_t, typename wrapped_t, typename predicate_t>
 tref post_order_query_traverser<node_t, wrapped_t, predicate_t>::traverse(
 	tref n, std::set<tref>& visited)
 {
+	DBG(assert(n != nullptr);)
 	// we traverse the children of the node in post-order, i.e. we visit
 	// the children first and then the node itself.
 	if (found) return found;
@@ -172,13 +179,16 @@ template <typename node_t, typename wrapped_t, typename predicate_t>
 tref post_order_tree_traverser<node_t, wrapped_t, predicate_t>::
 	operator()(tref n)
 {
+	DBG(assert(n != nullptr);)
 	// if the root node matches the query predicate, we traverse it, otherwise
 	// we return the result of apply the wrapped transform to the node.
 	return query(n) ? traverse(n) : wrapped(n);
 }
 
 template <typename node_t, typename wrapped_t, typename predicate_t>
-tref post_order_tree_traverser<node_t, wrapped_t, predicate_t>::traverse(tref n) {
+tref post_order_tree_traverser<node_t, wrapped_t, predicate_t>::traverse(tref n)
+{
+	DBG(assert(n != nullptr);)
 	// we traverse the children of the node in post-order, i.e. we visit
 	// the children first and then the node itself.
 	for (tref c : lcrs_tree<node_t>::get(n).children())
@@ -195,6 +205,7 @@ template <typename node_t>
 auto post_order_recursive_traverser<node_t>::operator()(
 	tref n, auto& query, auto& wrapped)
 {
+	DBG(assert(n != nullptr);)
 	if (query(n)) return traverse(n, query, wrapped);
 	else return wrapped(n, lcrs_tree<node_t>::get(n).get_children());
 }
@@ -203,6 +214,7 @@ template <typename node_t>
 tref post_order_recursive_traverser<node_t>::traverse(
 	tref n, auto& query, auto& wrapped)
 {
+	DBG(assert(n != nullptr);)
 	trefs children;
 	for (tref c : lcrs_tree<node_t>::get(n).children()) {
 		if (query(c))
@@ -221,6 +233,7 @@ map_transformer<node_t, wrapped_t>::map_transformer(wrapped_t& wrapped) : wrappe
 
 template <typename node_t, typename wrapped_t>
 tref map_transformer<node_t, wrapped_t>::operator()(tref& n) {
+	DBG(assert(n != nullptr);)
 	trefs ch;
 	const auto& nt = lcrs_tree<node_t>::get(n);
 	for (tref c : nt.children())
@@ -238,6 +251,7 @@ map_node_transformer<node_t, wrapped_t>::map_node_transformer(
 
 template <typename node_t, typename wrapped_t>
 tref map_node_transformer<node_t, wrapped_t>::operator()(tref n) {
+	DBG(assert(n != nullptr);)
 	auto nn = wrapped(n);
 	if (nn != n) { changes[n] == nn; return nn; };
 	trefs ch;
@@ -259,6 +273,7 @@ replace_node_transformer<node_t, wrapped_t>::replace_node_transformer(
 
 template <typename node_t, typename wrapped_t>
 tref replace_node_transformer<node_t, wrapped_t>::operator()(tref n) {
+	DBG(assert(n != nullptr);)
 	trefs ch;
 	const auto& nt = lcrs_tree<node_t>::get(n);
 	for (tref c : nt.children())
@@ -275,6 +290,7 @@ replace_transformer<node_t>::replace_transformer(
 
 template <typename node_t>
 tref replace_transformer<node_t>::operator()(tref n) {
+	DBG(assert(n != nullptr);)
 	// std::cout << "----------------------------------\n";
 	// std::cout << "replace_transformer: " << lcrs_tree<node_t>::get(n).value << "\n";
 	tref nn = get_cached<node_t>(n, changes);
@@ -287,6 +303,7 @@ tref replace_transformer<node_t>::operator()(tref n) {
 
 template <typename node_t>
 tref replace_transformer<node_t>::replace(tref n) {
+	DBG(assert(n != nullptr);)
 	trefs ch;
 	const auto& nt = lcrs_tree<node_t>::get(n);
 	for (tref c : nt.children())
@@ -300,6 +317,7 @@ tref replace_transformer<node_t>::replace(tref n) {
 // delete all top nodes that satisfy a predicate.
 template <typename node_t, typename predicate_t>
 tref trim_top(tref input, predicate_t& query) {
+	DBG(assert(input != nullptr);)
 	// std::cout << "trim_top: " << lcrs_tree<node_t>::get(input).value << " " << input << "\n";
 	const auto t = [&query](tref n) {
 		// std::cout << "trim_top: " << lcrs_tree<node_t>::get(n).value << " " << n << "\n";
@@ -325,6 +343,7 @@ tref trim_top(tref input, predicate_t& query) {
 // select all top nodes that satisfy a predicate and return them.
 template <typename node_t, typename predicate_t>
 trefs select_top(tref input, predicate_t& query) {
+	DBG(assert(input != nullptr);)
 	trefs selected;
 	auto select = [&query, &selected](const auto& n) {
 		if (!query(n)) return true;
@@ -342,6 +361,7 @@ trefs select_top(tref input, predicate_t& query) {
 // select all subnodes that satisfy a predicate according to the extractor and return them.
 template <typename node_t, typename predicate_t, typename extractor_t>
 trefs select_subnodes(tref input, predicate_t& query, extractor_t extractor) {
+	DBG(assert(input != nullptr);)
 	trefs selected;
 	rewriter::select_subnodes_predicate<predicate_t, extractor_t> select(
 		query, extractor, selected);
@@ -352,6 +372,7 @@ trefs select_subnodes(tref input, predicate_t& query, extractor_t extractor) {
 // select all nodes that satisfy a predicate and return them.
 template <typename node_t, typename predicate_t>
 trefs select_all(tref input, predicate_t& query) {
+	DBG(assert(input != nullptr);)
 	trefs selected;
 	auto select = [&query, &selected](const auto& n) {
 		if (query(n)) selected.push_back(n);
@@ -366,6 +387,7 @@ trefs select_all(tref input, predicate_t& query) {
 // Select all nodes in input that satisfy query ignoring subtrees under a node satisfying until
 template <typename node_t>
 trefs select_all_until(tref input, const auto& query, const auto& until) {
+	DBG(assert(input != nullptr);)
 	trefs selected;
 	auto select = [&](tref n) {
 		if (query(n)) selected.push_back(n);
@@ -381,6 +403,7 @@ trefs select_all_until(tref input, const auto& query, const auto& until) {
 // Select top nodes in input that satisfy query ignoring subtrees under a node satisfying until
 template <typename node_t>
 trefs select_top_until(tref input, const auto& query, const auto& until) {
+	DBG(assert(input != nullptr);)
 	trefs selected;
 	auto select = [&](tref n) {
 		if (until(n)) return false;
@@ -399,6 +422,7 @@ trefs select_top_until(tref input, const auto& query, const auto& until) {
 // find the first node that satisfy a predicate and return it.
 template <typename node_t, typename predicate_t>
 tref find_top(tref input, predicate_t& query) {
+	DBG(assert(input != nullptr);)
 	tref found = nullptr;
 	auto find_top = [&query, &found](const auto& n) {
 		if (found == nullptr && query(n)) found = n;
@@ -411,6 +435,7 @@ tref find_top(tref input, predicate_t& query) {
 // Select single top node in input that satisfy query ignoring subtrees under a node satisfying until
 template <typename node_t>
 tref find_top_until(tref input, const auto& query, const auto& until) {
+	DBG(assert(input != nullptr);)
 	tref node;
 	auto select = [&](tref n) {
 		if (!query(n)) return true;
@@ -427,6 +452,7 @@ tref find_top_until(tref input, const auto& query, const auto& until) {
 
 template <typename node_t>
 tref replace(tref n, const std::map<tref, tref>& changes) {
+	DBG(assert(n != nullptr);)
 	const auto r = [&changes](tref el) {
 		// lcrs_tree<node_t>::dump(std::cout << "el: ", el) << "\n";
 		auto ret = get_cached<node_t>(el, changes);
@@ -438,6 +464,7 @@ tref replace(tref n, const std::map<tref, tref>& changes) {
 
 template <typename node_t>
 tref replace(tref n, const typename lcrs_tree<node_t>::subtree_map& changes) {
+	DBG(assert(n != nullptr);)
 	const auto r = [&changes](tref el) {
 		// lcrs_tree<node_t>::dump(std::cout << "el: ", el) << "\n";
 		auto ret = get_cached<node_t>(el, changes);
@@ -449,6 +476,7 @@ tref replace(tref n, const typename lcrs_tree<node_t>::subtree_map& changes) {
 
 template <typename node_t>
 tref replace(tref n, tref replace, tref with) {
+	DBG(assert(n != nullptr && replace != nullptr && with != nullptr);)
 	const auto r = [&](tref el) {
 		if (lcrs_tree<node_t>::subtree_equals(el, replace)) return with;
 		else return el;
@@ -459,6 +487,7 @@ tref replace(tref n, tref replace, tref with) {
 // TODO (LOW) move it to a more appropriate place (parser)
 template <typename node_t>
 tref replace_with(tref n, tref with, tref inp) {
+	DBG(assert(n != nullptr && with != nullptr && inp != nullptr);)
 	typename lcrs_tree<node_t>::subtree_map changes = {{ n, with }};
 	return replace<node_t>(inp, changes);
 }
@@ -466,6 +495,7 @@ tref replace_with(tref n, tref with, tref inp) {
 // Replace nodes in n according to changes while skipping subtrees that don't satisfy query
 template <typename node_t, typename predicate_t>
 tref replace_if(tref n, const typename lcrs_tree<node_t>::subtree_map& changes, predicate_t& query) {
+	DBG(assert(n != nullptr);)
 	const auto r = [&changes](tref el) {
 		return get_cached<node_t>(el, changes);
 	};
@@ -475,6 +505,7 @@ tref replace_if(tref n, const typename lcrs_tree<node_t>::subtree_map& changes, 
 // Replace nodes in n according to changes while skipping subtrees that satisfy query
 template <typename node_t, typename predicate_t>
 tref replace_until(tref n, const typename lcrs_tree<node_t>::subtree_map& changes, predicate_t& query) {
+	DBG(assert(n != nullptr);)
 	const auto r = [&changes](tref el) {
 		return get_cached<node_t>(el, changes);
 	};
@@ -490,6 +521,7 @@ tref replace_until(tref n, const typename lcrs_tree<node_t>::subtree_map& change
 // find the first node that satisfy a predicate and return it.
 template <typename node_t, typename predicate_t>
 tref find_bottom(tref input, predicate_t& query) {
+	DBG(assert(input != nullptr);)
 	tref found = nullptr;
 	auto find_top = [&query, &found](const auto& n){
 		if (found == nullptr && query(n)) found = n;
@@ -570,6 +602,7 @@ pattern_matcher2<node_t, is_capture_t>::pattern_matcher2(
 
 template <typename node_t, typename is_capture_t>
 bool pattern_matcher2<node_t, is_capture_t>::operator()(tref n) {
+	DBG(assert(n != nullptr);)
 	const auto it = changes.find(n);
 	if (it != changes.end()) return true;
 	// we clear previous environment attempts
@@ -598,6 +631,7 @@ bool pattern_matcher2<node_t, is_capture_t>::operator()(tref n) {
 
 template <typename node_t, typename is_capture_t>
 tref pattern_matcher2<node_t, is_capture_t>::replace_root(tref n) {
+	DBG(assert(n != nullptr);)
 	auto x = get_cached<node_t>(n, changes);
 	// std::cout << "replace_root: ";
 	// lcrs_tree<node_t>::get(n).dump();
@@ -608,6 +642,7 @@ tref pattern_matcher2<node_t, is_capture_t>::replace_root(tref n) {
 
 template <typename node_t, typename is_capture_t>
 bool pattern_matcher2<node_t, is_capture_t>::match(tref p, tref n) {
+	DBG(assert(p != nullptr && n != nullptr);)
 	// if we already have captured a node associated to the current capture
 	// we check if it is the same as the current node, if it is not, we
 	// return false...
@@ -657,6 +692,7 @@ pattern_matcher_if<node_t, is_capture_t, predicate_t>::pattern_matcher_if(
 
 template <typename node_t, typename is_capture_t, typename predicate_t>
 bool pattern_matcher_if<node_t, is_capture_t, predicate_t>::operator()(tref n) {
+	DBG(assert(n != nullptr);)
 	// if we have matched the pattern, we never try again to unify
 	if (matched) return false;
 	// we clear previous environment attempts
@@ -671,6 +707,7 @@ bool pattern_matcher_if<node_t, is_capture_t, predicate_t>::operator()(tref n) {
 
 template <typename node_t, typename is_capture_t, typename predicate_t>
 bool pattern_matcher_if<node_t, is_capture_t, predicate_t>::match(tref p, tref n) {
+	DBG(assert(p != nullptr && n != nullptr);)
 	const auto& pt = lcrs_tree<node_t>::get(p);
 	const auto& nt = lcrs_tree<node_t>::get(n);
 	// if we already have captured a node associated to the current capture
@@ -701,6 +738,7 @@ bool pattern_matcher_if<node_t, is_capture_t, predicate_t>::match(tref p, tref n
 // apply a rule to a tree using the predicate to pattern_matcher.
 template <typename node_t, typename is_capture_t>
 tref apply_rule(const rewriter::rule& r, tref n, const is_capture_t& c) {
+	DBG(assert(n != nullptr);)
 	pattern_matcher2<node_t, is_capture_t> matcher{ r, c };
 	post_order<node_t>(n).search_unique(matcher);
 	auto nn = matcher.replace_root(n);
@@ -722,6 +760,7 @@ template <typename node_t, typename is_capture_t, typename predicate_t>
 tref apply_if(const rewriter::rule& r, tref n, is_capture_t& c,
 	predicate_t& predicate)
 {
+	DBG(assert(n != nullptr);)
 	auto [p , s] = r;
 	rewriter::environment<node_t> u;
 	pattern_matcher_if<node_t, is_capture_t, predicate_t>
@@ -742,6 +781,7 @@ tref apply_if(const rewriter::rule& r, tref n, is_capture_t& c,
 // use internaly by apply and apply with skip.
 template <typename node_t, typename matcher_t>
 tref apply(tref s, tref n, matcher_t& matcher) {
+	DBG(assert(s != nullptr && n != nullptr);)
 	post_order_query_traverser<node_t, decltype(idni::identity), matcher_t>(
 		idni::identity, matcher)(n);
 	if (matcher.matched) {
@@ -810,6 +850,7 @@ tref lcrs_tree<T>::replace(const subtree_map& changes) const {
 }
 template <typename T>
 tref lcrs_tree<T>::replace(tref replace, tref with) const {
+	DBG(assert(replace != nullptr && with != nullptr);)
 	return rewriter::replace<T>(get(), replace, with);
 }
 
@@ -846,6 +887,7 @@ tref lcrs_tree<T>::apply_if(const rewriter::rule& r,
 
 template <typename T>
 tref lcrs_tree<T>::apply(tref s, const auto& matcher) const {
+	DBG(assert(s != nullptr);)
 	return rewriter::apply<T, decltype(matcher)>(s, get(), matcher);
 }
 
