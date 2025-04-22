@@ -314,6 +314,15 @@ tref pre_order<node_t>::apply_unique(auto& f, auto& visit_subtree, auto& up) {
 
 template <typename node_t>
 template<size_t slot>
+tref pre_order<node_t>::apply_unique(auto& f, auto& visit_subtree) {
+	if (visit_subtree(root))
+		return traverse<false, slot, true>(root, f, visit_subtree,
+								identity);
+	else return root;
+}
+
+template <typename node_t>
+template<size_t slot>
 tref pre_order<node_t>::apply_unique(auto& f) {
 	return traverse<false, slot, true>(root, f, all, identity);
 }

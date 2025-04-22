@@ -849,6 +849,17 @@ struct pre_order {
 	tref apply_unique(auto& f, auto& visit_subtree, auto& up);
 
 	/**
+	 * @brief Apply f in pre order to root according to visit_subtree.
+	 * If f is applied to a node, the traversal will continue with the children of the transformed node
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node. Must not have side effects due to memorization
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @return The tree obtained after applying f to root
+	 */
+	template<size_t slot = 0>
+	tref apply_unique(auto& f, auto& visit_subtree);
+
+	/**
 	 * @brief Apply f in pre order to root.
 	 * If f is applied to a node, the traversal will continue with the children of the transformed node
 	 * @tparam slot Memory slot to use for memorization, disabled by default
