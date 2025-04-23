@@ -117,10 +117,10 @@ protected:
 	static tref get(const T& v, const std::vector<tref>& child);
 
 	size_t get_child_size() const;
-	//fills caller allocated child array upto len size
-	//with child ids. If child is nullptr, then just
-	//calculates number of children in len.
-	//caller's responsibility to free allocated memory
+	///fills caller allocated child array upto len size
+	///with child ids. If child is nullptr, then just
+	///calculates number of children in len.
+	///caller's responsibility to free allocated memory
 	bool get_kary_child(tref* child, size_t& len) const;
 	auto get_lcrs_child();
 	trefs get_children_trefs() const;
@@ -136,10 +136,10 @@ struct tree : public lcrs_tree<T> {
 	static const tree& get(const htree::sp& h);
 	static const tree& get(const tref id);
 
-	//fills caller allocated child array upto len size
-	//with child ids. If child is nullptr, then just
-	//calculates number of children in len.
-	//caller's responsibility to free allocated memory
+	///fills caller allocated child array upto len size
+	///with child ids. If child is nullptr, then just
+	///calculates number of children in len.
+	///caller's responsibility to free allocated memory
 	template<typename U = T>
 	static tref get(const T& v, const U* child, size_t len);
 	//static const htree::sp get(const T& v, std::vector<T>&& child = {});

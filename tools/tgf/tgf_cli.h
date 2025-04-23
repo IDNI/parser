@@ -23,10 +23,10 @@
 
 namespace idni {
 
-// TGF options and descriptions
+/// TGF options and descriptions
 cli::options tgf_options();
 
-// TGF commands, their options and descriptions
+/// TGF commands, their options and descriptions
 cli::commands tgf_commands();
 
 struct tgf_repl_evaluator {

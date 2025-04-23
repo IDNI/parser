@@ -911,8 +911,8 @@ bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
 
 	return ret;
 }
-// collects all possible variations of the given item's rhs while respecting the
-// span of the item and stores them in the set ambset.
+/// collects all possible variations of the given item's rhs while respecting the
+/// span of the item and stores them in the set ambset.
 template <typename C, typename T>
 void parser<C, T>::sbl_chd_forest(const item& eitem,
 	pnodes& curchd, size_t xfrom,
@@ -1037,7 +1037,7 @@ bool parser<C, T>::binarize_comb(const item& eitem,
 	}
 	return true;
 }
-// builds the forest starting with root
+/// builds the forest starting with root
 template <typename C, typename T>
 bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 	if (!root.first.nt()) return false;

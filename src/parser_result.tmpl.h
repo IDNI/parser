@@ -22,8 +22,8 @@ parser<C, T>::result::result(grammar<C, T>& g, std::unique_ptr<input> in,
 		found(fnd), parse_error(err), shaping(g.opt.shaping),
 		in(std::move(in)), f(std::move(f))
 {
-	// if is ambiguous add __AMB__ node to the nonterminals dict so it can
-	// be added to the resulting parse tree when get_shaped_tree() is called
+	/// if is ambiguous add __AMB__ node to the nonterminals dict so it can
+	/// be added to the resulting parse tree when get_shaped_tree() is called
 	static const std::string amb = "__AMB__";
 	if (is_ambiguous()) amb_node = g.nt(from_str<C>(amb));
 }
@@ -309,7 +309,7 @@ typename parser<C, T>::psptree parser<C, T>::result::get_shaped_tree() const
 	return get_shaped_tree(shaping);
 }
 
-// get a first parse tree from the parse_forest optionally provide root of the tree.
+/// get a first parse tree from the parse_forest optionally provide root of the tree.
 template <typename C, typename T>
 parser<C, T>::psptree parser<C, T>::result::get_tree() {
 	return get_tree(f->root());

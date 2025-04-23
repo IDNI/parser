@@ -65,12 +65,12 @@ struct colors {
 	bool toggle()    { return enabled = !enabled; }
 	bool set(bool e) { return enabled = e; }
 
-	// escape controls COLOR = start, AND = separator, EOC = end of color
+	/// escape controls COLOR = start, AND = separator, EOC = end of color
 	std::string COLOR()            const { return (*this)[color::COLOR]; }
 	std::string AND()              const { return (*this)[color::AND]; }
 	std::string EOC()              const { return (*this)[color::EOC]; }
 
-	// clear/reset all color settings
+	/// clear/reset all color settings
 	std::string CLEAR()            const { return (*this)(color::CLEAR); }
 	// set modifiers
 	std::string BRIGHT()           const { return (*this)(color::BRIGHT); }
@@ -123,7 +123,7 @@ struct colors {
 	std::string BG_LIGHT_CYAN()    const { return (*this)(color::BG_LIGHT_CYAN); }
 	std::string BG_WHITE()         const { return (*this)(color::BG_WHITE); }
 
-	// return the code for the color or empty string if colors disabled
+	/// return the code for the color or empty string if colors disabled
 	const std::string& operator[](color c) const {
 		static const std::vector<std::string> color_code{
 			"\x1b[", ";", "m", "0",
@@ -143,7 +143,7 @@ struct colors {
 		static const std::string no_code{};
 		return enabled ? color_code[c] : no_code;
 	}
-	// return the whole color code or empty string if colors disabled
+	/// return the whole color code or empty string if colors disabled
 	template<typename... Colors>
 	std::string operator()(Colors... colors) const {
 		bool first = true;

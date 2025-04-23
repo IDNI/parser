@@ -3,30 +3,30 @@
 #include <memory>
 #include "vec.h"
 
-// Instructions:
-// 1. you can create trees using tree::get, and access them using
-// tree:get, tree::data, tree::rank, tree::next.
-// 2. each tree gets a unique size_t id.
-// 3. the "next" is an array of tree size_t ids.
-// 4. you can also get a handle to tree, using htree::get.
-// 5. given a handle h, you can access its internal tree id by h->id().
-// 6. note that h->id() is "volatile": it can change with any call to gc.
-// 7. use handles only if you want gc to not delete your tree. do not use it
-// for temporary trees. otherwise it'll cause unnecessary calls to "new".
-// 8. if you have a handle to your tree, gc will not delete its subtrees, even
-// if they don't have a handle.
+/// Instructions:
+/// 1. you can create trees using tree::get, and access them using
+/// tree:get, tree::data, tree::rank, tree::next.
+/// 2. each tree gets a unique size_t id.
+/// 3. the "next" is an array of tree size_t ids.
+/// 4. you can also get a handle to tree, using htree::get.
+/// 5. given a handle h, you can access its internal tree id by h->id().
+/// 6. note that h->id() is "volatile": it can change with any call to gc.
+/// 7. use handles only if you want gc to not delete your tree. do not use it
+/// for temporary trees. otherwise it'll cause unnecessary calls to "new".
+/// 8. if you have a handle to your tree, gc will not delete its subtrees, even
+/// if they don't have a handle.
 
 template<typename T> struct htree;
 template<typename T> using sphtree = std::shared_ptr<htree<T>>;
 
 template<typename T> struct tree {
 	const T t;
-	const size_t n; // vec id of next tree ids
+	const size_t n; /// vec id of next tree ids
 	tree(const T& t, size_t n) : t(t), n(n) {}
 	bool operator<(const tree& x) const {
 		return t != x.t ? t < x.t : (n < x.n);
 	}
-	// be careful with inline statics. remove "inline" if needed
+	/// be careful with inline statics. remove "inline" if needed
 	inline static std::vector<tree> V;
 	inline static std::map<tree, size_t> M;
 	inline static size_t get(const T& t, size_t len, const size_t* n) {
