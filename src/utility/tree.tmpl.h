@@ -317,7 +317,7 @@ tref lcrs_tree<T>::get(const T& v, const trefs& ch, tref r) {
 
 template <typename T>
 tref lcrs_tree<T>::get(const T& v, const std::initializer_list<tref>& ch) {
-	return get(v, ch.begin(), ch.size());
+	return get(v, std::data(ch), ch.size());
 }
 
 template <typename T>
@@ -327,7 +327,7 @@ tref lcrs_tree<T>::get(const T& v) {
 
 template <typename T>
 tref lcrs_tree<T>::get(const T& v, tref child) {
-	return bintree<T>::get(v, child, 0);
+	return bintree<T>::get(v, &child, 1);
 }
 
 template <typename T>
@@ -354,8 +354,8 @@ tref lcrs_tree<T>::get(const T& v, const std::vector<T>& children) {
 }
 
 template <typename T>
-tref lcrs_tree<T>::get(const T& v, const std::initializer_list<T>& children) {
-	return get(v, children.begin(), children.size());
+tref lcrs_tree<T>::get(const T& v, const std::initializer_list<T>& ch) {
+	return get(v, std::data(ch), ch.size());
 }
 
 template <typename T>
