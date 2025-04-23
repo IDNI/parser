@@ -260,10 +260,10 @@ size_t lcrs_tree<T>::get_child_size() const {
 	return len;
 }
 
-//fills caller allocated child array upto len size
-//with child ids. If child is nullptr, then just
-//calculates number of children in len.
-//caller's responsibility to free allocated memory
+///fills caller allocated child array upto len size
+///with child ids. If child is nullptr, then just
+///calculates number of children in len.
+///caller's responsibility to free allocated memory
 template <typename T>
 bool lcrs_tree<T>::get_kary_child(tref* child, size_t& len) const {
 	/*

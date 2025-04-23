@@ -135,11 +135,11 @@ private:
 			traverser_t::get_nonterminal_extractor();
 		prods_t ps, nul{ lit_t{} };
 		nonterminals<C, T>& nts;
-		// set by @start ...
+		/// set by @start ...
 		prods_t start = nul;
-		// char class names coming from @use char class ...
+		/// char class names coming from @use char class ...
 		std::vector<std::string> cc_names{};
-		// grammar options
+		/// grammar options
 		grammar<C, T>::options opt{};
 		char_class_fns<T> cc;
 		grammar_builder(nonterminals<C, T>& nts) : nts(nts) {}

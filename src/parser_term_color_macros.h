@@ -13,7 +13,7 @@
 #ifndef __IDNI_PARSER_TERM_COLOR_PRESETS_H__
 
 #define __IDNI_PARSER_TERM_COLOR_PRESETS_H__
-// terminal color presets
+/// terminal color presets
 #define TC_DEFAULT         TC.DEFAULT()
 #define TC_CLEARED_DEFAULT (TC.CLEAR() + TC_DEFAULT)
 #define TC_BG_DEFAULT      TC.BG_DEFAULT()
@@ -31,7 +31,7 @@
 #else
 
 #undef __IDNI_PARSER_TERM_COLOR_PRESETS_H__
-// terminal color presets
+/// terminal color presets
 #undef TC_CLEARED_DEFAULT
 #undef TC_DEFAULT
 #undef TC_BG_DEFAULT

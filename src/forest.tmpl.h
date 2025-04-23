@@ -181,8 +181,8 @@ size_t forest<NodeT>::count_trees(const node& root) const {
 	return ndc[root];
 }
 
-// a dfs based approach to detect cycles for
-// any traversable type
+/// a dfs based approach to detect cycles for
+/// any traversable type
 template<typename NodeT>
 template<typename TraversableT>
 bool forest<NodeT>::detect_cycle(TraversableT& gr) const {
