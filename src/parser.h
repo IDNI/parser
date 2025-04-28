@@ -116,88 +116,192 @@ struct prods : public std::vector<prod<C, T>> { /// productions
 	disjs<C, T> to_disjs() const;
 };
 
-/// char class functions
+/// Char class functions
 template <typename T = char>
 using char_class_fn = std::function<bool(T)>;
+/**
+ * @brief Container for character class functions.
+ * 
+ * It can be passed to a grammar when instantiated.
+ */
 template <typename T = char>
 struct char_class_fns {
+	/// Functions container.
 	std::map<size_t, char_class_fn<T>> fns = {};
-	std::map<size_t, std::map<T, size_t>> ps = {}; ///char -> production
-	/// adds new char class function
+	/// char -> production
+	std::map<size_t, std::map<T, size_t>> ps = {};
+	/// Adds new char class function.
 	void operator()(size_t nt, const char_class_fn<T>& fn);
-	/// returns true if a nt is a cc function
+	/// Returns true if a \p nt is a character class function.
 	bool is_fn(size_t nt) const;
-	bool is_eof_fn(size_t nt) const; /// returns true if a nt is an eof fn
-	size_t eof_fn = -1; /// id of an eof fn
+	/// Returns true if a \p nt is an eof character class function.
+	bool is_eof_fn(size_t nt) const; 
+	/// id of an eof function.
+	size_t eof_fn = -1;
 };
+
+/**
+ * @brief Return a char_class_fns container with specified functions.
+ * 
+ * Helper function which returns a `char_class_fns` container with one or more
+ * of specified predefined character functions.
+ */
 template <typename C = char, typename T = C>
 char_class_fns<T> predefined_char_classes(
 	const std::vector<std::string>& cc_fn_names, nonterminals<C, T>& nts);
 
+/// @brief Settings which are used to shape parsed trees when shaping is used.
 struct shaping_options {
+	/**
+	 * @brief Nonterminal ids of symbols to trim (including their children) away from the resulting tree.
+	 * 
+	 * List can be provided in TGF with @trim whitespace, comment.
+	 */
 	std::set<size_t> to_trim{};
 	/// nonterminal ids which children to trim by shaping coming from @trim children ...
 	std::set<size_t> to_trim_children{};
-	/// nonterminal ids which children terminal to trim by shaping coming
-	/// from @trim children terminals ...
+	/**
+	 * @brief Nonterminal ids of symbols which children will be trimmed away from the resulting tree.
+	 * 
+	 * List can be provided in TGF with @trim children sym1, sym2.
+	 */
 	std::set<size_t> to_trim_children_terminals{};
-	bool trim_terminals = false; /// @trim all terminals.
+	/**
+	 * @brief Whetther to trim all terminals from the resulting parse tree.
+	 * 
+	 * If trim_terminals is true it trims all terminals from the resulting parse tree. It is false by default.
+	 * 
+	 * This can be set to true in TGF by @trim all terminals.
+	 */
+	bool trim_terminals = false;
 	std::set<size_t> dont_trim_terminals_of{}; /// except children of ...
 	/// nonterminal ids to inline by shaping coming from @inline ...
+	/**
+	 * @brief Replaces a node with its children.
+	 * 
+	 * Contains vectors of nonterminal ids.
+	 * 
+	 * If a vector contains only a single nonterminal, it means that the
+	 * nonterminal is replaced by its children.
+	 * 
+	 * If a vector contains more than one nonterminal, it searches the parsed
+	 * tree for occurance of a tree path of nonterminals denoted by nonterminal
+	 * ids in the vector. First nonterminal is replaced by the last nonterminal
+	 * node in the vector.
+	 * 
+	 * This can be populated by @inline directive.
+	 * 
+	 * @inline chars. Node chars is replaced by its children.
+	 * 
+	 * @inline expr > block > expr. Node expr containing a child node block
+	 * which contains a child node expr is replaced by the expr child.
+	 */
 	std::set<std::vector<size_t>> to_inline{};
-	bool inline_char_classes = false; /// @inline char classes.
+	/**
+	 * @brief Whether shaping will also inline all character class functions.
+	 * 
+	 * If inline_char_classes is true shaping will also inline all character
+	 * class functions. Is a short alternative to adding them into to_inline or
+	 * @inline one by one.
+	 * 
+	 * Default value is false.
+	 * 
+	 * In TGF this can be set to true by adding char classes to @inline directive.
+	 * 
+	 * @inline char classes.
+	 */
+	bool inline_char_classes = false;
 };
 
-/// grammar struct required by parser.
-/// accepts nonterminals ref, prods and char class functions
+
 template <typename C, typename T> struct grammar_inspector;
+/**
+ * @brief Grammar struct required by parser.
+ * 
+ * Accepts nonterminals ref, prods and char class functions.
+ */
 template <typename C = char, typename T = C>
 struct grammar {
 	friend struct grammar_inspector<C, T>;
 	typedef std::pair<lit<C, T>, std::vector<lits<C, T>>> production;
 	struct options {
-		bool transform_negation = true; /// false to disable negation transformation
-		bool auto_disambiguate = true; /// @enable/disable disambig.
-		std::set<size_t> nodisambig_list{}; /// @nodisambig nonterminal ids.
+		/**
+		 * @brief Whether negations in a grammar are transformed into a negation tracking rule.
+		 * 
+		 * If this is true, and it is true by default, any negation in a
+		 * grammar is transformed into a negation tracking rule when the
+		 * grammar is instantiated. false is used for example to instantiate
+		 * grammar from a generated parser because its rules are already
+		 * product of this negation transormation.
+		 */
+		bool transform_negation = true;
+		/**
+		 * @brief Disambiguates according to an order of production rule in the grammar.
+		 * 
+		 * This is true by default. Parser disambiguates parse trees according
+		 * to an order of production rule appearance in the grammar. Setting
+		 * this to false would make parser to provide all possible parse trees.
+		 * 
+		 * This can be also disabled by TGF directive @disable disambiguation.
+		 */
+		bool auto_disambiguate = true;
+		/**
+		 * If auto_disambiguate is set to true this list contains nonterminal
+		 * ids of symbols we don't want to disambiguate and we want to keep
+		 * ambiguity in the resulting parse forest.
+		 * 
+		 * This list can be set by TGF directive: @ambiguous symbol1, symbol2.
+		 */
+		std::set<size_t> nodisambig_list{};
+		/// Parsed tree shaping_options
 		shaping_options shaping = {};
-		std::set<std::string> enabled_guards = {}; /// production guard names
+		/// Production guard names
+		std::set<std::string> enabled_guards = {}; 
 	} opt;
 	grammar(nonterminals<C, T>& nts, options opt = {});
 	grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
 		const prods<C, T>& start, const char_class_fns<T>& cc_fns,
 		options opt = {});
-	/// sets guards of enabled productions
+	/// Sets guards of enabled productions
 	void set_enabled_productions(const std::set<std::string>&);
 	void productions_enable(const std::string& guard);
 	void productions_disable(const std::string& guard);
-	/// returns number of productions (every disjunction has a prod rule)
+	/// Returns number of productions (every disjunction has a prod rule)
 	size_t size() const;
-	/// returns head of the prod rule - literal
+	/// Returns head of the prod rule - literal
 	lit<C, T> operator()(const size_t& i) const;
-	/// returns body of the prod rule - conjunctions of literals
+	/// Returns body of the prod rule - conjunctions of literals
 	const std::vector<lits<C, T>>& operator[](const size_t& i) const;
-	/// returns length of the conjunction
+	/// Returns length of the conjunction
 	size_t len(const size_t& p, const size_t& c) const;
-	/// returns true if the literal is nullable
+	/// Returns true if the literal is nullable
 	bool nullable(lit<C, T> l) const;
-	/// returns true if the production rule has more then 1 conjunction
+	/// Returns true if the production rule has more then 1 conjunction
 	bool conjunctive(size_t p) const;
-	/// returns number of conjunctions for a given production p
+	/// Returns number of conjunctions for a given production p
 	size_t n_conjs(size_t p) const;
-	/// checks if the char class function returns true on the char ch
+	/// Checks if the char class function returns true on the char ch
 	bool char_class_check(lit<C, T> l, T ch) const;
-	/// does the same check as char_class_check and if the check is true then
-	/// it adds new rule: "cc_fn_name => ch." into the grammar
-	// returns id of the rule or (size_t)-1 if the check fails
+	/**
+	 * Does the same check as char_class_check and if the check is true then
+	 * it adds new rule: "cc_fn_name => ch." into the grammar
+	 * returns id of the rule or (size_t)-1 if the check fails
+	 */
 	size_t get_char_class_production(lit<C, T> l, T ch);
+	/// Adds a new production rule: l => ch and returns index of it.
 	size_t add_char_class_production(lit<C, T> l, T ch);
+	/// Returns indexes of all production rules for a nonterminal l.
 	const std::set<size_t>& prod_ids_of_literal(const lit<C, T>& l) const;
+	/// Returns the starting nonterminal literal.
 	const lit<C, T>& start_literal() const;
+	/// Returns true if the production rule with index p is a character class function.
 	bool is_cc_fn(const size_t& p) const;
+	/// Returns true if the production rule with index p is the eof character class.
 	bool is_eof_fn(const size_t& p) const;
 	std::set<size_t> reachable_productions(const lit<C, T>& l) const;
 	std::set<size_t> unreachable_productions(const lit<C, T>& l) const;
 	std::ostream& check_nullable_ambiguity(std::ostream& os) const;
+	/// Prints a production rule with index p into ostream os.
 	std::ostream& print_production(std::ostream& os,
 		size_t p, bool print_ids = false,
 		const term::colors& TC = {false}) const;
@@ -211,7 +315,12 @@ struct grammar {
 #ifdef DEBUG
 	std::ostream& print_data(std::ostream& os, std::string prep = {}) const;
 #endif // DEBUG
+	/// Returns a literal of a nonterminal with id n.
 	lit<C, T> nt(size_t n);
+	/** 
+	 * Returns a literal of a nonterminal named s. It is added into
+	 * nonterminals if it's not contained already.
+	 */
 	lit<C, T> nt(const std::basic_string<C>& s);
 	const lit<C, T>& get_start() const;
 private:
