@@ -1,12 +1,13 @@
 # IDNI parser library
 
-This C++ parsing library was created because other available parsers were missing features required for development of our non-turing but still very expressive languages:
-- **TML** (Tau Meta Language), a logical programming language
-- **Tau**, a software specification language...
+This C++ parser generator was created in an effort to facilitate the development of the Tau language. The predecessor to the Tau language was TML and its parser was hand-coded in C++.
+As the TML language evolved in complexity, it became increasingly difficult to evolve the C++ parser to include all the language features we wanted to add to TML.
+That is why at the beginning of the Tau project, we started by first developing this parser generator based on the Earley parsing algorithm. It afforded us the ability to
+effortlessly evolve the syntax of Tau language as we wished without the need to maintain very complex C++ code. We chose the Earley parsing algorithm because it is capable
+of parsing any context free language while remaining efficient even in the presence of ambiguities in the grammar.
 
-This library additionally provides a parser for TGF (Tau Grammar form), an EBNF-like language for describing boolean grammars.
-
-It also provides a `tgf` tool which takes a grammar described in a TGF file and it can help debug the grammar or generate C++ code of the parser.
+To make it even easier to define grammars, we created TGF (or the Tau Grammar format), an EBNF-like language for describing boolean grammars and included a `tgf` tool
+which takes a grammar described in a TGF file and generates C++ code of the corresponding parser. It can also help debug the grammar.
 
 
 ## Features
