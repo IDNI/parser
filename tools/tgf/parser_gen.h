@@ -16,8 +16,9 @@
 #include "parser.h"
 namespace idni {
 
+/// Provides access to private grammar members
 template <typename C = char, typename T = C>
-struct grammar_inspector { /// provides access to private grammar members
+struct grammar_inspector {
 	grammar_inspector(const grammar<C, T>& g) : g(g) {}
 	const grammar<C, T>& g;
 	lit<C, T> start() { return g.start; }
