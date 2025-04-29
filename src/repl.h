@@ -152,7 +152,7 @@ struct repl {
 		reset_input();
 		return 0;
 	}
-	/// sets the prompt
+	/// Sets the prompt
 	void prompt(const std::string& p) {
 		TDBG(std::cerr << " <PROMPT: `" << p << "`>";)
 		update_widths(), clear_input();
@@ -183,21 +183,21 @@ struct repl {
 	}
 	void set_prompt(const std::string& p) { prompt_ = p; }
 	void clear() { if (!is_pipe_) term::clear(); }
-	/// returns the current prompt
+	/// Returns the current prompt
 	std::string prompt() const { return prompt_; }
 private:
-	/// returns the current input as a string
+	/// Returns the current input as a string
 	std::string get() const {
 		std::stringstream ss;
 		return ss.write(input_.data(), input_.size()), ss.str();
 	}
-	/// sets the current input from a string
+	/// Sets the current input from a string
 	void set(const std::string& s) {
 		clear_input();
 		input_.assign(s.begin(), s.end()), pos_ = input_.size();
 		print_input();
 	}
-	/// clears the input line (set to empty)
+	/// Clears the input line (set to empty)
 	void set() { clear_input(), input_.clear(), pos_ = 0, print_input(); }
 #ifdef TERM_DEBUG
 	void print_debug() {
@@ -242,7 +242,8 @@ private:
 		r_ -= up, c_ -= left;
 		TDBG(std::cerr << " >";)
 	}
-	void backspace() { /// delete character before the cursor
+	/// Delete character before the cursor
+	void backspace() {
 		if (pos_ == 0) return;
 		size_t r = r_, c = c_;
 		if (c) c--;
@@ -252,7 +253,8 @@ private:
 		print_input();
 		go(r, c);
 	}
-	void del() { /// delete character after the cursor
+	/// Delete character after the cursor
+	void del() {
 		if (pos_ >= input_.size()) return;
 		size_t r = r_, c = c_;
 		clear_input();
@@ -260,27 +262,31 @@ private:
 		print_input();
 		go(r, c);
 	}
-	void left() { /// move cursor left
+	/// Move cursor left
+	void left() {
 		if (pos_) {
 			pos_--;
 			if (c_) c_--, term::cursor_left();
 			else if (r_) prev_line();
 		}
 	}
-	void right() { /// move cursor right
+	/// Move cursor right
+	void right() {
 		if (pos_ < input_.size()) {
 			pos_++;
 			if (c_ >= lws_[r_]) next_line();
 			else c_++, term::cursor_right();
 		}
 	}
-	void ctrl_left() { /// move cursor word left
+	/// Move cursor word left
+	void ctrl_left() {
 		if (pos_ == 0) return;
 		left();
 		while (pos_ > 0 && !std::isalnum(input_[pos_]))     left();
 		while (pos_ > 0 &&  std::isalnum(input_[pos_ - 1])) left();
 	}
-	void ctrl_right() { /// move cursor word right
+	/// Move cursor word right
+	void ctrl_right() {
 		if (pos_ == input_.size()) return;
 		right();
 		while (pos_ < input_.size()
@@ -288,33 +294,39 @@ private:
 		while (pos_ < input_.size()
 			&&  std::isalnum(input_[pos_]))   right();
 	}
-	void home() { /// move cursor to the beginning of the line
+	/// Move cursor to the beginning of the line
+	void home() {
 		while (pos_) left();
 	}
-	void end() { /// move cursor to the end of the line
+	/// Move cursor to the end of the line
+	void end() {
 		while (pos_ < input_.size()) right();
 	}
-	void up() { /// previous history input
+	/// Previous history input
+	void up() {
 		if (history_.size() == 0 || hpos_ == 0) return;
-		/// push current input into history if we are at the end
+		// push current input into history if we are at the end
 		if (hpos_ == history_.size() && input_.size())
 			history_.push_back(get());
 		set(history_[--hpos_]);
 	}
-	void down() { /// next history input
+	/// Next history input
+	void down() {
 		if (hpos_ == history_.size()) return;
 		if (++hpos_ == history_.size()) set();
 		else set(history_[hpos_]);
 	}
-	void ctrl_up() { /// go to first input in history
+	/// Go to first input in history
+	void ctrl_up() {
 		if (history_.size() == 0 || hpos_ == 0) return;
 		set(history_[hpos_ = 0]);
 	}
-	void ctrl_down() { /// go beyond the end of history into a new input
+	/// Go beyond the end of history into a new input
+	void ctrl_down() {
 		if (hpos_ == history_.size()) return;
 		hpos_ = history_.size(), set();
 	}
-	/// store a string into history and return the string
+	/// Store a string into history and return the string
 	const std::string& store(const std::string& s) {
 		auto escape = [](const std::string& s) {
 			std::ostringstream oss;
@@ -330,7 +342,7 @@ private:
 		if (file) file << escape(history_[hpos_ - 1]) << '\n';
 		return history_[hpos_ - 1];
 	}
-	/// store current input into history and return the input as a string
+	/// Store current input into history and return the input as a string
 	const std::string& store() { return store(get()); }
 	size_t printed_size(const std::string& s) const {
 		size_t size = 0;

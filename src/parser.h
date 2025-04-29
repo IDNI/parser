@@ -38,32 +38,73 @@ namespace idni {
 template <typename C, typename T>
 struct lit;
 
-/// nonterminals dict = vector with index being nonterminal's id
+/**
+ * @brief A container for maping ids of non-terminal literals to their names.
+ * 
+ * Since this library sees nonterminals only as their ids this container
+ * provides some convenience to use string names and get string names back when
+ * using the library.
+ */
 template <typename C = char, typename T = C>
 struct nonterminals : public std::vector<std::basic_string<C>> {
+	/// Create new empty container for non-terminals.
 	nonterminals() = default;
+	/// Create a container and initialize it with the provided list.
 	nonterminals(const std::vector<std::basic_string<C>>& init_list);
+	/// Create a container and initialize it with the provided list.
 	nonterminals(std::initializer_list<std::basic_string<C>> init_list);
+	/// Adds new name \p s of a non-terminal into the container and returns its id
 	size_t get(const std::basic_string<C>& s);
+	/// Returns a name of a non-terminal by a provided id \p nt
 	const std::basic_string<C>& get(size_t n) const;
+	/// Returns a non-terminal literal by it's name. If the name does not exist in the container yet it adds it.
 	lit<C, T> operator()(const std::basic_string<C>& s);
+	/// Returns a non-terminal literal by it's id.
 	lit<C, T> operator()(size_t n);
 private:
 	std::map<std::basic_string<C>, size_t> m;
 };
 
-/// literal containing terminal (c where if c = 0 then null) or nonterminal (n)
+/// Literal containing terminal (c where if c = 0 then null) or nonterminal (n)
 template <typename C = char, typename T = C>
 struct lit {
 	std::variant<size_t, T> data;
 	nonterminals<C, T>* nts = 0;
 	bool is_null_ = false;
+	/**
+	 * @brief Creates a null literal.
+	 * 
+	 * Null literal can be used as a body of a production rule or as one of its
+	 * disjuncted bodies to satisfy a production rule when there is no sequence
+	 * matched.
+	 */
 	lit();
+	/// Creates a terminal literal where \p t is a template type of the terminal.
 	lit(T t);
+	/// Creates a non-terminal literal.
 	lit(size_t n, nonterminals<C, T>* nts);
+	/**
+	 * @brief Returns true if the literal is nonterminal or false if it is terminal.
+	 * 
+	 * Before accessing a value of the literal by calling n() or t() it is
+	 * required to determine if it is a nonterminal or a terminal first.
+	 */
 	bool  nt() const;
+	/**
+	 * @brief Returns the id of an non-terminal if the literal is non-terminal.
+	 * 
+	 * Before calling this method one has to be sure that it is a non-terminal.
+	 * Use nt() to find out.
+	 */
 	size_t n() const;
+	/**
+	 * @brief Returns the terminal character (or terminal of a type T) if the literal is terminal.
+	 * 
+	 * Before calling this method one has to be sure that it is a terminal. Use
+	 * nt() to find out.
+	 */
 	T      t() const;
+	/// Returns true if the literal is null.
 	bool is_null() const;
 	size_t hashit() const {
 		std::size_t seed = grcprime;
@@ -80,39 +121,120 @@ struct lit {
 	// IDEA maybe we could use directly the default operator== for lit
 	bool operator==(const lit<C, T>& l) const;
 
+	/**
+	 * @brief Returns a vector of terminals.
+	 * 
+	 * It would have no elements if is non-terminal or null or it would have a
+	 * single terminal element if the literal is terminal.
+	 */
 	std::vector<T> to_terminals() const;
+	/**
+	 * @brief Returns the literal as a string.
+	 * 
+	 * \p nll is a string returned when the literal is null. If the literal is
+	 * a terminal it returns the string containing just the terminal (escaped)
+	 * in apostrophes ('). If the literal is a non-terminal it returns the name
+	 * of the non-terminal literal.
+	 */
 	std::basic_string<C> to_string(const std::basic_string<C>& nll={})const;
+	/**
+	 * @brief Returns the literal as a standard string (basic_string<char>).
+	 * 
+	 * This is useful for printing literals into standard output.
+	 * This method works in a same way as the previous method to_string() and
+	 * converts the result into a std::string if it isn't already.
+	 */
 	std::string to_std_string(const std::basic_string<C>& nll = {}) const;
 };
 
-/// production rules in a disjunctive normal form of conjunction clauses of lits
-template <typename C = char, typename T = C> ///  literals
-struct lits : public std::vector<lit<C, T>> { bool neg = false; };
+// production rules in a disjunctive normal form of conjunction clauses of lits
+/// Literals
+template <typename C = char, typename T = C> 
+struct lits : public std::vector<lit<C, T>> { 
+	/**
+	 * @brief Whether the sequence is negated or not.
+	 * 
+	 * Negated literal sequence satisfies a part of a production rule if it
+	 * does not match the input.
+	 */
+	bool neg = false; 
+};
 template <typename C = char, typename T = C>
 using conjs = std::set<lits<C, T>>; /// conjunctions of literals
 template <typename C = char, typename T = C>
 using disjs = std::set<conjs<C, T>>; /// disjunctions of literal conjunctions
+/// Production rule of a grammar.
 template <typename C = char, typename T = C>
-struct prod { /// production rule
+struct prod {
+	/// Rule's head literal
 	lit<C, T>                  first;
+	/// Rule's body in a form of a disjunction
 	disjs<C, T>                second;
 	std::optional<std::string> guard;
 	bool operator==(const prod& p) const;
 };
+/**
+ * @brief Represents a grammar in DNF.
+ * 
+ * It is a list of production rules. It can also represent a single production
+ * rule or any element of a production rule since prods is used for expressions
+ * to make building of a grammar programatically more convenient.
+ */
 template <typename C = char, typename T = C>
-struct prods : public std::vector<prod<C, T>> { /// productions
+struct prods : public std::vector<prod<C, T>> {
 	typedef std::vector<prod<C, T>> prods_t;
+	/// Creates an empty prods.
 	prods();
+	/**
+	 * Creates prods with a single prod rule with an empty head literal and
+	 * with a single literal l as body of the rule. Such a prods represents a
+	 * literal lit usable in expressions.
+	 */
 	prods(const lit<C, T>& l);
+	/**
+	 * Same as previous constructor but instead of a single literal l in body
+	 * of the rule it represents a sequence of terminal literals from the
+	 * string \p s.
+	 */
 	prods(const std::basic_string<C>& s);
+	/**
+	 * Same as previous constructor but terminal literals are taken from the
+	 * vector v.
+	 */
 	prods(const std::vector<T>& v);
+	/**
+	 * Adds a prod rule with an empty head literal and with a body with a
+	 * single literal \p l.
+	 */
 	void operator()(const lit<C, T>& l);
+	/**
+	 * Adds a prod rule with an empty head literal and with a body with a
+	 * sequence of terminal literals. Sequence is provided as a string \p s.
+	 */
 	void operator()(const std::basic_string<C>& s);
+	/**
+	 * Adds a prod rule with an empty head literal and with a body with a
+	 * sequence of terminal literals. Sequence is provided as a vector \p v.
+	 */
 	void operator()(const std::vector<T>& v);
+	/**
+	 * Adds a rule prod with a head literal \p l and body \p p represented by
+	 * prods.
+	 */
 	void operator()(const prods<C, T>& l, const prods<C, T>& p);
+	/**
+	 * Adds a rule prod with a head literal \p l (represented by prods) and
+	 * body \p p (represented by prods)
+	 */
 	void operator()(const lit<C, T>& l, const prods<C, T>& p);
+	/// 
 	bool operator==(const lit<C, T>& l) const;
+	/**
+	 * Returns the last literal from a body of the last rule. This simplifies
+	 * getting of a lit if prods represents a single lit element.
+	 */
 	lit<C, T> to_lit() const;
+	/// Returns a disjs (body) of the last rule prod.
 	disjs<C, T> to_disjs() const;
 };
 
@@ -351,6 +473,12 @@ public:
 	using node_type       = std::pair<symbol_type, location_type>;
 	using parser_type     = idni::parser<char_type, terminal_type>;
 
+	/**
+	 * @brief A structure used as a forest node.
+	 * 
+	 * It maps nodes to pointers to make sure the forest does not contain
+	 * duplicities.
+	 */
 	struct pnode : public node_type {
 		friend forest<pnode>;
 	private:
@@ -406,7 +534,7 @@ public:
 		size_t set, prod, con, from, dot;
 	};
 
-	/// input manager and decoder used by the parser
+	/// Input manager and decoder used by the parser
 	struct input {
 		using decoder_type =
 				std::function<std::vector<T>(input&)>;
@@ -427,193 +555,240 @@ public:
 		~input();
 		inline bool good() const;
 		inline bool isstream() const;
-		void clear(); /// resets stream (if used) to reenable at()/tat()
-		std::basic_string<C> get_string(); /// returns input data as a string
+		/// Resets stream (if used) to reenable at()/tat()
+		void clear();
+		/// Returns input data as a string
+		std::basic_string<C> get_string();
 		std::basic_string<T> get_terminals(size_t start, size_t end);
 		std::basic_string<T> get_terminals(
 			std::array<size_t, 2> pos_span);
-		/// source stream access
+		// source stream access
+		/// The current character.
 		C cur();
+		/// The position of the current character.
 		size_t pos();
+		/**
+		 * @brief Moves to the next character.
+		 * 
+		 * Increments position and updates the current character.
+		 */
 		bool next();
+		/// Whether the input has reached the end of file or a size stated in parse() call.
 		bool eof();
-		C at(size_t p); /// reads value at pos (uses seek, if stream)
-		/// transformed stream access
+		/// Reads value at pos (uses seek, if stream)
+		C at(size_t p);
+		/// Transformed stream access
 		T tcur();
 		size_t tpos();
 		bool tnext();
 		bool teof();
-		T tat(size_t p); /// reads value at tpos
+		/// Reads value at tpos 
+		T tat(size_t p);
 	private:
 		void decode();
-		enum type { POINTER, STREAM, MMAP } itype = POINTER;///input type
-		int_type e = std::char_traits<C>::eof(); /// end of a stream
+		/// input type
+		enum type { POINTER, STREAM, MMAP } itype = POINTER;
+		/// end of a stream
+		int_type e = std::char_traits<C>::eof();
 		decoder_type decoder = 0;
 		memory_map mm{};
-		size_t n = 0;         /// input position
-		size_t l = 0;         /// size of input data (0 for streams)
-		size_t max_l = 0;     /// read up to max length of the input size
-		const C* d = 0;       /// input data pointer if needed
+		/// input position
+		size_t n = 0;
+		/// size of input data (0 for streams)
+		size_t l = 0;
+		/// read up to max length of the input size
+		size_t max_l = 0;
+		/// input data pointer if needed
+		const C* d = 0;
 		std::basic_istream<C> s;
-		std::vector<T> ts{};  /// all collected terminals
-		size_t tp = 0;        /// current terminal pos
+		/// all collected terminals
+		std::vector<T> ts{};
+		/// current terminal pos
+		size_t tp = 0;
 	};
 	using decoder_type = input::decoder_type;
 
-	/// parser options for its constructor
+	/// Parser options for its constructor
 	struct options {
-		/// applying binarization to ensure every forest node
+		/// Applying binarization to ensure every forest node
 		/// has atmost 2 or less children nodes
 		bool binarize = DEFAULT_BINARIZE;
-		/// build forest incrementally as soon any
+		/// Build forest incrementally as soon any
 		/// item is completed
 		bool incr_gen_forest = DEFAULT_INCR_GEN_FOREST;
-		/// enable garbage collection
+		/// Enable garbage collection
 		bool enable_gc = false;
-		/// number of steps garbage collection lags behind
+		/// Number of steps garbage collection lags behind
 		/// parsing position n. should be greater than
 		/// 0 and less than the size of the input
 		/// for any collection activity. We cannot use
 		/// % since in the streaming case, we do not know
 		/// exact size in advance
 		size_t gc_lag = 1;
+		/**
+		 * Decoder function reading an input converting element or elements of
+		 * a type C to a vector of elements of type T according to template
+		 * type parameters T and C. More about these recorders here.
+		 * 
+		 * Default value is 0, ie. no decoder function.
+		 */
 		decoder_type chars_to_terminals = 0;
+		/**
+		 * Encoder function converting vector of terminals of a type T to a
+		 * std::basic_string\<C> according to template type parameters T and C.
+		 * 
+		 * Default value is 0, ie. no encoder function.
+		 */
 		encoder_type terminals_to_chars = 0;
 	};
 
-	/// parse error
+	/// Parse error
 	struct error {
 		enum info_lvl {
 			INFO_BASIC,
 			INFO_DETAILED,
 			INFO_ROOT_CAUSE
 		};
-		int_t loc;	     /// location of error
-		size_t line;         /// line of error
-		size_t col;          /// column of error
-		std::vector<T> ctxt; /// closest matching ctxt
-		lits<C, T> unexp;    /// unexpected literal sequence
+		/// Location of error.
+		int_t loc;
+		/// Line of error.
+		size_t line;
+		/// Column of error.
+		size_t col;
+		 /// Closest matching context.
+		std::vector<T> ctxt;
+		/// Terminal which was scanned in a place where it was not expected.
+		lits<C, T> unexp;
 		typedef struct _exp_prod {
 			std::string exp;
 			std::string prod_nt;
 			std::string prod_body;
-			/// back track information to higher derivations
+			/// Back track information to higher derivations
 			std::vector<_exp_prod> bktrk;
 		} exp_prod_t;
 
-		/// list of expected token and respective productions
+		/// List of expected token and respective productions
 		std::vector<exp_prod_t> expv;
 		error() : loc(-1) {}
+		/// Produces a string containing human readable information about the error.
 		std::string to_str(info_lvl lv = INFO_DETAILED,
 			size_t line_start = 0) const;
 	};
-	/// result of the parse call
+	/// Result of the parse call.
 	struct result {
-		/// true if the parse was successful
+		/// True if the parse was successful
 		const bool found;
-		/// contains error information if the parse was unsuccessful
+		/// Contains error information if the parse was unsuccessful
 		const error parse_error;
-		/// tree shaping options from grammar
+		/// Tree shaping options from grammar
 		const shaping_options shaping;
 
-		/// constructor
+		/// Constructor
 		result(grammar<C, T>& g, std::unique_ptr<input> in,
 			std::unique_ptr<pforest> f, bool found, error err);
 
-		/// returns the parsed forest
+		/// Returns the parsed forest
 		pforest* get_forest() const;
-		/// transforms forest into tree and applies trimming
+		/// Transforms forest into tree and applies trimming
 		/// grammar shaping options are used by default
 		/// also transforms ambiguous nodes as children of __AMB__ nodes
 		psptree get_trimmed_tree(const pnode& n) const;
 		psptree get_trimmed_tree(const pnode& n,
 			const shaping_options opts) const;
-		/// applies inlining to a tree (w/o tree paths)
+		/// Applies inlining to a tree (w/o tree paths)
 		psptree inline_tree_nodes(const psptree& t, psptree& parent)
 			const;
 		psptree inline_tree_nodes(const psptree& t, psptree& parent,
 			const shaping_options opts) const;
-		/// applies tree paths inlining to a tree
+		/// Applies tree paths inlining to a tree
 		psptree inline_tree_paths(const psptree& t) const;
 		psptree inline_tree_paths(const psptree& t,
 			const shaping_options opts) const;
-		/// applies inlining to a tree
+		/// Applies inlining to a tree
 		psptree inline_tree(psptree& t) const;
 		psptree inline_tree(psptree& t,
 			const shaping_options opts) const;
 		psptree trim_children_terminals(const psptree& t) const;
 		psptree trim_children_terminals(const psptree& t,
 			const shaping_options opts) const;
-		/// transforms forest into a tree and applies shaping
+		/// Transforms forest into a tree and applies shaping
 		psptree get_shaped_tree() const;
 		psptree get_shaped_tree(const shaping_options opts) const;
 		psptree get_shaped_tree(const pnode& n) const;
 		psptree get_shaped_tree(const pnode& n,
 			const shaping_options opts) const;
 
-		/// extracts the first parse tree from the parsed forest
+		/// Extracts the first parse tree from the parsed forest
 		psptree get_tree();
 		psptree get_tree(const pnode& n);
 
-		/// is input good = stream is good or mmap is opened
+		/// Is input good = stream is good or mmap is opened
 		bool good() const;
-		/// returns the input as a string (input's char type, ie. C)
+		/// Returns the input as a string (input's char type, ie. C)
 		std::basic_string<C> get_input();
-		/// read terminals from input (input's terminal type, ie. T)
+		/// Read terminals from input (input's terminal type, ie. T)
 		std::basic_string<T> get_terminals() const;
-		/// read terminals from input according to the position span of
+		/// Read terminals from input according to the position span of
 		/// a provided node
 		std::basic_string<T> get_terminals(const pnode& n) const;
 		std::basic_ostream<T>& get_terminals_to_stream(
 			std::basic_ostream<T>& os, const pnode& n) const;
-		/// reads terminals of a node and converts them to int
+		/// Reads terminals of a node and converts them to int
 		/// if the conversion fails or the int is out of range
 		/// returns no value
 		std::optional<int_t> get_terminals_to_int(const pnode& n) const;
 
-		/// returns true if the parse foreest is ambiguous (contains >1 tree)
+		/// Returns true if the parse foreest is ambiguous (contains >1 tree)
 		bool is_ambiguous() const;
-		/// returns true if the parse forest is not ambiguous (contains 1 tree)
+		/// Returns true if the parse forest is not ambiguous (contains 1 tree)
 		bool has_single_parse_tree() const;
-		/// returns ambiguous nodes
+		/// Returns ambiguous nodes
 		std::set<std::pair<pnode, pnodes_set>> ambiguous_nodes() const;
+		/// Prints ambiguous nodes.
 		std::ostream& print_ambiguous_nodes(std::ostream& os) const;
 
-		/// returns all nodes and edges of the forest
 		using node_edge       = std::pair<pnode, pnode>;
 		using edges           = std::vector<typename pforest::edge>;
 		using nodes_and_edges = std::pair<pnodes, edges>;
+		/// Returns all nodes and edges of the forest
 		nodes_and_edges get_nodes_and_edges() const;
 
-		/// removes all prefixed symbols from the graph everywhere
+		/// Removes all prefixed symbols from the graph everywhere
 		/// by replacing them with their immediate children nodes
 		bool inline_prefixed_nodes(pgraph& g,const std::string& prefix);
-		/// removes EBNF and binarize transformation prefixes
+		/// Removes EBNF and binarize transformation prefixes
 		bool inline_grammar_transformations(pgraph& g);
 
-		/// private members are accessible by parser
+		// private members are accessible by parser
 		friend parser<C, T>;
 	private:
-		/// input moved here from the parse call
+		/// Input moved here from the parse call
 		std::unique_ptr<input> in = 0;
-		/// forest moved here from the parse call
+		/// Forest moved here from the parse call
 		std::unique_ptr<pforest> f = 0;
-		/// if ambiguous, this is __AMB__ node lit used in a shaped tree
+		/// If ambiguous, this is __AMB__ node lit used in a shaped tree
 		lit<C, T> amb_node{};
-		/// recursive part of get_shaped_tree()
+		/// Recursive part of get_shaped_tree()
 		void _get_shaped_tree_children(const shaping_options& opts,
 			const pnodes& nodes,
 			std::vector<psptree>& child) const;
 	};
-	/// parse options for parse() call
+	/// Parse options for parse() call
 	struct parse_options {
-		size_t max_length = 0; /// read up to max length of the input size
-		size_t start = SIZE_MAX; /// start non-terminal, SIZE_MAX = use default
-		C eof = std::char_traits<C>::eof(); /// end of a stream
-		bool measure = false; /// measure time taken for parsing
-		bool measure_each_pos = false; /// for each string pos
-		bool measure_forest = false; /// forest building
-		bool measure_preprocess = false; /// preprocessing
+		/// Read up to max length of the input size
+		size_t max_length = 0;
+		/// Start non-terminal, SIZE_MAX = use default
+		size_t start = SIZE_MAX;
+		/// End of a stream
+		C eof = std::char_traits<C>::eof();
+		/// Measure time taken for parsing
+		bool measure = false;
+		/// For each string pos
+		bool measure_each_pos = false;
+		/// Forest building
+		bool measure_forest = false;
+		/// Preprocessing
+		bool measure_preprocess = false;
 		bool debug = false;
 	};
 
@@ -621,14 +796,26 @@ public:
 	parser(grammar<C, T>& g, options o = {});
 	virtual ~parser() {};
 
-	/// parse call
+	// parse call
 	result parse(const C* data, size_t size, parse_options po = {});
 	result parse(std::basic_istream<C>& is, parse_options po = {});
 	result parse(const std::string& fn, parse_options po = {});
 #ifndef _WIN32
 	result parse(int filedescriptor, parse_options po = {});
 #endif
+	/**
+	 * @brief Whether the last parse method call matched a starting literal production rule.
+	 * 
+	 * This means that the parsed input was parsed fully and successfully and
+	 * there exists at least one tree with a root being the starting literal.
+	 * If this method returns false use parser<C, T>::get_error() to obtain
+	 * more information.
+	 */
 	bool found(size_t start = SIZE_MAX);
+	/**
+	 * Returns parser<C, T>::error object containing information about a
+	 * parsing error if any happened, ie. found() call returned false.
+	 */
 	error get_error();
 	grammar<C, T>& get_grammar() { return g; }
 	bool debug = false;
