@@ -29,7 +29,7 @@ tref tref_range<T>::iterator::operator*() const {
 }
 
 template <typename T>
-tref_range<T>::iterator& tref_range<T>::iterator::operator++() {
+typename tref_range<T>::iterator& tref_range<T>::iterator::operator++() {
 	if (current != nullptr) current = bintree<T>::get(current).r;
 	return *this;
 }
@@ -45,10 +45,14 @@ bool tref_range<T>::iterator::operator==(const iterator& other) const {
 }
 
 template <typename T>
-tref_range<T>::iterator tref_range<T>::begin() const { return iterator(first); }
+typename tref_range<T>::iterator tref_range<T>::begin() const {
+	return iterator(first);
+}
 
 template <typename T>
-tref_range<T>::iterator tref_range<T>::end() const { return iterator(nullptr); }
+typename tref_range<T>::iterator tref_range<T>::end() const {
+	return iterator(nullptr);
+}
 
 template <typename T>
 tree_range<T>::tree_range(tref first_) : first(first_) {}
@@ -62,7 +66,7 @@ const T& tree_range<T>::iterator::operator*() const {
 }
 
 template <typename T>
-tree_range<T>::iterator& tree_range<T>::iterator::operator++() {
+typename tree_range<T>::iterator& tree_range<T>::iterator::operator++() {
 	if (current != nullptr)
 		current = bintree<T>::get(current).r;
 	return *this;
@@ -79,10 +83,14 @@ bool tree_range<T>::iterator::operator==(const iterator& other) const {
 }
 
 template <typename T>
-tree_range<T>::iterator tree_range<T>::begin() const { return iterator(first); }
+typename tree_range<T>::iterator tree_range<T>::begin() const {
+	return iterator(first);
+}
 
 template <typename T>
-tree_range<T>::iterator tree_range<T>::end() const { return iterator(nullptr); }
+typename tree_range<T>::iterator tree_range<T>::end() const {
+	return iterator(nullptr);
+}
 
 //------------------------------------------------------------------------------
 
@@ -277,10 +285,24 @@ bool lcrs_tree<T>::subtree_less(tref a, tref b) {
 }
 
 template <typename T>
-tref lcrs_tree<T>::get() const { return reinterpret_cast<tref>(this); }
+bool lcrs_tree<T>::subtree_equality::operator()(tref a, tref b) const {
+	return lcrs_tree<T>::subtree_less(a, b);
+}
 
 template <typename T>
-const htree::sp lcrs_tree<T>::geth(tref h) { return bintree<T>::geth(h); }
+template <typename PT>
+bool lcrs_tree<T>::subtree_pair_equality<PT>::operator()(const p& a, const p& b)
+	const
+{
+	return lcrs_tree<T>::subtree_less(a.first, b.first)
+		&& a.second < b.second;
+}
+
+//------------------------------------------------------------------------------
+// handles
+
+template <typename T>
+tref lcrs_tree<T>::get() const { return reinterpret_cast<tref>(this); }
 
 template <typename T>
 const lcrs_tree<T>& lcrs_tree<T>::get(const htree::sp& h) {
@@ -293,12 +315,13 @@ const lcrs_tree<T>& lcrs_tree<T>::get(tref id) {
 }
 
 template <typename T>
-tref lcrs_tree<T>::get(const T& v, const tref* ch, size_t len) {
-	return get(v, ch, len, (tref) nullptr);
-}
+const htree::sp lcrs_tree<T>::geth(tref h) { return bintree<T>::geth(h); }
+
+//------------------------------------------------------------------------------
+// creation with tref childs
 
 template <typename T>
-tref lcrs_tree<T>::get(const T& v, const tref* ch, size_t len, tref r) {
+tref lcrs_tree<T>::get_raw(const T& v, const tref* ch, size_t len, tref r) {
 	tref pr = nullptr;
 	for (size_t i = len; i > 0; ) --i,
 		pr = bintree<T>::get(get(ch[i]).value, get(ch[i]).l, pr);
@@ -306,8 +329,9 @@ tref lcrs_tree<T>::get(const T& v, const tref* ch, size_t len, tref r) {
 }
 
 template <typename T>
-tref lcrs_tree<T>::get(const T& v, const trefs& ch) {
-	return get(v, ch.data(), ch.size());
+tref lcrs_tree<T>::get(const T& v, const tref* ch, size_t len, tref r) {
+	if (hook == nullptr) return get_raw(v, ch, len, r);
+	return hook(v, ch, len, r);
 }
 
 template <typename T>
@@ -316,46 +340,52 @@ tref lcrs_tree<T>::get(const T& v, const trefs& ch, tref r) {
 }
 
 template <typename T>
-tref lcrs_tree<T>::get(const T& v, const std::initializer_list<tref>& ch) {
-	return get(v, std::data(ch), ch.size());
+tref lcrs_tree<T>::get(const T& v, const std::initializer_list<tref>& ch,
+	tref r)
+{
+	return get(v, std::data(ch), ch.size(), r);
 }
 
 template <typename T>
 tref lcrs_tree<T>::get(const T& v) {
-	return bintree<T>::get(v, 0, 0);
+	return get(v, (const tref*) nullptr, 0, nullptr);
 }
 
 template <typename T>
 tref lcrs_tree<T>::get(const T& v, tref child) {
-	return bintree<T>::get(v, &child, 1);
+	return get(v, &child, 1);
 }
 
 template <typename T>
 tref lcrs_tree<T>::get(const T& v, tref ch1, tref ch2) {
-	return get(v, trefs{ ch1, ch2 });
+	return get(v, { ch1, ch2 });
 }
 
 template <typename T>
-tref lcrs_tree<T>::get(const T& v, const T* ch, size_t len) {
-	return get(v, ch, len, (tref) nullptr);
+tref lcrs_tree<T>::get(tref n, tref r) {
+	if (get(n).r == r) return n;
+	return bintree<T>::get(get(n).value, get(n).l, r);
 }
+
+//------------------------------------------------------------------------------
+// creation with node childs
 
 template <typename T>
 tref lcrs_tree<T>::get(const T& v, const T* ch, size_t len, tref r) {
-	tref pr = nullptr;
-	for (size_t i = len; i > 0; ) --i,
-		pr = bintree<T>::get(ch[i], (tref) nullptr, pr);
-	return bintree<T>::get(v, pr, r);
+	// because of possible hook, this has to go through get with trefs
+	trefs nch;
+	for (size_t i = 0; i < len; ++i) nch.push_back(get(ch[i]));
+	return get(v, std::data(nch), len, r);
 }
 
 template <typename T>
-tref lcrs_tree<T>::get(const T& v, const std::vector<T>& children) {
-	return get(v, children.data(), children.size());
+tref lcrs_tree<T>::get(const T& v, const std::vector<T>& children, tref r) {
+	return get(v, children.data(), children.size(), r);
 }
 
 template <typename T>
-tref lcrs_tree<T>::get(const T& v, const std::initializer_list<T>& ch) {
-	return get(v, std::data(ch), ch.size());
+tref lcrs_tree<T>::get(const T& v, const std::initializer_list<T>& ch, tref r) {
+	return get(v, std::data(ch), ch.size(), r);
 }
 
 template <typename T>
@@ -365,7 +395,7 @@ tref lcrs_tree<T>::get(const T& v, const T& child) {
 
 template <typename T>
 tref lcrs_tree<T>::get(const T& v, const T& ch1, const T& ch2) {
-	return get(v, std::vector<T>{ ch1, ch2 });
+	return get(v, { ch1, ch2 });
 }
 
 template <typename T>
@@ -454,7 +484,9 @@ template <typename T>
 tref_range<T> lcrs_tree<T>::children() const { return tref_range<T>(this->l); }
 
 template <typename T>
-const lcrs_tree<T>& lcrs_tree<T>::operator[](size_t n) const { return child_tree(n); }
+const lcrs_tree<T>& lcrs_tree<T>::operator[](size_t n) const {
+	return child_tree(n);
+}
 
 template <typename T>
 tref lcrs_tree<T>::first() const { return this->l; }
@@ -515,6 +547,12 @@ std::ostream& lcrs_tree<T>::print(std::ostream& os, size_t s) const {
 }
 
 template <typename T>
+std::string lcrs_tree<T>::print_to_str(size_t s) const {
+	std::stringstream ss;
+	return print(ss, s), ss.str();
+}
+
+template <typename T>
 std::ostream& lcrs_tree<T>::print_in_line(std::ostream& os,
 	std::string open, std::string close, std::string sep) const
 {
@@ -536,16 +574,28 @@ template <typename T>
 std::ostream& lcrs_tree<T>::dump(std::ostream& os, tref n, bool subtree) {
 	const auto& t = get(n);
 	os << t.value << " [" << n ;
-	if (t.has_right_sibling()) os << " >> " << t.right_sibling();
 	if (t.has_child())         os << " __ " << t.left_child();
+	if (t.has_right_sibling()) os << " >> " << t.right_sibling();
 	os << "] ";
 	if (subtree) t.print_in_line(os);
 	return os;
 }
 
+
+template <typename T>
+std::string lcrs_tree<T>::dump_to_str(tref n, bool subtree) {
+	std::stringstream ss;
+	return dump(ss, n, subtree), ss.str();
+}
+
 template <typename T>
 std::ostream& lcrs_tree<T>::dump(std::ostream& os, bool subtree) const {
 	return dump(os, get(), subtree);
+}
+
+template <typename T>
+std::string lcrs_tree<T>::dump_to_str(bool subtree) const {
+	return dump_to_str(get(), subtree);
 }
 
 template <typename T>
@@ -582,6 +632,20 @@ std::ostream& dump(std::ostream& os,
 	}
 	return os << "----------------------------------\n";
 }
+
+//------------------------------------------------------------------------------
+// hooks
+
+template <typename node_t>
+void lcrs_tree<node_t>::set_hook(hook_function h) { hook = h; }
+
+template <typename node_t>
+void lcrs_tree<node_t>::reset_hook() { hook = nullptr; }
+
+template <typename node_t>
+bool lcrs_tree<node_t>::is_hooked() { return hook != nullptr; }
+
+//------------------------------------------------------------------------------
 
 // helper to get value from a cache
 template <typename node_t>

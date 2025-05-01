@@ -250,18 +250,13 @@ struct lcrs_tree : public bintree<T> {
 	static bool subtree_less(tref a, tref b);
 
 	struct subtree_equality {
-		bool operator() (tref a, tref b) const {
-			return lcrs_tree<T>::subtree_less(a, b);
-		}
+		bool operator()(tref a, tref b) const;
 	};
 
 	template <typename PT>
 	struct subtree_pair_equality {
 		using p = std::pair<tref, PT>;
-		bool operator() (const p& a, const p& b) const {
-			return lcrs_tree<T>::subtree_less(a.first, b.first)
-				&& a.second < b.second;
-		}
+		bool operator()(const p& a, const p& b) const;
 	};
 
 	using subtree_set = std::set<tref, subtree_equality>;
@@ -299,14 +294,18 @@ struct lcrs_tree : public bintree<T> {
 	 */
 	static const htree::sp geth(tref id);
 
+	// creation with tref childs
+
 	/**
-	 * @brief Creates new tree node from value and children
+	 * @brief Creates new tree node from value and children and right sibling without triggering hooks
 	 * @param v The value
 	 * @param ch The children pointer / array
 	 * @param len The number of children
+	 * @param r The right sibling
 	 * @return The new tree node's tref id
 	 */
-	static tref get(const T& v, const tref* ch, size_t len);
+	static tref get_raw(const T& v, const tref* ch = nullptr,
+					size_t len = 0, tref r = nullptr);
 
 	/**
 	 * @brief Creates new tree node from value and children and right sibling
@@ -316,15 +315,8 @@ struct lcrs_tree : public bintree<T> {
 	 * @param r The right sibling
 	 * @return The new tree node's tref id
 	 */
-	static tref get(const T& v, const tref* ch, size_t len, tref r);
-
-	/**
-	 * @brief Creates new tree node from value and children)
-	 * @param v The value
-	 * @param ch The children vector
-	 * @return The new tree node's tref id
-	 */
-	static tref get(const T& v, const trefs& ch);
+	static tref get(const T& v, const tref* ch, size_t len,
+		tref r = nullptr);
 
 	/**
 	 * @brief Creates new tree node from value and children and right sibling
@@ -333,16 +325,24 @@ struct lcrs_tree : public bintree<T> {
 	 * @param r The right sibling
 	 * @return The new tree node's tref id
 	 */
-	static tref get(const T& v, const trefs& ch, tref r);
-
+	static tref get(const T& v, const trefs& ch, tref r = nullptr);
 
 	/**
 	 * @brief Creates new tree node from value and children
 	 * @param v The value
 	 * @param ch The children trefs in an initializer list
+	 * @param r The right sibling
 	 * @return The new tree node's tref id
 	 */
-	static tref get(const T& v, const std::initializer_list<tref>& ch);
+	static tref get(const T& v, const std::initializer_list<tref>& ch,
+		tref r = nullptr);
+
+	/**
+	 * @brief Creates new tree leaf node from value
+	 * @param v The value
+	 * @return The new tree node's tref id
+	 */
+	static tref get(const T& v);
 
 	/**
 	 * @brief Creates new tree node from value and tref of a child
@@ -362,11 +362,14 @@ struct lcrs_tree : public bintree<T> {
 	static tref get(const T& v, tref ch1, tref ch2);
 
 	/**
-	 * @brief Creates new tree leaf node from value
-	 * @param v The value
+	 * @brief Creates a new tree node from node n and sets right sibling
+	 * @param n The node we want to copy and set right sibling for
+	 * @param r The right sibling
 	 * @return The new tree node's tref id
 	 */
-	static tref get(const T& v);
+	static tref get(tref n, tref r);
+
+	// creation with node childs
 
 	/**
 	 * @brief Creates new tree node from value and childdren array / pointer
@@ -376,32 +379,27 @@ struct lcrs_tree : public bintree<T> {
 	 * @param r The right sibling
 	 * @return The new tree node's tref id
 	 */
-	static tref get(const T& v, const T* ch, size_t len, tref r);
-
-	/**
-	 * @brief Creates new tree node from value and childdren array / pointer
-	 * @param v The node
-	 * @param ch Children pointer / array
-	 * @param len The number of children
-	 * @return The new tree node's tref id
-	 */
-	static tref get(const T& v, const T* ch, size_t len);
+	static tref get(const T& v, const T* ch, size_t len, tref r = nullptr);
 
 	/**
 	 * @brief Creates new tree node from value and children vector of nodes
 	 * @param v The node
 	 * @param ch Children nodes vector
+	 * @param r The right sibling
 	 * @return The new tree node's tref id
 	 */
-	static tref get(const T& v, const std::vector<T>& children);
+	static tref get(const T& v, const std::vector<T>& children,
+		tref r = nullptr);
 
 	/**
 	 * @brief Creates new tree node from value and children tref initializer list
 	 * @param v The node
 	 * @param ch Children tref initializer list
+	 * @param r The right sibling	
 	 * @return The new tree node's tref id
 	 */
-	static tref get(const T& v, const std::initializer_list<T>& children);
+	static tref get(const T& v, const std::initializer_list<T>& children,
+		tref r = nullptr);
 
 	/**
 	 * @brief Creates new tree node from value and child node
@@ -567,6 +565,13 @@ struct lcrs_tree : public bintree<T> {
 	std::ostream& print(std::ostream& os, size_t l = 0) const;
 
 	/**
+	 * @brief Print the tree to a string
+	 * @param l The indentation level
+	 * @return The string
+	 */
+	std::string print_to_str(size_t l = 0) const;
+
+	/**
 	 * @brief Print the tree to an ostream in line
 	 * @param os The ostream to print to
 	 * @param l The indentation level
@@ -586,12 +591,27 @@ struct lcrs_tree : public bintree<T> {
 	static std::ostream& dump(std::ostream& os, tref n, bool subtree = true);
 
 	/**
+	 * @brief Dump the node to a string
+	 * @param n The tree node to dump
+	 * @param subtree with node's subtree
+	 * @return The string
+	 */
+	static std::string dump_to_str(tref n, bool subtree = true);
+
+	/**
 	 * @brief Dump the node to an ostream
 	 * @param os The ostream to print to
 	 * @param subtree with node's subtree
 	 * @return The ostream
 	 */
 	std::ostream& dump(std::ostream& os, bool subtree = true) const;
+
+	/**
+	 * @brief Dump the node to astring
+	 * @param subtree with node's subtree
+	 * @return The string
+	 */
+	std::string dump_to_str(bool subtree = true) const;
 
 	/**
 	 * @brief Dump the node to std::cout
@@ -606,6 +626,15 @@ struct lcrs_tree : public bintree<T> {
 	 *         if (t.dump().value == 1) ...
 	 */
 	const lcrs_tree<T>& dump(bool subtree = true) const;
+
+	// hooks
+
+	using hook_function
+		= std::function<tref(const T&, const tref*, size_t, tref)>;
+	inline static hook_function hook = nullptr;
+	inline static void set_hook(hook_function h);
+	inline static void reset_hook();
+	inline static bool is_hooked();
 
 	// rewriter API available directly on the tree
 

@@ -491,14 +491,27 @@ tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 	}
 	stack.emplace_back(r);
 
+	// auto pst = [&stack](tref cn) {
+	// 	std::cout << "\tstack: ";
+	// 	for (tref n : stack) {
+	// 		std::cout << "\n\t\t";
+	// 		std::stringstream ss;
+	// 		const auto& c_tree = tree::get(n);
+	// 		ss << c_tree.value << ":";
+	// 		while (ss.tellp() < 16) ss << " ";
+	// 		ss << (n == cn ? "[" : " ") << n << (n == cn ? "]" : " ");
+	// 		if (c_tree.l) ss << " __ " << c_tree.l;
+	// 		if (c_tree.r) ss << " >> " << c_tree.r;
+	// 		std::cout << ss.str();
+	// 	}
+	// 	std::cout << "\n";
+	// };
+
 	auto call = [](auto& cb, tref n) -> tref {
 		tref nn = cb(n);
 		if (nn == n) return n;
 		if (nn == nullptr) return nullptr;
-		const auto& c_tree = tree::get(nn);
-		return bintree<node_t>::get(c_tree.value,
-						c_tree.left_child(),
-						tree::get(n).right_sibling());
+		return tree::get(nn, tree::get(n).right_sibling());
 	};
 
 	while (true) {
@@ -506,6 +519,9 @@ tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 		if (upos.empty()) return stack[0];
 		// Find first unprocessed position
 		tref& c_node = stack[upos.back()];
+		// std::cout << "\nnon-const loop begin: "
+		// 	<< tree::get(c_node).dump_to_str() << "\n";
+		// pst(c_node);
 		// Check cache first
 		// If we want to visit all nodes, deactivate caching/memory
 		if constexpr (unique) {
@@ -542,10 +558,11 @@ tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 			dec_depth();
 #endif //MEASURE_TRAVERSER_DEPTH
 			continue;
-			}
+		}
 		tref c = (stack.back() == c_node)
 				? tree::get(c_node).left_child()
 				: tree::get(stack.back()).right_sibling();
+		// std::cout << "\tmove to a child: " << c << " \t" << (stack.back() == c_node ? "LC" : "RS") << "\n";
 		// Are all children visited?
 		if (c == nullptr) {
 			// Get child position
@@ -578,6 +595,7 @@ tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				&stack[upos.back() + 1],
 				stack.size() - upos.back() - 1,
 				tree::get(c_node).right_sibling());
+			// std::cout << "\tnew node: " << tree::get(res).dump_to_str() << "\n";
 			// Pop children from stacks
 			stack.erase(stack.end() - c_pos, stack.end());
 			if (res == nullptr) return nullptr;
