@@ -19,6 +19,13 @@ namespace idni {
 
 namespace rewriter {
 
+inline rules merge(const rules& rs1, const rules& rs2) {
+	rules nrs;
+	nrs.insert(nrs.end(), rs1.begin(), rs1.end());
+	nrs.insert(nrs.end(), rs2.begin(), rs2.end());
+	return nrs;
+}
+
 // ---------------------------------------------------------------------
 // predicates
 

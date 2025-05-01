@@ -131,6 +131,8 @@ using rules = std::vector<rule>;
 using library = rules;
 using builder = rule;
 
+rules merge(const rules& rs1, const rules& rs2);
+
 }
 
 //------------------------------------------------------------------------------
