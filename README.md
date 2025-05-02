@@ -1,8 +1,10 @@
 # IDNI parser library
 
-This C++ parser generator was created in an effort to facilitate the development of the Tau language. The predecessor to the Tau language was TML and its parser was hand-coded in C++.
+Industry-level C++ parsing library and parser generator, capable of taking any context free grammar and an input string, and producing the full parse forest, capturing all ambiguities efficiently.
+
+This parser generator was created in an effort to facilitate the development of the Tau language. The predecessor to the Tau language was TML and its parser was hand-coded in C++.
 As the TML language evolved in complexity, it became increasingly difficult to evolve the C++ parser to include all the language features we wanted to add to TML.
-That is why at the beginning of the Tau project, we started by first developing this parser generator based on the Earley parsing algorithm. It afforded us the ability to
+That is why at the beginning of the Tau project, we started by first developing this parser generator based on the Earley parsing algorithm. This afforded us the ability to
 effortlessly evolve the syntax of Tau language as we wished without the need to maintain very complex C++ code. We chose the Earley parsing algorithm because it is capable
 of parsing any context free language while remaining efficient even in the presence of ambiguities in the grammar.
 
