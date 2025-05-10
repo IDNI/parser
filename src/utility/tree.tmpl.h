@@ -604,33 +604,49 @@ const lcrs_tree<T>& lcrs_tree<T>::dump(bool subtree) const {
 }
 
 template <typename node_t>
-std::ostream& dump(std::ostream& os, const std::map<tref, tref>& m) {
+std::ostream& dump(std::ostream& os, const std::map<tref, tref>& m,
+	bool subtree)
+{
 	using tree = lcrs_tree<node_t>;
 	std::cout << "tref_map: " << m.size() << "\n";
 	for (const auto& [k, v] : m) {
 		os << "\t";
-		tree::dump(os, k);
+		tree::dump(os, k, subtree);
 		os << " -> ";
-		tree::dump(os, v);
+		tree::dump(os, v, subtree);
+		os << "\n";
+	}
+	return os << "----------------------------------\n";
+}
+
+template <typename node>
+std::string dump_to_str(const std::map<tref, tref>& m, bool subtree) {
+	std::stringstream ss;
+	return dump<node>(ss, m, subtree), ss.str();
+}
+
+template <typename node_t>
+std::ostream& dump(std::ostream& os,
+	const typename lcrs_tree<node_t>::subtree_map& m, bool subtree)
+{
+	using tree = lcrs_tree<node_t>;
+	std::cout << "subtree_map: " << m.size() << "\n";
+	for (const auto& [k, v] : m) {
+		os << "\t";
+		tree::dump(os, k, subtree);
+		os << " -> ";
+		tree::dump(os, v, subtree);
 		os << "\n";
 	}
 	return os << "----------------------------------\n";
 }
 
 template <typename node_t>
-std::ostream& dump(std::ostream& os,
-	const typename lcrs_tree<node_t>::subtree_map& m)
+std::string dump_to_str(const typename lcrs_tree<node_t>::subtree_map& m,
+	bool subtree)
 {
-	using tree = lcrs_tree<node_t>;
-	std::cout << "subtree_map: " << m.size() << "\n";
-	for (const auto& [k, v] : m) {
-		os << "\t";
-		tree::dump(os, k);
-		os << " -> ";
-		tree::dump(os, v);
-		os << "\n";
-	}
-	return os << "----------------------------------\n";
+	std::stringstream ss;
+	return dump<node_t>(ss, m, subtree), ss.str();
 }
 
 //------------------------------------------------------------------------------

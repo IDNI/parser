@@ -472,10 +472,18 @@ tref replace(tref n, const std::map<tref, tref>& changes) {
 template <typename node_t>
 tref replace(tref n, const typename lcrs_tree<node_t>::subtree_map& changes) {
 	DBG(assert(n != nullptr);)
+	// #DEBUG_TREE_REWRITER
+	#if DEBUG_TREE_REWRITER
+		LOG_TRACE << "changes: " << dump_to_str<node_t>(changes);
+	#endif // DEBUG_TREE_REWRITER
 	const auto r = [&changes](tref el) {
-		// lcrs_tree<node_t>::dump(std::cout << "el: ", el) << "\n";
 		auto ret = get_cached<node_t>(el, changes);
-		// lcrs_tree<node_t>::dump(std::cout << "\tret: ", ret) << "\n";
+		#if DEBUG_TREE_REWRITER
+		if (el != ret) LOG_TRACE << "el: "
+			<< lcrs_tree<node_t>::dump_to_str(el, false) << "\n"
+			<< "\tret: "
+			<< lcrs_tree<node_t>::dump_to_str(ret, false) LOG_END;
+		#endif // DEBUG_TREE_REWRITER
 		return ret;
 	};
 	return pre_order<node_t>(n).apply_unique_until_change(r);
@@ -654,8 +662,8 @@ bool pattern_matcher2<node_t, is_capture_t>::match(tref p, tref n) {
 	// we check if it is the same as the current node, if it is not, we
 	// return false...
 	// std::cout << "match: ";
-	// tree::get(p).dump(std::cout, true);
-	// tree::get(n).dump(std::cout << "   ", true);
+	// tree::get(p).dump(std::cout);
+	// tree::get(n).dump(std::cout << "\nto:   ");
 	// std::cout << "\n";
 	if (is_capture(p)) {
 		if (auto it = env.find(p); it != env.end()

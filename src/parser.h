@@ -893,10 +893,6 @@ struct std::hash<idni::lit<C, T>> {
 #include "parser_result.tmpl.h" // for parser::result
 #include "get_shaped_tree2.tmpl.h"
 #include "tgf.h"                // Tau Grammar Form
-#ifndef PARSER_BINTREE_FOREST
-#	include "rewriting.h"
-#	include "traverser.h"
-#endif
 
 #ifdef DEBUG
 #include "utility/devhelpers.h"   // various helpers for converting forest

@@ -693,11 +693,20 @@ struct lcrs_tree : public bintree<T> {
 };
 
 template <typename node_t>
-std::ostream& dump(std::ostream& os, const std::map<tref, tref>& m);
+std::ostream& dump(std::ostream& os, const std::map<tref, tref>& m,
+	bool subtree = true);
 
 template <typename node_t>
 std::ostream& dump(std::ostream& os,
-	const typename lcrs_tree<node_t>::subtree_map& m);
+	const typename lcrs_tree<node_t>::subtree_map& m, bool subtree = true);
+
+template <typename node_t>
+std::string dump_to_str(const std::map<tref, tref>& m, bool subtree = true);
+
+
+template <typename node_t>
+std::string dump_to_str(const typename lcrs_tree<node_t>::subtree_map& m,
+	bool subtree = true);
 
 // helper to get value from a cache
 template <typename node_t>
