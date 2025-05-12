@@ -15,6 +15,13 @@
 
 namespace idni {
 
+// #define LOG_TRAVERSALS_ENABLED
+
+#ifdef LOG_TRAVERSALS_ENABLED
+#define DBGT(x) x
+#else
+#define DBGT(x)
+#endif // LOG_TRAVERSALS_ENABLED
 
 #ifdef MEASURE_TRAVERSER_DEPTH
 static size_t depth = 0;
@@ -113,6 +120,24 @@ tref post_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree) {
 	inc_depth();
 #endif //MEASURE_TRAVERSER_DEPTH
 
+#ifdef LOG_TRAVERSALS_ENABLED
+	auto pst = [&stack](tref cn) {
+		std::cout << "\tstack: ";
+		for (tref n : stack) {
+			std::cout << "\n\t\t";
+			std::stringstream ss;
+			const auto& c_tree = tree::get(n);
+			ss << c_tree.value << ":";
+			while (ss.tellp() < 16) ss << " ";
+			ss << (n == cn ? "[" : " ") << n << (n == cn ? "]" : " ");
+			if (c_tree.l) ss << " __ " << c_tree.l;
+			if (c_tree.r) ss << " >> " << c_tree.r;
+			std::cout << ss.str();
+		}
+		std::cout << "\n";
+	};
+#endif //LOG_TRAVERSALS_ENABLED
+
 	auto call = [](auto& cb, tref n) -> tref {
 		tref nn = cb(n);
 		if (nn == n) return n;
@@ -127,6 +152,9 @@ tref post_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree) {
 		// If no unprocessed position exists, we are done
 		if (upos.empty()) return stack[0];
 		tref& c_node = stack[upos.back()];
+		DBGT(std::cout << "\nnon-const loop begin: "
+			<< tree::get(c_node).dump_to_str() << "\n";)
+		DBGT(pst(c_node);)
 		// Check cache first
 		if constexpr (slot != 0) {
 			const auto it = m.find(std::make_pair(c_node, slot));
@@ -165,6 +193,8 @@ tref post_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree) {
 		tref c = (stack.back() == c_node)
 				? tree::get(c_node).left_child()
 				: tree::get(stack.back()).right_sibling();
+		DBGT(std::cout << "\tmove to a child: " << c << " \t"
+			<< (stack.back() == c_node ? "LC" : "RS") << "\n";)
 		// Are all children visited?
 		if (c == nullptr) {
 			// Get child position
@@ -193,6 +223,7 @@ tref post_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree) {
 				&stack[upos.back() + 1],
 				stack.size() - upos.back() - 1,
 				tree::get(c_node).right_sibling());
+			DBGT(std::cout << "\tnew node: " << tree::get(res).dump_to_str() << "\n";)
 			if (res == nullptr) return nullptr;
 			// Pop children from stacks
 			stack.erase(stack.end() - c_pos, stack.end());
@@ -491,21 +522,23 @@ tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 	}
 	stack.emplace_back(r);
 
-	// auto pst = [&stack](tref cn) {
-	// 	std::cout << "\tstack: ";
-	// 	for (tref n : stack) {
-	// 		std::cout << "\n\t\t";
-	// 		std::stringstream ss;
-	// 		const auto& c_tree = tree::get(n);
-	// 		ss << c_tree.value << ":";
-	// 		while (ss.tellp() < 16) ss << " ";
-	// 		ss << (n == cn ? "[" : " ") << n << (n == cn ? "]" : " ");
-	// 		if (c_tree.l) ss << " __ " << c_tree.l;
-	// 		if (c_tree.r) ss << " >> " << c_tree.r;
-	// 		std::cout << ss.str();
-	// 	}
-	// 	std::cout << "\n";
-	// };
+#ifdef LOG_TRAVERSALS_ENABLED
+	auto pst = [&stack](tref cn) {
+		std::cout << "\tstack: ";
+		for (tref n : stack) {
+			std::cout << "\n\t\t";
+			std::stringstream ss;
+			const auto& c_tree = tree::get(n);
+			ss << c_tree.value << ":";
+			while (ss.tellp() < 16) ss << " ";
+			ss << (n == cn ? "[" : " ") << n << (n == cn ? "]" : " ");
+			if (c_tree.l) ss << " __ " << c_tree.l;
+			if (c_tree.r) ss << " >> " << c_tree.r;
+			std::cout << ss.str();
+		}
+		std::cout << "\n";
+	};
+#endif //LOG_TRAVERSALS_ENABLED
 
 	auto call = [](auto& cb, tref n) -> tref {
 		tref nn = cb(n);
@@ -519,9 +552,9 @@ tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 		if (upos.empty()) return stack[0];
 		// Find first unprocessed position
 		tref& c_node = stack[upos.back()];
-		// std::cout << "\nnon-const loop begin: "
-		// 	<< tree::get(c_node).dump_to_str() << "\n";
-		// pst(c_node);
+		DBGT(std::cout << "\nnon-const loop begin: "
+			<< tree::get(c_node).dump_to_str() << "\n";)
+		DBGT(pst(c_node);)
 		// Check cache first
 		// If we want to visit all nodes, deactivate caching/memory
 		if constexpr (unique) {
@@ -562,7 +595,8 @@ tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 		tref c = (stack.back() == c_node)
 				? tree::get(c_node).left_child()
 				: tree::get(stack.back()).right_sibling();
-		// std::cout << "\tmove to a child: " << c << " \t" << (stack.back() == c_node ? "LC" : "RS") << "\n";
+		DBGT(std::cout << "\tmove to a child: " << c << " \t"
+			<< (stack.back() == c_node ? "LC" : "RS") << "\n";)
 		// Are all children visited?
 		if (c == nullptr) {
 			// Get child position
@@ -595,7 +629,7 @@ tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				&stack[upos.back() + 1],
 				stack.size() - upos.back() - 1,
 				tree::get(c_node).right_sibling());
-			// std::cout << "\tnew node: " << tree::get(res).dump_to_str() << "\n";
+			DBGT(std::cout << "\tnew node: " << tree::get(res).dump_to_str() << "\n";)
 			// Pop children from stacks
 			stack.erase(stack.end() - c_pos, stack.end());
 			if (res == nullptr) return nullptr;
