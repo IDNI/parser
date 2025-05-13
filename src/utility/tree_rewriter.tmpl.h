@@ -811,24 +811,24 @@ tref apply(tref s, tref n, matcher_t& matcher) {
 
 template <typename node>
 tref lcrs_tree<node>::trim_top(const auto& query) const {
-	return rewriter::trim_top<T, decltype(query)>(get(), query);
+	return rewriter::trim_top<node, decltype(query)>(get(), query);
 }
 
 template <typename node>
 trefs lcrs_tree<node>::select_top(const auto& query) const {
-	return rewriter::select_top<T, decltype(query)>(get(), query);
+	return rewriter::select_top<node, decltype(query)>(get(), query);
 }
 template <typename node>
 trefs lcrs_tree<node>::select_subnodes(const auto& query, const auto& extractor)
 	const
 {
-	return rewriter::select_subnodes<T,
+	return rewriter::select_subnodes<node,
 		decltype(query), decltype(extractor)>(get(), query, extractor);
 }
 
 template <typename node>
 trefs lcrs_tree<node>::select_all(const auto& query) const {
-	return rewriter::select_all<T, decltype(query)>(get(), query);
+	return rewriter::select_all<node, decltype(query)>(get(), query);
 }
 
 template <typename node>
@@ -847,7 +847,7 @@ trefs lcrs_tree<node>::select_top_until(const auto& query, const auto& until)
 
 template <typename node>
 tref lcrs_tree<node>::find_top(const auto& query) const {
-	return rewriter::find_top<T, decltype(query)>(get(), query);
+	return rewriter::find_top<node, decltype(query)>(get(), query);
 }
 template <typename node>
 tref lcrs_tree<node>::find_top_until(const auto& query, const auto& until) const
@@ -857,11 +857,11 @@ tref lcrs_tree<node>::find_top_until(const auto& query, const auto& until) const
 
 template <typename node>
 tref lcrs_tree<node>::find_bottom(const auto& query) const {
-	return rewriter::find_bottom<T, decltype(query)>(get(), query);
+	return rewriter::find_bottom<node, decltype(query)>(get(), query);
 }
 
 template <typename node>
-tref lcrs_tree<node>::replace(const subtree_map<T, tref>& changes) const {
+tref lcrs_tree<node>::replace(const subtree_map<node, tref>& changes) const {
 	return rewriter::replace<node>(get(), changes);
 }
 template <typename node>
@@ -871,17 +871,17 @@ tref lcrs_tree<node>::replace(tref replace, tref with) const {
 }
 
 template <typename node>
-tref lcrs_tree<node>::replace_if(const subtree_map<T, tref>& changes,
+tref lcrs_tree<node>::replace_if(const subtree_map<node, tref>& changes,
 	const auto& query) const
 {
-	return rewriter::replace_if<T, decltype(query)>(get(), changes, query);
+	return rewriter::replace_if<node, decltype(query)>(get(), changes, query);
 }
 
 template <typename node>
-tref lcrs_tree<node>::replace_until(const subtree_map<T, tref>& changes,
+tref lcrs_tree<node>::replace_until(const subtree_map<node, tref>& changes,
 	const auto& query) const
 {
-	return rewriter::replace_until<T, decltype(query)>(get(), changes,
+	return rewriter::replace_until<node, decltype(query)>(get(), changes,
 									query);
 }
 
@@ -889,7 +889,7 @@ template <typename node>
 tref lcrs_tree<node>::apply_rule(const rewriter::rule& r, const auto& is_capture)
 	const
 {
-	return rewriter::apply_rule<T, decltype(is_capture)>(r, get(),
+	return rewriter::apply_rule<node, decltype(is_capture)>(r, get(),
 								is_capture);
 }
 
@@ -897,14 +897,14 @@ template <typename node>
 tref lcrs_tree<node>::apply_if(const rewriter::rule& r,
 				const auto& is_capture, const auto& query) const
 {
-	return rewriter::apply_if<T, decltype(is_capture), decltype(query)>(
+	return rewriter::apply_if<node, decltype(is_capture), decltype(query)>(
 						r, get(), is_capture, query);
 }
 
 template <typename node>
 tref lcrs_tree<node>::apply(tref s, const auto& matcher) const {
 	DBG(assert(s != nullptr);)
-	return rewriter::apply<T, decltype(matcher)>(s, get(), matcher);
+	return rewriter::apply<node, decltype(matcher)>(s, get(), matcher);
 }
 
 } // idni::rewriter namespace
