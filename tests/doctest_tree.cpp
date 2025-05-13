@@ -75,7 +75,7 @@ TEST_SUITE("structural equality") {
 TEST_SUITE("subtree equality") {
 
 	TEST_CASE_FIXTURE(test_tree_fixture, "subtree_map") {
-		typename chtree::subtree_map m;
+		subtree_map<char, tref> m;
 		const auto& root = chtree::get(in);
 		m[in] = n('h'); // e
 		m[root.first()] = n('j'); // e b
@@ -109,7 +109,8 @@ TEST_SUITE("subtree equality") {
 	}
 
 	TEST_CASE_FIXTURE(test_tree_fixture, "subtree_set") {
-		typename chtree::subtree_set s;
+		std::cout << chtree::get(in).print_to_str() << std::endl;
+		subtree_set<char> s;
 		s.insert(in);
 		s.insert(chtree::get(in).first());
 		s.insert(chtree::get(in).second());
@@ -492,7 +493,7 @@ TEST_SUITE("replace_transformer") {
 	TEST_CASE("replace_transformer: given a simple tree and a visitor, it returns "
 			"a new tree with the provided replacements") {
 		tref root = n('a');
-		chtree::subtree_map m;
+		subtree_map<char, tref> m;
 		m[root] = n('z');
 		replace_transformer<char> replace{m};
 		tref expected { n('z') };
@@ -504,7 +505,7 @@ TEST_SUITE("replace_transformer") {
 	TEST_CASE("replace_transform: given a tree with two children and a visitor, "
 			"it returns a new tree with the provided replacements") {
 		tref root = n('a', {n('b'), n('c')});
-		chtree::subtree_map m;
+		subtree_map<char, tref> m;
 		m[n('b')] = n('z');
 		replace_transformer<char> replace{m};
 		tref expected { n('a', {n('z'), n('c')}) };
@@ -519,7 +520,7 @@ TEST_SUITE("replace_transformer") {
 	TEST_CASE("replace_transform: given a tree with underlying diamond like DAG "
 			"and a visitor, it returns a new tree with the provided replacements") {
 		tref root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
-		chtree::subtree_map m;
+		subtree_map<char, tref> m;
 		m[n('d')] = n('z');
 		replace_transformer<char> replace{m};
 		tref expected { n('a', {n('b', {n('z')}), n('c', {n('z')})}) };
@@ -1155,7 +1156,7 @@ TEST_SUITE("replace") {
 
 	TEST_CASE("replace: given a tree and a map of replacements, it returns the tree with the replacements applied") {
 		tref root = n('a', { n('a') });
-		chtree::subtree_map
+		subtree_map<char, tref>
 			env = {{ n('a'), { n('b', { n('c'), n('d') }) } }};
 		tref expected = n('a', { n('b', { n('c'), n('d') }) });
 		tref result = replace<char>(root, env);
@@ -1167,7 +1168,7 @@ TEST_SUITE("replace") {
 
 	TEST_CASE("replace: given a tree and a map of replacements, it returns the tree with the replacements applied") {
 		tref root = n('e', { n('f'), n('a'), n('g') });
-		chtree::subtree_map
+		subtree_map<char, tref>
 			env = {{ n('a'), { n('b', { n('c'), n('d') }) } }};
 		tref expected = n('e', { n('f'), n('b', { n('c'), n('d') }), n('g') });
 		tref result = replace<char>(root, env);
@@ -1179,7 +1180,7 @@ TEST_SUITE("replace") {
 
 	TEST_CASE("replace: given a tree and a map of replacements, it returns the tree with the replacements applied") {
 		tref root = n('e', { n('a'), n('a') });
-		chtree::subtree_map
+		subtree_map<char, tref>
 			env = {{ n('a'), { n('b', { n('c'), n('d') }) } }};
 		tref expected = n('e', { n('b', { n('c'), n('d') }), n('b', { n('c'), n('d') }) });
 		tref result = replace<char>(root, env);
@@ -1192,7 +1193,7 @@ TEST_SUITE("replace") {
 
 	TEST_CASE("replace: given a tree and a map of replacements, it returns the tree with the replacements applied") {
 		tref root = n('a', { n('b'), n('c') });
-		chtree::subtree_map
+		subtree_map<char, tref>
 			env = {{ n('b'), { n('d', { n('e'), n('f') }) } }};
 		tref expected = n('a', { n('d', { n('e'), n('f') }), n('c') });
 		tref result = replace<char>(root, env);
@@ -1204,7 +1205,7 @@ TEST_SUITE("replace") {
 
 	TEST_CASE("replace: given a tree and a map of replacements, it returns the tree with the replacements applied") {
 		tref root = n('a', { n('b'), n('c'), n('b') });
-		chtree::subtree_map
+		subtree_map<char, tref>
 			env = {{ n('b'), { n('d', { n('e') }) } }};
 		tref expected = n('a', { n('d', { n('e') }), n('c'), n('d', { n('e') }) });
 		tref result = replace<char>(root, env);

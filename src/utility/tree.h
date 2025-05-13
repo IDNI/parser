@@ -237,6 +237,36 @@ protected:
 template <typename T> struct pre_order;
 template <typename T> struct post_order;
 
+template <typename T>
+struct hash_tref {
+	size_t operator()(tref r) const;
+};
+
+template <typename T>
+struct subtree_equality {
+	bool operator()(tref a, tref b) const;
+};
+
+template <typename T, typename PT>
+struct subtree_pair_equality {
+	bool operator()(const std::pair<tref, PT>& a,
+			const std::pair<tref, PT>& b) const;
+};
+
+template <typename T>
+using subtree_set = std::set<tref, subtree_equality<T>>;
+
+template <typename T, typename PT>
+using subtree_map = std::map<tref, PT, subtree_equality<T>>;
+
+template <typename T>
+using subtree_unordered_set = std::unordered_set<tref,
+				hash_tref<T>, subtree_equality<T>>;
+
+template <typename T, typename PT>
+using subtree_unordered_map = std::unordered_map<tref, PT,
+				hash_tref<T>, subtree_pair_equality<T, PT>>;
+
 /**
  * @brief Left child right sibling tree
  * @tparam T The type of the tree node value
@@ -250,24 +280,6 @@ struct lcrs_tree : public bintree<T> {
 	bool operator<(const lcrs_tree<T>& other) const;
 	static bool subtree_equals(tref a, tref b);
 	static bool subtree_less(tref a, tref b);
-
-	struct subtree_equality {
-		bool operator()(tref a, tref b) const;
-	};
-
-	template <typename PT>
-	struct subtree_pair_equality {
-		using p = std::pair<tref, PT>;
-		bool operator()(const p& a, const p& b) const;
-	};
-
-	using subtree_set = std::set<tref, subtree_equality>;
-	using subtree_map = std::map<tref, tref, subtree_equality>;
-	using subtree_string_map = std::map<tref, std::string, subtree_equality>;
-	// using subtree_unordered_set = std::unordered_set<tref, subtree_equality>;
-	// using subtree_unordered_map = std::unordered_map<tref, tref, subtree_equality>;
-	using subtree_tref_size_t_map = std::map<tref, size_t,
-					subtree_pair_equality<size_t>>;
 
 	/**
 	 * @brief Get node's tref
@@ -668,14 +680,14 @@ struct lcrs_tree : public bintree<T> {
 	tref find_bottom(const auto& query) const;
 
 	tref replace(const std::map<tref, tref>& changes) const;
-	tref replace(const subtree_map& changes) const;
+	tref replace(const subtree_map<T, tref>& changes) const;
 	tref replace(tref what, tref with) const;
 
 	// Replace nodes in n according to changes while skipping subtrees that don't satisfy query
-	tref replace_if(const subtree_map& changes, const auto& query) const;
+	tref replace_if(const subtree_map<T, tref>& changes, const auto& query) const;
 
 	// Replace nodes in n according to changes while skipping subtrees that satisfy query
-	tref replace_until(const subtree_map& changes, const auto& query) const;
+	tref replace_until(const subtree_map<T, tref>& changes, const auto& query) const;
 
 	// TODO (LOW) consider adding a similar function for replace_node...
 
@@ -692,35 +704,35 @@ struct lcrs_tree : public bintree<T> {
 	tref apply(tref s, const auto& matcher) const;
 };
 
-template <typename node_t>
+template <typename node>
 std::ostream& dump(std::ostream& os, const std::map<tref, tref>& m,
 	bool subtree = true);
 
-template <typename node_t>
-std::ostream& dump(std::ostream& os,
-	const typename lcrs_tree<node_t>::subtree_map& m, bool subtree = true);
+template <typename node>
+std::ostream& dump(std::ostream& os, const subtree_map<node, tref>& m,
+	bool subtree = true);
 
-template <typename node_t>
+template <typename node>
 std::string dump_to_str(const std::map<tref, tref>& m, bool subtree = true);
 
 
-template <typename node_t>
-std::string dump_to_str(const typename lcrs_tree<node_t>::subtree_map& m,
+template <typename node>
+std::string dump_to_str(const subtree_map<node, tref>& m,
 	bool subtree = true);
 
 // helper to get value from a cache
-template <typename node_t>
+template <typename node>
 tref get_cached(tref n, const std::map<tref, tref>& cache);
 
 // helper to get value from a subtree cached map (using subtree_equality)
-template <typename node_t>
-tref get_cached(tref n, const typename lcrs_tree<node_t>::subtree_map& cache);
+template <typename node>
+tref get_cached(tref n, const subtree_map<node, tref>& cache);
 
 // helper to get a value from a cache using subtree_equality
-template <typename node_t>
+template <typename node>
 tref get_cached_subtree(tref n, const std::map<tref, tref>& cache);
 
-template <typename node_t>
+template <typename node>
 bool is_cached_subtree(tref n, const std::unordered_set<tref>& cache);
 
 //------------------------------------------------------------------------------
@@ -732,11 +744,11 @@ bool is_cached_subtree(tref n, const std::unordered_set<tref>& cache);
 
 /**
  * @brief Struct for tree traversals in post order
- * @tparam node_t Tree node type
+ * @tparam node Tree node type
  */
-template <typename node_t>
+template <typename node>
 struct post_order {
-	using tree = lcrs_tree<node_t>;
+	using tree = lcrs_tree<node>;
 
 	explicit post_order(tref n);
 	explicit post_order(const htree::sp& h);
@@ -798,7 +810,7 @@ private:
 	tref root;
 	// inline static std::unordered_map<std::pair<node_t, size_t>, node_t,
 	// 	std::hash<std::pair<node_t, size_t>>,
-	// 	traverser_pair_cache_equality<node_t>> m;
+	// 	traverser_pair_cache_equality<node>> m;
 	inline static std::unordered_map<std::pair<tref, size_t>, tref> m;
 
 	template <size_t slot>
@@ -808,7 +820,7 @@ private:
 	void const_traverse(tref n, auto& visit, auto& visit_subtree);
 };
 
-template <typename node_t>
+template <typename node>
 struct morris_post_order
 {
 	morris_post_order(tref root);
@@ -823,11 +835,11 @@ private:
 
 /**
  * @brief Struct for tree traversals in pre order
- * @tparam node_t Tree node type
+ * @tparam node Tree node type
  */
-template<typename node_t>
+template<typename node>
 struct pre_order {
-	using tree = lcrs_tree<node_t>;
+	using tree = lcrs_tree<node>;
 
 	explicit pre_order(tref n);
 	explicit pre_order(const htree::sp& h);
@@ -1038,7 +1050,7 @@ private:
 	tref root;
 	// inline static std::unordered_map<std::pair<node_t, size_t>, node_t,
 	// 		std::hash<std::pair<node_t, size_t>>,
-	// 		traverser_pair_cache_equality<node_t>> m;
+	// 		traverser_pair_cache_equality<node>> m;
 	inline static std::unordered_map<std::pair<tref, size_t>, tref> m;
 
 	template<bool break_on_change, size_t slot, bool unique>
@@ -1054,8 +1066,8 @@ namespace rewriter {
 // a environment is a map from captures to tree nodes, it is used
 // to keep track of the captures that have been unified and their
 // corresponding tree nodes.
-template <typename node_t>
-using environment = lcrs_tree<node_t>::subtree_map;
+template <typename node>
+using environment = subtree_map<node, tref>;
 
 } // rewriter namespace
 

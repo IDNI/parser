@@ -260,6 +260,27 @@ std::map<const bintree<T>, htree::wp> bintree<T>::M;
 //------------------------------------------------------------------------------
 
 template <typename T>
+size_t hash_tref<T>::operator()(tref r) const {
+	return std::hash<const lcrs_tree<T>&>(lcrs_tree<T>::get(r));
+}
+
+template <typename T>
+bool subtree_equality<T>::operator()(tref a, tref b) const {
+	return lcrs_tree<T>::subtree_less(a, b);
+}
+
+template <typename T, typename PT>
+bool subtree_pair_equality<T, PT>::operator()(const std::pair<tref, PT>& a,
+					const std::pair<tref, PT>& b) const
+{
+	bool r = lcrs_tree<T>::subtree_less(a.first, b.first);
+	if constexpr (std::is_same_v<PT, tref>)
+		r = r && lcrs_tree<T>::subtree_less(a.second, b.second);
+	else r = r && a.second < b.second;
+	return r;
+}
+
+template <typename T>
 bool lcrs_tree<T>::operator<(const lcrs_tree<T>& o) const {
 	if (this->value != o.value) return this->value < o.value;
 	return this->l < o.l;
@@ -282,20 +303,6 @@ bool lcrs_tree<T>::subtree_less(tref a, tref b) {
 	if (a == nullptr) return true;
 	if (b == nullptr) return false;
 	return lcrs_tree<T>::get(a) < lcrs_tree<T>::get(b);
-}
-
-template <typename T>
-bool lcrs_tree<T>::subtree_equality::operator()(tref a, tref b) const {
-	return lcrs_tree<T>::subtree_less(a, b);
-}
-
-template <typename T>
-template <typename PT>
-bool lcrs_tree<T>::subtree_pair_equality<PT>::operator()(const p& a, const p& b)
-	const
-{
-	return lcrs_tree<T>::subtree_less(a.first, b.first)
-		&& a.second < b.second;
 }
 
 //------------------------------------------------------------------------------
@@ -603,11 +610,11 @@ const lcrs_tree<T>& lcrs_tree<T>::dump(bool subtree) const {
 	return dump(std::cout, subtree), *this;
 }
 
-template <typename node_t>
+template <typename node>
 std::ostream& dump(std::ostream& os, const std::map<tref, tref>& m,
 	bool subtree)
 {
-	using tree = lcrs_tree<node_t>;
+	using tree = lcrs_tree<node>;
 	std::cout << "tref_map: " << m.size() << "\n";
 	for (const auto& [k, v] : m) {
 		os << "\t";
@@ -625,11 +632,11 @@ std::string dump_to_str(const std::map<tref, tref>& m, bool subtree) {
 	return dump<node>(ss, m, subtree), ss.str();
 }
 
-template <typename node_t>
-std::ostream& dump(std::ostream& os,
-	const typename lcrs_tree<node_t>::subtree_map& m, bool subtree)
+template <typename node>
+std::ostream& dump(std::ostream& os, const subtree_map<node, tref>& m,
+	bool subtree)
 {
-	using tree = lcrs_tree<node_t>;
+	using tree = lcrs_tree<node>;
 	std::cout << "subtree_map: " << m.size() << "\n";
 	for (const auto& [k, v] : m) {
 		os << "\t";
@@ -641,30 +648,28 @@ std::ostream& dump(std::ostream& os,
 	return os << "----------------------------------\n";
 }
 
-template <typename node_t>
-std::string dump_to_str(const typename lcrs_tree<node_t>::subtree_map& m,
-	bool subtree)
-{
+template <typename node>
+std::string dump_to_str(const subtree_map<node, tref>& m, bool subtree) {
 	std::stringstream ss;
-	return dump<node_t>(ss, m, subtree), ss.str();
+	return dump<node>(ss, m, subtree), ss.str();
 }
 
 //------------------------------------------------------------------------------
 // hooks
 
-template <typename node_t>
-void lcrs_tree<node_t>::set_hook(hook_function h) { hook = h; }
+template <typename node>
+void lcrs_tree<node>::set_hook(hook_function h) { hook = h; }
 
-template <typename node_t>
-void lcrs_tree<node_t>::reset_hook() { hook = nullptr; }
+template <typename node>
+void lcrs_tree<node>::reset_hook() { hook = nullptr; }
 
-template <typename node_t>
-bool lcrs_tree<node_t>::is_hooked() { return hook != nullptr; }
+template <typename node>
+bool lcrs_tree<node>::is_hooked() { return hook != nullptr; }
 
 //------------------------------------------------------------------------------
 
 // helper to get value from a cache
-template <typename node_t>
+template <typename node>
 tref get_cached(tref n, const std::map<tref, tref>& cache) {
 	if (auto it = cache.find(n); it != cache.end())
 		return it->second;
@@ -672,17 +677,17 @@ tref get_cached(tref n, const std::map<tref, tref>& cache) {
 }
 
 // helper to get value from a subtree cached map (using subtree_equality)
-template <typename node_t>
-tref get_cached(tref n, const typename lcrs_tree<node_t>::subtree_map& cache) {
+template <typename node>
+tref get_cached(tref n, const subtree_map<node, tref>& cache) {
 	if (auto it = cache.find(n); it != cache.end())
 		return it->second;
 	return n;
 }
 
 // helper to get a value from a cache using subtree_equality
-template <typename node_t>
+template <typename node>
 tref get_cached_subtree(tref n, const std::map<tref, tref>& cache) {
-	using tree = lcrs_tree<node_t>;
+	using tree = lcrs_tree<node>;
 	const auto& t = tree::get(n);
 	for (auto it = cache.begin(); it != cache.end(); ++it) {
 		if (tree::get(it->first) == t) {
@@ -693,9 +698,9 @@ tref get_cached_subtree(tref n, const std::map<tref, tref>& cache) {
 	return n;
 }
 
-template <typename node_t>
+template <typename node>
 bool is_cached_subtree(tref n, const std::unordered_set<tref>& cache) {
-	using tree = lcrs_tree<node_t>;
+	using tree = lcrs_tree<node>;
 	const auto& t = tree::get(n);
 	for (auto it = cache.begin(); it != cache.end(); ++it)
 		if (tree::get(*it) == t) return true;

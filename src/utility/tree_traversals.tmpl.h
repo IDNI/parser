@@ -58,51 +58,51 @@ struct traverser_pair_cache_equality {
 	}
 };
 
-template <typename node_t>
-post_order<node_t>::post_order(tref n) : root(n) {}
+template <typename node>
+post_order<node>::post_order(tref n) : root(n) {}
 
-template <typename node_t>
-post_order<node_t>::post_order(const htree::sp& h) : root(h->get()) {}
+template <typename node>
+post_order<node>::post_order(const htree::sp& h) : root(h->get()) {}
 
-template <typename node_t>
+template <typename node>
 template <size_t slot>
-tref post_order<node_t>::apply_unique(auto& f, auto& visit_subtree) {
+tref post_order<node>::apply_unique(auto& f, auto& visit_subtree) {
 	if (visit_subtree(root))
 		return traverse<slot>(root, f, visit_subtree);
 	else return root;
 }
 
-template <typename node_t>
+template <typename node>
 template <size_t slot>
-tref post_order<node_t>::apply_unique(auto& f) {
+tref post_order<node>::apply_unique(auto& f) {
 	return traverse<slot>(root, f, all);
 }
 
-template <typename node_t>
-void post_order<node_t>::search(auto& visit, auto& visit_subtree) {
+template <typename node>
+void post_order<node>::search(auto& visit, auto& visit_subtree) {
 	if (visit_subtree(root))
 		const_traverse<false>(root, visit, visit_subtree);
 }
 
-template <typename node_t>
-void post_order<node_t>::search(auto& visit) {
+template <typename node>
+void post_order<node>::search(auto& visit) {
 	const_traverse<false>(root, visit, all);
 }
 
-template <typename node_t>
-void post_order<node_t>::search_unique(auto& visit, auto& visit_subtree) {
+template <typename node>
+void post_order<node>::search_unique(auto& visit, auto& visit_subtree) {
 	if (visit_subtree(root))
 		const_traverse<true>(root, visit, visit_subtree);
 }
 
-template <typename node_t>
-void post_order<node_t>::search_unique(auto& visit) {
+template <typename node>
+void post_order<node>::search_unique(auto& visit) {
 	const_traverse<true>(root, visit, all);
 }
 
-template <typename node_t>
+template <typename node>
 template <size_t slot>
-tref post_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree) {
+tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 	if (n == nullptr) return nullptr;
 	// Check cache first
 	if constexpr (slot != 0) {
@@ -143,7 +143,7 @@ tref post_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree) {
 		if (nn == n) return n;
 		if (nn == nullptr) return nullptr;
 		const auto& c_tree = tree::get(nn);
-		return bintree<node_t>::get(c_tree.value,
+		return bintree<node>::get(c_tree.value,
 						c_tree.left_child(),
 						tree::get(n).right_sibling());
 	};
@@ -251,13 +251,13 @@ tref post_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree) {
 	}
 }
 
-template <typename node_t>
+template <typename node>
 template<bool unique>
-void post_order<node_t>::const_traverse(tref n, auto& visitor,
+void post_order<node>::const_traverse(tref n, auto& visitor,
 	auto& visit_subtree)
 {
 	if (n == nullptr) return;
-	typename lcrs_tree<node_t>::subtree_set cache; // TODO subtree_unordered_set
+	subtree_set<node> cache; // TODO subtree_unordered_set
 	trefs stack;
 	std::vector<size_t> upos;
 	auto get_parent = [&upos, &stack]() -> tref {
@@ -329,52 +329,52 @@ void post_order<node_t>::const_traverse(tref n, auto& visitor,
 	}
 }
 
-template <typename node_t>
-pre_order<node_t>::pre_order(tref n) : root(n) {}
+template <typename node>
+pre_order<node>::pre_order(tref n) : root(n) {}
 
-template <typename node_t>
-pre_order<node_t>::pre_order(const htree::sp& h) : root(h->get()) {}
+template <typename node>
+pre_order<node>::pre_order(const htree::sp& h) : root(h->get()) {}
 
-template <typename node_t>
+template <typename node>
 template<size_t slot>
-tref pre_order<node_t>::apply_unique(auto& f, auto& visit_subtree, auto& up) {
+tref pre_order<node>::apply_unique(auto& f, auto& visit_subtree, auto& up) {
 	if (visit_subtree(root))
 		return traverse<false, slot, true>(root, f, visit_subtree, up);
 	else return root;
 }
 
-template <typename node_t>
+template <typename node>
 template<size_t slot>
-tref pre_order<node_t>::apply_unique(auto& f, auto& visit_subtree) {
+tref pre_order<node>::apply_unique(auto& f, auto& visit_subtree) {
 	if (visit_subtree(root))
 		return traverse<false, slot, true>(root, f, visit_subtree,
 								identity);
 	else return root;
 }
 
-template <typename node_t>
+template <typename node>
 template<size_t slot>
-tref pre_order<node_t>::apply_unique(auto& f) {
+tref pre_order<node>::apply_unique(auto& f) {
 	return traverse<false, slot, true>(root, f, all, identity);
 }
 
-template <typename node_t>
+template <typename node>
 template<size_t slot>
-tref pre_order<node_t>::apply(auto& f, auto& visit_subtree, auto& up) {
+tref pre_order<node>::apply(auto& f, auto& visit_subtree, auto& up) {
 	if (visit_subtree(root))
 		return traverse<false, slot, false>(root, f, visit_subtree, up);
 	else return root;
 }
 
-template <typename node_t>
+template <typename node>
 template<size_t slot>
-tref pre_order<node_t>::apply(auto& f) {
+tref pre_order<node>::apply(auto& f) {
 	return traverse<false, slot, false>(root, f, all, identity);
 }
 
-template <typename node_t>
+template <typename node>
 template<size_t slot>
-tref pre_order<node_t>::apply_unique_until_change(auto& f, auto& visit_subtree,
+tref pre_order<node>::apply_unique_until_change(auto& f, auto& visit_subtree,
 	auto& up)
 {
 	if (visit_subtree(root))
@@ -382,9 +382,9 @@ tref pre_order<node_t>::apply_unique_until_change(auto& f, auto& visit_subtree,
 	else return root;
 }
 
-template <typename node_t>
+template <typename node>
 template<size_t slot>
-tref pre_order<node_t>::apply_unique_until_change(auto& f, auto& visit_subtree){
+tref pre_order<node>::apply_unique_until_change(auto& f, auto& visit_subtree){
 	if (visit_subtree(root))
 		return traverse<true, slot, true>(
 					root, f, visit_subtree, identity);
@@ -392,15 +392,15 @@ tref pre_order<node_t>::apply_unique_until_change(auto& f, auto& visit_subtree){
 }
 
 
-template <typename node_t>
+template <typename node>
 template<size_t slot>
-tref pre_order<node_t>::apply_unique_until_change(auto& f) {
+tref pre_order<node>::apply_unique_until_change(auto& f) {
 	return traverse<true, slot, true>(root, f, all, identity);
 }
 
-template <typename node_t>
+template <typename node>
 template<size_t slot>
-tref pre_order<node_t>::apply_until_change(auto& f, auto& visit_subtree,
+tref pre_order<node>::apply_until_change(auto& f, auto& visit_subtree,
 	auto& up)
 {
 	if (visit_subtree(root))
@@ -408,77 +408,77 @@ tref pre_order<node_t>::apply_until_change(auto& f, auto& visit_subtree,
 	else return root;
 }
 
-template <typename node_t>
+template <typename node>
 template<size_t slot>
-tref pre_order<node_t>::apply_until_change(auto& f) {
+tref pre_order<node>::apply_until_change(auto& f) {
 	return traverse<true, slot, false>(root, f, all, identity);
 }
 
-template <typename node_t>
-void pre_order<node_t>::visit(auto& visit, auto& visit_subtree, auto& up,
+template <typename node>
+void pre_order<node>::visit(auto& visit, auto& visit_subtree, auto& up,
 	auto& between)
 {
 	if (visit_subtree(root)) const_traverse<false, false>(root,
 					visit, visit_subtree, up, between);
 }
 
-template <typename node_t>
-void pre_order<node_t>::visit(auto& visit, auto& visit_subtree, auto& up) {
+template <typename node>
+void pre_order<node>::visit(auto& visit, auto& visit_subtree, auto& up) {
 	if (visit_subtree(root)) const_traverse<false, false>(root,
 					visit, visit_subtree, up, do_nothing);
 }
 
-template <typename node_t>
-void pre_order<node_t>::visit(auto& visit) {
+template <typename node>
+void pre_order<node>::visit(auto& visit) {
 	const_traverse<false, false>(root, visit, all, identity, do_nothing);
 }
 
-template <typename node_t>
-void pre_order<node_t>::search(auto& visit, auto& visit_subtree, auto& up,
+template <typename node>
+void pre_order<node>::search(auto& visit, auto& visit_subtree, auto& up,
 	auto& between)
 {
 	if (visit_subtree(root)) const_traverse<true, false>(root,
 					visit, visit_subtree, up, between);
 }
 
-template <typename node_t>
-void pre_order<node_t>::search(auto& visit, auto& visit_subtree, auto& up) {
+template <typename node>
+void pre_order<node>::search(auto& visit, auto& visit_subtree, auto& up) {
 	if (visit_subtree(root)) const_traverse<true, false>(root,
 					visit, visit_subtree, up, do_nothing);
 }
 
-template <typename node_t>
-void pre_order<node_t>::search(auto& visit) {
+template <typename node>
+void pre_order<node>::search(auto& visit) {
 	const_traverse<true, false>(root, visit, all, identity, do_nothing);
 }
 
-template <typename node_t>
-void pre_order<node_t>::visit_unique(auto& visit, auto& visit_subtree, auto& up)
+template <typename node>
+void pre_order<node>::visit_unique(auto& visit, auto& visit_subtree, auto& up)
 {
 	if (visit_subtree(root)) const_traverse<false, true>(root,
 					visit, visit_subtree, up, do_nothing);
 }
 
-template <typename node_t>
-void pre_order<node_t>::visit_unique(auto& visit) {
+template <typename node>
+void pre_order<node>::visit_unique(auto& visit) {
 	const_traverse<false, true>(root, visit, all, identity, do_nothing);
 }
 
-template <typename node_t>
-void pre_order<node_t>::search_unique(auto&visit, auto& visit_subtree, auto& up)
+template <typename node>
+void pre_order<node>::search_unique(auto&visit, auto& visit_subtree, auto& up)
 {
 	if (visit_subtree(root)) const_traverse<true, true>(root,
 					visit, visit_subtree, up, do_nothing);
 }
 
-template <typename node_t>
-void pre_order<node_t>::search_unique(auto&visit) {
+template <typename node>
+void pre_order<node>::search_unique(auto&visit) {
 	const_traverse<true, true>(root, visit, all, identity, do_nothing);
 }
 
 #ifdef MEASURE_TRAVERSER_DEPTH
-template <typename node_t>
-std::pair<size_t, size_t> pre_order<node_t>::get_tree_depth_and_size() {
+template <typename node>
+std::pair<size_t, size_t> pre_order<node>::get_tree_depth_and_size() {
 	size_t c_depth = depth;
 	size_t t_max_depth = depth;
 	size_t size;
@@ -493,13 +493,13 @@ std::pair<size_t, size_t> pre_order<node_t>::get_tree_depth_and_size() {
 }
 #endif //MEASURE_TRAVERSER_DEPTH
 
-template <typename node_t>
+template <typename node>
 template<bool break_on_change, size_t slot, bool unique>
-tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
+tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 {
 	if (n == nullptr) return nullptr;
-	// std::unordered_map<node_t, node_t, std::hash<node_t>,
-	// 	traverser_cache_equality<node_t>> cache;
+	// std::unordered_map<node_t, node_t, std::hash<node>,
+	// 	traverser_cache_equality<node>> cache;
 	std::unordered_map<tref, tref> cache;
 	trefs stack;
 	std::vector<size_t> upos;
@@ -674,13 +674,13 @@ tref pre_order<node_t>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 	}
 }
 
-template <typename node_t>
+template <typename node>
 template<bool search, bool unique>
-void pre_order<node_t>::const_traverse(tref n, auto& visitor,
+void pre_order<node>::const_traverse(tref n, auto& visitor,
 	auto& visit_subtree, auto& up, auto& between)
 {
 	if (n == nullptr) return;
-	typename lcrs_tree<node_t>::subtree_set cache; // TODO subtree_unordered_set
+	subtree_set<node> cache; // TODO subtree_unordered_set
 	std::vector<tref> stack;
 	std::vector<size_t> upos;
 	auto get_parent = [&upos, &stack]() -> tref {
@@ -769,32 +769,32 @@ void pre_order<node_t>::const_traverse(tref n, auto& visitor,
 	}
 }
 
-template <typename node_t>
-morris_post_order<node_t>::morris_post_order(tref n) : root(n) {}
+template <typename node>
+morris_post_order<node>::morris_post_order(tref n) : root(n) {}
 
-template <typename node_t>
-void morris_post_order<node_t>::search(auto &visit) {
+template <typename node>
+void morris_post_order<node>::search(auto &visit) {
 	traverse(root, visit);
 }
 
-template<typename node_t>
-void morris_post_order<node_t>::traverse(tref &root, auto &f) {
+template<typename node>
+void morris_post_order<node>::traverse(tref &root, auto &f) {
 	if (!root) return;
-	tref dummy = bintree<node_t>::get({}, root, nullptr);
+	tref dummy = bintree<node>::get({}, root, nullptr);
 	tref curr = dummy;
 	while (curr) {
-		const auto& curr_node = bintree<node_t>::get(curr);
+		const auto& curr_node = bintree<node>::get(curr);
 		if (!curr_node.l) {
 			curr = curr_node.r;
 		} else {
 			tref pred = curr_node.l;
 			while (true) {
 				const auto& pred_node =
-						bintree<node_t>::get(pred);
+						bintree<node>::get(pred);
 				if (!pred_node.r || pred_node.r == curr) break;
 				pred = pred_node.r;
 			}
-			auto& pred_r = bintree<node_t>::get(pred).r;
+			auto& pred_r = bintree<node>::get(pred).r;
 			if (!pred_r) {
 				const_cast<tref&>(pred_r) = curr;
 				curr = curr_node.l;
@@ -806,14 +806,14 @@ void morris_post_order<node_t>::traverse(tref &root, auto &f) {
 		}
 	}
 }
-template <typename node_t>
-void morris_post_order<node_t>::traverse_right_list(tref from, auto &f) {
+template <typename node>
+void morris_post_order<node>::traverse_right_list(tref from, auto &f) {
 	if (!from) return;
 	tref prev = nullptr;
 	tref curr = from, next;
 	// Reverse right pointers
 	while (curr) {
-		const auto& curr_node = bintree<node_t>::get(curr);
+		const auto& curr_node = bintree<node>::get(curr);
 		next = curr_node.r;
 		const_cast<tref&>(curr_node.r)  = prev;
 		prev = curr;
@@ -823,7 +823,7 @@ void morris_post_order<node_t>::traverse_right_list(tref from, auto &f) {
 	curr = prev;
 	prev = nullptr;
 	while (curr) {
-		const auto& curr_node = bintree<node_t>::get(curr);
+		const auto& curr_node = bintree<node>::get(curr);
 		next = curr_node.r;
 		const_cast<tref&>(curr_node.r) = prev;
 		f(curr);

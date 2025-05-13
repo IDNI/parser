@@ -153,7 +153,7 @@ struct find_visitor {
 // former rewriter predicate API traversing and transformations
 
 // visitor that traverse the tree in post-order (avoiding visited nodes).
-template <typename node_t, typename wrapped_t, typename predicate_t>
+template <typename node, typename wrapped_t, typename predicate_t>
 struct post_order_traverser {
 	post_order_traverser(wrapped_t& wrapped, predicate_t& query);
 	tref operator()(tref n);
@@ -164,7 +164,7 @@ private:
 };
 
 // visitor that traverse the tree in post-order (avoiding visited nodes).
-template <typename node_t, typename wrapped_t, typename predicate_t>
+template <typename node, typename wrapped_t, typename predicate_t>
 struct post_order_query_traverser {
 	post_order_query_traverser(wrapped_t& wrapped, predicate_t& query);
 	tref operator()(tref n);
@@ -176,7 +176,7 @@ private:
 };
 
 // visitor that traverse the tree in post-order (repeating visited nodes if necessary).
-template <typename node_t, typename wrapped_t, typename predicate_t>
+template <typename node, typename wrapped_t, typename predicate_t>
 struct post_order_tree_traverser {
 	post_order_tree_traverser(wrapped_t& wrapped, predicate_t& query);
 	tref operator()(tref n);
@@ -187,7 +187,7 @@ private:
 };
 
 // Do not use. Use post_order or pre_order instead depending on the needs.
-template <typename node_t>
+template <typename node>
 struct post_order_recursive_traverser {
 	auto operator() (tref n, auto& query, auto& wrapped);
 private:
@@ -196,22 +196,22 @@ private:
 
 // visitor that produces nodes transformed accordingly to the
 // given transformer. It only works with post order traversals.
-template <typename node_t, typename wrapped_t>
+template <typename node, typename wrapped_t>
 struct map_transformer {
 	map_transformer(wrapped_t& wrapped);
 	tref operator()(tref& n);
-	std::map<tref, tref> changes;
+	subtree_map<node, tref> changes;
 	wrapped_t& wrapped;
 };
 
 // visitor that produces nodes transformed accordingly to the
 // given transformer. It only works with post order traversals.
-template <typename node_t, typename wrapped_t>
+template <typename node, typename wrapped_t>
 struct map_node_transformer {
 	// REVIEW (MEDIUM) check the implementation of this transformer, it seems buggy
 	map_node_transformer(wrapped_t& wrapped);
 	tref operator()(tref n);
-	std::map<tref, tref> changes;
+	subtree_map<node, tref> changes;
 	wrapped_t& wrapped;
 };
 
@@ -219,21 +219,21 @@ struct map_node_transformer {
 // given transformer. It only works with post order traversals.
 //
 // TODO (MEDIUM) merge replace and replace_node transformers into one.
-template <typename node_t, typename wrapped_t>
+template <typename node, typename wrapped_t>
 struct replace_node_transformer {
 	replace_node_transformer(wrapped_t& wrapped);
 	tref operator()(tref n);
-	std::map<tref, tref> changes;
+	subtree_map<node, tref> changes;
 	wrapped_t& wrapped;
 };
 
 // visitor that produces nodes transformed accordingly to the
 // given transformer. It only works with post order traversals.
-template <typename node_t>
+template <typename node>
 struct replace_transformer {
-	replace_transformer(typename lcrs_tree<node_t>::subtree_map& changes);
+	replace_transformer(subtree_map<node, tref>& changes);
 	tref operator()(tref n);
-	typename lcrs_tree<node_t>::subtree_map& changes;
+	subtree_map<node, tref>& changes;
 private:
 	tref replace(tref n);
 };
@@ -248,9 +248,9 @@ private:
 // parameter.
 //
 // It should allow to detects matches in the middle of a tree.
-// template <typename node_t, typename is_capture_t>
+// template <typename node, typename is_capture_t>
 // struct pattern_matcher {
-// 	using tree = lcrs_tree<node_t>;
+// 	using tree = lcrs_tree<node>;
 // 	pattern_matcher(tref pattern, tree::structural_tref_map& env,
 // 		const is_capture_t& is_capture);
 // 	bool operator()(tref n);
@@ -263,18 +263,18 @@ private:
 // 	bool match(tref p, tref n);
 // };
 
-template <typename node_t, typename is_capture_t>
+template <typename node, typename is_capture_t>
 struct pattern_matcher2 {
 	pattern_matcher2(const rewriter::rule& r, const is_capture_t& is_capture);
 	bool operator()(tref n);
 	tref replace_root(tref n);
-	typename lcrs_tree<node_t>::subtree_map changes{};
+	subtree_map<node, tref> changes{};
 private:
-	using tree = lcrs_tree<node_t>;
+	using tree = lcrs_tree<node>;
 	bool match(tref p, tref n);
 	const rewriter::rule& r;
 	const is_capture_t& is_capture;
-	lcrs_tree<node_t>::subtree_map env;
+	subtree_map<node, tref> env;
 };
 
 
@@ -284,15 +284,14 @@ private:
 // TODO (LOW) create an env in operator() and pass it as a parameter to match, if
 // a  match occurs, copy the data from the temp env to the env passed as
 // parameter.
-template <typename node_t, typename is_capture_t, typename predicate_t>
+template <typename node, typename is_capture_t, typename predicate_t>
 struct pattern_matcher_if {
-	pattern_matcher_if(tref pattern,
-		typename lcrs_tree<node_t>::subtree_map& env,
+	pattern_matcher_if(tref pattern, subtree_map<node, tref>& env,
 		is_capture_t& is_capture, predicate_t& predicate);
 	bool operator()(tref n);
 	tref matched = nullptr;
 	tref pattern;
-	typename lcrs_tree<node_t>::subtree_map& env;
+	subtree_map<node, tref>& env;
 	is_capture_t& is_capture;
 	predicate_t& predicate;
 private:
@@ -300,79 +299,79 @@ private:
 };
 
 // delete all top nodes that satisfy a predicate.
-template <typename node_t, typename predicate_t>
+template <typename node, typename predicate_t>
 tref trim_top(tref input, predicate_t& query);
 
 // select all top nodes that satisfy a predicate and return them.
-template <typename node_t, typename predicate_t>
+template <typename node, typename predicate_t>
 trefs select_top(tref input, predicate_t& query);
 
 // select all subnodes that satisfy a predicate according to the extractor and return them.
-template <typename node_t, typename predicate_t, typename extractor_t>
+template <typename node, typename predicate_t, typename extractor_t>
 trefs select_subnodes(tref input, predicate_t& query, extractor_t extractor);
 
 // select all nodes that satisfy a predicate and return them.
-template <typename node_t, typename predicate_t>
+template <typename node, typename predicate_t>
 trefs select_all(tref input, predicate_t& query);
 
 // Select all nodes in input that satisfy query ignoring subtrees under a node satisfying until
-template <typename node_t>
+template <typename node>
 trefs select_all_until(tref input, const auto& query, const auto& until);
 
 // Select top nodes in input that satisfy query ignoring subtrees under a node satisfying until
-template <typename node_t>
+template <typename node>
 trefs select_top_until(tref input, const auto& query, const auto& until);
 
 // find the first node that satisfy a predicate and return it.
-template <typename node_t, typename predicate_t>
+template <typename node, typename predicate_t>
 tref find_top(tref input, predicate_t& query);
 
 // Select single top node in input that satisfy query ignoring subtrees under a node satisfying until
-template <typename node_t>
+template <typename node>
 tref find_top_until(tref input, const auto& query, const auto& until);
 
 // find the first node that satisfy a predicate and return it.
-template <typename node_t, typename predicate_t>
+template <typename node, typename predicate_t>
 tref find_bottom(tref input, predicate_t& query);
 
-template <typename node_t>
+template <typename node>
 tref replace(tref n, const std::map<tref, tref>& changes);
 
-template <typename node_t>
-tref replace(tref n, const typename lcrs_tree<node_t>::subtree_map& changes);
+template <typename node>
+tref replace(tref n, const subtree_map<node, tref>& changes);
 
-template <typename node_t>
+template <typename node>
 tref replace(tref n, tref replace, tref with);
 
-template <typename node_t>
+template <typename node>
 tref replace_with(tref n, tref with, tref inp);
 
 // Replace nodes in n according to changes while skipping subtrees that don't satisfy query
-template <typename node_t, typename predicate_t>
-tref replace_if(tref n, const typename lcrs_tree<node_t>::subtree_map& changes,
+template <typename node, typename predicate_t>
+tref replace_if(tref n, const subtree_map<node, tref>& changes,
 	predicate_t& query);
 
 // Replace nodes in n according to changes while skipping subtrees that satisfy query
-template <typename node_t, typename predicate_t>
-tref replace_until(tref n, const typename lcrs_tree<node_t>::subtree_map& changes,
+template <typename node, typename predicate_t>
+tref replace_until(tref n, const subtree_map<node, tref>& changes,
 	predicate_t& query);
 
 // TODO (LOW) consider adding a similar functino for replace_node...
 
 
 // apply a rule to a tree using the predicate to pattern_matcher.
-template <typename node_t, typename is_capture_t>
+template <typename node, typename is_capture_t>
 tref apply_rule(const rewriter::rule& r, tref n, const is_capture_t& c);
 
 // apply a rule to a tree using the predicate to pattern_matcher and skipping
 // unnecessary subtrees
-template <typename node_t, typename is_capture_t, typename predicate_t>
+template <typename node, typename is_capture_t, typename predicate_t>
 tref apply_if(const rewriter::rule& r, tref n,
 	is_capture_t& c, predicate_t& predicate);
 
 // apply a substitution to a rule according to a given matcher, this method is
 // use internaly by apply and apply with skip.
-template <typename node_t, typename matcher_t>
+template <typename node, typename matcher_t>
 tref apply(tref s, tref n, matcher_t& matcher);
 
 } // idni::rewriter namespace
