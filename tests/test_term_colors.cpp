@@ -14,6 +14,7 @@
 #include "utility/term_colors.h"
 
 using namespace std;
+using namespace idni;
 using namespace idni::term;
 
 

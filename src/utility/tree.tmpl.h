@@ -318,6 +318,7 @@ const lcrs_tree<T>& lcrs_tree<T>::get(const htree::sp& h) {
 
 template <typename T>
 const lcrs_tree<T>& lcrs_tree<T>::get(tref id) {
+	DBG(assert(id != nullptr);)
 	return (const lcrs_tree<T>&) bintree<T>::get(id);
 }
 
@@ -563,15 +564,44 @@ template <typename T>
 std::ostream& lcrs_tree<T>::print_in_line(std::ostream& os,
 	std::string open, std::string close, std::string sep) const
 {
-	auto on_enter = [&os, open](tref n) {
+
+// #define DEBUG_PRINT_IN_LINE
+
+	auto on_enter = [&os, open](tref n, [[maybe_unused]] tref parent) {
+#ifdef DEBUG_PRINT_IN_LINE
+		auto nt = lcrs_tree<T>::get(n).value;
+		auto pnt = parent ? lcrs_tree<T>::get(parent).value : T{};
+		std::cerr << "[" << nt << " " << pnt << "]";
+		os << "<" << get(n).value << ">";
+#else // DEBUG_PRINT_IN_LINE
+
 		os << get(n).value;
+
+#endif // DEBUG_PRINT_IN_LINE
+
 		if (get(n).has_child()) os << open;
 	};
-	auto on_leave = [&os, close](tref n) {
+	auto on_leave = [&os, close](tref n, [[maybe_unused]] tref parent) {
+#ifdef DEBUG_PRINT_IN_LINE
+		auto nt = lcrs_tree<T>::get(n).value;
+		auto pnt = parent ? lcrs_tree<T>::get(parent).value : T{};
+		std::cerr << "\n\t[/" << nt << " " << pnt << "/]";
+#endif // DEBUG_PRINT_IN_LINE
+
 		if (get(n).has_child()) os << close;
 	};
-	auto on_between = [&os, sep](tref) {
+	auto on_between = [&os, sep](
+		[[maybe_unused]] tref n, [[maybe_unused]] tref parent) {
+#ifdef DEBUG_PRINT_IN_LINE
+		auto nt = lcrs_tree<T>::get(n).value;
+		auto pnt = parent ? lcrs_tree<T>::get(parent).value : T{};
+		std::cerr << " [|" << nt << " " << pnt << "|]";
+		os << "<" << sep << ">";
+#else // DEBUG_PRINT_IN_LINE
+
 		os << sep;
+
+#endif // DEBUG_PRINT_IN_LINE
 	};
 	pre_order<T>(get()).visit(on_enter, all, on_leave, on_between);
 	return os;
