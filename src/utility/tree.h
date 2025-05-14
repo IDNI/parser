@@ -588,10 +588,23 @@ struct lcrs_tree : public bintree<T> {
 	/**
 	 * @brief Print the tree to an ostream in line
 	 * @param os The ostream to print to
-	 * @param l The indentation level
+	 * @param open The opening string
+	 * @param close The closing string
+	 * @param sep The separator string
 	 * @return The ostream
 	 */
 	std::ostream& print_in_line(std::ostream& os,
+		std::string open = " { ", std::string close = " }",
+		std::string sep = ", ") const;
+
+	/**
+	 * @brief Print the tree to a string in line
+	 * @param open The opening string
+	 * @param close The closing string
+	 * @param sep The separator string
+	 * @return The string
+	 */
+	std::string print_in_line_to_str(
 		std::string open = " { ", std::string close = " }",
 		std::string sep = ", ") const;
 

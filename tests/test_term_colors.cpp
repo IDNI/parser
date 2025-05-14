@@ -74,7 +74,6 @@ color_group g_backgrounds(background_code, background_code_names);
 
 int main() {
 	const string s("Hello World!");
-	colors TC;
 	auto print_color_ = [&](const string& code, const string& name) {
 		for (size_t i = 0; i != 12 - code.size(); ++i) cout << " ";
 		cout << code;

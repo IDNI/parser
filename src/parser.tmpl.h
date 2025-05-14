@@ -28,8 +28,6 @@ std::ostream& operator<<(std::ostream& os,
 					<< obj.second[1] << "]";
 }
 
-static inline idni::term::colors TC;
-
 #ifndef PARSER_BINTREE_FOREST
 template <typename C, typename T>
 typename forest<typename parser<C,T>::pnode>::node

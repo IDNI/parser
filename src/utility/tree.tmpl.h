@@ -578,6 +578,14 @@ std::ostream& lcrs_tree<T>::print_in_line(std::ostream& os,
 }
 
 template <typename T>
+std::string lcrs_tree<T>::print_in_line_to_str(
+	std::string open, std::string close, std::string sep) const
+{
+	std::stringstream ss;
+	return print_in_line(ss, open, close, sep), ss.str();
+}
+
+template <typename T>
 std::ostream& lcrs_tree<T>::dump(std::ostream& os, tref n, bool subtree) {
 	const auto& t = get(n);
 	os << t.value << " [" << n ;
