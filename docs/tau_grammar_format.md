@@ -1,8 +1,8 @@
 [back to index](../README.md#tgf---tau-grammar-form)
 
-# Tau Grammar Form
+# Tau Grammar Format
 
-TGF is a form for describing grammars. This library also provides a [`tgf`](tgf.md) parser, [`tgf tool`](tgf-tool.md) CLI for viewing, testing and debugging TGF grammars and generating C++ parsers.
+TGF is a format for describing grammars. This library also provides a [`tgf`](tgf.md) parser, [`tgf tool`](tgf-tool.md) CLI for viewing, testing and debugging TGF grammars and generating C++ parsers.
 
 ## TGF syntax
 

@@ -950,7 +950,7 @@ struct std::hash<idni::lit<C, T>> {
 #include "grammar.tmpl.h"       // for grammar and related
 #include "parser.tmpl.h"        // for parser
 #include "parser_result.tmpl.h" // for parse::result
-#include "tgf.h"                // Tau Grammar Form
+#include "tgf.h"                // Tau Grammar Format
 
 #ifdef DEBUG
 #include "devhelpers.h"   // various helpers for converting forest

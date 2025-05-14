@@ -6,7 +6,7 @@
 template <typename C = char, typename T = C> struct tgf;
 ```
 
-The simplest way to create a grammar is to use Tau Grammar form which is an EBNF-like language for describing grammars.
+The simplest way to create a grammar is to use Tau Grammar Format which is an EBNF-like language for describing grammars.
 
 Library implements a TGF parser which parses TGF from a string or from a file and it transforms the parsed forest into a `grammar` which can be used by a `parser`.
 
