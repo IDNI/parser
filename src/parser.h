@@ -892,7 +892,7 @@ struct std::hash<idni::lit<C, T>> {
 #include "parser_tree.tmpl.h" // for parser::tree
 #include "parser_result.tmpl.h" // for parser::result
 #include "get_shaped_tree2.tmpl.h"
-#include "tgf.h"                // Tau Grammar Form
+#include "tgf.h"                // Tau Grammar Format
 
 #ifdef DEBUG
 #include "utility/devhelpers.h"   // various helpers for converting forest

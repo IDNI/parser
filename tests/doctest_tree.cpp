@@ -109,7 +109,6 @@ TEST_SUITE("subtree equality") {
 	}
 
 	TEST_CASE_FIXTURE(test_tree_fixture, "subtree_set") {
-		std::cout << chtree::get(in).print_to_str() << std::endl;
 		subtree_set<char> s;
 		s.insert(in);
 		s.insert(chtree::get(in).first());

@@ -241,7 +241,7 @@ int tgf_run(int argc, char** argv) {
 		} else args.push_back(argv[i]);
 
 	cli cl("tgf", args, cmds, "repl", options);
-	cl.set_description("Tau Grammar Form (TGF) tool");
+	cl.set_description("Tau Grammar Format (TGF) tool");
 	cl.set_help_header("tgf <TGF file>");
 
 	// process args and exit if status not 0

@@ -13,7 +13,7 @@ It also provides a `tgf` tool which takes a grammar described in a TGF file and 
 
 - Boolean (including conjunctive) grammars
 	- C++ structures with operators for [creating grammars programatically](docs/programatic_grammar.md)
-	- [TGF](docs/tgf.md) - Tau Grammar Form language for describing grammars in an EBNF-like format
+	- [TGF](docs/tgf.md) - Tau Grammar Format language for describing grammars in an EBNF-like format
 - Earley based parser with garbage collection producing parse forest containing all the parsed trees
 - scannerless (lexerless) parsing
 - forest traversal with callbacks and extraction of trees and graphs to deal with transformations and with ambiguity
@@ -45,7 +45,7 @@ A **production rule** consists of two parts: a left-hand side (LHS) and a right-
 
 **EBNF** or **Extended Backus–Naur form** is a family of metasyntax notations, any of which can be used to express a context-free grammar.
 
-**TGF** or **Tau Grammar Form** is an EBNF based form to describe grammars which are usable by this library. TGF understands EBNF syntax (+, *, [] and {}) so it is easier to define repetition or optionality.
+**TGF** or **Tau Grammar Format** is an EBNF based format to describe grammars which are usable by this library. TGF understands EBNF syntax (+, *, [] and {}) so it is easier to define repetition or optionality.
 
 
 ## Namespace
@@ -87,7 +87,7 @@ Click on the type name in the following list to see more detailed documentation 
 - [`forest`](docs/forest.md) - a result of parsing containing all the parsed trees. Provides means of traversal or extraction of trees or graphs.
 - [`forest::graph`](docs/forest_graph.md) - a graph extracted from a forest
 - [`forest::tree`](docs/forest_tree.md) - a tree extracted from a graph
-- [`tgf`](docs/tgf.md) - Tau Grammar Form parser - reads a grammar in TGF format from a string or a file. An alternative way to describe a grammar instead of creating it programatically.
+- [`tgf`](docs/tgf.md) - Tau Grammar Format parser - reads a grammar in TGF format from a string or a file. An alternative way to describe a grammar instead of creating it programatically.
 - [`traverser`](docs/traverser.md) - struct for traversing and accessing rewriter trees
 - [`rewriting`](docs/rewriting.md) - API for rewriting a resulting parse tree
 - [`measure`](docs/measure.md) - simple struct for measuring time
@@ -108,9 +108,9 @@ There are several areas covered by functions provided by this library
 - [devhelpers](docs/devhelpers.md) - helper forest transformations to various formats (TML facts, TML rules, DOT) useful when developing a parser
 
 
-## TGF - Tau Grammar Form
+## TGF - Tau Grammar Format
 
-TGF is an EBNF-based form to describe grammars. Specification of the form can be found on page [`Tau Grammar Form`](docs/tau_grammar_form.md)
+TGF is an EBNF-based format to describe grammars. Specification of the format can be found on page [`Tau Grammar Format`](docs/tau_grammar_format.md)
 
 
 ## TGF tool
