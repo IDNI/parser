@@ -1,35 +1,107 @@
-# IDNI parser library
+# The Tau Parsing Library
 
-This C++ parser generator was created in an effort to facilitate the development of the Tau language. The predecessor to the Tau language was TML and its parser was hand-coded in C++.
-As the TML language evolved in complexity, it became increasingly difficult to evolve the C++ parser to include all the language features we wanted to add to TML.
-That is why at the beginning of the Tau project, we started by first developing this parser generator based on the Earley parsing algorithm. It afforded us the ability to
-effortlessly evolve the syntax of Tau language as we wished without the need to maintain very complex C++ code. We chose the Earley parsing algorithm because it is capable
-of parsing any context free language while remaining efficient even in the presence of ambiguities in the grammar.
+The Tau parsing library is a high-performance, industrial-strength, continuously maintained parsing tool. It is a C++ library able to parse, and generate a parser to, any Context Free Grammar (CFG) and even all Boolean grammars. 
 
-To make it even easier to define grammars, we created TGF (or the Tau Grammar Format), an EBNF-like language for describing boolean grammars and included a `tgf` tool
-which takes a grammar described in a TGF file and generates C++ code of the corresponding parser. It can also help debug the grammar.
+Compared to existing parsing solutions, the Tau Parsing Library stands out with it simplicity and robustness: just give it a grammar and an input string, and it will give you a representation of all possible parse trees, without any need for additional information, configuration, or callbacks that other CFG parsers commonly require you to provide.
+
+
+# Generate a parser in 3 easy steps:
+
+First, define the grammar using the Tau Grammar Format (TGF), which is very similar to EBNF.
+
+	@use char classes space, digit.  # introduce space and digit native productions
+
+	start => _ expr _.
+
+	expr  =>  ( '(' _ expr _ ')'  ):group
+		| ( expr _ '-' _ expr ):sub
+		| ( expr _ '+' _ expr ):add
+		| ( expr _ '/' _ expr ):div
+		| ( expr _ '*' _ expr ):mul
+		| ( '+' _ expr        ):pos
+		| ( '-' _ expr        ):neg
+		| ( digit+            ):number.
+
+	_     => space*.                 # optional white space of any length
+
+
+
+Second, use the TGF command line utility to translate your TGF file into a parser header file using just one command.
+
+	tgf basic_arithmetic.tgf gen
+
+
+Finally, include the parser header file in your C++ program and initialize your parser object. The parser object can then parse any valid input string in your grammar and return a parse forest or a syntax error.
+
+	#include "basic_arithmetic_parser.generated.h"
+
+	int main() {
+
+		std::string input = "-12*5"; // input expression
+
+		// run parser and get a parse result
+		basic_arithmetic_parser::result r = basic_arithmetic_parser::instance()
+						.parse(input.c_str(), input.size());
+
+		// check if any successfully parsed tree was found
+		if (!r.found) {
+			std::cerr << r.parse_error << std::endl;
+			return 1;
+		}
+
+		// get the parse tree from the result and print it to stdout
+		r.get_tree()->to_print(std::cout);
+
+		return 0;
+	}
+
+
+Above program prints:
+
+	start(3)[0, 5]
+		_(4)[0, 0]
+		expr(5)[0, 5]
+			mul(12)[0, 5]
+				expr(5)[0, 3]
+					neg(18)[0, 3]
+						'-'[0, 1]
+						_(4)[1, 1]
+						expr(5)[1, 3]
+							number(20)[1, 3]
+								digit(2)[1, 2]
+									'1'[1, 2]
+								digit(2)[2, 3]
+									'2'[2, 3]
+				_(4)[3, 3]
+				'*'[3, 4]
+				_(4)[4, 4]
+				expr(5)[4, 5]
+					number(20)[4, 5]
+						digit(2)[4, 5]
+							'5'[4, 5]
+		_(4)[5, 5]
+
 
 
 ## Features
 
-- Boolean (including conjunctive) grammars
-	- C++ structures with operators for [creating grammars programmatically](docs/programatic_grammar.md)
-	- [TGF](docs/tgf.md) - Tau Grammar Format for describing grammars in an EBNF-like format
-- Earley based parser with garbage collection producing parse forest containing all the parsed trees
-- scannerless (lexerless) parsing
-- forest traversal with callbacks and extraction of trees and graphs to deal with transformations and with ambiguity
+- Boolean grammars
+- C++ API (docs/programatic_grammar.md)
+- [TGF](docs/tgf.md) - Tau Grammar Format for describing grammars in an EBNF-like format
+- Earley based parser with garbage collection producing parse forest containing a compressed representation of all the parsed trees
+
+- Forest traversal API with callbacks and extraction of trees and graphs to deal with transformations and with ambiguity
 - `tgf` tool to test grammars in TGF file or to generate a C++ code representing a parser for a given TGF file.
-- predefined or custom classes of characters defined by a function (`<cctype>`-like functions)
-- optional [recoding](docs/recoders.md) of an input into another type which can can be used for lexing, reencoding or accessing binary data
+- Predefined or custom classes of characters defined by a function (`<cctype>`-like functions)
+- Optional [recoding](docs/recoders.md) of an input string into another type which can can be used for lexing, reencoding or accessing binary data
 - [own UTF-8 support](docs/utf8.md)
-- no dependencies on other libraries
+
 
 
 ## How to use
 
-To use the library or `tgf` tool you first have to compile this project. This requires CMake and a compiler supporting C++23 with GNU extensions (`-std=gnu++23`).
-
-On Windows with Mingw-w64 you can use `w64-debug.sh` or `w64-release.sh` script, and for Linux there are `debug.sh` and `release.sh` scripts for compiling all source files. After successful compilation you can find the artifactis in `build-Debug` and `build-Release` folders.
+To build the library and the `tgf` tool requires CMake and a compiler supporting C++23 with GNU extensions (`-std=gnu++23`).
+Then, for Windows with Mingw-w64 you can use `w64-debug.sh` or `w64-release.sh` script, and for Linux there are `debug.sh` and `release.sh` scripts for compiling all source files. After successful compilation you can find the artifacts in `build-Debug` and `build-Release` folders.
 
 
 ### TGF tool
@@ -38,30 +110,31 @@ This library comes with a CLI executable `tgf` which features viewing, testing a
 
 More detailed information about this CLI can be found on page [`TGF tool`](docs/tgf_tool.md)
 
-TGF is an EBNF-based format to describe grammars. Specification of the form can be found on page [`Tau Grammar Format`](docs/tau_grammar_format.md).
+TGF is an EBNF-based format to describe grammars. Description of this format can be found on page [`Tau Grammar Format`](docs/tau_grammar_format.md).
 
 ## Tutorials
 
 ### CSV parser
 
-Beginner tutorial to quick start using this library.
+Beginner tutorial to quickly start using this library.
 
 You can learn how to use this library in a CSV parser tutorial.
 
-Part 1 shows a very simple parser with all it's required.
+Part 1 shows a very simple parser with all that is required.
 Each following part expands the previous one.
 Read comments since they are always related to a new or a changed code.
 
-- [part 1](examples/csv_parser1/main.cpp) - minimal parser of positive integers
+- [part 1](examples/csv_parser1/main.cpp) - minimal parser for positive integers
 - [part 2](examples/csv_parser2/main.cpp) - using predefined character classes
-- [part 3](examples/csv_parser3/main.cpp) - refactor parser into its struct
-- [part 4](examples/csv_parser4/main.cpp) - parse also negative integers
-- [part 5](examples/csv_parser5/main.cpp) - parse strings and nulls, traverse
-- [part 6](examples/csv_parser6/main.cpp) - parse comma separated values
-- [part 7](examples/csv_parser7/main.cpp) - parse new line separated rows
-- [part 8](examples/csv_parser8/main.cpp) - replace programmatically created grammar with a grammar in TGF
+- [part 3](examples/csv_parser3/main.cpp) - refactoring parser into its components
+- [part 4](examples/csv_parser4/main.cpp) - also parse negative integers
+- [part 5](examples/csv_parser5/main.cpp) - parse strings and nulls
+- [part 6](examples/csv_parser6/main.cpp) - parsing comma separated values
+- [part 7](examples/csv_parser7/main.cpp) - parsing new line separated rows
+- [part 8](examples/csv_parser8/main.cpp) - replacing the programmatically created grammar with a grammar in TGF
 - [part 9](examples/csv_parser9/main.cpp) - using EBNF syntax in TGF
-- [part 10](examples/csv_parser10/main.cpp), [csv.tgf](examples/csv_parser10/csv.tgf) - using tgf tool to generate a parser from a TGF file
+- [part 10](examples/csv_parser10/main.cpp), [csv.tgf](examples/csv_parser10/csv.tgf)
+- using tgf tool to generate a parser from a TGF file
 
 ### JSON parser
 
@@ -71,16 +144,17 @@ Read comments since they are always related to a new or a changed code.
 
 ### Basic terminology
 
-**Literal** refers to a specific value or sequence of characters that appears exactly as it is in the input or in the grammar rules. It represents a fixed, concrete element that must be matched in order for a particular rule or pattern to be satisfied.
-Literal can be terminal or non-terminal.
+The following terminology is standard:
 
-A **terminal** literal represents a specific token or value in the input language. It corresponds to the actual elements that appear in the input stream during parsing. Terminal literals are also referred to as terminals or terminal symbols.
+**Literal** is either a terminal or a non-terminal.
 
-A **non-terminal** literal represents a syntactic category or a placeholder that can be replaced by a sequence of terminals and/or non-terminals. Non-terminal literals are used to define the structure of the language and serve as intermediate building blocks for generating valid sentences or expressions.
+A **terminal** literal is a fixed single character (from the chosen alphabet).
 
-A **production rule** consists of two parts: a left-hand side (LHS) and a right-hand side (RHS). The left-hand side contains a single non-terminal symbol, and the right-hand side contains a sequence of terminals, non-terminals, or both. The production rule indicates that the non-terminal on the left-hand side can be rewritten or expanded into the sequence of symbols on the right-hand side.
+A **non-terminal** literal represents a syntactic category or a placeholder that can be replaced by a sequence of terminals and/or non-terminals. Non-terminal literals are used to define the structure of the language.
 
-**Grammar** is a formal system that defines the syntax and structure of a language. It consists of terminals, non-terminals, production rules and a starting symbol (which is usually a non-terminal).
+A **production rule** consists of two parts: a left-hand side (LHS) and a right-hand side (RHS). The left-hand side contains a single non-terminal symbol, and the right-hand side contains a sequence of terminals and non-terminals. The production rule indicates that the non-terminal on the left-hand side can be rewritten or expanded into the sequence of symbols on the right-hand side.
+
+**Grammar** is a formal system that defines a set of strings (a language). It consists of terminals, non-terminals, production rules and a starting symbol (which is a non-terminal).
 
 **Conjunctive Grammar** is a grammar which allows usage of conjunctions of literal sequences in production rules. The conjunction acts as a logical "AND" operation, indicating that all the conjuncted literal sequences must be matched for the whole rule to be satisfied.
 
@@ -90,25 +164,25 @@ A **production rule** consists of two parts: a left-hand side (LHS) and a right-
 
 **EBNF** or **Extended Backus–Naur form** is a family of metasyntax notations, any of which can be used to express a context-free grammar.
 
-**TGF** or **Tau Grammar Format** is an EBNF based form to describe grammars which are usable by this library. TGF understands EBNF syntax (+, *, [] and {}) so it is easier to define repetition or optionality.
+**TGF** or **Tau Grammar Format** is an EBNF based format to describe grammars which are usable by this library. TGF understands EBNF-like syntax (+, *, [] and {}) so it is easier to define repetition or optionality.
 
 ### Namespace
 
-Library uses an `idni` namespace for its declarations.
+The library uses an `idni` namespace for its declarations.
 
 For simplicity, all examples in library documentation expect declaration `using namespace idni;`.
 
-### Templating
+### Templates
 
-Most of the structures provided by this library are templates to enable generic parsing of any input data while parsing any type of terminals. Usually they are declared like this:
+Most of the structures provided by this library are templates in order to support arbitrary alphabets (terminals) as well as to generalize the concept of "string". Usually they are declared like this:
 
 `template <typename C = char, typename T = C> ...` where
-- `C` is an input type of input data (usually characters).
-- `T` is a type of a terminal.
+- `C` is the input type of the input data (usually characters).
+- `T` is the type of terminals.
 
-Fully supported and tested types are `char` and `char32_t` (Unicode support). Though it is possible to supply encoder and decoder functions to your parser and these can convert input elements of any type into terminals of any type.
+Fully supported and tested types are `char` and `char32_t` (including Unicode). Though it is possible to supply encoder and decoder functions to the parser to convert input elements of any type into terminals of any other type.
 
-If `T` differs from `C` it is required to provide decoder and encoder functions in `parser::options`. `parser` uses these recoders to convert input data into terminals and back. See [recoders](docs/recoders.md) for more information.
+If `T` differs from `C` it is required to provide decoder and encoder functions in `parser::options`. `parser` uses these decoders to convert input data into terminals and back. See [recoders](docs/recoders.md) for more information.
 
 <a name="overview-of-types"></a>
 
@@ -130,7 +204,7 @@ Click on the type name in the following list to see more detailed documentation 
 - [`forest`](docs/forest.md) - a result of parsing containing all the parsed trees. Provides means of traversal or extraction of trees or graphs.
 - [`forest::graph`](docs/forest_graph.md) - a graph extracted from a forest
 - [`forest::tree`](docs/forest_tree.md) - a tree extracted from a graph
-- [`tgf`](docs/tgf.md) - Tau Grammar Format parser - reads a grammar in TGF format from a string or a file. An alternative way to describe a grammar instead of creating it programatically.
+- [`tgf`](docs/tgf.md) - Tau Grammar Format parser - reads a grammar in TGF format from a string or a file. An alternative way to describe a grammar instead of creating it programmatically.
 - [`traverser`](docs/traverser.md) - struct for traversing and accessing rewriter trees
 - [`rewriting`](docs/rewriting.md) - API for rewriting a resulting parse tree
 - [`measure`](docs/measure.md) - simple struct for measuring time
