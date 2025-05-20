@@ -101,6 +101,9 @@ private:
 	template <typename N> friend struct bintree;
 };
 
+using htref  = htree::sp;
+using htrefs = std::vector<htref>;
+
 //------------------------------------------------------------------------------
 
 // common predicates / callbacks
