@@ -13,9 +13,13 @@
 #ifndef __IDNI__PARSER__DEFS_H__
 #define __IDNI__PARSER__DEFS_H__
 
+#include <cstddef>
 #include <cstdint>
 #include <iomanip>
 #include <functional>
+#ifdef DEBUG
+#	include <cxxabi.h>     // unmangle symbol names for debugging
+#endif
 
 #include "utility/hashing.h"
 
