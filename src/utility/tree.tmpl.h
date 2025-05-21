@@ -152,6 +152,12 @@ void bintree<T>::dump() {
 
 template <typename T>
 void bintree<T>::gc() {
+	std::unordered_set<tref> keep{};
+	gc(keep);
+}
+
+template <typename T>
+void bintree<T>::gc(std::unordered_set<tref>& keep) {
 
 	// DBG(dump();)
 	//DBG(htree::dump();)
@@ -169,6 +175,7 @@ void bintree<T>::gc() {
 
 	for (auto& x : M)
 		if (!x.second.expired()) mark(x.second.lock()->get(), mark);
+	for (auto& x : keep) mark(x, mark);
 
 	// do not run gc, if no handle expired or empty.
 	if (!M.size() || (next.size() == M.size())) {
@@ -303,6 +310,50 @@ bool lcrs_tree<T>::subtree_less(tref a, tref b) {
 	if (a == nullptr) return true;
 	if (b == nullptr) return false;
 	return lcrs_tree<T>::get(a) < lcrs_tree<T>::get(b);
+}
+
+//------------------------------------------------------------------------------
+// gc
+
+template <typename T>
+void lcrs_tree<T>::gc() {
+	std::unordered_set<tref> keep{};
+	gc(keep);
+}
+
+template <typename T>
+void lcrs_tree<T>::gc(std::unordered_set<tref>& keep) {
+
+	// DBG(dump();)
+	//DBG(htree::dump();)
+
+	//mark subtree
+	std::unordered_set<tref> next;
+	auto mark = [&next](tref r, auto& mark) -> void {
+		if (!next.insert(r).second) return;
+		if (bintree<T>::get(r).l != nullptr)
+			mark(bintree<T>::get(r).l, mark);
+	};
+	//check if any handle expired and needs to be garbaged
+	// otherwise mark all to be retained live
+
+	for (auto& x : bintree<T>::M)
+		if (!x.second.expired()) mark(x.second.lock()->get(), mark);
+	for (auto& x : keep) mark(x, mark);
+
+	// do not run gc, if no handle expired or empty.
+	if (!bintree<T>::M.size() || (next.size() == bintree<T>::M.size())) {
+		DBG(std::cout << "gc-do nothing:" << next.size() << "\n";)
+		return;
+	}
+	//delete non-reachable garbage nodes from M
+	for (auto it = bintree<T>::M.begin(); it != bintree<T>::M.end(); )
+		if (next.count(it->first.get()) == 0)
+			it = bintree<T>::M.erase(it);
+		else it++;
+
+	// DBG(dump();)
+	//DBG(htree::dump();)
 }
 
 //------------------------------------------------------------------------------

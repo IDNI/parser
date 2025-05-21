@@ -207,6 +207,12 @@ struct bintree {
 	static void gc();
 
 	/**
+	 * @brief Garbage collect tree nodes
+	 * @param keep The set of nodes to exclude from being gc-ed
+	 */
+	static void gc(std::unordered_set<tref>& keep);
+
+	/**
 	 * @brief Print the tree to an ostream.
 	 * @param os The ostream to print to.
 	 * @param l The indentation level.
@@ -283,6 +289,17 @@ struct lcrs_tree : public bintree<T> {
 	bool operator<(const lcrs_tree<T>& other) const;
 	static bool subtree_equals(tref a, tref b);
 	static bool subtree_less(tref a, tref b);
+
+	/**
+	 * @brief Garbage collect tree nodes
+	 */
+	static void gc();
+
+	/**
+	 * @brief Garbage collect tree nodes
+	 * @param keep The set of nodes to exclude from being gc-ed
+	 */
+	static void gc(std::unordered_set<tref>& keep);
 
 	/**
 	 * @brief Get node's tref
