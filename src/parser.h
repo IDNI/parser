@@ -312,17 +312,18 @@ public:
 		tree_range<tree> children_trees() const;
 
 		tref child(size_t n) const;
-		tref operator[](size_t n) const;
 		tref first()  const;
 		tref second() const;
 		tref third()  const;
 		tref only_child() const;
 
+		const tree& operator[](size_t n) const;
 		const tree& child_tree(size_t n) const;
 		const tree& first_tree()  const;
 		const tree& second_tree() const;
 		const tree& third_tree()  const;
 		const tree& only_child_tree() const;
+		const tree& right_sibling_tree() const;
 
 		std::ostream& print(std::ostream& o, size_t s = 0) const;
 

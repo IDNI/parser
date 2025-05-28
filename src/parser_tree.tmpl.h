@@ -115,9 +115,6 @@ template <typename C, typename T>
 tref parser<C, T>::tree::child(size_t n) const {return base_t::child(n);}
 
 template <typename C, typename T>
-tref parser<C, T>::tree::operator[](size_t n) const { return base_t::child(n); }
-
-template <typename C, typename T>
 tref parser<C, T>::tree::first() const { return base_t::first(); }
 
 template <typename C, typename T>
@@ -129,6 +126,11 @@ tref parser<C, T>::tree::third() const { return base_t::third(); }
 template <typename C, typename T>
 tref parser<C, T>::tree::only_child() const {
 	return base_t::only_child();
+}
+
+template <typename C, typename T>
+const parser<C, T>::tree& parser<C, T>::tree::operator[](size_t n) const {
+	return child_tree(n);
 }
 
 template <typename C, typename T>
@@ -154,6 +156,12 @@ const parser<C, T>::tree& parser<C, T>::tree::third_tree() const {
 template <typename C, typename T>
 const parser<C, T>::tree& parser<C, T>::tree::only_child_tree() const {
 	return tree::get(base_t::only_child());
+}
+
+template <typename C, typename T>
+const parser<C, T>::tree& parser<C, T>::tree::right_sibling_tree() const {
+	tref s = this->right_sibling(); DBG(assert(s != nullptr);)
+	return get(s);
 }
 
 template <typename C, typename T>
