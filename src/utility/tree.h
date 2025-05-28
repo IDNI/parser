@@ -197,6 +197,13 @@ struct bintree {
 	static tref get(const T& v, tref l, tref r);
 
 	/**
+	 * @brief Create a new tree node from a new value while keeping the left and right children
+	 * @param v The new value
+	 * @return The new tree node's tref id
+	 */
+	tref replace_value(const T& v) const;
+
+	/**
 	 * @brief Dump the tree (including all its nodes) to stdout
 	 */
 	static void dump();

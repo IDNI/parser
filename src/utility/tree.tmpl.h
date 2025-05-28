@@ -140,6 +140,9 @@ tref bintree<T>::get(const T& v, tref l, tref r) {
 }
 
 template <typename T>
+tref bintree<T>::replace_value(const T& v) const { return get(v, l, r); }
+
+template <typename T>
 void bintree<T>::dump() {
 	std::cout << "-----\n";
 	std::cout << "MB:" << M.size() << "\n";
@@ -627,6 +630,15 @@ std::ostream& lcrs_tree<T>::print_in_line(std::ostream& os,
 #else // DEBUG_PRINT_IN_LINE
 
 		os << get(n).value;
+		if (bool print_lcrs_pointers = false;
+			print_lcrs_pointers)
+		{
+			const auto& t = lcrs_tree<T>::get(n);
+			os << " [" << n ;
+			if (t.has_child())         os << " __ " << t.left_child();
+			if (t.has_right_sibling()) os << " >> " << t.right_sibling() << "] ";
+			os << "] ";
+		}
 
 #endif // DEBUG_PRINT_IN_LINE
 
