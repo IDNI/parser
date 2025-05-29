@@ -1,11 +1,10 @@
 # The Tau Parsing Library
 
-The Tau parsing library is a high-performance, industrial-strength, continuously maintained parsing tool. It is a C++ library able to parse, and generate a parser to, any Context Free Grammar (CFG) and even all Boolean grammars. 
+The Tau parsing library is a high-performance, industrial-strength, continuously maintained parsing tool. It is a C++ library that is able to parse, and generate a parser, to any Context Free Grammar (CFG) and even all Boolean grammars. 
+Compared to existing parsing solutions, the Tau Parsing Library stands out with its simplicity and robustness: just give it a grammar and an input string, and it will give you a representation of all possible parse trees, without any need for additional information, configuration, or callbacks that other CFG parsers commonly require you to provide.
 
-Compared to existing parsing solutions, the Tau Parsing Library stands out with it simplicity and robustness: just give it a grammar and an input string, and it will give you a representation of all possible parse trees, without any need for additional information, configuration, or callbacks that other CFG parsers commonly require you to provide.
 
-
-# Generate a parser in 3 easy steps:
+**Generate a parser in 3 easy steps**:
 
 First, define the grammar using the Tau Grammar Format (TGF), which is very similar to EBNF.
 
@@ -23,7 +22,6 @@ First, define the grammar using the Tau Grammar Format (TGF), which is very simi
 		| ( digit+            ):number.
 
 	_     => space*.                 # optional white space of any length
-
 
 
 Second, use the TGF command line utility to translate your TGF file into a parser header file using just one command.
@@ -85,22 +83,22 @@ Above program prints:
 
 ## Features
 
-- Boolean grammars
-- C++ API (docs/programatic_grammar.md)
-- [TGF](docs/tgf.md) - Tau Grammar Format for describing grammars in an EBNF-like format
-- Earley based parser with garbage collection producing parse forest containing a compressed representation of all the parsed trees
+- Boolean grammars.
+- C++ API (docs/programatic_grammar.md).
+- [TGF](docs/tgf.md) - Tau Grammar Format for describing grammars in an EBNF-like format.
+- Earley based parser with garbage collection producing parse forest containing a compressed representation of all the parsed trees.
 
-- Forest traversal API with callbacks and extraction of trees and graphs to deal with transformations and with ambiguity
+- Forest traversal API with callbacks and extraction of trees and graphs to deal with transformations and with ambiguity.
 - `tgf` tool to test grammars in TGF file or to generate a C++ code representing a parser for a given TGF file.
-- Predefined or custom classes of characters defined by a function (`<cctype>`-like functions)
-- Optional [recoding](docs/recoders.md) of an input string into another type which can can be used for lexing, reencoding or accessing binary data
-- [own UTF-8 support](docs/utf8.md)
+- Predefined or custom classes of characters defined by a function (`<cctype>`-like functions).
+- Optional [recoding](docs/recoders.md) of an input string into another type which can be used for lexing, reencoding or accessing binary data.
+- [own UTF-8 support](docs/utf8.md).
 
 
 
 ## How to use
 
-To build the library and the `tgf` tool requires CMake and a compiler supporting C++23 with GNU extensions (`-std=gnu++23`).
+To build the library, the `tgf` tool requires CMake and a compiler supporting C++23 with GNU extensions (`-std=gnu++23`).
 Then, for Windows with Mingw-w64 you can use `w64-debug.sh` or `w64-release.sh` script, and for Linux there are `debug.sh` and `release.sh` scripts for compiling all source files. After successful compilation you can find the artifacts in `build-Debug` and `build-Release` folders.
 
 
@@ -116,9 +114,7 @@ TGF is an EBNF-based format to describe grammars. Description of this format can
 
 ### CSV parser
 
-Beginner tutorial to quickly start using this library.
-
-You can learn how to use this library in a CSV parser tutorial.
+Quickly learn how to use this library in a beginner tutorial for a CSV parser.
 
 Part 1 shows a very simple parser with all that is required.
 Each following part expands the previous one.
