@@ -101,7 +101,7 @@ private:
 		~nptr_t() {
 			//DBG(std::cout <<"-"<< NodeT::nid().size() <<" "<<nc );
 			//if(id){
-				if ((nc == (NodeT::nid().size() + 1))) {
+				if (nc == (NodeT::nid().size() + 1)) {
 					//DBG(std::cout<<"GCing nodes:  "<< nc-1 <<std::endl);
 					nc--;
 					NodeT::nid().clear();
@@ -157,6 +157,7 @@ public:
 	const nodes_set& operator[](const node& p) const;
 	size_t count_trees() const;
 	size_t count_trees(const node& root) const;
+	std::pair<size_t, size_t> count_useful_nodes(const node& root) const;
 
 	bool is_binarized() const;
 	template<typename TraversableT>

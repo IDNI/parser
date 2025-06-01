@@ -17,17 +17,21 @@
 
 auto id = [] (tref n) { return n; };
 
+
+/*
 auto is_e = [] (tref n) {
         return chtree::get(n).value == 'e';
-};
+}; 
 
 auto is_not_e = [] (tref n) {
         return chtree::get(n).value != 'e';
 };
 
+
 auto is_b = [] (tref n) {
         return chtree::get(n).value == 'b';
 };
+*/
 
 auto is_not_b = [] (tref n) {
         return chtree::get(n).value != 'b';
@@ -38,6 +42,7 @@ auto tr_e_E = [] (tref n) {
         if (x.value == 'e') return bintree<char>::get('E', x.l, x.r);
         return n;
 };
+
 
 TEST_SUITE("post_order") {
 

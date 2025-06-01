@@ -799,7 +799,7 @@ private:
 	lit<C, T> get_nt(const item& i) const;
 	std::basic_string<C> get_fresh_tnt();
 	std::vector<item> back_track(const item& obj);
-
+	void remove_item(const item& i);
 	// parsing
 	result _parse(const parse_options& po);
 	std::pair<container_iter, bool> add(container_t& t, const item& i);

@@ -186,6 +186,32 @@ bool parser<C, T>::nullable(const item& i) const {
 	return i.dot < n_literals(i) && g.nullable(get_lit(i));
 }
 template <typename C, typename T>
+void parser<C, T>::remove_item(const item& i){
+	if(i.set == 0) return;
+	bool inserted = gcready.insert(i).second;
+	if (!inserted) return; // return if already in gc_ready
+	const container_t& cont = S[i.from];
+	for (auto it = cont.begin(); it != cont.end(); ++it){
+		if (it->set == 0) continue;
+		if (!completed(*it) && get_lit(*it) == get_nt(i)) {
+			auto rit = refi.find(*it);
+			if (rit == refi.end()){
+				continue;
+			}
+			if (--rit->second == 0) {
+				refi.erase(rit);
+				if (o.enable_gc) {
+					remove_item(*it);
+				}
+				else if (o.enable_gc) {
+					gcready.insert(*it);
+				}
+			}
+		}
+	}
+	return;
+}
+template <typename C, typename T>
 std::pair<typename parser<C, T>::container_iter, bool>
 	parser<C, T>::add(container_t& t, const item& i)
 {
@@ -312,7 +338,7 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 		// whence the item is completed, then
 		// decrement the refcount for the one
 		// that predicted and inserted it
-		if (refi.count(i) && refi[i] > 0) --refi[i];
+		//if (refi.count(i) && refi[i] > 0) --refi[i];
 		//return;
 	}
 	const container_t& cont = S[i.from];
@@ -329,15 +355,27 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 			continue;
 		}
 		//DBGP(std::cout << "neg: " << g[it->prod][it->con].neg << "\n";)
+		// j is parent of i, but with next non-terminal advanced
 		if (add(t, j).second) {
+			// — record the new GC‐edge for parent → j
+			DBGP(print(std::cout << "Add Edge: ", *it) << " --> ";)
+			DBGP(print(std::cout, j) << std::endl;)
+			++refi[*it];
+			
+			// — your existing “added to t2” debug line
 			DBGP(print(std::cout << TC.MAGENTA() <<
-				" +  adding to t2 \t\t\t", j) << TC.CLEAR() <<
-				"\n";)
+				" +  adding to t2 \t\t\t", j) << TC.CLEAR() << "\n";)
+
+			// — now remove the old GC‐edge for parent → i
+			DBGP(print(std::cout << "Remove Edge: ", *it) << " --> ";)
+			DBGP(print(std::cout, i) << std::endl;)
+			auto rit = refi.find(*it);
+			DBG(assert(rit != refi.end() && rit->second>0);)
+			if (--rit->second == 0) {
+				refi.erase(rit);
+				remove_item(*it);
+			}
 		}
-		// whence the item is completed, then
-		// decrement the refcount for the one
-		// that predicted and inserted it
-		if (refi.count(*it) && refi[*it] > 0) --refi[*it];
 	}
 	//gcready.insert(i);
 }
@@ -375,15 +413,11 @@ void parser<C, T>::scan(const item& i, size_t n, T ch) {
 		//when the item fails, decrement refcount of items that
 		//predicted it i.e predicting items ( only the one) for
 		// which refc was incremented when this item was predicted
-		const container_t& cont = S[i.from];
-		for (auto it = cont.begin(); it != cont.end(); ++it)
-			if (!completed(*it) && get_lit(*it) == get_nt(i) &&
-				refi.count(*it) && refi[*it] > 0) {
-					--refi[*it];
-					if(refi[*it] == 0 ) gcready.insert(*it);
-				}
-		//DBG(std::cout<< "GC: adding failing scan\n");
-		gcready.insert(i);
+		auto rit = refi.find(i);
+		if (rit != refi.end() && --rit->second == 0) {
+			refi.erase(rit);
+		}
+		remove_item(i);
 		return;
 	}
 	// by this time, terminal is advanced over
@@ -395,6 +429,9 @@ void parser<C, T>::scan(const item& i, size_t n, T ch) {
 	DBGP(print(std::cout << " +  adding from scan into S[" << j.set <<
 		"]: \t", j) << std::endl;)
 	S[j.set].insert(j), fromS[j.from].push_back(j.set);
+	DBGP(print(std::cout << "Add Edge: ", i) << " --> ";)
+    DBGP(print(std::cout, j) << std::endl;)
+	//++refi[i];
 }
 template <typename C, typename T>
 void parser<C, T>::scan_cc_function(const item& i, size_t n, T ch,
@@ -422,6 +459,9 @@ void parser<C, T>::scan_cc_function(const item& i, size_t n, T ch,
 		"] \t", k) << "\n";)
 	if (S.size() <= k.set) S.resize(k.set + 1);
 	S[k.set].insert(k), fromS[k.from].push_back(k.set);
+	DBGP(print(std::cout << "Add Edge: ", i) << " --> ";)  
+	DBGP(print(std::cout, k) << "\n";)
+	//++refi[i];
 	// i is scanned over and item k is completed so collectible.
 	if (!o.binarize) gcready.insert(i);
 	//gcready.insert(k);
@@ -577,7 +617,7 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 				if ((rm.set + o.gc_lag) <= n) {
 					if(refi.find(rm) != refi.end() && refi[rm] <= 0)
 						refi.erase(rm);
-					auto its= S[rm.set].find(rm);
+					auto its = S[rm.set].find(rm);
 					if( its != S[rm.set].end() ){
 						S[rm.set].erase(its);
 						MS(gcnt++;)
@@ -603,7 +643,9 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 	MS(std::cout << "\nGC: total input size = " << n;)
 	MS(std::cout << "\nGC: total remaining  = " << count;)
 	MS(std::cout << "\nGC: total collected  = " << gcnt;)
-	MS(std::cout << "\nGC: readysize = " << gcready.size();)
+	//MS(std::cout << "\nGC: unique collected  = " << unique_collected.size();)
+	MS(std::cout << "\nGC: gcready size = " << gcready.size();)
+	MS(std::cout << "\nGC: refi size = " << refi.size();)
 	MS(if (count + gcnt)
 		std::cout << "\nGC: % = " << 100*gcnt/(count+gcnt) <<std::endl);
 
@@ -622,6 +664,23 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 
 	bool fnd = found(po.start);
 	error err = fnd ? error{} : get_error();
+
+	MS(auto usen = f->count_useful_nodes(f->root());)
+	MS(auto usenc = usen.first + usen.second;)
+	
+	MS(std::cout << "\nGC: Useful nodes"
+		<<usen.first <<"+"<<usen.second << "=" << usenc <<"\n" );
+	
+	MS(if (count + gcnt)
+		std::cout << "\nGC: useful% = " << 100*(usenc)
+		/(count+gcnt) <<std::endl );
+	MS(if (count + gcnt -usenc)
+		std::cout << "\nGC: achieved% = " << 100*gcnt
+		/(count+gcnt - usenc) <<std::endl);
+	
+	MS(if (count + gcnt)
+		std::cout << "\nGC: potenial% = " << 100*(count+gcnt 
+		- usenc)/(count + gcnt) <<std::endl);
 
 #ifdef PARSER_BINTREE_FOREST
 	return result(g, std::move(in_), fr, fnd, err);

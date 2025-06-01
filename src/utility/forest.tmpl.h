@@ -179,6 +179,17 @@ size_t forest<NodeT>::count_trees(const node& root) const {
 	return ndc[root];
 }
 
+template <typename NodeT>
+std::pair<size_t, size_t> forest<NodeT>::count_useful_nodes(const node& root) const {
+	size_t ntc= 0, tc = 0;
+	auto cb_exit = [&ntc, &tc](const node& root, auto&) {
+		if(root->first.nt()) ntc++;
+		else tc++;
+	};
+	traverse(root, NO_ENTER, cb_exit);
+	return {ntc, tc};
+}
+
 // a dfs based approach to detect cycles for
 // any traversable type
 template<typename NodeT>
