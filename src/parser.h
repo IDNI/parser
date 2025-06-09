@@ -1,15 +1,6 @@
-// LICENSE
-// This software is free for use and redistribution while including this
-// license notice, unless:
-// 1. is used for commercial or non-personal purposes, or
-// 2. used for a product which includes or associated with a blockchain or other
-// decentralized database technology, or
-// 3. used for a product which includes or associated with the issuance or use
-// of cryptographic or electronic currencies/coins/tokens.
-// On all of the mentioned cases, an explicit and written permission is required
-// from the Author (Ohad Asor).
-// Contact ohad@idni.org for requesting a permission. This license may be
-// modified over time by the Author.
+// To view the license please visit
+// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+
 #ifndef __IDNI__PARSER__PARSER_H__
 #define __IDNI__PARSER__PARSER_H__
 #include <array>
@@ -23,12 +14,12 @@
 #include <cassert>
 #include <algorithm>
 #include <initializer_list>
-#include "memory_map.h"
 #include "defs.h"
-#include "characters.h"
-#include "charclasses.h"
+#include "utility/memory_map.h"
+#include "utility/characters.h"
+#include "utility/charclasses.h"
+#include "utility/term_colors.h"
 #include "forest.h"
-#include "term_colors.h"
 
 #define DEFAULT_BINARIZE false
 #define DEFAULT_INCR_GEN_FOREST false
@@ -927,6 +918,12 @@ template <typename C, typename T>
 prods<C, T> operator+(const prods<C, T>& x,const std::basic_string<C>& s);
 prods<char32_t> operator+(const prods<char32_t>& x,
 	const std::basic_string<char>& s);
+prods<char32_t, char32_t> operator+(const prods<char32_t, char32_t>& x,
+	const std::string& s);
+prods<char32_t, char32_t> operator|(const prods<char32_t, char32_t>& x,
+	const std::string& s);
+prods<char32_t, char32_t> operator&(const prods<char32_t, char32_t>& x,
+	const std::string& s);
 
 #ifdef DEBUG
 template<typename C = char, typename T = C>
@@ -955,6 +952,8 @@ struct std::hash<idni::lit<C, T>> {
 #ifdef DEBUG
 #include "devhelpers.h"   // various helpers for converting forest
 #endif // DEBUG
+
+#include "parser.impl.h"
 
 // undef local macros
 #undef DEFAULT_BINARIZE

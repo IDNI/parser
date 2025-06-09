@@ -17,10 +17,17 @@ set(EXAMPLES
 
 foreach(X IN LISTS EXAMPLES)
 	add_executable(${X})
-	target_setup(${X})
+	tauparser_setup(${X} PRIVATE tauparser)
 	target_sources(${X} PRIVATE ${X}/main.cpp)
-	target_link_libraries(${X} ${PARSER_OBJECT_LIB_NAME})
 	target_include_directories(${X} PUBLIC
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
 	)
+	# add_dependencies(${X} ${TAU_PARSER_STATIC_LIB_NAME})
+	message(STATUS "installing ${X} to ${TAU_PARSER_DOC_DESTINATION}/examples")
+	install(DIRECTORY ${X}
+		DESTINATION "${TAU_PARSER_DOC_DESTINATION}/examples"
+		COMPONENT "Examples")
+	install(TARGETS ${X}
+		RUNTIME DESTINATION "${TAU_PARSER_DOC_DESTINATION}/examples/${X}"
+		COMPONENT "Examples")
 endforeach()

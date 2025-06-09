@@ -13,3 +13,4 @@ forest_grammar_rules*.tml
 .*_history
 ./tau-lang
 _site/*
+src/version_license.h

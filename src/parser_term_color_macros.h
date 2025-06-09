@@ -1,18 +1,9 @@
-// LICENSE
-// This software is free for use and redistribution while including this
-// license notice, unless:
-// 1. is used for commercial or non-personal purposes, or
-// 2. used for a product which includes or associated with a blockchain or other
-// decentralized database technology, or
-// 3. used for a product which includes or associated with the issuance or use
-// of cryptographic or electronic currencies/coins/tokens.
-// On all of the mentioned cases, an explicit and written permission is required
-// from the Author (Ohad Asor).
-// Contact ohad@idni.org for requesting a permission. This license may be
-// modified over time by the Author.
-#ifndef __IDNI_PARSER_TERM_COLOR_PRESETS_H__
+// To view the license please visit
+// https://github.com/IDNI/parser/blob/main/LICENSE.txt
 
-#define __IDNI_PARSER_TERM_COLOR_PRESETS_H__
+#ifndef __IDNI__PARSER__PARSER_TERM_COLOR_MACROS_H__
+#define __IDNI__PARSER__PARSER_TERM_COLOR_MACROS_H__
+
 /// terminal color presets
 #define TC_DEFAULT         TC.DEFAULT()
 #define TC_CLEARED_DEFAULT (TC.CLEAR() + TC_DEFAULT)
@@ -30,7 +21,7 @@
 #define TC_NEG             TC.RED()
 #else
 
-#undef __IDNI_PARSER_TERM_COLOR_PRESETS_H__
+#undef __IDNI__PARSER__PARSER_TERM_COLOR_MACROS_H__
 /// terminal color presets
 #undef TC_CLEARED_DEFAULT
 #undef TC_DEFAULT
@@ -47,4 +38,4 @@
 #undef TC_RANGE
 #undef TC_NEG
 
-#endif
+#endif // __IDNI__PARSER__PARSER_TERM_COLOR_MACROS_H__

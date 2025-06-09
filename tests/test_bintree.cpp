@@ -1,4 +1,7 @@
-#include "bintree.h"
+// To view the license please visit
+// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+
+#include "utility/bintree.h"
 #include <iostream>
 
 int main()

@@ -1,15 +1,5 @@
-// LICENSE
-// This software is free for use and redistribution while including this
-// license notice, unless:
-// 1. is used for commercial or non-personal purposes, or
-// 2. used for a product which includes or associated with a blockchain or other
-// decentralized database technology, or
-// 3. used for a product which includes or associated with the issuance or use
-// of cryptographic or electronic currencies/coins/tokens.
-// On all of the mentioned cases, an explicit and written permission is required
-// from the Author (Ohad Asor).
-// Contact ohad@idni.org for requesting a permission. This license may be
-// modified over time by the Author.
+// To view the license please visit
+// https://github.com/IDNI/parser/blob/main/LICENSE.txt
 
 // JSON parser tutorial
 
@@ -40,10 +30,10 @@ struct traversal_state {
         return this->size;
     }
 private:
-    // number of elements so far in the collection
-    int size = 0;
     // true for array, false for object
     bool type = true;
+    // number of elements so far in the collection
+    int size = 0;
 };
 
 struct json_parser {
@@ -78,7 +68,8 @@ private:
     prods<> digit, printable, space,
         start, element, whitespace,
         integer, digits,
-        str, strchars, strchar, escaping, escaped, unescaped,
+        escaping, escaped, unescaped,
+        strchar, strchars, str,
         array, itemseq, object, keyvalue, pairs;
     grammar<> g;
     parser<> p;
@@ -215,7 +206,9 @@ private:
         };
 
         // define a callback called when the traversal leaves a node n
-        auto cb_exit = [&buffer, &indentation_level, &state, &indentation, this](const parser<>::pnode& n, const forest<parser<>::pnode>::nodes_set &nodes) {
+        auto cb_exit = [&buffer, &indentation_level, &state, &indentation, this](
+            const parser<>::pnode& n, const forest<parser<>::pnode>::nodes_set &)
+        {
             // n is a pair of a literal and its span
 
             // when exiting array, reduce indentation and add closing bracket

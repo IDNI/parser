@@ -1,5 +1,5 @@
 // This file is generated from a file examples/csv_parser10/csv.tgf by
-//       https://github.com/IDNI/parser/tools/tgf
+//       https://github.com/IDNI/parser/src/tgf
 //
 #ifndef __CSV_PARSER_H__
 #define __CSV_PARSER_H__
