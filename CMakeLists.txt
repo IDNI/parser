@@ -176,8 +176,8 @@ endfunction()
 
 include(version_license)
 version_license(
-	"${CMAKE_SOURCE_DIR}/cmake/version_license.h.template"
-	"${CMAKE_SOURCE_DIR}/src/version_license.h")
+	"${CMAKE_CURRENT_SOURCE_DIR}/cmake/version_license.h.template"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/version_license.h")
 
 add_subdirectory(src)
 

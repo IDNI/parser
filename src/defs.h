@@ -58,6 +58,6 @@ void hashCombine(size_t& seed, const T& v, Rest... rest) {
 
 } // idni namespace
 
-#include "version_license.h" // include generated version and license constants
+#include "./version_license.h" // include generated version and license constants
 
 #endif // __IDNI__PARSER__DEFS_H__
