@@ -1,0 +1,90 @@
+name: Nightly Packages
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  check_date:
+    runs-on: ubuntu-24.04
+    name: Check latest commit
+    outputs:
+      should_run: ${{ steps.should_run.outputs.should_run }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: print latest_commit
+        run: echo ${{ github.sha }}
+
+      - id: should_run
+        continue-on-error: true
+        name: check latest commit is less than a day
+        if: ${{ github.event_name == 'schedule' }}
+        run: test -z $(git rev-list --after="24 hours" ${{ github.sha }}) && echo "should_run=false"
+
+  build_and_deploy_nightly:
+    needs: check_date
+    if: ${{ needs.check_date.outputs.should_run != 'false' }}
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image with nightly packages
+        run: docker build --build-arg RELEASE="yes" --build-arg NIGHTLY="yes" --build-arg TESTS="no" --build-arg DOCUMENTATION="yes" -t packages .
+
+      - name: Copy nightly packages and generated API documentation from container
+        run: |
+          CID=$(docker create packages)
+          docker cp $CID:/parser/build-Release/packages ${{ github.workspace }}/
+          docker cp $CID:/parser/build-Release/_site ${{ github.workspace }}/
+          docker rm $CID
+
+      - name: Read Version
+        id: version
+        run: echo "version=v$(head -n 1 VERSION)" >> $GITHUB_ENV
+
+      - name: Get ISO date
+        id: date_iso
+        run: echo "date_iso=$(date --iso)" >> $GITHUB_ENV
+
+      - name: Upload nightly packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: "nightly-${{ env.date_iso }}"
+          path: ${{ github.workspace }}/packages/
+
+      - name: Create Nightly Build Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "nightly-${{ env.date_iso }}"
+          name: "Tau Parser Library ${{ env.version }} Nightly Build ${{ env.date_iso }}"
+          body: "Tau Parser Library ${{ env.version }} automated nightly build ${{ env.date_iso }} commit ${{ github.sha }}"
+          draft: true
+          prerelease: true
+          files: ${{ github.workspace }}/packages/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ github.workspace }}/_site
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
