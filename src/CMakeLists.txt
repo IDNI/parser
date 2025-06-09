@@ -36,7 +36,7 @@ set(TAU_PARSER_HEADERS
 
 add_library(tauparser INTERFACE)
 target_include_directories(tauparser INTERFACE
-	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
 	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 tauparser_setup(tauparser INTERFACE "")
@@ -52,7 +52,7 @@ target_git_definitions(tauparser INTERFACE)
 #################
 include(GNUInstallDirs)
 if(DEFINED CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-	set(CMAKE_INSTALL_PREFIX "${CMAKE_SOURCE_DIR}/install"
+	set(CMAKE_INSTALL_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/install"
 		CACHE PATH "library installation dir" FORCE
 	)
 endif()

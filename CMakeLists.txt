@@ -4,7 +4,7 @@ message(STATUS "Adding ${CMAKE_CURRENT_SOURCE_DIR}/cmake to CMAKE_MODULE_PATH")
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 # Read version from file and strip prerelease information for cmake project VERSION property
-file(READ "${CMAKE_SOURCE_DIR}/VERSION" TAU_PARSER_VERSION)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" TAU_PARSER_VERSION)
 string(STRIP "${TAU_PARSER_VERSION}" TAU_PARSER_VERSION)
 string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" TAU_PARSER_TARGET_VERSION "${TAU_PARSER_VERSION}")
 message(STATUS "Parser version: ${TAU_PARSER_TARGET_VERSION} / ${TAU_PARSER_VERSION}")
@@ -195,10 +195,10 @@ endif()
 
 # Documentation
 message(STATUS "Installing license and static docs to ${TAU_PARSER_DOC_DESTINATION}")
-install(FILES "${CMAKE_SOURCE_DIR}/LICENSE.txt" "${CMAKE_SOURCE_DIR}/README.md" "${CMAKE_SOURCE_DIR}/mainpage.md"
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt" "${CMAKE_CURRENT_SOURCE_DIR}/README.md" "${CMAKE_CURRENT_SOURCE_DIR}/mainpage.md"
 	DESTINATION "${TAU_PARSER_DOC_DESTINATION}"
 	COMPONENT "Documentation")
-install(DIRECTORY "${CMAKE_SOURCE_DIR}/docs"
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/docs"
 	DESTINATION "${TAU_PARSER_DOC_DESTINATION}"
 	COMPONENT "Documentation")
 
@@ -219,9 +219,9 @@ if(TAU_PARSER_BUILD_DOC)
 endif()
 
 # if _site directory with generated API documentation exists, install it
-if(EXISTS ${CMAKE_SOURCE_DIR}/_site)
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/_site)
 	message(STATUS "Installing generated docs to ${TAU_PARSER_DOC_DESTINATION}/api")
-	install(DIRECTORY ${CMAKE_SOURCE_DIR}/_site/
+	install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/_site/
 		DESTINATION ${TAU_PARSER_DOC_DESTINATION}/api
 		COMPONENT "Documentation")
 endif()
