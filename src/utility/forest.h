@@ -1,15 +1,6 @@
-// LICENSE
-// This software is free for use and redistribution while including this
-// license notice, unless:
-// 1. is used for commercial or non-personal purposes, or
-// 2. used for a product which includes or associated with a blockchain or other
-// decentralized database technology, or
-// 3. used for a product which includes or associated with the issuance or use
-// of cryptographic or electronic currencies/coins/tokens.
-// On all of the mentioned cases, an explicit and written permission is required
-// from the Author (Ohad Asor).
-// Contact ohad@idni.org for requesting a permission. This license may be
-// modified over time by the Author.
+// To view the license please visit
+// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+
 #ifndef __IDNI__PARSER__FOREST_H__
 #define __IDNI__PARSER__FOREST_H__
 #include <array>
@@ -42,19 +33,29 @@ namespace idni {
 // possibly with cycles or shared nodes.
 // no cycles and no sharing implies its a tree
 
+/**
+ * @brief A structure which can contain multiple trees.
+ * Nodes can have multiple sets of children where more than one set represents
+ * splitting of trees meaning the part from root to the node is shared among
+ * all trees splitted.
+ */
 template <typename NodeT>
 struct forest {
 
-	// node pointer in forerst
-
 private:
+	/// Node pointer in forest
 	struct nptr_t {
 		friend NodeT;
 	private:
-		const NodeT *id; // points to pnode
+		/// Points to pnode	
+		const NodeT *id;
 		size_t hash; 
-		static size_t nc; // maintains a refcount for # of id pointers
-		// to NodeT obj in NodeT::nid map both externally and from inside nid
+		/**
+		 * Maintains a refcount for # of id pointers to NodeT obj in NodeT::nid
+		 * map both externally and from inside nid
+		 */
+		static size_t nc;
+		
 	public:
 		nptr_t(const NodeT *_id = nullptr) : id(_id) { //if(id)
 			hash = 0;
@@ -120,21 +121,32 @@ public:
 	using nodes_set  = std::set<nodes>;
 	using node_graph = std::map<node, nodes_set>;
 	using edge       = std::pair<size_t, size_t>;
+	
+	/// A tree extracted from forst<NodeT>::graph
 	struct tree {
+		/// The original node extracted from a graph (forest).
 		node value;
+		/// A vector of tree's children - shared pointers to subtrees.
 		std::vector<std::shared_ptr<struct tree>> child;
+		/// Prints the tree recursively to a stream os. l is used for indentation level.
 		std::ostream& to_print(std::ostream& os, size_t l = 0,
 			std::set<size_t> skip = {}, bool nulls = false) const;
 	};
 	using sptree = std::shared_ptr<tree>;
+	
+	/**
+	 * A least maximal core graph without ambiguity/repeating nodes/edges
+	 * possibly with cycles or shared nodes. No cycles and no sharing implies its a tree.
+	 */
 	struct graph : public node_graph {
 		static const forest forest_inst(){ 
 			static forest sf;
 			return sf;}
+		/// Graph's root node.
 		node root;
-		/// nodes that lead to cycle
+		/// Nodes that lead to cycle.
 		std::set<node> cycles;
-		/// builds and returns a tree with nodes
+		/// Builds and returns a tree with nodes.
 		sptree extract_trees();
 		htree::sp extract_tree2();
 	private:
@@ -149,19 +161,38 @@ public:
 	node rt;
 	std::set<node> cycles;
 
+	/// Returns the root node of a forest.
 	node root() const;
+	/// Sets the root node of a forest.
 	void root(const node& n);
+	/// Clears the forest by removing all its nodes.
 	void clear();
+	/// Returns true if the forest contains a node n.
 	bool contains(const node& n) const;
+	/// For a given node p sets the new set of subforests with children nodes and return it back.
 	nodes_set& operator[](const node& p);
+	/// For a given node p returns set of subforests with children nodes.
 	const nodes_set& operator[](const node& p) const;
+	/// Counts and returns a number of trees under a p node.
 	size_t count_trees() const;
+	/// Counts and returns a number of trees in a whole forest.
 	size_t count_trees(const node& root) const;
 	std::pair<size_t, size_t> count_useful_nodes(const node& root) const;
 
+	/// Returns true if the forest is binarized, ie. each node has up to 2 children.
 	bool is_binarized() const;
+	/// Returns true if there exist a cycle in a g.
 	template<typename TraversableT>
 	bool detect_cycle(TraversableT& g) const;
+	/**
+	 * @brief Extracts a graph from the forest.
+	 * 
+	 * Extracts graphs from the forest starting at a root node. For every
+	 * extracted graph cb_next_graph callback is called. 
+	 * 
+	 * If unique_edge is set to true it ensures that edges in resulting graphs
+	 * are unique.
+	 */
 	graphv extract_graphs(const node& root, cb_next_graph_t cb_next_graph,
 		bool unique_edge = true) const;
 
@@ -170,32 +201,35 @@ public:
 	using revisit_t=std::function<bool(const node&)>;
 	using ambig_t  =std::function<nodes_set(const node&, const nodes_set&)>;
 
+	/// Traverse method utilizes a visitor pattern.
 	template <typename cb_enter_t, typename cb_exit_t = exit_t,
 		typename cb_revisit_t = revisit_t, typename cb_ambig_t =ambig_t>
 	bool traverse(const node& root, cb_enter_t cb_enter,
 		cb_exit_t cb_exit = NO_EXIT,
 		cb_revisit_t cb_revisit = NO_REVISIT,
 		cb_ambig_t cb_ambig = NO_AMBIG) const;
+	/// Traverse method utilizes a visitor pattern.
 	template <typename cb_enter_t, typename cb_exit_t = exit_t,
 		typename cb_revisit_t = revisit_t, typename cb_ambig_t =ambig_t>
 	bool traverse(const node_graph& gr, const node& root,
 		cb_enter_t cb_enter, cb_exit_t cb_exit = NO_EXIT,
 		cb_revisit_t cb_revisit = NO_REVISIT,
 		cb_ambig_t cb_ambig = NO_AMBIG, bool post_ord = false) const;
+	/// Traverse method utilizes a visitor pattern.
 	template <typename cb_enter_t, typename cb_exit_t = exit_t,
 		typename cb_revisit_t = revisit_t, typename cb_ambig_t =ambig_t>
 	bool traverse(cb_enter_t cb_enter,
 		cb_exit_t cb_exit = NO_EXIT,
 		cb_revisit_t cb_revisit = NO_REVISIT,
 		cb_ambig_t cb_ambig = NO_AMBIG) const;
-	/// replace each node with its immediate children,
+	/// Replace each node with its immediate children,
 	/// assuming its only one pack (unambigous)
 	/// the caller to ensure the right order to avoid cyclic
 	/// dependency if any. deletes from graph g as well.
 	/// return true if any one of the nodes' replacement
 	/// succeeds
 	bool replace_nodes(graph& g, nodes& s);
-	/// replaces node 'torep' in one pass with the given nodes
+	/// Replaces node 'torep' in one pass with the given nodes
 	/// 'replacement' everywhere in the forest and returns true
 	/// if changed. Does not care if its recursive or cyclic, its
 	/// caller's responsibility to ensure

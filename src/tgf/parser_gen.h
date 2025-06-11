@@ -1,24 +1,16 @@
-// LICENSE
-// This software is free for use and redistribution while including this
-// license notice, unless:
-// 1. is used for commercial or non-personal purposes, or
-// 2. used for a product which includes or associated with a blockchain or other
-// decentralized database technology, or
-// 3. used for a product which includes or associated with the issuance or use
-// of cryptographic or electronic currencies/coins/tokens.
-// On all of the mentioned cases, an explicit and written permission is required
-// from the Author (Ohad Asor).
-// Contact ohad@idni.org for requesting a permission. This license may be
-// modified over time by the Author.
-#ifndef __IDNI__PARSER__PARSER_GEN_H__
-#define __IDNI__PARSER__PARSER_GEN_H__
+// To view the license please visit
+// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+
+#ifndef __IDNI__PARSER__TGF__PARSER_GEN_H__
+#define __IDNI__PARSER__TGF__PARSER_GEN_H__
 #include <filesystem>
 #include <cmath>
 #include "parser.h"
 namespace idni {
 
+/// Provides access to private grammar members
 template <typename C = char, typename T = C>
-struct grammar_inspector { // provides access to private grammar members
+struct grammar_inspector {
 	grammar_inspector(const grammar<C, T>& g) : g(g) {}
 	const grammar<C, T>& g;
 	lit<C, T> start() { return g.start; }
@@ -247,7 +239,7 @@ void generate_parser_cpp(const std::string& tgf_filename,
 	const auto ps = gen_prods();
 	os <<	"// This file is generated from a file " <<
 					tgf_filename_stripped << " by\n"
-		"//       https://github.com/IDNI/parser/tools/tgf\n"
+		"//       https://github.com/IDNI/parser/src/tgf\n"
 		"//\n"
 		"#ifndef __" << guard << "_H__\n"
 		"#define __" << guard << "_H__\n"
@@ -360,4 +352,4 @@ void generate_parser_cpp_from_file(const std::string& tgf_filename,
 }
 
 } // idni namespace
-#endif //__IDNI__PARSER__PARSER_GEN_H__
+#endif //__IDNI__PARSER__TGF__PARSER_GEN_H__

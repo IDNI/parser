@@ -1,5 +1,5 @@
 // This file is generated from a file src/tgf.tgf by
-//       https://github.com/IDNI/parser/tools/tgf
+//       https://github.com/IDNI/parser/src/tgf
 //
 #ifndef __TGF_PARSER_H__
 #define __TGF_PARSER_H__

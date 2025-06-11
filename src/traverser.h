@@ -1,15 +1,6 @@
-// LICENSE
-// This software is free for use and redistribution while including this
-// license notice, unless:
-// 1. is used for commercial or non-personal purposes, or
-// 2. used for a product which includes or associated with a blockchain or other
-// decentralized database technology, or
-// 3. used for a product which includes or associated with the issuance or use
-// of cryptographic or electronic currencies/coins/tokens.
-// On all of the mentioned cases, an explicit and written permission is required
-// from the Author (Ohad Asor).
-// Contact ohad@idni.org for requesting a permission. This license may be
-// modified over time by the Author.
+// To view the license please visit
+// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+
 #ifndef __IDNI__PARSER__TRAVERSER_H__
 #define __IDNI__PARSER__TRAVERSER_H__
 #include <ranges>
@@ -99,6 +90,15 @@ const auto nonterminal_extractor = extractor<node_variant_t, parser_t,
 		return none;
 	});
 
+/**
+ * @brief Traverser for traversing a subtree and extracting information from it.
+ * 
+ * Traverser object can be created from a rewriter tree node and provides API
+ * for traversing its subtree and extract information from it.
+ * 
+ * @tparam node_variant_t variant of the rewriter tree node.
+ * @tparam parser_t parser type.
+ */
 template <typename node_variant_t, typename parser_t>
 struct traverser {
 	using node_t        = idni::rewriter::depreciating::sp_node<node_variant_t>;
@@ -109,17 +109,23 @@ struct traverser {
 	traverser(const node_t& n) : values_({n}) {}
 	traverser(const std::vector<node_t>& n)
 		: has_value_(n.size()), values_(n) {}
+	/// Returns true if it contains (points to) at least one node.
 	bool has_value() const { return has_value_; }
+	/// Returns the first node from all it is pointing to.
 	const node_t& value() const { return values_.front(); }
+	/// Returns all nodes traverser is pointing to.
 	const std::vector<node_t>& values() const { return values_; }
+	/// Returns a vector of traversers for each node it points to.
 	std::vector<traverser<node_variant_t, parser_t>> traversers() const {
 		std::vector<traverser<node_variant_t, parser_t>> tv;
 		for (const auto& v : values_) tv.emplace_back(v);
 		return tv;
 	}
+	/// Returns a vector of traversers for each node it points to.
 	std::vector<traverser<node_variant_t, parser_t>> operator()() const {
 		return traversers();
 	}
+	/// Helper methods to check if a node is a nonterminal or if a node is a concrete nonterminal.
 	bool is_non_terminal_node(const node_t& n) const {
 		if (!std::holds_alternative<symbol_t>(n->value))
 			std::cout << "is_non_terminal_node: not a symbol_t.\n";
@@ -127,6 +133,7 @@ struct traverser {
 		return std::holds_alternative<symbol_t>(n->value)
 			&& std::get<symbol_t>(n->value).nt();
 	}
+	/// Helper methods to check if a node is a nonterminal or if a node is a concrete nonterminal.
 	bool is_non_terminal_node() const {
 		if (!has_value_) return false;
 		if (values_.size() > 1) {
@@ -136,11 +143,13 @@ struct traverser {
 		}
 		return is_non_terminal_node(values_.front());
 	}
+	/// Helper methods to check if a node is a nonterminal or if a node is a concrete nonterminal.
 	bool is_non_terminal(const node_t& n, const nonterminal_t& nt) const {
 		//size_t i_nt = nt;
 		return is_non_terminal_node(n)
 			&& std::get<symbol_t>(n->value).n() == nt;
 	}
+	/// Helper methods to check if a node is a nonterminal or if a node is a concrete nonterminal.
 	bool is_non_terminal(const nonterminal_t& nt) const {
 		return is_non_terminal_node()
 			&& is_non_terminal(values_.front(), nt);
@@ -195,16 +204,28 @@ struct traverser {
 	{
 		return children_extractor<node_variant_t, parser_t>;
 	}
+	/**
+	 * Returns an extractor usable to traverse to a single child if a single
+	 * child exists.
+	 */
 	static constexpr const extractor<node_variant_t, parser_t>&
 		get_only_child_extractor()
 	{
 		return only_child_extractor<node_variant_t, parser_t>;
 	}
+	/**
+	 * Returns an extractor usable to extract a string containing terminals
+	 * collected from subtrees of nodes traverser is pointing to.
+	 */
 	static constexpr const extractor<node_variant_t, parser_t, std::string>&
 		get_terminal_extractor()
 	{
 		return terminal_extractor<node_variant_t, parser_t>;
 	}
+	/**
+	 * Returns an extractor usable to extract nonterminal enum type from a node
+	 * traverser is pointing to.
+	 */
 	static constexpr const extractor<node_variant_t, parser_t,
 		typename parser_t::nonterminal>& get_nonterminal_extractor()
 	{

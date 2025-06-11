@@ -1,17 +1,8 @@
-// LICENSE
-// This software is free for use and redistribution while including this
-// license notice, unless:
-// 1. is used for commercial or non-personal purposes, or
-// 2. used for a product which includes or associated with a blockchain or other
-// decentralized database technology, or
-// 3. used for a product which includes or associated with the issuance or use
-// of cryptographic or electronic currencies/coins/tokens.
-// On all of the mentioned cases, an explicit and written permission is required
-// from the Author (Ohad Asor).
-// Contact ohad@idni.org for requesting a permission. This license may be
-// modified over time by the Author.
-#ifndef __IDNI__PARSER__CHARACTERS_H__
-#define __IDNI__PARSER__CHARACTERS_H__
+// To view the license please visit
+// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+
+#ifndef __IDNI__PARSER__UTILITY__CHARACTERS_H__
+#define __IDNI__PARSER__UTILITY__CHARACTERS_H__
 #include <vector>
 #include <string>
 #include <cstdint>
@@ -50,6 +41,7 @@ template <typename CharT>
 typename std::basic_string<CharT> from_cstr(const char32_t *);
 template <typename CharT>
 typename std::basic_string<CharT> from_str(const std::u32string&);
+
 /**
  * checks if character is a begining of a multibyte codepoint or
  * if it is a part of a multibyte codepoint
@@ -102,4 +94,6 @@ std::basic_ostream<char32_t>& operator<<(
 	std::basic_ostream<char32_t>& os, const std::string& s);
 
 } // idni namespace
-#endif // __IDNI__PARSER__CHARACTERS_H__
+
+#include "characters.impl.h"
+#endif // __IDNI__PARSER__UTILITY__CHARACTERS_H__

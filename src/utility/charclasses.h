@@ -1,19 +1,12 @@
-// LICENSE
-// This software is free for use and redistribution while including this
-// license notice, unless:
-// 1. is used for commercial or non-personal purposes, or
-// 2. used for a product which includes or associated with a blockchain or other
-// decentralized database technology, or
-// 3. used for a product which includes or associated with the issuance or use
-// of cryptographic or electronic currencies/coins/tokens.
-// On all of the mentioned cases, an explicit and written permission is required
-// from the Author (Ohad Asor).
-// Contact ohad@idni.org for requesting a permission. This license may be
-// modified over time by the Author.
-#ifndef __IDNI__PARSER__CHARCLASSES_H__
-#define __IDNI__PARSER__CHARCLASSES_H__
+// To view the license please visit
+// https://github.com/IDNI/parser/blob/main/LICENSE.txt
 
-namespace idni { namespace charclasses {
+#ifndef __IDNI__PARSER__UTILITY__CHARCLASSES_H__
+#define __IDNI__PARSER__UTILITY__CHARCLASSES_H__
+
+#include <locale>
+
+namespace idni::charclasses {
 
 template <typename C> bool iseof(C c) {return c==std::char_traits<C>::eof();}
 template <typename C> bool isalnum(C c);
@@ -29,5 +22,8 @@ template <typename C> bool isspace(C c);
 template <typename C> bool isupper(C c);
 template <typename C> bool isxdigit(C c);
 
-}} // idni::charclasses namespace
-#endif //__IDNI__PARSER__CHARCLASSES_H__
+} // idni::charclasses namespace
+
+#include "charclasses.impl.h"
+
+#endif //__IDNI__PARSER__UTILITY__CHARCLASSES_H__

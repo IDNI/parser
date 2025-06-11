@@ -1,15 +1,6 @@
-// LICENSE
-// This software is free for use and redistribution while including this
-// license notice, unless:
-// 1. is used for commercial or non-personal purposes, or
-// 2. used for a product which includes or associated with a blockchain or other
-// decentralized database technology, or
-// 3. used for a product which includes or associated with the issuance or use
-// of cryptographic or electronic currencies/coins/tokens.
-// On all of the mentioned cases, an explicit and written permission is required
-// from the Author (Ohad Asor).
-// Contact ohad@idni.org for requesting a permission. This license may be
-// modified over time by the Author.
+// To view the license please visit
+// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+
 #include <optional>
 #include "parser.h"
 namespace idni {
@@ -28,8 +19,8 @@ parser<C, T>::result::result(grammar<C, T>& g, std::unique_ptr<input> in_,
 		found(fnd), parse_error(err), shaping(g.opt.shaping),
 		in_(std::move(in_)), f(std::move(f))
 {
-	// if is ambiguous add __AMB__ node to the nonterminals dict so it can
-	// be added to the resulting parse tree when get_shaped_tree() is called
+	/// if is ambiguous add __AMB__ node to the nonterminals dict so it can
+	/// be added to the resulting parse tree when get_shaped_tree() is called
 	static const std::string amb = "__AMB__";
 	if (is_ambiguous()) amb_node = g.nt(from_str<C>(amb));
 }
@@ -311,7 +302,7 @@ typename parser<C, T>::psptree parser<C, T>::result::get_shaped_tree() const
 	return get_shaped_tree(shaping);
 }
 
-// get a first parse tree from the parse_forest optionally provide root of the tree.
+/// get a first parse tree from the parse_forest optionally provide root of the tree.
 template <typename C, typename T>
 parser<C, T>::psptree parser<C, T>::result::get_tree() {
 	return get_tree(f->root());

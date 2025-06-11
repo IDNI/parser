@@ -10,8 +10,8 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#ifndef __IDNI__TREE_H__
-#define __IDNI__TREE_H__
+#ifndef __IDNI__UTILITY__TREE_H__
+#define __IDNI__UTILITY__TREE_H__
 
 #include <vector>
 #include <initializer_list>
@@ -1124,4 +1124,4 @@ using environment = subtree_map<node, tref>;
 #include "tree.tmpl.h"
 #include "tree_traversals.tmpl.h"
 #include "tree_rewriter.tmpl.h"
-#endif // __IDNI__TREE_H__
+#endif // __IDNI__UTILITY__TREE_H__

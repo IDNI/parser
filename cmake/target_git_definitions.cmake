@@ -1,21 +1,22 @@
 # populates GIT_DESCRIBED, GIT_BRANCH and GIT_COMMIT_HASH variables
 # and creates GIT_DEFINITIONS list
+# provides target_git_definitions($target) function to add definitions to a target
 
 execute_process(
 	COMMAND git describe --tags --always
-	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 	OUTPUT_VARIABLE GIT_DESCRIBED
 	OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 execute_process(
 	COMMAND git rev-parse --abbrev-ref HEAD
-	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 	OUTPUT_VARIABLE GIT_BRANCH
 	OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 execute_process(
 	COMMAND git log -1 --format=%h
-	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 	OUTPUT_VARIABLE GIT_COMMIT_HASH
 	OUTPUT_STRIP_TRAILING_WHITESPACE
 )
@@ -25,3 +26,7 @@ set(GIT_DEFINITIONS
 	"GIT_COMMIT_HASH=\"${GIT_COMMIT_HASH}\""
 	"GIT_BRANCH=\"${GIT_BRANCH}\""
 )
+
+function(target_git_definitions target access)
+	target_compile_definitions(${target} ${access} ${GIT_DEFINITIONS})
+endfunction()

@@ -1,15 +1,6 @@
-// LICENSE
-// This software is free for use and redistribution while including this
-// license notice, unless:
-// 1. is used for commercial or non-personal purposes, or
-// 2. used for a product which includes or associated with a blockchain or other
-// decentralized database technology, or
-// 3. used for a product which includes or associated with the issuance or use
-// of cryptographic or electronic currencies/coins/tokens.
-// On all of the mentioned cases, an explicit and written permission is required
-// from the Author (Ohad Asor).
-// Contact ohad@idni.org for requesting a permission. This license may be
-// modified over time by the Author.
+// To view the license please visit
+// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+
 #ifndef __IDNI__PARSER__TGF_H__
 #define __IDNI__PARSER__TGF_H__
 #include <fstream>
@@ -111,11 +102,11 @@ private:
 	struct grammar_builder {
 		prods_t ps, nul{ lit_t{} };
 		nonterminals<C, T>& nts;
-		// set by @start ...
+		/// set by @start ...
 		prods_t start = nul;
-		// char class names coming from @use char class ...
+		/// char class names coming from @use char class ...
 		std::vector<std::string> cc_names{};
-		// grammar options
+		/// grammar options
 		grammar<C, T>::options opt{};
 		char_class_fns<T> cc;
 		grammar_builder(nonterminals<C, T>& nts) : nts(nts) {}

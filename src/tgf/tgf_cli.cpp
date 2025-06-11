@@ -1,15 +1,6 @@
-// LICENSE
-// This software is free for use and redistribution while including this
-// license notice, unless:
-// 1. is used for commercial or non-personal purposes, or
-// 2. used for a product which includes or associated with a blockchain or other
-// decentralized database technology, or
-// 3. used for a product which includes or associated with the issuance or use
-// of cryptographic or electronic currencies/coins/tokens.
-// On all of the mentioned cases, an explicit and written permission is required
-// from the Author (Ohad Asor).
-// Contact ohad@idni.org for requesting a permission. This license may be
-// modified over time by the Author.
+// To view the license please visit
+// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+
 #include <cassert>
 #include <string.h>
 #include <filesystem>
@@ -37,6 +28,10 @@ cli::options tgf_options() {
 	cli::options os;
 	os["help"] = cli::option("help", 'h', false)
 		.set_description("detailed information about options");
+	os["version"] = cli::option("version", 'v', false)
+		.set_description("print version and exit");
+	os["license"] = cli::option("license", 'L', false)
+		.set_description("print license and exit");
 	return os;
 }
 
@@ -210,6 +205,10 @@ int run_tests(shared_ptr<tgf_repl_evaluator::parser_type> p,
 	return ret;
 }
 
+void print_version() { cout << tauparser::full_version << "\n"; }
+
+void print_license() { cout << tauparser::license << "\n"; }
+
 int tgf_run(int argc, char** argv) {
 
 //#ifdef DEBUG
@@ -250,8 +249,15 @@ int tgf_run(int argc, char** argv) {
 	auto opts = cl.get_processed_options();
 	auto cmd  = cl.get_processed_command();
 
-	// if --help/-h option is true, print help end exit
-	if (opts["help"].get<bool>()) return cl.help(), 0;
+	// if --version/v option is true, print version...
+	// if --license/L option is true, print license...
+	// if --help/-h   option is true, print help...
+	//                                                 ...and exit
+	bool quit = false;
+	if (opts["version"].get<bool>()) quit = true, print_version();
+	if (opts["license"].get<bool>()) quit = true, print_license();
+	if (opts["help"]   .get<bool>()) quit = true, cl.help();
+	if (quit) return 0;
 
 	// error if command is invalid
 	if (!cmd.ok()) return cl.error("invalid command", true);
@@ -839,8 +845,6 @@ void tgf_repl_evaluator::update_bool_opt_cmd(
 	get_cmd(n);
 }
 
-void version() { cout << "TGF version: " << GIT_DESCRIBED << "\n"; }
-
 // TODO (LOW) write proper help messages
 void help(size_t nt = tgf_repl_parser::help_sym) {
 	using p = tgf_repl_parser;
@@ -1016,10 +1020,11 @@ int tgf_repl_evaluator::eval(const tt& s) {
 		else help();
 		break;
 	}
-	case p::version_cmd: version(); break;
-	case p::get_cmd:     get_cmd(s | p::option); break;
-	case p::set_cmd:     set_cmd(s); break;
-	case p::toggle_cmd:
+	case tgf_repl_parser::version_cmd: print_version(); break;
+	case tgf_repl_parser::license_cmd: print_license(); break;
+	case tgf_repl_parser::get_cmd:     get_cmd(s | tgf_repl_parser::option); break;
+	case tgf_repl_parser::set_cmd:     set_cmd(s); break;
+	case tgf_repl_parser::toggle_cmd:
 		update_bool_opt_cmd(s, [](bool& b){ return b = !b; }); break;
 	case p::enable_cmd:
 		update_bool_opt_cmd(s, [](bool& b){ return b = true; }); break;

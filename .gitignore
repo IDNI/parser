@@ -14,3 +14,5 @@ forest_grammar_rules*.tml
 ./tau-lang
 .gdbinit
 src/doctest.h
+_site/*
+src/version_license.h

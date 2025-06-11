@@ -12,7 +12,8 @@ start                  => _ [ statement (_ '.' _ statement)* _ ].
 # statement
 statement              => grammar_cmd | igrammar_cmd | unreachable_cmd
                         | reload_cmd | load_cmd | start_cmd
-                        | help_cmd | version_cmd | quit_cmd | clear_cmd
+                        | help_cmd | version_cmd | license_cmd | quit_cmd
+                        | clear_cmd
                         | get_cmd | set_cmd | toggle_cmd | enable_cmd
                         | disable_cmd | add_cmd | del_cmd | parse_file_cmd
                         | parse_cmd.
@@ -27,6 +28,7 @@ reload_cmd     => ("r" | "reload")               :reload_sym.
 load_cmd       => ("l" | "load")                 :load_sym __ filename.
 help_cmd       => ("h" | "help")                 :help_sym [ __ help_arg ].
 version_cmd    => ("v" | "version")              :version_sym.
+license_cmd    => ("L" | "license")              :license_sym.
 quit_cmd       => ("q" | "quit" | "e" | "exit")  :quit_sym.
 clear_cmd      => ("cls" | "clear")              :clear_sym.
 get_cmd        => "get"                          :get_sym [ __ option ].
@@ -48,8 +50,8 @@ parse_input            => quoted_string
 
 help_arg               => grammar_sym | igrammar_sym | unreachable_sym
                         | start_sym | parse_sym | parse_file_sym
-                        | load_sym | reload_sym
-                        | help_sym | quit_sym | version_sym | clear_sym
+                        | load_sym | reload_sym | clear_sym
+                        | help_sym | quit_sym | version_sym | license_sym
                         | get_sym | set_sym | add_sym | del_sym
                         | toggle_sym | enable_sym | disable_sym.
 

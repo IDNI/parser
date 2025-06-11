@@ -1,18 +1,8 @@
-// LICENSE
-// This software is free for use and redistribution while including this
-// license notice, unless:
-// 1. is used for commercial or non-personal purposes, or
-// 2. used for a product which includes or associated with a blockchain or other
-// decentralized database technology, or
-// 3. used for a product which includes or associated with the issuance or use
-// of cryptographic or electronic currencies/coins/tokens.
-// On all of the mentioned cases, an explicit and written permission is required
-// from the Author (Ohad Asor).
-// Contact ohad@idni.org for requesting a permission. This license may be
-// modified over time by the Author.
+// To view the license please visit
+// https://github.com/IDNI/parser/blob/main/LICENSE.txt
 
-#ifndef __REWRITING_H__
-#define __REWRITING_H__
+#ifndef __IDNI__PARSER__REWRITING_H__
+#define __IDNI__PARSER__REWRITING_H__
 
 #include <memory>
 #include <utility>
@@ -48,7 +38,7 @@
 #	endif
 #endif
 
-/**
+/*
  * @brief Controls if measuring depth and size
  * during looped traversal is enabled
  */
@@ -59,6 +49,9 @@
 // We should talk about of sp_tau_node, rule,...
 
 
+/**
+ * @brief Functions and types useful for rewriting parsed trees
+ */
 namespace idni::rewriter::depreciating {
 
 // IDEA this is very similar to idni::forest<...>::tree, but it
@@ -69,7 +62,11 @@ namespace idni::rewriter::depreciating {
 // it is public to easy the construction of the tree during testing, but it is
 // not really needed.
 
-// node of a tree.
+/**
+ * @brief Node of a tree.
+ * 
+ * @tparam symbol_t a type of node's value
+ */
 template <typename symbol_t>
 struct node {
 	using child_type = std::vector<std::shared_ptr<node>>;
@@ -102,12 +99,17 @@ struct node {
 		return !(*this == that);
 	}
 
-	// the value of the node and pointers to the children, we follow the same
-	// notation as in forest<...>::tree to be able to reuse the code with
-	// forest<...>::tree.
+	/** 
+	 * @brief Value stored in the node.
+	 * 
+	 * The value of the node and pointers to the children, we follow the same
+	 * notation as in forest<...>::tree to be able to reuse the code with
+	 * forest<...>::tree.
+	 */
 	const symbol_t value;
+	/// Vector of shared pointers to node's children.
 	const child_type child;
-	// Hash of the node
+	/// Hash of the node
 	const size_t hash;
 private:
 	size_t calc_hash (const symbol_t v, const child_type& c) const {
@@ -118,14 +120,18 @@ private:
 	}
 };
 
-// pointer to a node
+/**
+ * @brief Shared pointer to a node
+ * 
+ * @tparam symbol_t a type of node's value
+ */
 template <typename symbol_t>
 using sp_node = std::shared_ptr<node<symbol_t>>;
 
-// injecting preprocessing logic into the node factory method
+/// Injecting preprocessing logic into the node factory method.
 template <typename symbol_t>
 struct make_node_hook {
-	// node factory method
+	/// node factory method
 	std::optional<sp_node<symbol_t>> operator()(const node<symbol_t>& /* n */) {
 		return std::optional<sp_node<symbol_t>>{};
 	}
@@ -139,7 +145,11 @@ struct make_node_cache_equality {
 	}
 };
 
-// Implements perfect forwarding for children of the new node
+/**
+ * @brief Node factory function.
+ * 
+ * Creates a node with \p s as a value and \p ns as children. Implements perfect forwarding for children of the new node.
+ */
 template <typename symbol_t, class hook_t = make_node_hook<symbol_t>>
 sp_node<symbol_t> make_node(const symbol_t& s,
 	std::vector<sp_node<symbol_t>>&& ns) {
@@ -161,7 +171,11 @@ sp_node<symbol_t> make_node(const symbol_t& s,
 	return it->second;
 }
 
-// node factory method copying children
+/**
+ * @brief Node factory function.
+ * 
+ * Creates a node with \p s as a value and copies \p ns as children.
+ */
 template <typename symbol_t, class hook_t = make_node_hook<symbol_t>>
 sp_node<symbol_t> make_node(const symbol_t& s,
 	const std::vector<sp_node<symbol_t>>& ns) {
@@ -171,16 +185,20 @@ sp_node<symbol_t> make_node(const symbol_t& s,
 }
 
 // simple function objects to be used as default values for the traversers.
+
+/// Takes all nodes. It is always true.
 static const auto all = [](const auto&) static { return true; };
 using all_t = decltype(all);
 
+/// Takes none because it's always false.
 static const auto none = [](const auto&) static { return false; };
 using none_t = decltype(none);
 
+/// Returns itself.
 static const auto identity = [](const auto& n) static { return n; };
 using identity_t = decltype(identity);
 
-// trait for specifying a value of an error node for any plugged node type
+/// trait for specifying a value of an error node for any plugged node type
 template<typename T>
 struct error_node;
 
@@ -189,7 +207,7 @@ struct error_node<std::shared_ptr<T>> {
 	inline static const std::shared_ptr<T> value = nullptr;
 };
 
-// visitor that traverse the tree in post-order (avoiding visited nodes).
+/// Visitor that traverse the tree in post-order (avoiding visited nodes).
 template <typename wrapped_t, typename predicate_t, typename input_node_t,
 	typename output_node_t = input_node_t>
 struct post_order_traverser {
@@ -234,7 +252,7 @@ private:
 	}
 };
 
-// visitor that traverse the tree in post-order (avoiding visited nodes).
+/// Visitor that traverse the tree in post-order (avoiding visited nodes).
 template <typename wrapped_t, typename predicate_t, typename input_node_t,
 	typename output_node_t = input_node_t>
 struct post_order_query_traverser {
@@ -291,7 +309,7 @@ private:
 // it is faster when dealing with only predicate operations (searches,...) and
 // change all the related code.
 
-// visitor that traverse the tree in post-order (repeating visited nodes if necessary).
+/// Visitor that traverse the tree in post-order (repeating visited nodes if necessary).
 template <typename wrapped_t, typename predicate_t, typename input_node_t,
 	typename output_node_t = input_node_t>
 struct post_order_tree_traverser {
@@ -323,7 +341,7 @@ private:
 	}
 };
 
-// Do not use. Use post_order or pre_order instead depending on the needs.
+/// Do not use. Use post_order or pre_order instead depending on the needs.
 template<typename node_t>
 struct post_order_recursive_traverser {
 	auto operator() (const node_t n, auto& query, auto& wrapped) {
@@ -1061,8 +1079,11 @@ private:
 	}
 };
 
-// visitor that produces nodes transformed accordingly to the
-// given transformer. It only works with post order traversals.
+/**
+ * @brief Visitor that produces nodes transformed by the given transformer. 
+ * 
+ * It only works with post order traversals.
+ */
 template <typename wrapped_t, typename input_node_t,
 	typename output_node_t = input_node_t>
 struct map_transformer {
@@ -1081,8 +1102,11 @@ struct map_transformer {
 	wrapped_t& wrapped;
 };
 
-// visitor that produces nodes transformed accordingly to the
-// given transformer. It only works with post order traversals.
+/**
+ * @brief Visitor that produces nodes transformed by the given transformer. 
+ * 
+ * It only works with post order traversals.
+ */
 template <typename wrapped_t, typename input_node_t,
 	typename output_node_t = input_node_t>
 struct map_node_transformer {
@@ -1106,8 +1130,11 @@ struct map_node_transformer {
 	wrapped_t& wrapped;
 };
 
-// visitor that produces nodes transformed accordingly to the
-// given transformer. It only works with post order traversals.
+/**
+ * @brief Visitor that produces nodes transformed by the given transformer. 
+ * 
+ * It only works with post order traversals.
+ */
 //
 // TODO (MEDIUM) merge replace and replace_node transformers into one.
 template <typename wrapped_t, typename input_node_t,
@@ -1128,8 +1155,11 @@ struct replace_node_transformer {
 	wrapped_t& wrapped;
 };
 
-// visitor that produces nodes transformed accordingly to the
-// given transformer. It only works with post order traversals.
+/**
+ * @brief Visitor that produces nodes transformed by the given transformer. 
+ * 
+ * It only works with post order traversals.
+ */
 template <typename node_t>
 struct replace_transformer {
 	replace_transformer(std::map<node_t, node_t>& changes)
@@ -1152,9 +1182,12 @@ private:
 	}
 };
 
-// visitor that selects top nodes that satisfy a predicate and stores them in the
-// supplied vector. It only works with post order traversals and never produces
-// duplicates.
+/**
+ * @brief Visitor that selects top nodes that satisfy a predicate.
+ * 
+ * Stored the nodes in the supplied vector. It only works with post order
+ * traversals and never produces duplicates.
+ */
 // TODO (MEDIUM) replace vector by set
 template <typename predicate_t, typename node_t>
 struct select_top_predicate {
@@ -1163,8 +1196,8 @@ struct select_top_predicate {
 
 	bool operator()(const node_t& n) {
 		if (!query(n)) return true;
-		// we return false to avoid visiting the children of the node
-		// since we are only interested in the top nodes.
+		/// we return false to avoid visiting the children of the node
+		/// since we are only interested in the top nodes.
 		if (std::find(selected.begin(), selected.end(), n)
 				== selected.end()) selected.push_back(n);
 		return false;
@@ -1174,9 +1207,12 @@ struct select_top_predicate {
 	std::vector<node_t>& selected;
 };
 
-// visitor that selects nodes that satisfy a predicate and stores the subnodes
-// extracted from them in the supplied vector. It only works with post order
-// traversals and never produces duplicates.
+/**
+ * @brief Visitor that selects nodes that satisfy a predicate.
+ * 
+ * Stores the subnodes extracted from them in the supplied vector. It only
+ * works with post order traversals and never produces duplicates.
+ */
 // TODO (MEDIUM) replace vector by set
 template <typename predicate_t, typename extractor_t, typename node_t>
 struct select_subnodes_predicate {
@@ -1199,8 +1235,9 @@ struct select_subnodes_predicate {
 };
 
 
-// visitor that selects nodes that satisfy a predicate and stores them in the
-// supplied vector.
+/**
+ * @brief Visitor that selects nodes that satisfy a predicate and stores them in the supplied vector.
+ */
 // TODO (MEDIUM) replace vector by set
 template <typename predicate_t, typename node_t>
 struct select_all_predicate {
@@ -1217,8 +1254,9 @@ struct select_all_predicate {
 	std::vector<node_t>& selected;
 };
 
-// visitor that selects nodes that satisfy a predicate and stores them in the
-// supplied vector.
+/**
+ * @brief Visitor that selects nodes that satisfy a predicate and stores them in the supplied vector.
+ */
 template <typename predicate_t, typename node_t>
 struct find_top_predicate {
 	find_top_predicate(predicate_t& query, std::optional<node_t>& found)
@@ -1233,7 +1271,7 @@ struct find_top_predicate {
 	std::optional<node_t>& found;
 };
 
-// always true predicate
+/// Always true predicate
 //
 // TODO (LOW) define a const version of the predicate, move it to rewriter and use
 // it in all the code. Review the connection with all predicate and use only
@@ -1245,7 +1283,7 @@ auto true_predicate = [](const node_t&) { return true; };
 template <typename node_t>
 using true_predicate_t = decltype(true_predicate<node_t>);
 
-// always false predicate
+/// Always false predicate
 //
 // TODO (LOW) define a const version of the predicate as a lambda, move it to rewriter and use
 // it in all the code.
@@ -1256,7 +1294,7 @@ auto false_predicate = [](const node_t&) { return false; };
 template <typename node_t>
 using false_predicate_t = decltype(false_predicate<node_t>);
 
-// disjuction of the wrapped predicates.
+/// Disjuction of the wrapped predicates.
 //
 // IDEA we use combinators to build logical predicates. This could be simplified
 // by overloading the operators &&, ||, !, etc.
@@ -1275,7 +1313,7 @@ struct and_predicate {
 template <typename l_predicate_t, typename r_predicate_t>
 using and_predicate_t = and_predicate<l_predicate_t, r_predicate_t>;
 
-// disjuction of the wrapped predicates.
+/// Disjuction of the wrapped predicates.
 //
 // IDEA we use combinators to build logical predicates. This could be simplified
 // by overloading the operators &&, ||, !, etc.
@@ -1294,7 +1332,7 @@ struct or_predicate {
 template <typename l_predicate_t, typename r_predicate_t>
 using or_predicate_t = or_predicate<l_predicate_t, r_predicate_t>;
 
-// negation of the wrapped predicate.
+/// Negation of the wrapped predicate.
 //
 // IDEA we use combinators to build logical predicates. This could be simplified
 // by overloading the operators &&, ||, !, etc.
@@ -1312,7 +1350,7 @@ struct neg_predicate {
 template <typename predicate_t>
 using neg_predicate_t = neg_predicate<predicate_t>;
 
-// delete all top nodes that satisfy a predicate.
+/// Delete all top nodes that satisfy a predicate.
 template <typename predicate_t, typename symbol_t,
 	typename node_t = sp_node<symbol_t>>
 node_t trim_top(const node_t& input, predicate_t& query) {
@@ -1329,7 +1367,7 @@ node_t trim_top(const node_t& input, predicate_t& query) {
 	return pre_order(input).apply_unique_until_change(t);
 }
 
-// select all top nodes that satisfy a predicate and return them.
+/// Select all top nodes that satisfy a predicate and return them.
 template <typename predicate_t, typename node_t>
 std::vector<node_t> select_top(const node_t& input, predicate_t& query) {
 	std::vector<node_t> selected;
@@ -1345,7 +1383,7 @@ std::vector<node_t> select_top(const node_t& input, predicate_t& query) {
 	return selected;
 }
 
-// select all subnodes that satisfy a predicate according to the extractor and return them.
+/// Select all subnodes that satisfy a predicate according to the extractor and return them.
 template <typename predicate_t, typename extractor_t, typename node_t>
 std::vector<node_t> select_subnodes(const node_t& input, predicate_t& query,
 	extractor_t extractor)
@@ -1357,7 +1395,7 @@ std::vector<node_t> select_subnodes(const node_t& input, predicate_t& query,
 	return selected;
 }
 
-// select all nodes that satisfy a predicate and return them.
+/// Select all nodes that satisfy a predicate and return them.
 template <typename predicate_t, typename node_t>
 std::vector<node_t> select_all(const node_t& input, predicate_t& query) {
 	std::vector<node_t> selected;
@@ -1370,7 +1408,7 @@ std::vector<node_t> select_all(const node_t& input, predicate_t& query) {
 	return selected;
 }
 
-// Select all nodes in input that satisfy query ignoring subtrees under a node satisfying until
+/// Select all nodes in input that satisfy query ignoring subtrees under a node satisfying until
 template<typename node_t>
 std::vector<node_t> select_all_until (const node_t& input, const auto& query, const auto& until) {
 	std::vector<node_t> selected;
@@ -1384,7 +1422,7 @@ std::vector<node_t> select_all_until (const node_t& input, const auto& query, co
 	return selected;
 }
 
-// Select top nodes in input that satisfy query ignoring subtrees under a node satisfying until
+/// Select top nodes in input that satisfy query ignoring subtrees under a node satisfying until
 template<typename node_t>
 std::vector<node_t> select_top_until (const node_t& input, const auto& query, const auto& until) {
 	std::vector<node_t> selected;
@@ -1401,7 +1439,7 @@ std::vector<node_t> select_top_until (const node_t& input, const auto& query, co
 	return selected;
 }
 
-// find the first node that satisfy a predicate and return it.
+/// Find the first node that satisfy a predicate and return it.
 template <typename predicate_t, typename node_t>
 std::optional<node_t> find_top(const node_t& input, predicate_t& query) {
 	std::optional<node_t> found;
@@ -1413,7 +1451,7 @@ std::optional<node_t> find_top(const node_t& input, predicate_t& query) {
 	return found;
 }
 
-// Select single top node in input that satisfy query ignoring subtrees under a node satisfying until
+/// Select single top node in input that satisfy query ignoring subtrees under a node satisfying until
 template<typename node_t>
 std::optional<node_t> find_top_until (const node_t& input, const auto& query, const auto& until) {
 	std::optional<node_t> node;
@@ -1449,7 +1487,7 @@ node_t replace(const node_t& n, const node_t& replace, const node_t& with) {
 	return pre_order(n).apply_unique_until_change(r);
 }
 
-// Replace nodes in n according to changes while skipping subtrees that don't satisfy query
+/// Replace nodes in n according to changes while skipping subtrees that don't satisfy query
 template <typename node_t, typename predicate_t>
 node_t replace_if(const node_t& n, const std::map<node_t, node_t>& changes, predicate_t& query) {
 	const auto r = [&changes](const auto& el) {
@@ -1460,7 +1498,7 @@ node_t replace_if(const node_t& n, const std::map<node_t, node_t>& changes, pred
 	return pre_order(n).apply_unique_until_change(r, query);
 }
 
-// Replace nodes in n according to changes while skipping subtrees that satisfy query
+/// Replace nodes in n according to changes while skipping subtrees that satisfy query
 template <typename node_t, typename predicate_t>
 node_t replace_until(const node_t& n, const std::map<node_t, node_t>& changes, predicate_t& query) {
 	const auto r = [&changes](const auto& el) {
@@ -1476,8 +1514,11 @@ node_t replace_until(const node_t& n, const std::map<node_t, node_t>& changes, p
 
 // TODO (LOW) consider adding a similar functino for replace_node...
 
-// true while found is not set (found), it aborts the traversal once found has
-// been set.
+/**
+ * @brief True while found is not set (found).
+ * 
+ * Aborts the traversal once found has been set.
+ */
 template <typename node_t>
 struct while_not_found_predicate {
 
@@ -1489,8 +1530,11 @@ struct while_not_found_predicate {
 	std::optional<node_t>& found;
 };
 
-// to be used in conjunction with while_not_found_predicate. It sets found when
-// the predicate is satisfied by a node (set in found).
+/**
+ * @brief Sets found when the predicate is satisfied by a node (set in found).
+ * 
+ * To be used in conjunction with while_not_found_predicate.
+ */
 template <typename predicate_t, typename node_t>
 struct find_visitor {
 
@@ -1506,7 +1550,7 @@ struct find_visitor {
 	std::optional<node_t>& found;
 };
 
-// find the first node that satisfy a predicate and return it.
+/// Find the first node that satisfy a predicate and return it.
 template <typename predicate_t, typename node_t>
 std::optional<node_t> find_bottom(const node_t& input, predicate_t& query) {
 	std::optional<node_t> found;
@@ -1518,27 +1562,31 @@ std::optional<node_t> find_bottom(const node_t& input, predicate_t& query) {
 	return found;
 }
 
-// a environment is a map from captures to tree nodes, it is used
-// to keep track of the captures that have been unified and their
-// corresponding tree nodes.
+/// An environment is a map from captures to tree nodes, it is used
+/// to keep track of the captures that have been unified and their
+/// corresponding tree nodes.
 template<typename node_t>
 using environment = std::map<node_t, node_t>;
 
-// a rule is a pair of a pattern and a substitution. It is used to
-// rewrite a tree.
+/// A rule is a pair of a pattern and a substitution. It is used to
+/// rewrite a tree.
 template<typename node_t>
 using rule = std::pair<node_t, node_t>;
 
 // TODO (MEDIUM) simplify matchers code and extract common code.
 
-// this predicate matches when there exists a environment that makes the
-// pattern match the node.
 //
 // TODO (LOW) create and env in operator() and pass it as a parameter to match, if
 // a  match occurs, copy the data from the temp env to the env passed as
 // parameter.
 //
 // It should allow to detects matches in the middle of a tree.
+
+/**
+ * @brief Matches when there is an environment where pattern matches the node.
+ * 
+ * Predicate that matches when there exists a environment that makes the pattern match the node.
+ */
 template <typename node_t, typename is_capture_t>
 struct pattern_matcher {
 	using pattern_t = node_t;
@@ -1662,12 +1710,15 @@ private:
 };
 
 
-// this predicate matches when there exists a environment that makes the
-// pattern match the node ignoring the nodes detected as skippable.
-//
 // TODO (LOW) create an env in operator() and pass it as a parameter to match, if
 // a  match occurs, copy the data from the temp env to the env passed as
 // parameter.
+/**
+ * @brief Matches when there is an environment where pattern matches the node.
+ * 
+ * Predicate that matches when there exists a environment that makes the pattern
+ * match the node, ignoring the nodes detected as skippable.
+ */
 template <typename node_t, typename is_capture_t, typename predicate_t>
 struct pattern_matcher_if {
 	using pattern_t = node_t;
@@ -1722,7 +1773,7 @@ private:
 	}
 };
 
-// apply a rule to a tree using the predicate to pattern_matcher.
+/// Apply a rule to a tree using the predicate to pattern_matcher.
 template <typename node_t, typename is_capture_t>
 node_t apply_rule(const rule<node_t>& r, const node_t& n, const is_capture_t& c) {
 	pattern_matcher2<node_t, is_capture_t> matcher {r, c};
@@ -1740,8 +1791,12 @@ node_t apply_rule(const rule<node_t>& r, const node_t& n, const is_capture_t& c)
 	return nn;
 }
 
-// apply a rule to a tree using the predicate to pattern_matcher and skipping
-// unnecessary subtrees
+/**
+ * @brief Apply a rule to a tree using the predicate.
+ * 
+ * Apply a rule to a tree using the predicate to pattern_matcher and skipping
+ * unnecessary subtrees.
+ */
 template <typename node_t, typename is_capture_t, typename predicate_t>
 node_t apply_if(const rule<node_t>& r, const node_t& n,
 	is_capture_t& c, predicate_t& predicate)
@@ -1761,8 +1816,11 @@ node_t apply_if(const rule<node_t>& r, const node_t& n,
 	return nn;
 }
 
-// apply a substitution to a rule according to a given matcher, this method is
-// use internaly by apply and apply with skip.
+/**
+ * @brief Apply a substitution to a rule according to a given matcher.
+ * 
+ * This method is use internaly by apply and apply with skip.
+ */
 template <typename node_t, typename matcher_t>
 node_t apply(const node_t& s, const node_t& n, matcher_t& matcher) {
 	post_order_query_traverser<identity_t, matcher_t, node_t>(
@@ -1775,12 +1833,13 @@ node_t apply(const node_t& s, const node_t& n, matcher_t& matcher) {
 	return n;
 }
 
-// drop unnecessary information from the parse tree nodes
+/// Drop unnecessary information from the parse tree nodes
 template <typename parse_symbol_t, typename symbol_t>
 auto drop_location = [](const parse_symbol_t& n)-> symbol_t { return n.first; };
 template <typename parse_symbol_t, typename symbol_t>
 using drop_location_t = decltype(drop_location<parse_symbol_t, symbol_t>);
 
+/// Make a tree from the given tree extracted from a forest struct
 template<typename parser_t, typename transformer_t, typename symbol_t>
 sp_node<symbol_t> make_node_from_tree(
 	const transformer_t& /*transformer*/,
@@ -1804,7 +1863,7 @@ sp_node<symbol_t> make_node_from_tree(
 
 }
 
-// make a tree from the given parse result and logs parse error if parse fails.
+/// Make a tree from the given parse result and logs parse error if parse fails.
 template<typename parser_t, typename transformer_t, typename symbol_t>
 sp_node<symbol_t> make_node_from_parse_result(
 	const transformer_t& transformer, typename parser_t::result& r)
@@ -1816,7 +1875,7 @@ sp_node<symbol_t> make_node_from_parse_result(
 	return 0;
 }
 
-// make a tree from the given source code string.
+/// Make a tree from the given source code string.
 template<typename parser_t, typename transformer_t, typename symbol_t>
 sp_node<symbol_t> make_node_from_string(
 	const transformer_t& transformer,
@@ -1828,7 +1887,7 @@ sp_node<symbol_t> make_node_from_string(
 		transformer, result);
 }
 
-// make a tree from the given source code stream.
+/// Make a tree from the given source code stream.
 template<typename parser_t, typename transformer_t, typename symbol_t>
 sp_node<symbol_t> make_node_from_stream(const transformer_t& transformer,
 	std::istream& is, idni::parser<>::parse_options options = {})
@@ -1838,7 +1897,7 @@ sp_node<symbol_t> make_node_from_stream(const transformer_t& transformer,
 		transformer, result);
 }
 
-// make a tree from the given source code file.
+/// Make a tree from the given source code file.
 template<typename parser_t, typename transformer_t, typename symbol_t>
 sp_node<symbol_t> make_node_from_file(const transformer_t& transformer,
 	const std::string& filename, idni::parser<>::parse_options options = {})
@@ -1850,7 +1909,7 @@ sp_node<symbol_t> make_node_from_file(const transformer_t& transformer,
 
 } // namespace idni::rewriter::depreciating
 
-// Hash for node using specialization to std::hash
+/// Hash for node using specialization to std::hash
 template<typename symbol_t>
 struct std::hash<idni::rewriter::depreciating::node<symbol_t>> {
 	size_t operator()(const idni::rewriter::depreciating::node<symbol_t>& n) const noexcept {
@@ -1863,4 +1922,4 @@ struct std::hash<idni::rewriter::depreciating::node<symbol_t>> {
 #undef LOG_ERROR
 #undef LOG_END
 #undef LOG_REWRITING
-#endif // __IDNI__REWRITING_H__
+#endif // __IDNI__PARSER__REWRITING_H__

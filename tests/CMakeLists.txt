@@ -7,10 +7,16 @@ set(TESTS
 	tree
 )
 
+set(TEST_LIBS tauparser ${TEST_FRAMEWORK})
+if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
+    CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+	set(TEST_LIBS ${TEST_LIBS} -static-libgcc -static-libstdc++)
+endif()
+
 foreach(X IN LISTS TESTS)
 	set(N "test_${X}")
 	add_executable(${N} "${N}.cpp")
-	target_setup(${N})
+	tauparser_setup(${N} PRIVATE ${TEST_LIBS})
 	target_compile_options(${N} PUBLIC "-Wno-parentheses")
 	if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
 		CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -29,7 +35,6 @@ endforeach()
 
 # add required sources to test_cli
 target_sources("test_cli" PRIVATE
-	"${CMAKE_CURRENT_SOURCE_DIR}/../src/utility/cli.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../tools/tgf/tgf_cli.cpp")
 
 set(DOCTEST_HEADER "${PROJECT_SOURCE_DIR}/src/doctest.h" CACHE PATH "Doctest header")
@@ -72,4 +77,5 @@ foreach(X IN LISTS DOCTESTS)
 	target_include_directories(${N} PUBLIC
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
 	)
+	# add_dependencies(${N} ${TAU_PARSER_STATIC_LIB_NAME})
 endforeach()
