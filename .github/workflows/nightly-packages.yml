@@ -72,7 +72,7 @@ jobs:
           tag_name: "nightly-${{ env.date_iso }}"
           name: "Tau Parser Library ${{ env.version }} Nightly Build ${{ env.date_iso }}"
           body: "Tau Parser Library ${{ env.version }} automated nightly build ${{ env.date_iso }} commit ${{ github.sha }}"
-          draft: true
+          draft: false
           prerelease: true
           files: ${{ github.workspace }}/packages/*
         env:
