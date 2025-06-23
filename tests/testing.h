@@ -210,6 +210,13 @@ namespace idni::testing
 		};
 
 		f.extract_graphs(f.root(), cb_next_graph, opt_edge);
+		auto firstg = f.extract_first_graph(f.root());
+		{
+			f.detect_cycle(firstg);
+			dump_files(firstg, "first");
+			if (options<T>.binarize && r.inline_prefixed_nodes(firstg, "__B_"))
+				dump_files(firstg, "first_rembin");
+		}
 #endif
 		return 1;
 	}

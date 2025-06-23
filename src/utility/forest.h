@@ -89,13 +89,29 @@ private:
 			return *this;
 		}
 		inline bool operator<(const nptr_t& rhs) const {
-			return hash < rhs.hash;
+			if (hash == rhs.hash) {
+				if(id == rhs.id)
+					return false;
+				else return *id < *rhs.id;
+			}
+			else return hash < rhs.hash;
 			//return id < rhs.id;
 		}
+		std::size_t operator()(const nptr_t& _n) const {
+			return _n.hash;
+		}
+
 		inline bool operator==(const nptr_t& rhs) const {
 			if (hash == rhs.hash) {
-				DBG(assert(id == rhs.id));
-				return true;
+				if(id == rhs.id) return true;
+				else {
+					if(*id == *rhs.id ) return true;
+
+				//collision, so check if they are same
+				DBG(std::cout << "collision: " << *id << 
+					" and " << *rhs.id << std::endl;)
+				return false;
+				}
 			}
 			return false;
 		}
@@ -119,7 +135,7 @@ public:
 	using node       = nptr_t;
 	using nodes      = std::vector<node>;
 	using nodes_set  = std::set<nodes>;
-	using node_graph = std::map<node, nodes_set>;
+	using node_graph = std::unordered_map<node, nodes_set, node>;
 	using edge       = std::pair<size_t, size_t>;
 	
 	/// A tree extracted from forst<NodeT>::graph
@@ -153,7 +169,7 @@ public:
 		sptree _extract_trees(node& r, int_t choice = 0);
 		htree::sp _extract_tree2(node& r);
 	};
-	//vector of graph with callback
+		//vector of graph with callback
 	using graphv = std::vector<graph>;
 	using cb_next_graph_t = std::function<bool(graph&)>;
 
@@ -195,6 +211,7 @@ public:
 	 */
 	graphv extract_graphs(const node& root, cb_next_graph_t cb_next_graph,
 		bool unique_edge = true) const;
+	graph extract_first_graph(const node& root) const;
 
 	using enter_t  =std::function<void(const node&)>;
 	using exit_t   =std::function<void(const node&, const nodes_set&)>;

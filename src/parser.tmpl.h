@@ -192,9 +192,6 @@ void parser<C, T>::remove_item(const item& i){
 				if (o.enable_gc) {
 					remove_item(*it);
 				}
-				else if (o.enable_gc) {
-					gcready.insert(*it);
-				}
 			}
 		}
 	}
@@ -345,7 +342,7 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 		}
 		//DBGP(std::cout << "neg: " << g[it->prod][it->con].neg << "\n";)
 		// j is parent of i, but with next non-terminal advanced
-		if (add(t, j).second) {
+		if (add(t, j).second && o.enable_gc) {
 			// — record the new GC‐edge for parent → j
 			DBGP(print(std::cout << "Add Edge: ", *it) << " --> ";)
 			DBGP(print(std::cout, j) << std::endl;)
@@ -388,7 +385,7 @@ void parser<C, T>::predict(const item& i, container_t& t) {
 				DBGP(print(std::cout <<" +  adding to t \t\t\t",
 					j) << "\n";)
 			}
-			++refi[i]; //insert and increment
+			if(o.enable_gc) ++refi[i]; //insert and increment
 		}
 	}
 }
@@ -399,21 +396,23 @@ void parser<C, T>::scan(const item& i, size_t n, T ch) {
 		i.prod, i.con, i.from, i.dot + 1);
 	DBGP(std::cout << (ch == get_lit(i).t()?"SUCCESS":"FAIL") << "\n";)
 	if (ch != get_lit(i).t()) {
-		//when the item fails, decrement refcount of items that
-		//predicted it i.e predicting items ( only the one) for
-		// which refc was incremented when this item was predicted
-		auto rit = refi.find(i);
-		if (rit != refi.end() && --rit->second == 0) {
-			refi.erase(rit);
+		if(o.enable_gc) {
+			//when the item fails, decrement refcount of items that
+			//predicted it i.e predicting items ( only the one) for
+			// which refc was incremented when this item was predicted
+			auto rit = refi.find(i);
+			if (rit != refi.end() && --rit->second == 0) {
+				refi.erase(rit);
+			}
+			remove_item(i);
 		}
-		remove_item(i);
 		return;
 	}
 	// by this time, terminal is advanced over
 	// and new item j will be created.
 	// hence, the previous item i can be marked
 	// for gc
-	if (!o.binarize) gcready.insert(i);
+	if (!o.binarize && o.enable_gc) gcready.insert(i);
 	if (j.set >= S.size()) S.resize(j.set + 1);
 	DBGP(print(std::cout << " +  adding from scan into S[" << j.set <<
 		"]: \t", j) << std::endl;)
@@ -452,7 +451,7 @@ void parser<C, T>::scan_cc_function(const item& i, size_t n, T ch,
 	DBGP(print(std::cout, k) << "\n";)
 	//++refi[i];
 	// i is scanned over and item k is completed so collectible.
-	if (!o.binarize) gcready.insert(i);
+	if (!o.binarize && o.enable_gc ) gcready.insert(i);
 	//gcready.insert(k);
 	if (eof_fn) c.insert(k); // add current item for completion if eof_fn
 }
@@ -505,6 +504,7 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 	}
 #ifndef PARSER_BINTREE_FOREST
 	auto f = std::make_unique<pforest>();
+	f->g.reserve(2000);
 #endif
 	S.clear(), U.clear(), bin_tnt.clear(), refi.clear(),
 		gcready.clear(), sorted_citem.clear(), rsorted_citem.clear();

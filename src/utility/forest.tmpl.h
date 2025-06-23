@@ -304,6 +304,49 @@ bool forest<NodeT>::_extract_graph_uniq_edge(std::map<node, size_t>& ndmap,
 }
 
 template <typename NodeT>
+typename forest<NodeT>::graph forest<NodeT>::extract_first_graph(
+	const node& root) const
+{
+	graph gs;
+	std::unordered_set<edge> de;
+	de.reserve(this->g.size()); // reserve some space for edges
+	gs.root = root;
+	std::unordered_map<node, size_t, node> ndmap;
+	ndmap.reserve(this->g.size());
+	int_t id = 0;
+	for (auto& it : this->g) {
+		ndmap[it.first] = id++;
+		id += it.second.size(); // ambig node ids;
+	}
+	nodes todo;
+	todo.push_back(root);
+	while (todo.size()) {
+		auto crt = todo.back();
+		todo.pop_back();
+		auto cit = this->g.find(crt);
+		if(cit == this->g.end() || !cit->second.size()) continue;
+		auto &packs = cit->second;
+		size_t rid = ndmap[crt], ambpid = -1;
+		for(auto& nextp : packs){
+			ambpid++;
+			if( de.insert({rid, rid + ambpid + 1}).second) {
+				if(gs.find(crt) != gs.end())
+					gs.insert({crt, {nextp}});		
+				// coming back from different edge
+				else gs[crt].insert(nextp);
+				for (auto& nd: nextp) {
+					if(nd->first.nt() && de.insert({rid + ambpid + 1,
+						ndmap[nd]}).second) 
+							todo.push_back(nd);
+
+				}
+			}
+		}
+	}
+	return gs;
+}
+
+template <typename NodeT>
 typename forest<NodeT>::graphv forest<NodeT>::extract_graphs(
 	const node& root, cb_next_graph_t cb_next_graph, bool unique_edge) const
 {

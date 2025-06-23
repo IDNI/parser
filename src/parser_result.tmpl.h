@@ -311,11 +311,14 @@ parser<C, T>::psptree parser<C, T>::result::get_tree() {
 template <typename C, typename T>
 parser<C, T>::psptree parser<C, T>::result::get_tree(const pnode& n) {
 	psptree t;
+	emeasure_time_start(s, e);
+	std::cout<< "here2";
 	f->extract_graphs(n, [this, &t] (auto& g) {
 		inline_grammar_transformations(g);
 		t = g.extract_trees();
 		return false;
 	});
+	emeasure_time_end(s, e);
 	return t;
 }
 

@@ -186,12 +186,42 @@ tref parser<C, T>::result::get_tree2(const pnode&) {
 template <typename C, typename T>
 tref parser<C, T>::result::get_tree2(const pnode& n) {
 	htree::sp t;
+	MS(emeasure_time_start(s,e);)
+	MS(std::cout<<"\n extract_graph ";)
+	auto g = f->extract_first_graph(n);
+	/*f->extract_graphs(n, [this, &t] (auto& g) {
+		MS(emeasure_time_start(s1,e1);)
+		MS(std::cout<<"\n inline_grammar ";)
+		inline_grammar_transformations(g);
+		MS(emeasure_time_end(s1, e1);)
+		t = g.extract_tree2();
+	return false;
+	});
+	*/
+	MS(emeasure_time_end(s, e);)
+	
+	MS(emeasure_time_start(s1,e1);)
+	MS(std::cout<<"\n inline_grammar ";)
+	inline_grammar_transformations(g);
+	MS(emeasure_time_end(s1, e1);)
+	
+	
+	MS(emeasure_time_start(s2,e2);)
+	MS(std::cout<<"\n extract_tree2 ";)
+	t = g.extract_tree2();
+	MS(emeasure_time_end(s2, e2);)
+
+	/*
 	f->extract_graphs(n, [this, &t] (auto& g) {
 		inline_grammar_transformations(g);
 		t = g.extract_tree2();
 		return false;
 	});
+	*/
+	
+	
 	return t->get();
+	
 }
 #endif // PARSER_BINTREE_FOREST
 

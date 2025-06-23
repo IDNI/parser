@@ -719,6 +719,13 @@ public:
 		bool operator==(const item& i) const;
 		size_t set, prod, con, from, dot;
 	};
+	struct item_hash {
+		size_t operator()(const item& i) const {
+			size_t seed = 0;
+			hash_combine(seed, i.set, i.prod, i.con, i.from, i.dot);
+			return seed;
+		}
+	};
 
 	/// Input manager and decoder used by the parser
 	struct input {
