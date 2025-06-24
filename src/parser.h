@@ -721,7 +721,7 @@ public:
 	};
 	struct item_hash {
 		size_t operator()(const item& i) const {
-			size_t seed = 0;
+			size_t seed = grcprime;
 			hash_combine(seed, i.set, i.prod, i.con, i.from, i.dot);
 			return seed;
 		}
@@ -1055,7 +1055,7 @@ public:
 	bool debug = false;
 	std::pair<size_t, size_t> debug_at = { DEBUG_POS_FROM, DEBUG_POS_TO };
 private:
-	using container_t    = std::set<item>;
+	using container_t    = std::unordered_set<item, item_hash>;
 	using container_iter = typename container_t::iterator;
 public:
 	std::ostream& print(std::ostream& os, const item& i) const;
