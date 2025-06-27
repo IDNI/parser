@@ -263,17 +263,22 @@ struct subtree_equality {
 	bool operator()(tref a, tref b) const;
 };
 
+template <typename T>
+struct subtree_less {
+	bool operator()(tref a, tref b) const;
+};
+
 template <typename T, typename PT>
-struct subtree_pair_equality {
+struct subtree_pair_less {
 	bool operator()(const std::pair<tref, PT>& a,
 			const std::pair<tref, PT>& b) const;
 };
 
 template <typename T>
-using subtree_set = std::set<tref, subtree_equality<T>>;
+using subtree_set = std::set<tref, subtree_less<T>>;
 
 template <typename T, typename PT>
-using subtree_map = std::map<tref, PT, subtree_equality<T>>;
+using subtree_map = std::map<tref, PT, subtree_less<T>>;
 
 template <typename T>
 using subtree_unordered_set = std::unordered_set<tref,
@@ -281,7 +286,7 @@ using subtree_unordered_set = std::unordered_set<tref,
 
 template <typename T, typename PT>
 using subtree_unordered_map = std::unordered_map<tref, PT,
-				hash_tref<T>, subtree_pair_equality<T, PT>>;
+				hash_tref<T>, subtree_equality<T>>;
 
 /**
  * @brief Left child right sibling tree

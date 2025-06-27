@@ -276,11 +276,16 @@ size_t hash_tref<T>::operator()(tref r) const {
 
 template <typename T>
 bool subtree_equality<T>::operator()(tref a, tref b) const {
+	return lcrs_tree<T>::subtree_equals(a, b);
+}
+
+template <typename T>
+bool subtree_less<T>::operator()(tref a, tref b) const {
 	return lcrs_tree<T>::subtree_less(a, b);
 }
 
 template <typename T, typename PT>
-bool subtree_pair_equality<T, PT>::operator()(const std::pair<tref, PT>& a,
+bool subtree_pair_less<T, PT>::operator()(const std::pair<tref, PT>& a,
 					const std::pair<tref, PT>& b) const
 {
 	bool r = lcrs_tree<T>::subtree_less(a.first, b.first);
