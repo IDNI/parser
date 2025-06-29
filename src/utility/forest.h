@@ -135,7 +135,7 @@ public:
 	using node       = nptr_t;
 	using nodes      = std::vector<node>;
 	using nodes_set  = std::set<nodes>;
-	using node_graph = std::unordered_map<node, nodes_set, node>;
+	using node_graph = std::map<node, nodes_set>;
 	using edge       = std::pair<size_t, size_t>;
 	
 	/// A tree extracted from forst<NodeT>::graph

@@ -1055,7 +1055,7 @@ public:
 	bool debug = false;
 	std::pair<size_t, size_t> debug_at = { DEBUG_POS_FROM, DEBUG_POS_TO };
 private:
-	using container_t    = std::unordered_set<item, item_hash>;
+	using container_t    = std::set<item>;
 	using container_iter = typename container_t::iterator;
 public:
 	std::ostream& print(std::ostream& os, const item& i) const;
@@ -1078,6 +1078,7 @@ private:
 	std::vector<container_t> U; /// uncompleted
 		///mapping from to position of end in S for items
 	std::unordered_map<size_t, std::vector<size_t>> fromS;
+	std::unordered_map<std::pair<lit<C, T>,size_t> , std::set<item>> cache;
 
 	/// refcounter for the earley item
 	/// default value is 0, which means it can be garbaged

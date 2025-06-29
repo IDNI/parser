@@ -327,8 +327,13 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 		//if (refi.count(i) && refi[i] > 0) --refi[i];
 		//return;
 	}
-	const container_t& cont = S[i.from];
-	for (auto it = cont.begin(); it != cont.end(); ++it) {
+	//const container_t& cont = S[i.from];
+	auto smbl = get_nt(i);
+	auto &rng = cache[{smbl, i.from}];
+	//for (auto it = cont.begin(); it != cont.end(); ++it) {
+	for (auto eit : rng) {
+
+		auto it = &eit;
 		if (n_literals(*it) <= it->dot ||
 			get_lit(*it) != get_nt(i)) continue;
 		DBGP(print(std::cout << " ?  checking \t\t\t\t", *it) << "\n";)
@@ -368,6 +373,9 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 template <typename C, typename T>
 void parser<C, T>::predict(const item& i, container_t& t) {
 	DBGP(std::cout << "    predicting\n";)
+	lit<C, T> parl = get_lit(i);
+	//assert(parl.nt());
+	//assert(!completed(i));
 	for (size_t p : g.prod_ids_of_literal(get_lit(i))) {
 		// predicting item should have ref count increased
 		// since predicting item, for its advancement over
@@ -380,10 +388,16 @@ void parser<C, T>::predict(const item& i, container_t& t) {
 		// item, just use one
 		// Should we use S[n] to see if new item is insertable
 		for (size_t c = 0; c != g.n_conjs(p); ++c) {
+			//just once
+			if( c==0 )cache[{parl, i.set}].insert(i);
 			item j(i.set, p, c, i.set, 0);
 			if (add(t, j).second) {
 				DBGP(print(std::cout <<" +  adding to t \t\t\t",
 					j) << "\n";)
+				// if item is added, then it is a new item
+				//if(S[i.set].find(j) != S[i.set].end()) {
+					// j item is already present
+				//}		
 			}
 			if(o.enable_gc) ++refi[i]; //insert and increment
 		}
@@ -442,6 +456,7 @@ void parser<C, T>::scan_cc_function(const item& i, size_t n, T ch,
 		if (p == static_cast<size_t>(-1)) return;
 	}
 	if (!eof) n++;
+	cache[{l, i.set}].insert(i);
 	item k(n, p, 0, n - (eof ? 0 : 1), 1); // complete char functions's char
 	DBGP(print(std::cout << " +  adding from cc scan into S[" << k.set <<
 		"] \t", k) << "\n";)
@@ -504,9 +519,8 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 	}
 #ifndef PARSER_BINTREE_FOREST
 	auto f = std::make_unique<pforest>();
-	f->g.reserve(2000);
 #endif
-	S.clear(), U.clear(), bin_tnt.clear(), refi.clear(),
+	S.clear(), U.clear(), bin_tnt.clear(), refi.clear(), cache.clear(),
 		gcready.clear(), sorted_citem.clear(), rsorted_citem.clear();
 	//pnode::nid().clear();
 	MS(int gcnt = 0;) // count of collected items
