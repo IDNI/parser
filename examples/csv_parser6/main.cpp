@@ -95,7 +95,7 @@ private:
 			if (n.first == integer) r.push_back(get_int(n));
 			// if str then push the string into row of values
 			else if (n.first == str)
-					r.push_back(res.get_terminals(n));
+					r.emplace_back(res.get_terminals(n));
 			// if null, push the bool
 			else if (n.first == nullvalue) r.emplace_back(true);
 		};

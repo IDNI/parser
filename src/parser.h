@@ -847,9 +847,9 @@ public:
 		/// Location of error.
 		int_t loc;
 		/// Line of error.
-		size_t line;
+		size_t line = 0;
 		/// Column of error.
-		size_t col;
+		size_t col = 0;
 		 /// Closest matching context.
 		std::vector<T> ctxt;
 		/// Terminal which was scanned in a place where it was not expected.
