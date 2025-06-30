@@ -24,7 +24,7 @@ inline const std::vector<std::string> symbol_names{
 	"__E_directive_body_34", "__E___E_directive_body_34_35", "__E___E___E_directive_body_34_35_36", "trim_dir", "__E_directive_body_37", "use_dir", "__E_directive_body_38", "use_from", "cc_sym", "use_param", 
 	"__E___E_directive_body_38_39", "__E___E_directive_body_38_40", "disable_ad_dir", "__E_directive_body_41", "__E___E_directive_body_41_42", "__E___E_directive_body_41_43", "enable_prods_dir", "__E_directive_body_44", "ambiguous_dir", "__E_directive_body_45", 
 	"__E_syms_46", "__E_syms_47", "tree_path", "__E_inline_arg_48", "__E___E_inline_arg_48_49", "__E_tree_path_50", "__E_tree_path_51", "__E_use_param_52", "__E_sep_53", "sep_required", 
-	"__E___54", "__E____55", "comment", "__E_comment_56", "__E_comment_57", "__E_comment_58", "__N_0", "__N_1", 
+	"comment", "__E_comment_54", "__E_comment_55", "__E_comment_56", "__N_0", "__N_1", 
 };
 
 inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
@@ -207,10 +207,10 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(59), (T(18)));
 //G63:  __E_unescaped_c_21(59) => '\\'.
 	p(NT(59), (T(19)));
-//G64:  __N_0(116)           => __E_unescaped_c_21(59).
-	p(NT(116), (NT(59)));
-//G65:  unescaped_c(14)      => printable(5) & ~( __N_0(116) ).	 # conjunctive
-	p(NT(14), (NT(5)) & ~(NT(116)));
+//G64:  __N_0(114)           => __E_unescaped_c_21(59).
+	p(NT(114), (NT(59)));
+//G65:  unescaped_c(14)      => printable(5) & ~( __N_0(114) ).	 # conjunctive
+	p(NT(14), (NT(5)) & ~(NT(114)));
 //G66:  __E_escaped_c_22(60) => '\''.
 	p(NT(60), (T(18)));
 //G67:  __E_escaped_c_22(60) => '\\'.
@@ -247,10 +247,10 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(65), (T(26)));
 //G83:  __E_unescaped_s_26(65) => '\\'.
 	p(NT(65), (T(19)));
-//G84:  __N_1(117)           => __E_unescaped_s_26(65).
-	p(NT(117), (NT(65)));
-//G85:  unescaped_s(12)      => printable(5) & ~( __N_1(117) ).	 # conjunctive
-	p(NT(12), (NT(5)) & ~(NT(117)));
+//G84:  __N_1(115)           => __E_unescaped_s_26(65).
+	p(NT(115), (NT(65)));
+//G85:  unescaped_s(12)      => printable(5) & ~( __N_1(115) ).	 # conjunctive
+	p(NT(12), (NT(5)) & ~(NT(115)));
 //G86:  __E_escaped_s_27(66) => '"'.
 	p(NT(66), (T(26)));
 //G87:  __E_escaped_s_27(66) => '\\'.
@@ -431,34 +431,34 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(109), (T(17)));
 //G175: sep_required(109)    => __(6).
 	p(NT(109), (NT(6)));
-//G176: __E___54(110)        => __(6).
-	p(NT(110), (NT(6)));
-//G177: __E___54(110)        => null.
-	p(NT(110), (nul));
-//G178: _(7)                 => __E___54(110).
-	p(NT(7), (NT(110)));
-//G179: __E____55(111)       => space(4).
-	p(NT(111), (NT(4)));
-//G180: __E____55(111)       => comment(112).
-	p(NT(111), (NT(112)));
-//G181: __(6)                => __E____55(111) _(7).
-	p(NT(6), (NT(111)+NT(7)));
-//G182: __E_comment_56(113)  => printable(5).
-	p(NT(113), (NT(5)));
-//G183: __E_comment_56(113)  => '\t'.
-	p(NT(113), (T(46)));
-//G184: __E_comment_57(114)  => null.
-	p(NT(114), (nul));
-//G185: __E_comment_57(114)  => __E_comment_56(113) __E_comment_57(114).
-	p(NT(114), (NT(113)+NT(114)));
-//G186: __E_comment_58(115)  => '\r'.
-	p(NT(115), (T(47)));
-//G187: __E_comment_58(115)  => '\n'.
-	p(NT(115), (T(48)));
-//G188: __E_comment_58(115)  => eof(1).
-	p(NT(115), (NT(1)));
-//G189: comment(112)         => '#' __E_comment_57(114) __E_comment_58(115).
-	p(NT(112), (T(49)+NT(114)+NT(115)));
+//G176: _(7)                 => __(6).
+	p(NT(7), (NT(6)));
+//G177: _(7)                 => null.
+	p(NT(7), (nul));
+//G178: __(6)                => space(4).
+	p(NT(6), (NT(4)));
+//G179: __(6)                => comment(110).
+	p(NT(6), (NT(110)));
+//G180: __(6)                => __(6) space(4).
+	p(NT(6), (NT(6)+NT(4)));
+//G181: __(6)                => __(6) comment(110).
+	p(NT(6), (NT(6)+NT(110)));
+//G182: __E_comment_54(111)  => printable(5).
+	p(NT(111), (NT(5)));
+//G183: __E_comment_54(111)  => '\t'.
+	p(NT(111), (T(46)));
+//G184: __E_comment_55(112)  => null.
+	p(NT(112), (nul));
+//G185: __E_comment_55(112)  => __E_comment_54(111) __E_comment_55(112).
+	p(NT(112), (NT(111)+NT(112)));
+//G186: __E_comment_56(113)  => '\r'.
+	p(NT(113), (T(47)));
+//G187: __E_comment_56(113)  => '\n'.
+	p(NT(113), (T(48)));
+//G188: __E_comment_56(113)  => eof(1).
+	p(NT(113), (NT(1)));
+//G189: comment(110)         => '#' __E_comment_55(112) __E_comment_56(113).
+	p(NT(110), (T(49)+NT(112)+NT(113)));
 	#undef T
 	#undef NT
 	return loaded = true, p;
@@ -482,7 +482,7 @@ struct tgf_parser_nonterminals {
 		__E_directive_body_34, __E___E_directive_body_34_35, __E___E___E_directive_body_34_35_36, trim_dir, __E_directive_body_37, use_dir, __E_directive_body_38, use_from, cc_sym, use_param, 
 		__E___E_directive_body_38_39, __E___E_directive_body_38_40, disable_ad_dir, __E_directive_body_41, __E___E_directive_body_41_42, __E___E_directive_body_41_43, enable_prods_dir, __E_directive_body_44, ambiguous_dir, __E_directive_body_45, 
 		__E_syms_46, __E_syms_47, tree_path, __E_inline_arg_48, __E___E_inline_arg_48_49, __E_tree_path_50, __E_tree_path_51, __E_use_param_52, __E_sep_53, sep_required, 
-		__E___54, __E____55, comment, __E_comment_56, __E_comment_57, __E_comment_58, __N_0, __N_1, 
+		comment, __E_comment_54, __E_comment_55, __E_comment_56, __N_0, __N_1, 
 	};
 };
 
