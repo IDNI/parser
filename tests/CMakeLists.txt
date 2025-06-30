@@ -35,7 +35,7 @@ endforeach()
 
 # add required sources to test_cli
 target_sources("test_cli" PRIVATE
-	"${CMAKE_CURRENT_SOURCE_DIR}/../tools/tgf/tgf_cli.cpp")
+	"${CMAKE_CURRENT_SOURCE_DIR}/../src/tgf/tgf_cli.cpp")
 
 set(DOCTEST_HEADER "${PROJECT_SOURCE_DIR}/src/doctest.h" CACHE PATH "Doctest header")
 if (NOT EXISTS "${DOCTEST_HEADER}")
@@ -61,18 +61,18 @@ set(DOCTESTS
 foreach(X IN LISTS DOCTESTS)
 	set(N "doctest_${X}")
 	add_executable(${N} "${N}.cpp")
-	target_setup(${N})
+	tauparser_setup(${N} PRIVATE "")
 	target_compile_options(${N} PUBLIC "-Wno-parentheses")
 	if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
 		CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 			target_link_libraries(${N}
-				${PARSER_OBJECT_LIB_NAME}
+				tauparser
 				${TEST_FRAMEWORK}
 				-static-libgcc
 				-static-libstdc++
 			)
 	else()
-		target_link_libraries(${N} ${PARSER_OBJECT_LIB_NAME} doctest)
+		target_link_libraries(${N} tauparser doctest)
 	endif()
 	target_include_directories(${N} PUBLIC
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>

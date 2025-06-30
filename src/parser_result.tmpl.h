@@ -7,23 +7,28 @@ namespace idni {
 
 #ifdef PARSER_BINTREE_FOREST
 template <typename C, typename T>
-parser<C, T>::result::result(grammar<C, T>& g, std::unique_ptr<input> in_,
+parser<C, T>::result::result(parser<C, T>& p, std::unique_ptr<input> in_,
 	tref f, bool fnd, error err) :
-		found(fnd), parse_error(err), shaping(g.opt.shaping),
+		found(fnd), parse_error(err),
+		shaping(p.get_grammar().opt.shaping), p(p),
 		in_(std::move(in_)), froot(tree::geth(f))
 {}
 #else
 template <typename C, typename T>
-parser<C, T>::result::result(grammar<C, T>& g, std::unique_ptr<input> in_,
+parser<C, T>::result::result(parser<C, T>& p, std::unique_ptr<input> in_,
 	std::unique_ptr<pforest> f, bool fnd, error err) :
-		found(fnd), parse_error(err), shaping(g.opt.shaping),
+		found(fnd), parse_error(err),
+		shaping(p.get_grammar().opt.shaping), p(p),
 		in_(std::move(in_)), f(std::move(f))
 {
 	/// if is ambiguous add __AMB__ node to the nonterminals dict so it can
 	/// be added to the resulting parse tree when get_shaped_tree() is called
 	static const std::string amb = "__AMB__";
-	if (is_ambiguous()) amb_node = g.nt(from_str<C>(amb));
+	if (is_ambiguous()) amb_node = p.get_grammar().nt(from_str<C>(amb));
 }
+
+template <typename C, typename T>
+parser<C, T>& parser<C, T>::result::get_parser() const { return p; }
 
 template <typename C, typename T>
 typename parser<C, T>::pforest* parser<C, T>::result::get_forest() const {
@@ -433,26 +438,51 @@ typename parser<C, T>::result::nodes_and_edges
 
 template <typename C, typename T>
 bool parser<C, T>::result::inline_grammar_transformations(pgraph& g) {
-	bool r = false;
-	std::set<std::string> prefixes = {
-		"__E_", // ebnf prefix
-		"__B_"  // binarization prefix
-		//"__N_"  // negation prefix
+	static const std::set<std::basic_string<C>> prefixes = {
+		from_cstr<C>("__E_"), // ebnf prefix
+		from_cstr<C>("__B_")  // binarization prefix
+		//from_cstr<C>("__N_")  // negation prefix
 	};
-	for (auto& prefix : prefixes) r |= inline_prefixed_nodes(g, prefix);
+	return inline_nodes(g, get_nts_by_prefixes(prefixes));
+}
+
+template <typename C, typename T>
+std::set<size_t> parser<C, T>::result::get_nts_by_prefixes(
+	const std::set<std::basic_string<C>>& prefixes) const
+{
+	std::set<size_t> r;
+	nonterminals<C, T>& nts = p.get_grammar().nts;
+	for (size_t i = 0; i < nts.size(); ++i)
+		for (const auto& prefix : prefixes)
+			if (nts.get(i).find(prefix)
+				!= std::basic_string<C>::npos)
+			{
+				// std::cout << "found prefix " << prefix << " in " << nts.get(i) << std::endl;
+				r.insert(i);
+			}
 	return r;
 }
 
 template <typename C, typename T>
 bool parser<C, T>::result::inline_prefixed_nodes(pgraph& g,
-	const std::string& prefix)
+	const std::basic_string<C>& prefix)
 {
-	//collect all prefix like nodes for replacement
+	return inline_nodes(g, get_nts_by_prefixes({ prefix }));
+}
+
+template <typename C, typename T>
+bool parser<C, T>::result::inline_nodes(pgraph& g,
+	const std::set<size_t>& nts_to_inline)
+{
+	//collect all nodes for replacement
 	pnodes s;
 	for (auto& kv : f->g) {
-		auto name = kv.first->first.to_std_string();
-		if (name.find(prefix) != decltype(name)::npos)
+		const lit<C, T>& l = kv.first->first;
+		if (l.nt() && nts_to_inline.find(l.n()) != nts_to_inline.end())
+		{
 			s.insert(s.end(), kv.first);
+			// std::cout << "inserted node " << l.to_std_string() << std::endl;
+		}
 	}
 	return f->replace_nodes(g, s);
 }

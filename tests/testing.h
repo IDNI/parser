@@ -198,11 +198,12 @@ namespace idni::testing
 			filet << ptd.str();
 			filet.close();
 		};
+		static const auto bin_prefix = from_cstr<T>("__B_");
 		auto cb_next_graph = [&](typename parser<T>::pgraph &g)
 		{
 			f.detect_cycle(g);
 			dump_files(g);
-			if (options<T>.binarize && r.inline_prefixed_nodes(g, "__B_"))
+			if (options<T>.binarize && r.inline_prefixed_nodes(g, bin_prefix))
 				dump_files(g, "rembin");
 			i++;
 
@@ -214,7 +215,7 @@ namespace idni::testing
 		{
 			f.detect_cycle(firstg);
 			dump_files(firstg, "first");
-			if (options<T>.binarize && r.inline_prefixed_nodes(firstg, "__B_"))
+			if (options<T>.binarize && r.inline_prefixed_nodes(firstg, bin_prefix))
 				dump_files(firstg, "first_rembin");
 		}
 #endif

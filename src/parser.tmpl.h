@@ -686,9 +686,9 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 		- usenc)/(count + gcnt) <<std::endl);
 
 #ifdef PARSER_BINTREE_FOREST
-	return result(g, std::move(in_), fr, fnd, err);
+	return result(*this, std::move(in_), fr, fnd, err);
 #else
-	return result(g, std::move(in_), std::move(f), fnd, err);
+	return result(*this, std::move(in_), std::move(f), fnd, err);
 #endif
 }
 template <typename C, typename T>

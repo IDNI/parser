@@ -339,6 +339,7 @@ struct shaping_options {
 
 
 template <typename C, typename T> struct grammar_inspector;
+template <typename C, typename T> struct parser;
 /**
  * @brief Grammar struct required by parser.
  * 
@@ -347,6 +348,7 @@ template <typename C, typename T> struct grammar_inspector;
 template <typename C = char, typename T = C>
 struct grammar {
 	friend struct grammar_inspector<C, T>;
+	friend struct parser<C, T>;
 	typedef std::pair<lit<C, T>, std::vector<lits<C, T>>> production;
 	struct options {
 		/**
@@ -878,12 +880,13 @@ public:
 
 #ifdef PARSER_BINTREE_FOREST
 		// constructor
-		result(grammar<C, T>& g, std::unique_ptr<input> in,
+		result(parser<C, T>& p, std::unique_ptr<input> in_,
 			tref f, bool found, error err);
 #else
 		// constructor
-		result(grammar<C, T>& g, std::unique_ptr<input> in,
+		result(parser<C, T>& p, std::unique_ptr<input> in_,
 			std::unique_ptr<pforest> f, bool found, error err);
+		parser<C, T>& get_parser() const;
 		// returns the parsed forest
 		pforest* get_forest() const;
 		/// Transforms forest into tree and applies trimming
@@ -983,15 +986,20 @@ public:
 		nodes_and_edges get_nodes_and_edges() const;
 
 #ifndef PARSER_BINTREE_FOREST
-		// removes all prefixed symbols from the graph everywhere
-		// by replacing them with their immediate children nodes
-		bool inline_prefixed_nodes(pgraph& g,const std::string& prefix);
 		/// Removes EBNF and binarize transformation prefixes
 		bool inline_grammar_transformations(pgraph& g);
+		// removes all prefixed symbols from the graph everywhere
+		// by replacing them with their immediate children nodes
+		bool inline_prefixed_nodes(pgraph& g,
+			const std::basic_string<C>& prefix);
+		// removes all nodes with the given nt from the graph everywhere
+		bool inline_nodes(pgraph& g,
+				  const std::set<size_t>& nts_to_inline);
 #endif
 		// private members are accessible by parser
 		friend parser<C, T>;
 	private:
+		parser<C, T>& p;
 		// input moved here from the parse call
 		std::unique_ptr<input> in_ = 0;
 		// forest moved here from the parse call
@@ -999,6 +1007,9 @@ public:
 		htree::sp froot = 0;
 #else
 		std::unique_ptr<pforest> f = 0;
+		/// Filters nonterminals by prefixes
+		std::set<size_t> get_nts_by_prefixes(
+			const std::set<std::basic_string<C>>& prefixes) const;
 #endif
 		// if ambiguous, this is __AMB__ node lit used in a shaped tree
 		lit<C, T> amb_node{};
