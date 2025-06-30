@@ -460,6 +460,7 @@ bool forest<NodeT>::_traverse(const node_graph& g, const node& root,
 template <typename NodeT>
 bool forest<NodeT>::replace_nodes(graph& g, nodes& s) {
 	bool changed = false;
+	MS(std::cout << "replace_nodes: " << s.size() << "\n";)
 	for (auto& n : s) {
 		//DBG(assert(g[n].size() == 1);)
 		if (g.find(n) != g.end() &&
@@ -484,9 +485,9 @@ bool forest<NodeT>::replace_node(graph& g, const node& torepl,
 			auto newrhs = *rhs_it;
 			bool lchange = false;
 			//keep replacing torepl's any occurence in the newrhs
-			for (bool change = true; change; ) {
-				size_t rpos = 0; change = false;
-				for ( ; rpos < newrhs.size(); rpos++) {
+			
+				size_t rpos = 0; 
+				for ( ; rpos < newrhs.size(); ) {
 					//std::cout<< newrhs.at(rpos).first <<std::endl;
 					if (newrhs.at(rpos) == torepl) {
 						// std::cout<<"making change" << std::endl;
@@ -494,19 +495,21 @@ bool forest<NodeT>::replace_node(graph& g, const node& torepl,
 						auto inspos = newrhs.erase(
 							newrhs.begin() + rpos);
 						//do replacement at its new position
-						newrhs.insert(inspos,
+						inspos = newrhs.insert(inspos,
 							repl.begin(),
 							repl.end());
+						rpos = (inspos - newrhs.begin()) + repl.size();
 						/*
 						for (auto& v : newrhs)
 							std::cout << v.first ;
 						std::cout << std::endl;
 						std::cout<<"done making change\n";
 						*/
-						lchange = change = true; break;
+						lchange = true; 
 					}
+					else rpos++;
 				}
-			}
+			
 			if (lchange) {
 				//std::cout<<"making change2" << std::endl;
 				rhs_it = kv.second.erase(rhs_it);
