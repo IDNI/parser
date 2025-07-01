@@ -173,8 +173,25 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 	std::unordered_map<tref, tref> cache;
 	trefs stack;
 	std::vector<size_t> upos;
+	auto get_parent = [&upos, &stack]() -> tref {
+		return upos.empty() ? nullptr : stack[upos.back()];
+	};
+	auto call = [&get_parent](auto& cb, tref n) -> tref {
+		tref nn;
+		if constexpr (accepts_tref_tref<decltype(cb)>::value)
+				nn = cb(n, get_parent());
+		else nn = cb(n);
+		if (nn == n) return n;
+		if (nn == nullptr) {
+			DBGT(std::cerr << " call returned nullptr\n";)
+			return nullptr;
+		}
+		nn = tree::get(nn, tree::get(n).right_sibling());
+		DBGT(std::cout << "\tcall returned: " << tree::get(nn).dump_to_str() << "\n";)
+		return nn;
+	};
 	// Apply f and save on stack
-	tref r = f(n);
+	tref r = call(f, n);
 	if (r == nullptr) return nullptr;
 	if constexpr (break_on_change) {
 		if (r == n) {
@@ -191,19 +208,6 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 		upos.push_back(0);
 	}
 	stack.emplace_back(r);
-
-	auto call = [](auto& cb, tref n) -> tref {
-		tref nn = cb(n);
-		if (nn == n) return n;
-		if (nn == nullptr) {
-			DBGT(std::cerr << " call returned nullptr\n";)
-			return nullptr;
-		}
-		nn = tree::get(nn, tree::get(n).right_sibling());
-		DBGT(std::cout << "\tcall returned: " << tree::get(nn).dump_to_str() << "\n";)
-		return nn;
-	};
-
 	while (true) {
 		// If no unprocessed position exists, we are done
 		if (upos.empty()) return stack[0];
@@ -241,9 +245,9 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 		// // Check if node has children
 		if (!tree::get(c_node).has_child()) {
 			// Call up and move to next
+			upos.pop_back();
 			c_node = call(up, c_node);
 			if (c_node == nullptr) return nullptr;
-			upos.pop_back();
 #ifdef MEASURE_TRAVERSER_DEPTH
 			dec_depth();
 #endif //MEASURE_TRAVERSER_DEPTH
@@ -264,6 +268,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				stack.end(), ch_range.begin(), ch_range.end()))
 			{
 				// Call up
+				upos.pop_back();
 				auto res = call(up, c_node);
 				if (res == nullptr) return nullptr;
 				if constexpr (unique) {
@@ -275,7 +280,6 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				c_node = res;
 				// Pop children from stacks
 				stack.erase(stack.end() - c_pos, stack.end());
-				upos.pop_back();
 #ifdef MEASURE_TRAVERSER_DEPTH
 				dec_depth();
 #endif //MEASURE_TRAVERSER_DEPTH
@@ -291,6 +295,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 			stack.erase(stack.end() - c_pos, stack.end());
 			if (res == nullptr) return nullptr;
 			// Call up
+			upos.pop_back();
 			res = call(up, res);
 			if (res == nullptr) return nullptr;
 			if constexpr (unique) {
@@ -300,7 +305,6 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				else cache.emplace(c_node, res);
 			}
 			c_node = res;
-			upos.pop_back();
 #ifdef MEASURE_TRAVERSER_DEPTH
 			dec_depth();
 #endif //MEASURE_TRAVERSER_DEPTH
@@ -337,7 +341,7 @@ void pre_order<node>::const_traverse(tref n, auto& visitor,
 	auto& visit_subtree, auto& up, auto& between)
 {
 	if (n == nullptr) return;
-	subtree_set<node> cache; // TODO subtree_unordered_set
+	unordered_set<tref> cache;
 	std::vector<tref> stack;
 	std::vector<size_t> upos;
 	auto get_parent = [&upos, &stack]() -> tref {
@@ -407,14 +411,14 @@ void pre_order<node>::const_traverse(tref n, auto& visitor,
 						? "LC" : "RS") << "\n\n";)
 		// Are all children visited?
 		if (c == nullptr) {
-			// Call up (get parent from stack[upos[upos.size() - 2]])
-			call(up, c_node, upos.size() < 2 ? nullptr
-					: stack[upos[upos.size() - 2]], "up2");
 			// Get child position
 			size_t c_pos = (stack.size() - 1) - upos.back();
+			upos.pop_back();
+			// Call up
+			call(up, c_node, get_parent(), "up2");
+
 			// Pop children from stacks
 			stack.erase(stack.end() - c_pos, stack.end());
-			upos.pop_back();
 			// Node is finished. Call between if has right sibling
 			if (c_tree.has_right_sibling())
 				call(between, c_node, get_parent(), "between");
