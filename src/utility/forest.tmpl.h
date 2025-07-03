@@ -459,15 +459,79 @@ bool forest<NodeT>::_traverse(const node_graph& g, const node& root,
 
 template <typename NodeT>
 bool forest<NodeT>::replace_nodes(graph& g, nodes& s) {
-	bool changed = false;
+
 	MS(std::cout << "replace_nodes: " << s.size() << "\n";)
-	for (auto& n : s) {
-		//DBG(assert(g[n].size() == 1);)
-		if (g.find(n) != g.end() &&
-				replace_node(g, n, *(g[n].begin())))
-			changed = true, g.erase(n);
+
+	std::unordered_map<node, nodes, node> replmap;
+	replmap.reserve(s.size());
+	//Build replacement map and check for direct cycles
+	for (node& n : s) {
+		auto git = g.find(n);
+		if (git != g.end() ) {
+			DBG(assert(!git->second.empty()));
+			auto& repl = *(git->second.begin());
+			for (auto& r : repl) {
+				if ( n == r ) {
+					DBG(std::cout << "skipping replace: has direct cycle at " << NodeT(n) << "\n";)
+					return false;
+				}
+			}
+			replmap[n] = repl;
+		}
 	}
-	return changed;
+	MS(std::cout << "replacing nodes: " << replmap.size() << "\n";)
+
+	bool gchange = false;
+	MS(size_t total_replacements = 0;)
+	std::set<node> cleanup;
+
+	// Traverse the graph and replace nodes in RHSs
+	for (auto& [lhs, rhs_set] : g) {
+		std::set<nodes> updated_rhs_set;
+
+		for (const auto& rhs : rhs_set) {
+			nodes newrhs = rhs;
+			bool changed = false;
+
+			for (size_t i = 0; i < newrhs.size(); ) {
+				auto it = replmap.find(newrhs[i]);
+				if (it != replmap.end()) {
+					const node torepl = it->first;
+					const nodes& repl = it->second;
+
+					DBG(std::cout << "Replacing " << NodeT(torepl) << " with ";
+						for (auto& r : repl) std::cout << NodeT(r) << " " << newrhs.size() << " ";
+						std::cout << "\n";)
+
+					// Do replacement
+					newrhs.erase(newrhs.begin() + i);
+					newrhs.insert(newrhs.begin() + i, repl.begin(), repl.end());
+
+					i += repl.size()? 0: 1;
+					changed = true;
+					total_replacements++;
+					cleanup.insert(torepl);
+				} else {
+					++i;
+				}
+			}
+
+			updated_rhs_set.insert(std::move(newrhs));
+		}
+
+		if (!updated_rhs_set.empty()) {
+			rhs_set = std::move(updated_rhs_set);
+			gchange = true;
+		}
+	}
+
+	// Cleanup replaced nodes from graph
+	for (const auto& n : cleanup) {
+		g.erase(n);
+	}
+
+	MS(std::cout << "Total replaced count: " << total_replacements << "\n";)
+	return gchange;
 }
 
 template <typename NodeT>
