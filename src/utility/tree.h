@@ -269,6 +269,12 @@ struct subtree_less {
 };
 
 template <typename T, typename PT>
+struct subtree_pair_equal {
+	bool operator()(const std::pair<tref, PT>& a,
+			const std::pair<tref, PT>& b) const;
+};
+
+template <typename T, typename PT>
 struct subtree_pair_less {
 	bool operator()(const std::pair<tref, PT>& a,
 			const std::pair<tref, PT>& b) const;

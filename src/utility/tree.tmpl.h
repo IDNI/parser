@@ -285,14 +285,26 @@ bool subtree_less<T>::operator()(tref a, tref b) const {
 }
 
 template <typename T, typename PT>
+bool subtree_pair_equal<T, PT>::operator()(const std::pair<tref, PT>& a,
+					const std::pair<tref, PT>& b) const
+{
+	bool r = lcrs_tree<T>::subtree_equal(a.first, b.first);
+	if constexpr (std::is_same_v<PT, tref>)
+		r = r && lcrs_tree<T>::subtree_equal(a.second, b.second);
+	else r = r && a.second == b.second;
+	return r;
+}
+
+template <typename T, typename PT>
 bool subtree_pair_less<T, PT>::operator()(const std::pair<tref, PT>& a,
 					const std::pair<tref, PT>& b) const
 {
-	bool r = lcrs_tree<T>::subtree_less(a.first, b.first);
+	if (lcrs_tree<T>::subtree_less(a.first, b.first)) return true;
+	if (!lcrs_tree<T>::subtree_equals(a.first, b.first)) return false;
+	// a.first and b.first are equal here
 	if constexpr (std::is_same_v<PT, tref>)
-		r = r && lcrs_tree<T>::subtree_less(a.second, b.second);
-	else r = r && a.second < b.second;
-	return r;
+		return lcrs_tree<T>::subtree_less(a.second, b.second);
+	else return a.second < b.second;
 }
 
 template <typename T>

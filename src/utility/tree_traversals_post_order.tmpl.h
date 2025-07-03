@@ -68,7 +68,7 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 	}
 	// std::unordered_map<tref, tref, std::hash<tref>,
 	// 	traverser_cache_equality> cache;
-	std::unordered_map<tref, tref> cache;
+	subtree_map<node, tref> cache;
 	std::vector<tref> stack;
 	std::vector<size_t> upos;
 	stack.push_back(n);
@@ -196,7 +196,7 @@ void post_order<node>::const_traverse(tref n, auto& visitor,
 	auto& visit_subtree)
 {
 	if (n == nullptr) return;
-	std::unordered_set<tref> cache;
+	subtree_set<node> cache;
 	trefs stack;
 	std::vector<size_t> upos;
 	auto get_parent = [&upos, &stack]() -> tref {

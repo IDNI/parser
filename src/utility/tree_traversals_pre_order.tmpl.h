@@ -170,7 +170,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 	if (n == nullptr) return nullptr;
 	// std::unordered_map<node_t, node_t, std::hash<node>,
 	// 	traverser_cache_equality<node>> cache;
-	std::unordered_map<tref, tref> cache;
+	subtree_map<node, tref> cache;
 	trefs stack;
 	std::vector<size_t> upos;
 	auto get_parent = [&upos, &stack]() -> tref {
@@ -341,7 +341,7 @@ void pre_order<node>::const_traverse(tref n, auto& visitor,
 	auto& visit_subtree, auto& up, auto& between)
 {
 	if (n == nullptr) return;
-	std::unordered_set<tref> cache;
+	subtree_set<node> cache;
 	std::vector<tref> stack;
 	std::vector<size_t> upos;
 	auto get_parent = [&upos, &stack]() -> tref {
