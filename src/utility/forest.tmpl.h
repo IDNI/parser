@@ -509,7 +509,7 @@ bool forest<NodeT>::replace_nodes(graph& g, nodes& s) {
 
 					i += repl.size()? 0: 1;
 					changed = true;
-					total_replacements++;
+					MS(total_replacements++);
 					cleanup.insert(torepl);
 				} else {
 					++i;
