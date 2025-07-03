@@ -491,7 +491,7 @@ bool forest<NodeT>::replace_nodes(graph& g, nodes& s) {
 
 		for (const auto& rhs : rhs_set) {
 			nodes newrhs = rhs;
-			bool changed = false;
+			// bool changed = false;
 
 			for (size_t i = 0; i < newrhs.size(); ) {
 				auto it = replmap.find(newrhs[i]);
@@ -508,7 +508,7 @@ bool forest<NodeT>::replace_nodes(graph& g, nodes& s) {
 					newrhs.insert(newrhs.begin() + i, repl.begin(), repl.end());
 
 					i += repl.size()? 0: 1;
-					changed = true;
+					// changed = true;
 					MS(total_replacements++);
 					cleanup.insert(torepl);
 				} else {
