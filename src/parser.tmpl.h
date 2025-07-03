@@ -1386,7 +1386,10 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 
 		cambset.clear();
 		if (ambset.size())
-			cambset.insert(*next(ambset.begin(), gi[0]));
+			cambset.insert(
+				gi.size()
+					? *next(ambset.begin(), gi[0])
+					: *ambset.begin());
 
 	//std::cout <<" camb "<< cambset.size() << std::endl;
 		if (snodes.size()) {
