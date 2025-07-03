@@ -127,17 +127,13 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 #endif //MEASURE_TRAVERSER_DEPTH
 			continue;
 		}
-
-		// Get next child
-		tref c = (stack.back() == c_node)
-				? tree::get(c_node).left_child()
-				: tree::get(stack.back()).right_sibling();
+		// Get next child position
+		size_t c_pos = (stack.size() - 1) - upos.back();
+		tref c = tree::get(c_node).child(c_pos);
 		DBGT(std::cout << "\tmove to a child: " << c << " \t"
 			<< (stack.back() == c_node ? "LC" : "RS") << "\n";)
 		// Are all children visited?
 		if (c == nullptr) {
-			// Get child position
-			size_t c_pos = (stack.size() - 1) - upos.back();
 			// Check if children actually changed
 			auto ch_range = tree::get(c_node).children();
 			if (std::equal(stack.begin() + (upos.back() + 1),
@@ -160,7 +156,7 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 			// Make new node if children are different
 			tref res = tree::get(tree::get(c_node).value,
 				&stack[upos.back() + 1],
-				stack.size() - upos.back() - 1,
+				c_pos,
 				tree::get(c_node).right_sibling());
 			DBGT(std::cout << "\tnew node: " << tree::get(res).dump_to_str() << "\n";)
 			if (res == nullptr) return nullptr;
