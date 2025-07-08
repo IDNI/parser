@@ -134,6 +134,22 @@ const bintree<T>& bintree<T>::get(const htree::sp& h) {
 
 template <typename T>
 tref bintree<T>::get(const T& v, tref l, tref r) {
+#ifdef DEBUG
+	// Check that the pointed to children are of same node type as v by
+	// checking that they are present in the M map
+	if (l != nullptr) {
+		auto c0 = get(l);
+		auto res_c0 = M.emplace(c0, htree::wp());
+		assert(res_c0.second == false);
+		assert(reinterpret_cast<tref>(std::addressof(res_c0.first->first)) == l);
+	}
+	if (r != nullptr) {
+		auto c1 = get(r);
+		auto res_c1 = M.emplace(c1, htree::wp());
+		assert(res_c1.second == false);
+		assert(reinterpret_cast<tref>(std::addressof(res_c1.first->first)) == r);
+	}
+#endif
 	bintree bn(v, l, r);
 	auto res = bintree<T>::M.emplace(bn, htree::wp());
 	return reinterpret_cast<tref>(std::addressof(res.first->first));
