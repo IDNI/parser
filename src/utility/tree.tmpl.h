@@ -714,14 +714,16 @@ std::string lcrs_tree<T>::print_in_line_to_str(
 template <typename T>
 std::ostream& lcrs_tree<T>::dump(std::ostream& os, tref n, bool subtree) {
 	const auto& t = get(n);
-	os << t.value << " [" << n ;
-	if (t.has_child())         os << " __ " << t.left_child();
-	if (t.has_right_sibling()) os << " >> " << t.right_sibling();
-	os << "] ";
-	if (subtree) t.print_in_line(os);
+	os << t.value;
+	if (bool print_pointers = false; print_pointers) {
+		os << " [" << n ;
+		if (t.has_child())         os << " __ " << t.left_child();
+		if (t.has_right_sibling()) os << " >> " << t.right_sibling();
+		os << "]";
+	}
+	if (subtree) t.print_in_line(os << " ");
 	return os;
 }
-
 
 template <typename T>
 std::string lcrs_tree<T>::dump_to_str(tref n, bool subtree) {

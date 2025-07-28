@@ -631,6 +631,8 @@ bool pattern_matcher2<node, is_capture_t>::operator()(tref n) {
 		auto nn = replace<node>(body->get(), env);
 		// tree::get(nn).dump(std::cout << "nn: ", true) << "\n";
 		if (nn == nullptr) return false;
+		// tree::get(n).dump(std::cout << "pattern_matcher2: we got a match ") << "\n";
+		// tree::get(nn).dump(std::cout << "pattern_matcher2: replaced with ") << "\n";
 		changes[n] = nn;
 		// tree::get(changes[n]).dump(std::cout << "changes: ", true) << "\n";
 		return true;
@@ -661,9 +663,8 @@ bool pattern_matcher2<node, is_capture_t>::match(tref p, tref n) {
 	// if we already have captured a node associated to the current capture
 	// we check if it is the same as the current node, if it is not, we
 	// return false...
-	// std::cout << "match: ";
-	// tree::get(p).dump(std::cout);
-	// tree::get(n).dump(std::cout << "\nto:   ");
+	// tree::get(p).dump(std::cout << "match: ");
+	// tree::get(n).dump(std::cout << "\nto:    ");
 	// std::cout << "\n";
 	if (is_capture(p)) {
 		if (auto it = env.find(p); it != env.end()
@@ -680,12 +681,12 @@ bool pattern_matcher2<node, is_capture_t>::match(tref p, tref n) {
 	if (pt.value == nt.value) {
 		auto n_it = nt.children().begin();
 		for (tref ptc : pt.children()) {
-			if (n_it == nt.children().end()) return false;
-			if (tree::subtree_equals(ptc, *n_it)) {
-					++n_it; continue; }
-			else if (match(ptc, *n_it)) { ++n_it; continue; }
-			else return false;
+			if (n_it == nt.children().end()
+				|| (!tree::subtree_equals(ptc, *n_it)
+					&& !match(ptc, *n_it))) return false;
+			++n_it;
 		}
+		if (n_it != nt.children().end()) return false;
 		return true;
 	}
 	return false;
