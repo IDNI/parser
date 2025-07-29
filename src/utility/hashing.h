@@ -25,13 +25,17 @@ static inline constexpr std::size_t grcprime = sizeof(std::size_t) == 8
 
 template <typename T, typename... Rest>
 constexpr void hash_combine(size_t& seed, const T& v, Rest... rest) {
-        seed ^= std::hash<T>()(v) + grcprime + (seed << 12) + (seed >> 4);
+	if constexpr (sizeof(std::size_t) == 8)
+		seed ^= std::hash<T>()(v) + grcprime + (seed << 12) + (seed >> 4);
+	else seed ^= std::hash<T>()(v) + grcprime + (seed << 6) + (seed >> 2);
         (hash_combine(seed, rest), ...);
 }
 
 template<typename T>
 constexpr void hash_combine (size_t& seed, const T& v) {
-	seed ^= std::hash<T>{}(v) + grcprime + (seed << 12) + (seed >> 4);
+	if constexpr (sizeof(std::size_t) == 8)
+		seed ^= std::hash<T>{}(v) + grcprime + (seed << 12) + (seed >> 4);
+	else seed ^= std::hash<T>{}(v) + grcprime + (seed << 6) + (seed >> 2);
 }
 
 } // namespace idni
