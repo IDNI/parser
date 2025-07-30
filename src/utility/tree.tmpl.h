@@ -299,7 +299,7 @@ std::vector<const bintree<T>*> bintree<T>::V;
 */
 
 template <typename T>
-std::map<const bintree<T>, htree::wp> bintree<T>::M;
+std::unordered_map<const bintree<T>, htree::wp> bintree<T>::M;
 
 //------------------------------------------------------------------------------
 

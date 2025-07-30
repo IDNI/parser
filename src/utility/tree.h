@@ -257,7 +257,7 @@ protected:
 	/**
 	 * @brief Map of tree nodes to their handles
 	 */
-	static std::map<const bintree, htree::wp> M;
+	static std::unordered_map<const bintree, htree::wp> M;
 };
 
 template <typename T> struct pre_order;
