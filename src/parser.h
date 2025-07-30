@@ -462,6 +462,45 @@ private:
 	std::vector<production> G;
 };
 
+#ifndef PARSER_BINTREE_FOREST
+/**
+* @brief A structure used as a forest node.
+*
+* It maps nodes to pointers to make sure the forest does not contain
+* duplicities.
+*/
+template<typename C, typename T = C>
+struct pnode_type : public std::pair<lit<C, T>, std::array<size_t, 2>> {
+	using node_type = std::pair<lit<C, T>, std::array<size_t, 2>>;
+	friend forest<pnode_type>;
+private:
+	static typename forest<pnode_type>::node ptrof(const pnode_type& p);
+	static std::map<const pnode_type, typename forest<pnode_type>::node>&
+		nid()
+	{
+		static std::map<const pnode_type,
+				typename forest<pnode_type>::node> instance;
+		return instance;
+	}
+public:
+	pnode_type() {}
+	pnode_type(const lit<C, T>& _f, const std::array<size_t, 2>& _s)
+		: node_type(_f, _s) {}
+	inline operator typename forest<pnode_type>::node() const {
+		return ptrof(*this);
+	}
+	friend std::ostream& operator<<<>(std::ostream& os, const node_type& n);
+	inline size_t _mpsize() const { return nid().size(); }
+	std::size_t hashit() const {
+		std::size_t seed = this->first.hashit();
+		hash_combine(seed, this->second[0], this->second[1]);
+		return seed;
+	}
+	//inline lit<C,T> &first() const { return this->first; }
+	//inline std::array<size_t, 2>& second() const { return this->second; }
+};
+#endif
+
 template <typename C = char, typename T = C>
 class parser {
 public:
@@ -480,40 +519,7 @@ public:
 #ifdef PARSER_BINTREE_FOREST
 	using pnode = node_type;
 #else
-	/**
-	 * @brief A structure used as a forest node.
-	 * 
-	 * It maps nodes to pointers to make sure the forest does not contain
-	 * duplicities.
-	 */
-	struct pnode : public node_type {
-		friend forest<pnode>;
-	private:
-		static typename forest<pnode>::node ptrof(const pnode& p);
-		static std::map<const pnode, typename forest<pnode>::node>&
-			nid()
-		{
-			static std::map<const pnode,
-					typename forest<pnode>::node> instance;
-			return instance;
-		}
-	public:
-		pnode() {}
-		pnode(const symbol_type& _f, const location_type& _s)
-			: node_type(_f, _s) {}
-		inline operator typename forest<pnode>::node() const {
-			return ptrof(*this);
-		}
-		friend std::ostream& operator<<<>(std::ostream& os, const node_type& n);
-		inline size_t _mpsize() const { return nid().size(); }
-		std::size_t hashit() const {
-			std::size_t seed = this->first.hashit();
-			hash_combine(seed, this->second[0], this->second[1]);
-			return seed;
-		}
-		//inline lit<C,T> &first() const { return this->first; }
-		//inline std::array<size_t, 2>& second() const { return this->second; }
-	};
+	using pnode = pnode_type<C, T>;
 #endif
 	struct tree : public lcrs_tree<pnode> {
 		using base_t = lcrs_tree<pnode>;
@@ -1200,6 +1206,14 @@ template<typename C, typename T>
 struct std::hash<idni::lit<C, T>> {
 	size_t operator()(const idni::lit<C,T>& l) const noexcept {
 		return l.hashit();
+	}
+};
+
+// Hash for pnode
+template <typename C, typename T>
+struct std::hash<idni::pnode_type<C,T>> {
+	size_t operator()(const idni::pnode_type<C,T>& pn) const noexcept {
+		return pn.hashit();
 	}
 };
 

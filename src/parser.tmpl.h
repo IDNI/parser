@@ -19,12 +19,11 @@ std::ostream& operator<<(std::ostream& os,
 
 #ifndef PARSER_BINTREE_FOREST
 template <typename C, typename T>
-typename forest<typename parser<C,T>::pnode>::node
-	parser<C,T>::pnode::ptrof(const typename parser<C,T>::pnode& pn)
+typename forest<pnode_type<C,T>>::node pnode_type<C,T>::ptrof(const pnode_type<C,T>& pn)
 {
 	auto r = nid().emplace( pn, nullptr );
 	if (r.second) r.first->second = typename
-		forest<typename parser<C,T>::pnode>::node(&(r.first->first));
+		forest<pnode_type<C,T>>::node(&(r.first->first));
 	return r.first->second;
 }
 #endif
