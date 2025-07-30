@@ -246,7 +246,7 @@ protected:
 	/**
 	 * Use to produce hash for bintree node
 	 */
-	size_t hash_it (const T& _value, tref _l, tref _r);
+	size_t hashit (const T& _value, tref _l, tref _r);
 
 	/**
 	 * @brief Get the string representation of the node (for debugging)

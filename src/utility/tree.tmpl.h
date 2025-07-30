@@ -247,9 +247,18 @@ void bintree<T>::gc(std::unordered_set<tref>& keep) {
 
 template <typename T>
 bool bintree<T>::operator<(const bintree<T>& o) const {
+	if (hash != o.hash) return hash < o.hash;
 	if (value != o.value) return value < o.value;
-	if (l != o.l) return l < o.l;
-	return r < o.r;
+	// Make comparator independent of tref value for fully deterministic ordering
+	if (l == o.l) {
+		if (r == o.r || o.r == nullptr) return false;
+		if (r == nullptr) return true;
+		return get(r) < get(o.r);
+	} else {
+		if (l == nullptr) return true;
+		if (o.l == nullptr) return false;
+		return get(l) < get(o.l);
+	}
 }
 template <typename T>
 bool bintree<T>::operator==(const bintree<T>& o) const {
@@ -258,10 +267,10 @@ bool bintree<T>::operator==(const bintree<T>& o) const {
 
 template <typename T>
 bintree<T>::bintree(const T& _value, tref _l, tref _r)
-	: value(_value), l(_l), r(_r), hash(hash_it(_value, _l, _r)) { }
+	: value(_value), l(_l), r(_r), hash(hashit(_value, _l, _r)) { }
 
 template<typename T>
-size_t bintree<T>::hash_it(const T& _value, tref _l, tref _r) {
+size_t bintree<T>::hashit(const T& _value, tref _l, tref _r) {
 	size_t seed = 0;
 	hash_combine(seed, _value,
 		_l == nullptr ? 0 : get(_l).hash,
@@ -351,11 +360,17 @@ bool subtree_pair_less<T, PT>::operator()(const std::pair<tref, PT>& a,
 	else return a.second < b.second;
 }
 
+// The less comparator is independent of tref addresses
+// enabling deterministic orderings
 template <typename T>
 bool lcrs_tree<T>::operator<(const lcrs_tree<T>& o) const {
 	if (this->value != o.value) return this->value < o.value;
-	return this->l < o.l;
+	// This check ensures that we do not traverse equal trees
+	if (this->l == o.l || o.l == nullptr) return false;
+	if (this->l == nullptr) return true;
+	return bintree<T>::get(this->l) < bintree<T>::get(o.l);
 }
+
 template <typename T>
 bool lcrs_tree<T>::operator==(const lcrs_tree<T>& o) const {
 	return this->value == o.value && this->l == o.l;
