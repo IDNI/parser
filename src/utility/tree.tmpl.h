@@ -258,7 +258,16 @@ bool bintree<T>::operator==(const bintree<T>& o) const {
 
 template <typename T>
 bintree<T>::bintree(const T& _value, tref _l, tref _r)
-	: value(_value), l(_l), r(_r) { }
+	: value(_value), l(_l), r(_r), hash(hash_it(_value, _l, _r)) { }
+
+template<typename T>
+size_t bintree<T>::hash_it(const T& _value, tref _l, tref _r) {
+	size_t seed = 0;
+	hash_combine(seed, _value,
+		_l == nullptr ? 0 : get(_l).hash,
+		_r == nullptr ? 0 : get(_r).hash);
+	return seed;
+}
 
 template <typename T>
 std::ostream& bintree<T>::print(std::ostream& o, size_t s) const {
@@ -287,7 +296,26 @@ std::map<const bintree<T>, htree::wp> bintree<T>::M;
 
 template <typename T>
 size_t hash_tref<T>::operator()(tref r) const {
-	return std::hash<const lcrs_tree<T>&>(lcrs_tree<T>::get(r));
+	return bintree<T>::get(r).hash;
+}
+
+template<typename T>
+size_t hash_lcrs_tref<T>::operator()(tref r) const {
+	const lcrs_tree<T>& n = lcrs_tree<T>::get(r);
+	size_t seed = 0;
+	const size_t hash_l = n.l == nullptr ? 0 : lcrs_tree<T>::get(n.l).hash;
+	hash_combine(seed, n.value, hash_l);
+	return seed;
+}
+
+template <typename T>
+size_t hash_htree<T>::operator()(const htree& h) const {
+	return hash_tref<T>{}(h.get());
+}
+
+template<typename T>
+size_t hash_lcrs_htree<T>::operator()(const htree& h) const {
+	return hash_lcrs_tref<T>{}(h.get());
 }
 
 template <typename T>
@@ -847,3 +875,9 @@ bool is_cached_subtree(tref n, const std::unordered_set<tref>& cache) {
 //------------------------------------------------------------------------------
 
 } // idni namespace
+
+template<typename T>
+size_t std::hash<const idni::bintree<T>>::operator()(
+	const idni::bintree<T>& b) const noexcept {
+	return b.hash;
+}

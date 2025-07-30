@@ -161,6 +161,11 @@ struct bintree {
 	const tref r;
 
 	/**
+	 * @brief Hash of binary tree node
+	 */
+	const size_t hash;
+
+	/**
 	 * @brief Get nodes's tref id
 	 * @return The tree node's tref
 	 */
@@ -236,7 +241,12 @@ protected:
 	 * @param _l The left child
 	 * @param _r The right child
 	 */
-	bintree(const T& _value, tref _l = nullptr, tref _r = nullptr);
+	explicit bintree(const T& _value, tref _l = nullptr, tref _r = nullptr);
+
+	/**
+	 * Use to produce hash for bintree node
+	 */
+	size_t hash_it (const T& _value, tref _l, tref _r);
 
 	/**
 	 * @brief Get the string representation of the node (for debugging)
@@ -256,6 +266,23 @@ template <typename T> struct post_order;
 template <typename T>
 struct hash_tref {
 	size_t operator()(tref r) const;
+};
+
+// Hash ignores right child, since it is sibling
+template <typename T>
+struct hash_lcrs_tref {
+	size_t operator()(tref r) const;
+};
+
+template <typename T>
+struct hash_htree {
+	size_t operator()(const htree& h) const;
+};
+
+// Hash ignores right child, since it is sibling
+template <typename T>
+struct hash_lcrs_htree {
+	size_t operator()(const htree& h) const;
 };
 
 template <typename T>
@@ -288,11 +315,11 @@ using subtree_map = std::map<tref, PT, subtree_less<T>>;
 
 template <typename T>
 using subtree_unordered_set = std::unordered_set<tref,
-				hash_tref<T>, subtree_equality<T>>;
+				hash_lcrs_tref<T>, subtree_equality<T>>;
 
 template <typename T, typename PT>
 using subtree_unordered_map = std::unordered_map<tref, PT,
-				hash_tref<T>, subtree_equality<T>>;
+				hash_lcrs_tref<T>, subtree_equality<T>>;
 
 /**
  * @brief Left child right sibling tree
@@ -1123,6 +1150,11 @@ using environment = subtree_map<node, tref>;
 } // rewriter namespace
 
 } // idni namespace
+
+template <typename T>
+struct std::hash<const idni::bintree<T>> {
+	size_t operator()(const idni::bintree<T>& b) const noexcept;
+};
 
 //------------------------------------------------------------------------------
 // include rewriter types and predicates
