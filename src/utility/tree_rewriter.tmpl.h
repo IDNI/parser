@@ -353,10 +353,12 @@ trefs select_top(tref input, predicate_t& query) {
 	DBG(assert(input != nullptr);)
 	trefs selected;
 	auto select = [&query, &selected](const auto& n) {
+		using tree = lcrs_tree<node>;
 		if (!query(n)) return true;
 		// we return false to avoid visiting the children of the node
 		// since we are only interested in the top nodes.
-		if (std::find(selected.begin(), selected.end(), n)
+		if (std::ranges::find_if(selected, [&n](const auto& el)
+			{return tree::get(el) == tree::get(n);})
 				== selected.end()) selected.push_back(n);
 		return false;
 	};
