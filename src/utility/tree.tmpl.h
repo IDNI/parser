@@ -341,9 +341,9 @@ template <typename T, typename PT>
 bool subtree_pair_equal<T, PT>::operator()(const std::pair<tref, PT>& a,
 					const std::pair<tref, PT>& b) const
 {
-	bool r = lcrs_tree<T>::subtree_equal(a.first, b.first);
+	bool r = lcrs_tree<T>::subtree_equals(a.first, b.first);
 	if constexpr (std::is_same_v<PT, tref>)
-		r = r && lcrs_tree<T>::subtree_equal(a.second, b.second);
+		r = r && lcrs_tree<T>::subtree_equals(a.second, b.second);
 	else r = r && a.second == b.second;
 	return r;
 }
