@@ -307,19 +307,19 @@ struct subtree_pair_less {
 			const std::pair<tref, PT>& b) const;
 };
 
-template <typename T>
-using subtree_set = std::set<tref, subtree_less<T>>;
+template <typename node>
+using subtree_set = std::set<tref, subtree_less<node>>;
 
-template <typename T, typename PT>
-using subtree_map = std::map<tref, PT, subtree_less<T>>;
+template <typename node, typename PT>
+using subtree_map = std::map<tref, PT, subtree_less<node>>;
 
-template <typename T>
+template <typename node>
 using subtree_unordered_set = std::unordered_set<tref,
-				hash_lcrs_tref<T>, subtree_equality<T>>;
+				hash_lcrs_tref<node>, subtree_equality<node>>;
 
-template <typename T, typename PT>
+template <typename node, typename PT>
 using subtree_unordered_map = std::unordered_map<tref, PT,
-				hash_lcrs_tref<T>, subtree_equality<T>>;
+				hash_lcrs_tref<node>, subtree_equality<node>>;
 
 /**
  * @brief Left child right sibling tree
