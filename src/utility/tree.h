@@ -308,6 +308,18 @@ struct subtree_pair_less {
 };
 
 template <typename node>
+struct subtree_bool_bool_tuple_equality {
+	bool operator()(const std::tuple<tref, bool, bool>& a,
+			const std::tuple<tref, bool, bool>& b) const;
+};
+
+template <typename node>
+struct subtree_bool_bool_tuple_less {
+	bool operator()(const std::tuple<tref, bool, bool>& a,
+			const std::tuple<tref, bool, bool>& b) const;
+};
+
+template <typename node>
 using subtree_set = std::set<tref, subtree_less<node>>;
 
 template <typename node, typename PT>
@@ -886,10 +898,9 @@ struct post_order {
 
 private:
 	tref root;
-	// inline static std::unordered_map<std::pair<node_t, size_t>, node_t,
-	// 	std::hash<std::pair<node_t, size_t>>,
-	// 	traverser_pair_cache_equality<node>> m;
-	inline static std::unordered_map<std::pair<tref, size_t>, tref> m;
+	inline static std::unordered_map<std::pair<tref, size_t>, tref,
+		std::hash<std::pair<tref, size_t> >, subtree_pair_equal<node,
+			size_t> > m;
 
 	template <size_t slot>
 	tref traverse(tref n, auto& f, auto& visit_subtree);
@@ -1126,10 +1137,9 @@ struct pre_order {
 
 private:
 	tref root;
-	// inline static std::unordered_map<std::pair<node_t, size_t>, node_t,
-	// 		std::hash<std::pair<node_t, size_t>>,
-	// 		traverser_pair_cache_equality<node>> m;
-	inline static std::unordered_map<std::pair<tref, size_t>, tref> m;
+	inline static std::unordered_map<std::pair<tref, size_t>, tref,
+		std::hash<std::pair<tref, size_t> >, subtree_pair_equal<node,
+			size_t> > m;
 
 	template<bool break_on_change, size_t slot, bool unique>
 	tref traverse(tref n, auto& f, auto& visit_subtree, auto& up);

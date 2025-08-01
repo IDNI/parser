@@ -360,6 +360,25 @@ bool subtree_pair_less<T, PT>::operator()(const std::pair<tref, PT>& a,
 	else return a.second < b.second;
 }
 
+template<typename node>
+bool subtree_bool_bool_tuple_equality<node>::operator()(
+	const std::tuple<tref, bool, bool>& a,
+	const std::tuple<tref, bool, bool>& b) const {
+	return lcrs_tree<node>::subtree_equals(std::get<0>(a), std::get<0>(b))
+		&& std::get<1>(a) == std::get<1>(b)
+			&& std::get<2>(a) == std::get<2>(b);
+}
+
+template<typename node>
+bool subtree_bool_bool_tuple_less<node>::operator()(
+	const std::tuple<tref, bool, bool>& a,
+	const std::tuple<tref, bool, bool>& b) const {
+	return lcrs_tree<node>::subtree_less(std::get<0>(a),
+						     std::get<0>(b))
+			&& std::get<1>(a) < std::get<1>(b)
+			&& std::get<2>(a) < std::get<2>(b);
+}
+
 // The less comparator is independent of tref addresses
 // enabling deterministic orderings
 template <typename T>
