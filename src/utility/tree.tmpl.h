@@ -239,7 +239,7 @@ void bintree<T>::gc(std::unordered_set<tref>& keep) {
 	for (auto it = M.begin(); it != M.end(); )
 		if (next.count(it->first.get()) == 0)
 			it = M.erase(it);
-		else it++;
+		else keep.insert(it->first.get()), it++;
 
 	// DBG(dump();)
 	//DBG(htree::dump();)
@@ -415,7 +415,7 @@ bool lcrs_tree<T>::subtree_less(tref a, tref b) {
 
 template <typename T>
 void lcrs_tree<T>::gc() {
-	std::unordered_set<tref> keep{};
+	static std::unordered_set<tref> keep{};
 	gc(keep);
 }
 
@@ -448,7 +448,7 @@ void lcrs_tree<T>::gc(std::unordered_set<tref>& keep) {
 	for (auto it = bintree<T>::M.begin(); it != bintree<T>::M.end(); )
 		if (next.count(it->first.get()) == 0)
 			it = bintree<T>::M.erase(it);
-		else it++;
+		else keep.insert(it->first.get()), it++;
 
 	// DBG(dump();)
 	//DBG(htree::dump();)
