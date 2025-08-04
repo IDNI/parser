@@ -415,7 +415,7 @@ bool lcrs_tree<T>::subtree_less(tref a, tref b) {
 
 template <typename T>
 void lcrs_tree<T>::gc() {
-	static std::unordered_set<tref> keep{};
+	std::unordered_set<tref> keep{};
 	gc(keep);
 }
 
