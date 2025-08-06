@@ -220,7 +220,7 @@ struct bintree {
 
 	/**
 	 * @brief Garbage collect tree nodes
-	 * @param keep The set of nodes to exclude from being gc-ed
+	 * @param keep The set of nodes to exclude from being gc-ed. After gc, it contains all existing nodes.
 	 */
 	static void gc(std::unordered_set<tref>& keep);
 

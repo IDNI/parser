@@ -372,11 +372,15 @@ bool subtree_bool_bool_tuple_equality<node>::operator()(
 template<typename node>
 bool subtree_bool_bool_tuple_less<node>::operator()(
 	const std::tuple<tref, bool, bool>& a,
-	const std::tuple<tref, bool, bool>& b) const {
-	return lcrs_tree<node>::subtree_less(std::get<0>(a),
-						     std::get<0>(b))
-			&& std::get<1>(a) < std::get<1>(b)
-			&& std::get<2>(a) < std::get<2>(b);
+	const std::tuple<tref, bool, bool>& b) const
+{
+	if (lcrs_tree<node>::subtree_less(std::get<0>(a), std::get<0>(b)))
+		return true;
+	if (lcrs_tree<node>::subtree_less(std::get<0>(b), std::get<0>(a)))
+		return false;
+	if (std::get<1>(a) < std::get<1>(b)) return true;
+	if (std::get<1>(b) < std::get<1>(a)) return false;
+	return std::get<2>(a) < std::get<2>(b);
 }
 
 // The less comparator is independent of tref addresses
