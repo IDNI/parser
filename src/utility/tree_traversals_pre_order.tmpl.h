@@ -19,7 +19,7 @@ template <typename node>
 pre_order<node>::pre_order(tref n) : root(n) {}
 
 template <typename node>
-pre_order<node>::pre_order(const htree::sp& h) : root(h->get()) {}
+pre_order<node>::pre_order(const htref& h) : root(h->get()) {}
 
 template <typename node>
 template<size_t slot>

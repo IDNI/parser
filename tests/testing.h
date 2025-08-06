@@ -179,8 +179,8 @@ namespace idni::testing
 			filet.close();
 			using ndtype = typename parser<T>::pnode;
 
-			htree::sp lcrs_tr = g.extract_tree2();
-			static std::vector<htree::sp> storesp;
+			htref lcrs_tr = g.extract_tree2();
+			static std::vector<htref> storesp;
 			storesp.push_back(lcrs_tr);
 
 			if (storesp.size() > 2)

@@ -24,12 +24,12 @@ const parser<C, T>::tree& parser<C, T>::tree::get(const tref id) {
 }
 
 template <typename C, typename T>
-const parser<C, T>::tree& parser<C, T>::tree::get(const htree::sp& h) {
+const parser<C, T>::tree& parser<C, T>::tree::get(const htref& h) {
 	return static_cast<const tree&>(base_t::get(h));
 }
 
 template <typename C, typename T>
-const htree::sp parser<C, T>::tree::geth(tref id) {
+const htref parser<C, T>::tree::geth(tref id) {
 	return base_t::geth(id);
 }
 

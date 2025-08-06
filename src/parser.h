@@ -526,8 +526,8 @@ public:
 
 		tref get() const;
 		static const tree& get(const tref id);
-		static const tree& get(const htree::sp& h);
-		static const htree::sp geth(tref h);
+		static const tree& get(const htref& h);
+		static const htref geth(tref h);
 
 		static tref get(const pnode& v, const tref* ch, size_t len);
 		static tref get(const pnode& v, const trefs& ch);
@@ -1010,7 +1010,7 @@ public:
 		std::unique_ptr<input> in_ = 0;
 		// forest moved here from the parse call
 #ifdef PARSER_BINTREE_FOREST
-		htree::sp froot = 0;
+		htref froot = 0;
 #else
 		std::unique_ptr<pforest> f = 0;
 		/// Filters nonterminals by prefixes

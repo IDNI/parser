@@ -94,7 +94,7 @@ typename tree_range<T>::iterator tree_range<T>::end() const {
 
 //------------------------------------------------------------------------------
 
-inline const htree::sp& htree::null() {
+inline const htref& htree::null() {
 	static const sp hnull(new htree());
 	return hnull;
 }
@@ -110,12 +110,12 @@ template <typename T>
 tref bintree<T>::get() const { return reinterpret_cast<tref>(this); }
 
 template <typename T>
-const htree::sp bintree<T>::geth(tref h) {
+const htref bintree<T>::geth(tref h) {
 	//DBG(assert(h != NULL);)
 	if (h == NULL) return htree::null();
 	auto res = M.find(*reinterpret_cast<const bintree*>(h)); //done with one search
-	htree::sp ret;
-	if (res != M.end()) res->second = ret = htree::sp(new htree(h));
+	htref ret;
+	if (res != M.end()) res->second = ret = htref(new htree(h));
 	DBG(assert(!res->second.expired());)
 	return res->second.lock();
 }
@@ -128,7 +128,7 @@ const bintree<T>& bintree<T>::get(const tref id) {
 }
 
 template <typename T>
-const bintree<T>& bintree<T>::get(const htree::sp& h) {
+const bintree<T>& bintree<T>::get(const htref& h) {
 	return get(h->get());
 }
 
@@ -465,7 +465,7 @@ template <typename T>
 tref lcrs_tree<T>::get() const { return reinterpret_cast<tref>(this); }
 
 template <typename T>
-const lcrs_tree<T>& lcrs_tree<T>::get(const htree::sp& h) {
+const lcrs_tree<T>& lcrs_tree<T>::get(const htref& h) {
 	return (const lcrs_tree<T>&) bintree<T>::get(h);
 }
 
@@ -476,7 +476,7 @@ const lcrs_tree<T>& lcrs_tree<T>::get(tref id) {
 }
 
 template <typename T>
-const htree::sp lcrs_tree<T>::geth(tref h) { return bintree<T>::geth(h); }
+const htref lcrs_tree<T>::geth(tref h) { return bintree<T>::geth(h); }
 
 //------------------------------------------------------------------------------
 // creation with tref childs
@@ -590,7 +590,7 @@ size_t lcrs_tree<T>::children_size() const {
 template <typename T>
 bool lcrs_tree<T>::get_kary_children(tref* child, size_t& len) const {
 	/*
-	htree::sp curp = htree::get(this->l);
+	htref curp = htree::get(this->l);
 	// having a vector here misses the whole point. got to be
 	// something like get_next_child, or, get_nchilds and then
 	// the user provides an array (ptr alloced with alloca()) to
@@ -598,7 +598,7 @@ bool lcrs_tree<T>::get_kary_children(tref* child, size_t& len) const {
 	// that's problem #1. problem #2 is that we shouldn't return
 	// handles, only ids. we definitely dont want to create handles
 	// for all trees in the system.
-	std::vector<htree::sp> childs;
+	std::vector<htref> childs;
 	while (curp != htree::null())
 		childs.push_back(curp), curp = htree::get(get(curp).r);
 	return childs;

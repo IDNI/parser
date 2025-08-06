@@ -185,7 +185,7 @@ tref parser<C, T>::result::get_tree2(const pnode&) {
 #else
 template <typename C, typename T>
 tref parser<C, T>::result::get_tree2(const pnode& n) {
-	htree::sp t;
+	htref t;
 	MS(emeasure_time_start(s,e);)
 	MS(std::cout<<"\n extract_graph ";)
 	auto g = f->extract_first_graph(n);

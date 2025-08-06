@@ -128,7 +128,7 @@ using accepts_tref_tref = std::is_invocable<Cb, tref, tref>;
 
 namespace rewriter {
 
-using rule = std::pair<htree::sp, htree::sp>;
+using rule = std::pair<htref, htref>;
 using rules = std::vector<rule>;
 
 using library = rules;
@@ -183,14 +183,14 @@ struct bintree {
 	 * @param h The tree node handle
 	 * @return The tree node
 	 */
-	static const bintree& get(const htree::sp& h);
+	static const bintree& get(const htref& h);
 
 	/**
 	 * @brief Get the tree node shared handle preventing it from gc
 	 * @param id The tree node's ref
 	 * @return The tree node's shared handle (preventing from gc)
 	 */
-	static const htree::sp geth(tref id);
+	static const htref geth(tref id);
 
 	/**
 	 * @brief Create a new tree node from value and left and right children
@@ -376,14 +376,14 @@ struct lcrs_tree : public bintree<T> {
 	 * @param h The tree node handle
 	 * @return The tree node
 	 */
-	static const lcrs_tree<T>& get(const htree::sp& h);
+	static const lcrs_tree<T>& get(const htref& h);
 
 	/**
 	 * @brief Get the tree node shared handle
 	 * @param h The tree node handle
 	 * @return The tree node shared handle
 	 */
-	static const htree::sp geth(tref id);
+	static const htref geth(tref id);
 
 	// creation with tref childs
 
@@ -841,7 +841,7 @@ struct post_order {
 	using tree = lcrs_tree<node>;
 
 	explicit post_order(tref n);
-	explicit post_order(const htree::sp& h);
+	explicit post_order(const htref& h);
 
 	/**
 	 * @brief Apply f in post order to root according to visit_subtree.
@@ -931,7 +931,7 @@ struct pre_order {
 	using tree = lcrs_tree<node>;
 
 	explicit pre_order(tref n);
-	explicit pre_order(const htree::sp& h);
+	explicit pre_order(const htref& h);
 
 	/**
 	 * @brief Apply f in pre order to root according to visit_subtree.

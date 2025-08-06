@@ -19,7 +19,7 @@ template <typename node>
 post_order<node>::post_order(tref n) : root(n) {}
 
 template <typename node>
-post_order<node>::post_order(const htree::sp& h) : root(h->get()) {}
+post_order<node>::post_order(const htref& h) : root(h->get()) {}
 
 template <typename node>
 template <size_t slot>
