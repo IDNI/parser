@@ -59,7 +59,7 @@ private:
 	public:
 		nptr_t(const NodeT *_id = nullptr) : id(_id) { //if(id)
 			hash = 0;
-			if(id) hash = id->hashit();
+			if(id) hash = id->hash;
 			nc++; }
 		nptr_t(const nptr_t& rhs) {  id = rhs.id; //if(id)
 			hash = rhs.hash;

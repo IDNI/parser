@@ -339,7 +339,7 @@ struct shaping_options {
 
 
 template <typename C, typename T> struct grammar_inspector;
-template <typename C, typename T> struct parser;
+template <typename C, typename T> class parser;
 /**
  * @brief Grammar struct required by parser.
  * 
@@ -483,9 +483,11 @@ private:
 		return instance;
 	}
 public:
-	pnode_type() {}
+	const size_t hash;
+
+	pnode_type() : hash(hashit()) {}
 	pnode_type(const lit<C, T>& _f, const std::array<size_t, 2>& _s)
-		: node_type(_f, _s) {}
+		: node_type(_f, _s), hash(hashit()) {}
 	inline operator typename forest<pnode_type>::node() const {
 		return ptrof(*this);
 	}
@@ -1213,7 +1215,7 @@ struct std::hash<idni::lit<C, T>> {
 template <typename C, typename T>
 struct std::hash<idni::pnode_type<C,T>> {
 	size_t operator()(const idni::pnode_type<C,T>& pn) const noexcept {
-		return pn.hashit();
+		return pn.hash;
 	}
 };
 
