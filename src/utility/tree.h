@@ -140,6 +140,24 @@ rules merge(const rules& rs1, const rules& rs2);
 
 //------------------------------------------------------------------------------
 
+// Concept for caches holding bintree nodes
+template <typename cache_t>
+concept CacheType = requires {
+	typename cache_t;
+	typename cache_t::const_iterator;
+	typename cache_t::key_type;
+	typename cache_t::mapped_type;
+	typename cache_t::size_type;
+} &&
+requires(cache_t& cache, const typename cache_t::key_type& key,
+		const typename cache_t::mapped_type& value) {
+	{ cache.emplace(key, value) } -> std::convertible_to<std::pair<typename cache_t::const_iterator, bool>>;
+	{ cache.begin() } -> std::convertible_to<typename cache_t::const_iterator>;
+	{ cache.end() } -> std::convertible_to<typename cache_t::const_iterator>;
+	{ cache.size() } -> std::convertible_to<typename cache_t::size_type>;
+	{ cache.contains(key) } -> std::convertible_to<bool>;
+		};
+
 /**
  * @brief Binary tree (each node has left and right child)
  * @tparam T The type of the tree node stored as a value
@@ -214,6 +232,11 @@ struct bintree {
 	static void dump();
 
 	/**
+	 * @brief Controls if garbage collection is active
+	 */
+	inline static bool gc_enabled = true;
+
+	/**
 	 * @brief Garbage collect tree nodes
 	 */
 	static void gc();
@@ -223,6 +246,22 @@ struct bintree {
 	 * @param keep The set of nodes to exclude from being gc-ed. After gc, it contains all existing nodes.
 	 */
 	static void gc(std::unordered_set<tref>& keep);
+
+	using gc_callback =
+		std::function<void(const std::unordered_set<tref>& kept)>;
+	/**
+	 * @brief Vector of functions to be used during a call to garbage
+	 * collection in order to clean created caches from invalid references
+	 */
+	inline static std::vector<gc_callback> gc_callbacks{};
+
+	/**
+	 * @brief Create a cache of type cache_t that is garbage collected
+	 * @tparam cache_t The type of the cache
+	 * @return A reference to the created cache
+	 */
+	template <CacheType cache_t>
+	static cache_t& create_cache();
 
 	/**
 	 * @brief Print the tree to an ostream.
@@ -346,17 +385,6 @@ struct lcrs_tree : public bintree<T> {
 	bool operator<(const lcrs_tree<T>& other) const;
 	static bool subtree_equals(tref a, tref b);
 	static bool subtree_less(tref a, tref b);
-
-	/**
-	 * @brief Garbage collect tree nodes
-	 */
-	static void gc();
-
-	/**
-	 * @brief Garbage collect tree nodes
-	 * @param keep The set of nodes to exclude from being gc-ed
-	 */
-	static void gc(std::unordered_set<tref>& keep);
 
 	/**
 	 * @brief Get node's tref
@@ -830,8 +858,6 @@ bool is_cached_subtree(tref n, const std::unordered_set<tref>& cache);
 // - can be used with lcrs_tree, tree and their descendants
 // - does not work with bintree
 
-// TODO handle traversals and gc
-
 /**
  * @brief Struct for tree traversals in post order
  * @tparam node Tree node type
@@ -898,9 +924,10 @@ struct post_order {
 
 private:
 	tref root;
-	inline static std::unordered_map<std::pair<tref, size_t>, tref,
+	using cache_t = std::unordered_map<std::pair<tref, size_t>, tref,
 		std::hash<std::pair<tref, size_t> >, subtree_pair_equal<node,
-			size_t> > m;
+			size_t>>;
+	inline static cache_t& m = bintree<node>::template create_cache<cache_t>();
 
 	template <size_t slot>
 	tref traverse(tref n, auto& f, auto& visit_subtree);
@@ -1137,9 +1164,10 @@ struct pre_order {
 
 private:
 	tref root;
-	inline static std::unordered_map<std::pair<tref, size_t>, tref,
+	using cache_t = std::unordered_map<std::pair<tref, size_t>, tref,
 		std::hash<std::pair<tref, size_t> >, subtree_pair_equal<node,
-			size_t> > m;
+			size_t>>;
+	inline static cache_t& m = bintree<node>::template create_cache<cache_t>();
 
 	template<bool break_on_change, size_t slot, bool unique>
 	tref traverse(tref n, auto& f, auto& visit_subtree, auto& up);

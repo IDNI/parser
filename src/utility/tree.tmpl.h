@@ -11,6 +11,7 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
+#include <deque>
 #include "tree.h"
 
 namespace idni {
@@ -171,13 +172,14 @@ void bintree<T>::dump() {
 
 template <typename T>
 void bintree<T>::gc() {
+	if (!gc_enabled) return;
 	std::unordered_set<tref> keep{};
 	gc(keep);
 }
 
 template <typename T>
 void bintree<T>::gc(std::unordered_set<tref>& keep) {
-
+	if (!gc_enabled) return;
 	// DBG(dump();)
 	//DBG(htree::dump();)
 
@@ -241,8 +243,56 @@ void bintree<T>::gc(std::unordered_set<tref>& keep) {
 			it = M.erase(it);
 		else keep.insert(it->first.get()), it++;
 
+	// call callbacks to rebuild caches
+	for (const auto& cb : gc_callbacks) cb(keep);
+
 	// DBG(dump();)
 	//DBG(htree::dump();)
+}
+
+template<typename T>
+template<CacheType cache_t>
+cache_t& bintree<T>::create_cache() {
+	static std::deque<cache_t> caches{};
+	cache_t& cache = caches.emplace_back();
+	gc_callbacks.push_back([&cache](const std::unordered_set<tref>& kept) {
+		cache_t new_cache{};
+		for (auto it = cache.begin(); it != cache.end(); it++) {
+			bool ok = true;
+			const auto& key = it->first;
+			const auto check = [&ok, &kept](tref n) {
+				return (ok = ok && kept.contains(n));
+			};
+			if constexpr (std::is_same_v<
+					typename cache_t::key_type, tref>)
+				check(key);
+			else if constexpr (std::tuple_size_v<
+					typename cache_t::key_type> > 0)
+				std::apply([&ok, &kept, &check](
+							const auto&... args)
+				{
+					([&]() {
+						if constexpr (std::is_same_v<
+								std::decay_t<decltype(args)>, tref>)
+							check(args);
+					}(), ...);
+				}, key);
+			else {
+				if constexpr (std::is_same_v<std::decay_t<
+						decltype(key.first)>, tref>)
+					check(key.first);
+				if constexpr (std::is_same_v<std::decay_t<
+						decltype(key.second)>, tref>)
+					check(key.second);
+			}
+			if constexpr (std::is_same_v<
+					typename cache_t::mapped_type, tref>)
+				check(it->second);
+			if (ok) new_cache.emplace(it->first, it->second);
+		}
+		cache = std::move(new_cache);
+	});
+	return cache;
 }
 
 template <typename T>
@@ -313,7 +363,7 @@ size_t hash_lcrs_tref<T>::operator()(tref r) const {
 	const lcrs_tree<T>& n = lcrs_tree<T>::get(r);
 	size_t seed = 0;
 	const size_t hash_l = n.l == nullptr ? 0 : lcrs_tree<T>::get(n.l).hash;
-	hash_combine(seed, n.value, hash_l);
+	hash_combine(seed, n.value.hash, hash_l);
 	return seed;
 }
 
@@ -412,50 +462,6 @@ bool lcrs_tree<T>::subtree_less(tref a, tref b) {
 	if (a == nullptr) return true;
 	if (b == nullptr) return false;
 	return lcrs_tree<T>::get(a) < lcrs_tree<T>::get(b);
-}
-
-//------------------------------------------------------------------------------
-// gc
-
-template <typename T>
-void lcrs_tree<T>::gc() {
-	std::unordered_set<tref> keep{};
-	gc(keep);
-}
-
-template <typename T>
-void lcrs_tree<T>::gc(std::unordered_set<tref>& keep) {
-
-	// DBG(dump();)
-	//DBG(htree::dump();)
-
-	//mark subtree
-	std::unordered_set<tref> next;
-	auto mark = [&next](tref r, auto& mark) -> void {
-		if (!next.insert(r).second) return;
-		if (bintree<T>::get(r).l != nullptr)
-			mark(bintree<T>::get(r).l, mark);
-	};
-	//check if any handle expired and needs to be garbaged
-	// otherwise mark all to be retained live
-
-	for (auto& x : bintree<T>::M)
-		if (!x.second.expired()) mark(x.second.lock()->get(), mark);
-	for (auto& x : keep) mark(x, mark);
-
-	// do not run gc, if no handle expired or empty.
-	if (!bintree<T>::M.size() || (next.size() == bintree<T>::M.size())) {
-		DBG(std::cout << "gc-do nothing:" << next.size() << "\n";)
-		return;
-	}
-	//delete non-reachable garbage nodes from M
-	for (auto it = bintree<T>::M.begin(); it != bintree<T>::M.end(); )
-		if (next.count(it->first.get()) == 0)
-			it = bintree<T>::M.erase(it);
-		else keep.insert(it->first.get()), it++;
-
-	// DBG(dump();)
-	//DBG(htree::dump();)
 }
 
 //------------------------------------------------------------------------------

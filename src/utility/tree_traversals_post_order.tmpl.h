@@ -24,37 +24,54 @@ post_order<node>::post_order(const htref& h) : root(h->get()) {}
 template <typename node>
 template <size_t slot>
 tref post_order<node>::apply_unique(auto& f, auto& visit_subtree) {
-	if (visit_subtree(root))
-		return traverse<slot>(root, f, visit_subtree);
+	if (visit_subtree(root)) {
+		bintree<node>::gc_enabled = false;
+		tref res = traverse<slot>(root, f, visit_subtree);
+		bintree<node>::gc_enabled = true;
+		return res;
+	}
 	else return root;
 }
 
 template <typename node>
 template <size_t slot>
 tref post_order<node>::apply_unique(auto& f) {
-	return traverse<slot>(root, f, all);
+	bintree<node>::gc_enabled = false;
+	tref res = traverse<slot>(root, f, all);
+	bintree<node>::gc_enabled = true;
+	return res;
 }
 
 template <typename node>
 void post_order<node>::search(auto& visit, auto& visit_subtree) {
-	if (visit_subtree(root))
+	if (visit_subtree(root)) {
+		bintree<node>::gc_enabled = false;
 		const_traverse<false>(root, visit, visit_subtree);
+		bintree<node>::gc_enabled = true;
+	}
 }
 
 template <typename node>
 void post_order<node>::search(auto& visit) {
+	bintree<node>::gc_enabled = false;
 	const_traverse<false>(root, visit, all);
+	bintree<node>::gc_enabled = true;
 }
 
 template <typename node>
 void post_order<node>::search_unique(auto& visit, auto& visit_subtree) {
-	if (visit_subtree(root))
+	if (visit_subtree(root)) {
+		bintree<node>::gc_enabled = false;
 		const_traverse<true>(root, visit, visit_subtree);
+		bintree<node>::gc_enabled = true;
+	}
 }
 
 template <typename node>
 void post_order<node>::search_unique(auto& visit) {
+	bintree<node>::gc_enabled = false;
 	const_traverse<true>(root, visit, all);
+	bintree<node>::gc_enabled = true;
 }
 
 template <typename node>
@@ -66,9 +83,7 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 		const auto it = m.find(std::make_pair(n, slot));
 		if (it != m.end()) return it->second;
 	}
-	// std::unordered_map<tref, tref, std::hash<tref>,
-	// 	traverser_cache_equality> cache;
-	subtree_map<node, tref> cache;
+	subtree_unordered_map<node, tref> cache;
 	std::vector<tref> stack;
 	std::vector<size_t> upos;
 	stack.push_back(n);
@@ -192,7 +207,7 @@ void post_order<node>::const_traverse(tref n, auto& visitor,
 	auto& visit_subtree)
 {
 	if (n == nullptr) return;
-	subtree_set<node> cache;
+	subtree_unordered_set<node> cache;
 	trefs stack;
 	std::vector<size_t> upos;
 	auto get_parent = [&upos, &stack]() -> tref {
