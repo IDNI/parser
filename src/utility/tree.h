@@ -156,7 +156,7 @@ requires(cache_t& cache, const typename cache_t::key_type& key,
 	{ cache.end() } -> std::convertible_to<typename cache_t::const_iterator>;
 	{ cache.size() } -> std::convertible_to<typename cache_t::size_type>;
 	{ cache.contains(key) } -> std::convertible_to<bool>;
-		};
+};
 
 /**
  * @brief Binary tree (each node has left and right child)

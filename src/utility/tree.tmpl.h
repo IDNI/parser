@@ -250,47 +250,51 @@ void bintree<T>::gc(std::unordered_set<tref>& keep) {
 	//DBG(htree::dump();)
 }
 
-template<typename T>
-template<CacheType cache_t>
+template <typename T>
+template <CacheType cache_t>
 cache_t& bintree<T>::create_cache() {
 	static std::deque<cache_t> caches{};
 	cache_t& cache = caches.emplace_back();
+	// add callback to rebuild cache on gc
 	gc_callbacks.push_back([&cache](const std::unordered_set<tref>& kept) {
+		using std::is_same_v, std::tuple_size_v, std::decay_t;
+		using key_type    = typename cache_t::key_type;
+		using mapped_type = typename cache_t::mapped_type;
 		cache_t new_cache{};
 		for (auto it = cache.begin(); it != cache.end(); it++) {
+			// checked tref must be contained in kept (from gc)
 			bool ok = true;
-			const auto& key = it->first;
 			const auto check = [&ok, &kept](tref n) {
-				return (ok = ok && kept.contains(n));
+				ok = ok && kept.contains(n);
 			};
-			if constexpr (std::is_same_v<
-					typename cache_t::key_type, tref>)
-				check(key);
-			else if constexpr (std::tuple_size_v<
-					typename cache_t::key_type> > 0)
-				std::apply([&ok, &kept, &check](
-							const auto&... args)
-				{
-					([&]() {
-						if constexpr (std::is_same_v<
-								std::decay_t<decltype(args)>, tref>)
-							check(args);
-					}(), ...);
-				}, key);
-			else {
-				if constexpr (std::is_same_v<std::decay_t<
+			const auto key_tuple_check = [&ok, &kept, &check](
+				const auto&... args)
+			{
+				([&]() { if constexpr (
+					is_same_v<decay_t<decltype(args)>,tref>)
+						check(args); }(), ...);
+			};
+			const auto& key  = it->first;
+			// check key for tref
+			if constexpr (is_same_v<key_type, tref>) check(key);
+			// check key for tref in tuple
+			else if constexpr (tuple_size_v<key_type> > 0)
+				std::apply(key_tuple_check, key);
+			else { // check key for pair
+				if constexpr (is_same_v<decay_t<
 						decltype(key.first)>, tref>)
 					check(key.first);
-				if constexpr (std::is_same_v<std::decay_t<
+				if constexpr (is_same_v<decay_t<
 						decltype(key.second)>, tref>)
 					check(key.second);
 			}
-			if constexpr (std::is_same_v<
-					typename cache_t::mapped_type, tref>)
+			// check value for tref in pair
+			if constexpr (is_same_v<mapped_type, tref>)
 				check(it->second);
-			if (ok) new_cache.emplace(it->first, it->second);
+			// add to new cache if all checks passed
+			if (ok) new_cache.emplace(key, it->second);
 		}
-		cache = std::move(new_cache);
+		cache = std::move(new_cache); 
 	});
 	return cache;
 }
