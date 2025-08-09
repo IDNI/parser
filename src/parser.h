@@ -989,7 +989,7 @@ public:
 #else
 		using edges           = std::vector<typename pforest::edge>;
 #endif
-		using nodes_and_edges = std::pair<pnodes, edges>;
+		using nodes_and_edges = std::pair<std::vector<node_type>, edges>;
 		/// Returns all nodes and edges of the forest
 		nodes_and_edges get_nodes_and_edges() const;
 

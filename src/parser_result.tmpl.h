@@ -402,9 +402,10 @@ template <typename C, typename T>
 typename parser<C, T>::result::nodes_and_edges
 	parser<C, T>::result::get_nodes_and_edges() const
 {
-	std::map<pnode, size_t> nid;
-	std::map<size_t, pnode> ns;
-	pnodes n;
+	using node = std::pair<lit<C, T>, std::array<size_t, 2>>;
+	std::map<node, size_t> nid;
+	std::map<size_t, node> ns;
+	std::vector<node> n;
 	edges es;
 	size_t id = 0;
 	if (!f) return nodes_and_edges{ n, es };
