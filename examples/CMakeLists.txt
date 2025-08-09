@@ -23,11 +23,13 @@ foreach(X IN LISTS EXAMPLES)
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
 	)
 	# add_dependencies(${X} ${TAU_PARSER_STATIC_LIB_NAME})
-	message(STATUS "installing ${X} to ${TAU_PARSER_DOC_DESTINATION}/examples")
-	install(DIRECTORY ${X}
-		DESTINATION "${TAU_PARSER_DOC_DESTINATION}/examples"
-		COMPONENT "Examples")
-	install(TARGETS ${X}
-		RUNTIME DESTINATION "${TAU_PARSER_DOC_DESTINATION}/examples/${X}"
-		COMPONENT "Examples")
+	if(TAU_PARSER_INSTALL)
+		message(STATUS "installing ${X} to ${TAU_PARSER_DOC_DESTINATION}/examples")
+		install(DIRECTORY ${X}
+			DESTINATION "${TAU_PARSER_DOC_DESTINATION}/examples"
+			COMPONENT "Examples")
+		install(TARGETS ${X}
+			RUNTIME DESTINATION "${TAU_PARSER_DOC_DESTINATION}/examples/${X}"
+			COMPONENT "Examples")
+	endif()
 endforeach()
