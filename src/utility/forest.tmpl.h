@@ -499,9 +499,9 @@ bool forest<NodeT>::replace_nodes(graph& g, nodes& s) {
 					const node torepl = it->first;
 					const nodes& repl = it->second;
 
-					DBG(std::cout << "Replacing " << NodeT(torepl) << " with ";
-						for (auto& r : repl) std::cout << NodeT(r) << " " << newrhs.size() << " ";
-						std::cout << "\n";)
+					// DBG(std::cout << "Replacing " << NodeT(torepl) << " with ";
+					// 	for (auto& r : repl) std::cout << NodeT(r) << " " << newrhs.size() << " ";
+					// 	std::cout << "\n";)
 
 					// Do replacement
 					newrhs.erase(newrhs.begin() + i);

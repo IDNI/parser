@@ -107,10 +107,10 @@ private:
 				else {
 					if(*id == *rhs.id ) return true;
 
-				//collision, so check if they are same
-				DBG(std::cout << "collision: " << *id << 
-					" and " << *rhs.id << std::endl;)
-				return false;
+					//collision, so check if they are same
+					// DBG(std::cout << "collision: " << *id << 
+					// 	" and " << *rhs.id << std::endl;)
+					return false;
 				}
 			}
 			return false;
