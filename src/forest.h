@@ -102,7 +102,7 @@ private:
 		~nptr_t() {
 			//DBG(std::cout <<"-"<< NodeT::nid().size() <<" "<<nc );
 			//if(id){
-				if ((nc == (NodeT::nid().size() + 1))) {
+				if (nc == (NodeT::nid().size() + 1)) {
 					//DBG(std::cout<<"GCing nodes:  "<< nc-1 <<std::endl);
 					nc--;
 					NodeT::nid().clear();
