@@ -367,7 +367,9 @@ size_t hash_lcrs_tref<T>::operator()(tref r) const {
 	const lcrs_tree<T>& n = lcrs_tree<T>::get(r);
 	size_t seed = 0;
 	const size_t hash_l = n.l == nullptr ? 0 : lcrs_tree<T>::get(n.l).hash;
-	hash_combine(seed, n.value.hash, hash_l);
+	if constexpr (requires { n.value.hash; })
+		hash_combine(seed, n.value.hash, hash_l);
+	else    hash_combine(seed, n.value, hash_l);
 	return seed;
 }
 
