@@ -16,12 +16,21 @@ function(target_setup target access compile_definitions compile_options link_opt
 			-Wformat=2
 			-Wcast-align
 			-Wstrict-aliasing=2
-			-Wstrict-overflow=5
 			-Wfloat-equal
 			-Wwrite-strings
 			#-Werror
 			#-Wfatal-errors
 		)
+		if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
+				CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+			target_compile_options(${target} ${access}
+				-Wstrict-overflow=2
+			)
+		else()
+			target_compile_options(${target} ${access}
+				-Wstrict-overflow=5
+			)
+		endif()
 	else()
 		target_compile_options(${target} ${access} /W4)
 	endif()
