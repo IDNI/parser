@@ -32,19 +32,50 @@ set(TAU_PARSER_HEADERS
 	CACHE STRING "Tau Parser headers files"
 )
 
-add_library(tauparser INTERFACE)
-target_include_directories(tauparser INTERFACE
-	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+set(TAU_PARSER_SOURCES
+	parser.cpp
 )
-tauparser_setup(tauparser INTERFACE "")
 
-if(TAU_PARSER_MEASURE)
-	target_compile_definitions(tauparser INTERFACE TAU_PARSER_MEASURE)
+if(TAU_PARSER_BUILD_HEADER_ONLY)
+	add_library(tauparser INTERFACE)
+	target_include_directories(tauparser INTERFACE
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+		$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+	)
+	target_compile_definitions(tauparser INTERFACE TAU_PARSER_BUILD_HEADER_ONLY)
+	tauparser_setup(tauparser INTERFACE "")
+else()
+	if(TAU_PARSER_BUILD_STATIC_LIBRARY)
+		add_library(tauparser_static STATIC ${TAU_PARSER_SOURCES})
+		set_target_properties(tauparser_static PROPERTIES
+			OUTPUT_NAME "tauparser"
+		)
+		target_include_directories(tauparser_static PUBLIC
+			$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+			$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+		)
+		tauparser_setup(tauparser_static PUBLIC "")
+	endif()
+	
+	if(TAU_PARSER_BUILD_SHARED_LIBRARY)
+		add_library(tauparser_shared SHARED ${TAU_PARSER_SOURCES})
+		set_target_properties(tauparser_shared PROPERTIES
+			OUTPUT_NAME "tauparser"
+		)
+		target_include_directories(tauparser_shared PUBLIC
+			$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+			$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+		)
+		tauparser_setup(tauparser_shared PUBLIC "")
+	endif()
+	
+	# Create an alias target for backward compatibility
+	if(TAU_PARSER_BUILD_STATIC_LIBRARY)
+		add_library(tauparser ALIAS tauparser_static)
+	elseif(TAU_PARSER_BUILD_SHARED_LIBRARY)
+		add_library(tauparser ALIAS tauparser_shared)
+	endif()
 endif()
-
-include(target_git_definitions)
-target_git_definitions(tauparser INTERFACE)
 
 # install targets
 #################
@@ -67,23 +98,38 @@ if(TAU_PARSER_INSTALL)
 			PATTERN "CMakeLists.txt" EXCLUDE
 			PATTERN "*.cmake*" EXCLUDE
 	)
-	install(TARGETS ${PROJECT_NAME}
-		EXPORT "${PROJECT_NAME}Targets"
-		RUNTIME       DESTINATION ${CMAKE_INSTALL_BINDIR}
-		LIBRARY       DESTINATION ${CMAKE_INSTALL_LIBDIR}
-		INCLUDES      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}
-		COMPONENT "Library"
-	)
+	# Install targets based on what was built
+	if(TAU_PARSER_BUILD_STATIC_LIBRARY)
+		install(TARGETS tauparser_static
+			EXPORT "${PROJECT_NAME}Targets"
+			RUNTIME       DESTINATION ${CMAKE_INSTALL_BINDIR}
+			LIBRARY       DESTINATION ${CMAKE_INSTALL_LIBDIR}
+			ARCHIVE       DESTINATION ${CMAKE_INSTALL_LIBDIR}
+			INCLUDES      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}
+			COMPONENT "Library"
+		)
+	endif()
+	
+	if(TAU_PARSER_BUILD_SHARED_LIBRARY)
+		install(TARGETS tauparser_shared
+			EXPORT "${PROJECT_NAME}Targets"
+			RUNTIME       DESTINATION ${CMAKE_INSTALL_BINDIR}
+			LIBRARY       DESTINATION ${CMAKE_INSTALL_LIBDIR}
+			ARCHIVE       DESTINATION ${CMAKE_INSTALL_LIBDIR}
+			INCLUDES      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}
+			COMPONENT "Library"
+		)
+	endif()
 
-	# install cmake configuration
-	#############################
-	message(STATUS "installing cmake configuration to cmake/")
-
-	install(EXPORT "${PROJECT_NAME}Targets"
-		FILE "${PROJECT_NAME}Targets.cmake"
-		NAMESPACE ${namespace}::
-		DESTINATION cmake
-	)
+	# install cmake configuration if not header-only
+	if(NOT TAU_PARSER_BUILD_HEADER_ONLY)
+		message(STATUS "installing cmake configuration to cmake/")
+		install(EXPORT "${PROJECT_NAME}Targets"
+			FILE "${PROJECT_NAME}Targets.cmake"
+			NAMESPACE ${namespace}::
+			DESTINATION cmake
+		)
+	endif()
 endif()
 
 include(CMakePackageConfigHelpers)
@@ -103,10 +149,13 @@ if(TAU_PARSER_INSTALL)
 		"${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
 		DESTINATION cmake
 	)
-	message(STATUS "Exporting ${PROJECT_NAME}Targets to ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Targets.cmake")
-	export(EXPORT "${PROJECT_NAME}Targets"
-		FILE "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Targets.cmake"
-		NAMESPACE ${namespace}::
-	)
+	
+	if(NOT TAU_PARSER_BUILD_HEADER_ONLY)
+		message(STATUS "Exporting ${PROJECT_NAME}Targets to ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Targets.cmake")
+		export(EXPORT "${PROJECT_NAME}Targets"
+			FILE "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Targets.cmake"
+			NAMESPACE ${namespace}::
+		)
+	endif()
 endif()
 

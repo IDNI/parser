@@ -1234,4 +1234,10 @@ struct std::hash<idni::pnode_type<C,T>> {
 // undef local macros
 #undef DEFAULT_BINARIZE
 #undef DEFAULT_INCR_GEN_FOREST
+
+#ifndef TAU_PARSER_BUILD_HEADER_ONLY
+// explicit template instantiations to avoid recompilation
+extern template class idni::parser<char, char>;
+#endif
+
 #endif // __IDNI__PARSER__PARSER_H__
