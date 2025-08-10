@@ -276,7 +276,7 @@ template <typename C, typename T>
 typename parser<C, T>::psptree parser<C, T>::result::trim_children_terminals(
 	const psptree& t) const
 {
-	return trim_children_nodes(t, shaping);
+	return trim_children_terminals(t, shaping);
 }
 
 template <typename C, typename T>
