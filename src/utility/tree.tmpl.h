@@ -267,7 +267,7 @@ cache_t& bintree<T>::create_cache() {
 			const auto check = [&ok, &kept](tref n) {
 				ok = ok && kept.contains(n);
 			};
-			const auto key_tuple_check = [&ok, &kept, &check](
+			const auto key_tuple_check = [&check](
 				const auto&... args)
 			{
 				([&]() { if constexpr (
