@@ -14,3 +14,4 @@ forest_grammar_rules*.tml
 ./tau-lang
 _site/*
 src/version_license.h
+external/emsdk
