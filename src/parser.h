@@ -348,7 +348,7 @@ template <typename C, typename T> class parser;
 template <typename C = char, typename T = C>
 struct grammar {
 	friend struct grammar_inspector<C, T>;
-	friend struct parser<C, T>;
+	friend class parser<C, T>;
 	typedef std::pair<lit<C, T>, std::vector<lits<C, T>>> production;
 	struct options {
 		/**
