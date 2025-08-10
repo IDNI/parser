@@ -79,7 +79,7 @@ template <typename C, typename T>
 tref parser<C, T>::tree::get(const pnode& v,
 	const pnode& ch1, const pnode& ch2)
 {
-	return get(v, ch1, ch2);
+	return get(v, get(ch1), get(ch2));
 }
 
 template <typename C, typename T>
