@@ -45,14 +45,14 @@ using int_t = int32_t;
 //-----------------------------------------------------------------------------
 
 // GIT_* macros are populated at compile time by -D or they're set to "n/a"
-#ifndef GIT_DESCRIBED
-#define GIT_DESCRIBED   "n/a"
+#ifndef TAU_PARSER_GIT_DESCRIBED
+#define TAU_PARSER_GIT_DESCRIBED   "n/a"
 #endif
-#ifndef GIT_COMMIT_HASH
-#define GIT_COMMIT_HASH "n/a"
+#ifndef TAU_PARSER_GIT_COMMIT_HASH
+#define TAU_PARSER_GIT_COMMIT_HASH "n/a"
 #endif
-#ifndef GIT_BRANCH
-#define GIT_BRANCH      "n/a"
+#ifndef TAU_PARSER_GIT_BRANCH
+#define TAU_PARSER_GIT_BRANCH      "n/a"
 #endif
 
 #include "./version_license.h" // include generated version and license constants
