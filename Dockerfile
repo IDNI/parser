@@ -47,7 +47,7 @@ COPY ./ /parser
 
 WORKDIR /parser
 
-RUN ./clean.sh all
+RUN ./dev clean all
 
 # if NIGHTLY is set to yes, then add .YYYY-MM-DD to the first line of the VERSION file
 RUN if [ "$NIGHTLY" = "yes" ]; then \
@@ -58,7 +58,7 @@ RUN echo "(BUILD) -- Building version: $(head -n 1 VERSION)"
 # Build tests and run them if TESTS is set to yes. Stop the build if they fail
 RUN echo " (BUILD) -- Running tests: $TESTS"
 RUN if [ "$TESTS" = "yes" ]; then \
-	./build.sh "${BUILD_TYPE}" -DTAU_PARSER_BUILD_TESTS=ON && \
+	./dev build "${BUILD_TYPE}" -DTAU_PARSER_BUILD_TESTS=ON && \
 	cd tests && \
 	ctest -j 8 --test-dir "../build-${BUILD_TYPE}" --output-on-failure \
 		|| exit 1; \
@@ -68,23 +68,23 @@ RUN echo "(BUILD) -- Building packages: $RELEASE (nightly: $NIGHTLY)"
 
 # Documentation
 RUN if [ "$DOCUMENTATION" = "yes" ] || [ "$RELEASE" = "yes" ]; then \
-	./build.sh "${BUILD_TYPE}" -DTAU_PARSER_BUILD_DOC=ON; \
+	./dev build "${BUILD_TYPE}" -DTAU_PARSER_BUILD_DOC=ON; \
 fi
 
 # Windows packages
 RUN if [ "$RELEASE" = "yes" ]; then \
-	./w64-packages.sh \
+	./dev w64-packages \
 	&& rm ./build-Release/CMakeCache.txt; \
 fi
 
 # Linux packages
 RUN if [ "$RELEASE" = "yes" ]; then \
-	./packages.sh; \
+	./dev packages; \
 fi
 
 # If tgf executable does not exist already, build it
 RUN if [ ! -f ./build-${BUILD_TYPE}/tgf ]; then \
-	./build.sh "${BUILD_TYPE}" -DTAU_PARSER_BUILD_TGF=ON; \
+	./dev build "${BUILD_TYPE}" -DTAU_PARSER_BUILD_TGF=ON; \
 fi
 
 # Set the entrypoint to the tgf executable
