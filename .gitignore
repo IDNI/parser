@@ -16,3 +16,4 @@ forest_grammar_rules*.tml
 src/doctest.h
 _site/*
 src/version_license.h
+external/emsdk

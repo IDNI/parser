@@ -17,11 +17,15 @@ project("tauparser"
 	DESCRIPTION "Tau Parser Library"
 )
 
+option(TAU_PARSER_INSTALL "Install tauparser targets and files" OFF)
+
 if(NOT CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
 	message(STATUS
 		"${PROJECT_NAME} as a subproject of [${CMAKE_PROJECT_NAME}]")
+	set(TAU_PARSER_INSTALL OFF)
 else()
 	message(STATUS "${PROJECT_NAME} as a top project")
+	set(TAU_PARSER_INSTALL ON)
 endif()
 
 # Options
@@ -137,6 +141,7 @@ set(TAU_PARSER_BIN_DESTINATION "bin")
 set(TAU_PARSER_DOC_DESTINATION "share/doc/${PROJECT_NAME}")
 
 ################################################################################
+message(STATUS "TAU_PARSER_INSTALL:              ${TAU_PARSER_INSTALL}")
 message(STATUS "TAU_PARSER_BUILD_ALL:            ${TAU_PARSER_BUILD_ALL}")
 message(STATUS "TAU_PARSER_BUILD_DOC:            ${TAU_PARSER_BUILD_DOC}")
 # message(STATUS "TAU_PARSER_BUILD_STATIC_LIBRARY: ${TAU_PARSER_BUILD_STATIC_LIBRARY}")
@@ -194,14 +199,17 @@ if(TAU_PARSER_BUILD_TESTS)
 endif()
 
 # Documentation
-message(STATUS "Installing license and static docs to ${TAU_PARSER_DOC_DESTINATION}")
-install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt" "${CMAKE_CURRENT_SOURCE_DIR}/README.md" "${CMAKE_CURRENT_SOURCE_DIR}/mainpage.md"
-	DESTINATION "${TAU_PARSER_DOC_DESTINATION}"
-	COMPONENT "Documentation")
-install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/docs"
-	DESTINATION "${TAU_PARSER_DOC_DESTINATION}"
-	COMPONENT "Documentation")
+if(TAU_PARSER_INSTALL)
+	message(STATUS "Installing license and static docs to ${TAU_PARSER_DOC_DESTINATION}")
+	install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt" "${CMAKE_CURRENT_SOURCE_DIR}/README.md" "${CMAKE_CURRENT_SOURCE_DIR}/mainpage.md"
+		DESTINATION "${TAU_PARSER_DOC_DESTINATION}"
+		COMPONENT "Documentation")
+	install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/docs"
+		DESTINATION "${TAU_PARSER_DOC_DESTINATION}"
+		COMPONENT "Documentation")
+endif()
 
+# Documentation
 if(TAU_PARSER_BUILD_DOC)
 	find_package(Doxygen)
 	if(DOXYGEN_FOUND)
@@ -219,7 +227,7 @@ if(TAU_PARSER_BUILD_DOC)
 endif()
 
 # if _site directory with generated API documentation exists, install it
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/_site)
+if(TAU_PARSER_INSTALL AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/_site)
 	message(STATUS "Installing generated docs to ${TAU_PARSER_DOC_DESTINATION}/api")
 	install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/_site/
 		DESTINATION ${TAU_PARSER_DOC_DESTINATION}/api

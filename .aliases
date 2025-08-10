@@ -1,5 +1,5 @@
-alias debug="clear; ./debug.sh"
-alias release="clear; ./release.sh"
+alias debug="clear; ./dev debug"
+alias release="clear; ./dev release"
 
 export TESTS="-DTAU_PARSER_BUILD_TESTS=1"
 export TOOLS="-DTAU_PARSER_BUILD_TGF=1"
