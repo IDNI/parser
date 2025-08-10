@@ -630,36 +630,34 @@ public:
 				}};
 			static inline const extractor<tref_range<pnode>>
 							children_range{
-				[](const traverser& t) {
-					if (!t) return traverser();
-					return traverser(t.value_tree()
-							.children());
+				[](const traverser& t) -> tref_range<pnode> {
+					if (!t) return { nullptr };
+					return t.value_tree().children();
 				}};
 			static inline const extractor<tree_range<tree>>
 							children_trees_range{
-				[](const traverser& t) {
-					if (!t) return traverser();
-					return traverser(t.value_tree()
-							.children());
+				[](const traverser& t) -> tree_range<tree> {
+					if (!t) return { nullptr };
+					return t.value_tree().children_trees();
 				}};
 			static inline const extractor<traverser> first{
 				[](const traverser& t) {
 					if (!t) return traverser();
-					tref r = t.value_tree()[0];
+					tref r = t.value_tree().first();
 					if (!r) return traverser();
 					return traverser(r);
 				}};
 			static inline const extractor<traverser> second{
 				[](const traverser& t) {
 					if (!t) return traverser();
-					tref r = t.value_tree()[1];
+					tref r = t.value_tree().second();
 					if (!r) return traverser();
 					return traverser(r);
 				}};
 			static inline const extractor<traverser> third{
 				[](const traverser& t) {
 					if (!t) return traverser();
-					tref r = t.value_tree()[2];
+					tref r = t.value_tree().third();
 					if (!r) return traverser();
 					return traverser(r);
 				}};
