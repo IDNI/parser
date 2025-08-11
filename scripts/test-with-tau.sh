@@ -50,4 +50,4 @@ cp -r ../cmake ../src ../CMakeLists.txt ../VERSION ../LICENSE.txt ../README.md \
 	external/parser
 
 # build tau with tests and run them
-./dev build $BUILD_TYPE -DTAU_BUILD_TESTS=ON && ./dev test-$BUILD_TYPE
+./dev $BUILD_TYPE -DTAU_BUILD_TESTS=ON && ./dev test-$BUILD_TYPE
