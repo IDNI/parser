@@ -1,3 +1,6 @@
+// To view the license please visit
+// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+
 #include <algorithm>
 #include "parser.h"
 
