@@ -7,6 +7,10 @@
 #include <string>
 #include <cstdint>
 
+#ifdef __EMSCRIPTEN__
+#include "unsigned_char_traits.h"
+#endif
+
 namespace idni {
 
 typedef unsigned char utf8char;

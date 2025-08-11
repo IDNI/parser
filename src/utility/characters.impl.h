@@ -51,7 +51,7 @@ inline utf8string to_utf8string(char32_t ch) {
 	if (ch == static_cast<char32_t>(0)) return {};
 	utf8char s[4];
 	size_t l = emit_codepoint(ch, s);
-	if (l == (size_t) -1) return utf8string();
+	if (l == 0) return utf8string();
 	return utf8string(s, l);
 }
 inline utf8string to_utf8string(const std::u32string& str) {
