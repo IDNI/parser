@@ -255,6 +255,15 @@ struct bintree {
 	static cache_t& create_cache();
 
 	/**
+	 * @brief Create a cache of type cache_t that is garbage collected
+	 * @tparam cache_t The type of the cache
+	 * @param init The initial cache content
+	 * @return A reference to the created cache
+	 */
+	 template <CacheType cache_t>
+	 static cache_t& create_cache(const cache_t& init);
+ 
+	/**
 	 * @brief Print the tree to an ostream.
 	 * @param os The ostream to print to.
 	 * @param l The indentation level.

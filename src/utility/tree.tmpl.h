@@ -243,8 +243,14 @@ void bintree<T>::gc(std::unordered_set<tref>& keep) {
 template <typename T>
 template <CacheType cache_t>
 cache_t& bintree<T>::create_cache() {
-	static std::deque<cache_t> caches{};
-	cache_t& cache = caches.emplace_back();
+	return create_cache<cache_t>({});
+}
+
+template <typename T>
+template <CacheType cache_t>
+cache_t& bintree<T>::create_cache(const cache_t& init) {
+	static std::deque<cache_t> caches;
+	cache_t& cache = caches.emplace_back(init);
 	// add callback to rebuild cache on gc
 	gc_callbacks.push_back([&cache](const std::unordered_set<tref>& kept) {
 		using std::is_same_v, std::tuple_size_v, std::decay_t;
