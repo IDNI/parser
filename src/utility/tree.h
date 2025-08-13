@@ -546,6 +546,19 @@ struct lcrs_tree : public bintree<T> {
 	static tref get(const T& v, const T& ch1, const T& ch2); 
 
 	/**
+	 * @brief Trim the right sibling of the node
+	 * @param n The node to trim
+	 * @return The new tree node's tref id
+	 */
+	static tref trim_right_sibling(tref n);
+
+	/**
+	 * @brief Trim the right sibling
+	 * @return The new tree node's tref id
+	 */
+	tref trim_right_sibling() const;
+
+	/**
 	 * @brief Check if the node has a right sibling
 	 * @return True if the node has a right sibling, false otherwise
 	 */

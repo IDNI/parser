@@ -574,6 +574,16 @@ tref lcrs_tree<T>::get(const T& v, const T& ch1, const T& ch2) {
 }
 
 template <typename T>
+tref lcrs_tree<T>::trim_right_sibling(tref n) {
+	return get(n).trim_right_sibling();
+}
+
+template <typename T>
+tref lcrs_tree<T>::trim_right_sibling() const {
+	return bintree<T>::get(this->value, this->l, nullptr);
+}
+
+template <typename T>
 bool lcrs_tree<T>::has_right_sibling() const { return this->r != nullptr; }
 
 template <typename T>
