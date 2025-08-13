@@ -460,6 +460,12 @@ bool lcrs_tree<T>::subtree_less(tref a, tref b) {
 	return lcrs_tree<T>::get(a) < lcrs_tree<T>::get(b);
 }
 
+template <typename T>
+bool lcrs_tree<T>::contains_subtree(const trefs& nodes, tref search) {
+	for (const tref& n : nodes) if (subtree_equals(n, search)) return true;
+	return false;
+}
+
 //------------------------------------------------------------------------------
 // handles
 

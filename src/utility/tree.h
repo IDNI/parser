@@ -378,6 +378,14 @@ struct lcrs_tree : public bintree<T> {
 	static bool subtree_less(tref a, tref b);
 
 	/**
+	 * @brief Check if vector of trefs `nodes` contain a subtree `search` using `subtree_equals()`
+	 * @param nodes The nodes to check
+	 * @param search The subtree to search for
+	 * @return True if the `nodes` contains the `search` node, false otherwise
+	 */
+	 static bool contains_subtree(const trefs& nodes, tref search);
+
+	/**
 	 * @brief Get node's tref
 	 * @return The tree node reference
 	 */
