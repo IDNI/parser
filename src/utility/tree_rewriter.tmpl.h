@@ -491,14 +491,6 @@ tref replace(tref n, tref replace, tref with) {
 	return pre_order<node>(n).apply_unique_until_change(r);
 }
 
-// TODO (LOW) move it to a more appropriate place (parser)
-template <typename node>
-tref replace_with(tref n, tref with, tref inp) {
-	DBG(assert(n != nullptr && with != nullptr && inp != nullptr);)
-	subtree_map<node, tref> changes = {{ n, with }};
-	return replace<node>(inp, changes);
-}
-
 // Replace nodes in n according to changes while skipping subtrees that don't satisfy query
 template <typename node, typename predicate_t>
 tref replace_if(tref n, const subtree_map<node, tref>& changes, predicate_t& query) {
