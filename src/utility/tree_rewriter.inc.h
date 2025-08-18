@@ -338,6 +338,9 @@ template <typename node, typename predicate_t>
 tref replace_if(tref n, const subtree_map<node, tref>& changes,
 	predicate_t& query);
 
+template <typename node>
+tref replace_if(tref n, tref replace, tref with, auto& query);
+
 // Replace nodes in n according to changes while skipping subtrees that satisfy query
 template <typename node, typename predicate_t>
 tref replace_until(tref n, const subtree_map<node, tref>& changes,

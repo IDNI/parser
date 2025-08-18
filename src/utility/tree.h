@@ -372,6 +372,9 @@ template <typename node, typename PT>
 using subtree_unordered_map = std::unordered_map<tref, PT,
 				hash_lcrs_tref<node>, subtree_equality<node>>;
 
+template <typename node>
+bool subtree_vec_contains(const trefs& vec, tref val);
+
 /**
  * @brief Left child right sibling tree
  * @tparam T The type of the tree node value

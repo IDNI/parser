@@ -435,6 +435,14 @@ bool subtree_bool_bool_tuple_less<node>::operator()(
 	return std::get<2>(a) < std::get<2>(b);
 }
 
+template<typename node>
+bool subtree_vec_contains(const trefs& vec, tref val) {
+	using tree = lcrs_tree<node>;
+	return std::ranges::find_if(vec, [&val](tref v) {
+		return tree::get(v) == tree(val);
+	}) != vec.end();
+}
+
 // The less comparator is independent of tref addresses
 // enabling deterministic orderings
 template <typename T>
