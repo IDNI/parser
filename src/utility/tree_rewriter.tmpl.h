@@ -501,8 +501,8 @@ tref replace_if(tref n, const subtree_map<node, tref>& changes, predicate_t& que
 	return pre_order<node>(n).apply_unique_until_change(r, query);
 }
 
-template<typename node>
-tref replace_if(tref n, tref replace, tref with, auto& query) {
+template<typename node, typename P>
+tref replace_if(tref n, tref replace, tref with, P& query) {
 	DBG(assert(n != nullptr && replace != nullptr && with != nullptr);)
 	const auto r = [&](tref el) {
 		if (lcrs_tree<node>::subtree_equals(el, replace)) return with;

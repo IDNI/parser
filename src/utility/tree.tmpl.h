@@ -439,7 +439,7 @@ template<typename node>
 bool subtree_vec_contains(const trefs& vec, tref val) {
 	using tree = lcrs_tree<node>;
 	return std::ranges::find_if(vec, [&val](tref v) {
-		return tree::get(v) == tree(val);
+		return tree::get(v) == tree::get(val);
 	}) != vec.end();
 }
 
