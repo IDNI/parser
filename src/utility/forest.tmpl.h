@@ -103,7 +103,7 @@ typename forest<NodeT>::sptree forest<NodeT>::graph::_extract_trees(
 		auto& ns = fit->second;
 		if (!ns.size()) continue;
 		auto it = ns.begin();
-		if (ns.size() > 1) {
+		if (ns.size() >= 1) {
 			// select which descendants to traverse not already done;
 			if (edgcount[cur->value] == ns.size()) continue;
 			for (size_t i = 0; i < edgcount[cur->value]; i++, ++it);
@@ -327,10 +327,10 @@ typename forest<NodeT>::graph forest<NodeT>::extract_first_graph(
 		if(cit == this->g.end() || !cit->second.size()) continue;
 		auto &packs = cit->second;
 		size_t rid = ndmap[crt], ambpid = -1;
-		for(auto& nextp : packs){
+		for(auto& nextp : packs) {
 			ambpid++;
 			if( de.insert({rid, rid + ambpid + 1}).second) {
-				if(gs.find(crt) != gs.end())
+				if(gs.find(crt) == gs.end())
 					gs.insert({crt, {nextp}});		
 				// coming back from different edge
 				else gs[crt].insert(nextp);
@@ -338,8 +338,8 @@ typename forest<NodeT>::graph forest<NodeT>::extract_first_graph(
 					if(nd->first.nt() && de.insert({rid + ambpid + 1,
 						ndmap[nd]}).second) 
 							todo.push_back(nd);
-
 				}
+				break;  // first graph needed only, so break out
 			}
 		}
 	}
