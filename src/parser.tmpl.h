@@ -1360,14 +1360,20 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 		// resolve ambiguity if WITHIN production, where same production with same symbols
 		// of different individual span
 		std::vector<int> gi;
-		int gspan = INT_MAX;
 		int k = 0;
 		std::vector<int> idxs;
 		for(size_t i = 0; i < ambset.size(); i++) idxs.push_back(i);
+		// smallest node count in ambset
+		int maxk = INT_MAX;
+		for(auto& pack : ambset) 
+			if ((int)pack.size() < maxk) maxk = pack.size();
 
-		//choose the one with the first smallest span
+
+		//choose the one with the first smallest span from upto size of 
+		// smallest set in ambset
 		do {
 			gi.clear();
+			int gspan = INT_MAX;
 			for (auto packidx : idxs) {
 				auto apack = *next(ambset.begin(), packidx);
 				pnode lt = apack[k];
@@ -1375,13 +1381,11 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 				if (gspan == span) gi.push_back(packidx);
 				if (gspan > span) gspan = span,
 						gi.clear(), gi.push_back(packidx);
-
 			}
-			k++;
 			idxs.clear();
 			idxs.insert(idxs.begin(),gi.begin(),gi.end());
 		}
-		while (k < int(ambset.size()) && gi.size() > 1);
+		while(++k < maxk && gi.size() > 1);
 
 		cambset.clear();
 		if (ambset.size())

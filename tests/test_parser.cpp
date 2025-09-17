@@ -251,10 +251,26 @@ int main(int argc, char **argv)
 *       DISAMBIGUATION
 *******************************************************************************/
 	//
-	TEST("disambig", "same")
+	TEST("disambig", "disambig_within_same_prod")
 	ps(start, start + plus + start );
 	ps(start, one);
 	run_test<char>(ps, nt, start, "1+1+1", {}, o);
+	ps.clear();
+
+	TEST("disambig", "disambig_different_length")
+	ps(start, start + A );
+	ps(start, start + A + start);
+	ps(A, one);
+	ps( start, nll);
+	run_test<char>(ps, nt, start, "1", {}, o);
+	ps.clear();
+
+	TEST("disambig", "disambig_across_prod")
+	ps(start, n);
+	ps(start, start + e + start);
+	ps(start, start + p + start);
+	ps(start, start + m + start);
+	run_test<char>(ps, nt, start, "npnmnen", {}, o);
 	ps.clear();
 
 /*******************************************************************************
