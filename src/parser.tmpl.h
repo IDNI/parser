@@ -296,9 +296,10 @@ void parser<C, T>::resolve_conjunctions(container_t& c, container_t& t) {
 			if (U.size() < S.size()) U.resize(S.size());
 			U[x.set].insert(x);
 			S[x.set].erase(x);
-			fromS[x.from].erase(remove_if(fromS[x.from].begin(),
-				fromS[x.from].end(),
-				[&x](size_t n) { return x.set == n; }));
+			if (auto fit = fromS.find(x.from); fit != fromS.end()) {
+   				fit->second.erase(x.set);         
+    			if (fit->second.empty()) fromS.erase(fit);  
+			}
 			c.erase(x);
 		}
 	}
@@ -429,7 +430,7 @@ void parser<C, T>::scan(const item& i, size_t n, T ch) {
 	if (j.set >= S.size()) S.resize(j.set + 1);
 	DBGP(print(std::cout << " +  adding from scan into S[" << j.set <<
 		"]: \t", j) << std::endl;)
-	S[j.set].insert(j), fromS[j.from].push_back(j.set);
+	S[j.set].insert(j), fromS[j.from].insert(j.set);
 	DBGP(print(std::cout << "Add Edge: ", i) << " --> ";)
     DBGP(print(std::cout, j) << std::endl;)
 	//++refi[i];
@@ -460,7 +461,7 @@ void parser<C, T>::scan_cc_function(const item& i, size_t n, T ch,
 	DBGP(print(std::cout << " +  adding from cc scan into S[" << k.set <<
 		"] \t", k) << "\n";)
 	if (S.size() <= k.set) S.resize(k.set + 1);
-	S[k.set].insert(k), fromS[k.from].push_back(k.set);
+	S[k.set].insert(k), fromS[k.from].insert(k.set);
 	DBGP(print(std::cout << "Add Edge: ", i) << " --> ";)  
 	DBGP(print(std::cout, k) << "\n";)
 	//++refi[i];
@@ -561,7 +562,7 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 			for (const item& x : t)
 				//print(std::cout << "adding from t into S[" << x.set << "]: ", x) << std::endl,
 				S[x.set].insert(x),
-				fromS[x.from].push_back(x.set);
+				fromS[x.from].insert(x.set);
 			t.clear();
 			const auto cont = S[n];
 			//DBGP(print(std::cout << "\nto process:\n", cont);)
@@ -617,11 +618,30 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 			for (auto it = gcready.begin(); it != gcready.end();) {
 				auto rm = *it;
 				if ((rm.set + o.gc_lag) <= n) {
-					if(refi.find(rm) != refi.end() && refi[rm] <= 0)
+					if (refi.find(rm) != refi.end() && refi[rm] <= 0)
 						refi.erase(rm);
 					auto its = S[rm.set].find(rm);
-					if( its != S[rm.set].end() ){
+					if ( its != S[rm.set].end() ){
 						S[rm.set].erase(its);
+						//also clean from cache
+
+						if (get_lit(rm).nt() ) {
+							if (auto fit = cache.find({get_lit(rm), rm.set});
+								fit != cache.end()) {
+								fit->second.erase(rm);
+								if( fit->second.size() == 0 )
+									cache.erase(fit);
+							}
+						}
+
+						// also clean from fromS
+						if (auto fit = fromS.find(rm.from);
+							fit != fromS.end() ) {
+								fit->second.erase(rm.set);
+								if (fit->second.empty())
+									fromS.erase(fit);
+						}
+	
 						MS(gcnt++;)
 					}
 					it = gcready.erase(it);

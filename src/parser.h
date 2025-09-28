@@ -1094,7 +1094,7 @@ private:
 	std::vector<container_t> S;
 	std::vector<container_t> U; /// uncompleted
 		///mapping from to position of end in S for items
-	std::unordered_map<size_t, std::vector<size_t>> fromS;
+	std::unordered_map<size_t, std::unordered_set<size_t>> fromS;
 	std::unordered_map<std::pair<lit<C, T>,size_t> , std::set<item>> cache;
 
 	/// refcounter for the earley item
@@ -1103,7 +1103,7 @@ private:
 	std::map<item, int_t> refi;
 	/// items ready for collection
 	std::set<item> gcready;
-	std::map<std::pair<size_t, size_t>, std::vector<const item*> >
+	std::unordered_map<std::pair<size_t, size_t>, std::vector<const item*> >
 		sorted_citem, rsorted_citem;
 
 	/// binarized temporary intermediate non-terminals
