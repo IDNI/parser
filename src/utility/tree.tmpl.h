@@ -92,7 +92,7 @@ inline const htref& htree::null() {
 inline tref htree::get() const { return hnd; }
 inline bool htree::operator==(const htree& r) const { return hnd == r.hnd; }
 inline bool htree::operator< (const htree& r) const { return hnd <  r.hnd; }
-//inline htree::~htree() { if (hnd != NULL) M.erase(hnd); }
+//inline htree::~htree() { if (hnd != NULL) M().erase(hnd); }
 inline htree::htree(tref h) : hnd(h) { }
 
 //------------------------------------------------------------------------------
@@ -104,9 +104,9 @@ template <typename T>
 const htref bintree<T>::geth(tref h) {
 	//DBG(assert(h != NULL);)
 	if (h == NULL) return htree::null();
-	auto res = M.find(*reinterpret_cast<const bintree*>(h)); //done with one search
+	auto res = M().find(*reinterpret_cast<const bintree*>(h)); //done with one search
 	htref ret;
-	if (res != M.end()) res->second = ret = htref(new htree(h));
+	if (res != M().end()) res->second = ret = htref(new htree(h));
 	DBG(assert(!res->second.expired());)
 	return res->second.lock();
 }
@@ -130,19 +130,19 @@ tref bintree<T>::get(const T& v, tref l, tref r) {
 	// checking that they are present in the M map
 	if (l != nullptr) {
 		auto c0 = get(l);
-		auto res_c0 = M.emplace(c0, htree::wp());
+		auto res_c0 = M().emplace(c0, htree::wp());
 		assert(res_c0.second == false);
 		assert(reinterpret_cast<tref>(std::addressof(res_c0.first->first)) == l);
 	}
 	if (r != nullptr) {
 		auto c1 = get(r);
-		auto res_c1 = M.emplace(c1, htree::wp());
+		auto res_c1 = M().emplace(c1, htree::wp());
 		assert(res_c1.second == false);
 		assert(reinterpret_cast<tref>(std::addressof(res_c1.first->first)) == r);
 	}
 #endif
 	bintree bn(v, l, r);
-	auto res = bintree<T>::M.emplace(bn, htree::wp());
+	auto res = bintree<T>::M().emplace(bn, htree::wp());
 	return reinterpret_cast<tref>(std::addressof(res.first->first));
 }
 
@@ -152,7 +152,7 @@ tref bintree<T>::replace_value(const T& v) const { return get(v, l, r); }
 template <typename T>
 void bintree<T>::dump() {
 	std::cout << "-----\n";
-	std::cout << "MB:" << M.size() << "\n";
+	std::cout << "MB:" << M().size() << "\n";
 	for (auto& x : M) {
 		std::cout << x.first.str() << " " << x.second.lock() << " "
 			<< x.second.use_count() << "\n";
@@ -184,18 +184,18 @@ void bintree<T>::gc(std::unordered_set<tref>& keep) {
 	//check if any handle expired and needs to be garbaged
 	// otherwise mark all to be retained live
 
-	for (auto& x : M)
+	for (auto& x : M())
 		if (!x.second.expired()) mark(x.second.lock()->get(), mark);
 	for (auto& x : keep) mark(x, mark);
 
 	// do not run gc, if no handle expired or empty.
-	if (!M.size() || (next.size() == M.size())) {
+	if (!M().size() || (next.size() == M().size())) {
 		DBG(std::cout << "gc-do nothing:" << next.size() << "\n";)
 		return;
 	}
 
 	/*
-	DBG(assert(next.size() != M.size()));
+	DBG(assert(next.size() != M().size()));
 	decltype(V) nv;
 	std::unordered_map<int_t, int_t> shift;
 	shift.emplace(-1,-1); // just for null
@@ -205,13 +205,13 @@ void bintree<T>::gc(std::unordered_set<tref>& keep) {
 	for( auto& x : shift)
 		DBG(std::cout<<x.first<< " "<< x.second <<"\n");
 
-	M.clear();
+	M().clear();
 	//reconstruct new V and M with updated handles
 	for (size_t i = 0; i < V.size(); i++)
 		if (next.count(i)) {
 			auto& bn = *V[i];
 			bintree nbn(bn.value, shift[bn.l], shift[bn.r]);
-			auto res = M.emplace(nbn, nv.size());
+			auto res = M().emplace(nbn, nv.size());
 			nv.push_back(&(res.first->first));
 		}
 
@@ -219,7 +219,7 @@ void bintree<T>::gc(std::unordered_set<tref>& keep) {
 
 	//update htree handle as well
 	decltype(htree::M) hm;
-	for( auto& x : htree::M)
+	for( auto& x : htree::M())
 	if (!x.second.expired()) {
 		auto psp = x.second.lock();
 		DBG(assert(psp->hnd == x.first);)
@@ -228,9 +228,9 @@ void bintree<T>::gc(std::unordered_set<tref>& keep) {
 	htree::M = std::move(hm);
 	*/
 	//delete non-reachable garbage nodes from M
-	for (auto it = M.begin(); it != M.end(); )
+	for (auto it = M().begin(); it != M().end(); )
 		if (next.count(it->first.get()) == 0)
-			it = M.erase(it);
+			it = M().erase(it);
 		else keep.insert(it->first.get()), it++;
 
 	// call callbacks to rebuild caches
@@ -349,7 +349,10 @@ std::vector<const bintree<T>*> bintree<T>::V;
 */
 
 template <typename T>
-std::unordered_map<const bintree<T>, htree::wp> bintree<T>::M;
+std::unordered_map<const bintree<T>, htree::wp>& bintree<T>::M() {
+	static std::unordered_map<const bintree<T>, htree::wp> m;
+	return m;
+}
 
 //------------------------------------------------------------------------------
 
