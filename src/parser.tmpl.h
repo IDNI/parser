@@ -329,7 +329,7 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 	}
 	//const container_t& cont = S[i.from];
 	auto smbl = get_nt(i);
-	auto &rng = cache[{smbl, i.from}];
+	auto &rng = cache[{smbl.n(), i.from}];
 	//for (auto it = cont.begin(); it != cont.end(); ++it) {
 	for (auto eit : rng) {
 
@@ -374,8 +374,8 @@ template <typename C, typename T>
 void parser<C, T>::predict(const item& i, container_t& t) {
 	DBGP(std::cout << "    predicting\n";)
 	lit<C, T> parl = get_lit(i);
-	//assert(parl.nt());
-	//assert(!completed(i));
+	DBG(assert(parl.nt()));
+	DBG(assert(!completed(i)));
 	for (size_t p : g.prod_ids_of_literal(get_lit(i))) {
 		// predicting item should have ref count increased
 		// since predicting item, for its advancement over
@@ -389,7 +389,7 @@ void parser<C, T>::predict(const item& i, container_t& t) {
 		// Should we use S[n] to see if new item is insertable
 		for (size_t c = 0; c != g.n_conjs(p); ++c) {
 			//just once
-			if( c==0 )cache[{parl, i.set}].insert(i);
+			if (c==0 && parl.nt()) cache[{parl.n(), i.set}].insert(i);
 			item j(i.set, p, c, i.set, 0);
 			if (add(t, j).second) {
 				DBGP(print(std::cout <<" +  adding to t \t\t\t",
@@ -442,6 +442,7 @@ void parser<C, T>::scan_cc_function(const item& i, size_t n, T ch,
 	DBGP(std::cout << "    scanning cc function for char: `"
 		<< to_std_string(ch) << "`[" << (int_t) ch << "]" << std::endl;)
 	size_t p = 0; // character's prod rule
+	DBG(assert(!completed(i)));
 	lit<C, T> l = get_lit(i);
 	bool eof = ch == static_cast<T>(0) || ch == static_cast<T>(-1);
 	//DBG(std::cout << "\tEOF: " << (eof ? "true" : "false") << "\n";)
@@ -456,7 +457,7 @@ void parser<C, T>::scan_cc_function(const item& i, size_t n, T ch,
 		if (p == static_cast<size_t>(-1)) return;
 	}
 	if (!eof) n++;
-	cache[{l, i.set}].insert(i);
+	if( l.nt()) cache[{l.n(), i.set}].insert(i);
 	item k(n, p, 0, n - (eof ? 0 : 1), 1); // complete char functions's char
 	DBGP(print(std::cout << " +  adding from cc scan into S[" << k.set <<
 		"] \t", k) << "\n";)
@@ -625,8 +626,8 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 						S[rm.set].erase(its);
 						//also clean from cache
 
-						if (get_lit(rm).nt() ) {
-							if (auto fit = cache.find({get_lit(rm), rm.set});
+						if (!completed(rm) && get_lit(rm).nt() ) {
+							if (auto fit = cache.find({get_lit(rm).n(), rm.set});
 								fit != cache.end()) {
 								fit->second.erase(rm);
 								if( fit->second.size() == 0 )

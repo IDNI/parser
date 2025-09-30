@@ -1095,7 +1095,7 @@ private:
 	std::vector<container_t> U; /// uncompleted
 		///mapping from to position of end in S for items
 	std::unordered_map<size_t, std::unordered_set<size_t>> fromS;
-	std::unordered_map<std::pair<lit<C, T>,size_t> , std::set<item>> cache;
+	std::unordered_map<std::pair<size_t /*nt_id*/, size_t> , std::set<item>> cache;
 
 	/// refcounter for the earley item
 	/// default value is 0, which means it can be garbaged
