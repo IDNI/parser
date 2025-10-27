@@ -28,7 +28,7 @@ using filter = extractor<node_variant_t, parser_t>;
 template <typename node_variant_t, typename parser_t>
 const auto children_extractor = extractor<node_variant_t, parser_t>(
 	[](const traverser<node_variant_t, parser_t>& t) {
-		using node_t = idni::rewriter::sp_node<node_variant_t>;
+		using node_t = idni::rewriter::depreciating::sp_node<node_variant_t>;
 		if (!t.has_value())
 			return traverser<node_variant_t, parser_t>();
 		std::vector<node_t> nv;
@@ -40,7 +40,7 @@ const auto children_extractor = extractor<node_variant_t, parser_t>(
 template <typename node_variant_t, typename parser_t>
 const auto only_child_extractor = extractor<node_variant_t, parser_t>(
 	[](const traverser<node_variant_t, parser_t>& t) {
-		using node_t = idni::rewriter::sp_node<node_variant_t>;
+		using node_t = idni::rewriter::depreciating::sp_node<node_variant_t>;
 		if (!t.has_value())
 			return traverser<node_variant_t, parser_t>();
 		std::vector<node_t> nv;
@@ -53,7 +53,7 @@ const auto only_child_extractor = extractor<node_variant_t, parser_t>(
 template <typename node_variant_t, typename parser_t>
 const auto terminal_extractor = extractor<node_variant_t, parser_t,std::string>(
 	[](const traverser<node_variant_t, parser_t>& t) {
-		using node_t = idni::rewriter::sp_node<node_variant_t>;
+		using node_t = idni::rewriter::depreciating::sp_node<node_variant_t>;
 		using symbol_t = typename parser_t::symbol_type;
 		if (!t.has_value()) return std::string();
 		std::vector<char> nv;
@@ -101,7 +101,7 @@ const auto nonterminal_extractor = extractor<node_variant_t, parser_t,
  */
 template <typename node_variant_t, typename parser_t>
 struct traverser {
-	using node_t        = idni::rewriter::sp_node<node_variant_t>;
+	using node_t        = idni::rewriter::depreciating::sp_node<node_variant_t>;
 	using symbol_t      = typename parser_t::symbol_type;
 	using nonterminal_t = typename parser_t::nonterminal;
 	using extractor_t   = extractor<node_variant_t, parser_t>;

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<title>tauparser.js test</title>
+	<meta charset="utf-8" />
+	<link rel="icon" href="data:,">
+	<style>
+		body { font-size: 13px; }
+	</style>
+</head>
+
+<body>
+	<h1>tauparser.js example page</h1>
+	<pre id="version"></pre>
+
+	<h2>test</h2>
+	<pre id="test"></pre>
+
+	<script src="tauparser.js"></script>
+	<script>
+		tauparser().then(tauparser => {
+			const {
+				version, test
+			} = tauparser;
+
+			console.log('tauparserjs loaded');
+			document.getElementById("version").innerText = version();
+			document.getElementById("test").innerText = test();
+		});
+	</script>
+</body>
+</html>
+<script>
+	console.log('tauparser.html loaded');
+</script>

@@ -9,6 +9,11 @@ string(STRIP "${TAU_PARSER_VERSION}" TAU_PARSER_VERSION)
 string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" TAU_PARSER_TARGET_VERSION "${TAU_PARSER_VERSION}")
 message(STATUS "Parser version: ${TAU_PARSER_TARGET_VERSION} / ${TAU_PARSER_VERSION}")
 
+if(TAU_PARSER_BUILD_EMSCRIPTEN)
+	include(emscripten-toolchain)
+	set_emscripten_toolchain()
+endif()
+
 # Project name and version
 set(namespace "idni")
 set(PROJECT_SHORT_NAME tauparser)
@@ -33,8 +38,10 @@ option(TAU_PARSER_MEASURE              "Allow performance measures"         OFF)
 option(TAU_PARSER_ADDRESS_SANITIZER    "Enable address sanitizer"           OFF)
 option(TAU_PARSER_BUILD_ALL            "Build all"                          OFF)
 option(TAU_PARSER_BUILD_DOC            "Build documentation"                OFF)
-# option(TAU_PARSER_BUILD_STATIC_LIBRARY "Build static library"               OFF)
-# option(TAU_PARSER_BUILD_SHARED_LIBRARY "Build shared library"               OFF)
+option(TAU_PARSER_BUILD_HEADER_ONLY    "Build header only library"          OFF)
+option(TAU_PARSER_BUILD_STATIC_LIBRARY "Build static library"               OFF)
+option(TAU_PARSER_BUILD_SHARED_LIBRARY "Build shared library"               OFF)
+option(TAU_PARSER_BUILD_EMSCRIPTEN     "Build for Emscripten"               OFF)
 option(TAU_PARSER_BUILD_TESTS          "Build library tests"                OFF)
 option(TAU_PARSER_BUILD_EXAMPLES       "Build examples"                     OFF)
 option(TAU_PARSER_BUILD_TGF            "Build tgf tool"                     OFF)
@@ -45,8 +52,10 @@ set_property(CACHE TAU_PARSER_MEASURE               PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_ADDRESS_SANITIZER     PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_ALL             PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_DOC             PROPERTY STRINGS "OFF" "ON")
-# set_property(CACHE TAU_PARSER_BUILD_STATIC_LIBRARY  PROPERTY STRINGS "OFF" "ON")
-# set_property(CACHE TAU_PARSER_BUILD_SHARED_LIBRARY  PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_PARSER_BUILD_HEADER_ONLY     PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_PARSER_BUILD_STATIC_LIBRARY  PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_PARSER_BUILD_SHARED_LIBRARY  PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_PARSER_BUILD_EMSCRIPTEN      PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_TESTS           PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_EXAMPLES        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_TGF             PROPERTY STRINGS "OFF" "ON")
@@ -55,12 +64,21 @@ set_property(CACHE TAU_PARSER_WINDOWS_ZIP_PACKAGE   PROPERTY STRINGS "OFF" "ON")
 
 # build all
 if(TAU_PARSER_BUILD_ALL)
-	# set(TAU_PARSER_BUILD_STATIC_LIBRARY ON)
-	# set(TAU_PARSER_BUILD_SHARED_LIBRARY ON)
+	set(TAU_PARSER_BUILD_HEADER_ONLY OFF)
+	set(TAU_PARSER_BUILD_STATIC_LIBRARY ON)
+	set(TAU_PARSER_BUILD_SHARED_LIBRARY ON)
 	set(TAU_PARSER_BUILD_TESTS ON)
 	set(TAU_PARSER_BUILD_TGF ON)
 	set(TAU_PARSER_BUILD_EXAMPLES ON)
 	set(TAU_PARSER_BUILD_DOC ON)
+endif()
+
+if(TAU_PARSER_BUILD_HEADER_ONLY AND (TAU_PARSER_BUILD_STATIC_LIBRARY OR TAU_PARSER_BUILD_SHARED_LIBRARY))
+	message(FATAL_ERROR "Cannot build header-only library together with static or shared libraries")
+endif()
+
+if(NOT TAU_PARSER_BUILD_HEADER_ONLY AND NOT TAU_PARSER_BUILD_STATIC_LIBRARY AND NOT TAU_PARSER_BUILD_SHARED_LIBRARY)
+	set(TAU_PARSER_BUILD_HEADER_ONLY ON)
 endif()
 
 if(TAU_PARSER_WINDOWS_PACKAGE AND TAU_PARSER_WINDOWS_ZIP_PACKAGE)
@@ -111,12 +129,13 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # link options
+set(TAU_PARSER_DEFINITIONS "TAU_PARSER_MEASURE")
 set(TAU_PARSER_LINK_OPTIONS "-flto=auto")
 
 # compile options for different build types
 set(TAU_PARSER_DEBUG_OPTIONS          "-O0;-DDEBUG;-ggdb3")
 set(TAU_PARSER_RELEASE_OPTIONS        "-O3;-DNDEBUG")
-set(TAU_PARSER_RELWITHDEBINFO_OPTIONS "-O3;-DNDEBUG;-g")
+set(TAU_PARSER_RELWITHDEBINFO_OPTIONS "-O3;-DNDEBUG;-ggdb3")
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 	set(TAU_PARSER_COMPILE_OPTIONS "${TAU_PARSER_DEBUG_OPTIONS}")
 elseif (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
@@ -124,17 +143,6 @@ elseif (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
 elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
 	set(TAU_PARSER_COMPILE_OPTIONS "${TAU_PARSER_RELEASE_OPTIONS}")
 endif()
-
-# fine tuning definitions according to build type
-if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo" OR
-   CMAKE_BUILD_TYPE STREQUAL "Debug")
-	set(TAU_PARSER_MEASURE ON)
-endif()
-
-# # target names
-# set(TAU_PARSER_OBJECT_LIB_NAME "${PROJECT_SHORT_NAME}o")
-# set(TAU_PARSER_STATIC_LIB_NAME "${PROJECT_SHORT_NAME}_static")
-# set(TAU_PARSER_SHARED_LIB_NAME "${PROJECT_SHORT_NAME}")
 
 # install destinations
 set(TAU_PARSER_BIN_DESTINATION "bin")
@@ -144,8 +152,10 @@ set(TAU_PARSER_DOC_DESTINATION "share/doc/${PROJECT_NAME}")
 message(STATUS "TAU_PARSER_INSTALL:              ${TAU_PARSER_INSTALL}")
 message(STATUS "TAU_PARSER_BUILD_ALL:            ${TAU_PARSER_BUILD_ALL}")
 message(STATUS "TAU_PARSER_BUILD_DOC:            ${TAU_PARSER_BUILD_DOC}")
-# message(STATUS "TAU_PARSER_BUILD_STATIC_LIBRARY: ${TAU_PARSER_BUILD_STATIC_LIBRARY}")
-# message(STATUS "TAU_PARSER_BUILD_SHARED_LIBRARY: ${TAU_PARSER_BUILD_SHARED_LIBRARY}")
+message(STATUS "TAU_PARSER_BUILD_HEADER_ONLY:    ${TAU_PARSER_BUILD_HEADER_ONLY}")
+message(STATUS "TAU_PARSER_BUILD_STATIC_LIBRARY: ${TAU_PARSER_BUILD_STATIC_LIBRARY}")
+message(STATUS "TAU_PARSER_BUILD_SHARED_LIBRARY: ${TAU_PARSER_BUILD_SHARED_LIBRARY}")
+message(STATUS "TAU_PARSER_BUILD_EMSCRIPTEN:     ${TAU_PARSER_BUILD_EMSCRIPTEN}")
 message(STATUS "TAU_PARSER_BUILD_TESTS:          ${TAU_PARSER_BUILD_TESTS}")
 message(STATUS "TAU_PARSER_BUILD_EXAMPLES:       ${TAU_PARSER_BUILD_EXAMPLES}")
 message(STATUS "TAU_PARSER_BUILD_TGF:            ${TAU_PARSER_BUILD_TGF}")
@@ -167,6 +177,8 @@ message(STATUS "CMAKE_BUILD_PARALLEL_LEVEL:      ${CMAKE_BUILD_PARALLEL_LEVEL}")
 message(STATUS "CMAKE_MODULE_PATH:               ${CMAKE_MODULE_PATH}")
 ################################################################################
 
+include(target_git_definitions)
+
 # setups a tauparser target
 function(tauparser_setup target access libs)
 	include(target_setup)
@@ -175,6 +187,7 @@ function(tauparser_setup target access libs)
 		"${TAU_PARSER_COMPILE_OPTIONS}"
 		"${TAU_PARSER_LINK_OPTIONS}"
 		"${libs}")
+	target_git_definitions(${target} INTERFACE)
 endfunction()
 
 ################################################################################
@@ -184,7 +197,13 @@ version_license(
 	"${CMAKE_CURRENT_SOURCE_DIR}/cmake/version_license.h.template"
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/version_license.h")
 
-add_subdirectory(src)
+if (TAU_PARSER_BUILD_EMSCRIPTEN)
+	if (EMSCRIPTEN)
+		add_subdirectory("js")
+	endif()
+else()
+	add_subdirectory("src")
+endif()
 
 if(TAU_PARSER_BUILD_TGF)
 	add_subdirectory(src/tgf)

@@ -5,29 +5,44 @@
 #include "parser.h"
 namespace idni {
 
+#ifdef PARSER_BINTREE_FOREST
 template <typename C, typename T>
-parser<C, T>::result::result(grammar<C, T>& g, std::unique_ptr<input> in,
+parser<C, T>::result::result(parser<C, T>& p, std::unique_ptr<input> in_,
+	tref f, bool fnd, error err) :
+		found(fnd), parse_error(err),
+		shaping(p.get_grammar().opt.shaping), p(p),
+		in_(std::move(in_)), froot(tree::geth(f))
+{}
+#else
+template <typename C, typename T>
+parser<C, T>::result::result(parser<C, T>& p, std::unique_ptr<input> in_,
 	std::unique_ptr<pforest> f, bool fnd, error err) :
-		found(fnd), parse_error(err), shaping(g.opt.shaping),
-		in(std::move(in)), f(std::move(f))
+		found(fnd), parse_error(err),
+		shaping(p.get_grammar().opt.shaping), p(p),
+		in_(std::move(in_)), f(std::move(f))
 {
 	/// if is ambiguous add __AMB__ node to the nonterminals dict so it can
 	/// be added to the resulting parse tree when get_shaped_tree() is called
 	static const std::string amb = "__AMB__";
-	if (is_ambiguous()) amb_node = g.nt(from_str<C>(amb));
+	if (is_ambiguous()) amb_node = p.get_grammar().nt(from_str<C>(amb));
 }
+
+template <typename C, typename T>
+parser<C, T>& parser<C, T>::result::get_parser() const { return p; }
 
 template <typename C, typename T>
 typename parser<C, T>::pforest* parser<C, T>::result::get_forest() const {
-	return f.get();
+	if (f) return f.get();
+	return nullptr;
 }
+#endif
 
 template <typename C, typename T>
-bool parser<C, T>::result::good() const { return in->good(); }
+bool parser<C, T>::result::good() const { return in_->good(); }
 
 template <typename C, typename T>
 std::basic_string<C> parser<C, T>::result::get_input() {
-	return in->get_string();
+	return in_->get_string();
 }
 
 template <typename C, typename T>
@@ -56,38 +71,32 @@ bool node_to_inline(const typename parser<C, T>::pnode& n,
 	const shaping_options& opts)
 {
 	if (!n.first.nt()) return false;
-	auto matches_inline_prefix = [](const parser<C, T>::pnode& n) {
+	auto name = n.first.to_std_string();
+	auto matches_inline_prefix = [&name]() {
 		static const std::vector<std::string> prefixes = {
 			"__E_", // ebnf prefix
 			"__B_"  // binarization prefix
 		};
-		if (n.first.nt()) {
-			auto s = n.first.to_std_string();
-			for (auto& prefix : prefixes)
-				if (s.find(prefix) != decltype(s)::npos)
-					return true;
-		}
+		for (auto& prefix : prefixes)
+			if (name.find(prefix) != std::string::npos) return true;
 		return false;
 	};
-	static const std::vector<std::string> cc_names = {
-		"eof",  "alnum", "alpha", "blank",
-                        "cntrl", "digit", "graph", "lower", "printable",
-                        "punct", "space", "upper", "xdigit"
+	auto is_char_class = [&name]() {
+		static const std::vector<std::string> list = {
+			"eof",  "alnum", "alpha", "blank",
+				"cntrl", "digit", "graph", "lower", "printable",
+				"punct", "space", "upper", "xdigit"
+		};
+		return std::find(list.begin(), list.end(), name) != list.end();
 	};
-	auto one_of_str = [](const parser<C, T>::pnode& n,
-		const std::vector<std::string>& list)
-	{
-		return std::find(list.begin(), list.end(),
-			n.first.to_std_string()) != list.end();
-	};
-	if ((opts.inline_char_classes && one_of_str(n, cc_names))
-		|| matches_inline_prefix(n)) return true;
+	if ((opts.inline_char_classes && is_char_class())
+		|| matches_inline_prefix()) return true;
 	for (const auto& i : opts.to_inline)
 		if (i.size() == 1 && i[0] == n.first.n()) return true;
 	return false;
 }
 
-
+#ifndef PARSER_BINTREE_FOREST
 template <typename C, typename T>
 typename parser<C, T>::psptree parser<C, T>::result::get_trimmed_tree(
 	const typename parser<C, T>::pnode& n, const shaping_options opts) const
@@ -267,7 +276,7 @@ template <typename C, typename T>
 typename parser<C, T>::psptree parser<C, T>::result::trim_children_terminals(
 	const psptree& t) const
 {
-	return trim_children_nodes(t, shaping);
+	return trim_children_terminals(t, shaping);
 }
 
 template <typename C, typename T>
@@ -307,22 +316,31 @@ parser<C, T>::psptree parser<C, T>::result::get_tree() {
 template <typename C, typename T>
 parser<C, T>::psptree parser<C, T>::result::get_tree(const pnode& n) {
 	psptree t;
+	emeasure_time_start(s, e);
+	std::cout<< "here2";
 	f->extract_graphs(n, [this, &t] (auto& g) {
 		inline_grammar_transformations(g);
 		t = g.extract_trees();
 		return false;
 	});
+	emeasure_time_end(s, e);
 	return t;
 }
 
+#endif // not PARSER_BINTREE_FOREST
+
 template <typename C, typename T>
 std::basic_string<T> parser<C, T>::result::get_terminals() const {
-	return in->get_terminals(f->root()->second);
+#ifdef PARSER_BINTREE_FOREST
+	return in_->get_terminals(tree::get(froot).value.second);
+#else
+	return in_->get_terminals(f->root()->second);
+#endif
 }
 
 template <typename C, typename T>
 std::basic_string<T> parser<C, T>::result::get_terminals(const pnode& n) const {
-	return in->get_terminals(n.second);
+	return in_->get_terminals(n.second);
 }
 
 template <typename C, typename T>
@@ -335,8 +353,10 @@ std::optional<int_t> parser<C, T>::result::get_terminals_to_int(const pnode& n)
 	return result;
 }
 
+#ifndef PARSER_BINTREE_FOREST
 template <typename C, typename T>
 bool parser<C, T>::result::is_ambiguous() const {
+	if (!f) return false;
 	for (auto& kv : f->g) if (kv.second.size() > 1) return true;
 	return false;
 }
@@ -351,6 +371,7 @@ std::set<std::pair<typename parser<C, T>::pnode,
 	typename parser<C, T>::pnodes_set>>
 		parser<C, T>::result::ambiguous_nodes() const
 {
+	if (!f) return {};
 	std::set<std::pair<pnode, pnodes_set>> r;
 	for (auto& kv : f->g) if (kv.second.size() > 1) r.insert(kv);
 	return r;
@@ -381,11 +402,13 @@ template <typename C, typename T>
 typename parser<C, T>::result::nodes_and_edges
 	parser<C, T>::result::get_nodes_and_edges() const
 {
-	std::map<pnode, size_t> nid;
-	std::map<size_t, pnode> ns;
-	pnodes n;
+	using node = std::pair<lit<C, T>, std::array<size_t, 2>>;
+	std::map<node, size_t> nid;
+	std::map<size_t, node> ns;
+	std::vector<node> n;
 	edges es;
 	size_t id = 0;
+	if (!f) return nodes_and_edges{ n, es };
 	for (auto& it : f->g) {
 		nid[it.first] = id;
 		// skip ids for one child ambig node
@@ -416,28 +439,54 @@ typename parser<C, T>::result::nodes_and_edges
 
 template <typename C, typename T>
 bool parser<C, T>::result::inline_grammar_transformations(pgraph& g) {
-	bool r = false;
-	std::set<std::string> prefixes = {
-		"__E_", // ebnf prefix
-		"__B_"  // binarization prefix
-		//"__N_"  // negation prefix
+	static const std::set<std::basic_string<C>> prefixes = {
+		from_cstr<C>("__E_"), // ebnf prefix
+		from_cstr<C>("__B_")  // binarization prefix
+		//from_cstr<C>("__N_")  // negation prefix
 	};
-	for (auto& prefix : prefixes) r |= inline_prefixed_nodes(g, prefix);
+	return inline_nodes(g, get_nts_by_prefixes(prefixes));
+}
+
+template <typename C, typename T>
+std::set<size_t> parser<C, T>::result::get_nts_by_prefixes(
+	const std::set<std::basic_string<C>>& prefixes) const
+{
+	std::set<size_t> r;
+	nonterminals<C, T>& nts = p.get_grammar().nts;
+	for (size_t i = 0; i < nts.size(); ++i)
+		for (const auto& prefix : prefixes)
+			if (nts.get(i).find(prefix)
+				!= std::basic_string<C>::npos)
+			{
+				// std::cout << "found prefix " << prefix << " in " << nts.get(i) << std::endl;
+				r.insert(i);
+			}
 	return r;
 }
 
 template <typename C, typename T>
 bool parser<C, T>::result::inline_prefixed_nodes(pgraph& g,
-	const std::string& prefix)
+	const std::basic_string<C>& prefix)
 {
-	//collect all prefix like nodes for replacement
+	return inline_nodes(g, get_nts_by_prefixes({ prefix }));
+}
+
+template <typename C, typename T>
+bool parser<C, T>::result::inline_nodes(pgraph& g,
+	const std::set<size_t>& nts_to_inline)
+{
+	//collect all nodes for replacement
 	pnodes s;
 	for (auto& kv : f->g) {
-		auto name = kv.first->first.to_std_string();
-		if (name.find(prefix) != decltype(name)::npos)
+		const lit<C, T>& l = kv.first->first;
+		if (l.nt() && nts_to_inline.find(l.n()) != nts_to_inline.end())
+		{
 			s.insert(s.end(), kv.first);
+			// std::cout << "inserted node " << l.to_std_string() << std::endl;
+		}
 	}
 	return f->replace_nodes(g, s);
 }
+#endif
 
 } // idni namespace

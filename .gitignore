@@ -12,6 +12,8 @@ forest_grammar_rules*.tml
 .local
 .*_history
 ./tau-lang
+.gdbinit
+src/doctest.h
 _site/*
 src/version_license.h
 external/emsdk

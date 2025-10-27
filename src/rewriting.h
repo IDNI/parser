@@ -16,7 +16,9 @@
 #include <variant>
 #include <compare>
 
-#include "forest.h"
+#ifndef PARSER_BINTREE_FOREST
+#include "utility/forest.h"
+#endif
 #include "parser.h"
 
 // use boost log if available otherwise use std::cout
@@ -46,10 +48,11 @@
 //
 // We should talk about of sp_tau_node, rule,...
 
+
 /**
  * @brief Functions and types useful for rewriting parsed trees
  */
-namespace idni::rewriter {
+namespace idni::rewriter::depreciating {
 
 // IDEA this is very similar to idni::forest<...>::tree, but it
 // also defines equality operators and ordering (important during hashing).
@@ -110,9 +113,9 @@ struct node {
 	const size_t hash;
 private:
 	size_t calc_hash (const symbol_t v, const child_type& c) const {
-		size_t seed = 0;
-		hashCombine(seed, v);
-		for (const std::shared_ptr<node>& _c : c) hashCombine(seed, *_c);
+		size_t seed = grcprime;
+		hash_combine(seed, v);
+		for (const std::shared_ptr<node>& _c : c) hash_combine(seed, *_c);
 		return seed;
 	}
 };
@@ -151,8 +154,7 @@ template <typename symbol_t, class hook_t = make_node_hook<symbol_t>>
 sp_node<symbol_t> make_node(const symbol_t& s,
 	std::vector<sp_node<symbol_t>>&& ns) {
 #ifdef DEBUG
-	for (const auto& el: ns)
-		assert(el != nullptr);
+	for (const auto& el : ns) assert(el != nullptr);
 #endif // DEBUG
 	static std::unordered_map<node<symbol_t>, sp_node<symbol_t>,
 			std::hash<node<symbol_t>>,
@@ -1905,27 +1907,15 @@ sp_node<symbol_t> make_node_from_file(const transformer_t& transformer,
 		transformer, result);
 }
 
-} // namespace idni::rewriter
+} // namespace idni::rewriter::depreciating
 
 /// Hash for node using specialization to std::hash
 template<typename symbol_t>
-struct std::hash<idni::rewriter::node<symbol_t>> {
-	size_t operator()(const idni::rewriter::node<symbol_t>& n) const noexcept {
+struct std::hash<idni::rewriter::depreciating::node<symbol_t>> {
+	size_t operator()(const idni::rewriter::depreciating::node<symbol_t>& n) const noexcept {
 		return n.hash;
 	}
 };
-
-//
-// operators << to pretty print the tau language related types
-//
-
-/// << for node (make it shared make use of the previous operator)
-template <typename symbol_t>
-std::ostream& operator<<(std::ostream& stream,
-	const idni::rewriter::node<symbol_t>& n)
-{
-	return stream << make_shared<idni::rewriter::sp_node<symbol_t>>(n);
-}
 
 #undef LOG_DEBUG
 #undef LOG_INFO

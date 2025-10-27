@@ -49,8 +49,5 @@ rm -rf external/parser/*
 cp -r ../cmake ../src ../CMakeLists.txt ../VERSION ../LICENSE.txt ../README.md \
 	external/parser
 
-# build tau with tests
-./$BUILD_TYPE.sh -DTAU_BUILD_TESTS=ON
-
-# run tests
-./test-$BUILD_TYPE.sh
+# build tau with tests and run them
+./dev $BUILD_TYPE -DTAU_BUILD_TESTS=ON && ./dev test-$BUILD_TYPE

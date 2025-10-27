@@ -6,37 +6,26 @@
 #include <fstream>
 #include <streambuf>
 
-#include "traverser.h"
 #include "tgf_test_parser.generated.h"
 
 namespace idni {
 
 template <typename C = char, typename T = C>
 struct tgf_test {
-	using parse_symbol_t = tgf_test_parser::node_type;
-	using symbol_t       = tgf_test_parser::symbol_type;
-	using node_variant_t = std::variant<symbol_t>;
-	using node_t         = idni::rewriter::sp_node<node_variant_t>;
-	using traverser_t    = traverser<node_variant_t, tgf_test_parser>;
+	using tree           = tgf_test_parser::tree;
+	using trv            = tree::traverser;
 
-	static constexpr const auto& get_only_child =
-		traverser_t::get_only_child_extractor();
-	static constexpr const auto& get_terminals =
-		traverser_t::get_terminal_extractor();
-	static constexpr const auto& get_nonterminal =
-		traverser_t::get_nonterminal_extractor();
-
-	static std::string get_quoted_string(traverser_t t) {
+	static std::string get_quoted_string(const trv& t) {
 		std::stringstream ss;
 		auto s = t || tgf_test_parser::quoted_string_char;
 		for (auto& c : s()) {
-			auto x = c | get_only_child;
-			auto nt = x | get_nonterminal;
+			auto x = c | trv::only_child;
+			auto nt = x | trv::nonterminal;
 			// std::cout << "quoted_string_char nt: " << nt << "\n";
 			if (nt == tgf_test_parser::unescaped_s)
-				ss << (x | get_terminals);
+				ss << (x | trv::terminals);
 			else {
-				auto esc = x | get_terminals;
+				auto esc = x | trv::terminals;
 				switch (esc[1]) {
 				case '"': ss << '"'; break;
 				case '\\': ss << '\\'; break;
@@ -52,10 +41,10 @@ struct tgf_test {
 		return ss.str();
 	}
 
-	static int run_tests(auto p, const traverser_t& tests) {
+	static int run_tests(auto p, const trv& tests) {
 		int ret = 0;
 		for (auto& test : tests()) {
-			auto s = test | tgf_test_parser::symbol | get_terminals;
+			auto s = test | tgf_test_parser::symbol | trv::terminals;
 			auto ts = test || tgf_test_parser::test_string;
 			std::cout << "testing symbol: " << s << "\n";
 			tgf_test_parser::parse_options po{
@@ -63,11 +52,11 @@ struct tgf_test {
 			};
 			// std::cout << "test strings size: " << ts().size() << std::endl;
 			for (auto& t : ts()) {
-				auto x = t | get_only_child;
-				auto nt = x | get_nonterminal;
+				auto x = t | trv::only_child;
+				auto nt = x | trv::nonterminal;
 				// std::cout << "test string nt: " << nt << "\n";
 				auto in = nt == tgf_test_parser::string
-					? x | get_terminals
+					? x | trv::terminals
 					: get_quoted_string(x);
 				std::cout << "\t\"" << in << "\"\t\t";
 				auto r = p->parse(in.c_str(), in.size(), po);
@@ -85,18 +74,13 @@ struct tgf_test {
 	}
 
 	static int run_from_string(auto p, const std::basic_string<C>& s) {
-		using namespace rewriter;
 		auto& tp = tgf_test_parser::instance();
 		auto r = tp.parse(s.c_str(), s.size());
 		if (!r.found) return std::cerr << "TGF test: " <<
 			r.parse_error.to_str(tgf_test_parser::error::
 				info_lvl::INFO_BASIC) << "\n", 1;
-		auto root = make_node_from_tree<tgf_test_parser,
-			drop_location_t<parse_symbol_t, node_variant_t>,
-								node_variant_t>(
-				drop_location<parse_symbol_t, node_variant_t>,
-				r.get_shaped_tree());
-		auto tests = traverser_t(root) || tgf_test_parser::test;
+		tref root = r.get_shaped_tree2();
+		auto tests = trv(root) || tgf_test_parser::test;
 		std::cout << "tests.size(): " << tests().size() << std::endl;
 		return run_tests(p, tests);
 	}

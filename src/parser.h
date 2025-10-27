@@ -14,12 +14,21 @@
 #include <cassert>
 #include <algorithm>
 #include <initializer_list>
+#include <map>
+#include <set>
+
+// #define PARSER_BINTREE_FOREST true
+
 #include "defs.h"
 #include "utility/memory_map.h"
 #include "utility/characters.h"
 #include "utility/charclasses.h"
 #include "utility/term_colors.h"
-#include "forest.h"
+#include "utility/tree.h"
+
+#ifndef PARSER_BINTREE_FOREST
+#include "utility/forest.h"
+#endif
 
 #define DEFAULT_BINARIZE false
 #define DEFAULT_INCR_GEN_FOREST false
@@ -99,11 +108,9 @@ struct lit {
 	bool is_null() const;
 	size_t hashit() const {
 		std::size_t seed = grcprime;
-		if (std::holds_alternative<size_t>(data)) 
-			seed ^= std::hash<size_t>{}(std::get<size_t>(data)) + 
-							grcprime + (seed << 12) + (seed >> 4);
-		else seed ^= std::hash<T>{}(std::get<T>(data)) + 
-							grcprime + (seed << 12) + (seed >> 4);
+		hash_combine(seed, static_cast<bool>(nt()));
+		if (nt()) hash_combine(seed, n());
+		else hash_combine(seed, t());
 		return seed;
 	}
 
@@ -137,6 +144,10 @@ struct lit {
 	 */
 	std::string to_std_string(const std::basic_string<C>& nll = {}) const;
 };
+
+template <typename C = char, typename T = C>
+std::ostream& operator<<(std::ostream& os,
+	const std::pair<lit<C, T>, std::array<size_t, 2>>& obj);
 
 // production rules in a disjunctive normal form of conjunction clauses of lits
 /// Literals
@@ -328,6 +339,7 @@ struct shaping_options {
 
 
 template <typename C, typename T> struct grammar_inspector;
+template <typename C, typename T> class parser;
 /**
  * @brief Grammar struct required by parser.
  * 
@@ -336,6 +348,7 @@ template <typename C, typename T> struct grammar_inspector;
 template <typename C = char, typename T = C>
 struct grammar {
 	friend struct grammar_inspector<C, T>;
+	friend class parser<C, T>;
 	typedef std::pair<lit<C, T>, std::vector<lits<C, T>>> production;
 	struct options {
 		/**
@@ -449,6 +462,47 @@ private:
 	std::vector<production> G;
 };
 
+#ifndef PARSER_BINTREE_FOREST
+/**
+* @brief A structure used as a forest node.
+*
+* It maps nodes to pointers to make sure the forest does not contain
+* duplicities.
+*/
+template<typename C, typename T = C>
+struct pnode_type : public std::pair<lit<C, T>, std::array<size_t, 2>> {
+	using node_type = std::pair<lit<C, T>, std::array<size_t, 2>>;
+	friend forest<pnode_type>;
+private:
+	static typename forest<pnode_type>::node ptrof(const pnode_type& p);
+	static std::map<const pnode_type, typename forest<pnode_type>::node>&
+		nid()
+	{
+		static std::map<const pnode_type,
+				typename forest<pnode_type>::node> instance;
+		return instance;
+	}
+public:
+	const size_t hash;
+
+	pnode_type() : hash(hashit()) {}
+	pnode_type(const lit<C, T>& _f, const std::array<size_t, 2>& _s)
+		: node_type(_f, _s), hash(hashit()) {}
+	inline operator typename forest<pnode_type>::node() const {
+		return ptrof(*this);
+	}
+	friend std::ostream& operator<<<>(std::ostream& os, const node_type& n);
+	inline size_t _mpsize() const { return nid().size(); }
+	std::size_t hashit() const {
+		std::size_t seed = this->first.hashit();
+		hash_combine(seed, this->second[0], this->second[1]);
+		return seed;
+	}
+	//inline lit<C,T> &first() const { return this->first; }
+	//inline std::array<size_t, 2>& second() const { return this->second; }
+};
+#endif
+
 template <typename C = char, typename T = C>
 class parser {
 public:
@@ -464,47 +518,195 @@ public:
 	using node_type       = std::pair<symbol_type, location_type>;
 	using parser_type     = idni::parser<char_type, terminal_type>;
 
-	/**
-	 * @brief A structure used as a forest node.
-	 * 
-	 * It maps nodes to pointers to make sure the forest does not contain
-	 * duplicities.
-	 */
-	struct pnode : public node_type {
-		friend forest<pnode>;
-	private:
-		static typename forest<pnode>::node ptrof(const pnode& p);
-		static std::map<const pnode,
-			typename forest<pnode>::node>& nid()
-		{
-			static std::map<const pnode,
-					typename forest<pnode>::node> instance;
-			return instance;
-		}
-	public:
-		pnode() {}
-		pnode(const lit<C, T>& _f, const std::array<size_t, 2>& _s)
-			: node_type(_f, _s) {}
-		inline operator typename forest<pnode>::node() const {
-			return ptrof(*this);
-		}
-		friend std::ostream& operator<<(std::ostream& os, const pnode& obj) {
-			os << obj.first<<"-"<< obj.second[0]<<
-			"-"<<obj.second[1];
-			return os;
-		}
+#ifdef PARSER_BINTREE_FOREST
+	using pnode = node_type;
+#else
+	using pnode = pnode_type<C, T>;
+#endif
+	struct tree : public lcrs_tree<pnode> {
+		using base_t = lcrs_tree<pnode>;
 
-		inline size_t _mpsize() const {
-			return nid().size();
-		}
-		std::size_t hashit() const {
-            std::size_t h1 = this->first.hashit();
-			hashCombine(h1, this->second[0], this->second[1]);
-            return h1;
-        }
-		//inline lit<C,T> &first() const { return this->first; }
-		//inline std::array<size_t, 2>& second() const { return this->second; }
+		tref get() const;
+		static const tree& get(const tref id);
+		static const tree& get(const htref& h);
+		static const htref geth(tref h);
+
+		static tref get(const pnode& v, const tref* ch, size_t len);
+		static tref get(const pnode& v, const trefs& ch);
+		static tref get(const pnode& v, tref ch); // with single child
+		static tref get(const pnode& v, tref ch1, tref ch2); // with two children
+		static tref get(const pnode& v); // leaf node
+
+		static tref get(const pnode& v, const pnode* ch, size_t len);
+		static tref get(const pnode& v, const std::vector<pnode>& ch);
+		static tref get(const pnode& v, const pnode& ch);
+		static tref get(const pnode& v, const pnode& ch1, const pnode& ch2); 
+
+		size_t children_size() const;
+
+		bool get_children(tref *ch, size_t& len) const;
+		trefs get_children() const;
+		tref_range<pnode> children() const;
+		tree_range<tree> children_trees() const;
+
+		tref child(size_t n) const;
+		tref first()  const;
+		tref second() const;
+		tref third()  const;
+		tref only_child() const;
+
+		const tree& operator[](size_t n) const;
+		const tree& child_tree(size_t n) const;
+		const tree& first_tree()  const;
+		const tree& second_tree() const;
+		const tree& third_tree()  const;
+		const tree& only_child_tree() const;
+		const tree& right_sibling_tree() const;
+
+		std::ostream& print(std::ostream& o, size_t s = 0) const;
+
+		// fast access helpers
+		bool is_nt() const;
+		bool is(size_t nt) const;
+		bool is_t() const;
+		std::string get_terminals() const;
+		size_t get_nt() const;
+		char get_t() const;
+
+		// provide also same api as literal
+		bool nt() const { return this->value.first.nt(); }
+		char t() const { return this->value.first.t(); }
+		size_t n() const { return this->value.first.n(); }
+		bool is_null() const { return this->value.first.is_null(); }
+
+		// const pnode& get_value() const { return this->value; }
+		lit<C, T> get_literal() const { return this->value.first; }
+		location_type get_location() const { return this->value.second; }
+
+		// tree wrapper for simple traversing using | and || operators
+		// and | extractor<result_type>
+		//                only_child, opt_nonterminal, nonterminal,
+		//                terminals, first, second, third)
+		struct traverser {
+			traverser();
+			traverser(tref r);
+			traverser(const trefs& n);
+			bool has_value() const;
+			explicit operator bool() const;
+			tref value() const;
+			const tree& value_tree() const;
+			const tree& operator[](size_t n) const;
+			const trefs& values() const;
+			std::vector<traverser> traversers() const;
+			std::vector<traverser> operator()() const;
+
+			template <typename result_type>
+			struct extractor {
+				using function = std::function<
+						result_type(const traverser&)>;
+				extractor(const function& e) : e(e) {}
+				result_type operator()(const traverser& t) const
+								{ return e(t); }
+			private:
+				function e;
+			};
+
+			static inline const extractor<tref> ref{
+				[](const traverser& t) -> tref {
+					return t.value();
+				}};
+			static inline const extractor<traverser> only_child{
+				[](const traverser& t) {
+					if (!t) return traverser();
+					tref r = t.value_tree().only_child();
+					if (!r) return traverser();
+					return traverser(r);
+				}};
+			static inline const extractor<traverser> children{
+				[](const traverser& t) {
+					if (!t) return traverser();
+					return traverser(t.value_tree()
+							.get_children());
+				}};
+			static inline const extractor<tref_range<pnode>>
+							children_range{
+				[](const traverser& t) -> tref_range<pnode> {
+					if (!t) return { nullptr };
+					return t.value_tree().children();
+				}};
+			static inline const extractor<tree_range<tree>>
+							children_trees_range{
+				[](const traverser& t) -> tree_range<tree> {
+					if (!t) return { nullptr };
+					return t.value_tree().children_trees();
+				}};
+			static inline const extractor<traverser> first{
+				[](const traverser& t) {
+					if (!t) return traverser();
+					tref r = t.value_tree().first();
+					if (!r) return traverser();
+					return traverser(r);
+				}};
+			static inline const extractor<traverser> second{
+				[](const traverser& t) {
+					if (!t) return traverser();
+					tref r = t.value_tree().second();
+					if (!r) return traverser();
+					return traverser(r);
+				}};
+			static inline const extractor<traverser> third{
+				[](const traverser& t) {
+					if (!t) return traverser();
+					tref r = t.value_tree().third();
+					if (!r) return traverser();
+					return traverser(r);
+				}};
+			static inline const extractor<std::string> terminals{
+				[](const traverser& t) {
+					if (!t) return std::string();
+					return t.value_tree().get_terminals();
+				}};
+			static inline const extractor<size_t> nonterminal{
+				[](const traverser& t) -> size_t {
+					if (!t) return 0;
+					return t.value_tree().get_nt();
+				}};
+			static inline const extractor<std::optional<size_t>>
+							opt_nonterminal{
+				[](const traverser& t) -> std::optional<size_t> {
+					if (!t) return std::optional<size_t>{};
+					const auto& x = t.value_tree();
+					if (x.value.first.nt())
+						return { x.value.first.n() };
+					return {};
+				}};
+			static inline const extractor<traverser> dump{
+				[](const traverser& t) {
+					if (!t) return t;
+					t.value_tree().dump(std::cout) << "\n";
+					return t;
+				}};
+
+			traverser operator|(size_t nt) const;
+			traverser operator||(size_t nt) const;
+			template <typename result_type>
+			result_type operator|(const extractor<result_type>&)
+									const;
+			template <typename result_type>
+			result_type operator||(const extractor<result_type>&)
+									const;
+		private:
+			bool has_value_ = true;
+			trefs values_{};
+		};
+		traverser operator|(size_t nt) const;
+		traverser operator||(size_t nt) const;
 	};
+	using tt = tree::traverser;
+#ifdef PARSER_BINTREE_FOREST
+	using pnodes          = std::vector<pnode>;
+	using pnodes_set      = std::set<pnodes>;
+#else
 	using pforest         = forest<pnode>;
 	using pnodes          = pforest::nodes;
 	using pnodes_set      = pforest::nodes_set;
@@ -514,8 +716,9 @@ public:
 	using psptree         = pforest::sptree;
 	using forest_type     = pforest;
 	using sptree_type     = psptree;
+#endif
 	using encoder_type    = std::function<std::basic_string<char_type>(
-			const std::vector<terminal_type>&)>;
+					const std::vector<terminal_type>&)>;
 
 	/// earley item
 	struct item {
@@ -523,6 +726,13 @@ public:
 		bool operator<(const item& i) const;
 		bool operator==(const item& i) const;
 		size_t set, prod, con, from, dot;
+	};
+	struct item_hash {
+		size_t operator()(const item& i) const {
+			size_t seed = grcprime;
+			hash_combine(seed, i.set, i.prod, i.con, i.from, i.dot);
+			return seed;
+		}
 	};
 
 	/// Input manager and decoder used by the parser
@@ -643,9 +853,9 @@ public:
 		/// Location of error.
 		int_t loc;
 		/// Line of error.
-		size_t line;
+		size_t line = 0;
 		/// Column of error.
-		size_t col;
+		size_t col = 0;
 		 /// Closest matching context.
 		std::vector<T> ctxt;
 		/// Terminal which was scanned in a place where it was not expected.
@@ -674,11 +884,16 @@ public:
 		/// Tree shaping options from grammar
 		const shaping_options shaping;
 
-		/// Constructor
-		result(grammar<C, T>& g, std::unique_ptr<input> in,
+#ifdef PARSER_BINTREE_FOREST
+		// constructor
+		result(parser<C, T>& p, std::unique_ptr<input> in_,
+			tref f, bool found, error err);
+#else
+		// constructor
+		result(parser<C, T>& p, std::unique_ptr<input> in_,
 			std::unique_ptr<pforest> f, bool found, error err);
-
-		/// Returns the parsed forest
+		parser<C, T>& get_parser() const;
+		// returns the parsed forest
 		pforest* get_forest() const;
 		/// Transforms forest into tree and applies trimming
 		/// grammar shaping options are used by default
@@ -712,6 +927,33 @@ public:
 		/// Extracts the first parse tree from the parsed forest
 		psptree get_tree();
 		psptree get_tree(const pnode& n);
+#endif
+		// applies trimming grammar shaping options are used by default
+		tref get_trimmed_tree2(tref ref) const;
+		tref get_trimmed_tree2(tref ref, const shaping_options opts)
+									const;
+		// applies inlining to a tree (w/o tree paths)
+		tref inline_tree_nodes2(tref t) const;
+		tref inline_tree_nodes2(tref t, const shaping_options opts)
+									const;
+		// applies tree paths inlining to a tree
+		tref inline_tree_paths2(tref t) const;
+		tref inline_tree_paths2(tref t, const shaping_options opts)
+									const;
+		// applies inlining to a tree
+		tref inline_tree2(tref t) const;
+		tref inline_tree2(tref t, const shaping_options opts) const;
+		tref trim_children_terminals2(tref ref) const;
+		tref trim_children_terminals2(tref ref,
+					const shaping_options opts) const;
+		// transforms forest into a tree and applies shaping
+		tref get_shaped_tree2();
+		tref get_shaped_tree2(const shaping_options opts);
+		tref get_shaped_tree2(tref t);
+		tref get_shaped_tree2(tref t, const shaping_options opts);
+		// returns parsed tree
+		tref get_tree2();
+		tref get_tree2(const pnode& n);
 
 		/// Is input good = stream is good or mmap is opened
 		bool good() const;
@@ -739,25 +981,43 @@ public:
 		std::ostream& print_ambiguous_nodes(std::ostream& os) const;
 
 		using node_edge       = std::pair<pnode, pnode>;
+#ifdef PARSER_BINTREE_FOREST
+		using edge            = std::pair<size_t, size_t>;
+		using edges           = std::vector<edge>;
+#else
 		using edges           = std::vector<typename pforest::edge>;
-		using nodes_and_edges = std::pair<pnodes, edges>;
+#endif
+		using nodes_and_edges = std::pair<std::vector<node_type>, edges>;
 		/// Returns all nodes and edges of the forest
 		nodes_and_edges get_nodes_and_edges() const;
 
-		/// Removes all prefixed symbols from the graph everywhere
-		/// by replacing them with their immediate children nodes
-		bool inline_prefixed_nodes(pgraph& g,const std::string& prefix);
+#ifndef PARSER_BINTREE_FOREST
 		/// Removes EBNF and binarize transformation prefixes
 		bool inline_grammar_transformations(pgraph& g);
-
+		// removes all prefixed symbols from the graph everywhere
+		// by replacing them with their immediate children nodes
+		bool inline_prefixed_nodes(pgraph& g,
+			const std::basic_string<C>& prefix);
+		// removes all nodes with the given nt from the graph everywhere
+		bool inline_nodes(pgraph& g,
+				  const std::set<size_t>& nts_to_inline);
+#endif
 		// private members are accessible by parser
 		friend parser<C, T>;
 	private:
-		/// Input moved here from the parse call
-		std::unique_ptr<input> in = 0;
-		/// Forest moved here from the parse call
+		parser<C, T>& p;
+		// input moved here from the parse call
+		std::unique_ptr<input> in_ = 0;
+		// forest moved here from the parse call
+#ifdef PARSER_BINTREE_FOREST
+		htref froot = 0;
+#else
 		std::unique_ptr<pforest> f = 0;
-		/// If ambiguous, this is __AMB__ node lit used in a shaped tree
+		/// Filters nonterminals by prefixes
+		std::set<size_t> get_nts_by_prefixes(
+			const std::set<std::basic_string<C>>& prefixes) const;
+#endif
+		// if ambiguous, this is __AMB__ node lit used in a shaped tree
 		lit<C, T> amb_node{};
 		/// Recursive part of get_shaped_tree()
 		void _get_shaped_tree_children(const shaping_options& opts,
@@ -826,15 +1086,16 @@ public:
 	friend std::ostream& operator<<(std::ostream& os, const result& res) {
 		return res.print_error(os);
 	}
-private:
 
+private:
 	grammar<C, T>& g;
 	options o;
-	std::unique_ptr<input> in = 0;
+	std::unique_ptr<input> in_ = 0;
 	std::vector<container_t> S;
 	std::vector<container_t> U; /// uncompleted
 		///mapping from to position of end in S for items
-	std::unordered_map<size_t, std::vector<size_t>> fromS;
+	std::unordered_map<size_t, std::unordered_set<size_t>> fromS;
+	std::unordered_map<std::pair<size_t /*nt_id*/, size_t> , std::set<item>> cache;
 
 	/// refcounter for the earley item
 	/// default value is 0, which means it can be garbaged
@@ -842,7 +1103,7 @@ private:
 	std::map<item, int_t> refi;
 	/// items ready for collection
 	std::set<item> gcready;
-	std::map<std::pair<size_t, size_t>, std::vector<const item*> >
+	std::unordered_map<std::pair<size_t, size_t>, std::vector<const item*> >
 		sorted_citem, rsorted_citem;
 
 	/// binarized temporary intermediate non-terminals
@@ -854,7 +1115,7 @@ private:
 	lit<C, T> get_nt(const item& i) const;
 	std::basic_string<C> get_fresh_tnt();
 	std::vector<item> back_track(const item& obj);
-
+	void remove_item(const item& i);
 	// parsing
 	result _parse(const parse_options& po);
 	std::pair<container_iter, bool> add(container_t& t, const item& i);
@@ -864,19 +1125,24 @@ private:
 	void scan(const item& i, size_t n, T ch);
 	void scan_cc_function(const item& i, size_t n, T ch, container_t& t);
 	void complete(const item& i, container_t& t, container_t& c,
-		bool conj_resolved = false);
+						bool conj_resolved = false);
 	bool completed(const item& i) const;
 	bool negative(const item& i) const;
 	/// returns number of literals for a given item
 	size_t n_literals(const item& i) const;
-	std::pair<item, bool> get_conj(size_t set, size_t prod, size_t con) const;
+	std::pair<item, bool> get_conj(size_t set, size_t prod, size_t con)
+									const;
 	void pre_process(const item& i);
+#ifdef PARSER_BINTREE_FOREST
+	tref init_forest(const lit<C, T>& start_lit, const parse_options& po);
+	tref build_forest(const pnode& root);
+#else
 	bool init_forest(pforest& f, const lit<C, T>& start_lit,
-		const parse_options& po);
+						const parse_options& po);
 	bool build_forest(pforest& f, const pnode& root);
+#endif
 	bool binarize_comb(const item&, pnodes_set&);
-	void sbl_chd_forest(const item&,
-		pnodes&, size_t, pnodes_set&);
+	void sbl_chd_forest(const item&, pnodes&, size_t, pnodes_set&);
 #ifdef DEBUG
 	template <typename CharU>
 	friend std::ostream& operator<<(std::ostream& os, lit<C, T>& l);
@@ -943,14 +1209,24 @@ struct std::hash<idni::lit<C, T>> {
 	}
 };
 
+// Hash for pnode
+template <typename C, typename T>
+struct std::hash<idni::pnode_type<C,T>> {
+	size_t operator()(const idni::pnode_type<C,T>& pn) const noexcept {
+		return pn.hash;
+	}
+};
+
 // template definitions
 #include "grammar.tmpl.h"       // for grammar and related
 #include "parser.tmpl.h"        // for parser
-#include "parser_result.tmpl.h" // for parse::result
+#include "parser_tree.tmpl.h" // for parser::tree
+#include "parser_result.tmpl.h" // for parser::result
+#include "get_shaped_tree2.tmpl.h"
 #include "tgf.h"                // Tau Grammar Format
 
 #ifdef DEBUG
-#include "devhelpers.h"   // various helpers for converting forest
+#include "utility/devhelpers.h"   // various helpers for converting forest
 #endif // DEBUG
 
 #include "parser.impl.h"
@@ -958,4 +1234,10 @@ struct std::hash<idni::lit<C, T>> {
 // undef local macros
 #undef DEFAULT_BINARIZE
 #undef DEFAULT_INCR_GEN_FOREST
+
+#ifndef TAU_PARSER_BUILD_HEADER_ONLY
+// explicit template instantiations to avoid recompilation
+extern template class idni::parser<char, char>;
+#endif
+
 #endif // __IDNI__PARSER__PARSER_H__

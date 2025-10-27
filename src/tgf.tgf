@@ -69,6 +69,6 @@ use_param              => ("eof"   | "alnum" | "alpha" | "blank"
 sep                    => [sep_required].
 sep_required           => '-' | '_' | __.
 
-_                      => [__].                 # optional whitespace
-__                     => (space | comment) _.  # whitespace (includes comments)
+_                      => __ | null.                      # optional whitespace
+__                     => space | comment | __ space | __ comment. # whitespace
 comment                => '#' (printable | '\t')* ('\r' | '\n' | eof).

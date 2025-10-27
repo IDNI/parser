@@ -3,11 +3,22 @@
 
 #ifndef __IDNI__PARSER__DEFS_H__
 #define __IDNI__PARSER__DEFS_H__
+
+#include <cstddef>
 #include <cstdint>
 #include <iomanip>
 #include <functional>
+#ifdef DEBUG
+#	include <cxxabi.h>     // unmangle symbol names for debugging
+#endif
+
+#include "utility/hashing.h"
 
 namespace idni {
+
+using int_t = int32_t;
+
+} // idni namespace
 
 #ifdef DEBUG
 #	define DBG(x) x
@@ -31,32 +42,18 @@ namespace idni {
 	std::setprecision(2) << tdiff(start, end) << " ms"
 #define emeasure_time_end(start, end) emeasure_time_end_to(start, end,std::cout)
 
-typedef int32_t int_t;
-
 //-----------------------------------------------------------------------------
 
 // GIT_* macros are populated at compile time by -D or they're set to "n/a"
-#ifndef GIT_DESCRIBED
-#define GIT_DESCRIBED   "n/a"
+#ifndef TAU_PARSER_GIT_DESCRIBED
+#define TAU_PARSER_GIT_DESCRIBED   "n/a"
 #endif
-#ifndef GIT_COMMIT_HASH
-#define GIT_COMMIT_HASH "n/a"
+#ifndef TAU_PARSER_GIT_COMMIT_HASH
+#define TAU_PARSER_GIT_COMMIT_HASH "n/a"
 #endif
-#ifndef GIT_BRANCH
-#define GIT_BRANCH      "n/a"
+#ifndef TAU_PARSER_GIT_BRANCH
+#define TAU_PARSER_GIT_BRANCH      "n/a"
 #endif
-
-inline constexpr std::size_t grcprime = sizeof(std::size_t) == 8
-                           ? 0x9e3779b97f4a7c15  // 64-bit golden ratio constant
-                           : 0x9e3779b9;
-
-template <typename T, typename... Rest>
-void hashCombine(size_t& seed, const T& v, Rest... rest) {
-    seed ^= std::hash<T>()(v) + grcprime + (seed << 12) + (seed >> 4);
-    (hashCombine(seed, rest), ...);
-}
-
-} // idni namespace
 
 #include "./version_license.h" // include generated version and license constants
 

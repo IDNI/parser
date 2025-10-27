@@ -33,18 +33,19 @@ typename forest<NodeT>::sptree forest<NodeT>::graph::extract_trees() {
 }
 
 template<typename NodeT>
-typename idni2::htree::sp forest<NodeT>::graph::extract_tree2() {
+typename htree::sp forest<NodeT>::graph::extract_tree2() {
 	return _extract_tree2(root);
 
 }
 
 template <typename NodeT>
-typename idni2::htree::sp forest<NodeT>::graph::_extract_tree2(
+typename htree::sp forest<NodeT>::graph::_extract_tree2(
 	node& r) {
 
 	std::map<node,size_t> edgcount;
-   	auto post_trav = [&edgcount, this](const node& root, idni2::tref rchd, 
-					auto &post_trav)->idni2::tref {
+   	auto post_trav = [&edgcount, this](const node& root, tref rchd,
+		auto &post_trav) -> tref
+	{
 		nodes_set pack;
 		auto &g = *this;
 		if (root->first.nt()) {
@@ -52,37 +53,34 @@ typename idni2::htree::sp forest<NodeT>::graph::_extract_tree2(
 			if (it == g.end()) return nullptr;
 			pack = it->second;
 		}
-		else {
-			// leaf terminal
-			idni2::tref children [] = {0, rchd};
-			idni2::tref tid = idni2::tree<NodeT>::get((NodeT)root, children, 2);
-			return tid;
-		}
+		else // leaf terminal
+			return bintree<NodeT>::get(root, 0, rchd);
 		//DBG( assert(! (pack.size()>1) ));
 		auto nodesit = pack.begin();
-		idni2::tref crchd = nullptr;    // child's right child
+		tref crchd = nullptr;    // child's right child
 		if (pack.size() >= 1) {
 			// select pack to traverse not already done;
 			if (edgcount[root] >= pack.size()) {
 				//have fully explored before, so just return 
 				//non terminal with no children
-				idni2::tref children [] = {nullptr, rchd};
-				return idni2::tree<NodeT>::get((NodeT)root, children, 2);
+				return bintree<NodeT>::get(root, nullptr, rchd);
 			}
 			//still an edge to children unexplored
 			for (size_t i = 0; i < edgcount[root]; i++) 
 				++nodesit;
 			edgcount[root]++;
-			for (auto chdit = nodesit->rbegin(); chdit != nodesit->rend(); chdit++)
-				crchd = post_trav((NodeT)*chdit, crchd, post_trav);
+			for (auto chdit = nodesit->rbegin();
+				chdit != nodesit->rend(); chdit++)
+			{
+				crchd = post_trav(*chdit, crchd, post_trav);
+			}
 		}
 		
-		idni2::tref children [] = {crchd, rchd};
-		return idni2::tree<NodeT>::get((NodeT)root, children, 2);
+		return bintree<NodeT>::get((NodeT)root, crchd, rchd);
     };
-	//idni2::bintree<NodeT>::dump();
-	idni2::tref tid = post_trav(r, 0, post_trav);
-	return idni2::tree<NodeT>::geth(tid);
+	//bintree<NodeT>::dump();
+	tref tid = post_trav(r, 0, post_trav);
+	return bintree<NodeT>::geth(tid);
 }
 
 
@@ -105,7 +103,7 @@ typename forest<NodeT>::sptree forest<NodeT>::graph::_extract_trees(
 		auto& ns = fit->second;
 		if (!ns.size()) continue;
 		auto it = ns.begin();
-		if (ns.size() > 1) {
+		if (ns.size() >= 1) {
 			// select which descendants to traverse not already done;
 			if (edgcount[cur->value] == ns.size()) continue;
 			for (size_t i = 0; i < edgcount[cur->value]; i++, ++it);
@@ -170,8 +168,19 @@ size_t forest<NodeT>::count_trees(const node& root) const {
 	return ndc[root];
 }
 
-/// a dfs based approach to detect cycles for
-/// any traversable type
+template <typename NodeT>
+std::pair<size_t, size_t> forest<NodeT>::count_useful_nodes(const node& root) const {
+	size_t ntc= 0, tc = 0;
+	auto cb_exit = [&ntc, &tc](const node& root, auto&) {
+		if(root->first.nt()) ntc++;
+		else tc++;
+	};
+	traverse(root, NO_ENTER, cb_exit);
+	return {ntc, tc};
+}
+
+// a dfs based approach to detect cycles for
+// any traversable type
 template<typename NodeT>
 template<typename TraversableT>
 bool forest<NodeT>::detect_cycle(TraversableT& gr) const {
@@ -295,6 +304,49 @@ bool forest<NodeT>::_extract_graph_uniq_edge(std::map<node, size_t>& ndmap,
 }
 
 template <typename NodeT>
+typename forest<NodeT>::graph forest<NodeT>::extract_first_graph(
+	const node& root) const
+{
+	graph gs;
+	std::unordered_set<edge> de;
+	de.reserve(this->g.size()); // reserve some space for edges
+	gs.root = root;
+	std::unordered_map<node, size_t, node> ndmap;
+	ndmap.reserve(this->g.size());
+	int_t id = 0;
+	for (auto& it : this->g) {
+		ndmap[it.first] = id++;
+		id += it.second.size(); // ambig node ids;
+	}
+	nodes todo;
+	todo.push_back(root);
+	while (todo.size()) {
+		auto crt = todo.back();
+		todo.pop_back();
+		auto cit = this->g.find(crt);
+		if(cit == this->g.end() || !cit->second.size()) continue;
+		auto &packs = cit->second;
+		size_t rid = ndmap[crt], ambpid = -1;
+		for(auto& nextp : packs) {
+			ambpid++;
+			if( de.insert({rid, rid + ambpid + 1}).second) {
+				if(gs.find(crt) == gs.end())
+					gs.insert({crt, {nextp}});		
+				// coming back from different edge
+				else gs[crt].insert(nextp);
+				for (auto& nd: nextp) {
+					if(nd->first.nt() && de.insert({rid + ambpid + 1,
+						ndmap[nd]}).second) 
+							todo.push_back(nd);
+				}
+				break;  // first graph needed only, so break out
+			}
+		}
+	}
+	return gs;
+}
+
+template <typename NodeT>
 typename forest<NodeT>::graphv forest<NodeT>::extract_graphs(
 	const node& root, cb_next_graph_t cb_next_graph, bool unique_edge) const
 {
@@ -407,14 +459,79 @@ bool forest<NodeT>::_traverse(const node_graph& g, const node& root,
 
 template <typename NodeT>
 bool forest<NodeT>::replace_nodes(graph& g, nodes& s) {
-	bool changed = false;
-	for (auto& n : s) {
-		//DBG(assert(g[n].size() == 1);)
-		if (g.find(n) != g.end() &&
-				replace_node(g, n, *(g[n].begin())))
-			changed = true, g.erase(n);
+
+	MS(std::cout << "replace_nodes: " << s.size() << "\n";)
+
+	std::unordered_map<node, nodes, node> replmap;
+	replmap.reserve(s.size());
+	//Build replacement map and check for direct cycles
+	for (node& n : s) {
+		auto git = g.find(n);
+		if (git != g.end() ) {
+			DBG(assert(!git->second.empty()));
+			auto& repl = *(git->second.begin());
+			for (auto& r : repl) {
+				if ( n == r ) {
+					DBG(std::cout << "skipping replace: has direct cycle at " << NodeT(n) << "\n";)
+					return false;
+				}
+			}
+			replmap[n] = repl;
+		}
 	}
-	return changed;
+	MS(std::cout << "replacing nodes: " << replmap.size() << "\n";)
+
+	bool gchange = false;
+	MS(size_t total_replacements = 0;)
+	std::set<node> cleanup;
+
+	// Traverse the graph and replace nodes in RHSs
+	for (auto& [lhs, rhs_set] : g) {
+		std::set<nodes> updated_rhs_set;
+
+		for (const auto& rhs : rhs_set) {
+			nodes newrhs = rhs;
+			// bool changed = false;
+
+			for (size_t i = 0; i < newrhs.size(); ) {
+				auto it = replmap.find(newrhs[i]);
+				if (it != replmap.end()) {
+					const node torepl = it->first;
+					const nodes& repl = it->second;
+
+					// DBG(std::cout << "Replacing " << NodeT(torepl) << " with ";
+					// 	for (auto& r : repl) std::cout << NodeT(r) << " " << newrhs.size() << " ";
+					// 	std::cout << "\n";)
+
+					// Do replacement
+					newrhs.erase(newrhs.begin() + i);
+					newrhs.insert(newrhs.begin() + i, repl.begin(), repl.end());
+
+					i += repl.size()? 0: 1;
+					// changed = true;
+					MS(total_replacements++);
+					cleanup.insert(torepl);
+				} else {
+					++i;
+				}
+			}
+
+			updated_rhs_set.insert(std::move(newrhs));
+		}
+
+		if (!updated_rhs_set.empty()) {
+			rhs_set = std::move(updated_rhs_set);
+			gchange = true;
+		}
+	}
+
+	// Cleanup replaced nodes from graph
+	for (const auto& n : cleanup) {
+		g.erase(n);
+	}
+
+	MS(std::cout << "Total replaced count: " << total_replacements << "\n";)
+	return gchange;
 }
 
 template <typename NodeT>
@@ -432,9 +549,9 @@ bool forest<NodeT>::replace_node(graph& g, const node& torepl,
 			auto newrhs = *rhs_it;
 			bool lchange = false;
 			//keep replacing torepl's any occurence in the newrhs
-			for (bool change = true; change; ) {
-				size_t rpos = 0; change = false;
-				for ( ; rpos < newrhs.size(); rpos++) {
+			
+				size_t rpos = 0; 
+				for ( ; rpos < newrhs.size(); ) {
 					//std::cout<< newrhs.at(rpos).first <<std::endl;
 					if (newrhs.at(rpos) == torepl) {
 						// std::cout<<"making change" << std::endl;
@@ -442,19 +559,21 @@ bool forest<NodeT>::replace_node(graph& g, const node& torepl,
 						auto inspos = newrhs.erase(
 							newrhs.begin() + rpos);
 						//do replacement at its new position
-						newrhs.insert(inspos,
+						inspos = newrhs.insert(inspos,
 							repl.begin(),
 							repl.end());
+						rpos = (inspos - newrhs.begin()) + repl.size();
 						/*
 						for (auto& v : newrhs)
 							std::cout << v.first ;
 						std::cout << std::endl;
 						std::cout<<"done making change\n";
 						*/
-						lchange = change = true; break;
+						lchange = true; 
 					}
+					else rpos++;
 				}
-			}
+			
 			if (lchange) {
 				//std::cout<<"making change2" << std::endl;
 				rhs_it = kv.second.erase(rhs_it);

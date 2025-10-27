@@ -18,7 +18,6 @@
 // it accepts any number of color codes as arguments.
 //
 // Example usage:
-//     term_colors TC;
 //     cout << TC.BLUE() << "blue text" << TC.CLEAR();
 //     cout << TC(BRIGHT, WHITE) << "bright and white text" << TC.CLEAR();
 // or manually compose the color code:
@@ -148,4 +147,11 @@ struct colors {
 };
 
 } // idni::term namespace
+
+namespace idni {
+
+inline static term::colors TC(true);
+
+} // idni namespace
+
 #endif // __IDNI__PARSER__UTILITY__TERM_COLORS_H__

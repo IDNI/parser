@@ -1,5 +1,5 @@
-// This file is generated from a file src/tgf/tgf_repl.tgf by
-//       https://github.com/IDNI/parser/src/tgf
+// This file is generated from a file ../parser.tree_api/src/tgf/tgf_repl.tgf by
+//       https://github.com/IDNI/parser/tools/tgf
 //
 #ifndef __TGF_REPL_PARSER_H__
 #define __TGF_REPL_PARSER_H__
@@ -11,17 +11,18 @@ namespace tgf_repl_parser_data {
 using char_type     = char;
 using terminal_type = char;
 
-inline std::vector<std::string> symbol_names{
+inline static constexpr size_t nt_bits = 8;
+inline const std::vector<std::string> symbol_names{
 	"", "eof", "alnum", "alpha", "space", "printable", "_", "__", "symbol", "quoted_string", 
 	"unescaped_s", "escaped_s", "parse_input_char_seq", "start", "__E_start_0", "statement", "__E___E_start_0_1", "__E___E_start_0_2", "grammar_cmd", "igrammar_cmd", 
-	"unreachable_cmd", "reload_cmd", "load_cmd", "start_cmd", "help", "version", "quit", "license", "clear", "get", 
-	"set", "toggle", "enable", "disable", "add", "del", "parse_file_cmd", "parse_cmd", "parse_sym", "__E_parse_cmd_3", 
+	"unreachable_cmd", "reload_cmd", "load_cmd", "start_cmd", "help_cmd", "version_cmd", "license_cmd", "quit_cmd", "clear_cmd", "get_cmd", 
+	"set_cmd", "toggle_cmd", "enable_cmd", "disable_cmd", "add_cmd", "del_cmd", "parse_file_cmd", "parse_cmd", "parse_sym", "__E_parse_cmd_3", 
 	"parse_input", "parse_file_sym", "__E_parse_file_cmd_4", "filename", "grammar_sym", "__E_grammar_cmd_5", "igrammar_sym", "__E_igrammar_cmd_6", "__E_igrammar_cmd_7", "start_sym", 
 	"__E_start_cmd_8", "__E_start_cmd_9", "unreachable_sym", "__E_unreachable_cmd_10", "__E_unreachable_cmd_11", "reload_sym", "__E_reload_cmd_12", "load_sym", "__E_load_cmd_13", "help_sym", 
-	"__E_help_14", "__E_help_15", "help_arg", "version_sym", "__E_version_16", "license_sym", "__E_license_17", "quit_sym", "__E_quit_18", "clear_sym", 
-	"__E_clear_19", "get_sym", "__E_get_20", "option", "add_sym", "__E_add_21", "list_option", "symbol_list", "treepaths_option", "treepath_list", 
-	"del_sym", "__E_del_22", "__E_del_23", "toggle_sym", "__E_toggle_24", "bool_option", "enable_sym", "__E_enable_25", "disable_sym", "__E_disable_26", 
-	"set_sym", "__E_set_27", "__E___E_set_27_28", "bool_value", "__E___E_set_27_29", "__E___E_set_27_30", "enum_ev_option", "__E___E_set_27_31", "error_verbosity", "__E_parse_input_32", 
+	"__E_help_cmd_14", "__E_help_cmd_15", "help_arg", "version_sym", "__E_version_cmd_16", "license_sym", "__E_license_cmd_17", "quit_sym", "__E_quit_cmd_18", "clear_sym", 
+	"__E_clear_cmd_19", "get_sym", "__E_get_cmd_20", "option", "add_sym", "__E_add_cmd_21", "list_option", "symbol_list", "treepaths_option", "treepath_list", 
+	"del_sym", "__E_del_cmd_22", "__E_del_cmd_23", "toggle_sym", "__E_toggle_cmd_24", "bool_option", "enable_sym", "__E_enable_cmd_25", "disable_sym", "__E_disable_cmd_26", 
+	"set_sym", "__E_set_cmd_27", "__E___E_set_cmd_27_28", "bool_value", "__E___E_set_cmd_27_29", "__E___E_set_cmd_27_30", "enum_ev_option", "__E___E_set_cmd_27_31", "error_verbosity", "__E_parse_input_32", 
 	"__E_parse_input_33", "error_verbosity_opt", "__E_enum_ev_option_34", "status_opt", "__E_bool_option_35", "colors_opt", "__E_bool_option_36", "print_ambiguity_opt", "__E_bool_option_37", "print_graphs_opt", 
 	"__E_bool_option_38", "print_rules_opt", "__E_bool_option_39", "print_facts_opt", "__E_bool_option_40", "print_terminals_opt", "__E_bool_option_41", "measure_parsing_opt", "__E_bool_option_42", "measure_each_pos_opt", 
 	"__E_bool_option_43", "measure_forest_opt", "__E_bool_option_44", "measure_preprocess_opt", "__E_bool_option_45", "debug_opt", "__E_bool_option_46", "auto_disambiguate_opt", "__E_bool_option_47", "trim_terminals_opt", 
@@ -104,29 +105,29 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(15), (NT(22)));
 //G11:  statement(15)        => start_cmd(23).
 	p(NT(15), (NT(23)));
-//G12:  statement(15)        => help(24).
+//G12:  statement(15)        => help_cmd(24).
 	p(NT(15), (NT(24)));
-//G13:  statement(15)        => version(25).
+//G13:  statement(15)        => version_cmd(25).
 	p(NT(15), (NT(25)));
-//G14:  statement(15)        => quit(26).
+//G14:  statement(15)        => license_cmd(26).
 	p(NT(15), (NT(26)));
-//G15:  statement(15)        => license(27).
+//G15:  statement(15)        => quit_cmd(27).
 	p(NT(15), (NT(27)));
-//G16:  statement(15)        => clear(28).
+//G16:  statement(15)        => clear_cmd(28).
 	p(NT(15), (NT(28)));
-//G17:  statement(15)        => get(29).
+//G17:  statement(15)        => get_cmd(29).
 	p(NT(15), (NT(29)));
-//G18:  statement(15)        => set(30).
+//G18:  statement(15)        => set_cmd(30).
 	p(NT(15), (NT(30)));
-//G19:  statement(15)        => toggle(31).
+//G19:  statement(15)        => toggle_cmd(31).
 	p(NT(15), (NT(31)));
-//G20:  statement(15)        => enable(32).
+//G20:  statement(15)        => enable_cmd(32).
 	p(NT(15), (NT(32)));
-//G21:  statement(15)        => disable(33).
+//G21:  statement(15)        => disable_cmd(33).
 	p(NT(15), (NT(33)));
-//G22:  statement(15)        => add(34).
+//G22:  statement(15)        => add_cmd(34).
 	p(NT(15), (NT(34)));
-//G23:  statement(15)        => del(35).
+//G23:  statement(15)        => del_cmd(35).
 	p(NT(15), (NT(35)));
 //G24:  statement(15)        => parse_file_cmd(36).
 	p(NT(15), (NT(36)));
@@ -212,139 +213,139 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(57), (NT(58)));
 //G65:  load_cmd(22)         => load_sym(57) __(7) filename(43).
 	p(NT(22), (NT(57)+NT(7)+NT(43)));
-//G66:  __E_help_14(60)      => 'h'.
+//G66:  __E_help_cmd_14(60)  => 'h'.
 	p(NT(60), (T(18)));
-//G67:  __E_help_14(60)      => 'h' 'e' 'l' 'p'.
+//G67:  __E_help_cmd_14(60)  => 'h' 'e' 'l' 'p'.
 	p(NT(60), (T(18)+T(6)+T(10)+T(2)));
-//G68:  help_sym(59)         => __E_help_14(60).
+//G68:  help_sym(59)         => __E_help_cmd_14(60).
 	p(NT(59), (NT(60)));
-//G69:  __E_help_15(61)      => __(7) help_arg(62).
+//G69:  __E_help_cmd_15(61)  => __(7) help_arg(62).
 	p(NT(61), (NT(7)+NT(62)));
-//G70:  __E_help_15(61)      => null.
+//G70:  __E_help_cmd_15(61)  => null.
 	p(NT(61), (nul));
-//G71:  help(24)             => help_sym(59) __E_help_15(61).
+//G71:  help_cmd(24)         => help_sym(59) __E_help_cmd_15(61).
 	p(NT(24), (NT(59)+NT(61)));
-//G72:  __E_version_16(64)   => 'v'.
+//G72:  __E_version_cmd_16(64) => 'v'.
 	p(NT(64), (T(22)));
-//G73:  __E_version_16(64)   => 'v' 'e' 'r' 's' 'i' 'o' 'n'.
+//G73:  __E_version_cmd_16(64) => 'v' 'e' 'r' 's' 'i' 'o' 'n'.
 	p(NT(64), (T(22)+T(6)+T(4)+T(5)+T(9)+T(20)+T(13)));
-//G74:  version_sym(63)      => __E_version_16(64).
+//G74:  version_sym(63)      => __E_version_cmd_16(64).
 	p(NT(63), (NT(64)));
-//G75:  version(25)          => version_sym(63).
+//G75:  version_cmd(25)      => version_sym(63).
 	p(NT(25), (NT(63)));
-//G76:  __E_license_17(66)   => 'L'.
+//G76:  __E_license_cmd_17(66) => 'L'.
 	p(NT(66), (T(23)));
-//G77:  __E_license_17(66)   => 'l' 'i' 'c' 'e' 'n' 's' 'e'.
+//G77:  __E_license_cmd_17(66) => 'l' 'i' 'c' 'e' 'n' 's' 'e'.
 	p(NT(66), (T(10)+T(9)+T(17)+T(6)+T(13)+T(5)+T(6)));
-//G78:  license_sym(65)      => __E_license_17(66).
+//G78:  license_sym(65)      => __E_license_cmd_17(66).
 	p(NT(65), (NT(66)));
-//G79:  license(27)          => license_sym(65).
-	p(NT(27), (NT(65)));
-//G80:  __E_quit_18(68)      => 'q'.
+//G79:  license_cmd(26)      => license_sym(65).
+	p(NT(26), (NT(65)));
+//G80:  __E_quit_cmd_18(68)  => 'q'.
 	p(NT(68), (T(24)));
-//G81:  __E_quit_18(68)      => 'q' 'u' 'i' 't'.
+//G81:  __E_quit_cmd_18(68)  => 'q' 'u' 'i' 't'.
 	p(NT(68), (T(24)+T(16)+T(9)+T(14)));
-//G82:  __E_quit_18(68)      => 'e'.
+//G82:  __E_quit_cmd_18(68)  => 'e'.
 	p(NT(68), (T(6)));
-//G83:  __E_quit_18(68)      => 'e' 'x' 'i' 't'.
+//G83:  __E_quit_cmd_18(68)  => 'e' 'x' 'i' 't'.
 	p(NT(68), (T(6)+T(25)+T(9)+T(14)));
-//G84:  quit_sym(67)         => __E_quit_18(68).
+//G84:  quit_sym(67)         => __E_quit_cmd_18(68).
 	p(NT(67), (NT(68)));
-//G85:  quit(26)             => quit_sym(67).
-	p(NT(26), (NT(67)));
-//G86:  __E_clear_19(70)     => 'c' 'l' 's'.
+//G85:  quit_cmd(27)         => quit_sym(67).
+	p(NT(27), (NT(67)));
+//G86:  __E_clear_cmd_19(70) => 'c' 'l' 's'.
 	p(NT(70), (T(17)+T(10)+T(5)));
-//G87:  __E_clear_19(70)     => 'c' 'l' 'e' 'a' 'r'.
+//G87:  __E_clear_cmd_19(70) => 'c' 'l' 'e' 'a' 'r'.
 	p(NT(70), (T(17)+T(10)+T(6)+T(3)+T(4)));
-//G88:  clear_sym(69)        => __E_clear_19(70).
+//G88:  clear_sym(69)        => __E_clear_cmd_19(70).
 	p(NT(69), (NT(70)));
-//G89:  clear(28)            => clear_sym(69).
+//G89:  clear_cmd(28)        => clear_sym(69).
 	p(NT(28), (NT(69)));
 //G90:  get_sym(71)          => 'g' 'e' 't'.
 	p(NT(71), (T(11)+T(6)+T(14)));
-//G91:  __E_get_20(72)       => __(7) option(73).
+//G91:  __E_get_cmd_20(72)   => __(7) option(73).
 	p(NT(72), (NT(7)+NT(73)));
-//G92:  __E_get_20(72)       => null.
+//G92:  __E_get_cmd_20(72)   => null.
 	p(NT(72), (nul));
-//G93:  get(29)              => get_sym(71) __E_get_20(72).
+//G93:  get_cmd(29)          => get_sym(71) __E_get_cmd_20(72).
 	p(NT(29), (NT(71)+NT(72)));
 //G94:  add_sym(74)          => 'a' 'd' 'd'.
 	p(NT(74), (T(3)+T(21)+T(21)));
-//G95:  __E_add_21(75)       => list_option(76) __(7) symbol_list(77).
+//G95:  __E_add_cmd_21(75)   => list_option(76) __(7) symbol_list(77).
 	p(NT(75), (NT(76)+NT(7)+NT(77)));
-//G96:  __E_add_21(75)       => treepaths_option(78) __(7) treepath_list(79).
+//G96:  __E_add_cmd_21(75)   => treepaths_option(78) __(7) treepath_list(79).
 	p(NT(75), (NT(78)+NT(7)+NT(79)));
-//G97:  add(34)              => add_sym(74) __(7) __E_add_21(75).
+//G97:  add_cmd(34)          => add_sym(74) __(7) __E_add_cmd_21(75).
 	p(NT(34), (NT(74)+NT(7)+NT(75)));
-//G98:  __E_del_22(81)       => 'd' 'e' 'l'.
+//G98:  __E_del_cmd_22(81)   => 'd' 'e' 'l'.
 	p(NT(81), (T(21)+T(6)+T(10)));
-//G99:  __E_del_22(81)       => 'd' 'e' 'l' 'e' 't' 'e'.
+//G99:  __E_del_cmd_22(81)   => 'd' 'e' 'l' 'e' 't' 'e'.
 	p(NT(81), (T(21)+T(6)+T(10)+T(6)+T(14)+T(6)));
-//G100: __E_del_22(81)       => 'r' 'm'.
+//G100: __E_del_cmd_22(81)   => 'r' 'm'.
 	p(NT(81), (T(4)+T(12)));
-//G101: __E_del_22(81)       => 'r' 'e' 'm'.
+//G101: __E_del_cmd_22(81)   => 'r' 'e' 'm'.
 	p(NT(81), (T(4)+T(6)+T(12)));
-//G102: __E_del_22(81)       => 'r' 'e' 'm' 'o' 'v' 'e'.
+//G102: __E_del_cmd_22(81)   => 'r' 'e' 'm' 'o' 'v' 'e'.
 	p(NT(81), (T(4)+T(6)+T(12)+T(20)+T(22)+T(6)));
-//G103: del_sym(80)          => __E_del_22(81).
+//G103: del_sym(80)          => __E_del_cmd_22(81).
 	p(NT(80), (NT(81)));
-//G104: __E_del_23(82)       => list_option(76) __(7) symbol_list(77).
+//G104: __E_del_cmd_23(82)   => list_option(76) __(7) symbol_list(77).
 	p(NT(82), (NT(76)+NT(7)+NT(77)));
-//G105: __E_del_23(82)       => treepaths_option(78) __(7) treepath_list(79).
+//G105: __E_del_cmd_23(82)   => treepaths_option(78) __(7) treepath_list(79).
 	p(NT(82), (NT(78)+NT(7)+NT(79)));
-//G106: del(35)              => del_sym(80) __(7) __E_del_23(82).
+//G106: del_cmd(35)          => del_sym(80) __(7) __E_del_cmd_23(82).
 	p(NT(35), (NT(80)+NT(7)+NT(82)));
-//G107: __E_toggle_24(84)    => 't' 'o' 'g'.
+//G107: __E_toggle_cmd_24(84) => 't' 'o' 'g'.
 	p(NT(84), (T(14)+T(20)+T(11)));
-//G108: __E_toggle_24(84)    => 't' 'o' 'g' 'g' 'l' 'e'.
+//G108: __E_toggle_cmd_24(84) => 't' 'o' 'g' 'g' 'l' 'e'.
 	p(NT(84), (T(14)+T(20)+T(11)+T(11)+T(10)+T(6)));
-//G109: toggle_sym(83)       => __E_toggle_24(84).
+//G109: toggle_sym(83)       => __E_toggle_cmd_24(84).
 	p(NT(83), (NT(84)));
-//G110: toggle(31)           => toggle_sym(83) __(7) bool_option(85).
+//G110: toggle_cmd(31)       => toggle_sym(83) __(7) bool_option(85).
 	p(NT(31), (NT(83)+NT(7)+NT(85)));
-//G111: __E_enable_25(87)    => 'e' 'n' __(7).
+//G111: __E_enable_cmd_25(87) => 'e' 'n' __(7).
 	p(NT(87), (T(6)+T(13)+NT(7)));
-//G112: __E_enable_25(87)    => 'e' 'n' 'a' 'b' 'l' 'e' __(7).
+//G112: __E_enable_cmd_25(87) => 'e' 'n' 'a' 'b' 'l' 'e' __(7).
 	p(NT(87), (T(6)+T(13)+T(3)+T(19)+T(10)+T(6)+NT(7)));
-//G113: enable_sym(86)       => __E_enable_25(87).
+//G113: enable_sym(86)       => __E_enable_cmd_25(87).
 	p(NT(86), (NT(87)));
-//G114: enable(32)           => enable_sym(86) bool_option(85).
+//G114: enable_cmd(32)       => enable_sym(86) bool_option(85).
 	p(NT(32), (NT(86)+NT(85)));
-//G115: __E_disable_26(89)   => 'd' 'i' 's' __(7).
+//G115: __E_disable_cmd_26(89) => 'd' 'i' 's' __(7).
 	p(NT(89), (T(21)+T(9)+T(5)+NT(7)));
-//G116: __E_disable_26(89)   => 'd' 'i' 's' 'a' 'b' 'l' 'e' __(7).
+//G116: __E_disable_cmd_26(89) => 'd' 'i' 's' 'a' 'b' 'l' 'e' __(7).
 	p(NT(89), (T(21)+T(9)+T(5)+T(3)+T(19)+T(10)+T(6)+NT(7)));
-//G117: disable_sym(88)      => __E_disable_26(89).
+//G117: disable_sym(88)      => __E_disable_cmd_26(89).
 	p(NT(88), (NT(89)));
-//G118: disable(33)          => disable_sym(88) bool_option(85).
+//G118: disable_cmd(33)      => disable_sym(88) bool_option(85).
 	p(NT(33), (NT(88)+NT(85)));
 //G119: set_sym(90)          => 's' 'e' 't'.
 	p(NT(90), (T(5)+T(6)+T(14)));
-//G120: __E___E_set_27_28(92) => __(7).
+//G120: __E___E_set_cmd_27_28(92) => __(7).
 	p(NT(92), (NT(7)));
-//G121: __E___E_set_27_28(92) => _(6) '=' _(6).
+//G121: __E___E_set_cmd_27_28(92) => _(6) '=' _(6).
 	p(NT(92), (NT(6)+T(26)+NT(6)));
-//G122: __E_set_27(91)       => bool_option(85) __E___E_set_27_28(92) bool_value(93).
+//G122: __E_set_cmd_27(91)   => bool_option(85) __E___E_set_cmd_27_28(92) bool_value(93).
 	p(NT(91), (NT(85)+NT(92)+NT(93)));
-//G123: __E___E_set_27_29(94) => __(7).
+//G123: __E___E_set_cmd_27_29(94) => __(7).
 	p(NT(94), (NT(7)));
-//G124: __E___E_set_27_29(94) => _(6) '=' _(6).
+//G124: __E___E_set_cmd_27_29(94) => _(6) '=' _(6).
 	p(NT(94), (NT(6)+T(26)+NT(6)));
-//G125: __E_set_27(91)       => list_option(76) __E___E_set_27_29(94) symbol_list(77).
+//G125: __E_set_cmd_27(91)   => list_option(76) __E___E_set_cmd_27_29(94) symbol_list(77).
 	p(NT(91), (NT(76)+NT(94)+NT(77)));
-//G126: __E___E_set_27_30(95) => __(7).
+//G126: __E___E_set_cmd_27_30(95) => __(7).
 	p(NT(95), (NT(7)));
-//G127: __E___E_set_27_30(95) => _(6) '=' _(6).
+//G127: __E___E_set_cmd_27_30(95) => _(6) '=' _(6).
 	p(NT(95), (NT(6)+T(26)+NT(6)));
-//G128: __E_set_27(91)       => treepaths_option(78) __E___E_set_27_30(95) treepath_list(79).
+//G128: __E_set_cmd_27(91)   => treepaths_option(78) __E___E_set_cmd_27_30(95) treepath_list(79).
 	p(NT(91), (NT(78)+NT(95)+NT(79)));
-//G129: __E___E_set_27_31(97) => __(7).
+//G129: __E___E_set_cmd_27_31(97) => __(7).
 	p(NT(97), (NT(7)));
-//G130: __E___E_set_27_31(97) => _(6) '=' _(6).
+//G130: __E___E_set_cmd_27_31(97) => _(6) '=' _(6).
 	p(NT(97), (NT(6)+T(26)+NT(6)));
-//G131: __E_set_27(91)       => enum_ev_option(96) __E___E_set_27_31(97) error_verbosity(98).
+//G131: __E_set_cmd_27(91)   => enum_ev_option(96) __E___E_set_cmd_27_31(97) error_verbosity(98).
 	p(NT(91), (NT(96)+NT(97)+NT(98)));
-//G132: set(30)              => set_sym(90) __(7) __E_set_27(91).
+//G132: set_cmd(30)          => set_sym(90) __(7) __E_set_cmd_27(91).
 	p(NT(30), (NT(90)+NT(7)+NT(91)));
 //G133: parse_input(40)      => quoted_string(9).
 	p(NT(40), (NT(9)));
@@ -778,18 +779,18 @@ inline ::idni::grammar<char_type, terminal_type> grammar(
 
 } // namespace tgf_repl_parser_data
 
-struct tgf_repl_parser : public idni::parser<char, char> {
+struct tgf_repl_parser_nonterminals {
 	enum nonterminal {
 		nul, eof, alnum, alpha, space, printable, _, __, symbol, quoted_string, 
 		unescaped_s, escaped_s, parse_input_char_seq, start, __E_start_0, statement, __E___E_start_0_1, __E___E_start_0_2, grammar_cmd, igrammar_cmd, 
-		unreachable_cmd, reload_cmd, load_cmd, start_cmd, help, version, quit, license, clear, get, 
-		set, toggle, enable, disable, add, del, parse_file_cmd, parse_cmd, parse_sym, __E_parse_cmd_3, 
+		unreachable_cmd, reload_cmd, load_cmd, start_cmd, help_cmd, version_cmd, license_cmd, quit_cmd, clear_cmd, get_cmd, 
+		set_cmd, toggle_cmd, enable_cmd, disable_cmd, add_cmd, del_cmd, parse_file_cmd, parse_cmd, parse_sym, __E_parse_cmd_3, 
 		parse_input, parse_file_sym, __E_parse_file_cmd_4, filename, grammar_sym, __E_grammar_cmd_5, igrammar_sym, __E_igrammar_cmd_6, __E_igrammar_cmd_7, start_sym, 
 		__E_start_cmd_8, __E_start_cmd_9, unreachable_sym, __E_unreachable_cmd_10, __E_unreachable_cmd_11, reload_sym, __E_reload_cmd_12, load_sym, __E_load_cmd_13, help_sym, 
-		__E_help_14, __E_help_15, help_arg, version_sym, __E_version_16, license_sym, __E_license_17, quit_sym, __E_quit_18, clear_sym, 
-		__E_clear_19, get_sym, __E_get_20, option, add_sym, __E_add_21, list_option, symbol_list, treepaths_option, treepath_list, 
-		del_sym, __E_del_22, __E_del_23, toggle_sym, __E_toggle_24, bool_option, enable_sym, __E_enable_25, disable_sym, __E_disable_26, 
-		set_sym, __E_set_27, __E___E_set_27_28, bool_value, __E___E_set_27_29, __E___E_set_27_30, enum_ev_option, __E___E_set_27_31, error_verbosity, __E_parse_input_32, 
+		__E_help_cmd_14, __E_help_cmd_15, help_arg, version_sym, __E_version_cmd_16, license_sym, __E_license_cmd_17, quit_sym, __E_quit_cmd_18, clear_sym, 
+		__E_clear_cmd_19, get_sym, __E_get_cmd_20, option, add_sym, __E_add_cmd_21, list_option, symbol_list, treepaths_option, treepath_list, 
+		del_sym, __E_del_cmd_22, __E_del_cmd_23, toggle_sym, __E_toggle_cmd_24, bool_option, enable_sym, __E_enable_cmd_25, disable_sym, __E_disable_cmd_26, 
+		set_sym, __E_set_cmd_27, __E___E_set_cmd_27_28, bool_value, __E___E_set_cmd_27_29, __E___E_set_cmd_27_30, enum_ev_option, __E___E_set_cmd_27_31, error_verbosity, __E_parse_input_32, 
 		__E_parse_input_33, error_verbosity_opt, __E_enum_ev_option_34, status_opt, __E_bool_option_35, colors_opt, __E_bool_option_36, print_ambiguity_opt, __E_bool_option_37, print_graphs_opt, 
 		__E_bool_option_38, print_rules_opt, __E_bool_option_39, print_facts_opt, __E_bool_option_40, print_terminals_opt, __E_bool_option_41, measure_parsing_opt, __E_bool_option_42, measure_each_pos_opt, 
 		__E_bool_option_43, measure_forest_opt, __E_bool_option_44, measure_preprocess_opt, __E_bool_option_45, debug_opt, __E_bool_option_46, auto_disambiguate_opt, __E_bool_option_47, trim_terminals_opt, 
@@ -799,6 +800,9 @@ struct tgf_repl_parser : public idni::parser<char, char> {
 		__E_treepath_65, __E_treepath_66, __E_treepath_list_67, __E_treepath_list_68, quoted_string_char, __E_quoted_string_69, __E_unescaped_s_70, __E_unescaped_s_71, __E_escaped_s_72, __E___73, 
 		__E____74, comment, __E_comment_75, __E_comment_76, __E_comment_77, __N_0, 
 	};
+};
+
+struct tgf_repl_parser : public idni::parser<char, char>, public tgf_repl_parser_nonterminals {
 	static tgf_repl_parser& instance() {
 		static tgf_repl_parser inst;
 		return inst;

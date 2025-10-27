@@ -11,8 +11,8 @@
 #include <ranges>
 #include <deque>
 #include <sstream>
-#include "defs.h"
-#include "utility/bintree.h"
+#include "../defs.h"
+#include "tree.h"
 
 #ifdef DEBUG
 #include <cassert>
@@ -59,7 +59,7 @@ private:
 	public:
 		nptr_t(const NodeT *_id = nullptr) : id(_id) { //if(id)
 			hash = 0;
-			if(id) hash = id->hashit();
+			if(id) hash = id->hash;
 			nc++; }
 		nptr_t(const nptr_t& rhs) {  id = rhs.id; //if(id)
 			hash = rhs.hash;
@@ -73,7 +73,7 @@ private:
 			DBG(assert(id != nullptr);)
 			return *id;
 		}
-		inline const NodeT* operator->() const { return id;}
+		inline const NodeT* operator->() const { return id; }
 		inline nptr_t& operator=(const nptr_t& rhs) {
 			//if(  !id && rhs.id)
 			//if(&rhs != this) nc++;
@@ -89,13 +89,29 @@ private:
 			return *this;
 		}
 		inline bool operator<(const nptr_t& rhs) const {
-			return hash <rhs.hash;
+			if (hash == rhs.hash) {
+				if(id == rhs.id)
+					return false;
+				else return *id < *rhs.id;
+			}
+			else return hash < rhs.hash;
 			//return id < rhs.id;
 		}
-		inline bool operator == (const nptr_t& rhs) const {
+		std::size_t operator()(const nptr_t& _n) const {
+			return _n.hash;
+		}
+
+		inline bool operator==(const nptr_t& rhs) const {
 			if (hash == rhs.hash) {
-				DBG(assert(id == rhs.id));
-				return true;
+				if(id == rhs.id) return true;
+				else {
+					if(*id == *rhs.id ) return true;
+
+					//collision, so check if they are same
+					// DBG(std::cout << "collision: " << *id << 
+					// 	" and " << *rhs.id << std::endl;)
+					return false;
+				}
 			}
 			return false;
 		}
@@ -148,12 +164,12 @@ public:
 		std::set<node> cycles;
 		/// Builds and returns a tree with nodes.
 		sptree extract_trees();
-		idni2::htree::sp extract_tree2();
+		htree::sp extract_tree2();
 	private:
 		sptree _extract_trees(node& r, int_t choice = 0);
-		idni2::htree::sp _extract_tree2(node& r);
+		htree::sp _extract_tree2(node& r);
 	};
-	//vector of graph with callback
+		//vector of graph with callback
 	using graphv = std::vector<graph>;
 	using cb_next_graph_t = std::function<bool(graph&)>;
 
@@ -177,6 +193,7 @@ public:
 	size_t count_trees() const;
 	/// Counts and returns a number of trees in a whole forest.
 	size_t count_trees(const node& root) const;
+	std::pair<size_t, size_t> count_useful_nodes(const node& root) const;
 
 	/// Returns true if the forest is binarized, ie. each node has up to 2 children.
 	bool is_binarized() const;
@@ -194,6 +211,7 @@ public:
 	 */
 	graphv extract_graphs(const node& root, cb_next_graph_t cb_next_graph,
 		bool unique_edge = true) const;
+	graph extract_first_graph(const node& root) const;
 
 	using enter_t  =std::function<void(const node&)>;
 	using exit_t   =std::function<void(const node&, const nodes_set&)>;

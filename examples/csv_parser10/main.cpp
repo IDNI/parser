@@ -62,7 +62,7 @@ struct csv_reader {
 				<< numeric_limits<int_t>::max() << '\n', false;
 			return i.value();
 		};
-		auto cb_enter = [&r, &get_int, &res, this](const auto& n) {
+		auto cb_enter = [&r, &get_int, &res](const auto& n) {
 			if (!n->first.nt()) return;
 			// generated csv_parser contains enum containing all
 			// nonterminals from the grammar with their id values.
