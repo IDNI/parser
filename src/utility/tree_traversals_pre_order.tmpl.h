@@ -258,11 +258,16 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 			upos.push_back(0);
 		}
 	}
-	else {
+	// If the transformed node should not be
+	// visited, do not add it to upos
+	else if (visit_subtree(r)) {
 #ifdef MEASURE_TRAVERSER_DEPTH
 		inc_depth();
 #endif //MEASURE_TRAVERSER_DEPTH
 		upos.push_back(0);
+	} else {
+		r = call(up, r);
+		if (r == nullptr) return nullptr;
 	}
 	stack.emplace_back(r);
 	while (true) {
@@ -377,11 +382,16 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 						upos.push_back(stack.size());
 					}
 				}
-				else {
+				// If the transformed node should not be
+				// visited, do not add it to upos
+				else if (visit_subtree(r)) {
 #ifdef MEASURE_TRAVERSER_DEPTH
 					inc_depth();
 #endif //MEASURE_TRAVERSER_DEPTH
 					upos.push_back(stack.size());
+				} else {
+					r = call(up, r);
+					if (r == nullptr) return nullptr;
 				}
 				stack.emplace_back(r);
 			}
@@ -426,6 +436,8 @@ void pre_order<node>::const_traverse(tref n, auto& visitor,
 		return true;
 	};
 	// visit n and save on stack
+	if (!call(visit_subtree, n, nullptr, "visit_subtree"))
+		return;
 	bool ret = !call(visitor, n, nullptr, "visitor0");
 	if constexpr (search) { if (ret) return; }
 	stack.push_back(n);
@@ -441,7 +453,6 @@ void pre_order<node>::const_traverse(tref n, auto& visitor,
 		if (upos.empty()) return;
 		// Find first unprocessed position
 		tref c_node = stack[upos.back()];
-		// if (c_node == nullptr) return;
 		DBGT(std::cout << "-- non-const loop begin: "
 			<< tree::get(c_node).value << "\n";)
 		DBGT(print_stack<node>(stack, c_node);)
@@ -494,9 +505,6 @@ void pre_order<node>::const_traverse(tref n, auto& visitor,
 #endif //MEASURE_TRAVERSER_DEPTH
 					upos.push_back(stack.size() - 1);
 				}
-				// // Node is finished. Call between if has right sibling
-				// if (tree::get(c).has_right_sibling())
-				// 	call(between, c, get_parent(), "between");
 			}
 			if constexpr (unique) cache.emplace(c);
 		}
