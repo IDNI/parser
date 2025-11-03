@@ -256,6 +256,8 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 			inc_depth();
 #endif //MEASURE_TRAVERSER_DEPTH
 			upos.push_back(0);
+		} else {
+			r = call(up, r);
 		}
 	}
 	// If the transformed node should not be
@@ -380,6 +382,8 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 						inc_depth();
 #endif //MEASURE_TRAVERSER_DEPTH
 						upos.push_back(stack.size());
+					} else {
+						r = call(up, r);
 					}
 				}
 				// If the transformed node should not be
