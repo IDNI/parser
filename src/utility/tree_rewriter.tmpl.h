@@ -435,7 +435,7 @@ tref find_top(tref input, predicate_t& query) {
 template <typename node>
 tref find_top_until(tref input, const auto& query, const auto& until) {
 	DBG(assert(input != nullptr);)
-	tref n;
+	tref n = nullptr;
 	auto select = [&](tref nn) {
 		if (!query(nn)) return true;
 		if (n != nullptr) return false;
@@ -445,7 +445,7 @@ tref find_top_until(tref input, const auto& query, const auto& until) {
 	const auto neg_until = [&until](const auto& p) {
 		return !until(p);
 	};
-	pre_order<node>(input).search_unique(select, neg_until);
+	pre_order<node>(input).search_unique(select, neg_until, identity);
 	return n;
 }
 
