@@ -32,7 +32,7 @@
 
 #define DEFAULT_BINARIZE false
 #define DEFAULT_INCR_GEN_FOREST false
-
+#define DEFAULT_ENABLE_LEO true
 namespace idni {
 
 template <typename C, typename T>
@@ -811,6 +811,9 @@ public:
 
 	/// Parser options for its constructor
 	struct options {
+		/// enable leo optimization to speed up right recursions
+		bool enable_leo = DEFAULT_ENABLE_LEO;
+
 		/// Applying binarization to ensure every forest node
 		/// has atmost 2 or less children nodes
 		bool binarize = DEFAULT_BINARIZE;
@@ -1128,6 +1131,7 @@ private:
 						bool conj_resolved = false);
 	bool completed(const item& i) const;
 	bool negative(const item& i) const;
+	bool leo_optimize(const item& i, container_t& t, container_t &c, bool);
 	/// returns number of literals for a given item
 	size_t n_literals(const item& i) const;
 	std::pair<item, bool> get_conj(size_t set, size_t prod, size_t con)

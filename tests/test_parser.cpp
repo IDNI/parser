@@ -247,6 +247,23 @@ int main(int argc, char **argv)
 	run_test<char>(ps, nt, start, "1+++1", {}, o);
 	ps.clear();
 
+
+/*******************************************************************************
+*       optimization
+*******************************************************************************/
+	TEST("optimize","leo_basic")
+	ps(start, one + start );
+	ps(start, one);
+	run_test<char>(ps, nt, start, "1111", {}, o);
+	ps.clear();
+
+	TEST("optimize","leo_basic_null")
+	ps(start, one + start );
+	ps(start, nll);
+	run_test<char>(ps, nt, start, "1111", {}, o);
+	ps.clear();
+	
+
 /*******************************************************************************
 *       DISAMBIGUATION
 *******************************************************************************/

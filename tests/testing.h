@@ -178,7 +178,7 @@ namespace idni::testing
 			filet << ptd.str();
 			filet.close();
 			using ndtype = typename parser<T>::pnode;
-
+			/*
 			htref lcrs_tr = g.extract_tree2();
 			static std::vector<htref> storesp;
 			storesp.push_back(lcrs_tr);
@@ -197,6 +197,7 @@ namespace idni::testing
 
 			filet << ptd.str();
 			filet.close();
+			*/
 		};
 		static const auto bin_prefix = from_cstr<T>("__B_");
 		auto cb_next_graph = [&](typename parser<T>::pgraph &g)
@@ -463,6 +464,7 @@ namespace idni::testing
 				  << "	-verbose     -v         increase verbosity\n"
 				  << "	-vv                     increase verbosity +2\n"
 				  << "	-vvv                    increase verbosity +3\n"
+				  << "	-enable_leo             enables leo optimization\n"
 				  << "	-[enable|disable]_incrgen\n"
 				  << "	              enable/disable incremental generation of forest\n"
 				  << "	-[enable|disable]_binarization\n"
@@ -489,7 +491,7 @@ namespace idni::testing
 		bool incr_gen = false;
 		bool enable_gc = false;
 		bool auto_disambg = false;
-
+		bool enable_leo = false;
 		std::vector<std::string> args(argv + 1, argv + argc);
 
 		auto missing = [](const std::string &opt)
@@ -501,7 +503,9 @@ namespace idni::testing
 		for (auto it = args.begin(); it != args.end(); ++it)
 		{
 			auto opt = *it;
-			if (opt == "-enable_binarization")
+			if( opt == "-enable_leo")
+				enable_leo = true;
+			else if (opt == "-enable_binarization")
 				binarize = true;
 			else if (opt == "-enable_incrgen")
 				incr_gen = true;
@@ -609,7 +613,8 @@ namespace idni::testing
 					 { std::cout << a << " "; });
 			std::cout << std::endl;
 		}
-
+		options<char>.enable_leo =
+			options<char32_t>.enable_leo = enable_leo;
 		options<char>.binarize =
 			options<char32_t>.binarize = binarize;
 		options<char>.incr_gen_forest =

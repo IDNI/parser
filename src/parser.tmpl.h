@@ -305,6 +305,101 @@ void parser<C, T>::resolve_conjunctions(container_t& c, container_t& t) {
 	}
 	//DBG(std::cout << "... conjunctions resolved\n";)
 }
+
+template <typename C, typename T>
+bool parser<C, T>::leo_optimize(const item& i, container_t& t, container_t& c,
+	bool conj_resolved)
+{
+	if (o.enable_leo) {
+		// DBG(print(std::cout << "\n .. leo complt: ", i) <<"\n";)
+		const auto A = get_nt(i);           // completed NT over [i.from, i.set]
+		size_t j_end = i.set;         // fixed end position for chain
+		typeof(cache) temp_cache = cache;
+
+		// Is 'p' a live waiter at 'set' waiting exactly on 'L'?
+		auto is_live_waiter = [&](size_t set, const lit<C,T>& L, const item& p)->bool {
+			if (!L.nt()) return false;
+			if (set >= S.size()) return false;
+		//	if (S[set].find(p) == S[set].end()) return false;    // still present
+		//	if (p.from != set) return false;                    // MUST be start-set waiter
+			if (n_literals(p) <= p.dot) return false;             // has next symbol?
+			return get_lit(p) == L;                               // waiting on L
+		};
+
+		// Find the unique live waiter for (L,set), if any.
+		auto unique_live_waiter = [&](size_t set, const lit<C,T>& L, item& out)->bool {
+			if (!L.nt()) return false;
+			auto it = temp_cache.find({ L.n(), set });
+			if (it == temp_cache.end()) return false;
+			int cnt = 0;
+			for (const auto& cand : it->second) {
+			//	DBG(print(std::cout << "leo cand: ", cand) <<"\n";)
+				if(!is_live_waiter(set, L, cand)) continue;
+				out = cand;
+				if (++cnt > 1) break;
+			}
+			return cnt == 1;
+		};
+
+		// First hop: unique parent waiting on A 
+		const item dummy{0,0,0,0,0}; // dummy initial value for out
+		item parent0 = dummy;
+		//any potential
+		if (unique_live_waiter(i.from, A, parent0)) {
+		//	print_S(std::cout << "\n") << "\n";
+			// Advance along the unique chain to produce ONE final advanced item.
+		//	DBG(print(std::cout << "leo seed: ",parent0) <<"\n";)
+			item adv = parent0;
+			
+			// Follow right-recursive chain at fixed end 	
+			item  top = dummy;
+			std::set<item> interm;
+			while (true) {
+				++adv.dot; adv.set = j_end;  // advance over L at j_end
+				//if (!negative(adv) && completed(adv) && g.conjunctive(adv.prod)) 
+				//	return false;
+				DBG(print(std::cout << "leo advance: ",adv) <<"\n";)
+				//if(!completed(adv)) break;
+				if (n_literals(adv) == 1) {
+   					auto rhs0 = g[adv.prod][adv.con][0];
+    				if (rhs0.nt()) break; // no unit-hop in Leo
+				}
+				if( ! interm.insert(adv).second) break;
+				top = adv;
+
+				//if (adv.dot >= n_literals(adv)) break;
+				auto L = get_nt(adv);
+				//if ( g.is_cc_fn(L.n())) break; // stop at terminals or cc
+				//temp_cache[{L.n(), adv.set}].insert(adv);
+
+				item next_parent = dummy;
+				if (!unique_live_waiter(adv.from, L, next_parent)) break;
+
+				adv = next_parent;           // jump to the next parent	
+			}
+			//print(std::cout << "leo top: ", interm.back()) <<"\n";
+			if(interm.size() == 0) return false; // nothing advanced
+			DBG(print(std::cout << "leo top: ", top) <<" " << interm.size() <<"\n";)
+			
+			for( auto it = interm.begin(); it != interm.end(); ++it) {
+				if (add(t, *it).second ) {
+					// GC bookkeeping analogous to one-hop fallback:
+					// move dependency from parent0→i to parent0→top
+					++refi[parent0]; // add edge: parent0 -> top
+					auto rit = refi.find(parent0);
+					DBG(assert(rit != refi.end() && rit->second > 0);)
+					if (--rit->second == 0) {
+						refi.erase(rit);
+						remove_item(parent0);
+					}
+				}
+			}
+			return true;// done via Leo fast-path
+		}
+	
+	}
+	return false; // not done via Leo fast-path
+}
 template <typename C, typename T>
 void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 	bool conj_resolved)
@@ -327,7 +422,14 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 		//if (refi.count(i) && refi[i] > 0) --refi[i];
 		//return;
 	}
-	//const container_t& cont = S[i.from];
+
+	if( o.enable_leo && leo_optimize(i, t, c, conj_resolved)) {
+		return; // done via Leo fast-path
+	}
+	if (o.enable_leo)
+		DBGP(std::cout << "    leo_not_applicable\n";)
+
+		//const container_t& cont = S[i.from];
 	auto smbl = get_nt(i);
 	auto &rng = cache[{smbl.n(), i.from}];
 	//for (auto it = cont.begin(); it != cont.end(); ++it) {
@@ -653,10 +755,10 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 		//DBGP(print_S(std::cout << "\n") << "\n";)
 
 	} while (in_->tnext());
-
 	#ifdef TAU_PARSER_MEASURE
 	measures::print_timer("parsing");
 	measures::stop_timer("parsing");
+	DBG(print_S(std::cout << "\n") << "\n";)
 	#endif // TAU_PARSER_MEASURE
 
 	in_->clear();
@@ -1083,6 +1185,31 @@ void parser<C, T>::sbl_chd_forest(const item& eitem,
 		if (loc(curchd.back())[1] == eitem.set) ambset.insert(curchd);
 #else
 		if (curchd.back()->second[1] == eitem.set) ambset.insert(curchd);
+		else if( false && curchd.back()->second[1] < eitem.set ) {
+		/* 	// for leo optimization, figure out all nodes on deterministic path
+			size_t last_chd = curchd.size() - 1;
+			pnode nxtl = { g[eitem.prod][eitem.con][last_chd], {} };
+			auto& nxtls = sorted_citem[{ nxtl.first.n(), xfrom }];
+
+			while( nxtls.size() == 1 ) {
+				auto &v = *nxtls[0];
+				// ignore beyond the span
+				if (v.set > eitem.set) break;
+				// store current and recursively build for next nt
+				nxtl.second[0] = xfrom;
+				nxtl.second[1] = v.set;
+				curchd.push_back(nxtl), xfrom = v.set;
+				last_chd = curchd.size() - 1;
+				if (g.len(eitem.prod, eitem.con) <= last_chd) {
+					if (curchd.back()->second[1] == eitem.set)
+						ambset.insert(curchd);
+					break;
+				}
+				nxtl = { g[eitem.prod][eitem.con][last_chd], {} };
+				nxtls = sorted_citem[{ nxtl.first.n(), xfrom }];
+			}
+			
+		*/} 
 #endif
 		return;
 	}
