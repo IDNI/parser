@@ -546,7 +546,42 @@ struct lcrs_tree : public bintree<T> {
 	 * @param ch2 The second child node
 	 * @return The new tree node's tref id
 	 */
-	static tref get(const T& v, const T& ch1, const T& ch2); 
+	static tref get(const T& v, const T& ch1, const T& ch2);
+
+	/**
+	 * @brief Adds a sibling to nodes siblings at position pos by default at
+	 * back
+	 * @param n Current tree node
+	 * @param s Sibling to add
+	 * @param pos Position at which to add the sibling
+	 * @return Resulting tree node with added sibling
+	 */
+	static tref add_sibling(tref n, tref s, int_t pos = -1);
+
+	/**
+	 * @brief Adds a child to a tree node by default at back
+	 * @param n Current tree node
+	 * @param c Child to add
+	 * @param pos Position in children of n for c
+	 * @return Resulting tree node having c as pos-th child
+	 */
+	static tref add_child(tref n, tref c, int_t pos = -1);
+
+	/**
+	 * @brief Removes a sibling from a tree node by default at back
+	 * @param n Current tree node
+	 * @param pos Position at which to remove the sibling
+	 * @return Resulting tree node with removed sibling
+	 */
+	static tref remove_sibling(tref n, int_t pos = 0);
+
+	/**
+	 * @brief Removes a child from a tree node by default at back
+	 * @param n Current tree node
+	 * @param pos Position of child to remove
+	 * @return Resulting tree node with child removed
+	 */
+	static tref remove_child(tref n, int_t pos = -1);
 
 	/**
 	 * @brief Trim the right sibling of the node
@@ -785,6 +820,7 @@ struct lcrs_tree : public bintree<T> {
 
 	// hooks
 
+	inline static bool use_hooks = true;
 	using hook_function
 		= std::function<tref(const T&, const tref*, size_t, tref)>;
 	inline static hook_function hook = nullptr;
