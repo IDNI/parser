@@ -629,33 +629,28 @@ tref lcrs_tree<T>::add_child(tref n, tref c, int_t pos) {
 template<typename T>
 tref lcrs_tree<T>::remove_sibling(tref n, int_t pos) {
 	const lcrs_tree<T>& t = get(n);
-	if (pos <= 0) {
-		// Remove sibling at back
-		if (t.r != nullptr && get(t.r).r == nullptr) {
-			// Found last sibling
-			return bintree<T>::get(t.value, t.l, nullptr);
-		} else if (t.r == nullptr) {
-			// No sibling to remove
-			return n;
+	if (pos < 0) {
+		// Remove current node
+		if (t.r == nullptr) {
+			return nullptr;
 		} else {
 			tref ns = remove_sibling(t.r, -1);
 			return bintree<T>::get(t.value, t.l, ns);
 		}
 	} else {
-		if (pos == 1) {
-			// Remove sibling now
+		if (pos == 0) {
+			// Remove current node
 			if (t.r != nullptr) {
-				return bintree<T>::get(t.value, t.l, get(t.r).r);
+				return bintree<T>::get(get(t.r).value, get(t.r).l, get(t.r).r);
 			}
-			// No sibling to remove
-			else return n;
+			else return nullptr;
 		} else {
 			if (t.r != nullptr) {
 				// Move to next sibling
 				tref ns = remove_sibling(t.r, pos - 1);
 				return bintree<T>::get(t.value, t.l, ns);
 			} else {
-				// No sibling to remove
+				// No sibling to move to
 				return n;
 			}
 		}
@@ -665,13 +660,8 @@ tref lcrs_tree<T>::remove_sibling(tref n, int_t pos) {
 template<typename T>
 tref lcrs_tree<T>::remove_child(tref n, int_t pos) {
 	const lcrs_tree<T>& t = get(n);
-	// If no child present
+	// If no child is present
 	if (t.l == nullptr) return n;
-	// If n has only a single child
-	if (get(t.l).r == nullptr)
-		return bintree<T>::get(t.value, get(t.l).r, t.r);
-	// Remove first child
-	if (pos == 0) return bintree<T>::get(t.value, get(t.l).r, t.r);
 	tref nc = remove_sibling(t.l, pos);
 	return bintree<T>::get(t.value, nc, t.r);
 }

@@ -573,7 +573,7 @@ struct lcrs_tree : public bintree<T> {
 	 * @param pos Position at which to remove the sibling
 	 * @return Resulting tree node with removed sibling
 	 */
-	static tref remove_sibling(tref n, int_t pos = 0);
+	static tref remove_sibling(tref n, int_t pos = -1);
 
 	/**
 	 * @brief Removes a child from a tree node by default at back
