@@ -1,7 +1,7 @@
 # Function version_license(template_file, output_file)
 # takes a template file and replaces the following placeholders:
 #   @VERSION@          with content of VERSION file
-#   @LICENSE_CONTENT@  with content of LICENSE.txt file
+#   @LICENSE_CONTENT@  with content of LICENSE.md file
 #   @BUILD_DATE_ISO@   with current date in ISO format
 # and writes the result to the output file
 # TODO generic BOM removal
@@ -13,7 +13,10 @@ function(version_license template_file output_file)
 	string(REPLACE "\"" "\\\"" VERSION "${VERSION}")
 
 	# @LICENSE_CONTENT@
-	set(license_file "${PROJECT_SOURCE_DIR}/LICENSE.txt")
+	set(license_file "${PROJECT_SOURCE_DIR}/LICENSE.md")
+	if(NOT EXISTS ${license_file})
+		set(license_file "${PROJECT_SOURCE_DIR}/LICENSE.txt")
+	endif()
 	file(READ ${license_file} LICENSE_CONTENT ENCODING UTF-8)
 	# remove BOM if any. Expects word License to be the start of the text
 	string(FIND "${LICENSE_CONTENT}" "License" LICENSE_CONTENT_START)

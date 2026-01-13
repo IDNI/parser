@@ -1,5 +1,5 @@
 // To view the license please visit
-// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+// https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #ifndef __IDNI__PARSER__FOREST_H__
 #define __IDNI__PARSER__FOREST_H__
@@ -47,15 +47,15 @@ private:
 	struct nptr_t {
 		friend NodeT;
 	private:
-		/// Points to pnode	
+		/// Points to pnode
 		const NodeT *id;
-		size_t hash; 
+		size_t hash;
 		/**
 		 * Maintains a refcount for # of id pointers to NodeT obj in NodeT::nid
 		 * map both externally and from inside nid
 		 */
 		static size_t nc;
-		
+
 	public:
 		nptr_t(const NodeT *_id = nullptr) : id(_id) { //if(id)
 			hash = 0;
@@ -108,7 +108,7 @@ private:
 					if(*id == *rhs.id ) return true;
 
 					//collision, so check if they are same
-					// DBG(std::cout << "collision: " << *id << 
+					// DBG(std::cout << "collision: " << *id <<
 					// 	" and " << *rhs.id << std::endl;)
 					return false;
 				}
@@ -137,7 +137,7 @@ public:
 	using nodes_set  = std::set<nodes>;
 	using node_graph = std::map<node, nodes_set>;
 	using edge       = std::pair<size_t, size_t>;
-	
+
 	/// A tree extracted from forst<NodeT>::graph
 	struct tree {
 		/// The original node extracted from a graph (forest).
@@ -149,13 +149,13 @@ public:
 			std::set<size_t> skip = {}, bool nulls = false) const;
 	};
 	using sptree = std::shared_ptr<tree>;
-	
+
 	/**
 	 * A least maximal core graph without ambiguity/repeating nodes/edges
 	 * possibly with cycles or shared nodes. No cycles and no sharing implies its a tree.
 	 */
 	struct graph : public node_graph {
-		static const forest forest_inst(){ 
+		static const forest forest_inst(){
 			static forest sf;
 			return sf;}
 		/// Graph's root node.
@@ -202,10 +202,10 @@ public:
 	bool detect_cycle(TraversableT& g) const;
 	/**
 	 * @brief Extracts a graph from the forest.
-	 * 
+	 *
 	 * Extracts graphs from the forest starting at a root node. For every
-	 * extracted graph cb_next_graph callback is called. 
-	 * 
+	 * extracted graph cb_next_graph callback is called.
+	 *
 	 * If unique_edge is set to true it ensures that edges in resulting graphs
 	 * are unique.
 	 */

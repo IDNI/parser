@@ -1,5 +1,5 @@
 // To view the license please visit
-// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+// https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 // CSV parser tutorial - part 1
 //

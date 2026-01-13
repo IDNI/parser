@@ -1,5 +1,5 @@
 // To view the license please visit
-// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+// https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #ifndef __IDNI__PARSER__REWRITING_H__
 #define __IDNI__PARSER__REWRITING_H__
@@ -64,7 +64,7 @@ namespace idni::rewriter::depreciating {
 
 /**
  * @brief Node of a tree.
- * 
+ *
  * @tparam symbol_t a type of node's value
  */
 template <typename symbol_t>
@@ -99,9 +99,9 @@ struct node {
 		return !(*this == that);
 	}
 
-	/** 
+	/**
 	 * @brief Value stored in the node.
-	 * 
+	 *
 	 * The value of the node and pointers to the children, we follow the same
 	 * notation as in forest<...>::tree to be able to reuse the code with
 	 * forest<...>::tree.
@@ -122,7 +122,7 @@ private:
 
 /**
  * @brief Shared pointer to a node
- * 
+ *
  * @tparam symbol_t a type of node's value
  */
 template <typename symbol_t>
@@ -147,7 +147,7 @@ struct make_node_cache_equality {
 
 /**
  * @brief Node factory function.
- * 
+ *
  * Creates a node with \p s as a value and \p ns as children. Implements perfect forwarding for children of the new node.
  */
 template <typename symbol_t, class hook_t = make_node_hook<symbol_t>>
@@ -173,7 +173,7 @@ sp_node<symbol_t> make_node(const symbol_t& s,
 
 /**
  * @brief Node factory function.
- * 
+ *
  * Creates a node with \p s as a value and copies \p ns as children.
  */
 template <typename symbol_t, class hook_t = make_node_hook<symbol_t>>
@@ -1080,8 +1080,8 @@ private:
 };
 
 /**
- * @brief Visitor that produces nodes transformed by the given transformer. 
- * 
+ * @brief Visitor that produces nodes transformed by the given transformer.
+ *
  * It only works with post order traversals.
  */
 template <typename wrapped_t, typename input_node_t,
@@ -1103,8 +1103,8 @@ struct map_transformer {
 };
 
 /**
- * @brief Visitor that produces nodes transformed by the given transformer. 
- * 
+ * @brief Visitor that produces nodes transformed by the given transformer.
+ *
  * It only works with post order traversals.
  */
 template <typename wrapped_t, typename input_node_t,
@@ -1131,8 +1131,8 @@ struct map_node_transformer {
 };
 
 /**
- * @brief Visitor that produces nodes transformed by the given transformer. 
- * 
+ * @brief Visitor that produces nodes transformed by the given transformer.
+ *
  * It only works with post order traversals.
  */
 //
@@ -1156,8 +1156,8 @@ struct replace_node_transformer {
 };
 
 /**
- * @brief Visitor that produces nodes transformed by the given transformer. 
- * 
+ * @brief Visitor that produces nodes transformed by the given transformer.
+ *
  * It only works with post order traversals.
  */
 template <typename node_t>
@@ -1184,7 +1184,7 @@ private:
 
 /**
  * @brief Visitor that selects top nodes that satisfy a predicate.
- * 
+ *
  * Stored the nodes in the supplied vector. It only works with post order
  * traversals and never produces duplicates.
  */
@@ -1209,7 +1209,7 @@ struct select_top_predicate {
 
 /**
  * @brief Visitor that selects nodes that satisfy a predicate.
- * 
+ *
  * Stores the subnodes extracted from them in the supplied vector. It only
  * works with post order traversals and never produces duplicates.
  */
@@ -1516,7 +1516,7 @@ node_t replace_until(const node_t& n, const std::map<node_t, node_t>& changes, p
 
 /**
  * @brief True while found is not set (found).
- * 
+ *
  * Aborts the traversal once found has been set.
  */
 template <typename node_t>
@@ -1532,7 +1532,7 @@ struct while_not_found_predicate {
 
 /**
  * @brief Sets found when the predicate is satisfied by a node (set in found).
- * 
+ *
  * To be used in conjunction with while_not_found_predicate.
  */
 template <typename predicate_t, typename node_t>
@@ -1584,7 +1584,7 @@ using rule = std::pair<node_t, node_t>;
 
 /**
  * @brief Matches when there is an environment where pattern matches the node.
- * 
+ *
  * Predicate that matches when there exists a environment that makes the pattern match the node.
  */
 template <typename node_t, typename is_capture_t>
@@ -1715,7 +1715,7 @@ private:
 // parameter.
 /**
  * @brief Matches when there is an environment where pattern matches the node.
- * 
+ *
  * Predicate that matches when there exists a environment that makes the pattern
  * match the node, ignoring the nodes detected as skippable.
  */
@@ -1793,7 +1793,7 @@ node_t apply_rule(const rule<node_t>& r, const node_t& n, const is_capture_t& c)
 
 /**
  * @brief Apply a rule to a tree using the predicate.
- * 
+ *
  * Apply a rule to a tree using the predicate to pattern_matcher and skipping
  * unnecessary subtrees.
  */
@@ -1818,7 +1818,7 @@ node_t apply_if(const rule<node_t>& r, const node_t& n,
 
 /**
  * @brief Apply a substitution to a rule according to a given matcher.
- * 
+ *
  * This method is use internaly by apply and apply with skip.
  */
 template <typename node_t, typename matcher_t>

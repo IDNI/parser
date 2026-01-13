@@ -1,5 +1,5 @@
 // To view the license please visit
-// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+// https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #ifndef __IDNI__UTILITY__TREE_H__
 #define __IDNI__UTILITY__TREE_H__
@@ -37,7 +37,7 @@ struct tref_range {
 		using difference_type = std::ptrdiff_t;
 		using pointer = tref*;
 		using reference = tref&;
-        
+
 		tref current;
 		iterator(tref id);
 		tref operator*() const;
@@ -60,7 +60,7 @@ struct tree_range {
 		using difference_type = std::ptrdiff_t;
 		using pointer = const T*;
 		using reference = const T&;
-        
+
 		tref current;
 		iterator(tref id);
 		const T& operator*() const;
@@ -163,7 +163,7 @@ struct bintree {
 	 * @brief Left child of the binary tree node
 	 */
 	const tref l;
-	
+
 	/**
 	 * @brief Right child of the binary tree node
 	 */
@@ -262,7 +262,7 @@ struct bintree {
 	 */
 	 template <CacheType cache_t>
 	 static cache_t& create_cache(const cache_t& init);
- 
+
 	/**
 	 * @brief Print the tree to an ostream.
 	 * @param os The ostream to print to.
@@ -525,7 +525,7 @@ struct lcrs_tree : public bintree<T> {
 	 * @brief Creates new tree node from value and children tref initializer list
 	 * @param v The node
 	 * @param ch Children tref initializer list
-	 * @param r The right sibling	
+	 * @param r The right sibling
 	 * @return The new tree node's tref id
 	 */
 	static tref get(const T& v, const std::initializer_list<T>& children,
@@ -808,8 +808,8 @@ struct lcrs_tree : public bintree<T> {
 	 * @brief Dump the node to std::cout
 	 * @param subtree with node's subtree
 	 * @return The node itself
-	 * This method can be used to simply add ".dump()" anywhere 
-	 * to lcrs_tree<T> instance for simple debugging. 
+	 * This method can be used to simply add ".dump()" anywhere
+	 * to lcrs_tree<T> instance for simple debugging.
 	 * Example:
 	 *         auto t = lcrs_tree<int>::get(0);
 	 *         if (t.value == 1) ...

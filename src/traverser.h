@@ -1,5 +1,5 @@
 // To view the license please visit
-// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+// https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #ifndef __IDNI__PARSER__TRAVERSER_H__
 #define __IDNI__PARSER__TRAVERSER_H__
@@ -92,10 +92,10 @@ const auto nonterminal_extractor = extractor<node_variant_t, parser_t,
 
 /**
  * @brief Traverser for traversing a subtree and extracting information from it.
- * 
+ *
  * Traverser object can be created from a rewriter tree node and provides API
  * for traversing its subtree and extract information from it.
- * 
+ *
  * @tparam node_variant_t variant of the rewriter tree node.
  * @tparam parser_t parser type.
  */

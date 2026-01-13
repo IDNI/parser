@@ -1,5 +1,5 @@
 // To view the license please visit
-// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+// https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #include <deque>
 #include "tree.h"
@@ -290,7 +290,7 @@ cache_t& bintree<T>::create_cache(const cache_t& init) {
 			// add to new cache if all checks passed
 			if (ok) new_cache.emplace(key, it->second);
 		}
-		cache = std::move(new_cache); 
+		cache = std::move(new_cache);
 	});
 	return cache;
 }
@@ -619,7 +619,7 @@ tref lcrs_tree<T>::add_sibling(tref n, tref s, int_t pos) {
 
 template<typename T>
 tref lcrs_tree<T>::add_child(tref n, tref c, int_t pos) {
-	const lcrs_tree<T>& t = get(n); 
+	const lcrs_tree<T>& t = get(n);
 	if (t.l == nullptr)
 		return bintree<T>::get(t.value, c, t.r);
 	tref nc = add_sibling(t.l, c, pos);

@@ -1,5 +1,5 @@
 // To view the license please visit
-// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+// https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #include <optional>
 #include "forest.h"
@@ -61,12 +61,12 @@ typename htree::sp forest<NodeT>::graph::_extract_tree2(
 		if (pack.size() >= 1) {
 			// select pack to traverse not already done;
 			if (edgcount[root] >= pack.size()) {
-				//have fully explored before, so just return 
+				//have fully explored before, so just return
 				//non terminal with no children
 				return bintree<NodeT>::get(root, nullptr, rchd);
 			}
 			//still an edge to children unexplored
-			for (size_t i = 0; i < edgcount[root]; i++) 
+			for (size_t i = 0; i < edgcount[root]; i++)
 				++nodesit;
 			edgcount[root]++;
 			for (auto chdit = nodesit->rbegin();
@@ -75,7 +75,7 @@ typename htree::sp forest<NodeT>::graph::_extract_tree2(
 				crchd = post_trav(*chdit, crchd, post_trav);
 			}
 		}
-		
+
 		return bintree<NodeT>::get((NodeT)root, crchd, rchd);
     };
 	//bintree<NodeT>::dump();
@@ -331,12 +331,12 @@ typename forest<NodeT>::graph forest<NodeT>::extract_first_graph(
 			ambpid++;
 			if( de.insert({rid, rid + ambpid + 1}).second) {
 				if(gs.find(crt) == gs.end())
-					gs.insert({crt, {nextp}});		
+					gs.insert({crt, {nextp}});
 				// coming back from different edge
 				else gs[crt].insert(nextp);
 				for (auto& nd: nextp) {
 					if(nd->first.nt() && de.insert({rid + ambpid + 1,
-						ndmap[nd]}).second) 
+						ndmap[nd]}).second)
 							todo.push_back(nd);
 				}
 				break;  // first graph needed only, so break out
@@ -549,8 +549,8 @@ bool forest<NodeT>::replace_node(graph& g, const node& torepl,
 			auto newrhs = *rhs_it;
 			bool lchange = false;
 			//keep replacing torepl's any occurence in the newrhs
-			
-				size_t rpos = 0; 
+
+				size_t rpos = 0;
 				for ( ; rpos < newrhs.size(); ) {
 					//std::cout<< newrhs.at(rpos).first <<std::endl;
 					if (newrhs.at(rpos) == torepl) {
@@ -569,11 +569,11 @@ bool forest<NodeT>::replace_node(graph& g, const node& torepl,
 						std::cout << std::endl;
 						std::cout<<"done making change\n";
 						*/
-						lchange = true; 
+						lchange = true;
 					}
 					else rpos++;
 				}
-			
+
 			if (lchange) {
 				//std::cout<<"making change2" << std::endl;
 				rhs_it = kv.second.erase(rhs_it);

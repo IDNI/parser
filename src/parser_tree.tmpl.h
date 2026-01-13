@@ -1,5 +1,5 @@
 // To view the license please visit
-// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+// https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #include "parser.h"
 namespace idni {
@@ -249,7 +249,7 @@ typename parser<C, T>::tree::traverser
 	if (!has_value()) return traverser();
 	for (tref c : tree::get(value()).children()) {
 		const auto& n = tree::get(c);
-		if (n.is_nt() && n.get_nt() == nt) return { c }; 
+		if (n.is_nt() && n.get_nt() == nt) return { c };
 	}
 	return {};
 }
@@ -262,7 +262,7 @@ typename parser<C, T>::tree::traverser
 	for (tref v : values()) {
 		for (tref c : tree::get(v).children()) {
 			const auto& n = tree::get(c);
-			if (n.is_nt() && n.get_nt() == nt) r.push_back(c); 
+			if (n.is_nt() && n.get_nt() == nt) r.push_back(c);
 		}
 	}
 	return traverser(r);

@@ -1,5 +1,5 @@
 // To view the license please visit
-// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+// https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 // JSON parser tutorial
 
@@ -15,9 +15,9 @@ using namespace std;
 using namespace idni;
 
 //state class for traversing a JSON collection element
-struct traversal_state { 
-    traversal_state(bool is_array) : 
-        type(is_array), 
+struct traversal_state {
+    traversal_state(bool is_array) :
+        type(is_array),
         size(0) {}
 
     bool is_array() {
@@ -40,10 +40,10 @@ struct json_parser {
     json_parser() :
         // predefined character class function for digits, printables and spaces
         cc(predefined_char_classes({ "digit", "printable", "space" }, nts)),
-        digit(nts("digit")), printable(nts("printable")), space(nts("space")), 
+        digit(nts("digit")), printable(nts("printable")), space(nts("space")),
         // create nonterminals we will use
         start(nts("start")), element(nts("element")), whitespace(nts("whitespace")),
-        integer(nts("integer")), digits(nts("digits")), 
+        integer(nts("integer")), digits(nts("digits")),
         escaping(nts("escaping")), escaped(nts("escaped")),
         unescaped(nts("unescaped")), strchar(nts("strchar")),
         strchars(nts("strchars")), str(nts("string")),
@@ -80,7 +80,7 @@ private:
             opensquare('['), closedsquare(']'), comma(','),
             opencurly('{'), closedcurly('}'), colon(':'),
             nul{ lit() }; // nul(l) literal
-        
+
         // whitespace is zero or more spaces
         r(whitespace, (space + whitespace) | nul);
 
@@ -103,8 +103,8 @@ private:
         r(str,        quote + strchars + quote);
 
         // array items are zero or more comma separated elements
-        r(itemseq,    element | 
-                      (element + whitespace + comma + whitespace + itemseq) | 
+        r(itemseq,    element |
+                      (element + whitespace + comma + whitespace + itemseq) |
                       nul);
         // array is list of elements in square brackets
         r(array,      opensquare + whitespace + itemseq + whitespace + closedsquare);
@@ -112,12 +112,12 @@ private:
         // key-value pair are string and element separated by colon
         r(keyvalue,   str + whitespace + colon + whitespace + element);
         // object elements are zero or more comma separated key-value pairs
-        r(pairs,      keyvalue | 
-                      (keyvalue + whitespace + comma + whitespace + pairs) | 
+        r(pairs,      keyvalue |
+                      (keyvalue + whitespace + comma + whitespace + pairs) |
                       nul);
         // object is list of key-value pairs in curly braces
         r(object,     opencurly + whitespace + pairs + whitespace + closedcurly);
-        
+
         // JSON elemen it is either a number, string, array, or an object
         r(element,    integer | str | array | object);
         // start can be value
@@ -188,7 +188,7 @@ private:
                     // of the collection
                     else
                         buffer << indentation_level;
-                    
+
                     // advance the number of elements in the collection
                     // keys and values in objects count as separate elements
                     current_state.add_element();

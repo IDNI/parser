@@ -1,5 +1,5 @@
 // To view the license please visit
-// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+// https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #include "tree.h"
 
@@ -67,7 +67,7 @@ template <typename predicate_t>
 find_top_predicate<predicate_t>::find_top_predicate(predicate_t& query, tref& found)
 	: query(query), found(found) {}
 
-template <typename predicate_t>	
+template <typename predicate_t>
 bool find_top_predicate<predicate_t>::operator()(tref n) {
 	DBG(assert(n != nullptr);)
 	if (found == nullptr && query(n)) found = n;

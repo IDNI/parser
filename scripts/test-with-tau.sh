@@ -46,7 +46,7 @@ done
 rm -rf external/parser/*
 
 # copy current parser source to place where tau expects it
-cp -r ../cmake ../src ../CMakeLists.txt ../VERSION ../LICENSE.txt ../README.md \
+cp -r ../cmake ../src ../CMakeLists.txt ../VERSION ../LICENSE.md ../README.md \
 	external/parser
 
 # build tau with tests and run them

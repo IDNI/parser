@@ -1,5 +1,5 @@
 // To view the license please visit
-// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+// https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #ifndef __IDNI__PARSER__PARSER_TERM_COLOR_MACROS_H__
 #define __IDNI__PARSER__PARSER_TERM_COLOR_MACROS_H__

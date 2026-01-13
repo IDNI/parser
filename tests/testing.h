@@ -1,5 +1,5 @@
 // To view the license please visit
-// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+// https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #ifndef __IDNI__PARSER__TESTING_H__
 #define __IDNI__PARSER__TESTING_H__
@@ -77,9 +77,9 @@ namespace idni::testing
 			test_id++;
 		else
 			test_name_prev = test_name, test_id = 0;
-		
+
 		if (only_neg && test_is_neg == false)
-			return false;	
+			return false;
 		// check white lists and black lists and decide if we run or skip
 		bool g_wl = groups_wl.size(),
 			 t_wl = tests_wl.size(),

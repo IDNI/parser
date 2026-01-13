@@ -1,5 +1,5 @@
 // To view the license please visit
-// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+// https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #ifndef __IDNI__PARSER__UTILITY__REPL_H__
 #define __IDNI__PARSER__UTILITY__REPL_H__
@@ -198,7 +198,7 @@ private:
 			std::cerr << " " << lws_[i];
 		std::cerr << " >";
 	}
-#endif // TERM_DEBUG	
+#endif // TERM_DEBUG
 	void prev_line() {
 		TDBG(std::cerr << " <PREV LINE: [" << r_ << ", " << c_ << "]>";)
 		if (r_) {

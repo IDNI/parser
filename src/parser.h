@@ -1,5 +1,5 @@
 // To view the license please visit
-// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+// https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #ifndef __IDNI__PARSER__PARSER_H__
 #define __IDNI__PARSER__PARSER_H__
@@ -40,7 +40,7 @@ struct lit;
 
 /**
  * @brief A container for maping ids of non-terminal literals to their names.
- * 
+ *
  * Since this library sees nonterminals only as their ids this container
  * provides some convenience to use string names and get string names back when
  * using the library.
@@ -73,7 +73,7 @@ struct lit {
 	bool is_null_ = false;
 	/**
 	 * @brief Creates a null literal.
-	 * 
+	 *
 	 * Null literal can be used as a body of a production rule or as one of its
 	 * disjuncted bodies to satisfy a production rule when there is no sequence
 	 * matched.
@@ -85,21 +85,21 @@ struct lit {
 	lit(size_t n, nonterminals<C, T>* nts);
 	/**
 	 * @brief Returns true if the literal is nonterminal or false if it is terminal.
-	 * 
+	 *
 	 * Before accessing a value of the literal by calling n() or t() it is
 	 * required to determine if it is a nonterminal or a terminal first.
 	 */
 	bool  nt() const;
 	/**
 	 * @brief Returns the id of an non-terminal if the literal is non-terminal.
-	 * 
+	 *
 	 * Before calling this method one has to be sure that it is a non-terminal.
 	 * Use nt() to find out.
 	 */
 	size_t n() const;
 	/**
 	 * @brief Returns the terminal character (or terminal of a type T) if the literal is terminal.
-	 * 
+	 *
 	 * Before calling this method one has to be sure that it is a terminal. Use
 	 * nt() to find out.
 	 */
@@ -121,14 +121,14 @@ struct lit {
 
 	/**
 	 * @brief Returns a vector of terminals.
-	 * 
+	 *
 	 * It would have no elements if is non-terminal or null or it would have a
 	 * single terminal element if the literal is terminal.
 	 */
 	std::vector<T> to_terminals() const;
 	/**
 	 * @brief Returns the literal as a string.
-	 * 
+	 *
 	 * \p nll is a string returned when the literal is null. If the literal is
 	 * a terminal it returns the string containing just the terminal (escaped)
 	 * in apostrophes ('). If the literal is a non-terminal it returns the name
@@ -137,7 +137,7 @@ struct lit {
 	std::basic_string<C> to_string(const std::basic_string<C>& nll={})const;
 	/**
 	 * @brief Returns the literal as a standard string (basic_string<char>).
-	 * 
+	 *
 	 * This is useful for printing literals into standard output.
 	 * This method works in a same way as the previous method to_string() and
 	 * converts the result into a std::string if it isn't already.
@@ -151,15 +151,15 @@ std::ostream& operator<<(std::ostream& os,
 
 // production rules in a disjunctive normal form of conjunction clauses of lits
 /// Literals
-template <typename C = char, typename T = C> 
-struct lits : public std::vector<lit<C, T>> { 
+template <typename C = char, typename T = C>
+struct lits : public std::vector<lit<C, T>> {
 	/**
 	 * @brief Whether the sequence is negated or not.
-	 * 
+	 *
 	 * Negated literal sequence satisfies a part of a production rule if it
 	 * does not match the input.
 	 */
-	bool neg = false; 
+	bool neg = false;
 };
 template <typename C = char, typename T = C>
 using conjs = std::set<lits<C, T>>; /// conjunctions of literals
@@ -177,7 +177,7 @@ struct prod {
 };
 /**
  * @brief Represents a grammar in DNF.
- * 
+ *
  * It is a list of production rules. It can also represent a single production
  * rule or any element of a production rule since prods is used for expressions
  * to make building of a grammar programatically more convenient.
@@ -229,7 +229,7 @@ struct prods : public std::vector<prod<C, T>> {
 	 * body \p p (represented by prods)
 	 */
 	void operator()(const lit<C, T>& l, const prods<C, T>& p);
-	/// 
+	///
 	bool operator==(const lit<C, T>& l) const;
 	/**
 	 * Returns the last literal from a body of the last rule. This simplifies
@@ -245,7 +245,7 @@ template <typename T = char>
 using char_class_fn = std::function<bool(T)>;
 /**
  * @brief Container for character class functions.
- * 
+ *
  * It can be passed to a grammar when instantiated.
  */
 template <typename T = char>
@@ -259,14 +259,14 @@ struct char_class_fns {
 	/// Returns true if a \p nt is a character class function.
 	bool is_fn(size_t nt) const;
 	/// Returns true if a \p nt is an eof character class function.
-	bool is_eof_fn(size_t nt) const; 
+	bool is_eof_fn(size_t nt) const;
 	/// id of an eof function.
 	size_t eof_fn = -1;
 };
 
 /**
  * @brief Return a char_class_fns container with specified functions.
- * 
+ *
  * Helper function which returns a `char_class_fns` container with one or more
  * of specified predefined character functions.
  */
@@ -278,7 +278,7 @@ char_class_fns<T> predefined_char_classes(
 struct shaping_options {
 	/**
 	 * @brief Nonterminal ids of symbols to trim (including their children) away from the resulting tree.
-	 * 
+	 *
 	 * List can be provided in TGF with @trim whitespace, comment.
 	 */
 	std::set<size_t> to_trim{};
@@ -286,15 +286,15 @@ struct shaping_options {
 	std::set<size_t> to_trim_children{};
 	/**
 	 * @brief Nonterminal ids of symbols which children will be trimmed away from the resulting tree.
-	 * 
+	 *
 	 * List can be provided in TGF with @trim children sym1, sym2.
 	 */
 	std::set<size_t> to_trim_children_terminals{};
 	/**
 	 * @brief Whetther to trim all terminals from the resulting parse tree.
-	 * 
+	 *
 	 * If trim_terminals is true it trims all terminals from the resulting parse tree. It is false by default.
-	 * 
+	 *
 	 * This can be set to true in TGF by @trim all terminals.
 	 */
 	bool trim_terminals = false;
@@ -302,36 +302,36 @@ struct shaping_options {
 	/// nonterminal ids to inline by shaping coming from @inline ...
 	/**
 	 * @brief Replaces a node with its children.
-	 * 
+	 *
 	 * Contains vectors of nonterminal ids.
-	 * 
+	 *
 	 * If a vector contains only a single nonterminal, it means that the
 	 * nonterminal is replaced by its children.
-	 * 
+	 *
 	 * If a vector contains more than one nonterminal, it searches the parsed
 	 * tree for occurance of a tree path of nonterminals denoted by nonterminal
 	 * ids in the vector. First nonterminal is replaced by the last nonterminal
 	 * node in the vector.
-	 * 
+	 *
 	 * This can be populated by @inline directive.
-	 * 
+	 *
 	 * @inline chars. Node chars is replaced by its children.
-	 * 
+	 *
 	 * @inline expr > block > expr. Node expr containing a child node block
 	 * which contains a child node expr is replaced by the expr child.
 	 */
 	std::set<std::vector<size_t>> to_inline{};
 	/**
 	 * @brief Whether shaping will also inline all character class functions.
-	 * 
+	 *
 	 * If inline_char_classes is true shaping will also inline all character
 	 * class functions. Is a short alternative to adding them into to_inline or
 	 * @inline one by one.
-	 * 
+	 *
 	 * Default value is false.
-	 * 
+	 *
 	 * In TGF this can be set to true by adding char classes to @inline directive.
-	 * 
+	 *
 	 * @inline char classes.
 	 */
 	bool inline_char_classes = false;
@@ -342,7 +342,7 @@ template <typename C, typename T> struct grammar_inspector;
 template <typename C, typename T> class parser;
 /**
  * @brief Grammar struct required by parser.
- * 
+ *
  * Accepts nonterminals ref, prods and char class functions.
  */
 template <typename C = char, typename T = C>
@@ -353,7 +353,7 @@ struct grammar {
 	struct options {
 		/**
 		 * @brief Whether negations in a grammar are transformed into a negation tracking rule.
-		 * 
+		 *
 		 * If this is true, and it is true by default, any negation in a
 		 * grammar is transformed into a negation tracking rule when the
 		 * grammar is instantiated. false is used for example to instantiate
@@ -363,11 +363,11 @@ struct grammar {
 		bool transform_negation = true;
 		/**
 		 * @brief Disambiguates according to an order of production rule in the grammar.
-		 * 
+		 *
 		 * This is true by default. Parser disambiguates parse trees according
 		 * to an order of production rule appearance in the grammar. Setting
 		 * this to false would make parser to provide all possible parse trees.
-		 * 
+		 *
 		 * This can be also disabled by TGF directive @disable disambiguation.
 		 */
 		bool auto_disambiguate = true;
@@ -375,14 +375,14 @@ struct grammar {
 		 * If auto_disambiguate is set to true this list contains nonterminal
 		 * ids of symbols we don't want to disambiguate and we want to keep
 		 * ambiguity in the resulting parse forest.
-		 * 
+		 *
 		 * This list can be set by TGF directive: @ambiguous symbol1, symbol2.
 		 */
 		std::set<size_t> nodisambig_list{};
 		/// Parsed tree shaping_options
 		shaping_options shaping = {};
 		/// Production guard names
-		std::set<std::string> enabled_guards = {}; 
+		std::set<std::string> enabled_guards = {};
 	} opt;
 	grammar(nonterminals<C, T>& nts, options opt = {});
 	grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
@@ -443,7 +443,7 @@ struct grammar {
 #endif // DEBUG
 	/// Returns a literal of a nonterminal with id n.
 	lit<C, T> nt(size_t n);
-	/** 
+	/**
 	 * Returns a literal of a nonterminal named s. It is added into
 	 * nonterminals if it's not contained already.
 	 */
@@ -540,7 +540,7 @@ public:
 		static tref get(const pnode& v, const pnode* ch, size_t len);
 		static tref get(const pnode& v, const std::vector<pnode>& ch);
 		static tref get(const pnode& v, const pnode& ch);
-		static tref get(const pnode& v, const pnode& ch1, const pnode& ch2); 
+		static tref get(const pnode& v, const pnode& ch1, const pnode& ch2);
 
 		size_t children_size() const;
 
@@ -770,7 +770,7 @@ public:
 		size_t pos();
 		/**
 		 * @brief Moves to the next character.
-		 * 
+		 *
 		 * Increments position and updates the current character.
 		 */
 		bool next();
@@ -783,7 +783,7 @@ public:
 		size_t tpos();
 		bool tnext();
 		bool teof();
-		/// Reads value at tpos 
+		/// Reads value at tpos
 		T tat(size_t p);
 	private:
 		void decode();
@@ -830,14 +830,14 @@ public:
 		 * Decoder function reading an input converting element or elements of
 		 * a type C to a vector of elements of type T according to template
 		 * type parameters T and C. More about these recorders here.
-		 * 
+		 *
 		 * Default value is 0, ie. no decoder function.
 		 */
 		decoder_type chars_to_terminals = 0;
 		/**
 		 * Encoder function converting vector of terminals of a type T to a
 		 * std::basic_string\<C> according to template type parameters T and C.
-		 * 
+		 *
 		 * Default value is 0, ie. no encoder function.
 		 */
 		encoder_type terminals_to_chars = 0;
@@ -1056,7 +1056,7 @@ public:
 #endif
 	/**
 	 * @brief Whether the last parse method call matched a starting literal production rule.
-	 * 
+	 *
 	 * This means that the parsed input was parsed fully and successfully and
 	 * there exists at least one tree with a root being the starting literal.
 	 * If this method returns false use parser<C, T>::get_error() to obtain

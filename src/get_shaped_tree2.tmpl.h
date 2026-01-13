@@ -1,5 +1,5 @@
 // To view the license please visit
-// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+// https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #include <algorithm>
 #include "parser.h"
@@ -18,7 +18,7 @@ tref parser<C, T>::result::get_trimmed_tree2(tref ref,
 	if (t.is_null()) return nullptr;
 	if (trimmable_node<C, T>(t.value, opts)) return nullptr;
 
-	if (t.is_t()) return ref; // terminal leaf node 
+	if (t.is_t()) return ref; // terminal leaf node
 
 	trefs ch;
 	for (tref c : t.children()) {
@@ -202,13 +202,13 @@ tref parser<C, T>::result::get_tree2(const pnode& n) {
 	});
 	*/
 	MS(emeasure_time_end(s, e);)
-	
+
 	MS(emeasure_time_start(s1,e1);)
 	MS(std::cout<<"\n inline_grammar ";)
 	inline_grammar_transformations(g);
 	MS(emeasure_time_end(s1, e1);)
-	
-	
+
+
 	MS(emeasure_time_start(s2,e2);)
 	MS(std::cout<<"\n extract_tree2 ";)
 	t = g.extract_tree2();
@@ -221,10 +221,10 @@ tref parser<C, T>::result::get_tree2(const pnode& n) {
 		return false;
 	});
 	*/
-	
-	
+
+
 	return t->get();
-	
+
 }
 #endif // PARSER_BINTREE_FOREST
 

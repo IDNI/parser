@@ -1,5 +1,5 @@
 // To view the license please visit
-// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+// https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #include "parser.h"
 
@@ -297,8 +297,8 @@ void parser<C, T>::resolve_conjunctions(container_t& c, container_t& t) {
 			U[x.set].insert(x);
 			S[x.set].erase(x);
 			if (auto fit = fromS.find(x.from); fit != fromS.end()) {
-   				fit->second.erase(x.set);         
-    			if (fit->second.empty()) fromS.erase(fit);  
+   				fit->second.erase(x.set);
+    			if (fit->second.empty()) fromS.erase(fit);
 			}
 			c.erase(x);
 		}
@@ -352,7 +352,7 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 			DBGP(print(std::cout << "Add Edge: ", *it) << " --> ";)
 			DBGP(print(std::cout, j) << std::endl;)
 			++refi[*it];
-			
+
 			// — your existing “added to t2” debug line
 			DBGP(print(std::cout << TC.MAGENTA() <<
 				" +  adding to t2 \t\t\t", j) << TC.CLEAR() << "\n";)
@@ -397,7 +397,7 @@ void parser<C, T>::predict(const item& i, container_t& t) {
 				// if item is added, then it is a new item
 				//if(S[i.set].find(j) != S[i.set].end()) {
 					// j item is already present
-				//}		
+				//}
 			}
 			if(o.enable_gc) ++refi[i]; //insert and increment
 		}
@@ -463,7 +463,7 @@ void parser<C, T>::scan_cc_function(const item& i, size_t n, T ch,
 		"] \t", k) << "\n";)
 	if (S.size() <= k.set) S.resize(k.set + 1);
 	S[k.set].insert(k), fromS[k.from].insert(k.set);
-	DBGP(print(std::cout << "Add Edge: ", i) << " --> ";)  
+	DBGP(print(std::cout << "Add Edge: ", i) << " --> ";)
 	DBGP(print(std::cout, k) << "\n";)
 	//++refi[i];
 	// i is scanned over and item k is completed so collectible.
@@ -642,7 +642,7 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 								if (fit->second.empty())
 									fromS.erase(fit);
 						}
-	
+
 						MS(gcnt++;)
 					}
 					it = gcready.erase(it);
@@ -690,19 +690,19 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 
 	MS(auto usen = f->count_useful_nodes(f->root());)
 	MS(auto usenc = usen.first + usen.second;)
-	
+
 	MS(std::cout << "\nGC: Useful nodes"
 		<<usen.first <<"+"<<usen.second << "=" << usenc <<"\n" );
-	
+
 	MS(if (count + gcnt)
 		std::cout << "\nGC: useful% = " << 100*(usenc)
 		/(count+gcnt) <<std::endl );
 	MS(if (count + gcnt -usenc)
 		std::cout << "\nGC: achieved% = " << 100*gcnt
 		/(count+gcnt - usenc) <<std::endl);
-	
+
 	MS(if (count + gcnt)
-		std::cout << "\nGC: potenial% = " << 100*(count+gcnt 
+		std::cout << "\nGC: potenial% = " << 100*(count+gcnt
 		- usenc)/(count + gcnt) <<std::endl);
 
 #ifdef PARSER_BINTREE_FOREST
@@ -1225,10 +1225,10 @@ tref parser<C, T>::build_forest(const pnode& root) {
 			auto& cur = *curp;
 			// print(std::cout << "cur: ", cur) << "\n";
 			if (cur.set != node.second[1]) continue;
-			
+
 			pnode cnode(completed(cur) /*&& !negative(cur)*/
 				? g(cur.prod) : g.nt(node.first.n()),
-				{ cur.from, cur.set });			
+				{ cur.from, cur.set });
 			cambset.clear();
 			bool allowed_disambg = check_allowed(cnode);
 			if (o.binarize) binarize_comb(cur,
@@ -1270,7 +1270,7 @@ tref parser<C, T>::build_forest(const pnode& root) {
 				for (auto packidx : idxs) {
 					auto apack = *next(ambset.begin(), packidx);
 					pnode lt = apack[k];
-					int span = static_cast<int>(lt.second[1] - lt.second[0]);					
+					int span = static_cast<int>(lt.second[1] - lt.second[0]);
 					if (gspan == span) gi.push_back(packidx);
 					if (gspan > span) gspan = span,
 						gi.clear(),gi.push_back(packidx);
@@ -1286,7 +1286,7 @@ tref parser<C, T>::build_forest(const pnode& root) {
 		}
 
 		// choose which set to use for building
-		return (snodes.size() && check_allowed(*snodes.begin())) 
+		return (snodes.size() && check_allowed(*snodes.begin()))
 			? cambset : ambset;
 	};
 
@@ -1386,11 +1386,11 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 		for(size_t i = 0; i < ambset.size(); i++) idxs.push_back(i);
 		// smallest node count in ambset
 		int maxk = INT_MAX;
-		for(auto& pack : ambset) 
+		for(auto& pack : ambset)
 			if ((int)pack.size() < maxk) maxk = pack.size();
 
 
-		//choose the one with the first smallest span from upto size of 
+		//choose the one with the first smallest span from upto size of
 		// smallest set in ambset
 		do {
 			gi.clear();

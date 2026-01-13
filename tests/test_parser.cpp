@@ -1,5 +1,5 @@
 // To view the license please visit
-// https://github.com/IDNI/parser/blob/main/LICENSE.txt
+// https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #include "parser.h"
 
@@ -36,7 +36,7 @@ int main(int argc, char **argv)
 		enabled(nt("enabled")), disabled(nt("disabled")),
 		number(nt("number")),  digits(nt("digits")),
 		q_str(lit<>{'"'}), esc(lit<>{'\\'}), escape(nt("escape"));
-	
+
 #ifndef PARSER_BINTREE_FOREST
 		parser<>::pnode n1, n2,n3;
 		{
@@ -48,10 +48,10 @@ int main(int argc, char **argv)
 			p2 = p1;
 			p2 = n2;
 			p2 = p4;
-			
+
 			auto f= [p1,&p2](auto a){
 				return	p2 = a;
-				
+
 			};
 			p4 = f(p1);
 			//n3 = ) p4;
@@ -594,7 +594,7 @@ int main(int argc, char **argv)
 		if (testing::verbosity > 0)
 			cout << "benchmark test finished" << endl;
 	}
-	
+
 	cout << endl;
 	if (testing::failed) cout << "FAILED\n";
 	return testing::failed ? 1 : 0;
