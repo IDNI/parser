@@ -24,7 +24,7 @@ function(version_license template_file output_file)
 	string(REPLACE "\"" "\\\"" LICENSE_CONTENT "${LICENSE_CONTENT}")
 
 	# @BUILD_DATE_ISO@
-	execute_process(COMMAND date --iso
+	execute_process(COMMAND date -I
 			OUTPUT_VARIABLE BUILD_DATE_ISO
 			OUTPUT_STRIP_TRAILING_WHITESPACE)
 	string(REPLACE "\"" "\\\"" BUILD_DATE_ISO "${BUILD_DATE_ISO}")
