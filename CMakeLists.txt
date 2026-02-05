@@ -45,6 +45,7 @@ option(TAU_PARSER_BUILD_EMSCRIPTEN     "Build for Emscripten"               OFF)
 option(TAU_PARSER_BUILD_TESTS          "Build library tests"                OFF)
 option(TAU_PARSER_BUILD_EXAMPLES       "Build examples"                     OFF)
 option(TAU_PARSER_BUILD_TGF            "Build tgf tool"                     OFF)
+option(TAU_PARSER_BUILD_PIC            "Build position independent code"    OFF)
 option(TAU_PARSER_WINDOWS_PACKAGE      "Build Windows package"              OFF)
 option(TAU_PARSER_WINDOWS_ZIP_PACKAGE  "Build Windows zip package"          OFF)
 
@@ -144,6 +145,10 @@ elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
 	set(TAU_PARSER_COMPILE_OPTIONS "${TAU_PARSER_RELEASE_OPTIONS}")
 endif()
 
+if(TAU_PARSER_BUILD_PIC)
+	set(TAU_PARSER_COMPILE_OPTIONS "${TAU_PARSER_COMPILE_OPTIONS};-fPIC")
+endif()
+
 # install destinations
 set(TAU_PARSER_BIN_DESTINATION "bin")
 set(TAU_PARSER_DOC_DESTINATION "share/doc/${PROJECT_NAME}")
@@ -159,6 +164,7 @@ message(STATUS "TAU_PARSER_BUILD_EMSCRIPTEN:     ${TAU_PARSER_BUILD_EMSCRIPTEN}"
 message(STATUS "TAU_PARSER_BUILD_TESTS:          ${TAU_PARSER_BUILD_TESTS}")
 message(STATUS "TAU_PARSER_BUILD_EXAMPLES:       ${TAU_PARSER_BUILD_EXAMPLES}")
 message(STATUS "TAU_PARSER_BUILD_TGF:            ${TAU_PARSER_BUILD_TGF}")
+message(STATUS "TAU_PARSER_BUILD_PIC:            ${TAU_PARSER_BUILD_PIC}")
 message(STATUS "TAU_PARSER_ADDRESS_SANITIZER:    ${TAU_PARSER_ADDRESS_SANITIZER}")
 message(STATUS "TAU_PARSER_WINDOWS_PACKAGE:      ${TAU_PARSER_WINDOWS_PACKAGE}")
 message(STATUS "TAU_PARSER_WINDOWS_ZIP_PACKAGE:  ${TAU_PARSER_WINDOWS_ZIP_PACKAGE}")
