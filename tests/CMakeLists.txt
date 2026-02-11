@@ -5,6 +5,7 @@ set(TESTS
 	tgf
 	cli
 	tree
+	threadsafety
 )
 
 set(TEST_LIBS tauparser ${TEST_FRAMEWORK})

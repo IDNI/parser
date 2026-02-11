@@ -102,6 +102,7 @@ tref bintree<T>::get() const { return reinterpret_cast<tref>(this); }
 
 template <typename T>
 const htref bintree<T>::geth(tref h) {
+	std::lock_guard<std::mutex> lk(mtx);
 	//DBG(assert(h != NULL);)
 	if (h == NULL) return htree::null();
 	auto res = M().find(*reinterpret_cast<const bintree*>(h)); //done with one search
@@ -125,6 +126,7 @@ const bintree<T>& bintree<T>::get(const htref& h) {
 
 template <typename T>
 tref bintree<T>::get(const T& v, tref l, tref r) {
+	std::lock_guard<std::mutex> lk(mtx);
 #ifdef DEBUG
 	// Check that the pointed to children are of same node type as v by
 	// checking that they are present in the M map
@@ -151,9 +153,10 @@ tref bintree<T>::replace_value(const T& v) const { return get(v, l, r); }
 
 template <typename T>
 void bintree<T>::dump() {
+	std::lock_guard<std::mutex> lk(mtx);
 	std::cout << "-----\n";
 	std::cout << "MB:" << M().size() << "\n";
-	for (auto& x : M) {
+	for (auto& x : M()) {
 		std::cout << x.first.str() << " " << x.second.lock() << " "
 			<< x.second.use_count() << "\n";
 	}
@@ -162,6 +165,7 @@ void bintree<T>::dump() {
 
 template <typename T>
 void bintree<T>::gc() {
+	std::lock_guard<std::mutex> lk(mtx);
 	if (!gc_enabled) return;
 	std::unordered_set<tref> keep{};
 	gc(keep);
@@ -249,6 +253,7 @@ cache_t& bintree<T>::create_cache() {
 template <typename T>
 template <CacheType cache_t>
 cache_t& bintree<T>::create_cache(const cache_t& init) {
+	std::lock_guard<std::mutex> lk(mtx);
 	static std::deque<cache_t> caches;
 	cache_t& cache = caches.emplace_back(init);
 	// add callback to rebuild cache on gc

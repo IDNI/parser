@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <memory>
+#include <mutex>
 #include <iostream>
 #include <cassert>
 #include <iterator>
@@ -173,6 +174,12 @@ struct bintree {
 	 * @brief Hash of binary tree node
 	 */
 	const size_t hash;
+
+	/**
+     * @brief Mutex guarding M(), gc_callbacks, and caches created via create_cache().
+     * Minimal correctness approach
+     */
+	inline static std::mutex mtx{};
 
 	/**
 	 * @brief Get nodes's tref id
