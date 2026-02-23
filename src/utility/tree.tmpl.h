@@ -126,7 +126,23 @@ const bintree<T>& bintree<T>::get(const htref& h) {
 
 template <typename T>
 tref bintree<T>::get(const T& v, tref l, tref r) {
+
+
+#ifdef IDNI_TREE_LOCK_PROF
+	using clock = std::chrono::steady_clock;
+	auto t0 = clock::now();
+#endif
+
 	std::lock_guard<std::mutex> lk(mtx);
+
+#ifdef IDNI_TREE_LOCK_PROF
+	auto t1 = clock::now();
+	bintree<T>::get_calls.fetch_add(1, std::memory_order_relaxed);
+	bintree<T>::get_wait_ns.fetch_add(
+	(uint64_t)std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count(),
+	std::memory_order_relaxed);
+#endif
+
 #ifdef DEBUG
 	// Check that the pointed to children are of same node type as v by
 	// checking that they are present in the M map
@@ -145,6 +161,13 @@ tref bintree<T>::get(const T& v, tref l, tref r) {
 #endif
 	bintree bn(v, l, r);
 	auto res = bintree<T>::M().emplace(bn, htree::wp());
+
+#ifdef IDNI_TREE_LOCK_PROF
+	auto t2 = clock::now();
+	bintree<T>::get_hold_ns.fetch_add(
+ 	 (uint64_t)std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count(),
+ 	 std::memory_order_relaxed);
+#endif
 	return reinterpret_cast<tref>(std::addressof(res.first->first));
 }
 

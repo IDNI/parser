@@ -16,6 +16,11 @@
 #include <iostream>
 #include <cassert>
 #include <iterator>
+#define IDNI_TREE_LOCK_PROF 1
+#ifdef IDNI_TREE_LOCK_PROF
+#include <atomic>
+#include <chrono>
+#endif
 #include "../defs.h"
 
 namespace idni {
@@ -304,6 +309,32 @@ protected:
 	 * @brief Map of tree nodes to their handles
 	 */
 	static std::unordered_map<const bintree, htree::wp>& M();
+
+	
+#ifdef IDNI_TREE_LOCK_PROF
+	public:
+	static void reset_get_lock_profile() {
+  		get_calls.store(0, std::memory_order_relaxed);
+  		get_wait_ns.store(0, std::memory_order_relaxed);
+  		get_hold_ns.store(0, std::memory_order_relaxed);
+	}
+	static void print_get_lock_profile(std::ostream& os) {
+	const auto c = get_calls.load(std::memory_order_relaxed);
+	const auto w = get_wait_ns.load(std::memory_order_relaxed);
+	const auto h = get_hold_ns.load(std::memory_order_relaxed);
+	os << "bintree::get"
+		<< " calls=" << c
+		<< " wait_ms=" << (w / 1e6)
+		<< " hold_ms=" << (h / 1e6)
+		<< " avg_wait_ns=" << (c ? (w / c) : 0)
+		<< " avg_hold_ns=" << (c ? (h / c) : 0)
+		<< "\n";
+	}
+	private:
+	inline static std::atomic<uint64_t> get_calls{0};
+	inline static std::atomic<uint64_t> get_wait_ns{0};
+	inline static std::atomic<uint64_t> get_hold_ns{0};
+#endif
 };
 
 template <typename T> struct pre_order;

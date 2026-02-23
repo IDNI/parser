@@ -62,6 +62,8 @@ namespace idni::testing
 	bool print_lines = false;
 	size_t verbosity = 0;
 	bool run = false;
+	size_t thread_count = 4;
+
 
 	// selects group/test/id for testing or disables group/test from running
 	void group(const std::string &s) { groups_wl.push_back(s); }
@@ -564,6 +566,21 @@ namespace idni::testing
 				if (it == args.end())
 					missing(opt);
 				disable_test(*it);
+			}
+			else if (opt == "-thread_count")
+			{
+				it++;
+				if(it == args.end())
+					missing(opt);
+				std::stringstream is(*it);
+				int_t result = 0;
+				if (!(is >> result) || result < 0)
+				{
+					std::cerr << "'" << *it << "' is not a positive number.\n";
+					exit(1);
+				}
+				thread_count = result;
+
 			}
 			else if (opt == "-id")
 			{
