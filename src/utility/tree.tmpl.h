@@ -102,14 +102,61 @@ tref bintree<T>::get() const { return reinterpret_cast<tref>(this); }
 
 template <typename T>
 const htref bintree<T>::geth(tref h) {
-	std::lock_guard<std::mutex> lk(mtx);
-	//DBG(assert(h != NULL);)
-	if (h == NULL) return htree::null();
-	auto res = M().find(*reinterpret_cast<const bintree*>(h)); //done with one search
+    if (h == NULL) return htree::null();
+
+#ifdef IDNI_TREE_LOCK_PROF
+    using clock = std::chrono::steady_clock;
+    auto t0 = clock::now();
+#endif
+
+    std::unique_lock<std::shared_mutex> lk(mtx);
+
+#ifdef IDNI_TREE_LOCK_PROF
+    auto t1 = clock::now();
+    bintree<T>::geth_calls.fetch_add(1, std::memory_order_relaxed);
+    bintree<T>::geth_wait_ns.fetch_add(
+        (uint64_t)std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count(),
+        std::memory_order_relaxed);
+#endif
+
+    auto res = M().find(*reinterpret_cast<const bintree*>(h));
+
+    if (res == M().end()) {
+#ifdef IDNI_TREE_LOCK_PROF
+        auto t2 = clock::now();
+        bintree<T>::geth_hold_ns.fetch_add(
+            (uint64_t)std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count(),
+            std::memory_order_relaxed);
+#endif
+        return htree::null();
+    }
+
+    // Fast path: already have a live handle
+    if (auto ret = res->second.lock()) {
+#ifdef IDNI_TREE_LOCK_PROF
+        bintree<T>::geth_hit.fetch_add(1, std::memory_order_relaxed);
+        auto t2 = clock::now();
+        bintree<T>::geth_hold_ns.fetch_add(
+            (uint64_t)std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count(),
+            std::memory_order_relaxed);
+#endif
+        return ret;
+    }
+
+    // Slow path: create handle once
 	htref ret;
-	if (res != M().end()) res->second = ret = htref(new htree(h));
-	DBG(assert(!res->second.expired());)
-	return res->second.lock();
+    res->second = ret = htref(new htree(h));
+    DBG(assert(!res->second.expired());)
+
+#ifdef IDNI_TREE_LOCK_PROF
+    bintree<T>::geth_create.fetch_add(1, std::memory_order_relaxed);
+    auto t2 = clock::now();
+    bintree<T>::geth_hold_ns.fetch_add(
+        (uint64_t)std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count(),
+        std::memory_order_relaxed);
+#endif
+
+    return res->second.lock();
 }
 
 template <typename T>
@@ -126,47 +173,83 @@ const bintree<T>& bintree<T>::get(const htref& h) {
 
 template <typename T>
 tref bintree<T>::get(const T& v, tref l, tref r) {
-
+	bintree bn(v, l, r);
 
 #ifdef IDNI_TREE_LOCK_PROF
 	using clock = std::chrono::steady_clock;
 	auto t0 = clock::now();
 #endif
 
-	std::lock_guard<std::mutex> lk(mtx);
+	// Fast path: shared/read lock
+	{
+		std::shared_lock<std::shared_mutex> lk(mtx);
+		auto it = M().find(bn);
+		if (it != M().end()) {
+#ifdef IDNI_TREE_LOCK_PROF
+			auto t1 = clock::now();
+			bintree<T>::get_calls.fetch_add(1, std::memory_order_relaxed);
+			bintree<T>::get_wait_ns.fetch_add(
+				(uint64_t)std::chrono::duration_cast<
+					std::chrono::nanoseconds>(t1 - t0).count(),
+				std::memory_order_relaxed);
+			bintree<T>::get_hold_ns.fetch_add(
+				0, std::memory_order_relaxed);
+#endif
+			return reinterpret_cast<tref>(std::addressof(it->first));
+		}
+	}
+
+	// Slow path: unique/write lock
+	std::unique_lock<std::shared_mutex> lk(mtx);
 
 #ifdef IDNI_TREE_LOCK_PROF
 	auto t1 = clock::now();
 	bintree<T>::get_calls.fetch_add(1, std::memory_order_relaxed);
 	bintree<T>::get_wait_ns.fetch_add(
-	(uint64_t)std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count(),
-	std::memory_order_relaxed);
+		(uint64_t)std::chrono::duration_cast<
+			std::chrono::nanoseconds>(t1 - t0).count(),
+		std::memory_order_relaxed);
 #endif
 
+	// Re-check after acquiring unique lock
+	auto it = M().find(bn);
+	if (it != M().end()) {
+#ifdef IDNI_TREE_LOCK_PROF
+		auto t2 = clock::now();
+		bintree<T>::get_hold_ns.fetch_add(
+			(uint64_t)std::chrono::duration_cast<
+				std::chrono::nanoseconds>(t2 - t1).count(),
+			std::memory_order_relaxed);
+#endif
+		return reinterpret_cast<tref>(std::addressof(it->first));
+	}
+
 #ifdef DEBUG
-	// Check that the pointed to children are of same node type as v by
-	// checking that they are present in the M map
+	// Keep debug checks only on write path
 	if (l != nullptr) {
 		auto c0 = get(l);
 		auto res_c0 = M().emplace(c0, htree::wp());
 		assert(res_c0.second == false);
-		assert(reinterpret_cast<tref>(std::addressof(res_c0.first->first)) == l);
+		assert(reinterpret_cast<tref>(
+			std::addressof(res_c0.first->first)) == l);
 	}
 	if (r != nullptr) {
 		auto c1 = get(r);
 		auto res_c1 = M().emplace(c1, htree::wp());
 		assert(res_c1.second == false);
-		assert(reinterpret_cast<tref>(std::addressof(res_c1.first->first)) == r);
+		assert(reinterpret_cast<tref>(
+			std::addressof(res_c1.first->first)) == r);
 	}
 #endif
-	bintree bn(v, l, r);
+
 	auto res = bintree<T>::M().emplace(bn, htree::wp());
 
 #ifdef IDNI_TREE_LOCK_PROF
 	auto t2 = clock::now();
 	bintree<T>::get_hold_ns.fetch_add(
- 	 (uint64_t)std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count(),
- 	 std::memory_order_relaxed);
+		(uint64_t)std::chrono::duration_cast<
+			std::chrono::nanoseconds>(t2 - t1).count(),
+		std::memory_order_relaxed);
 #endif
 	return reinterpret_cast<tref>(std::addressof(res.first->first));
 }
@@ -176,7 +259,7 @@ tref bintree<T>::replace_value(const T& v) const { return get(v, l, r); }
 
 template <typename T>
 void bintree<T>::dump() {
-	std::lock_guard<std::mutex> lk(mtx);
+	std::unique_lock<std::shared_mutex> lk(mtx);
 	std::cout << "-----\n";
 	std::cout << "MB:" << M().size() << "\n";
 	for (auto& x : M()) {
@@ -188,7 +271,7 @@ void bintree<T>::dump() {
 
 template <typename T>
 void bintree<T>::gc() {
-	std::lock_guard<std::mutex> lk(mtx);
+	std::unique_lock<std::shared_mutex> lk(mtx);
 	if (!gc_enabled) return;
 	std::unordered_set<tref> keep{};
 	gc(keep);
@@ -276,7 +359,7 @@ cache_t& bintree<T>::create_cache() {
 template <typename T>
 template <CacheType cache_t>
 cache_t& bintree<T>::create_cache(const cache_t& init) {
-	std::lock_guard<std::mutex> lk(mtx);
+	std::unique_lock<std::shared_mutex> lk(mtx);
 	static std::deque<cache_t> caches;
 	cache_t& cache = caches.emplace_back(init);
 	// add callback to rebuild cache on gc

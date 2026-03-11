@@ -13,6 +13,7 @@
 #include <unordered_set>
 #include <memory>
 #include <mutex>
+#include <shared_mutex>
 #include <iostream>
 #include <cassert>
 #include <iterator>
@@ -184,7 +185,7 @@ struct bintree {
      * @brief Mutex guarding M(), gc_callbacks, and caches created via create_cache().
      * Minimal correctness approach
      */
-	inline static std::mutex mtx{};
+	inline static std::shared_mutex mtx{};
 
 	/**
 	 * @brief Get nodes's tref id
@@ -317,23 +318,51 @@ protected:
   		get_calls.store(0, std::memory_order_relaxed);
   		get_wait_ns.store(0, std::memory_order_relaxed);
   		get_hold_ns.store(0, std::memory_order_relaxed);
+
+		geth_calls.store(0, std::memory_order_relaxed);
+    	geth_hit.store(0, std::memory_order_relaxed);
+    	geth_create.store(0, std::memory_order_relaxed);
+    	geth_wait_ns.store(0, std::memory_order_relaxed);
+    	geth_hold_ns.store(0, std::memory_order_relaxed);
 	}
 	static void print_get_lock_profile(std::ostream& os) {
-	const auto c = get_calls.load(std::memory_order_relaxed);
-	const auto w = get_wait_ns.load(std::memory_order_relaxed);
-	const auto h = get_hold_ns.load(std::memory_order_relaxed);
-	os << "bintree::get"
+		const auto c = get_calls.load(std::memory_order_relaxed);
+		const auto w = get_wait_ns.load(std::memory_order_relaxed);
+		const auto h = get_hold_ns.load(std::memory_order_relaxed);
+		os << "bintree::get"
+			<< " calls=" << c
+			<< " wait_ms=" << (w / 1e6)
+			<< " hold_ms=" << (h / 1e6)
+			<< " avg_wait_ns=" << (c ? (w / c) : 0)
+			<< " avg_hold_ns=" << (c ? (h / c) : 0)
+			<< "\n";
+		
+		{
+		const auto c = geth_calls.load(std::memory_order_relaxed);
+		const auto hit = geth_hit.load(std::memory_order_relaxed);
+		const auto create = geth_create.load(std::memory_order_relaxed);
+		const auto w = geth_wait_ns.load(std::memory_order_relaxed);
+		const auto h = geth_hold_ns.load(std::memory_order_relaxed);
+		os << "bintree::geth"
 		<< " calls=" << c
+		<< " hit=" << hit
+		<< " create=" << create
 		<< " wait_ms=" << (w / 1e6)
 		<< " hold_ms=" << (h / 1e6)
 		<< " avg_wait_ns=" << (c ? (w / c) : 0)
 		<< " avg_hold_ns=" << (c ? (h / c) : 0)
 		<< "\n";
+		}
 	}
 	private:
 	inline static std::atomic<uint64_t> get_calls{0};
 	inline static std::atomic<uint64_t> get_wait_ns{0};
 	inline static std::atomic<uint64_t> get_hold_ns{0};
+	inline static std::atomic<uint64_t> geth_calls{0};
+	inline static std::atomic<uint64_t> geth_hit{0};
+	inline static std::atomic<uint64_t> geth_create{0};
+	inline static std::atomic<uint64_t> geth_wait_ns{0};
+	inline static std::atomic<uint64_t> geth_hold_ns{0};
 #endif
 };
 
