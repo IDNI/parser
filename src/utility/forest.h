@@ -239,6 +239,31 @@ public:
 		cb_exit_t cb_exit = NO_EXIT,
 		cb_revisit_t cb_revisit = NO_REVISIT,
 		cb_ambig_t cb_ambig = NO_AMBIG) const;
+
+	// Build reverse adjacency index: child -> set of parent nodes.
+	// O(|edges|) one-time cost. Must call before traverse_backward/predecessors.
+	void build_reverse_index();
+
+	// Invalidate reverse index (call after any structural modification).
+	void invalidate_reverse_index();
+
+	// Visit all direct predecessors of node n via cb(predecessor_node).
+	template <typename cb_t>
+	void predecessors(const node& n, cb_t&& cb) const;
+
+	// Backward BFS traversal from a set of start nodes.
+	// cb_enter(node) called on each visited node.
+	// cb_revisit(node)->bool: return true to re-visit an already-seen node.
+	template <typename cb_enter_t, typename cb_revisit_t>
+	void traverse_backward(const nodes_set& starts,
+	                       cb_enter_t cb_enter,
+	                       cb_revisit_t cb_revisit) const;
+
+	// Backward traversal without revisit predicate (no-revisit by default).
+	template <typename cb_enter_t>
+	void traverse_backward(const nodes_set& starts, cb_enter_t cb_enter) const {
+		traverse_backward(starts, cb_enter, [](const node&){ return false; });
+	}
 	/// Replace each node with its immediate children,
 	/// assuming its only one pack (unambigous)
 	/// the caller to ensure the right order to avoid cyclic
@@ -256,6 +281,9 @@ public:
 	std::ostream& print_data(std::ostream& os) const;
 #endif
 private:
+	std::map<node, nodes> reverse_index;
+	bool reverse_index_valid = false;
+
 	template <typename cb_enter_t, typename cb_exit_t,
 		typename cb_revisit_t, typename cb_ambig_t>
 	bool _traverse(const node_graph& g, const node& root,

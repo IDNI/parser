@@ -44,6 +44,7 @@ if(TAU_PARSER_BUILD_HEADER_ONLY)
 	)
 	target_compile_definitions(tauparser INTERFACE TAU_PARSER_BUILD_HEADER_ONLY)
 	tauparser_setup(tauparser INTERFACE "")
+	target_link_libraries(tauparser INTERFACE unordered_dense)
 else()
 	if(TAU_PARSER_BUILD_STATIC_LIBRARY)
 		add_library(tauparser_static STATIC ${TAU_PARSER_SOURCES})
@@ -55,8 +56,9 @@ else()
 			$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 		)
 		tauparser_setup(tauparser_static PUBLIC "")
+		target_link_libraries(tauparser_static PUBLIC unordered_dense)
 	endif()
-	
+
 	if(TAU_PARSER_BUILD_SHARED_LIBRARY)
 		add_library(tauparser_shared SHARED ${TAU_PARSER_SOURCES})
 		set_target_properties(tauparser_shared PROPERTIES
@@ -67,6 +69,7 @@ else()
 			$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 		)
 		tauparser_setup(tauparser_shared PUBLIC "")
+		target_link_libraries(tauparser_shared PUBLIC unordered_dense)
 	endif()
 	
 	# Create an alias target for backward compatibility

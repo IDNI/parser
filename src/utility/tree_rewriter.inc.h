@@ -259,6 +259,9 @@ struct pattern_matcher2 {
 	bool operator()(tref n);
 	tref replace_root(tref n);
 	subtree_map<node, tref> changes{};
+	// Binding environment: pattern-variable tref -> captured input tref.
+	// Populated after a successful match and accessible to guards.
+	const subtree_map<node, tref>& get_env() const { return env; }
 private:
 	using tree = lcrs_tree<node>;
 	bool match(tref p, tref n);
@@ -267,6 +270,27 @@ private:
 	subtree_map<node, tref> env;
 };
 
+// Pattern matcher with guard predicate: matches only when structural pattern
+// matches AND guard(env, n) returns true.
+// guard_t signature: bool(const rewriter::environment<node>&, tref)
+// where env maps pattern-variable trefs to the captured input trefs.
+template <typename node, typename is_capture_t, typename guard_t>
+struct pattern_matcher_guarded {
+	pattern_matcher_guarded(const rewriter::rule& r,
+	                        const is_capture_t& is_capture,
+	                        guard_t&& guard);
+	bool operator()(tref n);
+	tref replace_root(tref n);
+	subtree_map<node, tref> changes{};
+private:
+	pattern_matcher2<node, is_capture_t> base;
+	guard_t guard_;
+	const rewriter::rule& r;
+};
+
+template <typename node, typename is_capture_t, typename guard_t>
+tref apply_rule_guarded(const rewriter::rule& r, tref root,
+                        const is_capture_t& c, guard_t&& guard);
 
 // this predicate matches when there exists a environment that makes the
 // pattern match the node ignoring the nodes detected as skippable.
@@ -363,6 +387,15 @@ tref apply_if(const rewriter::rule& r, tref n,
 // use internaly by apply and apply with skip.
 template <typename node, typename matcher_t>
 tref apply(tref s, tref n, matcher_t& matcher);
+
+// Apply rules repeatedly until the tree no longer changes (pointer equality test).
+template <typename node, typename is_capture_t>
+tref fixpoint(const rewriter::rules& rs, tref root, const is_capture_t& is_capture);
+
+// fixpoint with early-termination predicate: done(root) -> bool
+template <typename node, typename is_capture_t, typename done_t>
+tref fixpoint(const rewriter::rules& rs, tref root,
+              const is_capture_t& is_capture, done_t&& done);
 
 } // idni::rewriter namespace
 

@@ -802,6 +802,82 @@ tref apply(tref s, tref n, matcher_t& matcher) {
 	return n;
 }
 
+// Apply rules repeatedly until the tree no longer changes (pointer equality).
+template <typename node, typename is_capture_t>
+tref fixpoint(const rewriter::rules& rs, tref root, const is_capture_t& is_capture) {
+	auto done = [](tref) { return false; };
+	return fixpoint<node>(rs, root, is_capture, done);
+}
+
+// fixpoint with early-termination predicate: done(root) -> bool
+template <typename node, typename is_capture_t, typename done_t>
+tref fixpoint(const rewriter::rules& rs, tref root,
+              const is_capture_t& is_capture, done_t&& done)
+{
+	while (true) {
+		if (done(root)) return root;
+		tref prev = root;
+		for (const auto& r : rs)
+			root = apply_rule<node>(r, root, is_capture);
+		if (root == prev) return root;
+	}
+}
+
+// pattern_matcher_guarded implementations
+
+template <typename node, typename is_capture_t, typename guard_t>
+pattern_matcher_guarded<node, is_capture_t, guard_t>::pattern_matcher_guarded(
+	const rewriter::rule& r, const is_capture_t& is_capture, guard_t&& guard)
+	: base(r, is_capture), guard_(std::forward<guard_t>(guard)), r(r) {}
+
+template <typename node, typename is_capture_t, typename guard_t>
+bool pattern_matcher_guarded<node, is_capture_t, guard_t>::operator()(tref n) {
+	DBG(assert(n != nullptr);)
+	// If we already processed this node, return true to continue traversal
+	if (changes.find(n) != changes.end()) return true;
+	// Snapshot the base changes before running base(n) so we can detect
+	// what base added for n specifically
+	auto pre_changes = base.changes;
+	// Run the base matcher on n; it populates base.changes[n]
+	base(n); // base always returns true
+	// Sync our changes with base (includes child updates accumulated so far)
+	changes = base.changes;
+	// Determine what the "rebuild-only" result for n would be (no pattern match)
+	trefs ch;
+	const auto& nt_ref = lcrs_tree<node>::get(n);
+	for (tref c : nt_ref.children())
+		ch.push_back(get_cached<node>(c, pre_changes));
+	auto rebuild = lcrs_tree<node>::get(nt_ref.value, ch);
+	// If base put something different from a plain rebuild in changes[n],
+	// a real pattern match occurred — check the guard
+	auto base_it = changes.find(n);
+	if (base_it != changes.end() && base_it->second != rebuild) {
+		// Real match: apply guard with binding env (pattern-var -> captured value)
+		if (!guard_(base.get_env(), n)) {
+			// Guard rejected: revert n's entry to the plain rebuild
+			if (rebuild) changes[n] = rebuild;
+			else changes.erase(n);
+		}
+	}
+	return true;
+}
+
+template <typename node, typename is_capture_t, typename guard_t>
+tref pattern_matcher_guarded<node, is_capture_t, guard_t>::replace_root(tref n) {
+	DBG(assert(n != nullptr);)
+	return get_cached<node>(n, changes);
+}
+
+template <typename node, typename is_capture_t, typename guard_t>
+tref apply_rule_guarded(const rewriter::rule& r, tref root,
+                        const is_capture_t& c, guard_t&& guard) {
+	DBG(assert(root != nullptr);)
+	pattern_matcher_guarded<node, is_capture_t, guard_t> pm(
+		r, c, std::forward<guard_t>(guard));
+	post_order<node>(root).search_unique(pm);
+	return pm.replace_root(root);
+}
+
 } // rewriter namespace
 
 template <typename node>

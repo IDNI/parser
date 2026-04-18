@@ -198,6 +198,27 @@ endfunction()
 
 ################################################################################
 
+# ankerl/unordered_dense — Robin Hood open-addressing hash map (MIT)
+# Prefer a local vendored copy (external/ankerl/unordered_dense.h) over
+# fetching from the network so offline builds work.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/ankerl/unordered_dense.h")
+	message(STATUS "Using vendored ankerl/unordered_dense from external/")
+	add_library(unordered_dense INTERFACE)
+	target_include_directories(unordered_dense INTERFACE
+		"${CMAKE_CURRENT_SOURCE_DIR}/external")
+else()
+	include(FetchContent)
+	FetchContent_Declare(
+		unordered_dense
+		GIT_REPOSITORY https://github.com/martinus/unordered-dense.git
+		GIT_TAG        v4.4.0
+		GIT_SHALLOW    TRUE
+	)
+	FetchContent_MakeAvailable(unordered_dense)
+endif()
+
+################################################################################
+
 include(version_license)
 version_license(
 	"${CMAKE_CURRENT_SOURCE_DIR}/cmake/version_license.h.template"

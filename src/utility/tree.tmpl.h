@@ -102,9 +102,9 @@ tref bintree<T>::get() const { return reinterpret_cast<tref>(this); }
 
 template <typename T>
 const htref bintree<T>::geth(tref h) {
-	//DBG(assert(h != NULL);)
 	if (h == NULL) return htree::null();
-	auto res = M().find(*reinterpret_cast<const bintree*>(h)); //done with one search
+	std::unique_lock lock(mtx_);
+	auto res = M().find(*reinterpret_cast<const bintree*>(h));
 	htref ret;
 	if (res != M().end()) res->second = ret = htref(new htree(h));
 	DBG(assert(!res->second.expired());)
@@ -125,24 +125,17 @@ const bintree<T>& bintree<T>::get(const htref& h) {
 
 template <typename T>
 tref bintree<T>::get(const T& v, tref l, tref r) {
-#ifdef DEBUG
-	// Check that the pointed to children are of same node type as v by
-	// checking that they are present in the M map
-	if (l != nullptr) {
-		auto c0 = get(l);
-		auto res_c0 = M().emplace(c0, htree::wp());
-		assert(res_c0.second == false);
-		assert(reinterpret_cast<tref>(std::addressof(res_c0.first->first)) == l);
-	}
-	if (r != nullptr) {
-		auto c1 = get(r);
-		auto res_c1 = M().emplace(c1, htree::wp());
-		assert(res_c1.second == false);
-		assert(reinterpret_cast<tref>(std::addressof(res_c1.first->first)) == r);
-	}
-#endif
 	bintree bn(v, l, r);
-	auto res = bintree<T>::M().emplace(bn, htree::wp());
+	// Fast path: shared lock for the common case where the node already exists.
+	{
+		std::shared_lock lock(mtx_);
+		auto it = M().find(bn);
+		if (it != M().end())
+			return reinterpret_cast<tref>(std::addressof(it->first));
+	}
+	// Slow path: exclusive lock to insert (double-check after acquiring).
+	std::unique_lock lock(mtx_);
+	auto res = M().emplace(bn, htree::wp());
 	return reinterpret_cast<tref>(std::addressof(res.first->first));
 }
 
@@ -162,14 +155,15 @@ void bintree<T>::dump() {
 
 template <typename T>
 void bintree<T>::gc() {
-	if (!gc_enabled) return;
+	if (!gc_enabled.load(std::memory_order_relaxed)) return;
 	std::unordered_set<tref> keep{};
 	gc(keep);
 }
 
 template <typename T>
 void bintree<T>::gc(std::unordered_set<tref>& keep) {
-	if (!gc_enabled) return;
+	if (!gc_enabled.load(std::memory_order_relaxed)) return;
+	std::unique_lock lock(mtx_);
 	// DBG(dump();)
 	//DBG(htree::dump();)
 
@@ -250,6 +244,8 @@ template <typename T>
 template <CacheType cache_t>
 cache_t& bintree<T>::create_cache(const cache_t& init) {
 	static std::deque<cache_t> caches;
+	// Protect both caches and gc_callbacks under the exclusive lock.
+	std::unique_lock lock(mtx_);
 	cache_t& cache = caches.emplace_back(init);
 	// add callback to rebuild cache on gc
 	gc_callbacks.push_back([&cache](const std::unordered_set<tref>& kept) {
@@ -349,8 +345,8 @@ std::vector<const bintree<T>*> bintree<T>::V;
 */
 
 template <typename T>
-std::unordered_map<const bintree<T>, htree::wp>& bintree<T>::M() {
-	static std::unordered_map<const bintree<T>, htree::wp> m;
+std::unordered_map<bintree<T>, htree::wp>& bintree<T>::M() {
+	static std::unordered_map<bintree<T>, htree::wp> m;
 	return m;
 }
 
@@ -516,8 +512,15 @@ tref lcrs_tree<T>::get_raw(const T& v, const tref* ch, size_t len, tref r) {
 
 template <typename T>
 tref lcrs_tree<T>::get(const T& v, const tref* ch, size_t len, tref r) {
-	if (hook == nullptr || !use_hooks) return get_raw(v, ch, len, r);
-	return hook(v, ch, len, r);
+	// Snapshot hook under shared lock; call it after releasing the lock
+	// to avoid holding hook_mtx_ while bintree::get() acquires mtx_.
+	hook_function h;
+	{
+		std::shared_lock lock(hook_mtx_);
+		if (!use_hooks || !hook) return get_raw(v, ch, len, r);
+		h = hook;
+	}
+	return h(v, ch, len, r);
 }
 
 template <typename T>
@@ -977,13 +980,22 @@ std::string dump_to_str(const subtree_map<node, tref>& m, bool subtree) {
 // hooks
 
 template <typename node>
-void lcrs_tree<node>::set_hook(hook_function h) { hook = h; }
+void lcrs_tree<node>::set_hook(hook_function h) {
+	std::unique_lock lock(hook_mtx_);
+	hook = h;
+}
 
 template <typename node>
-void lcrs_tree<node>::reset_hook() { hook = nullptr; }
+void lcrs_tree<node>::reset_hook() {
+	std::unique_lock lock(hook_mtx_);
+	hook = nullptr;
+}
 
 template <typename node>
-bool lcrs_tree<node>::is_hooked() { return hook != nullptr; }
+bool lcrs_tree<node>::is_hooked() {
+	std::shared_lock lock(hook_mtx_);
+	return hook != nullptr;
+}
 
 //------------------------------------------------------------------------------
 
@@ -1026,6 +1038,46 @@ bool is_cached_subtree(tref n, const std::unordered_set<tref>& cache) {
 	return false;
 }
 
+
+//------------------------------------------------------------------------------
+// merge_trees implementation
+
+template <typename T, typename JoinFn, typename MismatchFn>
+tref merge_trees(tref a, tref b, JoinFn&& join_fn, MismatchFn&& mismatch_fn) {
+	// local cache keyed by (a, b) pointer pair
+	struct PairHash {
+		size_t operator()(const std::pair<tref, tref>& p) const noexcept {
+			std::hash<tref> h;
+			size_t seed = h(p.first) ^ (h(p.second) * 2654435761u);
+			return seed;
+		}
+	};
+	std::unordered_map<std::pair<tref,tref>, tref, PairHash> cache;
+
+	// recursive lambda with memoization
+	auto impl = [&](auto& self, tref x, tref y) -> tref {
+		if (x == y) return x;
+		if (x == nullptr) return mismatch_fn(y, nullptr);
+		if (y == nullptr) return mismatch_fn(x, nullptr);
+
+		auto key = std::make_pair(x, y);
+		auto it = cache.find(key);
+		if (it != cache.end()) return it->second;
+
+		const auto& nx = bintree<T>::get(x);
+		const auto& ny = bintree<T>::get(y);
+
+		T joined = join_fn(nx.value, ny.value);
+		tref merged_l = self(self, nx.l, ny.l);
+		tref merged_r = self(self, nx.r, ny.r);
+
+		tref result = bintree<T>::get(joined, merged_l, merged_r);
+		cache.emplace(key, result);
+		return result;
+	};
+
+	return impl(impl, a, b);
+}
 
 //------------------------------------------------------------------------------
 
