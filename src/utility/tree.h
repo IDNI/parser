@@ -15,6 +15,8 @@
 #include <iostream>
 #include <cassert>
 #include <iterator>
+#include <shared_mutex>
+#include <atomic>
 #include "../defs.h"
 
 namespace idni {
@@ -225,7 +227,9 @@ struct bintree {
 	/**
 	 * @brief Controls if garbage collection is active
 	 */
-	inline static bool gc_enabled = true;
+	inline static std::atomic<bool> gc_enabled{true};
+	// Protects M() and gc_callbacks; shared for reads, exclusive for writes/gc.
+	inline static std::shared_mutex mtx_{};
 
 	/**
 	 * @brief Garbage collect tree nodes
@@ -296,7 +300,9 @@ protected:
 	/**
 	 * @brief Map of tree nodes to their handles
 	 */
-	static std::unordered_map<const bintree, htree::wp>& M();
+	// Node-based storage: tref = &key must remain valid across inserts AND erases
+	// (gc() requires stable addresses on erase; segmented_map only guarantees insert-stability).
+	static std::unordered_map<bintree, htree::wp>& M();
 };
 
 template <typename T> struct pre_order;
@@ -824,6 +830,8 @@ struct lcrs_tree : public bintree<T> {
 	using hook_function
 		= std::function<tref(const T&, const tref*, size_t, tref)>;
 	inline static hook_function hook = nullptr;
+	// Protects hook and use_hooks (shared for reads, exclusive for set/reset).
+	inline static std::shared_mutex hook_mtx_{};
 	inline static void set_hook(hook_function h);
 	inline static void reset_hook();
 	inline static bool is_hooked();
@@ -1247,11 +1255,98 @@ using environment = subtree_map<node, tref>;
 
 } // rewriter namespace
 
+//------------------------------------------------------------------------------
+// Union-Find over interned tree nodes (tref). Uses path-halving and union by rank.
+// Two trefs comparing equal under subtree_equality are already same-class.
+template <typename node>
+struct tref_union_find {
+	tref find(tref x);           // path-halving find
+	tref unite(tref x, tref y);  // merge, return representative
+	bool same(tref x, tref y) { return find(x) == find(y); }
+	void each_class(auto&& cb) const;  // cb(representative, vector<tref>)
+private:
+	subtree_unordered_map<node, tref>    parent;
+	subtree_unordered_map<node, size_t> rank;
+	tref root_of(tref x);
+};
+
+template <typename node>
+tref tref_union_find<node>::root_of(tref x) {
+	// path-halving: make every other node on the path point to its grandparent
+	while (true) {
+		auto it = parent.find(x);
+		if (it == parent.end() || it->second == x) return x;
+		tref p = it->second;
+		auto gp_it = parent.find(p);
+		if (gp_it != parent.end() && gp_it->second != p)
+			it->second = gp_it->second; // point to grandparent
+		x = it->second;
+	}
+}
+
+template <typename node>
+tref tref_union_find<node>::find(tref x) {
+	auto it = parent.find(x);
+	if (it == parent.end()) {
+		parent.emplace(x, x);
+		rank.emplace(x, 0u);
+		return x;
+	}
+	return root_of(x);
+}
+
+template <typename node>
+tref tref_union_find<node>::unite(tref x, tref y) {
+	x = find(x);
+	y = find(y);
+	if (x == y) return x;
+	size_t rx = rank.count(x) ? rank[x] : 0u;
+	size_t ry = rank.count(y) ? rank[y] : 0u;
+	if (rx < ry) std::swap(x, y);
+	parent[y] = x;
+	if (rx == ry) rank[x]++;
+	return x;
+}
+
+template <typename node>
+void tref_union_find<node>::each_class(auto&& cb) const {
+	std::unordered_map<tref, std::vector<tref>> classes;
+	for (const auto& [node_ref, par] : parent) {
+		// find representative without mutating (const method)
+		tref r = node_ref;
+		while (true) {
+			auto it = parent.find(r);
+			if (it == parent.end() || it->second == r) break;
+			r = it->second;
+		}
+		classes[r].push_back(node_ref);
+	}
+	for (const auto& [rep, members] : classes)
+		cb(rep, members);
+}
+
+//------------------------------------------------------------------------------
+// Structurally merge two lcrs trees: where they share structure, combine node
+// values via join_fn(T a, T b) -> T. Where one side is null, use mismatch_fn.
+// Result is memoized per call via a local cache.
+template <typename T, typename JoinFn,
+          typename MismatchFn = decltype([](tref a, tref) { return a; })>
+tref merge_trees(tref a, tref b, JoinFn&& join_fn,
+                 MismatchFn&& mismatch_fn = {});
+
 } // idni namespace
 
 template <typename T>
 struct std::hash<const idni::bintree<T>> {
 	size_t operator()(const idni::bintree<T>& b) const noexcept;
+};
+
+// Non-const version required by ankerl::unordered_dense (key stored by value)
+template <typename T>
+struct std::hash<idni::bintree<T>> {
+	size_t operator()(const idni::bintree<T>& b) const noexcept {
+		return b.hash;
+	}
 };
 
 //------------------------------------------------------------------------------

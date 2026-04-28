@@ -449,6 +449,11 @@ struct grammar {
 	 */
 	lit<C, T> nt(const std::basic_string<C>& s);
 	const lit<C, T>& get_start() const;
+	// Bottom-up derivation fixpoint.
+	// seeds: (nonterminal_literal, position) pairs representing known memberships.
+	// Returns: set of all derivable (literal, span) pairs via unit-rule closure.
+	std::set<std::pair<lit<C,T>, std::array<size_t,2>>>
+	derive_all(const std::vector<std::pair<lit<C,T>, size_t>>& seeds) const;
 private:
 	bool all_nulls(const lits<C, T>& a) const;
 	nonterminals<C, T>& nts;

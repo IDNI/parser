@@ -589,6 +589,57 @@ bool forest<NodeT>::replace_node(graph& g, const node& torepl,
 	return gchange;
 }
 
+template <typename NodeT>
+void forest<NodeT>::build_reverse_index() {
+	reverse_index.clear();
+	for (auto& [parent, children_sets] : g)
+		for (auto& child_nodes : children_sets)
+			for (auto& child : child_nodes)
+				reverse_index[child].push_back(parent);
+	reverse_index_valid = true;
+}
+
+template <typename NodeT>
+void forest<NodeT>::invalidate_reverse_index() {
+	reverse_index.clear();
+	reverse_index_valid = false;
+}
+
+template <typename NodeT>
+template <typename cb_t>
+void forest<NodeT>::predecessors(const node& n, cb_t&& cb) const {
+	assert(reverse_index_valid);
+	auto it = reverse_index.find(n);
+	if (it != reverse_index.end())
+		for (auto& parent : it->second)
+			cb(parent);
+}
+
+template <typename NodeT>
+template <typename cb_enter_t, typename cb_revisit_t>
+void forest<NodeT>::traverse_backward(const nodes_set& starts,
+	cb_enter_t cb_enter, cb_revisit_t cb_revisit) const
+{
+	assert(reverse_index_valid);
+	std::set<node> visited;
+	std::deque<node> queue;
+	for (auto& pack : starts)
+		for (auto& n : pack)
+			if (visited.insert(n).second)
+				queue.push_back(n);
+	while (!queue.empty()) {
+		node n = queue.front();
+		queue.pop_front();
+		cb_enter(n);
+		auto it = reverse_index.find(n);
+		if (it != reverse_index.end())
+			for (auto& parent : it->second)
+				if (visited.find(parent) == visited.end() || cb_revisit(parent))
+					if (visited.insert(parent).second)
+						queue.push_back(parent);
+	}
+}
+
 #ifdef DEBUG
 template <typename NodeT>
 std::ostream& forest<NodeT>::print_data(std::ostream& os) const {

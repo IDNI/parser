@@ -56,6 +56,7 @@ enable_testing()
 set(DOCTESTS
 	tree
 	tree_traversals
+	enhancements
 )
 
 foreach(X IN LISTS DOCTESTS)
@@ -79,3 +80,12 @@ foreach(X IN LISTS DOCTESTS)
 	)
 	# add_dependencies(${N} ${TAU_PARSER_STATIC_LIB_NAME})
 endforeach()
+
+# Benchmark executable (not a test — run manually)
+add_executable(bench_enhancements bench_enhancements.cpp)
+tauparser_setup(bench_enhancements PRIVATE "")
+target_compile_options(bench_enhancements PUBLIC "-O3" "-Wno-parentheses")
+target_link_libraries(bench_enhancements tauparser)
+target_include_directories(bench_enhancements PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
+)

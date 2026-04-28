@@ -1,6 +1,7 @@
 // To view the license please visit
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
+#include <deque>
 #include <queue>
 #include "parser.h"
 
@@ -832,5 +833,53 @@ std::ostream& print_dictmap(std::ostream& os,
 	return os;
 }
 #endif // DEBUG
+
+template <typename C, typename T>
+std::set<std::pair<lit<C,T>, std::array<size_t,2>>>
+grammar<C,T>::derive_all(
+	const std::vector<std::pair<lit<C,T>, size_t>>& seeds) const
+{
+	// Worklist-based bottom-up fixpoint.
+	// A "fact" is (literal, {begin, end}) meaning literal covers span [begin,end).
+	using span_t = std::array<size_t, 2>;
+	using fact   = std::pair<lit<C,T>, span_t>;
+	std::set<fact>   derived;
+	std::deque<fact> worklist;
+
+	// Seed initial facts: each (lit, pos) gives span [pos, pos+1).
+	for (const auto& [l, pos] : seeds) {
+		fact f{ l, { pos, pos + 1 } };
+		if (derived.insert(f).second)
+			worklist.push_back(f);
+	}
+
+	while (!worklist.empty()) {
+		auto [proven_lit, proven_span] = worklist.front();
+		worklist.pop_front();
+
+		// Unit-rule propagation: for every production A -> B (single literal body)
+		// where B == proven_lit, derive A with the same span.
+		for (size_t p = 0; p < G.size(); ++p) {
+			const lit<C,T>& head = G[p].first;
+			const std::vector<lits<C,T>>& conjs = G[p].second;
+			// A production fires as a unit rule when every conjunction has
+			// exactly one literal equal to proven_lit (standard unit rule:
+			// one conjunction, one literal).
+			if (conjs.size() == 1 && conjs[0].size() == 1
+				&& conjs[0][0] == proven_lit)
+			{
+				fact new_fact{ head, proven_span };
+				if (derived.insert(new_fact).second)
+					worklist.push_back(new_fact);
+			}
+		}
+
+		// TODO: binary-rule closure (A -> B C where B covers [i,j] and
+		// C covers [j,k] -> A covers [i,k]). Requires span-join over
+		// the derived set. Omitted here for simplicity; unit-rule
+		// propagation is sufficient for role-hierarchy and simple EL queries.
+	}
+	return derived;
+}
 
 } // idni namespace
