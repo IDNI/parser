@@ -210,7 +210,7 @@ else()
 	include(FetchContent)
 	FetchContent_Declare(
 		unordered_dense
-		GIT_REPOSITORY https://github.com/martinus/unordered-dense.git
+		GIT_REPOSITORY https://github.com/martinus/unordered_dense.git
 		GIT_TAG        v4.4.0
 		GIT_SHALLOW    TRUE
 	)

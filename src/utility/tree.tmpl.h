@@ -2,6 +2,7 @@
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #include <deque>
+#include <mutex>
 #include "tree.h"
 
 namespace idni {
