@@ -57,6 +57,7 @@ set(DOCTESTS
 	tree
 	tree_traversals
 	enhancements
+	utf8
 )
 
 foreach(X IN LISTS DOCTESTS)
