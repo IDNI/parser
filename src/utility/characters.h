@@ -23,19 +23,31 @@ utf8string to_utf8string(const char* s);
 utf8string to_utf8string(const std::string& s);
 utf8string to_utf8string(char32_t ch);
 utf8string to_utf8string(const std::u32string& str);
+utf8string to_utf8string(const std::u16string& str);
 // u32string
 std::u32string to_u32string(const std::u32string& str);
 std::u32string to_u32string(const utf8string& str);
 std::u32string to_u32string(const std::string& str);
+std::u32string to_u32string(const std::u16string& str);
+// u16string
+std::u16string to_u16string(const std::string& s);
+std::u16string to_u16string(const utf8string& s);
+std::u16string to_u16string(const std::u32string& s);
 // utf8string to other strings
 std::string to_string(const std::string& s);
 std::string to_string(const utf8string& s);
 std::string to_string(const std::u32string& s);
+std::string to_string(const std::u16string& s);
 std::string to_string(const char32_t& s);
 std::string to_std_string(const std::string& s);
 std::string to_std_string(const utf8string& s);
 std::string to_std_string(const std::u32string& s);
+std::string to_std_string(const std::u16string& s);
 std::string to_std_string(const char32_t& ch);
+#ifdef _WIN32
+std::wstring utf8_to_wide(const std::string& s);
+std::string  wide_to_utf8(const std::wstring& w);
+#endif
 // from char*/string/char32_t*/u32string to string or u32string
 template <typename CharT>
 typename std::basic_string<CharT> from_cstr(const char *);
@@ -59,6 +71,20 @@ bool is_mb_codepoint(utf8char ch, uint8_t p = 0);
  * @return size (0, 1 - 4 bytes) or (size_t) -1 if illegal UTF8 code unit
  */
 size_t peek_codepoint(const utf8char* s, size_t l, char32_t& ch);
+/**
+ * convert const char16_t* sequence s of 1-2 utf-16 code units into codepoint &ch
+ * @param s string of utf-16 code units
+ * @param l size of the s string in code units
+ * @param ch reference to a codepoint read from string
+ * @return size (0, 1 - 2 code units) or (size_t) -1 if illegal UTF-16
+ */
+size_t peek_codepoint_u16(const char16_t* s, size_t l, char32_t& ch);
+/**
+ * Convert codepoint to UTF-16 code units written to out (size 2 sufficient).
+ * @return number of code units written (0, 1, or 2). 0 if codepoint is invalid
+ *         (surrogate or > U+10FFFF).
+ */
+size_t emit_codepoint_u16(char32_t ch, char16_t* out);
 /**
  * Returns size of a unicode codepoint in bytes
  * @return size (0-4)

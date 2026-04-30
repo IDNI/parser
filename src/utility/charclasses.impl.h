@@ -6,18 +6,18 @@
 
 namespace idni::charclasses {
 
-template<> inline bool isalnum<char>(char c) { return std::isalnum(c); }
-template<> inline bool isalpha<char>(char c) { return std::isalpha(c); }
-template<> inline bool isblank<char>(char c) { return std::isblank(c); }
-template<> inline bool iscntrl<char>(char c) { return std::iscntrl(c); }
-template<> inline bool isdigit<char>(char c) { return std::isdigit(c); }
-template<> inline bool isgraph<char>(char c) { return std::isgraph(c); }
-template<> inline bool islower<char>(char c) { return std::islower(c); }
-template<> inline bool isprint<char>(char c) { return std::isprint(c); }
-template<> inline bool ispunct<char>(char c) { return std::ispunct(c); }
-template<> inline bool isspace<char>(char c) { return std::isspace(c); }
-template<> inline bool isupper<char>(char c) { return std::isupper(c); }
-template<> inline bool isxdigit<char>(char c){ return std::isxdigit(c);}
+template<> inline bool isalnum<char>(char c) { return std::isalnum(static_cast<unsigned char>(c)); }
+template<> inline bool isalpha<char>(char c) { return std::isalpha(static_cast<unsigned char>(c)); }
+template<> inline bool isblank<char>(char c) { return std::isblank(static_cast<unsigned char>(c)); }
+template<> inline bool iscntrl<char>(char c) { return std::iscntrl(static_cast<unsigned char>(c)); }
+template<> inline bool isdigit<char>(char c) { return std::isdigit(static_cast<unsigned char>(c)); }
+template<> inline bool isgraph<char>(char c) { return std::isgraph(static_cast<unsigned char>(c)); }
+template<> inline bool islower<char>(char c) { return std::islower(static_cast<unsigned char>(c)); }
+template<> inline bool isprint<char>(char c) { return std::isprint(static_cast<unsigned char>(c)); }
+template<> inline bool ispunct<char>(char c) { return std::ispunct(static_cast<unsigned char>(c)); }
+template<> inline bool isspace<char>(char c) { return std::isspace(static_cast<unsigned char>(c)); }
+template<> inline bool isupper<char>(char c) { return std::isupper(static_cast<unsigned char>(c)); }
+template<> inline bool isxdigit<char>(char c){ return std::isxdigit(static_cast<unsigned char>(c));}
 
 // Follows simplified versions of char class functions for Unicode symbols
 // TODO: use real Unicode character classes
