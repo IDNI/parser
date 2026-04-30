@@ -97,11 +97,11 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		os << "\n";
 		return os.str();
 	};
-	auto gen_nts_enum_cte = [&gi, &U]() {
+	auto gen_nts_enum_cte = [&gi]() {
 		std::stringstream os;
 		auto& x = gi.nts();
 		for (size_t n = 0; n != x.size(); ++n)
-			os << (n % 10 == 0 ? "\n\t\t" : "") << U <<
+			os << (n % 10 == 0 ? "\n\t\t" : "") <<
 				(n == 0 ? "nul" : to_std_string(x[n]))
 				<< ", ";
 		os << "\n";
@@ -244,8 +244,11 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		"#ifndef __" << guard << "_H__\n"
 		"#define __" << guard << "_H__\n"
 		"\n"
-		"#include \"parser.h\"\n"
-		"\n";
+		"#include \"parser.h\"\n";
+	if ((opt.decoder.size() && opt.decoder.starts_with("idni::")) ||
+		(opt.encoder.size() && opt.encoder.starts_with("idni::")))
+			os << "#include \"recoders.h\"\n";
+	os <<	"\n";
 	if (opt.ns.size()) os << "namespace " << opt.ns << " {\n\n";
 	os << "namespace " << opt.name << "_data {\n\n";
 	size_t nt_bits = std::ceil(std::log2(gi.nts().size()));
