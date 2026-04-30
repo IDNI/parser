@@ -265,9 +265,8 @@ private:
 			alternation(nr.to_lit(), t | tgf_parser::alternation);
 			return ps(nn, nr | (nr + nn)), nn;
 		}
-		std::basic_string<T> unescape(const std::string& s) {
-			//std::cout << "unescape: `" << s << "`\n";
-			std::basic_stringstream<T> ss;
+		std::basic_string<C> unescape(const std::string& s) {
+			std::basic_stringstream<C> ss;
 			size_t l = s.size() - 1;
 			for (size_t i = 0; i != s.size(); ++i) {
 				if (i != l && s[i] == '\\') {
@@ -281,7 +280,6 @@ private:
 					}
 				} else ss << s[i];
 			}
-			//std::cout << "\t: `" << ss.str() << "`\n";
 			return ss.str();
 		}
 		prods_t terminal_char(const trv& t) {
