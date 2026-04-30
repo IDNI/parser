@@ -753,7 +753,11 @@ public:
 		input(const std::string& filename, size_t max_length = 0,
 			decoder_type decoder = 0,
 			int_type e = std::char_traits<C>::eof());
-#ifndef _WIN32
+#ifdef _WIN32
+		input(const std::wstring& filename, size_t max_length = 0,
+			decoder_type decoder = 0,
+			int_type e = std::char_traits<C>::eof());
+#else
 		input(int filedescriptor, size_t max_length = 0,
 			decoder_type decoder = 0,
 			int_type e = std::char_traits<C>::eof());
@@ -1056,7 +1060,9 @@ public:
 	result parse(const C* data, size_t size, parse_options po = {});
 	result parse(std::basic_istream<C>& is, parse_options po = {});
 	result parse(const std::string& fn, parse_options po = {});
-#ifndef _WIN32
+#ifdef _WIN32
+	result parse(const std::wstring& fn, parse_options po = {});
+#else
 	result parse(int filedescriptor, parse_options po = {});
 #endif
 	/**

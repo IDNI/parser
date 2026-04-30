@@ -178,7 +178,11 @@ template <typename C, typename T>
 std::string parser<C, T>::tree::get_terminals() const {
 	std::stringstream ss;
 	auto terminal_printer = [&ss](tref n) {
-		if (n && get(n).is_t()) ss << get(n).get_t();
+		if (n && get(n).is_t()) {
+			T t = get(n).value.first.t();
+			if constexpr (std::is_same_v<T, char>) ss << t;
+			else ss << to_string(t);
+		}
 		return true;
 	};
 	pre_order<pnode>(get()).visit(terminal_printer);

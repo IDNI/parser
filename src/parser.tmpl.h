@@ -60,12 +60,27 @@ parser<C, T>::input::input(std::basic_istream<C>& is, size_t max_l,
 template <typename C, typename T>
 parser<C, T>::input::input(const std::string& filename, size_t max_l,
 	decoder_type decoder, int_type eof) : itype(MMAP), e(eof),
+	decoder(decoder),
+#ifdef _WIN32
+	mm(idni::utf8_to_wide(filename), 0, MMAP_READ),
+#else
+	mm(filename, 0, MMAP_READ),
+#endif
+	l(mm.size()),
+	max_l(max_l), d(reinterpret_cast<const C*>(mm.data())), s(nullptr)
+{
+	if (mm.error) std::cerr << mm.error_message << std::endl;
+}
+#ifdef _WIN32
+template <typename C, typename T>
+parser<C, T>::input::input(const std::wstring& filename, size_t max_l,
+	decoder_type decoder, int_type eof) : itype(MMAP), e(eof),
 	decoder(decoder), mm(filename, 0, MMAP_READ), l(mm.size()),
 	max_l(max_l), d(reinterpret_cast<const C*>(mm.data())), s(nullptr)
 {
 	if (mm.error) std::cerr << mm.error_message << std::endl;
 }
-#ifndef _WIN32
+#else
 template <typename C, typename T>
 parser<C, T>::input::input(int fd, size_t max_l, decoder_type decoder,
 	int_type eof) : itype(MMAP), e(eof), decoder(decoder),
@@ -496,7 +511,16 @@ parser<C, T>::result  parser<C, T>::parse(const std::string& fn,
 		po.max_length, o.chars_to_terminals, po.eof);
 	return _parse(po);
 }
-#ifndef _WIN32
+#ifdef _WIN32
+template <typename C, typename T>
+parser<C, T>::result parser<C, T>::parse(const std::wstring& fn,
+	parse_options po)
+{
+	in_ = std::make_unique<input>(fn,
+		po.max_length, o.chars_to_terminals, po.eof);
+	return _parse(po);
+}
+#else
 template <typename C, typename T>
 parser<C, T>::result parser<C, T>::parse(int fd, parse_options po) {
 	in_ = std::make_unique<input>(fd,
@@ -1452,11 +1476,17 @@ std::basic_string<T> parser<C, T>::input::get_terminals(
 		return std::basic_string<T>(ts.begin() + start,
 			ts.begin() + end);
 	}
-	if (!isstream()) return std::basic_string<T>(d + start, end - start);
-	std::basic_stringstream<T> ss;
-	s.seekg(start);
-	while (end > start++) ss << s.get();
-	return clear(), ss.str();
+	// No decoder: Only valid when the parser's char_type and terminal_type match
+	if constexpr (std::is_same_v<C, T>) {
+		if (!isstream()) return std::basic_string<T>(d + start,
+								end - start);
+		std::basic_stringstream<T> ss;
+		s.seekg(start);
+		while (end > start++) ss << s.get();
+		return clear(), ss.str();
+	} else {
+		return std::basic_string<T>{};
+	}
 }
 
 template <typename C, typename T>
