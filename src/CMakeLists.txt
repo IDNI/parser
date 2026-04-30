@@ -71,7 +71,7 @@ else()
 		tauparser_setup(tauparser_shared PUBLIC "")
 		target_link_libraries(tauparser_shared PUBLIC unordered_dense)
 	endif()
-	
+
 	# Create an alias target for backward compatibility
 	if(TAU_PARSER_BUILD_STATIC_LIBRARY)
 		add_library(tauparser ALIAS tauparser_static)
@@ -94,7 +94,7 @@ if(TAU_PARSER_INSTALL)
 	install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
 		DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}
 		COMPONENT "Library"
-		FILES_MATCHING 
+		FILES_MATCHING
 			PATTERN "*.h"
 			PATTERN "tgf" EXCLUDE
 			PATTERN "CMakeFiles" EXCLUDE
@@ -112,7 +112,7 @@ if(TAU_PARSER_INSTALL)
 			COMPONENT "Library"
 		)
 	endif()
-	
+
 	if(TAU_PARSER_BUILD_SHARED_LIBRARY)
 		install(TARGETS tauparser_shared
 			EXPORT "${PROJECT_NAME}Targets"
@@ -121,6 +121,25 @@ if(TAU_PARSER_INSTALL)
 			ARCHIVE       DESTINATION ${CMAKE_INSTALL_LIBDIR}
 			INCLUDES      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}
 			COMPONENT "Library"
+		)
+	endif()
+
+	# unordered_dense dependency
+	install(TARGETS unordered_dense
+		EXPORT "${PROJECT_NAME}Targets"
+		COMPONENT "Library"
+	)
+	if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../external/ankerl/unordered_dense.h")
+		install(FILES
+			"${CMAKE_CURRENT_SOURCE_DIR}/../external/ankerl/unordered_dense.h"
+			DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ankerl
+			COMPONENT "Library"
+		)
+	elseif(DEFINED unordered_dense_SOURCE_DIR)
+		install(DIRECTORY "${unordered_dense_SOURCE_DIR}/include/ankerl"
+			DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+			COMPONENT "Library"
+			FILES_MATCHING PATTERN "*.h"
 		)
 	endif()
 
@@ -152,7 +171,7 @@ if(TAU_PARSER_INSTALL)
 		"${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
 		DESTINATION cmake
 	)
-	
+
 	if(NOT TAU_PARSER_BUILD_HEADER_ONLY)
 		message(STATUS "Exporting ${PROJECT_NAME}Targets to ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Targets.cmake")
 		export(EXPORT "${PROJECT_NAME}Targets"
@@ -161,4 +180,3 @@ if(TAU_PARSER_INSTALL)
 		)
 	endif()
 endif()
-

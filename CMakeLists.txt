@@ -205,7 +205,8 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/ankerl/unordered_dense.h")
 	message(STATUS "Using vendored ankerl/unordered_dense from external/")
 	add_library(unordered_dense INTERFACE)
 	target_include_directories(unordered_dense INTERFACE
-		"${CMAKE_CURRENT_SOURCE_DIR}/external")
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external>
+		$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 else()
 	include(FetchContent)
 	FetchContent_Declare(
