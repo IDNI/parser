@@ -109,8 +109,14 @@ cli::commands tgf_commands() {
 
 	OPT(help);
 	OPT(start);
-	//OPT(char_type);
-	//OPT(terminal_type);
+	OPT(cli::option("char-type", 'C', "char")),
+		DESC("input character type (e.g. char, char32_t)");
+	OPT(cli::option("terminal-type", 'T', "char")),
+		DESC("terminal character type (e.g. char, char32_t)");
+	OPT(cli::option("utf8", 'U', false)),
+		DESC("shorthand: --char-type char --terminal-type char32_t "
+			"--decoder idni::utf8_to_u32_conv "
+			"--encoder idni::u32_to_utf8_conv");
 	OPT(cli::option("name", 'n',
 		"")),
 		DESC("name of the generated parser struct");
@@ -183,8 +189,10 @@ int show(const string& tgf_file, const string start = "start",
 	return 0;
 }
 
-parser<char>::error::info_lvl str2error_verbosity(const string& str) {
-	using lvl = parser<char>::error::info_lvl;
+tgf_repl_evaluator::parser_type::error::info_lvl
+	str2error_verbosity(const string& str)
+{
+	using lvl = tgf_repl_evaluator::parser_type::error::info_lvl;
 	if (str == "detailed")   return lvl::INFO_DETAILED;
 	if (str == "root-cause") return lvl::INFO_ROOT_CAUSE;
 	if (str != "basic") cerr << "error: invalid error-verbosity: "
@@ -313,16 +321,26 @@ int tgf_run(int argc, char** argv) {
 		for (auto&& s : cmd.get<string>("nodisambig-list")
 			| views::split(',')) nodisambig_list
 					.emplace_back(s.begin(), s.end());
+		string char_type     = cmd.get<string>("char-type");
+		string terminal_type = cmd.get<string>("terminal-type");
+		string decoder       = cmd.get<string>("decoder");
+		string encoder       = cmd.get<string>("encoder");
+		if (cmd.get<bool>("utf8")) {
+			char_type     = "char";
+			terminal_type = "char32_t";
+			if (decoder.empty()) decoder = "idni::utf8_to_u32_conv";
+			if (encoder.empty()) encoder = "idni::u32_to_utf8_conv";
+		}
 		generate_parser_cpp_from_file<char>(tgf_file, parser_gen_options
 		{
 			.output_dir          = cmd.get<string>("output-dir"),
 			.output              = cmd.get<string>("output"),
 			.name                = cmd.get<string>("name"),
 			.ns                  = cmd.get<string>("namespace"),
-			.char_type           = "char",
-			.terminal_type       = "char",
-			.decoder             = cmd.get<string>("decoder"),
-			.encoder             = cmd.get<string>("encoder"),
+			.char_type           = char_type,
+			.terminal_type       = terminal_type,
+			.decoder             = decoder,
+			.encoder             = encoder,
 			.auto_disambiguate   = cmd.get<bool>("auto-disambiguate"),
 			.nodisambig_list     = nodisambig_list
 		});
@@ -383,11 +401,25 @@ ostream& tgf_repl_evaluator::pretty_print(ostream& os, tref n,
 	return os;
 }
 
+static tgf_repl_evaluator::parser_type::options utf8_parser_options() {
+	tgf_repl_evaluator::parser_type::options o;
+	if constexpr (
+		!std::is_same_v<tgf_repl_evaluator::parser_type::char_type,
+		                tgf_repl_evaluator::parser_type::terminal_type>)
+	{
+		o.chars_to_terminals = idni::utf8_to_u32_conv;
+		o.terminals_to_chars = idni::u32_to_utf8_conv;
+	}
+	return o;
+}
+
 tgf_repl_evaluator::tgf_repl_evaluator(const string& tgf_file)
 	: tgf_file(tgf_file), nts(shared_ptr<nonterminals_type>()),
 		g(make_shared<grammar_type>(
-			tgf<char>::from_file(*nts, tgf_file))),
-		p(make_shared<parser_type>(*g))
+			tgf<tgf_repl_evaluator::parser_type::char_type,
+				tgf_repl_evaluator::parser_type::terminal_type>
+				::from_file(*nts, tgf_file))),
+		p(make_shared<parser_type>(*g, utf8_parser_options()))
 {
 	update_opts_by_grammar_opts();
 }
@@ -396,8 +428,10 @@ tgf_repl_evaluator::tgf_repl_evaluator(const string& tgf_file, options opt)
 	: tgf_file(tgf_file), opt(opt),
 		nts(make_shared<nonterminals_type>()),
 		g(make_shared<grammar_type>(
-			tgf<char>::from_file(*nts, tgf_file))),
-		p(make_shared<parser_type>(*g))
+			tgf<tgf_repl_evaluator::parser_type::char_type,
+				tgf_repl_evaluator::parser_type::terminal_type>
+				::from_file(*nts, tgf_file))),
+		p(make_shared<parser_type>(*g, utf8_parser_options()))
 {
 	TC.set(opt.colors);
 	update_opts_by_grammar_opts();
@@ -444,21 +478,23 @@ void tgf_repl_evaluator::parsed(parser_type::result& r) {
 #ifndef PARSER_BINTREE_FOREST
 	if (opt.print_ambiguity) r.print_ambiguous_nodes(ss);
 	if (opt.print_terminals) ss << "parsed terminals: "
-		<< TC_T << r.get_terminals() << TC_CLEARED_DEFAULT << "\n";
+		<< TC_T << to_std_string(r.get_terminals())
+		<< TC_CLEARED_DEFAULT << "\n";
 #endif
 #ifndef PARSER_BINTREE_FOREST
+	using c_t = parser_type::char_type;
+	using t_t = parser_type::terminal_type;
 	auto cb_next_g = [&r, &ss, this](parser_type::pgraph& g) {
 		r.inline_grammar_transformations(g);
 		auto t = g.extract_trees();
 		//if (opt.print_graphs) pretty_print(ss << "parsed graph:\n",
 		//	t, {}, false, 1);
-		if (opt.tml_rules) to_tml_rules<char, char, parser_type::pgraph>(
+		if (opt.tml_rules) to_tml_rules<c_t, t_t, parser_type::pgraph>(
 			ss << "TML rules:\n", g), ss << "\n";
 		return true;
 	};
-	// to_tml_rules<char>(ss, std::as_const(*f));
 	if (opt.tml_rules) f->extract_graphs(f->root(), cb_next_g);
-	if (opt.tml_facts) to_tml_facts<char, char>(ss << "TML facts:\n", r);
+	if (opt.tml_facts) to_tml_facts<c_t, t_t>(ss << "TML facts:\n", r);
 #endif
 	if (opt.print_graphs) {
 		auto str2ntids = [this](const set<string>& list) {
@@ -531,8 +567,10 @@ void tgf_repl_evaluator::parse(const string& infile) {
 void tgf_repl_evaluator::reload(const string& new_tgf_file) {
 	if (tgf_file != new_tgf_file) tgf_file = new_tgf_file;
 	nts = make_shared<nonterminals_type>();
-	g = make_shared<grammar_type>(tgf<char>::from_file(*nts, tgf_file));
-	p = make_shared<parser_type>(*g);
+	g = make_shared<grammar_type>(tgf<tgf_repl_evaluator::parser_type::char_type,
+				tgf_repl_evaluator::parser_type::terminal_type>
+				::from_file(*nts, tgf_file));
+	p = make_shared<parser_type>(*g, utf8_parser_options());
 	update_opts_by_grammar_opts();
 	cout << "loaded: " << tgf_file << "\n";
 }

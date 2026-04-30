@@ -1,15 +1,16 @@
-// This file is generated from a file ../parser.tree_api/src/tgf/tgf_repl.tgf by
-//       https://github.com/IDNI/parser/tools/tgf
+// This file is generated from a file src/tgf/tgf_repl.tgf by
+//       https://github.com/IDNI/parser/src/tgf
 //
 #ifndef __TGF_REPL_PARSER_H__
 #define __TGF_REPL_PARSER_H__
 
 #include "parser.h"
+#include "recoders.h"
 
 namespace tgf_repl_parser_data {
 
 using char_type     = char;
-using terminal_type = char;
+using terminal_type = char32_t;
 
 inline static constexpr size_t nt_bits = 8;
 inline const std::vector<std::string> symbol_names{
@@ -36,11 +37,11 @@ inline const std::vector<std::string> symbol_names{
 inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
 
 inline std::vector<terminal_type> terminals{
-	'\0', '.', 'p', 'a', 'r', 's', 'e', 'f', ' ', 
-	'i', 'l', 'g', 'm', 'n', 't', '-', 'u', 'c', 'h', 
-	'b', 'o', 'd', 'v', 'L', 'q', 'x', '=', '\t', 'y', 
-	'1', '0', '_', ',', '>', '"', '\\', '/', '\r', '\n', 
-	'#', 
+	U'\0', U'.', U'p', U'a', U'r', U's', U'e', U'f', U' ', 
+	U'i', U'l', U'g', U'm', U'n', U't', U'-', U'u', U'c', U'h', 
+	U'b', U'o', U'd', U'v', U'L', U'q', U'x', U'=', U'\t', U'y', 
+	U'1', U'0', U'_', U',', U'>', U'"', U'\\', U'/', U'\r', U'\n', 
+	U'#', 
 };
 
 inline ::idni::char_class_fns<terminal_type> char_classes =
@@ -70,6 +71,8 @@ inline struct ::idni::grammar<char_type, terminal_type>::options
 };
 
 inline ::idni::parser<char_type, terminal_type>::options parser_options{
+	.chars_to_terminals = idni::utf8_to_u32_conv,
+	.terminals_to_chars = idni::u32_to_utf8_conv
 };
 
 inline ::idni::prods<char_type, terminal_type> start_symbol{ nts(13) };
@@ -802,7 +805,7 @@ struct tgf_repl_parser_nonterminals {
 	};
 };
 
-struct tgf_repl_parser : public idni::parser<char, char>, public tgf_repl_parser_nonterminals {
+struct tgf_repl_parser : public idni::parser<char, char32_t>, public tgf_repl_parser_nonterminals {
 	static tgf_repl_parser& instance() {
 		static tgf_repl_parser inst;
 		return inst;

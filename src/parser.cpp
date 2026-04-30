@@ -6,5 +6,6 @@
 namespace idni {
 
 template class parser<char, char>;
+template class parser<char, char32_t>;
 
 } // namespace idni

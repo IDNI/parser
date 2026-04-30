@@ -5,11 +5,12 @@
 #define __TGF_TEST_PARSER_H__
 
 #include "parser.h"
+#include "recoders.h"
 
 namespace tgf_test_parser_data {
 
 using char_type     = char;
-using terminal_type = char;
+using terminal_type = char32_t;
 
 inline static constexpr size_t nt_bits = 6;
 inline const std::vector<std::string> symbol_names{
@@ -22,8 +23,8 @@ inline const std::vector<std::string> symbol_names{
 inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
 
 inline std::vector<terminal_type> terminals{
-	'\0', '.', ',', ':', '_', '"', '\\', '/', 'b', 
-	'f', 'n', 'r', 't', '\t', '\r', '\n', '#', 
+	U'\0', U'.', U',', U':', U'_', U'"', U'\\', U'/', U'b', 
+	U'f', U'n', U'r', U't', U'\t', U'\r', U'\n', U'#', 
 };
 
 inline ::idni::char_class_fns<terminal_type> char_classes =
@@ -54,6 +55,8 @@ inline struct ::idni::grammar<char_type, terminal_type>::options
 };
 
 inline ::idni::parser<char_type, terminal_type>::options parser_options{
+	.chars_to_terminals = idni::utf8_to_u32_conv,
+	.terminals_to_chars = idni::u32_to_utf8_conv
 };
 
 inline ::idni::prods<char_type, terminal_type> start_symbol{ nts(13) };
@@ -192,7 +195,7 @@ struct tgf_test_parser_nonterminals {
 	};
 };
 
-struct tgf_test_parser : public idni::parser<char, char>, public tgf_test_parser_nonterminals {
+struct tgf_test_parser : public idni::parser<char, char32_t>, public tgf_test_parser_nonterminals {
 	static tgf_test_parser& instance() {
 		static tgf_test_parser inst;
 		return inst;
