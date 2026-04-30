@@ -44,6 +44,10 @@ function(target_setup target access compile_definitions compile_options link_opt
 				-static-libstdc++
 				${libs}
 			)
+			get_target_property(_tgt_type ${target} TYPE)
+			if(_tgt_type STREQUAL "EXECUTABLE")
+				target_link_options(${target} ${access} -static)
+			endif()
 	else()
 		target_link_libraries(${target} ${access} ${CMAKE_THREAD_LIBS_INIT} ${libs})
 	endif()
@@ -62,4 +66,3 @@ function(exclude target)
 		EXCLUDE_FROM_ALL 1
 		EXCLUDE_FROM_DEFAULT_BUILD 1)
 endfunction()
-
