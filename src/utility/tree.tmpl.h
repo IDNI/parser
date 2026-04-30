@@ -106,10 +106,10 @@ const htref bintree<T>::geth(tref h) {
 	if (h == NULL) return htree::null();
 	std::unique_lock lock(mtx_);
 	auto res = M().find(*reinterpret_cast<const bintree*>(h));
-	htref ret;
-	if (res != M().end()) res->second = ret = htref(new htree(h));
-	DBG(assert(!res->second.expired());)
-	return res->second.lock();
+	if (auto sp = res->second.lock()) return sp;
+	htref ret(new htree(h));
+	res->second = ret;
+	return ret;
 }
 
 template <typename T>
