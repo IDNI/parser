@@ -6,21 +6,9 @@
 #include <filesystem>
 #include <cmath>
 #include "parser.h"
-namespace idni {
+#include "grammar_inspector.h"
 
-/// Provides access to private grammar members
-template <typename C = char, typename T = C>
-struct grammar_inspector {
-	grammar_inspector(const grammar<C, T>& g) : g(g) {}
-	const grammar<C, T>& g;
-	lit<C, T> start() { return g.start; }
-	nonterminals<C, T>& nts() { return g.nts; }
-	const std::vector<std::pair<lit<C, T>, std::vector<lits<C, T>>>>& G() {
-		return g.G; }
-	const char_class_fns<C>& cc_fns() { return g.cc_fns; }
-	const std::map<size_t, size_t>& grdm() { return g.grdm; }
-	const std::vector<std::string>& guards() { return g.guards; }
-};
+namespace idni {
 
 struct parser_gen_options {
 	std::string output_dir                       = "";
