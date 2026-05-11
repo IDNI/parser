@@ -1,0 +1,523 @@
+{
+	"version": 8,
+	"configurePresets": [
+		{
+			"name": "_generator-make",
+			"hidden": true,
+			"generator": "Unix Makefiles"
+		},
+
+		{
+			"name": "_generator-ninja",
+			"hidden": true,
+			"generator": "Ninja"
+		},
+
+		{
+			"name": "_toolchain-gcc",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_C_COMPILER": "gcc",
+				"CMAKE_CXX_COMPILER": "g++"
+			}
+		},
+		{
+			"name": "_toolchain-clang",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_C_COMPILER": "clang",
+				"CMAKE_CXX_COMPILER": "clang++"
+			}
+		},
+
+		{
+			"name": "_toolchain-mingw",
+			"hidden": true,
+			"toolchainFile": "cmake/mingw-w64-x86_64.cmake"
+		},
+
+		{
+			"name": "_toolchain-emscripten",
+			"hidden": true,
+			"toolchainFile": "cmake/emscripten-toolchain.cmake"
+		},
+
+		{
+			"name": "_build_dir-release",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/release"
+		},
+
+		{
+			"name": "_build_dir-debug",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug"
+		},
+
+		{
+			"name": "_build_dir-release-clang",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/release-clang"
+		},
+
+		{
+			"name": "_build_dir-debug-clang",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-clang"
+		},
+
+		{
+			"name": "_build_dir-release-mingw",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/release-mingw"
+		},
+
+		{
+			"name": "_build_dir-debug-mingw",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-mingw"
+		},
+
+		{
+			"name": "_build-type-debug",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug"
+			}
+		},
+
+		{
+			"name": "_build-type-release",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release"
+			}
+		},
+
+		{
+			"name": "_build-tests",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_PARSER_BUILD_TESTS": "ON"
+			}
+		},
+
+		{
+			"name": "_build-tgf",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_PARSER_BUILD_TGF": "ON"
+			}
+		},
+
+		{
+			"name": "_build-examples",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_PARSER_BUILD_EXAMPLES": "ON"
+			}
+		},
+
+		{
+			"name": "_build-all",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_PARSER_BUILD_ALL": "ON"
+			}
+		},
+
+		{
+			"name": "_build-static",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_PARSER_BUILD_STATIC_LIBRARY": "ON"
+			}
+		},
+
+		{
+			"name": "_build-shared",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_PARSER_BUILD_SHARED_LIBRARY": "ON"
+			}
+		},
+
+		{
+			"name": "_build-pic",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_PARSER_BUILD_PIC": "ON"
+			}
+		},
+
+		{
+			"name": "_sanitize-address",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_PARSER_ADDRESS_SANITIZER": "ON"
+			}
+		},
+
+		{
+			"name": "_install",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_PARSER_INSTALL": "ON"
+			}
+		},
+
+		{
+			"name": "_emscripten",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_PARSER_BUILD_EMSCRIPTEN": "ON"
+			}
+		},
+
+		{
+			"name": "release-make-gcc",
+			"inherits": [
+				"_build_dir-release",
+				"_generator-make",
+				"_toolchain-gcc",
+				"_build-type-release"
+			]
+		},
+
+		{
+			"name": "debug-make-gcc",
+			"inherits": [
+				"_build_dir-debug",
+				"_generator-make",
+				"_toolchain-gcc",
+				"_build-type-debug"
+			]
+		},
+
+		{
+			"name": "release-ninja-gcc",
+			"inherits": [
+				"_build_dir-release",
+				"_generator-ninja",
+				"_toolchain-gcc",
+				"_build-type-release"
+			]
+		},
+
+		{
+			"name": "debug-ninja-gcc",
+			"inherits": [
+				"_build_dir-debug",
+				"_generator-ninja",
+				"_toolchain-gcc",
+				"_build-type-debug"
+			]
+		},
+
+		{
+			"name": "release-make-clang",
+			"inherits": [
+				"_build_dir-release-clang",
+				"_generator-make",
+				"_toolchain-clang",
+				"_build-type-release"
+			]
+		},
+
+		{
+			"name": "debug-make-clang",
+			"inherits": [
+				"_build_dir-debug-clang",
+				"_generator-make",
+				"_toolchain-clang",
+				"_build-type-debug"
+			]
+		},
+
+		{
+			"name": "release-ninja-clang",
+			"inherits": [
+				"_build_dir-release-clang",
+				"_generator-ninja",
+				"_toolchain-clang",
+				"_build-type-release"
+			]
+		},
+
+		{
+			"name": "debug-ninja-clang",
+			"inherits": [
+				"_build_dir-debug-clang",
+				"_generator-ninja",
+				"_toolchain-clang",
+				"_build-type-debug"
+			]
+		},
+
+		{
+			"name": "release-mingw",
+			"inherits": [
+				"_build_dir-release-mingw",
+				"_generator-make",
+				"_toolchain-mingw",
+				"_build-type-release"
+			]
+		},
+
+		{
+			"name": "debug-mingw",
+			"inherits": [
+				"_build_dir-debug-mingw",
+				"_generator-make",
+				"_toolchain-mingw",
+				"_build-type-debug"
+			]
+		},
+
+		{
+			"name": "release",
+			"inherits": ["release-make-gcc"]
+		},
+
+		{
+			"name": "debug",
+			"inherits": ["debug-make-gcc"]
+		},
+
+		{
+			"name": "release-ninja",
+			"inherits": ["release-ninja-gcc"]
+		},
+
+		{
+			"name": "debug-ninja",
+			"inherits": ["debug-ninja-gcc"]
+		},
+
+		{
+			"name": "release-clang",
+			"inherits": ["release-make-clang"]
+		},
+
+		{
+			"name": "debug-clang",
+			"inherits": ["debug-make-clang"]
+		},
+
+		{
+			"name": "release-tests",
+			"inherits": ["release", "_build-tests"]
+		},
+
+		{
+			"name": "debug-tests",
+			"inherits": [
+				"debug",
+				"_build-tests",
+				"_build-type-debug"
+			]
+		},
+
+		{
+			"name": "release-all",
+			"inherits": ["release", "_build-all"]
+		},
+
+		{
+			"name": "debug-all",
+			"inherits": ["debug", "_build-all", "_build-type-debug"]
+		},
+
+		{
+			"name": "release-tgf",
+			"inherits": ["release", "_build-tgf"]
+		},
+
+		{
+			"name": "debug-tgf",
+			"inherits": ["debug", "_build-tgf", "_build-type-debug"]
+		},
+
+		{
+			"name": "debug-asan",
+			"inherits": [
+				"debug",
+				"_sanitize-address",
+				"_build-type-debug"
+			]
+		},
+
+		{
+			"name": "release-static",
+			"inherits": ["release", "_build-static", "_install"]
+		},
+
+		{
+			"name": "release-shared",
+			"inherits": [
+				"release",
+				"_build-shared",
+				"_build-pic",
+				"_install"
+			]
+		},
+
+		{
+			"name": "emscripten",
+			"inherits": [
+				"_build_dir-release",
+				"_generator-make",
+				"_toolchain-emscripten",
+				"_emscripten"
+			]
+		}
+	],
+	"buildPresets": [
+		{
+			"name": "debug",
+			"jobs": 0,
+			"configurePreset": "debug"
+		},
+		{
+			"name": "release",
+			"jobs": 0,
+			"configurePreset": "release"
+		},
+		{
+			"name": "release-ninja",
+			"jobs": 0,
+			"configurePreset": "release-ninja"
+		},
+		{
+			"name": "debug-ninja",
+			"jobs": 0,
+			"configurePreset": "debug-ninja"
+		},
+		{
+			"name": "release-clang",
+			"jobs": 0,
+			"configurePreset": "release-clang"
+		},
+		{
+			"name": "debug-clang",
+			"jobs": 0,
+			"configurePreset": "debug-clang"
+		},
+		{
+			"name": "debug-tests",
+			"jobs": 0,
+			"configurePreset": "debug-tests"
+		},
+		{
+			"name": "release-tests",
+			"jobs": 0,
+			"configurePreset": "release-tests"
+		},
+		{
+			"name": "debug-all",
+			"jobs": 0,
+			"configurePreset": "debug-all"
+		},
+		{
+			"name": "release-all",
+			"jobs": 0,
+			"configurePreset": "release-all"
+		},
+		{
+			"name": "debug-tgf",
+			"jobs": 0,
+			"configurePreset": "debug-tgf"
+		},
+		{
+			"name": "release-tgf",
+			"jobs": 0,
+			"configurePreset": "release-tgf"
+		},
+		{
+			"name": "debug-asan",
+			"jobs": 0,
+			"configurePreset": "debug-asan"
+		},
+		{
+			"name": "release-static",
+			"jobs": 0,
+			"configurePreset": "release-static"
+		},
+		{
+			"name": "release-shared",
+			"jobs": 0,
+			"configurePreset": "release-shared"
+		},
+		{
+			"name": "emscripten",
+			"jobs": 0,
+			"configurePreset": "emscripten"
+		},
+		{
+			"name": "release-make-gcc",
+			"jobs": 0,
+			"configurePreset": "release-make-gcc"
+		},
+		{
+			"name": "debug-make-gcc",
+			"jobs": 0,
+			"configurePreset": "debug-make-gcc"
+		},
+		{
+			"name": "release-ninja-gcc",
+			"jobs": 0,
+			"configurePreset": "release-ninja-gcc"
+		},
+		{
+			"name": "debug-ninja-gcc",
+			"jobs": 0,
+			"configurePreset": "debug-ninja-gcc"
+		},
+		{
+			"name": "release-make-clang",
+			"jobs": 0,
+			"configurePreset": "release-make-clang"
+		},
+		{
+			"name": "debug-make-clang",
+			"jobs": 0,
+			"configurePreset": "debug-make-clang"
+		},
+		{
+			"name": "release-ninja-clang",
+			"jobs": 0,
+			"configurePreset": "release-ninja-clang"
+		},
+		{
+			"name": "debug-ninja-clang",
+			"jobs": 0,
+			"configurePreset": "debug-ninja-clang"
+		},
+		{
+			"name": "release-mingw",
+			"jobs": 0,
+			"configurePreset": "release-mingw"
+		},
+		{
+			"name": "debug-mingw",
+			"jobs": 0,
+			"configurePreset": "debug-mingw"
+		}
+	],
+	"testPresets": [
+		{
+			"name": "debug-tests",
+			"configurePreset": "debug-tests",
+			"execution": {
+				"jobs": 0
+			}
+		},
+		{
+			"name": "release-tests",
+			"configurePreset": "release-tests",
+			"execution": {
+				"jobs": 0
+			}
+		}
+	]
+}
