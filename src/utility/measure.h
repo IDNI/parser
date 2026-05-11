@@ -3,12 +3,86 @@
 
 #ifndef __IDNI__PARSER__UTILITY__MEASURE_H__
 #define __IDNI__PARSER__UTILITY__MEASURE_H__
+
 #include <string>
 #include <iostream>
 #include <iomanip>
 #include <map>
+#include <fstream>
+
+#if defined(__linux__) || defined(__APPLE__)
+#	include <unistd.h>
+#	include <sys/resource.h>
+#	ifdef __APPLE__
+#		include <mach/mach.h>
+#	endif
+#elif defined(_WIN32)
+#	ifndef WIN32_LEAN_AND_MEAN
+#		define WIN32_LEAN_AND_MEAN
+#	endif
+#	ifndef NOMINMAX
+#		define NOMINMAX
+#	endif
+#	include <windows.h>
+#	include <psapi.h>
+#	ifdef _MSC_VER
+#		pragma comment(lib, "psapi.lib")
+#	endif
+#endif
 
 namespace idni::measures {
+
+/// current resident set size in KB
+[[maybe_unused]]
+inline long current_rss_kb() {
+#ifdef __linux__
+	std::ifstream f("/proc/self/statm");
+	if (!f.is_open()) return -1;
+	long total_pages = 0, rss_pages = 0;
+	if (!(f >> total_pages >> rss_pages)) return -1;
+	static long page_size_kb = sysconf(_SC_PAGESIZE) / 1024;
+	return rss_pages * page_size_kb;
+#elif defined(__APPLE__)
+	task_vm_info_data_t vm_info;
+	mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
+	if (task_info(mach_task_self(), TASK_VM_INFO,
+			(task_info_t)&vm_info, &count) != KERN_SUCCESS)
+		return -1;
+	return static_cast<long>(vm_info.phys_footprint / 1024);
+#elif defined(_WIN32)
+	HANDLE hProcess = GetCurrentProcess();
+	PROCESS_MEMORY_COUNTERS pmc;
+	pmc.cb = sizeof(pmc);
+	if (GetProcessMemoryInfo(hProcess, &pmc, sizeof(pmc)))
+		return static_cast<long>(pmc.WorkingSetSize / 1024);
+	return -1;
+#else
+	return -1;
+#endif
+}
+
+/// peak resident set size since process start, in KB
+[[maybe_unused]]
+inline long peak_rss_kb() {
+#if defined(__linux__)
+	struct rusage ru;
+	if (getrusage(RUSAGE_SELF, &ru) != 0) return -1;
+	return ru.ru_maxrss;
+#elif defined(__APPLE__)
+	struct rusage ru;
+	if (getrusage(RUSAGE_SELF, &ru) != 0) return -1;
+	return ru.ru_maxrss / 1024;
+#elif defined(_WIN32)
+	HANDLE hProcess = GetCurrentProcess();
+	PROCESS_MEMORY_COUNTERS pmc;
+	pmc.cb = sizeof(pmc);
+	if (GetProcessMemoryInfo(hProcess, &pmc, sizeof(pmc)))
+		return static_cast<long>(pmc.PeakWorkingSetSize / 1024);
+	return -1;
+#else
+	return -1;
+#endif
+}
 
 struct timer {
 
