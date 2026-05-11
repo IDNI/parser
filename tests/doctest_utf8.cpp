@@ -66,12 +66,12 @@ TEST_SUITE("peek_codepoint correctness") {
 	TEST_CASE("2-byte: U+00A9 ©") {
 		char32_t ch;
 		CHECK(peek_exact({ 0xC2, 0xA9 }, ch) == 2);
-		CHECK(ch == U'©');
+		CHECK(ch == 0x00A9);
 	}
 	TEST_CASE("3-byte: U+20AC €") {
 		char32_t ch;
 		CHECK(peek_exact({ 0xE2, 0x82, 0xAC }, ch) == 3);
-		CHECK(ch == U'€');
+		CHECK(ch == 0x20AC);
 	}
 	TEST_CASE("4-byte: U+1F600 grinning face") {
 		char32_t ch;
