@@ -9,6 +9,9 @@ string(STRIP "${TAU_PARSER_VERSION}" TAU_PARSER_VERSION)
 string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" TAU_PARSER_TARGET_VERSION "${TAU_PARSER_VERSION}")
 message(STATUS "Parser version: ${TAU_PARSER_TARGET_VERSION} / ${TAU_PARSER_VERSION}")
 
+# Load machine-local cmake settings
+include(CMakeLocalLists.txt OPTIONAL)
+
 if(TAU_PARSER_BUILD_EMSCRIPTEN)
 	include(emscripten-toolchain)
 	set_emscripten_toolchain()
