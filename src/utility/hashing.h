@@ -7,6 +7,7 @@
 #include <vector>
 #include <tuple>
 #include <utility>
+#include <array>
 
 namespace idni {
 
@@ -35,9 +36,18 @@ namespace std {
 
 template<typename T>
 struct hash<vector<T>> {
-	size_t operator()(const vector<T>& vec) const {
+	size_t operator()(const vector<T>& vec) const noexcept {
 		size_t seed = vec.size();
 		for (auto& i : vec) idni::hash_combine(seed, i);
+		return seed;
+	}
+};
+
+template<typename T, size_t N>
+struct hash<array<T, N>> {
+	size_t operator()(const std::array<T, N>& a) const noexcept {
+		size_t seed = N;
+		for (auto& i : a) idni::hash_combine(seed, i);
 		return seed;
 	}
 };
