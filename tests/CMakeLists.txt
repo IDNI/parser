@@ -31,6 +31,7 @@ foreach(X IN LISTS TESTS)
 	target_include_directories(${N} PUBLIC
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
 	)
+	add_test(NAME ${N} COMMAND ${N})
 endforeach()
 
 # add required sources to test_cli
@@ -79,6 +80,7 @@ foreach(X IN LISTS DOCTESTS)
 	target_include_directories(${N} PUBLIC
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
 	)
+	add_test(NAME ${N} COMMAND ${N})
 	# add_dependencies(${N} ${TAU_PARSER_STATIC_LIB_NAME})
 endforeach()
 
