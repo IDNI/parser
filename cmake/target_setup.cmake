@@ -18,8 +18,8 @@ function(target_setup target access compile_definitions compile_options link_opt
 			-Wstrict-aliasing=2
 			-Wfloat-equal
 			-Wwrite-strings
-			#-Werror
-			#-Wfatal-errors
+			-Werror
+			# -Wfatal-errors
 		)
 		if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
 				CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
