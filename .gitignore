@@ -12,9 +12,11 @@ graph_grammar_rules*.tml
 forest_grammar_rules*.tml
 .local
 .*_history
-./tau-lang
+/tau-lang/
 .gdbinit
 src/doctest.h
 _site/*
 src/version_license.h
 external/emsdk
+Testing
+tests/data/bench/
