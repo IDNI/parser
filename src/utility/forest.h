@@ -49,7 +49,9 @@ private:
 	private:
 		/// Points to pnode
 		const NodeT *id;
+	public:
 		size_t hash;
+	private:
 		/**
 		 * Maintains a refcount for # of id pointers to NodeT obj in NodeT::nid
 		 * map both externally and from inside nid
