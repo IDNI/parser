@@ -18,7 +18,44 @@ struct tgf {
 	using lit_t          = lit<C, T>;
 	using prods_t        = prods<C, T>;
 
-	static grammar<C, T> from_string(nonterminals<C, T>& nts_,
+	/// Parse TGF from string
+	static grammar<C, T> from_string(
+		nonterminals<C, T>& nts_,
+		const std::basic_string<C>& s)
+	{
+		auto& p = tgf_parser::instance();
+		static tgf_parser::parse_options po{
+			.start = tgf_parser::start };
+		auto r = p.parse(s.c_str(), s.size(), po);
+		if (!r.found) {
+			std::cerr << "TGF: "
+				<< r.parse_error.to_str(tgf_parser::error::
+					info_lvl::INFO_BASIC) << "\n";
+			return grammar<C, T>(nts_);
+		}
+		grammar_builder b(nts_);
+		b.build(trv(r.get_shaped_tree2()));
+		return b.g();
+	}
+	/// Parse TGF from a file
+	static grammar<C, T> from_file(
+		nonterminals<C, T>& nts_,
+		const std::string& filename)
+	{
+		std::ifstream ifs(filename);
+		if (!ifs) {
+			std::cerr << "cannot open file: "
+						<< filename << std::endl;
+			return grammar<C, T>(nts_);
+		}
+		return from_string(nts_, std::string(
+				std::istreambuf_iterator<C>(ifs),
+				std::istreambuf_iterator<C>()));
+	}
+
+	/// Parse TGF from a string but split it to statements first
+	static grammar<C, T> from_string_presplit(
+		nonterminals<C, T>& nts_,
 		const std::basic_string<C>& s)
 	{
 		grammar_builder b(nts_);
@@ -83,8 +120,9 @@ struct tgf {
 		}
 		return b.g();
 	}
-
-	static grammar<C, T> from_file(nonterminals<C, T>& nts_,
+	/// Parse TGF from a file but split it to statements first
+	static grammar<C, T> from_file_presplit(
+		nonterminals<C, T>& nts_,
 		const std::string& filename)
 	{
 		std::ifstream ifs(filename);
@@ -93,7 +131,7 @@ struct tgf {
 						<< filename << std::endl;
 			return grammar<C, T>(nts_);
 		}
-		return from_string(nts_, std::string(
+		return from_string_presplit(nts_, std::string(
 				std::istreambuf_iterator<C>(ifs),
 				std::istreambuf_iterator<C>()));
 	}
