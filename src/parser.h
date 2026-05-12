@@ -17,7 +17,7 @@
 #include <map>
 #include <set>
 
-// #define PARSER_BINTREE_FOREST true
+#include "ankerl/unordered_dense.h"
 
 #include "defs.h"
 #include "utility/memory_map.h"
@@ -25,8 +25,7 @@
 #include "utility/charclasses.h"
 #include "utility/term_colors.h"
 #include "utility/tree.h"
-
-#ifndef PARSER_BINTREE_FOREST
+#include "ankerl/unordered_dense.h"
 #include "utility/forest.h"
 #endif
 
@@ -1083,7 +1082,7 @@ public:
 	bool debug = false;
 	std::pair<size_t, size_t> debug_at = { DEBUG_POS_FROM, DEBUG_POS_TO };
 private:
-	using container_t    = std::set<item>;
+	using container_t    = ankerl::unordered_dense::set<item, item_hash>;
 	using container_iter = typename container_t::iterator;
 public:
 	std::ostream& print(std::ostream& os, const item& i) const;
@@ -1105,17 +1104,35 @@ private:
 	std::vector<container_t> S;
 	std::vector<container_t> U; /// uncompleted
 		///mapping from to position of end in S for items
-	std::unordered_map<size_t, std::unordered_set<size_t>> fromS;
-	std::unordered_map<std::pair<size_t /*nt_id*/, size_t> , std::set<item>> cache;
+	ankerl::unordered_dense::map<size_t,
+		ankerl::unordered_dense::set<size_t>> fromS;
+	ankerl::unordered_dense::map<std::pair<size_t /*nt_id*/, size_t>,
+		container_t> cache;
 
 	/// refcounter for the earley item
 	/// default value is 0, which means it can be garbaged
 	/// non-zero implies, its not to be collected
 	std::map<item, int_t> refi;
 	/// items ready for collection
-	std::set<item> gcready;
-	std::unordered_map<std::pair<size_t, size_t>, std::vector<const item*> >
-		sorted_citem, rsorted_citem;
+	container_t gcready;
+	ankerl::unordered_dense::map<std::pair<size_t, size_t>,
+		std::vector<item>> sorted_citem, rsorted_citem;
+
+	/// completion key (nt_id, from, set) for dependency tracking
+	using completion_key = std::tuple<size_t, size_t, size_t>;
+	std::unordered_map<completion_key, std::vector<item>>
+		completion_deps;
+	/// O(1) "is anything still completed?" predicate.
+	std::unordered_map<completion_key, size_t> completion_count;
+	/// True iff any production in `g` is conjunctive. Cascade machinery
+	/// is dead code when this is false, so its bookkeeping is skipped.
+	bool any_conj = false;
+	/// Per-item memoization for complete(): index into the underlying
+	/// cache vector at the last call. complete() only re-processes cache
+	/// entries [last, current_size) instead of the whole cache. The cache
+	/// only grows during a parse, so indices into its underlying vector
+	/// are stable.
+	ankerl::unordered_dense::map<item, size_t, item_hash> complete_memo;
 
 	/// binarized temporary intermediate non-terminals
 	std::map<std::vector<lit<C, T>>, lit<C, T>> bin_tnt;
@@ -1132,6 +1149,9 @@ private:
 	std::pair<container_iter, bool> add(container_t& t, const item& i);
 	bool nullable(const item& i) const;
 	void resolve_conjunctions(container_t& c, container_t& t);
+	void cascade_uncomplete(size_t nt_id, size_t from, size_t set,
+		container_t& c);
+	bool nt_still_completed(size_t nt_id, size_t from, size_t set) const;
 	void predict(const item& i, container_t& t);
 	void scan(const item& i, size_t n, T ch);
 	void scan_cc_function(const item& i, size_t n, T ch, container_t& t);
