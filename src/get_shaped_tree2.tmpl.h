@@ -159,11 +159,10 @@ tref parser<C, T>::result::get_shaped_tree2(tref t)
 }
 template <typename C, typename T>
 tref parser<C, T>::result::get_shaped_tree2(const shaping_options opts) {
-#ifdef PARSER_BINTREE_FOREST
-	return get_shaped_tree2(froot->get(), opts);
-#else
-	return get_shaped_tree2(get_tree2(), opts);
-#endif // PARSER_BINTREE_FOREST
+	if (froot != 0)
+		return get_shaped_tree2(froot->get(), opts);
+	else
+		return get_shaped_tree2(get_tree2(), opts);
 }
 template <typename C, typename T>
 tref parser<C, T>::result::get_shaped_tree2() {
@@ -172,60 +171,32 @@ tref parser<C, T>::result::get_shaped_tree2() {
 
 template <typename C, typename T>
 tref parser<C, T>::result::get_tree2() {
-#ifdef PARSER_BINTREE_FOREST
-	return froot->get();
-#else
-	return get_tree2(f->root());
-#endif // PARSER_BINTREE_FOREST
+	if (froot != 0)
+		return froot->get();
+	else if (f)
+		return get_tree2(f->root());
+	return nullptr;
 }
 
-#ifdef PARSER_BINTREE_FOREST
-template <typename C, typename T>
-tref parser<C, T>::result::get_tree2(const pnode&) {
-	// TODO get tree from pnode
-	return froot->get();
-}
-#else
 template <typename C, typename T>
 tref parser<C, T>::result::get_tree2(const pnode& n) {
+	if (froot != 0)
+		return froot->get();
+	if (!f) return nullptr;
 	htref t;
 	MS(emeasure_time_start(s,e);)
 	MS(std::cout<<"\n extract_graph ";)
 	auto g = f->extract_first_graph(n);
-	/*f->extract_graphs(n, [this, &t] (auto& g) {
-		MS(emeasure_time_start(s1,e1);)
-		MS(std::cout<<"\n inline_grammar ";)
-		inline_grammar_transformations(g);
-		MS(emeasure_time_end(s1, e1);)
-		t = g.extract_tree2();
-	return false;
-	});
-	*/
 	MS(emeasure_time_end(s, e);)
-
 	MS(emeasure_time_start(s1,e1);)
 	MS(std::cout<<"\n inline_grammar ";)
 	inline_grammar_transformations(g);
 	MS(emeasure_time_end(s1, e1);)
-
-
 	MS(emeasure_time_start(s2,e2);)
 	MS(std::cout<<"\n extract_tree2 ";)
 	t = g.extract_tree2();
 	MS(emeasure_time_end(s2, e2);)
-
-	/*
-	f->extract_graphs(n, [this, &t] (auto& g) {
-		inline_grammar_transformations(g);
-		t = g.extract_tree2();
-		return false;
-	});
-	*/
-
-
 	return t->get();
-
 }
-#endif // PARSER_BINTREE_FOREST
 
 } // idni namespace

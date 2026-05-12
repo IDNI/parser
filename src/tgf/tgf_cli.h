@@ -46,6 +46,8 @@ struct tgf_repl_evaluator {
 		std::string start{"start"};
 		parser_type::error::info_lvl error_verbosity =
 			parser_type::error::info_lvl::INFO_BASIC;
+		parse_tree_path tree_path = parse_tree_path::bintree_path;
+		bool auto_disambiguate = true;
 		std::set<std::string> nodisambig_list{};
 		std::set<std::string> to_trim{};
 		std::set<std::string> dont_trim_terminals_of{};

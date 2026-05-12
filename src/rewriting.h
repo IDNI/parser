@@ -16,9 +16,7 @@
 #include <variant>
 #include <compare>
 
-#ifndef PARSER_BINTREE_FOREST
 #include "utility/forest.h"
-#endif
 #include "parser.h"
 
 // use boost log if available otherwise use std::cout

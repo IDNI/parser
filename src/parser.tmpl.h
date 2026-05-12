@@ -3,6 +3,8 @@
 
 #include "parser.h"
 
+#include <climits>
+
 #ifdef TAU_PARSER_MEASURE
 #include "utility/measure.h"
 #endif // TAU_PARSER_MEASURE
@@ -17,16 +19,16 @@ std::ostream& operator<<(std::ostream& os,
 					<< obj.second[1] << "]";
 }
 
-#ifndef PARSER_BINTREE_FOREST
 template <typename C, typename T>
 typename forest<pnode_type<C,T>>::node pnode_type<C,T>::ptrof(const pnode_type<C,T>& pn)
 {
-	auto r = nid().emplace( pn, nullptr );
-	if (r.second) r.first->second = typename
-		forest<pnode_type<C,T>>::node(&(r.first->first));
+	auto r = nid().try_emplace(pn);
+	if (r.second) {
+		r.first->second.id = &(r.first->first);
+		r.first->second.hash = r.first->first.hash;
+	}
 	return r.first->second;
 }
-#endif
 
 //------------------------------------------------------------------------------
 
@@ -616,9 +618,11 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 		g.print_internal_grammar(std::cout << "grammar: \n", "\t", true)
 			<< "\n";
 	}
-#ifndef PARSER_BINTREE_FOREST
-	auto f = std::make_unique<pforest>();
-#endif
+	// In forest_path the forest is built eagerly; in bintree_path
+	// the tref (stored in `fr` below) is built instead.
+	std::unique_ptr<pforest> f;
+	if (po.tree_path == parse_tree_path::forest_path)
+		f = std::make_unique<pforest>();
 	S.clear(), U.clear(), bin_tnt.clear(), refi.clear(), cache.clear(),
 		gcready.clear(), sorted_citem.clear(), rsorted_citem.clear(),
 		completion_deps.clear(), completion_count.clear(),
@@ -702,8 +706,9 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 			#endif // TAU_PARSER_MEASURE
 		}
 
-#ifndef PARSER_BINTREE_FOREST
-		if (o.incr_gen_forest) {
+		if (po.tree_path == parse_tree_path::forest_path
+			&& o.incr_gen_forest)
+		{
 			const auto& cont = S[n];
 			for (auto it = cont.begin(); it != cont.end(); ++it)
 				pre_process(*it);
@@ -714,7 +719,6 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 					build_forest(*f, curroot);
 				}
 		}
-#endif
 		if (o.enable_gc) {
 			for (auto it = gcready.begin(); it != gcready.end();) {
 				auto rm = *it;
@@ -761,8 +765,8 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 
 	in_->clear();
 	// remaining total items
-	size_t count = 0;
-	for (size_t i = 0; i < S.size(); i++) count += S[i].size();
+	MS(size_t count = 0;)
+	MS(for (size_t i = 0; i < S.size(); i++) count += S[i].size();)
 	MS(std::cout << "\nGC: total input size = " << n;)
 	MS(std::cout << "\nGC: total remaining  = " << count;)
 	MS(std::cout << "\nGC: total collected  = " << gcnt;)
@@ -772,44 +776,43 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 	MS(if (count + gcnt)
 		std::cout << "\nGC: % = " << 100*gcnt/(count+gcnt) <<std::endl);
 
-#ifdef PARSER_BINTREE_FOREST
-	tref fr;
-	if (!o.incr_gen_forest) {
-		fr = init_forest(start_lit, po);
-		// tree::get(fr).print(std::cout << "forest in_ tree: ") << std::endl;
-	}
-#else
-	if (!o.incr_gen_forest) init_forest(*f, start_lit, po);
+	tref fr = 0;
+	if (po.tree_path == parse_tree_path::bintree_path) {
+		// bintree is always built post-parse; incr_gen_forest is ignored.
+		fr = build_bintree(start_lit, po);
+	} else {
+		if (!o.incr_gen_forest) init_forest(*f, start_lit, po);
 		else f->root(pnode(start_lit, { 0, in_->tpos() }));
-#endif
+	}
 
 	if (debug) debug = false;
 
 	bool fnd = found(po.start);
 	error err = fnd ? error{} : get_error();
 
-	MS(auto usen = f->count_useful_nodes(f->root());)
-	MS(auto usenc = usen.first + usen.second;)
+	if (f) {
+		MS(auto usen = f->count_useful_nodes(f->root());)
+		MS(auto usenc = usen.first + usen.second;)
 
-	MS(std::cout << "\nGC: Useful nodes"
-		<<usen.first <<"+"<<usen.second << "=" << usenc <<"\n" );
+		MS(std::cout << "\nGC: Useful nodes"
+			<<usen.first <<"+"<<usen.second << "=" << usenc <<"\n" );
 
-	MS(if (count + gcnt)
-		std::cout << "\nGC: useful% = " << 100*(usenc)
-		/(count+gcnt) <<std::endl );
-	MS(if (count + gcnt -usenc)
-		std::cout << "\nGC: achieved% = " << 100*gcnt
-		/(count+gcnt - usenc) <<std::endl);
+		MS(if (count + gcnt)
+			std::cout << "\nGC: useful% = " << 100*(usenc)
+			/(count+gcnt) <<std::endl );
+		MS(if (count + gcnt -usenc)
+			std::cout << "\nGC: achieved% = " << 100*gcnt
+			/(count+gcnt - usenc) <<std::endl);
 
-	MS(if (count + gcnt)
-		std::cout << "\nGC: potenial% = " << 100*(count+gcnt
-		- usenc)/(count + gcnt) <<std::endl);
+		MS(if (count + gcnt)
+			std::cout << "\nGC: potenial% = " << 100*(count+gcnt
+			- usenc)/(count + gcnt) <<std::endl);
+	}
 
-#ifdef PARSER_BINTREE_FOREST
-	return result(*this, std::move(in_), fr, fnd, err);
-#else
-	return result(*this, std::move(in_), std::move(f), fnd, err);
-#endif
+	if (po.tree_path == parse_tree_path::bintree_path)
+		return result(*this, std::move(in_), fr, fnd, err);
+	else
+		return result(*this, std::move(in_), std::move(f), fnd, err);
 }
 template <typename C, typename T>
 bool parser<C, T>::found(size_t start) {
@@ -1075,44 +1078,177 @@ void parser<C, T>::pre_process(const item& i) {
 	}
 }
 
-#ifdef PARSER_BINTREE_FOREST
-// build forest directly into tree (skip forest struct)
+// build_bintree: preprocesses S items and builds a tref directly from them.
+// When auto_disambiguate is on, picks the parse with smallest production id
+// and within it the alternative with smallest spans. When off, wraps
+// alternatives under __AMB__ nodes.
 template <typename C, typename T>
-tref parser<C, T>::init_forest(const lit<C, T>& start_lit,
+tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 	[[maybe_unused]] const parse_options& po)
 {
 	bin_tnt.clear();
 	sorted_citem.clear();
 	rsorted_citem.clear();
 	tid = 0;
-	// set the start root node
 	pnode root(start_lit, { 0, in_->tpos() });
-	// f.root(root);
 
 	// preprocess parser items for faster retrieval
 	#ifdef PARSER_MEASURE
 	measures::start_timer("preprocess", po.measure_preprocess);
+	int count = 0;
 	#endif // PARSER_MEASURE
 
-	int count = 0;
 	for (size_t n = 0; n < in_->tpos() + 1; n++)
-		for (const item& i : S[n]) count++, pre_process(i);
+		for (const item& i : S[n])
+			#ifdef PARSER_MEASURE
+			count++,
+			#endif // PARSER_MEASURE
+			pre_process(i);
 
 	#ifdef PARSER_MEASURE
 	measures::print_timer("preprocess");
 	measures::stop_timer("preprocess");
-	std::cout << "preprocess size: " << count << "\n";
-	std::cout << "sorted sizes : " << sorted_citem.size()
-		<< " " << rsorted_citem.size() << " \n";
 	#endif // PARSER_MEASURE
 
-	// build forest
 	#ifdef PARSER_MEASURE
 	measures::start_timer("forest building", po.measure_forest);
 	#endif // PARSER_MEASURE
 
-	tref ret = build_forest(root);
-	// f.print_data(std::cout) << "\n";
+	auto check_allowed = [this](const pnode& n) {
+		if (!g.opt.auto_disambiguate) return false;
+		for (auto& nt : g.opt.nodisambig_list)
+			if (n.first.nt() && n.first.n() == nt) return false;
+		return true;
+	};
+
+	auto pick_best = [](pnodes_set& packs) -> pnodes {
+		if (packs.size() <= 1)
+			return packs.empty() ? pnodes{} : *packs.begin();
+		int maxk = INT_MAX;
+		for (auto& p : packs)
+			if ((int)p.size() < maxk) maxk = (int)p.size();
+		std::vector<int> idxs;
+		for (size_t i = 0; i < packs.size(); i++)
+			idxs.push_back((int)i);
+		int k = 0;
+		while (k < maxk && idxs.size() > 1) {
+			int gspan = INT_MAX;
+			std::vector<int> gi;
+			for (auto idx : idxs) {
+				auto& pk = *std::next(packs.begin(), idx);
+				int span = (int)(pk[k]->second[1]
+						- pk[k]->second[0]);
+				if (span < gspan) {
+					gspan = span; gi.clear();
+					gi.push_back(idx);
+				} else if (span == gspan)
+					gi.push_back(idx);
+			}
+			idxs = std::move(gi);
+			k++;
+		}
+		return *std::next(packs.begin(), idxs[0]);
+	};
+
+	auto is_ebnf = [](const pnode& n) -> bool {
+		auto s = n.first.to_std_string();
+		return s.size() >= 4 && s.substr(0, 4) == "__E_";
+	};
+
+	auto is_amb = [](tref n) {
+		if (!n) return false;
+		auto& l = tree::get(n).value.first;
+		return l.nt() && l.to_std_string() == "__AMB__";
+	};
+
+	std::set<pnode> visiting;
+	std::function<tref(const pnode&)> build;
+	std::function<tref(const pnode&, const pnodes&)> build_pack;
+
+	auto build_children = [&](const pnodes& pack, trefs& out) {
+		for (auto& nxt : pack) {
+			if (is_ebnf(nxt)) {
+				auto ch = build(nxt);
+				if (ch && is_amb(ch)) out.push_back(ch);
+				else if (ch) for (auto c
+					: tree::get(ch).children())
+					out.push_back(c);
+			} else if (auto ch = build(nxt); ch)
+				out.push_back(ch);
+		}
+	};
+
+	build_pack = [&](const pnode& node, const pnodes& pack) {
+		trefs children;
+		build_children(pack, children);
+		return tree::get(node, children);
+	};
+
+	build = [&](const pnode& node) -> tref {
+		if (!node.first.nt()) return tree::get(node);
+		if (visiting.count(node)) return tree::get(node);
+		visiting.insert(node);
+
+		auto& items = sorted_citem[{ node.first.n(),
+						node.second[0] }];
+		pnodes_set packs;
+		bool ad_allowed = check_allowed(node);
+
+		if (ad_allowed) {
+			size_t best_prod = SIZE_MAX;
+			for (auto& cur : items) {
+				if (cur.set != node.second[1]) continue;
+				if (cur.prod >= best_prod) continue;
+				pnodes nxtlits;
+				pnodes_set cur_packs;
+				if (o.binarize)
+					binarize_comb(cur, cur_packs);
+				else
+					sbl_chd_forest(cur, nxtlits,
+						cur.from, cur_packs);
+				if (!cur_packs.empty()) {
+					best_prod = cur.prod;
+					packs = std::move(cur_packs);
+				}
+			}
+		} else {
+			for (auto& cur : items) {
+				if (cur.set != node.second[1]) continue;
+				pnodes nxtlits;
+				pnodes_set cur_packs;
+				if (o.binarize)
+					binarize_comb(cur, cur_packs);
+				else
+					sbl_chd_forest(cur, nxtlits,
+						cur.from, cur_packs);
+				for (auto& p : cur_packs)
+					packs.insert(std::move(p));
+			}
+		}
+
+		tref r;
+		if (packs.empty()) {
+			r = tree::get(node);
+		} else if (packs.size() == 1) {
+			r = build_pack(node, *packs.begin());
+		} else if (ad_allowed) {
+			r = build_pack(node, pick_best(packs));
+		} else {
+			auto amb = g.nt(from_str<C>(
+				std::string("__AMB__")));
+			trefs alts;
+			for (auto& pack : packs)
+				if (auto alt = build_pack(node,
+						pack); alt)
+					alts.push_back(alt);
+			r = tree::get(pnode(amb, node.second), alts);
+		}
+
+		visiting.erase(node);
+		return r;
+	};
+
+	tref ret = build(root);
 
 	#ifdef PARSER_MEASURE
 	measures::print_timer("forest building");
@@ -1121,7 +1257,8 @@ tref parser<C, T>::init_forest(const lit<C, T>& start_lit,
 
 	return ret;
 }
-#else
+
+// default-mode init_forest: builds a pforest eagerly from S-items
 template <typename C, typename T>
 bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
 	[[maybe_unused]] const parse_options& po)
@@ -1138,11 +1275,16 @@ bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
 	// preprocess parser items for faster retrieval
 	#ifdef TAU_PARSER_MEASURE
 	measures::start_timer("preprocess", po.measure_preprocess);
+	int count = 0;
 	#endif // TAU_PARSER_MEASURE
 
 	int count = 0;
 	for (size_t n = 0; n < in_->tpos() + 1; n++)
-		for (const item& i : S[n]) count++, pre_process(i);
+		for (const item& i : S[n])
+			#ifdef TAU_PARSER_MEASURE
+			count++,
+			#endif // TAU_PARSER_MEASURE
+			pre_process(i);
 
 	#ifdef TAU_PARSER_MEASURE
 	measures::print_timer("preprocess");
@@ -1167,7 +1309,6 @@ bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
 
 	return ret;
 }
-#endif
 // collects all possible variations of the given item's rhs while respecting the
 // span of the item and stores them in the set ambset.
 template <typename C, typename T>
@@ -1178,12 +1319,7 @@ void parser<C, T>::sbl_chd_forest(const item& eitem,
 	//check if we have reached the end of the rhs of prod
 	if (g.len(eitem.prod, eitem.con) <= curchd.size())  {
 		// match the end of the span we are searching in.
-#ifdef PARSER_BINTREE_FOREST
-		static auto loc = [](pnode& n) -> location_type& { return n.second; };
-		if (loc(curchd.back())[1] == eitem.set) ambset.insert(curchd);
-#else
 		if (curchd.back()->second[1] == eitem.set) ambset.insert(curchd);
-#endif
 		return;
 	}
 	// curchd.size() refers to index of cur literal to process in the rhs of production
@@ -1279,8 +1415,7 @@ bool parser<C, T>::binarize_comb(const item& eitem,
 		}
 		else {
 			auto &leftit = sorted_citem[{ l.n(), eitem.from }];
-			for (auto& itp : leftit)	for (auto& rit : rcomb){
-				auto& it = *itp;
+			for (auto& it : leftit) for (auto& rit : rcomb) {
 				if (it.set == rit.second[0])
 					left.second[0] = it.from,
 					left.second[1] = it.set,
@@ -1295,127 +1430,7 @@ bool parser<C, T>::binarize_comb(const item& eitem,
 	}
 	return true;
 }
-#ifdef PARSER_BINTREE_FOREST
-// builds the forest from root
-template <typename C, typename T>
-tref parser<C, T>::build_forest(const pnode& root) {
-
-	// checks if disambiguation is allowed for a node
-	auto check_allowed = [this](const pnode &cnode) {
-		if (g.opt.auto_disambiguate == false) return false;
-		for (auto &nt : g.opt.nodisambig_list)
-			if (cnode.first.nt() && cnode.first.n() == nt)
-				return false;
-		return true;
-	};
-
-	// find all relevant parse items for the node
-	auto find_items = [&](const pnode& node) -> pnodes_set{
-		auto &nxtset = sorted_citem[{ node.first.n(), node.second[0] }];
-		if (nxtset.empty()) return {};
-
-		pnodes_set ambset, cambset;
-		std::set<pnode> snodes;
-		size_t last_p = SIZE_MAX;
-
-		for (auto& curp : nxtset) {
-			auto& cur = *curp;
-			// print(std::cout << "cur: ", cur) << "\n";
-			if (cur.set != node.second[1]) continue;
-
-			pnode cnode(completed(cur) /*&& !negative(cur)*/
-				? g(cur.prod) : g.nt(node.first.n()),
-				{ cur.from, cur.set });
-			cambset.clear();
-			bool allowed_disambg = check_allowed(cnode);
-			if (o.binarize) binarize_comb(cur,
-					allowed_disambg ? cambset : ambset);
-			else {
-				pnodes nxtlits;
-				// std::cout << "\n" << cur.prod << " " << last_p << " " << ambset.size();
-				sbl_chd_forest(cur, nxtlits, cur.from,
-					allowed_disambg ? cambset : ambset);
-			}
-
-			// resolve ambiguity across productions, due to different earley items
-			// with different prod id
-			if (allowed_disambg) {
-				if (cambset.size()) { // any new sub forest
-					if (ambset.size() == 0) // first time if
-						last_p = cur.prod, ambset = cambset;
-					else // get the smallest one
-						if (last_p > cur.prod) ambset.clear(),
-							last_p = cur.prod,
-							ambset = cambset;
-				}
-				snodes.insert(cnode);
-			}
-		}
-
-		// resolve ambiguity within the same production
-		if (snodes.size() && check_allowed(*snodes.begin())) {
-			std::vector<int> gi;
-			int gspan = INT_MAX;
-			int k = 0;
-			std::vector<int> idxs;
-			for(size_t i = 0; i < ambset.size(); i++)
-				idxs.push_back(static_cast<int>(i));
-
-			// choose the one with the smallest span for each level
-			do {
-				gi.clear();
-				for (auto packidx : idxs) {
-					auto apack = *next(ambset.begin(), packidx);
-					pnode lt = apack[k];
-					int span = static_cast<int>(lt.second[1] - lt.second[0]);
-					if (gspan == span) gi.push_back(packidx);
-					if (gspan > span) gspan = span,
-						gi.clear(),gi.push_back(packidx);
-				}
-				k++;
-				idxs.clear();
-				idxs.insert(idxs.begin(), gi.begin(), gi.end());
-			} while (k < static_cast<int>(ambset.size()) && gi.size() > 1);
-
-			cambset.clear();
-			if (ambset.size() && gi.size())
-				cambset.insert(*next(ambset.begin(), gi[0]));
-		}
-
-		// choose which set to use for building
-		return (snodes.size() && check_allowed(*snodes.begin()))
-			? cambset : ambset;
-	};
-
-	auto is_ebnf = [](const pnode& node) -> bool {
-		std::string name = node.first.to_std_string();
-		return name.size() >= 4 && name.substr(0, 4) == "__E_";
-	};
-
-	std::set<pnode> visited;
-	std::function<void(const pnode&, trefs&)> build_children;
-	build_children = [&visited, &find_items, &is_ebnf, &build_children]
-		(const pnode& node, trefs& children)
-	{
-		// std::cout << "build_children for node: `" << node << "`" << std::endl;
-		if (!node.first.nt() || visited.count(node)) return;
-		visited.insert(node);
-		for (const auto& aset : find_items(node))
-			for (const auto &nxt : aset)
-				if (is_ebnf(nxt))
-					build_children(nxt, children);
-				else {
-					trefs ch;
-					build_children(nxt, ch);
-					children.push_back(tree::get(nxt, ch));
-				}
-	};
-	trefs ch;
-	build_children(root, ch);
-	return tree::get(root, ch);
-}
-#else
-// builds the forest starting with root
+// default-mode build_forest — builds a pforest from a root pnode
 template <typename C, typename T>
 bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 	if (!root.first.nt()) return false;
@@ -1435,8 +1450,7 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 		return true;
 	};
 
-	for (auto& curp : nxtset) {
-		auto& cur = *curp;
+	for (auto& cur : nxtset) {
 		// print(std::cout << "cur: ", cur) << std::endl;
 		if (cur.set != root.second[1]) continue;
 		pnode cnode(completed(cur) /*&& !negative(cur)*/
@@ -1526,7 +1540,7 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 
 	return true;
 }
-#endif
+
 template <typename C, typename T>
 std::basic_string<C> parser<C, T>::input::get_string() {
 	if (!isstream()) return std::basic_string<C>(d, l);

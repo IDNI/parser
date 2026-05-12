@@ -93,6 +93,12 @@ cli::commands tgf_commands() {
 	auto error_verbosity = OPT(cli::option("error-verbosity", 'v',
 		"basic"));
 		DESC("error info verbosity: basic, detailed, root-cause");
+	auto tree_path_opt = OPT(cli::option("tree-path", 'P',
+		"bintree"));
+		DESC("parse tree path: bintree or forest");
+	auto auto_disam_opt = OPT(cli::option("auto-disambiguate", 'a',
+		true));
+		DESC("enables auto-disambiguation");
 	auto print_graphs = OPT(cli::option("print-graphs", 'p',
 		true));
 		DESC("prints parsed graph");
@@ -295,8 +301,16 @@ int tgf_run(int argc, char** argv) {
 		cmd.get<bool>("tml-facts");
 	if (cmd.has("error-verbosity"))         tgf_repl_opt.error_verbosity =
 		str2error_verbosity(cmd.get<string>("error-verbosity"));
-	if (cmd.has("start"))                   tgf_repl_opt.start =
-		cmd.get<string>("start");
+	if (cmd.has("start"))
+		tgf_repl_opt.start = cmd.get<string>("start");
+	if (cmd.has("tree-path"))
+		tgf_repl_opt.tree_path =
+			cmd.get<string>("tree-path") == "forest"
+				? parse_tree_path::forest_path
+				: parse_tree_path::bintree_path;
+	if (cmd.has("auto-disambiguate"))
+		tgf_repl_opt.auto_disambiguate =
+			cmd.get<bool>("auto-disambiguate");
 	tgf_repl_evaluator re(tgf_file, tgf_repl_opt);
 
 	if (cmd.name() == "test") {
@@ -422,6 +436,7 @@ tgf_repl_evaluator::tgf_repl_evaluator(const string& tgf_file)
 		p(make_shared<parser_type>(*g, utf8_parser_options()))
 {
 	update_opts_by_grammar_opts();
+	g->opt.auto_disambiguate = this->opt.auto_disambiguate;
 }
 
 tgf_repl_evaluator::tgf_repl_evaluator(const string& tgf_file, options opt)
@@ -435,6 +450,7 @@ tgf_repl_evaluator::tgf_repl_evaluator(const string& tgf_file, options opt)
 {
 	TC.set(opt.colors);
 	update_opts_by_grammar_opts();
+	g->opt.auto_disambiguate = opt.auto_disambiguate;
 }
 
 void tgf_repl_evaluator::update_opts_by_grammar_opts() {
@@ -470,18 +486,13 @@ void tgf_repl_evaluator::parsed(parser_type::result& r) {
 		cerr << r.parse_error.to_str(opt.error_verbosity) << endl;
 		return;
 	}
-#ifndef PARSER_BINTREE_FOREST
 	auto f = r.get_forest();
-#endif
 	stringstream ss;
 	if (opt.print_input) ss << "input: \"" << r.get_input() << "\"\n";
-#ifndef PARSER_BINTREE_FOREST
 	if (opt.print_ambiguity) r.print_ambiguous_nodes(ss);
 	if (opt.print_terminals) ss << "parsed terminals: "
 		<< TC_T << to_std_string(r.get_terminals())
 		<< TC_CLEARED_DEFAULT << "\n";
-#endif
-#ifndef PARSER_BINTREE_FOREST
 	using c_t = parser_type::char_type;
 	using t_t = parser_type::terminal_type;
 	auto cb_next_g = [&r, &ss, this](parser_type::pgraph& g) {
@@ -495,7 +506,6 @@ void tgf_repl_evaluator::parsed(parser_type::result& r) {
 	};
 	if (opt.tml_rules) f->extract_graphs(f->root(), cb_next_g);
 	if (opt.tml_facts) to_tml_facts<c_t, t_t>(ss << "TML facts:\n", r);
-#endif
 	if (opt.print_graphs) {
 		auto str2ntids = [this](const set<string>& list) {
 			set<size_t> r;
@@ -541,7 +551,8 @@ tgf_repl_evaluator::parser_type::parse_options
 		.measure_each_pos   = opt.measure_each_pos,
 		.measure_forest     = opt.measure_forest,
 		.measure_preprocess = opt.measure_preprocess,
-		.debug              = opt.debug
+		.debug              = opt.debug,
+		.tree_path          = opt.tree_path
 	};
 }
 
@@ -572,6 +583,7 @@ void tgf_repl_evaluator::reload(const string& new_tgf_file) {
 				::from_file(*nts, tgf_file));
 	p = make_shared<parser_type>(*g, utf8_parser_options());
 	update_opts_by_grammar_opts();
+	g->opt.auto_disambiguate = opt.auto_disambiguate;
 	cout << "loaded: " << tgf_file << "\n";
 }
 
@@ -1154,9 +1166,7 @@ int tgf_repl_evaluator::eval(const string& src) {
 	auto r = rp.parse(src.c_str(), src.size());
 	if (!r.found) cout << "invalid command: " << r.parse_error << "\n";
 	else {
-#ifndef PARSER_BINTREE_FOREST
 		r.print_ambiguous_nodes(cout);
-#endif
 		if (opt.debug) {
 			pretty_print(cout << "input command graph:\n",
 				r.get_shaped_tree2(), {}, false, 1);

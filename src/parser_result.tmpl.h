@@ -5,15 +5,40 @@
 #include "parser.h"
 namespace idni {
 
-#ifdef PARSER_BINTREE_FOREST
+// __AMB__ is registered only when an ambiguity wrapper is actually present.
+// Both result constructors are defined unconditionally. At instantiation
+// time `if constexpr` in _parse selects the one used for the active mode.
+
+template <typename C, typename T>
+const lit<C, T>& parser<C, T>::result::ambiguity_literal() const
+{
+	return amb_node;
+}
+
+
+// bintree-mode constructor — stores tref root, forest is null
 template <typename C, typename T>
 parser<C, T>::result::result(parser<C, T>& p, std::unique_ptr<input> in_,
 	tref f, bool fnd, error err) :
 		found(fnd), parse_error(err),
-		shaping(p.get_grammar().opt.shaping), p(p),
-		in_(std::move(in_)), froot(tree::geth(f))
-{}
-#else
+		shaping(p.get_grammar().opt.shaping),
+		p(p), in_(std::move(in_)), froot(tree::geth(f))
+{
+	if (!froot) return;
+	auto amb_name = from_str<C>(std::string("__AMB__"));
+	auto& nts = p.get_grammar().nts;
+	for (size_t i = 0; i < nts.size(); ++i)
+		if (nts.get(i) == amb_name) {
+			lit<C, T> amb(i, &nts);
+			if (tree::get(froot->get()).find_top([&](tref n) {
+				return tree::get(n).value.first == amb;
+			}) != nullptr)
+				amb_node = amb;
+			break;
+		}
+}
+
+// default-mode constructor — stores forest directly
 template <typename C, typename T>
 parser<C, T>::result::result(parser<C, T>& p, std::unique_ptr<input> in_,
 	std::unique_ptr<pforest> f, bool fnd, error err) :
@@ -21,21 +46,83 @@ parser<C, T>::result::result(parser<C, T>& p, std::unique_ptr<input> in_,
 		shaping(p.get_grammar().opt.shaping), p(p),
 		in_(std::move(in_)), f(std::move(f))
 {
-	/// if is ambiguous add __AMB__ node to the nonterminals dict so it can
-	/// be added to the resulting parse tree when get_shaped_tree() is called
-	static const std::string amb = "__AMB__";
-	if (is_ambiguous()) amb_node = p.get_grammar().nt(from_str<C>(amb));
+	if (is_ambiguous())
+		amb_node = p.get_grammar().nt(from_str<C>(std::string("__AMB__")));
 }
 
 template <typename C, typename T>
 parser<C, T>& parser<C, T>::result::get_parser() const { return p; }
 
+// Lazy reconstruction of a pforest from the tref (bintree path).
+// In forest_path the forest is already populated and this returns it.
 template <typename C, typename T>
 typename parser<C, T>::pforest* parser<C, T>::result::get_forest() const {
 	if (f) return f.get();
-	return nullptr;
+	if (froot != 0) {
+		f = std::make_unique<pforest>();
+		if (!froot) return f.get();
+		tref root_t = froot->get();
+		const auto& rt = tree::get(root_t);
+		using pnt = pnode_type<C, T>;
+		auto root_value = [&]() -> pnt {
+			if (rt.value.first.nt() && rt.value.first == amb_node) {
+				if (tref alt0 = rt.first(); alt0) {
+					const auto& at = tree::get(alt0);
+					return pnt(at.value.first, at.value.second);
+				}
+			}
+			return pnt(rt.value.first, rt.value.second);
+		};
+		f->root(root_value());
+		std::set<pnt> visited;
+
+		auto child_pn = [&](tref c) -> pnt {
+			const auto& ct = tree::get(c);
+			if (ct.value.first.nt() && ct.value.first == amb_node) {
+				tref alt0 = ct.first();
+				if (alt0) {
+					const auto& at = tree::get(alt0);
+					return pnt(at.value.first, at.value.second);
+				}
+			}
+			return pnt(ct.value.first, ct.value.second);
+		};
+
+		std::function<void(tref)> walk = [&](tref n) {
+			if (!n) return;
+			const auto& nt = tree::get(n);
+			if (!nt.value.first.nt()) return;
+			if (nt.value.first == amb_node) {
+				tref alt0 = nt.first();
+				if (!alt0) return;
+				const auto& a0 = tree::get(alt0);
+				pnt shared(a0.value.first, a0.value.second);
+				if (!visited.insert(shared).second) return;
+				typename pforest::nodes_set packs;
+				for (tref alt : nt.children()) {
+					const auto& at = tree::get(alt);
+					typename pforest::nodes pack;
+					for (tref c : at.children())
+						pack.push_back(child_pn(c));
+					packs.insert(pack);
+					for (tref c : at.children()) walk(c);
+				}
+				(*f)[shared] = packs;
+				return;
+			}
+			pnt me(nt.value.first, nt.value.second);
+			if (!visited.insert(me).second) return;
+			typename pforest::nodes pack;
+			for (tref c : nt.children()) pack.push_back(child_pn(c));
+			typename pforest::nodes_set packs;
+			packs.insert(pack);
+			(*f)[me] = packs;
+			for (tref c : nt.children()) walk(c);
+		};
+		walk(root_t);
+	}
+	return f.get();
 }
-#endif
 
 template <typename C, typename T>
 bool parser<C, T>::result::good() const { return in_->good(); }
@@ -96,7 +183,6 @@ bool node_to_inline(const typename parser<C, T>::pnode& n,
 	return false;
 }
 
-#ifndef PARSER_BINTREE_FOREST
 template <typename C, typename T>
 typename parser<C, T>::psptree parser<C, T>::result::get_trimmed_tree(
 	const typename parser<C, T>::pnode& n, const shaping_options opts) const
@@ -310,7 +396,7 @@ typename parser<C, T>::psptree parser<C, T>::result::get_shaped_tree() const
 /// get a first parse tree from the parse_forest optionally provide root of the tree.
 template <typename C, typename T>
 parser<C, T>::psptree parser<C, T>::result::get_tree() {
-	return get_tree(f->root());
+	return get_tree(get_forest()->root());
 }
 
 template <typename C, typename T>
@@ -318,7 +404,7 @@ parser<C, T>::psptree parser<C, T>::result::get_tree(const pnode& n) {
 	psptree t;
 	emeasure_time_start(s, e);
 	std::cout<< "here2";
-	f->extract_graphs(n, [this, &t] (auto& g) {
+	get_forest()->extract_graphs(n, [this, &t] (auto& g) {
 		inline_grammar_transformations(g);
 		t = g.extract_trees();
 		return false;
@@ -327,15 +413,12 @@ parser<C, T>::psptree parser<C, T>::result::get_tree(const pnode& n) {
 	return t;
 }
 
-#endif // not PARSER_BINTREE_FOREST
-
 template <typename C, typename T>
 std::basic_string<T> parser<C, T>::result::get_terminals() const {
-#ifdef PARSER_BINTREE_FOREST
-	return in_->get_terminals(tree::get(froot).value.second);
-#else
-	return in_->get_terminals(f->root()->second);
-#endif
+	if (f) return in_->get_terminals(f->root()->second);
+	if (froot != 0)
+		return in_->get_terminals(tree::get(froot).value.second);
+	return {};
 }
 
 template <typename C, typename T>
@@ -353,9 +436,14 @@ std::optional<int_t> parser<C, T>::result::get_terminals_to_int(const pnode& n)
 	return result;
 }
 
-#ifndef PARSER_BINTREE_FOREST
 template <typename C, typename T>
 bool parser<C, T>::result::is_ambiguous() const {
+	if (froot != 0) {
+		if (!froot || !amb_node.nt()) return false;
+		return tree::get(froot->get()).find_top([this](tref n) {
+			return tree::get(n).value.first == amb_node;
+		}) != nullptr;
+	}
 	if (!f) return false;
 	for (auto& kv : f->g) if (kv.second.size() > 1) return true;
 	return false;
@@ -371,9 +459,10 @@ std::set<std::pair<typename parser<C, T>::pnode,
 	typename parser<C, T>::pnodes_set>>
 		parser<C, T>::result::ambiguous_nodes() const
 {
-	if (!f) return {};
+	auto* pf = get_forest();
+	if (!pf) return {};
 	std::set<std::pair<pnode, pnodes_set>> r;
-	for (auto& kv : f->g) if (kv.second.size() > 1) r.insert(kv);
+	for (auto& kv : pf->g) if (kv.second.size() > 1) r.insert(kv);
 	return r;
 }
 
@@ -382,7 +471,8 @@ std::ostream& parser<C, T>::result::print_ambiguous_nodes(std::ostream& os)
 	const
 {
 	if (!is_ambiguous()) return os;
-	os << "# n trees: " << f->count_trees() << "\n# ambiguous nodes:\n";
+	auto* pf = get_forest();
+	os << "# n trees: " << pf->count_trees() << "\n# ambiguous nodes:\n";
 	for (auto& n : ambiguous_nodes()) {
 		os << "\t `" << n.first.first << "` [" << n.first.second[0]
 			<< "," << n.first.second[1] << "]\n";
@@ -408,15 +498,16 @@ typename parser<C, T>::result::nodes_and_edges
 	std::vector<node> n;
 	edges es;
 	size_t id = 0;
-	if (!f) return nodes_and_edges{ n, es };
-	for (auto& it : f->g) {
+	auto* pf = get_forest();
+	if (!pf) return nodes_and_edges{ n, es };
+	for (auto& it : pf->g) {
 		nid[it.first] = id;
 		// skip ids for one child ambig node
 		id += it.second.size() == 1 ? 0 : it.second.size(); // ambig node ids;
 		//DBG(assert(it.second.size()!= 0));
 		id++;
 	}
-	for (auto& it : f->g) {
+	for (auto& it : pf->g) {
 		ns[nid[it.first]] = it.first;
 		size_t p = 0;
 		for (auto& pack : it.second) {
