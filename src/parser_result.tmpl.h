@@ -578,6 +578,5 @@ bool parser<C, T>::result::inline_nodes(pgraph& g,
 	}
 	return f->replace_nodes(g, s);
 }
-#endif
 
 } // idni namespace

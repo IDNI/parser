@@ -1278,7 +1278,6 @@ bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
 	int count = 0;
 	#endif // TAU_PARSER_MEASURE
 
-	int count = 0;
 	for (size_t n = 0; n < in_->tpos() + 1; n++)
 		for (const item& i : S[n])
 			#ifdef TAU_PARSER_MEASURE
