@@ -20,3 +20,4 @@ src/version_license.h
 external/emsdk
 Testing
 tests/data/bench/
+compile_commands.json
