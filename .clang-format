@@ -1,0 +1,86 @@
+---
+Language: Cpp
+BasedOnStyle: LLVM
+
+ColumnLimit: 80
+IncludeBlocks: Preserve
+InsertBraces: false
+FixNamespaceComments: false
+ReflowComments: false
+RemoveBracesLLVM: true
+RemoveSemicolon: true
+SortIncludes: false
+SortUsingDeclarations: false
+TabWidth: 8
+UseTab: Always
+
+BinPackArguments: true
+BinPackParameters: true
+
+# Indentation
+AccessModifierOffset: -8
+ConstructorInitializerIndentWidth: 8
+ContinuationIndentWidth: 8
+IndentCaseLabels: true
+IndentPPDirectives: AfterHash
+IndentWidth: 8
+IndentWrappedFunctionNames: false
+NamespaceIndentation: None
+
+# Spaces
+Cpp11BracedListStyle: false
+SpaceAfterCStyleCast: true
+SpaceAfterLogicalNot: false
+SpaceAfterTemplateKeyword: true
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCpp11BracedList: true
+SpaceBeforeCtorInitializerColon: true
+SpaceBeforeInheritanceColon: true
+SpaceBeforeParens: ControlStatements
+SpaceBeforeParensOptions:
+  AfterControlStatements: true
+  AfterFunctionDeclarationName: false
+  AfterFunctionDefinitionName: false
+  AfterIfMacros: true
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: 1
+SpacesInAngles: false
+SpacesInContainerLiterals: true
+SpacesInCStyleCastParentheses: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+
+# Breaking
+AlwaysBreakAfterReturnType: None
+AlwaysBreakBeforeMultilineStrings: false
+AllowAllArgumentsOnNextLine: true
+AllowAllConstructorInitializersOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: true
+AllowShortBlocksOnASingleLine: Always 
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortEnumsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: Always
+AllowShortLambdasOnASingleLine: All
+AllowShortLoopsOnASingleLine: true
+BreakBeforeBinaryOperators: NonAssignment
+BreakBeforeBraces: Attach
+BreakBeforeConceptDeclarations: Always
+BreakBeforeTernaryOperators: true
+BreakStringLiterals: true
+BreakTemplateDeclarations: Leave
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+
+# Alignment
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: true
+AlignConsecutiveMacros: true
+AlignEscapedNewlines: Left
+AlignOperands: AlignAfterOperator
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 2
+PointerAlignment: Left
+ReferenceAlignment: Left
