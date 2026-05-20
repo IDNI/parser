@@ -9,8 +9,6 @@
 #include <map>
 #include <vector>
 #include <iostream>
-#include <sstream>
-#include <algorithm>
 
 #include "defs.h"
 
@@ -155,6 +153,12 @@ template <typename T> T cli::option::get() const {
 	return std::get<T>(value_);
 }
 template <typename T> T cli::command::get(const std::string& n) const {
+#ifdef DEBUG
+	if (bool exists = opts_.find(n) != opts_.end(); !exists) {
+		std::cerr << name() << ": command option " << n << " not defined\n";
+		assert(exists);
+	}
+#endif
 	return opts_.at(n).get<T>();
 }
 
