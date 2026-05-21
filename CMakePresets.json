@@ -375,132 +375,106 @@
 	"buildPresets": [
 		{
 			"name": "debug",
-			"jobs": 0,
 			"configurePreset": "debug"
 		},
 		{
 			"name": "release",
-			"jobs": 0,
 			"configurePreset": "release"
 		},
 		{
 			"name": "release-ninja",
-			"jobs": 0,
 			"configurePreset": "release-ninja"
 		},
 		{
 			"name": "debug-ninja",
-			"jobs": 0,
 			"configurePreset": "debug-ninja"
 		},
 		{
 			"name": "release-clang",
-			"jobs": 0,
 			"configurePreset": "release-clang"
 		},
 		{
 			"name": "debug-clang",
-			"jobs": 0,
 			"configurePreset": "debug-clang"
 		},
 		{
 			"name": "debug-tests",
-			"jobs": 0,
 			"configurePreset": "debug-tests"
 		},
 		{
 			"name": "release-tests",
-			"jobs": 0,
 			"configurePreset": "release-tests"
 		},
 		{
 			"name": "debug-all",
-			"jobs": 0,
 			"configurePreset": "debug-all"
 		},
 		{
 			"name": "release-all",
-			"jobs": 0,
 			"configurePreset": "release-all"
 		},
 		{
 			"name": "debug-tgf",
-			"jobs": 0,
 			"configurePreset": "debug-tgf"
 		},
 		{
 			"name": "release-tgf",
-			"jobs": 0,
 			"configurePreset": "release-tgf"
 		},
 		{
 			"name": "debug-asan",
-			"jobs": 0,
 			"configurePreset": "debug-asan"
 		},
 		{
 			"name": "release-static",
-			"jobs": 0,
 			"configurePreset": "release-static"
 		},
 		{
 			"name": "release-shared",
-			"jobs": 0,
 			"configurePreset": "release-shared"
 		},
 		{
 			"name": "emscripten",
-			"jobs": 0,
 			"configurePreset": "emscripten"
 		},
 		{
 			"name": "release-make-gcc",
-			"jobs": 0,
 			"configurePreset": "release-make-gcc"
 		},
 		{
 			"name": "debug-make-gcc",
-			"jobs": 0,
 			"configurePreset": "debug-make-gcc"
 		},
 		{
 			"name": "release-ninja-gcc",
-			"jobs": 0,
 			"configurePreset": "release-ninja-gcc"
 		},
 		{
 			"name": "debug-ninja-gcc",
-			"jobs": 0,
 			"configurePreset": "debug-ninja-gcc"
 		},
 		{
 			"name": "release-make-clang",
-			"jobs": 0,
 			"configurePreset": "release-make-clang"
 		},
 		{
 			"name": "debug-make-clang",
-			"jobs": 0,
 			"configurePreset": "debug-make-clang"
 		},
 		{
 			"name": "release-ninja-clang",
-			"jobs": 0,
 			"configurePreset": "release-ninja-clang"
 		},
 		{
 			"name": "debug-ninja-clang",
-			"jobs": 0,
 			"configurePreset": "debug-ninja-clang"
 		},
 		{
 			"name": "release-mingw",
-			"jobs": 0,
 			"configurePreset": "release-mingw"
 		},
 		{
 			"name": "debug-mingw",
-			"jobs": 0,
 			"configurePreset": "debug-mingw"
 		}
 	],
