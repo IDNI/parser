@@ -1,5 +1,3 @@
-option(TAU_PARSER_MEASURE "Allow performance measures" OFF)
-
 # public headers and sources
 set(TAU_PARSER_HEADERS
 	version_license.h

@@ -423,7 +423,8 @@ struct grammar {
 	bool is_eof_fn(const size_t& p) const;
 	std::set<size_t> reachable_productions(const lit<C, T>& l) const;
 	std::set<size_t> unreachable_productions(const lit<C, T>& l) const;
-	std::ostream& check_nullable_ambiguity(std::ostream& os) const;
+	std::ostream& check_nullable_recursive_production(
+		std::ostream& os) const;
 	/// Prints a production rule with index p into ostream os.
 	std::ostream& print_production(std::ostream& os,
 		size_t p, bool print_ids = false,

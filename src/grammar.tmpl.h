@@ -651,38 +651,33 @@ template <typename C, typename T>
 const lit<C, T>& grammar<C, T>::get_start() const { return start; }
 
 template <typename C, typename T>
-std::ostream& grammar<C, T>::check_nullable_ambiguity(std::ostream& os) const {
-	const auto report = [&os, this](const lit<C, T>& first,
-		const lit<C, T>& second, size_t p)
-	{
-		os << "Warning: possible ambiguity from a nullable literal: ("
-			<< first << ") neighbors (" << second
-			<< ") in production: ";
-		print_production(os, p);
-		os << "\n";
-	};
-	const auto first_nullable = [this](const lit<C, T>& l) {
-		if (!l.nt()) return false;
-		const auto& prods = prod_ids_of_literal(l);
-		for (const auto& p : prods) for (const auto& a : G[p].second)
-			if (nullable(a[0])) return true;
-		return false;
-	};
-	const auto last_nullable = [this](const lit<C, T>& l) {
-		if (!l.nt()) return false;
-		const auto& prods = prod_ids_of_literal(l);
-		for (const auto& p : prods) for (const auto& a : G[p].second)
-			if (nullable(a.back())) return true;
-		return false;
-	};
-	for (size_t p = 0; p != G.size(); ++p) for (const auto& a : G[p].second)
-		if (a.size() > 1) for (size_t i = 1; i != a.size() - 1; ++i) {
-			const auto& last = a[i-1], curr = a[i];
-			if (last.nt() && curr.nt() &&
-				(nullable(last) || last_nullable(last)) &&
-				(nullable(curr) || first_nullable(curr)))
-					report(last, curr, p);
+std::ostream& grammar<C, T>::check_nullable_recursive_production(
+	std::ostream& os) const
+{
+	for (size_t p = 0; p != G.size(); ++p) {
+		const lit<C, T>& head = G[p].first;
+		if (!head.nt()) continue;
+		for (const auto& a : G[p].second) {
+			for (size_t i = 0; i != a.size(); ++i) {
+				const lit<C, T>& x = a[i];
+				if (!x.nt() || x.n() != head.n()) continue;
+				bool zero_progress = true;
+				for (size_t j = 0; j != a.size(); ++j) {
+					if (j == i) continue;
+					if (!nullable(a[j])) {
+						zero_progress = false;
+						break;
+					}
+				}
+				if (!zero_progress) continue;
+				os << "Warning: nullable recursive production: "
+					<< head << " can recurse without consuming input"
+					<< " in production: ";
+				print_production(os, p);
+				os << "\n";
+			}
 		}
+	}
 	return os;
 }
 

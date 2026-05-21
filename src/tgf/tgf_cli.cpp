@@ -179,7 +179,8 @@ cli::commands tgf_commands() {
 //
 
 int show(const string& tgf_file, const string start = "start",
-	bool print_grammar = true, bool print_nullable_ambiguity = false,
+	bool print_grammar = true,
+	bool print_nullable_recursive_production = false,
 	bool colors = true)
 {
 	//DBG(cout << tgf_file << " show" <<
@@ -191,7 +192,8 @@ int show(const string& tgf_file, const string start = "start",
 	auto g = tgf<char>::from_file(nts, tgf_file);
 	if (print_grammar) g.print_internal_grammar_for(
 		cout, start, {}, true, term::colors(colors));
-	if (print_nullable_ambiguity) g.check_nullable_ambiguity(cout);
+	if (print_nullable_recursive_production)
+		g.check_nullable_recursive_production(cout);
 	return 0;
 }
 
