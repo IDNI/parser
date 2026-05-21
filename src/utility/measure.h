@@ -121,7 +121,10 @@ struct timer {
 		return started_ = false, ms_;
 	}
 
-	double get() { return pause(); }
+	double get() {
+		if (!started_) return 0;
+		return pause();
+	}
 
 	~timer() { stop(); }
 };
