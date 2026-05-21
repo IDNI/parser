@@ -86,7 +86,7 @@ inline long peak_rss_kb() {
 
 struct timer {
 
-	clock_t start_time_;
+	clock_t start_time_ = 0;
 	bool started_ = false;
 	bool silent_ = false;
 	double ms_ = 0;
