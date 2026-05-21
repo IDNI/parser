@@ -155,7 +155,7 @@ size_t forest<NodeT>::count_trees(const node& root) const {
 				if (sym->first.nt() && ndc[sym] != 0) {
 					size_t x = pkc * ndc[sym];
 					if (pkc != 0 && x / pkc != ndc[sym]) {
-						MS(std::cout<<"Overflow\n");
+						MC(std::cout<<"Overflow\n");
 						ndc[croot]=SIZE_MAX;
 						return;
 					}
@@ -460,7 +460,7 @@ bool forest<NodeT>::_traverse(const node_graph& g, const node& root,
 template <typename NodeT>
 bool forest<NodeT>::replace_nodes(graph& g, nodes& s) {
 
-	MS(std::cout << "replace_nodes: " << s.size() << "\n";)
+	MC(std::cout << "replace_nodes: " << s.size() << "\n";)
 
 	std::unordered_map<node, nodes, node> replmap;
 	replmap.reserve(s.size());
@@ -479,10 +479,10 @@ bool forest<NodeT>::replace_nodes(graph& g, nodes& s) {
 			replmap[n] = repl;
 		}
 	}
-	MS(std::cout << "replacing nodes: " << replmap.size() << "\n";)
+	MC(std::cout << "replacing nodes: " << replmap.size() << "\n";)
 
 	bool gchange = false;
-	MS(size_t total_replacements = 0;)
+	MC(size_t total_replacements = 0;)
 	std::set<node> cleanup;
 
 	// Traverse the graph and replace nodes in RHSs
@@ -509,7 +509,7 @@ bool forest<NodeT>::replace_nodes(graph& g, nodes& s) {
 
 					i += repl.size()? 0: 1;
 					// changed = true;
-					MS(total_replacements++);
+					MC(total_replacements++);
 					cleanup.insert(torepl);
 				} else {
 					++i;
@@ -530,7 +530,7 @@ bool forest<NodeT>::replace_nodes(graph& g, nodes& s) {
 		g.erase(n);
 	}
 
-	MS(std::cout << "Total replaced count: " << total_replacements << "\n";)
+	MC(std::cout << "Total replaced count: " << total_replacements << "\n";)
 	return gchange;
 }
 

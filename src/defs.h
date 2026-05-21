@@ -21,15 +21,35 @@ using int_t = int32_t;
 } // idni namespace
 
 #ifdef DEBUG
+#	include <cassert>
 #	define DBG(x) x
 #else
 #	define DBG(x)
 #endif
-#ifdef TAU_PARSER_MEASURE
+#if defined(TAU_PARSER_MEASURE)
+#	ifndef TAU_PARSER_MEASURE_SCOPES
+#		define TAU_PARSER_MEASURE_SCOPES
+#	endif
+#	ifndef TAU_PARSER_MEASURE_COUNTERS
+#		define TAU_PARSER_MEASURE_COUNTERS
+#	endif
+#endif
+
+#ifdef TAU_PARSER_MEASURE_SCOPES
 #	define MS(x) x
+#	define DEFAULT_MEASURE_SCOPES true
 #else
 #	define MS(x)
-#endif // TAU_PARSER_MEASURE
+#	define DEFAULT_MEASURE_SCOPES false
+#endif
+
+#ifdef TAU_PARSER_MEASURE_COUNTERS
+#	define MC(x) x
+#	define DEFAULT_MEASURE_COUNTERS true
+#else
+#	define MC(x)
+#	define DEFAULT_MEASURE_COUNTERS false
+#endif
 
 #define DBGP(x) if (debug) { x }
 #define DEBUG_POS_FROM 0

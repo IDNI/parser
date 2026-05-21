@@ -37,7 +37,9 @@ else()
 endif()
 
 # Options
-option(TAU_PARSER_MEASURE              "Allow performance measures"         OFF)
+option(TAU_PARSER_MEASURE              "Allow performance measures (scopes+counters)" OFF)
+option(TAU_PARSER_MEASURE_SCOPES       "Measure timed scopes in reports"    OFF)
+option(TAU_PARSER_MEASURE_COUNTERS      "Measure parse counters and metrics" OFF)
 option(TAU_PARSER_ADDRESS_SANITIZER    "Enable address sanitizer"           OFF)
 option(TAU_PARSER_BUILD_ALL            "Build all"                          OFF)
 option(TAU_PARSER_BUILD_DOC            "Build documentation"                OFF)
@@ -51,8 +53,35 @@ option(TAU_PARSER_BUILD_TGF            "Build tgf tool"                     OFF)
 option(TAU_PARSER_BUILD_PIC            "Build position independent code"    OFF)
 option(TAU_PARSER_WINDOWS_PACKAGE      "Build Windows package"              OFF)
 option(TAU_PARSER_WINDOWS_ZIP_PACKAGE  "Build Windows zip package"          OFF)
+option(TAU_BUILD_JOBS                  "Number of jobs to use for the build (0 to auto-detect)" 0)
+
+if (TAU_BUILD_JOBS STREQUAL "")
+	set(TAU_BUILD_JOBS 0 CACHE STRING "Number of jobs to use for the build (0 to auto-detect)")
+endif()
+
+message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS}")
+
+if (TAU_BUILD_JOBS EQUAL 0)
+	include(ProcessorCount)
+	ProcessorCount(TAU_BUILD_JOBS)
+	if(TAU_BUILD_JOBS EQUAL 0)
+		message(WARNING "Could not detect number of logical CPU cores, defaulting to 1")
+		set(TAU_BUILD_JOBS 1)
+	else()
+		math(EXPR TAU_BUILD_JOBS "( ${TAU_BUILD_JOBS} + 1 ) / 2")
+		message(STATUS "Auto setting TAU_BUILD_JOBS: ${TAU_BUILD_JOBS} (half of available cores)")
+	endif()
+endif()
+set(ENV{CMAKE_BUILD_PARALLEL_LEVEL} "${TAU_BUILD_JOBS}")
 
 set_property(CACHE TAU_PARSER_MEASURE               PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_PARSER_MEASURE_SCOPES        PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_PARSER_MEASURE_COUNTERS      PROPERTY STRINGS "OFF" "ON")
+
+if(TAU_PARSER_MEASURE)
+	set(TAU_PARSER_MEASURE_SCOPES ON CACHE BOOL "" FORCE)
+	set(TAU_PARSER_MEASURE_COUNTERS ON CACHE BOOL "" FORCE)
+endif()
 set_property(CACHE TAU_PARSER_ADDRESS_SANITIZER     PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_ALL             PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_DOC             PROPERTY STRINGS "OFF" "ON")
@@ -65,6 +94,7 @@ set_property(CACHE TAU_PARSER_BUILD_EXAMPLES        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_TGF             PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_WINDOWS_PACKAGE       PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_WINDOWS_ZIP_PACKAGE   PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_BUILD_JOBS                   PROPERTY STRINGS "0" "1" "2" "3" "4" "5" "6" "7" "8" "9" "10" "11" "12" "13" "14" "15" "16" "17" "18" "19" "20")
 
 # build all
 if(TAU_PARSER_BUILD_ALL)
@@ -102,12 +132,12 @@ if(USED_CMAKE_GENERATOR MATCHES "Ninja")
 endif()
 
 # parallel processing
-cmake_host_system_information(RESULT CORE_COUNT QUERY NUMBER_OF_LOGICAL_CORES)
-if(CORE_COUNT GREATER 1)
+# cmake_host_system_information(RESULT CORE_COUNT QUERY NUMBER_OF_LOGICAL_CORES)
+if(TAU_BUILD_JOBS GREATER 1)
 	if(NOT DEFINED CMAKE_BUILD_PARALLEL_LEVEL)
-		set(CMAKE_BUILD_PARALLEL_LEVEL ${CORE_COUNT})
+		set(CMAKE_BUILD_PARALLEL_LEVEL ${TAU_BUILD_JOBS})
 	endif()
-	message(STATUS "Parallel processing enabled (${CORE_COUNT} cores)")
+	message(STATUS "Parallel processing enabled (${TAU_BUILD_JOBS} cores)")
 endif()
 
 if(TAU_PARSER_ADDRESS_SANITIZER)
@@ -133,7 +163,10 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # link options
-set(TAU_PARSER_DEFINITIONS "TAU_PARSER_MEASURE")
+set(TAU_PARSER_DEFINITIONS
+	TAU_PARSER_MEASURE
+	TAU_PARSER_MEASURE_SCOPES
+	TAU_PARSER_MEASURE_COUNTERS)
 set(TAU_PARSER_LINK_OPTIONS "-flto=auto")
 
 # compile options for different build types
@@ -177,6 +210,8 @@ message(STATUS "TAU_PARSER_DEFINITIONS:          ${TAU_PARSER_DEFINITIONS}")
 message(STATUS "TAU_PARSER_COMPILE_OPTIONS:      ${TAU_PARSER_COMPILE_OPTIONS}")
 message(STATUS "TAU_PARSER_LINK_OPTIONS:         ${TAU_PARSER_LINK_OPTIONS}")
 message(STATUS "TAU_PARSER_MEASURE:              ${TAU_PARSER_MEASURE}")
+message(STATUS "TAU_PARSER_MEASURE_SCOPES:       ${TAU_PARSER_MEASURE_SCOPES}")
+message(STATUS "TAU_PARSER_MEASURE_COUNTERS:     ${TAU_PARSER_MEASURE_COUNTERS}")
 ################################################################################
 message(STATUS "CMAKE_BUILD_TYPE:                ${CMAKE_BUILD_TYPE}")
 message(STATUS "CMAKE_CXX_COMPILER_ID:           ${CMAKE_CXX_COMPILER_ID}")

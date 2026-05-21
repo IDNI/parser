@@ -2,6 +2,9 @@ add_executable(tgf)
 target_sources(tgf PRIVATE
 	"${CMAKE_CURRENT_SOURCE_DIR}/tgf_cli.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/main.cpp")
+target_compile_definitions(tgf PRIVATE
+	TAU_PARSER_MEASURE_SCOPES
+	TAU_PARSER_MEASURE_COUNTERS)
 tauparser_setup(tgf PRIVATE tauparser)
 target_include_directories(tgf PRIVATE
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
