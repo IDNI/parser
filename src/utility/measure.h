@@ -4,6 +4,8 @@
 #ifndef __IDNI__PARSER__UTILITY__MEASURE_H__
 #define __IDNI__PARSER__UTILITY__MEASURE_H__
 
+#include <chrono>
+#include <ctime>
 #include <string>
 #include <iostream>
 #include <iomanip>
@@ -84,35 +86,63 @@ inline long peak_rss_kb() {
 #endif
 }
 
-struct timer {
+namespace detail {
 
-	clock_t start_time_ = 0;
+struct cpu_clock_tag {
+	using time_point = clock_t;
+	static time_point now() { return clock(); }
+	static double ms_between(time_point a, time_point b) {
+		return (double(b - a) / CLOCKS_PER_SEC) * 1000;
+	}
+};
+
+struct steady_clock_tag {
+	using time_point = std::chrono::steady_clock::time_point;
+	static time_point now() { return std::chrono::steady_clock::now(); }
+	static double ms_between(time_point a, time_point b) {
+		return std::chrono::duration<double, std::milli>(b - a).count();
+	}
+};
+
+} // namespace detail
+
+/// Elapsed-time accumulator.
+///  `basic_timer<cpu_clock_tag>` measures process CPU time via clock();
+///  `basic_timer<steady_clock_tag>` measures wall time via std::chrono::steady_clock.
+/// The two are interchangeable at the call site: start/pause/unpause/restart/stop/get all return milliseconds.
+template <typename ClockTag = detail::cpu_clock_tag>
+struct basic_timer {
+
+	using time_point = typename ClockTag::time_point;
+
+	time_point start_time_{};
 	bool started_ = false;
 	bool silent_ = false;
 	double ms_ = 0;
 
-	timer(bool silent = false) : silent_(silent) { }
+	basic_timer(bool silent = false) : silent_(silent) { }
 
-	void start() { if (!started_) started_ = true, start_time_ = clock(); }
+	void start() {
+		if (!started_) started_ = true, start_time_ = ClockTag::now();
+	}
 
 	double restart() {
 		if (!started_) return start(), 0;
 		double ms = pause();
-		start_time_ = clock();
+		start_time_ = ClockTag::now();
 		return ms;
 	}
 
 	double pause() {
 		if (!started_) return 0;
-		double ms = ((double(clock() - start_time_)
-			/ CLOCKS_PER_SEC) * 1000);
+		double ms = ClockTag::ms_between(start_time_, ClockTag::now());
 		ms_ += ms;
 		return ms;
 	}
 
 	double unpause() {
 		if (!started_) return start(), 0;
-		return start_time_ = clock(), 0;
+		return start_time_ = ClockTag::now(), 0;
 	}
 
 	double stop() {
@@ -126,8 +156,11 @@ struct timer {
 		return pause();
 	}
 
-	~timer() { stop(); }
+	~basic_timer() { stop(); }
 };
+
+using timer        = basic_timer<detail::cpu_clock_tag>;
+using steady_timer = basic_timer<detail::steady_clock_tag>;
 
 static std::map<std::string, timer> timers;
 static std::map<std::string, size_t> counters;
