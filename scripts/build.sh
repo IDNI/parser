@@ -1,6 +1,10 @@
 #!/bin/bash
 
-BUILD_TYPE="${1:-Release}"
+DEV_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+source "${DEV_ROOT}/scripts/devrc"
+devrc_entry "$@"
+
+BUILD_TYPE="${DEV_POSITIONAL[0]:-Release}"
 case "${BUILD_TYPE}" in
 	"Debug")
 		SUFFIX="Debug"
@@ -34,13 +38,13 @@ fi
 STATUS=0
 if [ -z $NINJA_BIN ]; then
   echo "Using make build system"
-  cmake .. -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" ${@:2} \
-  	&& cmake --build . -- -j5
+  cmake .. -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" "${DEV_CMAKE[@]}" \
+  	&& cmake --build . -- -j"${TAU_BUILD_JOBS}"
 	STATUS=$?
 else
   echo "Using Ninja build system"
-  cmake .. -G Ninja -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" ${@:2} \
-  	&& ninja -j 5
+  cmake .. -G Ninja -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" "${DEV_CMAKE[@]}" \
+  	&& ninja -j "${TAU_BUILD_JOBS}"
 	STATUS=$?
 fi
 

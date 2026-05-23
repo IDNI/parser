@@ -5,7 +5,11 @@
 echo "dev - Tau Parser development helper scripts"
 
 help() {
-	echo "Usage: ./dev <SCRIPT> <SCRIPT_OPTIONS>"
+	echo "Usage: ./dev <SCRIPT> [SCRIPT_OPTIONS...]"
+	echo ""
+	echo "  -D options may appear anywhere; see scripts/README.md"
+	echo "  TAU_BUILD_JOBS: -D, env, or auto (half of CPU cores)"
+	echo ""
 	echo "Available scripts:"
 	for script in scripts/*.sh; do
 		if [ -f "$script" ]; then

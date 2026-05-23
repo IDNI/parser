@@ -79,6 +79,18 @@
 		},
 
 		{
+			"name": "_build_dir-relwithdebinfo",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/relwithdebinfo"
+		},
+
+		{
+			"name": "_build_dir-emscripten",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/emscripten"
+		},
+
+		{
 			"name": "_build-type-debug",
 			"hidden": true,
 			"cacheVariables": {
@@ -91,6 +103,14 @@
 			"hidden": true,
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Release"
+			}
+		},
+
+		{
+			"name": "_build-type-relwithdebinfo",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "RelWithDebInfo"
 			}
 		},
 
@@ -115,6 +135,23 @@
 			"hidden": true,
 			"cacheVariables": {
 				"TAU_PARSER_BUILD_EXAMPLES": "ON"
+			}
+		},
+
+		{
+			"name": "_build-packages",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_PARSER_BUILD_TGF": "ON",
+				"TAU_PARSER_BUILD_EXAMPLES": "ON"
+			}
+		},
+
+		{
+			"name": "_build-measure",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_PARSER_MEASURE": "ON"
 			}
 		},
 
@@ -167,10 +204,27 @@
 		},
 
 		{
+			"name": "_windows-package",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_PARSER_WINDOWS_PACKAGE": "ON"
+			}
+		},
+
+		{
+			"name": "_windows-zip-package",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_PARSER_WINDOWS_ZIP_PACKAGE": "ON"
+			}
+		},
+
+		{
 			"name": "_emscripten",
 			"hidden": true,
 			"cacheVariables": {
-				"TAU_PARSER_BUILD_EMSCRIPTEN": "ON"
+				"TAU_PARSER_BUILD_EMSCRIPTEN": "ON",
+				"EMSCRIPTEN_DIR": "${sourceDir}/external/emsdk/upstream/emscripten"
 			}
 		},
 
@@ -275,6 +329,16 @@
 		},
 
 		{
+			"name": "relwithdebinfo-make-gcc",
+			"inherits": [
+				"_build_dir-relwithdebinfo",
+				"_generator-make",
+				"_toolchain-gcc",
+				"_build-type-relwithdebinfo"
+			]
+		},
+
+		{
 			"name": "release",
 			"inherits": ["release-make-gcc"]
 		},
@@ -329,6 +393,11 @@
 		},
 
 		{
+			"name": "all",
+			"inherits": ["release-all"]
+		},
+
+		{
 			"name": "release-tgf",
 			"inherits": ["release", "_build-tgf"]
 		},
@@ -336,6 +405,16 @@
 		{
 			"name": "debug-tgf",
 			"inherits": ["debug", "_build-tgf", "_build-type-debug"]
+		},
+
+		{
+			"name": "release-tgf-clang",
+			"inherits": ["release-make-clang", "_build-tgf"]
+		},
+
+		{
+			"name": "debug-tgf-clang",
+			"inherits": ["debug-make-clang", "_build-tgf"]
 		},
 
 		{
@@ -363,12 +442,89 @@
 		},
 
 		{
+			"name": "relwithdebinfo",
+			"inherits": ["relwithdebinfo-make-gcc"]
+		},
+
+		{
+			"name": "release-examples",
+			"inherits": ["release", "_build-examples"]
+		},
+
+		{
+			"name": "debug-examples",
+			"inherits": [
+				"debug",
+				"_build-examples",
+				"_build-type-debug"
+			]
+		},
+
+		{
+			"name": "release-packages",
+			"inherits": ["release", "_build-packages"]
+		},
+
+		{
+			"name": "release-mingw-packages",
+			"inherits": [
+				"release-mingw",
+				"_build-packages",
+				"_windows-package"
+			]
+		},
+
+		{
+			"name": "release-mingw-packages-zip",
+			"inherits": [
+				"release-mingw",
+				"_build-packages",
+				"_windows-zip-package"
+			]
+		},
+
+		{
+			"name": "relwithdebinfo-tests",
+			"inherits": ["relwithdebinfo", "_build-tests"]
+		},
+
+		{
+			"name": "relwithdebinfo-tgf",
+			"inherits": ["relwithdebinfo", "_build-tgf"]
+		},
+
+		{
+			"name": "relwithdebinfo-examples",
+			"inherits": ["relwithdebinfo", "_build-examples"]
+		},
+
+		{
+			"name": "relwithdebinfo-all",
+			"inherits": ["relwithdebinfo", "_build-all"]
+		},
+
+		{
+			"name": "release-measure",
+			"inherits": ["release", "_build-measure"]
+		},
+
+		{
+			"name": "debug-measure",
+			"inherits": [
+				"debug",
+				"_build-measure",
+				"_build-type-debug"
+			]
+		},
+
+		{
 			"name": "emscripten",
 			"inherits": [
-				"_build_dir-release",
+				"_build_dir-emscripten",
 				"_generator-make",
 				"_toolchain-emscripten",
-				"_emscripten"
+				"_emscripten",
+				"_build-type-release"
 			]
 		}
 	],
@@ -414,12 +570,24 @@
 			"configurePreset": "release-all"
 		},
 		{
+			"name": "all",
+			"configurePreset": "all"
+		},
+		{
 			"name": "debug-tgf",
 			"configurePreset": "debug-tgf"
 		},
 		{
 			"name": "release-tgf",
 			"configurePreset": "release-tgf"
+		},
+		{
+			"name": "release-tgf-clang",
+			"configurePreset": "release-tgf-clang"
+		},
+		{
+			"name": "debug-tgf-clang",
+			"configurePreset": "debug-tgf-clang"
 		},
 		{
 			"name": "debug-asan",
@@ -476,22 +644,88 @@
 		{
 			"name": "debug-mingw",
 			"configurePreset": "debug-mingw"
+		},
+		{
+			"name": "relwithdebinfo",
+			"configurePreset": "relwithdebinfo"
+		},
+		{
+			"name": "relwithdebinfo-make-gcc",
+			"configurePreset": "relwithdebinfo-make-gcc"
+		},
+		{
+			"name": "release-examples",
+			"configurePreset": "release-examples"
+		},
+		{
+			"name": "debug-examples",
+			"configurePreset": "debug-examples"
+		},
+		{
+			"name": "release-packages",
+			"configurePreset": "release-packages"
+		},
+		{
+			"name": "release-mingw-packages",
+			"configurePreset": "release-mingw-packages"
+		},
+		{
+			"name": "release-mingw-packages-zip",
+			"configurePreset": "release-mingw-packages-zip"
+		},
+		{
+			"name": "relwithdebinfo-tests",
+			"configurePreset": "relwithdebinfo-tests"
+		},
+		{
+			"name": "relwithdebinfo-tgf",
+			"configurePreset": "relwithdebinfo-tgf"
+		},
+		{
+			"name": "relwithdebinfo-examples",
+			"configurePreset": "relwithdebinfo-examples"
+		},
+		{
+			"name": "relwithdebinfo-all",
+			"configurePreset": "relwithdebinfo-all"
+		},
+		{
+			"name": "release-measure",
+			"configurePreset": "release-measure"
+		},
+		{
+			"name": "debug-measure",
+			"configurePreset": "debug-measure"
 		}
 	],
 	"testPresets": [
 		{
 			"name": "debug-tests",
-			"configurePreset": "debug-tests",
-			"execution": {
-				"jobs": 0
-			}
+			"configurePreset": "debug-tests"
 		},
 		{
 			"name": "release-tests",
-			"configurePreset": "release-tests",
-			"execution": {
-				"jobs": 0
-			}
+			"configurePreset": "release-tests"
+		},
+		{
+			"name": "release-all",
+			"configurePreset": "release-all"
+		},
+		{
+			"name": "debug-all",
+			"configurePreset": "debug-all"
+		},
+		{
+			"name": "all",
+			"configurePreset": "all"
+		},
+		{
+			"name": "relwithdebinfo-tests",
+			"configurePreset": "relwithdebinfo-tests"
+		},
+		{
+			"name": "relwithdebinfo-all",
+			"configurePreset": "relwithdebinfo-all"
 		}
 	]
 }

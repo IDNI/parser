@@ -59,6 +59,13 @@ if (TAU_BUILD_JOBS STREQUAL "")
 	set(TAU_BUILD_JOBS 0 CACHE STRING "Number of jobs to use for the build (0 to auto-detect)")
 endif()
 
+if(TAU_BUILD_JOBS EQUAL 0 AND DEFINED ENV{TAU_BUILD_JOBS}
+		AND NOT "$ENV{TAU_BUILD_JOBS}" STREQUAL "")
+	set(TAU_BUILD_JOBS "$ENV{TAU_BUILD_JOBS}" CACHE STRING
+		"Number of jobs to use for the build (0 to auto-detect)" FORCE)
+	message(STATUS "TAU_BUILD_JOBS from environment: ${TAU_BUILD_JOBS}")
+endif()
+
 message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS}")
 
 if (TAU_BUILD_JOBS EQUAL 0)

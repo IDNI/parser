@@ -1,0 +1,69 @@
+# sourced by build.sh and preset.sh; not a standalone script
+
+is_cmake_arg() {
+	case "$1" in
+		-D*) return 0 ;;
+		*)   return 1 ;;
+	esac
+}
+
+normalize_args() {
+	DEV_POSITIONAL=()
+	DEV_CMAKE=()
+	DEV_PROGRAM=()
+	local past_dd=false
+	for arg in "$@"; do
+		if $past_dd; then
+			DEV_PROGRAM+=("$arg")
+			continue
+		fi
+		if [[ $arg == -- ]]; then
+			DEV_PROGRAM+=(--)
+			past_dd=true
+			continue
+		fi
+		if is_cmake_arg "$arg"; then
+			DEV_CMAKE+=("$arg")
+		else
+			DEV_POSITIONAL+=("$arg")
+		fi
+	done
+}
+
+resolve_jobs() {
+	local jobs=0 arg
+	for arg in "${DEV_CMAKE[@]}"; do
+		if [[ $arg == -DTAU_BUILD_JOBS=* ]]; then
+			jobs="${arg#-DTAU_BUILD_JOBS=}"
+		fi
+	done
+	if [[ $jobs -eq 0 && -n "${TAU_BUILD_JOBS:-}" ]]; then
+		jobs="${TAU_BUILD_JOBS}"
+	fi
+	if [[ $jobs -eq 0 ]]; then
+		jobs=$(cmake -P "${DEV_ROOT}/cmake/processor-counter.cmake" 2>/dev/null \
+			|| echo 1)
+		jobs=$((jobs / 2))
+		[[ $jobs -lt 1 ]] && jobs=1
+		echo "TAU_BUILD_JOBS: ${jobs} (half of available cores)"
+	fi
+	# preset configure uses env; cmake --preset rejects -DTAU_BUILD_JOBS
+	local filtered=() arg
+	for arg in "${DEV_CMAKE[@]}"; do
+		[[ $arg == -DTAU_BUILD_JOBS=* ]] && continue
+		filtered+=("$arg")
+	done
+	DEV_CMAKE=("${filtered[@]}")
+	export TAU_BUILD_JOBS="$jobs"
+	export CMAKE_BUILD_PARALLEL_LEVEL="$jobs"
+}
+
+# Call at start of cmake driver scripts (build.sh, preset.sh).
+devrc_entry() {
+	if [[ -z "${DEV_ROOT:-}" ]]; then
+		echo "devrc: DEV_ROOT not set" >&2
+		exit 1
+	fi
+	normalize_args "$@"
+	resolve_jobs
+}

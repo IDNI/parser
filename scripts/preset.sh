@@ -1,45 +1,69 @@
 #!/bin/bash
 
-PRESET="${1}"
-if [ -z "${PRESET}" ]; then
-	PRESET="release"
+DEV_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+source "${DEV_ROOT}/scripts/devrc"
+devrc_entry "$@"
+
+PRESET="${DEV_POSITIONAL[0]:-release}"
+RUN=""
+if [[ ${DEV_POSITIONAL[1]:-} == "run" ]]; then
+	RUN="run"
 fi
 
-ARGS_START=2
-RUN="${2}"
-if [[ $RUN == "run" ]]; then
-	ARGS_START=3
-fi
+preset_binary_dir() {
+	case "$1" in
+		release-mingw*|*-mingw-packages*)
+			echo "build/release-mingw"
+			;;
+		debug-mingw*)
+			echo "build/debug-mingw"
+			;;
+		relwithdebinfo*)
+			echo "build/relwithdebinfo"
+			;;
+		emscripten*)
+			echo "build/emscripten"
+			;;
+		release-clang|release-*-clang|release-make-clang \
+			|release-ninja-clang)
+			echo "build/release-clang"
+			;;
+		debug-clang|debug-*-clang|debug-make-clang \
+			|debug-ninja-clang)
+			echo "build/debug-clang"
+			;;
+		debug*)
+			echo "build/debug"
+			;;
+		release*)
+			echo "build/release"
+			;;
+		all)
+			echo "build/release"
+			;;
+		*)
+			echo "build"
+			;;
+	esac
+}
 
 echo "Preset: ${PRESET}"
 echo "Run: ${RUN}"
-echo "Args: ${@:$ARGS_START}"
-
-# Set number of build jobs (0 to use half of available logical CPU cores)
-TAU_BUILD_JOBS=0
-for arg in "${@:$ARGS_START}"; do
-	if [[ $arg == -DTAU_BUILD_JOBS=* ]]; then
-		TAU_BUILD_JOBS="${arg#-DTAU_BUILD_JOBS=}"
-		break
-	fi
-done
-if [ $TAU_BUILD_JOBS -eq 0 ]; then
-	TAU_BUILD_JOBS=$(cmake -P cmake/processor-counter.cmake 2>&1 || echo "1")
-	TAU_BUILD_JOBS=$((TAU_BUILD_JOBS / 2))
-	echo "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS} (half of available cores)"
+if [[ ${#DEV_CMAKE[@]} -gt 0 ]]; then
+	echo "CMake args: ${DEV_CMAKE[*]}"
 fi
 
-export CMAKE_BUILD_PARALLEL_LEVEL=${TAU_BUILD_JOBS}
+TAU_BUILD_JOBS="${TAU_BUILD_JOBS:-1}"
 
 #LOGGING_OPTIONS="--debug-output --log-level=VERBOSE"
 LOGGING_OPTIONS=""
 
 echo "Configuring with preset ${PRESET}"
-cmake ${LOGGING_OPTIONS} --fresh --preset ${PRESET} ${@:$ARGS_START}
+cmake ${LOGGING_OPTIONS} --fresh --preset ${PRESET} "${DEV_CMAKE[@]}"
 
 echo "Building with preset ${PRESET}"
 echo "Parallel jobs: ${TAU_BUILD_JOBS}"
-cmake --build --preset ${PRESET} ${@:$ARGS_START} -- -j ${TAU_BUILD_JOBS}
+cmake --build --preset ${PRESET} "${DEV_CMAKE[@]}" -- -j ${TAU_BUILD_JOBS}
 STATUS=$?
 if [ $STATUS -ne 0 ]; then
 	echo "Build failed"
@@ -47,10 +71,22 @@ if [ $STATUS -ne 0 ]; then
 fi
 echo "Preset '${PRESET}' build completed"
 
-if [[ $RUN == "run" ]]; then
-	if [[ $PRESET == *test* ]]; then
+if [[ $PRESET == *package* ]]; then
+	BUILD_DIR="$(preset_binary_dir "${PRESET}")"
+	echo "Creating packages in ${BUILD_DIR} (Release)"
+	( cd "${BUILD_DIR}" && cpack -C Release )
+	STATUS=$?
+	if [ $STATUS -ne 0 ]; then
+		echo "Packaging failed"
+		exit $STATUS
+	fi
+	echo "Packages created in ${BUILD_DIR}/packages"
+elif [[ $RUN == "run" ]]; then
+	if [[ $PRESET == *test* ]] || [[ $PRESET == *-all ]] \
+			|| [[ $PRESET == "all" ]]; then
 		echo "Running tests"
-		ctest --preset ${PRESET} -j ${TAU_BUILD_JOBS} --output-on-failure ${@:$ARGS_START}
+		ctest --preset ${PRESET} -j ${TAU_BUILD_JOBS} \
+			--output-on-failure "${DEV_CMAKE[@]}"
 		STATUS=$?
 		if [ $STATUS -ne 0 ]; then
 			echo "Running tests failed"
@@ -58,25 +94,11 @@ if [[ $RUN == "run" ]]; then
 		fi
 		echo "All tests passed"
 	else
-		BUILD_DIR="build"
-		if [[ $PRESET == release* ]]; then
-			BUILD_DIR="build/release"
+		BUILD_DIR="$(preset_binary_dir "${PRESET}")"
+		TGF_ARGS=("${DEV_PROGRAM[@]}")
+		if [[ ${TGF_ARGS[0]:-} == -- ]]; then
+			TGF_ARGS=("${TGF_ARGS[@]:1}")
 		fi
-		if [[ $PRESET == debug* ]]; then
-			BUILD_DIR="build/debug"
-		fi
-		if [[ $PRESET == relwithdebinfo* ]]; then
-			BUILD_DIR="build/relwithdebinfo"
-		fi
-		if [[ $PRESET == coverage* ]]; then
-			BUILD_DIR="build/coverage"
-		fi
-		for arg in "${@:$ARGS_START}"; do
-			ARGS_START=$((ARGS_START + 1))
-			if [[ $arg == -- ]]; then
-				break
-			fi
-		done
-		./${BUILD_DIR}/tgf ${@:$ARGS_START}
+		./${BUILD_DIR}/tgf "${TGF_ARGS[@]}"
 	fi
 fi
