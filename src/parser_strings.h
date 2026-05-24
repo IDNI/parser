@@ -10,7 +10,7 @@
 
 #include "defs.h"
 
-namespace idni::diagnostics { class report; }
+namespace idni::diagnostics { struct report; }
 
 namespace idni::parser_strings {
 
@@ -137,11 +137,11 @@ inline constexpr id_t key_id(static_key k) {
 	return static_cast<id_t>(k);
 }
 
-// THREAD-SAFETY: the diagnostics/parser label dictionary is immutable after
-// function-local static initialization. Positive ids are reserved for the
-// well-known labels listed in PARSER_STATIC_LABELS. Unknown/user labels are
-// not inserted here; diagnostics::report stores them as report-local dynamic
-// strings with negative ids.
+// the diagnostics/parser label dictionary is immutable after function-local 
+// static initialization. Positive ids are reserved for the well-known labels
+// listed in PARSER_STATIC_LABELS. Unknown/user labels are not inserted here;
+// diagnostics::report stores them as report-local dynamic strings with negative
+// ids.
 inline const auto& dict_strings() {
 	static const std::array<std::string,
 		static_cast<size_t>(static_key::count)> v{{
