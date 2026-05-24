@@ -938,7 +938,7 @@ std::ostream& dump(std::ostream& os, const std::map<tref, tref>& m,
 	bool subtree)
 {
 	using tree = lcrs_tree<node>;
-	std::cout << "tref_map: " << m.size() << "\n";
+	os << "tref_map: " << m.size() << "\n";
 	for (const auto& [k, v] : m) {
 		os << "\t";
 		tree::dump(os, k, subtree);
@@ -960,7 +960,7 @@ std::ostream& dump(std::ostream& os, const subtree_map<node, tref>& m,
 	bool subtree)
 {
 	using tree = lcrs_tree<node>;
-	std::cout << "subtree_map: " << m.size() << "\n";
+	os << "subtree_map: " << m.size() << "\n";
 	for (const auto& [k, v] : m) {
 		os << "\t";
 		tree::dump(os, k, subtree);
