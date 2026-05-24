@@ -3,6 +3,7 @@
 
 #ifndef __IDNI__PARSER__TRAVERSER_H__
 #define __IDNI__PARSER__TRAVERSER_H__
+#include <cassert>
 #include <ranges>
 #include "parser.h"
 #include "rewriting.h"
@@ -78,11 +79,9 @@ const auto nonterminal_extractor = extractor<node_variant_t, parser_t,
 		using nonterminal_t = typename parser_t::nonterminal;
 		static nonterminal_t none = static_cast<nonterminal_t>(0);
 		if (!t.has_value()) return none;
-		if (t.values().size() > 1) {
-			std::cout << "cannot use nonterminal_extractor on "
-							"multiple nodes.\n";
-			return none;
-		}
+		assert(t.values().size() <= 1
+			&& "cannot use nonterminal_extractor on multiple nodes");
+		if (t.values().size() > 1) return none;
 		if (std::holds_alternative<symbol_t>(t.value()->value)) {
 			auto& l = std::get<symbol_t>(t.value()->value);
 			if (l.nt()) return static_cast<nonterminal_t>(l.n());
@@ -127,8 +126,9 @@ struct traverser {
 	}
 	/// Helper methods to check if a node is a nonterminal or if a node is a concrete nonterminal.
 	bool is_non_terminal_node(const node_t& n) const {
-		if (!std::holds_alternative<symbol_t>(n->value))
-			std::cout << "is_non_terminal_node: not a symbol_t.\n";
+		assert(std::holds_alternative<symbol_t>(n->value)
+			&& "is_non_terminal_node: not a symbol_t");
+		if (!std::holds_alternative<symbol_t>(n->value)) return false;
 		//std::cout << "n = " << std::get<symbol_t>(n->value) << std::endl;
 		return std::holds_alternative<symbol_t>(n->value)
 			&& std::get<symbol_t>(n->value).nt();
@@ -136,11 +136,9 @@ struct traverser {
 	/// Helper methods to check if a node is a nonterminal or if a node is a concrete nonterminal.
 	bool is_non_terminal_node() const {
 		if (!has_value_) return false;
-		if (values_.size() > 1) {
-			std::cout << "cannot use is_non_terminal_node on "
-						"multiple nodes.\n";
-			return false;
-		}
+		assert(values_.size() <= 1
+			&& "cannot use is_non_terminal_node on multiple nodes");
+		if (values_.size() > 1) return false;
 		return is_non_terminal_node(values_.front());
 	}
 	/// Helper methods to check if a node is a nonterminal or if a node is a concrete nonterminal.
@@ -156,11 +154,9 @@ struct traverser {
 	}
 	traverser operator|(const nonterminal_t& nt) const {
 		if (!has_value_) return *this;
-		if (values_.size() > 1) {
-			std::cout << "cannot use operator| on multiple nodes. "
-						"use operator|| instead.\n";
-			return *this;
-		}
+		assert(values_.size() <= 1
+			&& "cannot use operator| on multiple nodes — use operator||");
+		if (values_.size() > 1) return *this;
 		auto v = values_[0]->child
 			| std::ranges::views::filter([nt,this](const node_t& n){
 				return is_non_terminal(n, nt); })
@@ -185,11 +181,9 @@ struct traverser {
 		const extractor<node_variant_t, parser_t, result_t>& e) const
 	{
 		if (!has_value_) return result_t();
-		if (values_.size() > 1) {
-			std::cout << "cannot use operator| on multiple nodes. "
-						"use operator|| instead.\n";
-			return result_t();
-		}
+		assert(values_.size() <= 1
+			&& "cannot use operator| on multiple nodes — use operator||");
+		if (values_.size() > 1) return result_t();
 		return e(*this);
 	}
 	template <typename result_t>
