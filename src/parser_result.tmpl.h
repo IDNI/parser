@@ -5,6 +5,23 @@
 #include "parser.h"
 namespace idni {
 
+// ---------------------------------------------------------------------------
+// Record a parser error in a diagnostics report
+// ---------------------------------------------------------------------------
+template <typename C, typename T>
+inline void report_parse_error(idni::diagnostics::report& r,
+	const typename parser<C, T>::error& err,
+	const idni::parser_strings::keys& k,
+	typename parser<C, T>::error::info_lvl verbosity =
+		parser<C, T>::error::INFO_DETAILED)
+{
+	using namespace idni::diagnostics;
+	auto msg = err.to_str(verbosity);
+	r.error(code::parse_error, msg, err.loc,
+		{{k.line, err.line},
+		 {k.col,  err.col}});
+}
+
 // __AMB__ is registered only when an ambiguity wrapper is actually present.
 // Both result constructors are defined unconditionally. At instantiation
 // time `if constexpr` in _parse selects the one used for the active mode.
@@ -22,8 +39,13 @@ parser<C, T>::result::result(parser<C, T>& p, std::unique_ptr<input> in_,
 	tref f, bool fnd, error err) :
 		found(fnd), parse_error(err),
 		shaping(p.get_grammar().opt.shaping),
+		measure_scopes(p.po.measure_scopes),
+		measure_counters(p.po.measure_counters),
+		diag_report(std::move(p.report_)),
 		p(p), in_(std::move(in_)), froot(tree::geth(f))
 {
+	if (!fnd) report_parse_error<C, T>(diag_report, err, p.keys(),
+		p.po.error_verbosity);
 	if (!froot) return;
 	auto amb_name = from_str<C>(std::string("__AMB__"));
 	auto& nts = p.get_grammar().nts;
@@ -43,9 +65,14 @@ template <typename C, typename T>
 parser<C, T>::result::result(parser<C, T>& p, std::unique_ptr<input> in_,
 	std::unique_ptr<pforest> f, bool fnd, error err) :
 		found(fnd), parse_error(err),
-		shaping(p.get_grammar().opt.shaping), p(p),
-		in_(std::move(in_)), f(std::move(f))
+		shaping(p.get_grammar().opt.shaping),
+		measure_scopes(p.po.measure_scopes),
+		measure_counters(p.po.measure_counters),
+		diag_report(std::move(p.report_)),
+		p(p), in_(std::move(in_)), f(std::move(f))
 {
+	if (!fnd) report_parse_error<C, T>(diag_report, err, p.keys(),
+		p.po.error_verbosity);
 	if (is_ambiguous())
 		amb_node = p.get_grammar().nt(from_str<C>(std::string("__AMB__")));
 }
@@ -58,6 +85,8 @@ parser<C, T>& parser<C, T>::result::get_parser() const { return p; }
 template <typename C, typename T>
 typename parser<C, T>::pforest* parser<C, T>::result::get_forest() const {
 	if (f) return f.get();
+	auto _rf = diag_report.open_if(measure_scopes,
+		p.keys().reconstruct_forest);
 	if (froot != 0) {
 		f = std::make_unique<pforest>();
 		if (!froot) return f.get();
@@ -402,14 +431,16 @@ parser<C, T>::psptree parser<C, T>::result::get_tree() {
 template <typename C, typename T>
 parser<C, T>::psptree parser<C, T>::result::get_tree(const pnode& n) {
 	psptree t;
-	emeasure_time_start(s, e);
-	std::cout<< "here2";
-	get_forest()->extract_graphs(n, [this, &t] (auto& g) {
-		inline_grammar_transformations(g);
-		t = g.extract_trees();
-		return false;
+	auto extract = [this, &t, &n] {
+		get_forest()->extract_graphs(n, [this, &t](auto& g) {
+			inline_grammar_transformations(g);
+			t = g.extract_trees();
+			return false;
+		});
+	};
+	diag_report.step(measure_scopes, p.keys().extract_graph, [&] {
+		extract();
 	});
-	emeasure_time_end(s, e);
 	return t;
 }
 

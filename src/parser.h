@@ -27,6 +27,8 @@
 #include "utility/tree.h"
 #include "utility/forest.h"
 
+#include "parser_strings.h"
+
 #define DEFAULT_BINARIZE false
 #define DEFAULT_INCR_GEN_FOREST false
 
@@ -269,7 +271,8 @@ struct char_class_fns {
  */
 template <typename C = char, typename T = C>
 char_class_fns<T> predefined_char_classes(
-	const std::vector<std::string>& cc_fn_names, nonterminals<C, T>& nts);
+	const std::vector<std::string>& cc_fn_names, nonterminals<C, T>& nts,
+	idni::diagnostics::report* diag = nullptr);
 
 /// @brief Settings which are used to shape parsed trees when shaping is used.
 struct shaping_options {
@@ -510,7 +513,7 @@ public:
 enum class parse_tree_path { forest_path, bintree_path };
 
 template <typename C = char, typename T = C>
-class parser {
+class parser : public idni::parser_strings::keys {
 public:
 	struct input;
 	using char_type       = C;
@@ -744,11 +747,13 @@ public:
 			int_type e = std::char_traits<C>::eof());
 		input(const std::string& filename, size_t max_length = 0,
 			decoder_type decoder = 0,
-			int_type e = std::char_traits<C>::eof());
+			int_type e = std::char_traits<C>::eof(),
+			idni::diagnostics::report* diag = nullptr);
 #ifdef _WIN32
 		input(const std::wstring& filename, size_t max_length = 0,
 			decoder_type decoder = 0,
-			int_type e = std::char_traits<C>::eof());
+			int_type e = std::char_traits<C>::eof(),
+			idni::diagnostics::report* diag = nullptr);
 #else
 		input(int filedescriptor, size_t max_length = 0,
 			decoder_type decoder = 0,
@@ -884,6 +889,25 @@ public:
 		const error parse_error;
 		/// Tree shaping options from grammar
 		const shaping_options shaping;
+		/// Whether parse recorded timed scopes. Copied at construction
+		/// from parse_options because lazy result operations may run after
+		/// a subsequent parse overwrites parser-owned options.
+		const bool measure_scopes;
+		/// Whether parse recorded counters and RSS metrics. Same lifetime
+		/// rationale as measure_scopes.
+		const bool measure_counters;
+		[[nodiscard]] idni::diagnostics::report& report() & {
+			return diag_report;
+		}
+		[[nodiscard]] const idni::diagnostics::report& report() const& {
+			return diag_report;
+		}
+		[[nodiscard]] idni::diagnostics::report&& report() && {
+			return std::move(diag_report);
+		}
+		[[nodiscard]] bool has_error() const {
+			return diag_report.has_error();
+		}
 
 		result(parser& p, std::unique_ptr<input> in_,
 			tref f, bool found, error err);
@@ -994,6 +1018,9 @@ public:
 		friend parser;
 		const lit<C, T>& ambiguity_literal() const;
 	private:
+		/// Metrics and diagnostics from the parse. Mutable so that lazy
+		/// operations on a const result can still record timing scopes.
+		mutable idni::diagnostics::report diag_report;
 		parser& p;
 		// input moved here from the parse call
 		std::unique_ptr<input> in_ = 0;
@@ -1023,6 +1050,10 @@ public:
 		size_t start = SIZE_MAX;
 		/// End of a stream
 		C eof = std::char_traits<C>::eof();
+		/// Record timed scopes in diagnostics report
+		bool measure_scopes = DEFAULT_MEASURE_SCOPES;
+		/// Record parse counters and RSS metrics in report
+		bool measure_counters = DEFAULT_MEASURE_COUNTERS;
 		/// Measure time taken for parsing
 		bool measure = false;
 		/// For each string pos
@@ -1032,6 +1063,8 @@ public:
 		/// Preprocessing
 		bool measure_preprocess = false;
 		bool debug = false;
+		/// Verbosity used when recording parse errors into diagnostics.
+		typename error::info_lvl error_verbosity = error::INFO_DETAILED;
 		/// Runtime tree path selection: build forest eagerly (forest_path) or
 		/// build binary tree directly (bintree_path, the default).
 		parse_tree_path tree_path = parse_tree_path::bintree_path;
@@ -1079,11 +1112,20 @@ public:
 	friend std::ostream& operator<<(std::ostream& os, const error& err) {
 		return os << err.to_str(error::info_lvl::INFO_BASIC);
 	}
+	/// Streams the full diagnostics report (scopes, counters, errors,
+	/// infos). For error-only output use res.parse_error.to_str(...).
 	friend std::ostream& operator<<(std::ostream& os, const result& res) {
-		return res.print_error(os);
+		return os << res.report();
+	}
+	// `keys` data members are inherited from idni::parser_strings::keys.
+	const idni::parser_strings::keys& keys() const {
+		return *this;
 	}
 
 private:
+	mutable idni::diagnostics::report report_;
+	idni::parser_strings::counters cnt;
+	parse_options po; /// current parse options, mirrored for result construction
 	grammar<C, T>& g;
 	options o;
 	std::unique_ptr<input> in_ = 0;

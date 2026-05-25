@@ -7,6 +7,8 @@ set(TAU_PARSER_HEADERS
 	forest.tmpl.h
 	grammar.tmpl.h
 	parser_result.tmpl.h
+	parser_strings.h
+	parser_strings.tmpl.h
 	parser_term_color_macros.h
 	parser.h
 	parser.tmpl.h
@@ -21,6 +23,8 @@ set(TAU_PARSER_HEADERS
 	utility/charclasses.impl.h
 	utility/cli.h
 	utility/cli.impl.h
+	utility/diagnostics.h
+	utility/diagnostics.tmpl.h
 	utility/measure.h
 	utility/memory_map.h
 	utility/repl.h

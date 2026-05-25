@@ -45,15 +45,16 @@ cli::commands tgf_commands() {
 		DESC("starting literal");
 	auto print_grammar = OPT(cli::option("grammar", 'g', true));
 		DESC("prints grammar");
-	//OPT(cli::option("nullable-ambiguity", 'N', false));
-	//	DESC("report possible nullable ambiguity");
-	//auto char_type = OPT(cli::option("char-type", 'C', "char"));
-	//	DESC("type of input character");
-	//auto terminal_type = OPT(cli::option("terminal-type", 'T', "char"));
-	//	DESC("type of terminal character");
-//
-	// ---------------------------------------------------------------------
-
+	auto print_json = OPT(cli::option("json", 'J', false));
+		DESC("respond with JSON");
+	auto measure = OPT(cli::option("measure", 'm', false));
+		DESC("benchmark: measure parse time and emit the diagnostics "
+			"report");
+	auto colors = OPT(cli::option("colors", 'c', true));
+		DESC("enable terminal colors for output");
+	OPT(cli::option("nullable", 'N', false));
+		DESC("report nullable recursive productions");
+	OPT(print_json);
 	CMD(cli::command("parse", "parse an input string, file or stdin"));
 
 	OPT(help);
@@ -62,6 +63,9 @@ cli::commands tgf_commands() {
 	//OPT(terminal_type);
 	print_grammar.set(false);
 	OPT(print_grammar);
+	OPT(print_json);
+	OPT(measure);
+	OPT(colors);
 	OPT(cli::option("input", 'i',
 		"")),
 		DESC("parse input from file or STDIN if -");
@@ -102,6 +106,7 @@ cli::commands tgf_commands() {
 
 	OPT(help);
 	OPT(start);
+	OPT(print_json);
 	OPT(cli::option("char-type", 'C', "char")),
 		DESC("input character type (e.g. char, char32_t)");
 	OPT(cli::option("terminal-type", 'T', "char")),
@@ -142,15 +147,16 @@ cli::commands tgf_commands() {
 	OPT(help);
 	OPT(start);
 	OPT(print_grammar);
+	OPT(print_json);
 	OPT(print_ambiguity);
 	OPT(print_graphs);
 	OPT(tml_rules);
 	OPT(tml_facts);
 	OPT(error_verbosity);
+	OPT(measure);
+	OPT(colors);
 	OPT(cli::option("evaluate", 'e', ""));
 		DESC("run repl command with input to evaluate and quit");
-	OPT(cli::option("nullable-ambiguity", 'N', false));
-		DESC("report possible nullable ambiguity");
 	//OPT(char_type);
 	//OPT(terminal_type);
 

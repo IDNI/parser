@@ -150,6 +150,12 @@ private:
 };
 
 template <typename T> T cli::option::get() const {
+#ifdef DEBUG
+	if (bool holds = holds_alternative<T>(value_); !holds) {
+		std::cerr << name() << ": option value is not a " << typeid(T).name() << "\n";
+		assert(holds);
+	}
+#endif
 	return std::get<T>(value_);
 }
 template <typename T> T cli::command::get(const std::string& n) const {

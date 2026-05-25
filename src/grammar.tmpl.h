@@ -460,7 +460,8 @@ bool char_class_fns<T>::is_eof_fn(size_t nt) const {
 
 template <typename C, typename T>
 char_class_fns<T> predefined_char_classes(
-	const std::vector<std::string>& cc_fn_names, nonterminals<C, T>& nts)
+	const std::vector<std::string>& cc_fn_names, nonterminals<C, T>& nts,
+	idni::diagnostics::report* diag)
 {
 	char_class_fns<T> r;
 	if constexpr (!std::is_same_v<T, char> && !std::is_same_v<T, char32_t>)
@@ -483,13 +484,20 @@ char_class_fns<T> predefined_char_classes(
 	r(nts.get(std::basic_string<C>{}), [](T) { return false; });
 	for (const auto& cc : cc_fn_names) {
 		auto it = predef.find(cc);
-		if (it == predef.end()) std::cerr << "Unknown character class: "
-			<< to_string(cc) << "\n";
-		else {
-			auto nt = nts.get(from_str<C>(it->first));
-			r(nt, it->second);
-			if (cc == "eof") r.eof_fn = nt;
+		if (it == predef.end()) {
+			if (diag) {
+				auto cc_id = diag->intern_dynamic(cc);
+				diag->error(idni::diagnostics::code::unknown_char_class,
+					"unknown character class",
+					{{ idni::parser_strings::KEYS.name, cc_id }});
+			} else
+				std::cerr << "Unknown character class: "
+					<< to_string(cc) << '\n';
+			continue;
 		}
+		auto nt = nts.get(from_str<C>(it->first));
+		r(nt, it->second);
+		if (cc == "eof") r.eof_fn = nt;
 	}
 	return r;
 }

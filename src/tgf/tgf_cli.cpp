@@ -9,11 +9,16 @@
 #include <ranges>
 
 #include "parser.h"
+#ifndef DEBUG
+#include "utility/devhelpers.h"   // various helpers for converting forest
+#endif
 #include "tgf_cli.h"
+#include "tgf.h"
 #include "parser_gen.h"
 #include "parser_term_color_macros.h"
 #include "tgf_test.h"
 #include "tgf_cli_options.h"
+#include "parser_strings.h"
 
 #define PBOOL(bval) (( bval ) ? "true" : "false")
 
@@ -26,22 +31,34 @@ using tt = tgf_repl_parser::tree::traverser;
 // commands
 //
 
-int show(const string& tgf_file, const string start = "start",
+static void print_diagnostics_report(
+	const idni::diagnostics::report& report,
+	bool json, bool print_names = true)
+{
+	if (report.nodes().empty()) return;
+	if (json) report.to_json(cout, print_names) << '\n';
+	else report.print();
+}
+
+int show(const string& tgf_file, string start = {},
 	bool print_grammar = true,
 	bool print_nullable_recursive_production = false,
-	bool colors = true)
+	bool measure = false,
+	bool print_json = false)
 {
-	//DBG(cout << tgf_file << " show" <<
-	//	" --start " << start <<
-	//	" --grammar " << PBOOL(print_grammar) <<
-	//	" --nullable-ambiguity " << PBOOL(print_nullable_ambiguity) <<
-	//	"\n";)
 	nonterminals<char> nts;
-	auto g = tgf<char>::from_file(nts, tgf_file);
+	auto gr = tgf<char>::from_file(nts, tgf_file, measure || print_json);
+	if (!gr.has_value()) {
+		print_diagnostics_report(gr.report(), print_json);
+		return 1;
+	}
+	const auto& g = gr.value();
+	if (start.empty()) start = g.start_literal().to_std_string();
 	if (print_grammar) g.print_internal_grammar_for(
-		cout, start, {}, true, term::colors(colors));
+		cout, start, {}, true);
 	if (print_nullable_recursive_production)
 		g.check_nullable_recursive_production(cout);
+	print_diagnostics_report(gr.report(), print_json);
 	return 0;
 }
 
@@ -85,6 +102,10 @@ int tgf_run(int argc, char** argv) {
 //	cout << "= /DEBUG ====================================================="
 //							"=============\n\n";
 //#endif
+
+	// process CLI arguments
+	// ---------------------------------------------------------------------
+
 
 	auto cmds = tgf_commands();
 	auto options = tgf_options();
@@ -133,12 +154,67 @@ int tgf_run(int argc, char** argv) {
 	if (!provided) return cl.error("no TGF file specified", true);
 	if (!exists) return cl.error("TGF file does not exist ", true);
 
+	if (cmd.has("colors")) TC.set(cmd.get<bool>("colors"));
+
+	// GRAMMAR COMMAND
+	// ---------------------------------------------------------------------
+
+	if (cmd.name() == "grammar")
+		return show(tgf_file, cmd.get<string>("start"),
+			cmd.get<bool>("grammar"),
+			cmd.get<bool>("nullable"),
+			cmd.get<bool>("measure"),
+			cmd.get<bool>("json"));
+
+	// GEN COMMAND
+	// ---------------------------------------------------------------------
+
+	if (cmd.name() == "gen") {
+		vector<string> nodisambig_list;
+		for (auto&& s : cmd.get<string>("nodisambig-list")
+			| views::split(',')) nodisambig_list
+					.emplace_back(s.begin(), s.end());
+		string char_type     = cmd.get<string>("char-type");
+		string terminal_type = cmd.get<string>("terminal-type");
+		string decoder       = cmd.get<string>("decoder");
+		string encoder       = cmd.get<string>("encoder");
+		if (cmd.get<bool>("utf8")) {
+			char_type     = "char";
+			terminal_type = "char32_t";
+			if (decoder.empty()) decoder = "idni::utf8_to_u32_conv";
+			if (encoder.empty()) encoder = "idni::u32_to_utf8_conv";
+		}
+		const bool print_json = cmd.get<bool>("json");
+		auto gr = generate_parser_cpp_from_file<char>(tgf_file,
+			parser_gen_options{
+			.output_dir          = cmd.get<string>("output-dir"),
+			.output              = cmd.get<string>("output"),
+			.name                = cmd.get<string>("name"),
+			.ns                  = cmd.get<string>("namespace"),
+			.char_type           = char_type,
+			.terminal_type       = terminal_type,
+			.decoder             = decoder,
+			.encoder             = encoder,
+			.auto_disambiguate   = cmd.get<bool>("auto-disambiguate"),
+			.nodisambig_list     = nodisambig_list
+		}, print_json);
+		print_diagnostics_report(gr.report(), print_json);
+		return gr.has_value() ? 0 : 1;
+	}
+
+	// prepare repl evaluator options and initialize repl evaluator
+	// ---------------------------------------------------------------------
+
 	// pass cli options to repl evaluator if exists
 	tgf_repl_evaluator::options tgf_repl_opt;
 	if (cmd.has("status"))                  tgf_repl_opt.status =
 		cmd.get<bool>("status");
 	if (cmd.has("colors"))                  tgf_repl_opt.colors =
 		cmd.get<bool>("colors");
+	if (cmd.has("measure"))                 tgf_repl_opt.measure =
+		cmd.get<bool>("measure");
+	if (cmd.has("json"))                    tgf_repl_opt.print_json =
+		cmd.get<bool>("json");
 	if (cmd.has("print-input"))             tgf_repl_opt.print_input =
 		cmd.get<bool>("print-input");
 	if (cmd.has("print-ambiguity"))         tgf_repl_opt.print_ambiguity =
@@ -162,56 +238,42 @@ int tgf_run(int argc, char** argv) {
 		tgf_repl_opt.auto_disambiguate =
 			cmd.get<bool>("auto-disambiguate");
 	tgf_repl_evaluator re(tgf_file, tgf_repl_opt);
+	if (!re.good()) return re.flush_report(), 1;
+
+	// TEST COMMAND
+	// ---------------------------------------------------------------------
 
 	if (cmd.name() == "test") {
 		auto files = cl.get_files();
-		if (files.size()) return run_tests(re.p, files);
-		else return cl.error(
+		if (!files.size()) return cl.error(
 			"test command needs at least one file as an argument");
+		int ret = run_tests(re.p, files);
+		re.flush_report();
+		return ret;
 	}
+
+	// REPL COMMAND
+	// ---------------------------------------------------------------------
 
 	if (cmd.name() == "repl") {
-		if (cmd.get<string>("evaluate").size())
-			return re.eval(cmd.get<string>("evaluate"));
+		if (cmd.get<string>("evaluate").size()) {
+			re.flush_report();
+			int ret = re.eval(cmd.get<string>("evaluate"));
+			re.flush_report();
+			return ret;
+		}
+		re.flush_report();
 		repl<decltype(re)> r(re, "tgf> ", ".tgf_history");
 		re.set_repl(r);
-		return r.run();
+		int ret = r.run();
+		re.flush_report();
+		return ret;
 	}
 
-	if (cmd.name() == "grammar") re.eval("internal-grammar");
+	// PARSE COMMAND
+	// ---------------------------------------------------------------------
 
-	else if (cmd.name() == "gen") {
-		vector<string> nodisambig_list;
-		for (auto&& s : cmd.get<string>("nodisambig-list")
-			| views::split(',')) nodisambig_list
-					.emplace_back(s.begin(), s.end());
-		string char_type     = cmd.get<string>("char-type");
-		string terminal_type = cmd.get<string>("terminal-type");
-		string decoder       = cmd.get<string>("decoder");
-		string encoder       = cmd.get<string>("encoder");
-		if (cmd.get<bool>("utf8")) {
-			char_type     = "char";
-			terminal_type = "char32_t";
-			if (decoder.empty()) decoder = "idni::utf8_to_u32_conv";
-			if (encoder.empty()) encoder = "idni::u32_to_utf8_conv";
-		}
-		generate_parser_cpp_from_file<char>(tgf_file, parser_gen_options
-		{
-			.output_dir          = cmd.get<string>("output-dir"),
-			.output              = cmd.get<string>("output"),
-			.name                = cmd.get<string>("name"),
-			.ns                  = cmd.get<string>("namespace"),
-			.char_type           = char_type,
-			.terminal_type       = terminal_type,
-			.decoder             = decoder,
-			.encoder             = encoder,
-			.auto_disambiguate   = cmd.get<bool>("auto-disambiguate"),
-			.nodisambig_list     = nodisambig_list
-		});
-	}
-
-	else if (cmd.name() == "parse") {
-		stringstream ss;
+	if (cmd.name() == "parse") {
 		string infile = cmd.get<string>("input");
 		string inexp  = cmd.get<string>("input-expression");
 		if (infile.size() && inexp.size())
@@ -226,6 +288,7 @@ int tgf_run(int argc, char** argv) {
 			}
 		else // string
 			re.parse(inexp.c_str(), inexp.size());
+		re.flush_report();
 	}
 	return 0;
 }
@@ -277,28 +340,43 @@ static tgf_repl_evaluator::parser_type::options utf8_parser_options() {
 	return o;
 }
 
+void tgf_repl_evaluator::flush_report() {
+	print_diagnostics_report(report, opt.print_json);
+	report.clear();
+}
+
+bool tgf_repl_evaluator::init_grammar(const string& filename) {
+	using char_t = parser_type::char_type;
+	using term_t = parser_type::terminal_type;
+	auto next_nts = make_shared<nonterminals_type>();
+	auto gr = tgf<char_t, term_t>::from_file(*next_nts, filename,
+		opt.measure || opt.print_json);
+	if (!gr.has_value()) {
+		report.append(std::move(gr).report());
+		return false;
+	}
+	auto next_g = make_shared<grammar_type>(std::move(gr).value());
+	auto next_p = make_shared<parser_type>(*next_g, utf8_parser_options());
+	report.append(std::move(gr).report());
+	nts = std::move(next_nts);
+	g = std::move(next_g);
+	p = std::move(next_p);
+	return true;
+}
+
 tgf_repl_evaluator::tgf_repl_evaluator(const string& tgf_file)
-	: tgf_file(tgf_file), nts(shared_ptr<nonterminals_type>()),
-		g(make_shared<grammar_type>(
-			tgf<tgf_repl_evaluator::parser_type::char_type,
-				tgf_repl_evaluator::parser_type::terminal_type>
-				::from_file(*nts, tgf_file))),
-		p(make_shared<parser_type>(*g, utf8_parser_options()))
+	: tgf_file(tgf_file)
 {
+	if (!init_grammar(tgf_file)) return;
 	update_opts_by_grammar_opts();
 	g->opt.auto_disambiguate = this->opt.auto_disambiguate;
 }
 
 tgf_repl_evaluator::tgf_repl_evaluator(const string& tgf_file, options opt)
-	: tgf_file(tgf_file), opt(opt),
-		nts(make_shared<nonterminals_type>()),
-		g(make_shared<grammar_type>(
-			tgf<tgf_repl_evaluator::parser_type::char_type,
-				tgf_repl_evaluator::parser_type::terminal_type>
-				::from_file(*nts, tgf_file))),
-		p(make_shared<parser_type>(*g, utf8_parser_options()))
+	: tgf_file(tgf_file), opt(opt)
 {
 	TC.set(opt.colors);
+	if (!init_grammar(tgf_file)) return;
 	update_opts_by_grammar_opts();
 	g->opt.auto_disambiguate = opt.auto_disambiguate;
 }
@@ -331,9 +409,8 @@ void tgf_repl_evaluator::set_repl(repl<tgf_repl_evaluator>& r_) {
 }
 
 void tgf_repl_evaluator::parsed(parser_type::result& r) {
-	if (!r.good()) return;
-	if (!r.found) {
-		cerr << r.parse_error.to_str(opt.error_verbosity) << endl;
+	if (!r.good() || !r.found) {
+		report.append(std::move(r.report()));
 		return;
 	}
 	auto f = r.get_forest();
@@ -390,23 +467,33 @@ void tgf_repl_evaluator::parsed(parser_type::result& r) {
 			r.get_shaped_tree2(sopt), {}, false, 1);
 	}
 	cout << ss.str();
+	report.append(std::move(r.report()));
 }
 
 tgf_repl_evaluator::parser_type::parse_options
 	tgf_repl_evaluator::get_parse_options() const
 {
-	return parser_type::parse_options{
+	parser_type::parse_options po{
 		.start              = nts->get(opt.start),
 		.measure            = opt.measure,
 		.measure_each_pos   = opt.measure_each_pos,
 		.measure_forest     = opt.measure_forest,
 		.measure_preprocess = opt.measure_preprocess,
 		.debug              = opt.debug,
+		.error_verbosity    = opt.error_verbosity,
 		.tree_path          = opt.tree_path
 	};
+	if (opt.measure) { /// `opt.measure` is a master ENABLE for now
+		po.measure_scopes       = true;
+		po.measure_counters     = true;
+		po.measure_forest       = true;
+		po.measure_preprocess   = true;
+	}
+	return po;
 }
 
 void tgf_repl_evaluator::parse(const char* input, size_t size) {
+	if (!good()) return;
 	//cout << "parsing: " << input << "\n";
 	auto po = get_parse_options();
 	auto r = p->parse(input, size, po);
@@ -414,31 +501,33 @@ void tgf_repl_evaluator::parse(const char* input, size_t size) {
 }
 
 void tgf_repl_evaluator::parse(istream& instream) {
+	if (!good()) return;
 	auto po = get_parse_options();
 	auto r = p->parse(instream, po);
 	parsed(r);
 }
 
 void tgf_repl_evaluator::parse(const string& infile) {
+	if (!good()) return;
 	auto po = get_parse_options();
 	auto r = p->parse(infile, po);
 	parsed(r);
 }
 
-void tgf_repl_evaluator::reload(const string& new_tgf_file) {
-	if (tgf_file != new_tgf_file) tgf_file = new_tgf_file;
-	nts = make_shared<nonterminals_type>();
-	g = make_shared<grammar_type>(tgf<tgf_repl_evaluator::parser_type::char_type,
-				tgf_repl_evaluator::parser_type::terminal_type>
-				::from_file(*nts, tgf_file));
-	p = make_shared<parser_type>(*g, utf8_parser_options());
+bool tgf_repl_evaluator::reload(const string& new_tgf_file) {
+	if (!init_grammar(new_tgf_file)) {
+		cout << "reload failed: " << new_tgf_file << "\n";
+		return false;
+	}
+	tgf_file = new_tgf_file;
 	update_opts_by_grammar_opts();
 	g->opt.auto_disambiguate = opt.auto_disambiguate;
 	cout << "loaded: " << tgf_file << "\n";
+	return true;
 }
 
-void tgf_repl_evaluator::reload() {
-	reload(tgf_file);
+bool tgf_repl_evaluator::reload() {
+	return reload(tgf_file);
 }
 
 pair<tgf_repl_parser::nonterminal, tt> get_opt(const tt& t) {
@@ -908,10 +997,17 @@ void help(size_t nt = tgf_repl_parser::help_sym) {
 	}
 }
 
+static std::string_view repl_cmd_scope_name(size_t nt) {
+	return tgf_repl_parser::instance().name(nt);
+}
+
 int tgf_repl_evaluator::eval(const tt& s) {
 	using p = tgf_repl_parser;
-	switch (s | tt::nonterminal) {
-	case p::quit_cmd: return cout << "Quit.\n", 1;
+	const auto nt = s | tt::nonterminal;
+	auto _ = report.open_if(opt.measure, repl_cmd_scope_name(nt));
+	int ret = 0;
+	switch (nt) {
+	case p::quit_cmd: ret = (cout << "Quit.\n", 1); break;
 	case p::clear_cmd: if (r) r->clear(); break;
 	case p::help_cmd: {
 		auto optarg = s | p::help_arg
@@ -1007,15 +1103,17 @@ int tgf_repl_evaluator::eval(const tt& s) {
 	}
 	default: cout << "error: unknown command\n"; break;
 	}
-	return 0;
+	return ret;
 }
 
 int tgf_repl_evaluator::eval(const string& src) {
 	static tgf_repl_parser rp;
 	int quit = 0;
 	auto r = rp.parse(src.c_str(), src.size());
-	if (!r.found) cout << "invalid command: " << r.parse_error << "\n";
-	else {
+	if (!r.found) {
+		report.append(std::move(r.report()));
+		flush_report();
+	} else {
 		r.print_ambiguous_nodes(cout);
 		if (opt.debug) {
 			pretty_print(cout << "input command graph:\n",
@@ -1025,9 +1123,11 @@ int tgf_repl_evaluator::eval(const string& src) {
 		tref ref = r.get_shaped_tree2();
 		auto t = tt(ref);
 		auto statements = t || tgf_repl_parser::statement;
-		for (const auto& statement : statements())
-			if (quit = eval(statement | tt::only_child); quit == 1)
-				return quit;
+		for (const auto& statement : statements()) {
+			quit = eval(statement | tt::only_child);
+			flush_report();
+			if (quit == 1) return quit;
+		}
 	}
 	std::cout << std::endl;
 	if (quit == 0) reprompt();

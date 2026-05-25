@@ -5,70 +5,109 @@
 #define __IDNI__PARSER__TGF_H__
 #include <fstream>
 #include <streambuf>
+#include <optional>
 
 #include "tgf_parser.generated.h"
+#include "parser_strings.h"
 #include "utility/devhelpers.h"
+#include "utility/diagnostics.h"
 
 namespace idni {
 
 template <typename C = char, typename T = C>
 struct tgf {
-	using tree           = tgf_parser::tree;
-	using trv            = tree::traverser;
-	using lit_t          = lit<C, T>;
-	using prods_t        = prods<C, T>;
+	using tree     = tgf_parser::tree;
+	using trv      = tree::traverser;
+	using lit_t    = lit<C, T>;
+	using prods_t  = prods<C, T>;
+	using code     = idni::diagnostics::code;
+	using result   = idni::diagnostics::result<grammar<C, T>>;
+	using keys     = idni::parser_strings::keys;
+	using names    = idni::parser_strings::names;
+	using messages = idni::parser_strings::messages;
 
 	/// Parse TGF from string
-	static grammar<C, T> from_string(
-		nonterminals<C, T>& nts_,
-		const std::basic_string<C>& s)
+	static result from_string(nonterminals<C, T>& nts_,
+				  const std::basic_string<C>& s,
+				  bool measure = false)
 	{
 		auto& p = tgf_parser::instance();
-		static tgf_parser::parse_options po{
-			.start = tgf_parser::start };
-		auto r = p.parse(s.c_str(), s.size(), po);
-		if (!r.found) {
-			std::cerr << "TGF: "
-				<< r.parse_error.to_str(tgf_parser::error::
-					info_lvl::INFO_BASIC) << "\n";
-			return grammar<C, T>(nts_);
+		tgf_parser::parse_options po{
+			.start = tgf_parser::start,
+			.measure_scopes = measure,
+			.measure_counters = measure
+		};
+
+		result R;
+		{
+			auto _ = R.open_if(measure, names::grammar_load);
+			keys dk{};
+			std::optional<typename tgf_parser::result> pr;
+			tref n;
+			{
+				auto _p = R.open_if(measure, dk.tgf_parse);
+				pr.emplace(p.parse(s.c_str(), s.size(), po));
+				if (!pr->found) {
+					if (!pr->report().nodes().empty())
+						R.append(std::move(pr->report()));
+					return R;
+				}
+				n = pr->get_shaped_tree2();
+				if (!pr->report().nodes().empty())
+					R.append(std::move(pr->report()));
+			}
+			{
+				auto _b = R.open_if(measure, dk.tgf_build);
+				grammar_builder b(nts_);
+				// build() / predefined_char_classes() take a raw
+				// report*, so errors written there do NOT trigger
+				// the result<> value-drop invariant. Gate emplace
+				// on has_error() — this is the canonical pattern;
+				// see the comment on predefined_char_classes in
+				// src/grammar.tmpl.h.
+				b.build(trv(n), &R.report());
+				if (!R.report().has_error()) R.emplace(b.g());
+			}
 		}
-		grammar_builder b(nts_);
-		b.build(trv(r.get_shaped_tree2()));
-		return b.g();
+		return R;
 	}
 	/// Parse TGF from a file
-	static grammar<C, T> from_file(
-		nonterminals<C, T>& nts_,
-		const std::string& filename)
+	static result from_file(nonterminals<C, T>& nts_,
+				const std::string& filename,
+				bool measure = false)
 	{
 		std::ifstream ifs(filename);
 		if (!ifs) {
-			std::cerr << "cannot open file: "
-						<< filename << std::endl;
-			return grammar<C, T>(nts_);
+			result R;
+			R.report().reset(names::grammar_load);
+			R.error(code::io_error,
+				std::string(messages::cannot_open_file) + filename);
+			return R;
 		}
-		return from_string(nts_, std::string(
-				std::istreambuf_iterator<C>(ifs),
-				std::istreambuf_iterator<C>()));
+		return from_string(nts_,
+			std::string(std::istreambuf_iterator<C>(ifs),
+				std::istreambuf_iterator<C>()),
+			measure);
 	}
 
 	/// Parse TGF from a string but split it to statements first
-	static grammar<C, T> from_string_presplit(
+	static result from_string_presplit(
 		nonterminals<C, T>& nts_,
-		const std::basic_string<C>& s)
+		const std::basic_string<C>& s,
+		tgf_parser::parse_options po = {})
 	{
+		result R;
+		R.report().reset(names::grammar_load);
 		grammar_builder b(nts_);
 		auto c = s.c_str();
 		size_t line = 0;
 		size_t last = 0;
 		auto l = s.size();
-		//std::cout << "parsing: " << to_std_string(s) << std::endl;
 		bool in_string = false;
-		//DBG(f.g.print_data(std::cout << "\n>>>\n\n") << "\n<<<" << std::endl;)
 		bool in_comment = false;
 		bool in_char = false;
 		bool in_escape = false;
+		bool had_parse_error = false;
 
 		auto escape = [&in_escape](char c) {
 			bool ret = in_escape;
@@ -77,11 +116,6 @@ struct tgf {
 			return in_escape = (c == '\\');
 		};
 		for (size_t i = 0; i != l; ++i) {
-			//std::cout << "i: " << i << " c[i]: '" << c[i]
-			//	<< "' string: " << in_string
-			//	<< " comment: " << in_comment
-			//	<< " char: " << in_char
-			//	<< " escape: " << in_escape << std::endl;
 			if (in_comment) {
 				if (c[i] == '\n') in_comment = false;
 			}
@@ -98,42 +132,36 @@ struct tgf {
 			else if (c[i] == '#') in_comment = true;
 			else if (c[i] == '.') {
 				const char* nc = c + last;
-				//std::cout << "last: " << last << " " << c[last] << std::endl;
-				//std::cout << "i:    " << i << " " << c[i] << std::endl;
 				size_t nl = i - last + 1;
-				//std::cout << "nl:   " << nl << std::endl;
-				//std::cout << "nc:   {";
-				//for (size_t j = 0; j < nl; ++j) {
-				//	std::cout << nc[j];
-				//}
-				//std::cout << "}\n";
 				last = i + 1;
 				size_t line_start = line;
 				for (size_t j = 0; j < nl; ++j)
 					if (nc[j] == '\n') --line_start;
-				//std::cout << "parsing: " << to_std_string(std::basic_string<C>(nc, nl)) << std::endl;
-				int ret = b.parse(nc, nl, line_start);
-				//std::cout << "ret:   " << ret << std::endl;
-				if (ret == 1) break;
+				int ret = b.parse(nc, nl, line_start, R, po);
+				if (ret == 1) { had_parse_error = true; break; }
 			}
 			if (c[i] == '\n') ++line;
 		}
-		return b.g();
+		if (!had_parse_error) R.emplace(b.g());
+		return R;
 	}
 	/// Parse TGF from a file but split it to statements first
-	static grammar<C, T> from_file_presplit(
+	static result from_file_presplit(
 		nonterminals<C, T>& nts_,
-		const std::string& filename)
+		const std::string& filename,
+		tgf_parser::parse_options po = {})
 	{
 		std::ifstream ifs(filename);
 		if (!ifs) {
-			std::cerr << "cannot open file: "
-						<< filename << std::endl;
-			return grammar<C, T>(nts_);
+			result R;
+			R.report().reset(names::grammar_load);
+			R.error(code::io_error,
+				std::string(messages::cannot_open_file) + filename);
+			return R;
 		}
 		return from_string_presplit(nts_, std::string(
 				std::istreambuf_iterator<C>(ifs),
-				std::istreambuf_iterator<C>()));
+				std::istreambuf_iterator<C>()), po);
 	}
 
 private:
@@ -148,25 +176,36 @@ private:
 		grammar<C, T>::options opt{};
 		char_class_fns<T> cc;
 		grammar_builder(nonterminals<C, T>& nts) : nts(nts) {}
-		grammar_builder(nonterminals<C, T>& nts, const trv& t)
-			: nts(nts) { build(t); }
-		void build(const trv& t) {
+		grammar_builder(nonterminals<C, T>& nts, const trv& t,
+			idni::diagnostics::report* diag = nullptr)
+			: nts(nts) { build(t, diag); }
+		void build(const trv& t,
+			idni::diagnostics::report* diag = nullptr) {
 			auto statements  = t || tgf_parser::statement;
 			auto directives  = statements || tgf_parser::directive;
 			for (const auto& d : directives()) directive(d);
-			cc = predefined_char_classes<C, T>(cc_names, nts);
+			cc = predefined_char_classes<C, T>(cc_names, nts, diag);
 			auto productions = statements || tgf_parser::production;
 			for (const auto& pr : productions()) production(pr);
 		}
-		int parse(const char* s, size_t l, size_t line) {
+		int parse(const char* s, size_t l, size_t line,
+			idni::diagnostics::result<grammar<C, T>>& res,
+			tgf_parser::parse_options po = {})
+		{
+			po.start = tgf_parser::start_statement;
 			auto& p = tgf_parser::instance();
-			static tgf_parser::parse_options po{
-				.start = tgf_parser::start_statement };
 			auto r = p.parse(s, l, po);
-			if (!r.found) return std::cerr << "TGF: "
-				<< r.parse_error.to_str(tgf_parser::error::
-					info_lvl::INFO_BASIC, line) << "\n",1;
-			build(trv(r.get_shaped_tree2()));
+			if (!r.found) {
+				keys k{};
+				auto verbosity = po.error_verbosity;
+				res.error(code::parse_error,
+					r.parse_error.to_str(verbosity, line),
+					r.parse_error.loc,
+					{{ k.line, line + r.parse_error.line },
+					 { k.col,  r.parse_error.col }});
+				return 1;
+			}
+			build(trv(r.get_shaped_tree2()), &res.report());
 			return 0;
 		}
 		grammar<C, T> g() {

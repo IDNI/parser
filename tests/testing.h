@@ -396,7 +396,9 @@ namespace idni::testing
 			return info(std::cout), true;
 		emeasure_time_start(start_tgf, end_tgf);
 		nonterminals<T> nts;
-		grammar<T> g = tgf<T>::from_string(nts, g_tgf);
+		auto gr = tgf<T>::from_string(nts, g_tgf);
+		if (!gr.print_and_ok()) return false;
+		grammar<T> g = gr.value();
 		if (measure)
 		{
 			ss << "elapsed TGF: ";

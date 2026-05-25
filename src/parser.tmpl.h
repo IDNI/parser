@@ -4,6 +4,7 @@
 #include "parser.h"
 
 #include <climits>
+#include <optional>
 
 #ifdef TAU_PARSER_MEASURE
 #include "utility/measure.h"
@@ -61,7 +62,8 @@ parser<C, T>::input::input(std::basic_istream<C>& is, size_t max_l,
 	{ s.rdbuf(is.rdbuf()); }
 template <typename C, typename T>
 parser<C, T>::input::input(const std::string& filename, size_t max_l,
-	decoder_type decoder, int_type eof) : itype(MMAP), e(eof),
+	decoder_type decoder, int_type eof,
+	idni::diagnostics::report* diag) : itype(MMAP), e(eof),
 	decoder(decoder),
 #ifdef _WIN32
 	mm(idni::utf8_to_wide(filename), 0, MMAP_READ),
@@ -71,16 +73,25 @@ parser<C, T>::input::input(const std::string& filename, size_t max_l,
 	l(mm.size()),
 	max_l(max_l), d(reinterpret_cast<const C*>(mm.data())), s(nullptr)
 {
-	if (mm.error) std::cerr << mm.error_message << std::endl;
+	if (mm.error) {
+		if (diag) diag->error(idni::diagnostics::code::io_error,
+			mm.error_message);
+		else std::cerr << mm.error_message << std::endl;
+	}
 }
 #ifdef _WIN32
 template <typename C, typename T>
 parser<C, T>::input::input(const std::wstring& filename, size_t max_l,
-	decoder_type decoder, int_type eof) : itype(MMAP), e(eof),
+	decoder_type decoder, int_type eof,
+	idni::diagnostics::report* diag) : itype(MMAP), e(eof),
 	decoder(decoder), mm(filename, 0, MMAP_READ), l(mm.size()),
 	max_l(max_l), d(reinterpret_cast<const C*>(mm.data())), s(nullptr)
 {
-	if (mm.error) std::cerr << mm.error_message << std::endl;
+	if (mm.error) {
+		if (diag) diag->error(idni::diagnostics::code::io_error,
+			mm.error_message);
+		else std::cerr << mm.error_message << std::endl;
+	}
 }
 #else
 template <typename C, typename T>
@@ -567,6 +578,7 @@ template <typename C, typename T>
 parser<C, T>::result parser<C, T>::parse(const C* data, size_t size,
 	parse_options po)
 {
+	report_.clear();
 	in_ = std::make_unique<input>(data, size,
 		po.max_length, o.chars_to_terminals, po.eof);
 	return _parse(po);
@@ -575,6 +587,7 @@ template <typename C, typename T>
 parser<C, T>::result parser<C, T>::parse(std::basic_istream<C>& is,
 	parse_options po)
 {
+	report_.clear();
 	in_ = std::make_unique<input>(is,
 		po.max_length, o.chars_to_terminals, po.eof);
 	return _parse(po);
@@ -583,8 +596,9 @@ template <typename C, typename T>
 parser<C, T>::result  parser<C, T>::parse(const std::string& fn,
 	parse_options po)
 {
+	report_.clear();
 	in_ = std::make_unique<input>(fn,
-		po.max_length, o.chars_to_terminals, po.eof);
+		po.max_length, o.chars_to_terminals, po.eof, &report_);
 	return _parse(po);
 }
 #ifdef _WIN32
@@ -592,13 +606,15 @@ template <typename C, typename T>
 parser<C, T>::result parser<C, T>::parse(const std::wstring& fn,
 	parse_options po)
 {
+	report_.clear();
 	in_ = std::make_unique<input>(fn,
-		po.max_length, o.chars_to_terminals, po.eof);
+		po.max_length, o.chars_to_terminals, po.eof, &report_);
 	return _parse(po);
 }
 #else
 template <typename C, typename T>
 parser<C, T>::result parser<C, T>::parse(int fd, parse_options po) {
+	report_.clear();
 	in_ = std::make_unique<input>(fd,
 		po.max_length, o.chars_to_terminals, po.eof);
 	return _parse(po);
@@ -606,6 +622,11 @@ parser<C, T>::result parser<C, T>::parse(int fd, parse_options po) {
 #endif
 template <typename C, typename T>
 parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
+	this->po = po;
+	std::optional<idni::diagnostics::report::scope_guard> parse_scope;
+	if (po.measure_scopes)
+		parse_scope.emplace(report_.open(keys().parse));
+	cnt = idni::parser_strings::counters{};
 	#ifdef TAU_PARSER_MEASURE
 	measures::start_timer("parsing", po.measure);
 	#endif // TAU_PARSER_MEASURE
@@ -762,6 +783,11 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 	measures::print_timer("parsing");
 	measures::stop_timer("parsing");
 	#endif // TAU_PARSER_MEASURE
+	if (po.measure_counters) {
+		idni::parser_strings::flush_counters(report_, cnt, keys());
+		report_.count(keys().input_length, in_->tpos());
+		report_.count(keys().position_count, in_->tpos());
+	}
 
 	in_->clear();
 	// remaining total items
@@ -809,6 +835,7 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 			- usenc)/(count + gcnt) <<std::endl);
 	}
 
+	parse_scope.reset();
 	if (po.tree_path == parse_tree_path::bintree_path)
 		return result(*this, std::move(in_), fr, fnd, err);
 	else

@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "utility/cli.h"
+#include "utility/diagnostics.h"
 #include "utility/repl.h"
 #include "utility/term_colors.h"
 #include "tgf_repl_parser.generated.h"
@@ -39,11 +40,17 @@ struct tgf_repl_evaluator {
 		bool print_ambiguity    = true;
 		bool tml_rules          = false;
 		bool tml_facts          = false;
+		bool print_json         = false;
 		bool measure            = false;
 		bool measure_each_pos   = false;
+#ifdef TAU_PARSER_MEASURE_SCOPES
+		bool measure_forest     = true;
+		bool measure_preprocess = true;
+#else
 		bool measure_forest     = false;
 		bool measure_preprocess = false;
-		std::string start{"start"};
+#endif
+		std::string start{};
 		parser_type::error::info_lvl error_verbosity =
 			parser_type::error::info_lvl::INFO_BASIC;
 		parse_tree_path tree_path = parse_tree_path::bintree_path;
@@ -59,6 +66,18 @@ struct tgf_repl_evaluator {
 	tgf_repl_evaluator(const std::string& tgf_file);
 	tgf_repl_evaluator(const std::string& tgf_file, options opt);
 
+	/// Load the TGF from @p filename into @ref nts, @ref g, @ref p.
+	/// On failure it appends diagnostics and returns @c false.
+	bool init_grammar(const std::string& filename);
+
+	/// True when the grammar loaded successfully and the parser is ready.
+	[[nodiscard]] bool good() const noexcept {
+		return g != nullptr && p != nullptr;
+	}
+
+	/// Print and clear the accumulated diagnostics report.
+	void flush_report();
+
 	void set_repl(repl<tgf_repl_evaluator>& r_);
 	void reprompt();
 
@@ -70,8 +89,8 @@ struct tgf_repl_evaluator {
 	void parse(const std::string& infile);
 	void parsed(parser_type::result& r);
 
-	void reload();
-	void reload(const std::string& new_tgf_file);
+	bool reload();
+	bool reload(const std::string& new_tgf_file);
 
 	void get_cmd(const trv& n);
 	void set_cmd(const trv& n);
@@ -92,6 +111,9 @@ struct tgf_repl_evaluator {
 	std::shared_ptr<grammar_type> g;
 	std::shared_ptr<parser_type> p;
 	term::colors TC;
+
+private:
+	idni::diagnostics::report report;
 };
 
 } // namespace idni

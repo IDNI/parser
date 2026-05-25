@@ -323,23 +323,35 @@ void generate_parser_cpp(const std::string& tgf_filename,
 	os <<	"#endif // __" << guard << "_H__\n";
 }
 
+// generate_parser_cpp_from_* returns a result<bool> whose report is the
+// grammar's parse report (forwarded). On success the value is `true`; on
+// failure the value is absent and the report carries the errors. Caller
+// prints the report once at the end via print_and_ok() / operator<<.
 template <typename C = char, typename T = C>
-void generate_parser_cpp_from_string(const std::string& tgf_filename,
+idni::diagnostics::result<bool> generate_parser_cpp_from_string(
+	const std::string& tgf_filename,
 	const std::basic_string<C>& grammar_tgf,
-	parser_gen_options opt = {})
+	parser_gen_options opt = {},
+	bool measure = false)
 {
 	nonterminals<C, T> nts;
-	generate_parser_cpp(tgf_filename,
-		tgf<C, T>::from_string(nts, grammar_tgf), opt);
+	auto gr = tgf<C, T>::from_string(nts, grammar_tgf, measure);
+	if (gr.has_value())
+		generate_parser_cpp(tgf_filename, std::move(gr).value(), opt);
+	return idni::diagnostics::forward_as<bool>(std::move(gr), true);
 }
 
 template <typename C = char, typename T = C>
-void generate_parser_cpp_from_file(const std::string& tgf_filename,
-	parser_gen_options opt = {})
+idni::diagnostics::result<bool> generate_parser_cpp_from_file(
+	const std::string& tgf_filename,
+	parser_gen_options opt = {},
+	bool measure = false)
 {
 	nonterminals<C, T> nts;
-	generate_parser_cpp(tgf_filename,
-		tgf<C, T>::from_file(nts, tgf_filename), opt);
+	auto gr = tgf<C, T>::from_file(nts, tgf_filename, measure);
+	if (gr.has_value())
+		generate_parser_cpp(tgf_filename, std::move(gr).value(), opt);
+	return idni::diagnostics::forward_as<bool>(std::move(gr), true);
 }
 
 } // idni namespace
