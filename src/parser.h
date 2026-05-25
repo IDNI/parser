@@ -5,13 +5,8 @@
 #define __IDNI__PARSER__PARSER_H__
 #include <array>
 #include <variant>
-#include <unordered_set>
 #include <iostream>
-#include <fstream>
-#include <sstream>
 #include <istream>
-#include <span>
-#include <cassert>
 #include <algorithm>
 #include <initializer_list>
 #include <map>
@@ -31,6 +26,8 @@
 
 #define DEFAULT_BINARIZE false
 #define DEFAULT_INCR_GEN_FOREST false
+#define DEFAULT_ENABLE_GC false
+#define DEFAULT_GC_LAG 1
 
 namespace idni {
 
@@ -719,6 +716,7 @@ public:
 	using sptree_type     = psptree;
 	using encoder_type    = std::function<std::basic_string<char_type>(
 					const std::vector<terminal_type>&)>;
+	using counters        = idni::parser_strings::counters;
 
 	/// earley item
 	struct item {
@@ -814,41 +812,6 @@ public:
 		size_t tp = 0;
 	};
 	using decoder_type = input::decoder_type;
-
-	/// Parser options for its constructor
-	struct options {
-		/// Applying binarization to ensure every forest node
-		/// has atmost 2 or less children nodes
-		bool binarize = DEFAULT_BINARIZE;
-		/// Build forest incrementally as soon any
-		/// item is completed
-		bool incr_gen_forest = DEFAULT_INCR_GEN_FOREST;
-		/// Enable garbage collection
-		bool enable_gc = false;
-		/// Number of steps garbage collection lags behind
-		/// parsing position n. should be greater than
-		/// 0 and less than the size of the input
-		/// for any collection activity. We cannot use
-		/// % since in the streaming case, we do not know
-		/// exact size in advance
-		size_t gc_lag = 1;
-		/**
-		 * Decoder function reading an input converting element or elements of
-		 * a type C to a vector of elements of type T according to template
-		 * type parameters T and C. More about these recorders here.
-		 *
-		 * Default value is 0, ie. no decoder function.
-		 */
-		decoder_type chars_to_terminals = 0;
-		/**
-		 * Encoder function converting vector of terminals of a type T to a
-		 * std::basic_string\<C> according to template type parameters T and C.
-		 *
-		 * Default value is 0, ie. no encoder function.
-		 */
-		encoder_type terminals_to_chars = 0;
-	};
-
 	/// Parse error
 	struct error {
 		enum info_lvl {
@@ -881,6 +844,76 @@ public:
 		std::string to_str(info_lvl lv = INFO_DETAILED,
 			size_t line_start = 0) const;
 	};
+	/// Parse options for parse() call
+	struct parse_options {
+		/// Read up to max length of the input size
+		size_t max_length = 0;
+		/// Start non-terminal, SIZE_MAX = use default
+		size_t start = SIZE_MAX;
+		/// End of a stream
+		C eof = std::char_traits<C>::eof();
+		/// Record timed scopes in diagnostics report
+		bool measure_scopes = DEFAULT_MEASURE_SCOPES;
+		/// Record parse counters and RSS metrics in report
+		bool measure_counters = DEFAULT_MEASURE_COUNTERS;
+		/// Measure time taken for parsing (legacy aggregate flag,
+		/// distinct from the scope-level measure_scopes).
+		bool measure = false;
+		/// For each string pos
+		bool measure_each_pos = false;
+		/// Forest building scope
+		bool measure_forest = false;
+		/// Preprocessing scope
+		bool measure_preprocess = false;
+		/// Enables `if (po.debug)` diagnostic print paths inside the
+		/// build_bintree / init_forest helpers (e.g. "preprocess size: N",
+		/// "sorted sizes : ..."). Independent from the DBG()/DBGP() macros,
+		/// which are compile-time gated.
+		bool debug = false;
+		/// Verbosity used when recording a parse error into the diagnostics
+		/// report. Plumbed from the CLI/REPL `error-verbosity` option so
+		/// `basic` / `detailed` / `root-cause` settings actually take effect.
+		typename error::info_lvl error_verbosity = error::INFO_DETAILED;
+		/// Runtime tree path selection: build forest eagerly (forest_path) or
+		/// build binary tree directly (bintree_path, the default).
+		parse_tree_path tree_path = parse_tree_path::bintree_path;
+		/// Enable garbage collection
+		bool enable_gc = DEFAULT_ENABLE_GC;
+		/// Garbage collection lag
+		size_t gc_lag = DEFAULT_GC_LAG;
+	};
+	/// Parser options for its constructor
+	struct options {
+		/// Applying binarization to ensure every forest node
+		/// has atmost 2 or less children nodes
+		bool binarize = DEFAULT_BINARIZE;
+		/// Build forest incrementally as soon any
+		/// item is completed
+		bool incr_gen_forest = DEFAULT_INCR_GEN_FOREST;
+		/**
+		 * Decoder function reading an input converting element or elements of
+		 * a type C to a vector of elements of type T according to template
+		 * type parameters T and C. More about these recorders here.
+		 *
+		 * Default value is 0, ie. no decoder function.
+		 */
+		decoder_type chars_to_terminals = 0;
+		/**
+		 * Encoder function converting vector of terminals of a type T to a
+		 * std::basic_string\<C> according to template type parameters T and C.
+		 *
+		 * Default value is 0, ie. no encoder function.
+		 */
+		encoder_type terminals_to_chars = 0;
+		/**
+		 * Default parse options for parse call.
+		 */
+		/// Default per-parse options for this parser. The parse(...)
+		/// overloads that take a parse_options use it for that one parse
+		/// and restore this default afterwards.
+		parse_options parse_opts = {};
+	};
+
 	/// Result of the parse call.
 	struct result {
 		/// True if the parse was successful
@@ -890,11 +923,11 @@ public:
 		/// Tree shaping options from grammar
 		const shaping_options shaping;
 		/// Whether parse recorded timed scopes. Copied at construction
-		/// from parse_options because lazy result operations may run after
-		/// a subsequent parse overwrites parser-owned options.
+		/// from parse_options because `parser::po` may be overwritten by
+		/// a subsequent parse before the result is consumed lazily.
 		const bool measure_scopes;
-		/// Whether parse recorded counters and RSS metrics. Same lifetime
-		/// rationale as measure_scopes.
+		/// Whether parse recorded counters and RSS metrics. Same
+		/// lifetime rationale as measure_scopes.
 		const bool measure_counters;
 		[[nodiscard]] idni::diagnostics::report& report() & {
 			return diag_report;
@@ -905,6 +938,7 @@ public:
 		[[nodiscard]] idni::diagnostics::report&& report() && {
 			return std::move(diag_report);
 		}
+
 		[[nodiscard]] bool has_error() const {
 			return diag_report.has_error();
 		}
@@ -914,63 +948,107 @@ public:
 		result(parser& p, std::unique_ptr<input> in_,
 			std::unique_ptr<pforest> f, bool found, error err);
 		parser& get_parser() const;
-		// returns the parsed forest
+
+		/// FOREST APIs
+
+		/// Returns the parsed forest. In bintree mode this reconstructs a
+		/// forest lazily; use bintree APIs to avoid that reconstruction.
 		pforest* get_forest() const;
-		/// Transforms forest into tree and applies trimming
-		/// grammar shaping options are used by default
-		/// also transforms ambiguous nodes as children of __AMB__ nodes
+
+		/// `psptree` APIs. These are the original
+		/// forest-backed tree APIs and may reconstruct the forest when the
+		/// result was produced in bintree mode.
+		psptree get_trimmed_forest_tree(const pnode& n) const;
+		psptree get_trimmed_forest_tree(const pnode& n,
+			const shaping_options opts) const;
+		psptree inline_forest_tree_nodes(const psptree& t,
+			psptree& parent) const;
+		psptree inline_forest_tree_nodes(const psptree& t,
+			psptree& parent, const shaping_options opts) const;
+		psptree inline_forest_tree_paths(const psptree& t) const;
+		psptree inline_forest_tree_paths(const psptree& t,
+			const shaping_options opts) const;
+		psptree inline_forest_tree(psptree& t) const;
+		psptree inline_forest_tree(psptree& t,
+			const shaping_options opts) const;
+		psptree trim_forest_tree_child_terminals(const psptree& t) const;
+		psptree trim_forest_tree_child_terminals(const psptree& t,
+			const shaping_options opts) const;
+		psptree get_shaped_forest_tree() const;
+		psptree get_shaped_forest_tree(const shaping_options opts) const;
+		psptree get_shaped_forest_tree(const pnode& n) const;
+		psptree get_shaped_forest_tree(const pnode& n,
+			const shaping_options opts) const;
+		psptree get_forest_tree();
+		psptree get_forest_tree(const pnode& n);
+
+		/// Legacy names for forest-tree (`psptree`) APIs.
 		psptree get_trimmed_tree(const pnode& n) const;
 		psptree get_trimmed_tree(const pnode& n,
 			const shaping_options opts) const;
-		/// Applies inlining to a tree (w/o tree paths)
 		psptree inline_tree_nodes(const psptree& t, psptree& parent)
 			const;
 		psptree inline_tree_nodes(const psptree& t, psptree& parent,
 			const shaping_options opts) const;
-		/// Applies tree paths inlining to a tree
 		psptree inline_tree_paths(const psptree& t) const;
 		psptree inline_tree_paths(const psptree& t,
 			const shaping_options opts) const;
-		/// Applies inlining to a tree
 		psptree inline_tree(psptree& t) const;
 		psptree inline_tree(psptree& t,
 			const shaping_options opts) const;
 		psptree trim_children_terminals(const psptree& t) const;
 		psptree trim_children_terminals(const psptree& t,
 			const shaping_options opts) const;
-		/// Transforms forest into a tree and applies shaping
 		psptree get_shaped_tree() const;
 		psptree get_shaped_tree(const shaping_options opts) const;
 		psptree get_shaped_tree(const pnode& n) const;
 		psptree get_shaped_tree(const pnode& n,
 			const shaping_options opts) const;
-		/// Extracts the first parse tree from the parsed forest
 		psptree get_tree();
 		psptree get_tree(const pnode& n);
-		// applies trimming grammar shaping options are used by default
+
+		/// BINTREE APIs
+
+		/// aka `tref` APIs. These are native in bintree mode and
+		/// derive a bintree from the forest when the result was produced in
+		/// forest mode.
+		tref get_trimmed_bintree(tref ref) const;
+		tref get_trimmed_bintree(tref ref, const shaping_options opts) const;
+		tref inline_bintree_nodes(tref t) const;
+		tref inline_bintree_nodes(tref t, const shaping_options opts) const;
+		tref inline_bintree_paths(tref t) const;
+		tref inline_bintree_paths(tref t, const shaping_options opts) const;
+		tref inline_bintree(tref t) const;
+		tref inline_bintree(tref t, const shaping_options opts) const;
+		tref trim_bintree_child_terminals(tref ref) const;
+		tref trim_bintree_child_terminals(tref ref,
+			const shaping_options opts) const;
+		tref get_shaped_bintree();
+		tref get_shaped_bintree(const shaping_options opts);
+		tref get_shaped_bintree(tref t);
+		tref get_shaped_bintree(tref t, const shaping_options opts);
+		tref get_bintree();
+		/// Returns the bintree rooted at pnode n. In bintree mode this
+		/// searches froot directly and preserves an __AMB__ wrapper when n
+		/// is ambiguous; it does not reconstruct the forest.
+		tref get_bintree(const pnode& n);
+
+		/// Legacy names for bintree (`tref`) APIs.
 		tref get_trimmed_tree2(tref ref) const;
-		tref get_trimmed_tree2(tref ref, const shaping_options opts)
-									const;
-		// applies inlining to a tree (w/o tree paths)
+		tref get_trimmed_tree2(tref ref, const shaping_options opts) const;
 		tref inline_tree_nodes2(tref t) const;
-		tref inline_tree_nodes2(tref t, const shaping_options opts)
-									const;
-		// applies tree paths inlining to a tree
+		tref inline_tree_nodes2(tref t, const shaping_options opts) const;
 		tref inline_tree_paths2(tref t) const;
-		tref inline_tree_paths2(tref t, const shaping_options opts)
-									const;
-		// applies inlining to a tree
+		tref inline_tree_paths2(tref t, const shaping_options opts) const;
 		tref inline_tree2(tref t) const;
 		tref inline_tree2(tref t, const shaping_options opts) const;
 		tref trim_children_terminals2(tref ref) const;
 		tref trim_children_terminals2(tref ref,
-					const shaping_options opts) const;
-		// transforms forest into a tree and applies shaping
+			const shaping_options opts) const;
 		tref get_shaped_tree2();
 		tref get_shaped_tree2(const shaping_options opts);
 		tref get_shaped_tree2(tref t);
 		tref get_shaped_tree2(tref t, const shaping_options opts);
-		// returns parsed tree
 		tref get_tree2();
 		tref get_tree2(const pnode& n);
 
@@ -1018,8 +1096,17 @@ public:
 		friend parser;
 		const lit<C, T>& ambiguity_literal() const;
 	private:
-		/// Metrics and diagnostics from the parse. Mutable so that lazy
-		/// operations on a const result can still record timing scopes.
+		/// Bintree-mode helper used by ambiguous_nodes() when the
+		/// result holds a bintree (froot != 0).
+		std::set<std::pair<pnode, pnodes_set>>
+			ambiguous_nodes_from_bintree() const;
+		/// Forest-mode helper used by ambiguous_nodes() when the
+		/// result holds a built forest (f != null).
+		std::set<std::pair<pnode, pnodes_set>>
+			ambiguous_nodes_from_forest() const;
+		/// Metrics and diagnostics from the parse. Mutable so that
+		/// lazy operations on a const @ref result (e.g. @ref get_forest)
+		/// can still record timing scopes.
 		mutable idni::diagnostics::report diag_report;
 		parser& p;
 		// input moved here from the parse call
@@ -1029,45 +1116,19 @@ public:
 		htref froot = 0;
 		// The parsed forest. In forest mode it is populated by parse().
 		// In bintree mode it is null until get_forest() lazily builds it
-		// from `froot`. `mutable` so the lazy build path stays inside
-		// const get_forest().
+		// from `froot`. `mutable` so lazy build stays inside const
+		// get_forest().
 		mutable std::unique_ptr<pforest> f = 0;
 		/// Filters nonterminals by prefixes
 		std::set<size_t> get_nts_by_prefixes(
 			const std::set<std::basic_string<C>>& prefixes) const;
 		// if ambiguous, this is __AMB__ node lit used in a shaped tree
 		lit<C, T> amb_node{};
+		tref shape_tree2_impl(tref t, const shaping_options& opts);
 		/// Recursive part of get_shaped_tree()
 		void _get_shaped_tree_children(const shaping_options& opts,
 			const pnodes& nodes,
 			std::vector<psptree>& child) const;
-	};
-	/// Parse options for parse() call
-	struct parse_options {
-		/// Read up to max length of the input size
-		size_t max_length = 0;
-		/// Start non-terminal, SIZE_MAX = use default
-		size_t start = SIZE_MAX;
-		/// End of a stream
-		C eof = std::char_traits<C>::eof();
-		/// Record timed scopes in diagnostics report
-		bool measure_scopes = DEFAULT_MEASURE_SCOPES;
-		/// Record parse counters and RSS metrics in report
-		bool measure_counters = DEFAULT_MEASURE_COUNTERS;
-		/// Measure time taken for parsing
-		bool measure = false;
-		/// For each string pos
-		bool measure_each_pos = false;
-		/// Forest building
-		bool measure_forest = false;
-		/// Preprocessing
-		bool measure_preprocess = false;
-		bool debug = false;
-		/// Verbosity used when recording parse errors into diagnostics.
-		typename error::info_lvl error_verbosity = error::INFO_DETAILED;
-		/// Runtime tree path selection: build forest eagerly (forest_path) or
-		/// build binary tree directly (bintree_path, the default).
-		parse_tree_path tree_path = parse_tree_path::bintree_path;
 	};
 
 	// constructor
@@ -1075,13 +1136,18 @@ public:
 	virtual ~parser() {};
 
 	// parse call
-	result parse(const C* data, size_t size, parse_options po = {});
-	result parse(std::basic_istream<C>& is, parse_options po = {});
-	result parse(const std::string& fn, parse_options po = {});
+	result parse(const C* data, size_t size);
+	result parse(const C* data, size_t size, parse_options popts);
+	result parse(std::basic_istream<C>& is);
+	result parse(std::basic_istream<C>& is, parse_options popts);
+	result parse(const std::string& fn);
+	result parse(const std::string& fn, parse_options popts);
 #ifdef _WIN32
-	result parse(const std::wstring& fn, parse_options po = {});
+	result parse(const std::wstring& fn);
+	result parse(const std::wstring& fn, parse_options popts);
 #else
-	result parse(int filedescriptor, parse_options po = {});
+	result parse(int filedescriptor);
+	result parse(int filedescriptor, parse_options popts);
 #endif
 	/**
 	 * @brief Whether the last parse method call matched a starting literal production rule.
@@ -1118,22 +1184,25 @@ public:
 		return os << res.report();
 	}
 	// `keys` data members are inherited from idni::parser_strings::keys.
+	// `keys()` below returns *this typed as the base so the call sites
+	// `p.keys().<field>` resolve.
 	const idni::parser_strings::keys& keys() const {
 		return *this;
 	}
-
 private:
 	mutable idni::diagnostics::report report_;
-	idni::parser_strings::counters cnt;
-	parse_options po; /// current parse options, mirrored for result construction
+	MC(mutable counters cnt;)
 	grammar<C, T>& g;
 	options o;
+	parse_options po; /// current parse options
 	std::unique_ptr<input> in_ = 0;
 	std::vector<container_t> S;
 	std::vector<container_t> U; /// uncompleted
 		///mapping from to position of end in S for items
 	ankerl::unordered_dense::map<size_t,
 		ankerl::unordered_dense::set<size_t>> fromS;
+	/// true iff fromS writes are needed this parse (enable_gc || any_conj)
+	bool need_fromS = false;
 	ankerl::unordered_dense::map<std::pair<size_t /*nt_id*/, size_t>,
 		container_t> cache;
 
@@ -1167,12 +1236,28 @@ private:
 	size_t tid; /// id for temporary non-terminals
 
 	// helpers
+	// Shared body of the preprocess step in build_bintree() and
+	// init_forest(): walks every item in every position calling
+	// pre_process(), wrapped in a measured scope. Returns the
+	// number of items visited (for the caller's debug printing).
+	int do_preprocess();
+
+#ifdef TAU_PARSER_MEASURE_COUNTERS
+	void count(size_t& c, size_t n = 1) {
+		if (po.measure_counters) c += n;
+	}
+	void maks(size_t& peak, size_t v) {
+		if (po.measure_counters)
+			peak = std::max(peak, v);
+	}
+#endif
 	lit<C, T> get_lit(const item& i) const;
 	lit<C, T> get_nt(const item& i) const;
 	std::basic_string<C> get_fresh_tnt();
 	std::vector<item> back_track(const item& obj);
 	void remove_item(const item& i);
 	// parsing
+	result _parse();
 	result _parse(const parse_options& po);
 	std::pair<container_iter, bool> add(container_t& t, const item& i);
 	bool nullable(const item& i) const;
@@ -1296,6 +1381,7 @@ struct std::hash<idni::pnode_type<C,T>> {
 #ifndef TAU_PARSER_BUILD_HEADER_ONLY
 // explicit template instantiations to avoid recompilation
 extern template class idni::parser<char, char>;
+extern template class idni::parser<char, char32_t>;
 #endif
 
 #endif // __IDNI__PARSER__PARSER_H__
