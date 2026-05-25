@@ -74,6 +74,7 @@ bool_option            => ("s" | "status"):status_opt
                                                         :measure_each_pos_opt
                         | ("mf" | "measure-forest"):measure_forest_opt
                         | ("mp" | "measure-preprocess"):measure_preprocess_opt
+                        | ("gc"):gc_opt
                         | ("d" | "debug"):debug_opt
                         | ("ad" | "auto-disambiguate"):auto_disambiguate_opt
                         | ("tt" | "trim-terminals"):trim_terminals_opt

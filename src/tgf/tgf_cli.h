@@ -31,6 +31,7 @@ struct tgf_repl_evaluator {
 
 	std::string tgf_file;
 	struct options {
+		bool gc                 = true;
 		bool debug              = false;
 		bool status             = true;
 		bool colors             = true;

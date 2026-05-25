@@ -587,6 +587,8 @@ void tgf_repl_evaluator::get_cmd(const tt& n) {
 		"measure-forest:         " << pbool(opt.measure_forest) << "\n"; } },
 	{ p::measure_preprocess_opt, [this]() { cout <<
 		"measure-preprocess:     " << pbool(opt.measure_preprocess) << "\n"; } },
+	{ p::gc_opt, [this]() { cout <<
+		"gc:                     " << pbool(opt.gc) << "\n"; } },
 	{ p::print_terminals_opt, [this]() { cout <<
 		"print-terminals:        " << pbool(opt.print_terminals) << "\n"; } },
 	{ p::print_graphs_opt, [this]() { cout <<
@@ -679,6 +681,7 @@ void tgf_repl_evaluator::set_cmd(const tt& n) {
 		opt.measure_forest = get_bool_value(v); break;
 	case p::measure_preprocess_opt:
 		opt.measure_preprocess = get_bool_value(v); break;
+	case p::gc_opt: opt.gc = get_bool_value(v); break;
 	case p::trim_terminals_opt:
 		g->opt.shaping.trim_terminals = get_bool_value(v); break;
 	case p::inline_cc_opt:
@@ -817,6 +820,7 @@ void tgf_repl_evaluator::update_bool_opt_cmd(
 	case p::measure_each_pos_opt:  update_fn(opt.measure_each_pos); break;
 	case p::measure_forest_opt:    update_fn(opt.measure_forest); break;
 	case p::measure_preprocess_opt:update_fn(opt.measure_preprocess); break;
+	case p::gc_opt:                update_fn(opt.gc); break;
 	case p::auto_disambiguate_opt: update_fn(g->opt.auto_disambiguate); break;
 	case p::trim_terminals_opt:    update_fn(g->opt.shaping.trim_terminals); break;
 	case p::inline_cc_opt:         update_fn(g->opt.shaping.inline_char_classes); break;
@@ -840,6 +844,7 @@ void help(size_t nt = tgf_repl_parser::help_sym) {
 		"  measure-each-pos       measures parsing time of each pos  on/off\n"
 		"  measure-forest         measures forest building time      on/off\n"
 		"  measure-preprocess     measures forest preprocess time    on/off\n"
+		"  gc                     Earley chart garbage collection    on/off\n"
 		"  trim-terminals         trim terminals                     on/off\n"
 		"  inline-char-classes    inline character classes           on/off\n";
 	static const string list_options =
@@ -1105,15 +1110,15 @@ int tgf_repl_evaluator::eval(const string& src) {
 		report.append(std::move(r.report()));
 		flush_report();
 	} else {
-		r.print_ambiguous_nodes(cout);
-		if (opt.debug) {
-			pretty_print(cout << "input command graph:\n",
-				r.get_shaped_tree2(), {}, false, 1);
+			r.print_ambiguous_nodes(cout);
+			if (opt.debug) {
+				pretty_print(cout << "input command graph:\n",
+					r.get_shaped_tree2(), {}, false, 1);
 			//g->print_internal_grammar(cout << "\ngrammar:\n\n", "  ");
-		}
-		tref ref = r.get_shaped_tree2();
-		auto t = tt(ref);
-		auto statements = t || tgf_repl_parser::statement;
+			}
+			tref ref = r.get_shaped_tree2();
+			auto t = tt(ref);
+			auto statements = t || tgf_repl_parser::statement;
 		for (const auto& statement : statements()) {
 			quit = eval(statement | tt::only_child);
 			flush_report();

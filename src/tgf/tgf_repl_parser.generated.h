@@ -1,4 +1,4 @@
-// This file is generated from a file src/tgf/tgf_repl.tgf by
+// This file is generated from a file ../parser.devel/src/tgf/tgf_repl.tgf by
 //       https://github.com/IDNI/parser/src/tgf
 //
 #ifndef __TGF_REPL_PARSER_H__
@@ -26,12 +26,12 @@ inline const std::vector<std::string> symbol_names{
 	"set_sym", "__E_set_cmd_27", "__E___E_set_cmd_27_28", "bool_value", "__E___E_set_cmd_27_29", "__E___E_set_cmd_27_30", "enum_ev_option", "__E___E_set_cmd_27_31", "error_verbosity", "__E_parse_input_32", 
 	"__E_parse_input_33", "error_verbosity_opt", "__E_enum_ev_option_34", "status_opt", "__E_bool_option_35", "colors_opt", "__E_bool_option_36", "print_ambiguity_opt", "__E_bool_option_37", "print_graphs_opt", 
 	"__E_bool_option_38", "print_rules_opt", "__E_bool_option_39", "print_facts_opt", "__E_bool_option_40", "print_terminals_opt", "__E_bool_option_41", "measure_parsing_opt", "__E_bool_option_42", "measure_each_pos_opt", 
-	"__E_bool_option_43", "measure_forest_opt", "__E_bool_option_44", "measure_preprocess_opt", "__E_bool_option_45", "debug_opt", "__E_bool_option_46", "auto_disambiguate_opt", "__E_bool_option_47", "trim_terminals_opt", 
-	"__E_bool_option_48", "inline_cc_opt", "__E_bool_option_49", "nodisambig_list_opt", "__E_list_option_50", "enabled_prods_opt", "__E_list_option_51", "trim_opt", "trim_children_opt", "__E_list_option_52", 
-	"trim_children_terminals_opt", "__E_list_option_53", "inline_opt", "__E_treepaths_option_54", "true_value", "__E_bool_value_55", "false_value", "__E_bool_value_56", "basic_sym", "__E_error_verbosity_57", 
-	"detailed_sym", "__E_error_verbosity_58", "root_cause_sym", "__E_error_verbosity_59", "__E_symbol_60", "__E_symbol_61", "__E_symbol_62", "__E_symbol_list_63", "__E_symbol_list_64", "treepath", 
-	"__E_treepath_65", "__E_treepath_66", "__E_treepath_list_67", "__E_treepath_list_68", "quoted_string_char", "__E_quoted_string_69", "__E_unescaped_s_70", "__E_unescaped_s_71", "__E_escaped_s_72", "__E___73", 
-	"__E____74", "comment", "__E_comment_75", "__E_comment_76", "__E_comment_77", "__N_0", 
+	"__E_bool_option_43", "measure_forest_opt", "__E_bool_option_44", "measure_preprocess_opt", "__E_bool_option_45", "gc_opt", "__E_bool_option_46", "debug_opt", "__E_bool_option_47", "auto_disambiguate_opt", 
+	"__E_bool_option_48", "trim_terminals_opt", "__E_bool_option_49", "inline_cc_opt", "__E_bool_option_50", "nodisambig_list_opt", "__E_list_option_51", "enabled_prods_opt", "__E_list_option_52", "trim_opt", 
+	"trim_children_opt", "__E_list_option_53", "trim_children_terminals_opt", "__E_list_option_54", "inline_opt", "__E_treepaths_option_55", "true_value", "__E_bool_value_56", "false_value", "__E_bool_value_57", 
+	"basic_sym", "__E_error_verbosity_58", "detailed_sym", "__E_error_verbosity_59", "root_cause_sym", "__E_error_verbosity_60", "__E_symbol_61", "__E_symbol_62", "__E_symbol_63", "__E_symbol_list_64", 
+	"__E_symbol_list_65", "treepath", "__E_treepath_66", "__E_treepath_67", "__E_treepath_list_68", "__E_treepath_list_69", "quoted_string_char", "__E_quoted_string_70", "__E_unescaped_s_71", "__E_unescaped_s_72", 
+	"__E_escaped_s_73", "__E___74", "__E____75", "comment", "__E_comment_76", "__E_comment_77", "__E_comment_78", "__N_0", 
 };
 
 inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
@@ -526,252 +526,258 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(123), (NT(124)));
 //G220: bool_option(85)      => measure_preprocess_opt(123).
 	p(NT(85), (NT(123)));
-//G221: __E_bool_option_46(126) => 'd'.
-	p(NT(126), (T(21)));
-//G222: __E_bool_option_46(126) => 'd' 'e' 'b' 'u' 'g'.
-	p(NT(126), (T(21)+T(6)+T(19)+T(16)+T(11)));
-//G223: debug_opt(125)       => __E_bool_option_46(126).
+//G221: __E_bool_option_46(126) => 'g' 'c'.
+	p(NT(126), (T(11)+T(17)));
+//G222: gc_opt(125)          => __E_bool_option_46(126).
 	p(NT(125), (NT(126)));
-//G224: bool_option(85)      => debug_opt(125).
+//G223: bool_option(85)      => gc_opt(125).
 	p(NT(85), (NT(125)));
-//G225: __E_bool_option_47(128) => 'a' 'd'.
-	p(NT(128), (T(3)+T(21)));
-//G226: __E_bool_option_47(128) => 'a' 'u' 't' 'o' '-' 'd' 'i' 's' 'a' 'm' 'b' 'i' 'g' 'u' 'a' 't' 'e'.
-	p(NT(128), (T(3)+T(16)+T(14)+T(20)+T(15)+T(21)+T(9)+T(5)+T(3)+T(12)+T(19)+T(9)+T(11)+T(16)+T(3)+T(14)+T(6)));
-//G227: auto_disambiguate_opt(127) => __E_bool_option_47(128).
+//G224: __E_bool_option_47(128) => 'd'.
+	p(NT(128), (T(21)));
+//G225: __E_bool_option_47(128) => 'd' 'e' 'b' 'u' 'g'.
+	p(NT(128), (T(21)+T(6)+T(19)+T(16)+T(11)));
+//G226: debug_opt(127)       => __E_bool_option_47(128).
 	p(NT(127), (NT(128)));
-//G228: bool_option(85)      => auto_disambiguate_opt(127).
+//G227: bool_option(85)      => debug_opt(127).
 	p(NT(85), (NT(127)));
-//G229: __E_bool_option_48(130) => 't' 't'.
-	p(NT(130), (T(14)+T(14)));
-//G230: __E_bool_option_48(130) => 't' 'r' 'i' 'm' '-' 't' 'e' 'r' 'm' 'i' 'n' 'a' 'l' 's'.
-	p(NT(130), (T(14)+T(4)+T(9)+T(12)+T(15)+T(14)+T(6)+T(4)+T(12)+T(9)+T(13)+T(3)+T(10)+T(5)));
-//G231: trim_terminals_opt(129) => __E_bool_option_48(130).
+//G228: __E_bool_option_48(130) => 'a' 'd'.
+	p(NT(130), (T(3)+T(21)));
+//G229: __E_bool_option_48(130) => 'a' 'u' 't' 'o' '-' 'd' 'i' 's' 'a' 'm' 'b' 'i' 'g' 'u' 'a' 't' 'e'.
+	p(NT(130), (T(3)+T(16)+T(14)+T(20)+T(15)+T(21)+T(9)+T(5)+T(3)+T(12)+T(19)+T(9)+T(11)+T(16)+T(3)+T(14)+T(6)));
+//G230: auto_disambiguate_opt(129) => __E_bool_option_48(130).
 	p(NT(129), (NT(130)));
-//G232: bool_option(85)      => trim_terminals_opt(129).
+//G231: bool_option(85)      => auto_disambiguate_opt(129).
 	p(NT(85), (NT(129)));
-//G233: __E_bool_option_49(132) => 'i' 'c' 'c'.
-	p(NT(132), (T(9)+T(17)+T(17)));
-//G234: __E_bool_option_49(132) => 'i' 'n' 'l' 'i' 'n' 'e' '-' 'c' 'c'.
-	p(NT(132), (T(9)+T(13)+T(10)+T(9)+T(13)+T(6)+T(15)+T(17)+T(17)));
-//G235: __E_bool_option_49(132) => 'i' 'n' 'l' 'i' 'n' 'e' '-' 'c' 'h' 'a' 'r' '-' 'c' 'l' 'a' 's' 's' 'e' 's'.
-	p(NT(132), (T(9)+T(13)+T(10)+T(9)+T(13)+T(6)+T(15)+T(17)+T(18)+T(3)+T(4)+T(15)+T(17)+T(10)+T(3)+T(5)+T(5)+T(6)+T(5)));
-//G236: inline_cc_opt(131)   => __E_bool_option_49(132).
+//G232: __E_bool_option_49(132) => 't' 't'.
+	p(NT(132), (T(14)+T(14)));
+//G233: __E_bool_option_49(132) => 't' 'r' 'i' 'm' '-' 't' 'e' 'r' 'm' 'i' 'n' 'a' 'l' 's'.
+	p(NT(132), (T(14)+T(4)+T(9)+T(12)+T(15)+T(14)+T(6)+T(4)+T(12)+T(9)+T(13)+T(3)+T(10)+T(5)));
+//G234: trim_terminals_opt(131) => __E_bool_option_49(132).
 	p(NT(131), (NT(132)));
-//G237: bool_option(85)      => inline_cc_opt(131).
+//G235: bool_option(85)      => trim_terminals_opt(131).
 	p(NT(85), (NT(131)));
-//G238: __E_list_option_50(134) => 'n' 'd'.
-	p(NT(134), (T(13)+T(21)));
-//G239: __E_list_option_50(134) => 'n' 'd' 'l'.
-	p(NT(134), (T(13)+T(21)+T(10)));
-//G240: __E_list_option_50(134) => 'n' 'o' 'd' 'i' 's' 'a' 'm' 'b' 'i' 'g' '-' 'l' 'i' 's' 't'.
-	p(NT(134), (T(13)+T(20)+T(21)+T(9)+T(5)+T(3)+T(12)+T(19)+T(9)+T(11)+T(15)+T(10)+T(9)+T(5)+T(14)));
-//G241: nodisambig_list_opt(133) => __E_list_option_50(134).
+//G236: __E_bool_option_50(134) => 'i' 'c' 'c'.
+	p(NT(134), (T(9)+T(17)+T(17)));
+//G237: __E_bool_option_50(134) => 'i' 'n' 'l' 'i' 'n' 'e' '-' 'c' 'c'.
+	p(NT(134), (T(9)+T(13)+T(10)+T(9)+T(13)+T(6)+T(15)+T(17)+T(17)));
+//G238: __E_bool_option_50(134) => 'i' 'n' 'l' 'i' 'n' 'e' '-' 'c' 'h' 'a' 'r' '-' 'c' 'l' 'a' 's' 's' 'e' 's'.
+	p(NT(134), (T(9)+T(13)+T(10)+T(9)+T(13)+T(6)+T(15)+T(17)+T(18)+T(3)+T(4)+T(15)+T(17)+T(10)+T(3)+T(5)+T(5)+T(6)+T(5)));
+//G239: inline_cc_opt(133)   => __E_bool_option_50(134).
 	p(NT(133), (NT(134)));
-//G242: list_option(76)      => nodisambig_list_opt(133).
-	p(NT(76), (NT(133)));
-//G243: __E_list_option_51(136) => 'g' 'u' 'a' 'r' 'd' 's'.
-	p(NT(136), (T(11)+T(16)+T(3)+T(4)+T(21)+T(5)));
-//G244: __E_list_option_51(136) => 'e' 'n' 'a' 'b' 'l' 'e' 'd' '-' 'p' 'r' 'o' 'd' 'u' 'c' 't' 'i' 'o' 'n' 's'.
-	p(NT(136), (T(6)+T(13)+T(3)+T(19)+T(10)+T(6)+T(21)+T(15)+T(2)+T(4)+T(20)+T(21)+T(16)+T(17)+T(14)+T(9)+T(20)+T(13)+T(5)));
-//G245: enabled_prods_opt(135) => __E_list_option_51(136).
+//G240: bool_option(85)      => inline_cc_opt(133).
+	p(NT(85), (NT(133)));
+//G241: __E_list_option_51(136) => 'n' 'd'.
+	p(NT(136), (T(13)+T(21)));
+//G242: __E_list_option_51(136) => 'n' 'd' 'l'.
+	p(NT(136), (T(13)+T(21)+T(10)));
+//G243: __E_list_option_51(136) => 'n' 'o' 'd' 'i' 's' 'a' 'm' 'b' 'i' 'g' '-' 'l' 'i' 's' 't'.
+	p(NT(136), (T(13)+T(20)+T(21)+T(9)+T(5)+T(3)+T(12)+T(19)+T(9)+T(11)+T(15)+T(10)+T(9)+T(5)+T(14)));
+//G244: nodisambig_list_opt(135) => __E_list_option_51(136).
 	p(NT(135), (NT(136)));
-//G246: list_option(76)      => enabled_prods_opt(135).
+//G245: list_option(76)      => nodisambig_list_opt(135).
 	p(NT(76), (NT(135)));
-//G247: trim_opt(137)        => 't' 'r' 'i' 'm'.
-	p(NT(137), (T(14)+T(4)+T(9)+T(12)));
-//G248: list_option(76)      => trim_opt(137).
+//G246: __E_list_option_52(138) => 'g' 'u' 'a' 'r' 'd' 's'.
+	p(NT(138), (T(11)+T(16)+T(3)+T(4)+T(21)+T(5)));
+//G247: __E_list_option_52(138) => 'e' 'n' 'a' 'b' 'l' 'e' 'd' '-' 'p' 'r' 'o' 'd' 'u' 'c' 't' 'i' 'o' 'n' 's'.
+	p(NT(138), (T(6)+T(13)+T(3)+T(19)+T(10)+T(6)+T(21)+T(15)+T(2)+T(4)+T(20)+T(21)+T(16)+T(17)+T(14)+T(9)+T(20)+T(13)+T(5)));
+//G248: enabled_prods_opt(137) => __E_list_option_52(138).
+	p(NT(137), (NT(138)));
+//G249: list_option(76)      => enabled_prods_opt(137).
 	p(NT(76), (NT(137)));
-//G249: __E_list_option_52(139) => 't' 'c'.
-	p(NT(139), (T(14)+T(17)));
-//G250: __E_list_option_52(139) => 't' 'r' 'i' 'm' '-' 'c' 'h' 'i' 'l' 'd' 'r' 'e' 'n'.
-	p(NT(139), (T(14)+T(4)+T(9)+T(12)+T(15)+T(17)+T(18)+T(9)+T(10)+T(21)+T(4)+T(6)+T(13)));
-//G251: trim_children_opt(138) => __E_list_option_52(139).
-	p(NT(138), (NT(139)));
-//G252: list_option(76)      => trim_children_opt(138).
-	p(NT(76), (NT(138)));
-//G253: __E_list_option_53(141) => 't' 'c' 't'.
-	p(NT(141), (T(14)+T(17)+T(14)));
-//G254: __E_list_option_53(141) => 't' 'r' 'i' 'm' '-' 'c' 'h' 'i' 'l' 'd' 'r' 'e' 'n' '-' 't' 'e' 'r' 'm' 'i' 'n' 'a' 'l' 's'.
-	p(NT(141), (T(14)+T(4)+T(9)+T(12)+T(15)+T(17)+T(18)+T(9)+T(10)+T(21)+T(4)+T(6)+T(13)+T(15)+T(14)+T(6)+T(4)+T(12)+T(9)+T(13)+T(3)+T(10)+T(5)));
-//G255: trim_children_terminals_opt(140) => __E_list_option_53(141).
+//G250: trim_opt(139)        => 't' 'r' 'i' 'm'.
+	p(NT(139), (T(14)+T(4)+T(9)+T(12)));
+//G251: list_option(76)      => trim_opt(139).
+	p(NT(76), (NT(139)));
+//G252: __E_list_option_53(141) => 't' 'c'.
+	p(NT(141), (T(14)+T(17)));
+//G253: __E_list_option_53(141) => 't' 'r' 'i' 'm' '-' 'c' 'h' 'i' 'l' 'd' 'r' 'e' 'n'.
+	p(NT(141), (T(14)+T(4)+T(9)+T(12)+T(15)+T(17)+T(18)+T(9)+T(10)+T(21)+T(4)+T(6)+T(13)));
+//G254: trim_children_opt(140) => __E_list_option_53(141).
 	p(NT(140), (NT(141)));
-//G256: list_option(76)      => trim_children_terminals_opt(140).
+//G255: list_option(76)      => trim_children_opt(140).
 	p(NT(76), (NT(140)));
-//G257: __E_treepaths_option_54(143) => 'i'.
-	p(NT(143), (T(9)));
-//G258: __E_treepaths_option_54(143) => 'i' 'n' 'l' 'i' 'n' 'e'.
-	p(NT(143), (T(9)+T(13)+T(10)+T(9)+T(13)+T(6)));
-//G259: inline_opt(142)      => __E_treepaths_option_54(143).
+//G256: __E_list_option_54(143) => 't' 'c' 't'.
+	p(NT(143), (T(14)+T(17)+T(14)));
+//G257: __E_list_option_54(143) => 't' 'r' 'i' 'm' '-' 'c' 'h' 'i' 'l' 'd' 'r' 'e' 'n' '-' 't' 'e' 'r' 'm' 'i' 'n' 'a' 'l' 's'.
+	p(NT(143), (T(14)+T(4)+T(9)+T(12)+T(15)+T(17)+T(18)+T(9)+T(10)+T(21)+T(4)+T(6)+T(13)+T(15)+T(14)+T(6)+T(4)+T(12)+T(9)+T(13)+T(3)+T(10)+T(5)));
+//G258: trim_children_terminals_opt(142) => __E_list_option_54(143).
 	p(NT(142), (NT(143)));
-//G260: treepaths_option(78) => inline_opt(142).
-	p(NT(78), (NT(142)));
-//G261: __E_bool_value_55(145) => 't'.
-	p(NT(145), (T(14)));
-//G262: __E_bool_value_55(145) => 't' 'r' 'u' 'e'.
-	p(NT(145), (T(14)+T(4)+T(16)+T(6)));
-//G263: __E_bool_value_55(145) => 'o' 'n'.
-	p(NT(145), (T(20)+T(13)));
-//G264: __E_bool_value_55(145) => '1'.
-	p(NT(145), (T(29)));
-//G265: __E_bool_value_55(145) => 'y'.
-	p(NT(145), (T(28)));
-//G266: __E_bool_value_55(145) => 'y' 'e' 's'.
-	p(NT(145), (T(28)+T(6)+T(5)));
-//G267: true_value(144)      => __E_bool_value_55(145).
+//G259: list_option(76)      => trim_children_terminals_opt(142).
+	p(NT(76), (NT(142)));
+//G260: __E_treepaths_option_55(145) => 'i'.
+	p(NT(145), (T(9)));
+//G261: __E_treepaths_option_55(145) => 'i' 'n' 'l' 'i' 'n' 'e'.
+	p(NT(145), (T(9)+T(13)+T(10)+T(9)+T(13)+T(6)));
+//G262: inline_opt(144)      => __E_treepaths_option_55(145).
 	p(NT(144), (NT(145)));
-//G268: bool_value(93)       => true_value(144).
-	p(NT(93), (NT(144)));
-//G269: __E_bool_value_56(147) => 'f'.
-	p(NT(147), (T(7)));
-//G270: __E_bool_value_56(147) => 'f' 'a' 'l' 's' 'e'.
-	p(NT(147), (T(7)+T(3)+T(10)+T(5)+T(6)));
-//G271: __E_bool_value_56(147) => 'o' 'f' 'f'.
-	p(NT(147), (T(20)+T(7)+T(7)));
-//G272: __E_bool_value_56(147) => '0'.
-	p(NT(147), (T(30)));
-//G273: __E_bool_value_56(147) => 'n'.
-	p(NT(147), (T(13)));
-//G274: __E_bool_value_56(147) => 'n' 'o'.
-	p(NT(147), (T(13)+T(20)));
-//G275: false_value(146)     => __E_bool_value_56(147).
+//G263: treepaths_option(78) => inline_opt(144).
+	p(NT(78), (NT(144)));
+//G264: __E_bool_value_56(147) => 't'.
+	p(NT(147), (T(14)));
+//G265: __E_bool_value_56(147) => 't' 'r' 'u' 'e'.
+	p(NT(147), (T(14)+T(4)+T(16)+T(6)));
+//G266: __E_bool_value_56(147) => 'o' 'n'.
+	p(NT(147), (T(20)+T(13)));
+//G267: __E_bool_value_56(147) => '1'.
+	p(NT(147), (T(29)));
+//G268: __E_bool_value_56(147) => 'y'.
+	p(NT(147), (T(28)));
+//G269: __E_bool_value_56(147) => 'y' 'e' 's'.
+	p(NT(147), (T(28)+T(6)+T(5)));
+//G270: true_value(146)      => __E_bool_value_56(147).
 	p(NT(146), (NT(147)));
-//G276: bool_value(93)       => false_value(146).
+//G271: bool_value(93)       => true_value(146).
 	p(NT(93), (NT(146)));
-//G277: __E_error_verbosity_57(149) => 'b'.
-	p(NT(149), (T(19)));
-//G278: __E_error_verbosity_57(149) => 'b' 'a' 's' 'i' 'c'.
-	p(NT(149), (T(19)+T(3)+T(5)+T(9)+T(17)));
-//G279: basic_sym(148)       => __E_error_verbosity_57(149).
+//G272: __E_bool_value_57(149) => 'f'.
+	p(NT(149), (T(7)));
+//G273: __E_bool_value_57(149) => 'f' 'a' 'l' 's' 'e'.
+	p(NT(149), (T(7)+T(3)+T(10)+T(5)+T(6)));
+//G274: __E_bool_value_57(149) => 'o' 'f' 'f'.
+	p(NT(149), (T(20)+T(7)+T(7)));
+//G275: __E_bool_value_57(149) => '0'.
+	p(NT(149), (T(30)));
+//G276: __E_bool_value_57(149) => 'n'.
+	p(NT(149), (T(13)));
+//G277: __E_bool_value_57(149) => 'n' 'o'.
+	p(NT(149), (T(13)+T(20)));
+//G278: false_value(148)     => __E_bool_value_57(149).
 	p(NT(148), (NT(149)));
-//G280: error_verbosity(98)  => basic_sym(148).
-	p(NT(98), (NT(148)));
-//G281: __E_error_verbosity_58(151) => 'd'.
-	p(NT(151), (T(21)));
-//G282: __E_error_verbosity_58(151) => 'd' 'e' 't' 'a' 'i' 'l' 'e' 'd'.
-	p(NT(151), (T(21)+T(6)+T(14)+T(3)+T(9)+T(10)+T(6)+T(21)));
-//G283: detailed_sym(150)    => __E_error_verbosity_58(151).
+//G279: bool_value(93)       => false_value(148).
+	p(NT(93), (NT(148)));
+//G280: __E_error_verbosity_58(151) => 'b'.
+	p(NT(151), (T(19)));
+//G281: __E_error_verbosity_58(151) => 'b' 'a' 's' 'i' 'c'.
+	p(NT(151), (T(19)+T(3)+T(5)+T(9)+T(17)));
+//G282: basic_sym(150)       => __E_error_verbosity_58(151).
 	p(NT(150), (NT(151)));
-//G284: error_verbosity(98)  => detailed_sym(150).
+//G283: error_verbosity(98)  => basic_sym(150).
 	p(NT(98), (NT(150)));
-//G285: __E_error_verbosity_59(153) => 'r'.
-	p(NT(153), (T(4)));
-//G286: __E_error_verbosity_59(153) => 'r' 'c'.
-	p(NT(153), (T(4)+T(17)));
-//G287: __E_error_verbosity_59(153) => 'r' 'o' 'o' 't' '-' 'c' 'a' 'u' 's' 'e'.
-	p(NT(153), (T(4)+T(20)+T(20)+T(14)+T(15)+T(17)+T(3)+T(16)+T(5)+T(6)));
-//G288: root_cause_sym(152)  => __E_error_verbosity_59(153).
+//G284: __E_error_verbosity_59(153) => 'd'.
+	p(NT(153), (T(21)));
+//G285: __E_error_verbosity_59(153) => 'd' 'e' 't' 'a' 'i' 'l' 'e' 'd'.
+	p(NT(153), (T(21)+T(6)+T(14)+T(3)+T(9)+T(10)+T(6)+T(21)));
+//G286: detailed_sym(152)    => __E_error_verbosity_59(153).
 	p(NT(152), (NT(153)));
-//G289: error_verbosity(98)  => root_cause_sym(152).
+//G287: error_verbosity(98)  => detailed_sym(152).
 	p(NT(98), (NT(152)));
-//G290: __E_symbol_60(154)   => alpha(3).
-	p(NT(154), (NT(3)));
-//G291: __E_symbol_60(154)   => '_'.
-	p(NT(154), (T(31)));
-//G292: __E_symbol_61(155)   => alnum(2).
-	p(NT(155), (NT(2)));
-//G293: __E_symbol_61(155)   => '_'.
-	p(NT(155), (T(31)));
-//G294: __E_symbol_62(156)   => null.
-	p(NT(156), (nul));
-//G295: __E_symbol_62(156)   => __E_symbol_61(155) __E_symbol_62(156).
-	p(NT(156), (NT(155)+NT(156)));
-//G296: symbol(8)            => __E_symbol_60(154) __E_symbol_62(156).
-	p(NT(8), (NT(154)+NT(156)));
-//G297: __E_symbol_list_63(157) => _(6) ',' _(6) symbol(8).
-	p(NT(157), (NT(6)+T(32)+NT(6)+NT(8)));
-//G298: __E_symbol_list_64(158) => null.
+//G288: __E_error_verbosity_60(155) => 'r'.
+	p(NT(155), (T(4)));
+//G289: __E_error_verbosity_60(155) => 'r' 'c'.
+	p(NT(155), (T(4)+T(17)));
+//G290: __E_error_verbosity_60(155) => 'r' 'o' 'o' 't' '-' 'c' 'a' 'u' 's' 'e'.
+	p(NT(155), (T(4)+T(20)+T(20)+T(14)+T(15)+T(17)+T(3)+T(16)+T(5)+T(6)));
+//G291: root_cause_sym(154)  => __E_error_verbosity_60(155).
+	p(NT(154), (NT(155)));
+//G292: error_verbosity(98)  => root_cause_sym(154).
+	p(NT(98), (NT(154)));
+//G293: __E_symbol_61(156)   => alpha(3).
+	p(NT(156), (NT(3)));
+//G294: __E_symbol_61(156)   => '_'.
+	p(NT(156), (T(31)));
+//G295: __E_symbol_62(157)   => alnum(2).
+	p(NT(157), (NT(2)));
+//G296: __E_symbol_62(157)   => '_'.
+	p(NT(157), (T(31)));
+//G297: __E_symbol_63(158)   => null.
 	p(NT(158), (nul));
-//G299: __E_symbol_list_64(158) => __E_symbol_list_63(157) __E_symbol_list_64(158).
+//G298: __E_symbol_63(158)   => __E_symbol_62(157) __E_symbol_63(158).
 	p(NT(158), (NT(157)+NT(158)));
-//G300: symbol_list(77)      => symbol(8) __E_symbol_list_64(158).
-	p(NT(77), (NT(8)+NT(158)));
-//G301: __E_treepath_65(160) => _(6) '>' _(6) symbol(8).
-	p(NT(160), (NT(6)+T(33)+NT(6)+NT(8)));
-//G302: __E_treepath_66(161) => null.
-	p(NT(161), (nul));
-//G303: __E_treepath_66(161) => __E_treepath_65(160) __E_treepath_66(161).
-	p(NT(161), (NT(160)+NT(161)));
-//G304: treepath(159)        => symbol(8) __E_treepath_66(161).
-	p(NT(159), (NT(8)+NT(161)));
-//G305: __E_treepath_list_67(162) => _(6) ',' _(6) treepath(159).
-	p(NT(162), (NT(6)+T(32)+NT(6)+NT(159)));
-//G306: __E_treepath_list_68(163) => null.
+//G299: symbol(8)            => __E_symbol_61(156) __E_symbol_63(158).
+	p(NT(8), (NT(156)+NT(158)));
+//G300: __E_symbol_list_64(159) => _(6) ',' _(6) symbol(8).
+	p(NT(159), (NT(6)+T(32)+NT(6)+NT(8)));
+//G301: __E_symbol_list_65(160) => null.
+	p(NT(160), (nul));
+//G302: __E_symbol_list_65(160) => __E_symbol_list_64(159) __E_symbol_list_65(160).
+	p(NT(160), (NT(159)+NT(160)));
+//G303: symbol_list(77)      => symbol(8) __E_symbol_list_65(160).
+	p(NT(77), (NT(8)+NT(160)));
+//G304: __E_treepath_66(162) => _(6) '>' _(6) symbol(8).
+	p(NT(162), (NT(6)+T(33)+NT(6)+NT(8)));
+//G305: __E_treepath_67(163) => null.
 	p(NT(163), (nul));
-//G307: __E_treepath_list_68(163) => __E_treepath_list_67(162) __E_treepath_list_68(163).
+//G306: __E_treepath_67(163) => __E_treepath_66(162) __E_treepath_67(163).
 	p(NT(163), (NT(162)+NT(163)));
-//G308: treepath_list(79)    => treepath(159) __E_treepath_list_68(163).
-	p(NT(79), (NT(159)+NT(163)));
-//G309: filename(43)         => quoted_string(9).
-	p(NT(43), (NT(9)));
-//G310: __E_quoted_string_69(165) => null.
+//G307: treepath(161)        => symbol(8) __E_treepath_67(163).
+	p(NT(161), (NT(8)+NT(163)));
+//G308: __E_treepath_list_68(164) => _(6) ',' _(6) treepath(161).
+	p(NT(164), (NT(6)+T(32)+NT(6)+NT(161)));
+//G309: __E_treepath_list_69(165) => null.
 	p(NT(165), (nul));
-//G311: __E_quoted_string_69(165) => quoted_string_char(164) __E_quoted_string_69(165).
+//G310: __E_treepath_list_69(165) => __E_treepath_list_68(164) __E_treepath_list_69(165).
 	p(NT(165), (NT(164)+NT(165)));
-//G312: quoted_string(9)     => '"' __E_quoted_string_69(165) '"'.
-	p(NT(9), (T(34)+NT(165)+T(34)));
-//G313: quoted_string_char(164) => unescaped_s(10).
-	p(NT(164), (NT(10)));
-//G314: quoted_string_char(164) => escaped_s(11).
-	p(NT(164), (NT(11)));
-//G315: __E_unescaped_s_70(166) => space(4).
-	p(NT(166), (NT(4)));
-//G316: __E_unescaped_s_70(166) => printable(5).
-	p(NT(166), (NT(5)));
-//G317: __E_unescaped_s_71(167) => '"'.
-	p(NT(167), (T(34)));
-//G318: __E_unescaped_s_71(167) => '\\'.
-	p(NT(167), (T(35)));
-//G319: __N_0(175)           => __E_unescaped_s_71(167).
-	p(NT(175), (NT(167)));
-//G320: unescaped_s(10)      => __E_unescaped_s_70(166) & ~( __N_0(175) ).	 # conjunctive
-	p(NT(10), (NT(166)) & ~(NT(175)));
-//G321: __E_escaped_s_72(168) => '"'.
-	p(NT(168), (T(34)));
-//G322: __E_escaped_s_72(168) => '\\'.
-	p(NT(168), (T(35)));
-//G323: __E_escaped_s_72(168) => '/'.
-	p(NT(168), (T(36)));
-//G324: __E_escaped_s_72(168) => 'b'.
-	p(NT(168), (T(19)));
-//G325: __E_escaped_s_72(168) => 'f'.
-	p(NT(168), (T(7)));
-//G326: __E_escaped_s_72(168) => 'n'.
-	p(NT(168), (T(13)));
-//G327: __E_escaped_s_72(168) => 'r'.
-	p(NT(168), (T(4)));
-//G328: __E_escaped_s_72(168) => 't'.
-	p(NT(168), (T(14)));
-//G329: escaped_s(11)        => '\\' __E_escaped_s_72(168).
-	p(NT(11), (T(35)+NT(168)));
-//G330: __E___73(169)        => __(7).
-	p(NT(169), (NT(7)));
-//G331: __E___73(169)        => null.
-	p(NT(169), (nul));
-//G332: _(6)                 => __E___73(169).
-	p(NT(6), (NT(169)));
-//G333: __E____74(170)       => space(4).
-	p(NT(170), (NT(4)));
-//G334: __E____74(170)       => comment(171).
-	p(NT(170), (NT(171)));
-//G335: __(7)                => __E____74(170) _(6).
-	p(NT(7), (NT(170)+NT(6)));
-//G336: __E_comment_75(172)  => printable(5).
-	p(NT(172), (NT(5)));
-//G337: __E_comment_75(172)  => '\t'.
-	p(NT(172), (T(27)));
-//G338: __E_comment_76(173)  => null.
-	p(NT(173), (nul));
-//G339: __E_comment_76(173)  => __E_comment_75(172) __E_comment_76(173).
-	p(NT(173), (NT(172)+NT(173)));
-//G340: __E_comment_77(174)  => '\r'.
-	p(NT(174), (T(37)));
-//G341: __E_comment_77(174)  => '\n'.
-	p(NT(174), (T(38)));
-//G342: __E_comment_77(174)  => eof(1).
-	p(NT(174), (NT(1)));
-//G343: comment(171)         => '#' __E_comment_76(173) __E_comment_77(174).
-	p(NT(171), (T(39)+NT(173)+NT(174)));
+//G311: treepath_list(79)    => treepath(161) __E_treepath_list_69(165).
+	p(NT(79), (NT(161)+NT(165)));
+//G312: filename(43)         => quoted_string(9).
+	p(NT(43), (NT(9)));
+//G313: __E_quoted_string_70(167) => null.
+	p(NT(167), (nul));
+//G314: __E_quoted_string_70(167) => quoted_string_char(166) __E_quoted_string_70(167).
+	p(NT(167), (NT(166)+NT(167)));
+//G315: quoted_string(9)     => '"' __E_quoted_string_70(167) '"'.
+	p(NT(9), (T(34)+NT(167)+T(34)));
+//G316: quoted_string_char(166) => unescaped_s(10).
+	p(NT(166), (NT(10)));
+//G317: quoted_string_char(166) => escaped_s(11).
+	p(NT(166), (NT(11)));
+//G318: __E_unescaped_s_71(168) => space(4).
+	p(NT(168), (NT(4)));
+//G319: __E_unescaped_s_71(168) => printable(5).
+	p(NT(168), (NT(5)));
+//G320: __E_unescaped_s_72(169) => '"'.
+	p(NT(169), (T(34)));
+//G321: __E_unescaped_s_72(169) => '\\'.
+	p(NT(169), (T(35)));
+//G322: __N_0(177)           => __E_unescaped_s_72(169).
+	p(NT(177), (NT(169)));
+//G323: unescaped_s(10)      => __E_unescaped_s_71(168) & ~( __N_0(177) ).	 # conjunctive
+	p(NT(10), (NT(168)) & ~(NT(177)));
+//G324: __E_escaped_s_73(170) => '"'.
+	p(NT(170), (T(34)));
+//G325: __E_escaped_s_73(170) => '\\'.
+	p(NT(170), (T(35)));
+//G326: __E_escaped_s_73(170) => '/'.
+	p(NT(170), (T(36)));
+//G327: __E_escaped_s_73(170) => 'b'.
+	p(NT(170), (T(19)));
+//G328: __E_escaped_s_73(170) => 'f'.
+	p(NT(170), (T(7)));
+//G329: __E_escaped_s_73(170) => 'n'.
+	p(NT(170), (T(13)));
+//G330: __E_escaped_s_73(170) => 'r'.
+	p(NT(170), (T(4)));
+//G331: __E_escaped_s_73(170) => 't'.
+	p(NT(170), (T(14)));
+//G332: escaped_s(11)        => '\\' __E_escaped_s_73(170).
+	p(NT(11), (T(35)+NT(170)));
+//G333: __E___74(171)        => __(7).
+	p(NT(171), (NT(7)));
+//G334: __E___74(171)        => null.
+	p(NT(171), (nul));
+//G335: _(6)                 => __E___74(171).
+	p(NT(6), (NT(171)));
+//G336: __E____75(172)       => space(4).
+	p(NT(172), (NT(4)));
+//G337: __E____75(172)       => comment(173).
+	p(NT(172), (NT(173)));
+//G338: __(7)                => __E____75(172) _(6).
+	p(NT(7), (NT(172)+NT(6)));
+//G339: __E_comment_76(174)  => printable(5).
+	p(NT(174), (NT(5)));
+//G340: __E_comment_76(174)  => '\t'.
+	p(NT(174), (T(27)));
+//G341: __E_comment_77(175)  => null.
+	p(NT(175), (nul));
+//G342: __E_comment_77(175)  => __E_comment_76(174) __E_comment_77(175).
+	p(NT(175), (NT(174)+NT(175)));
+//G343: __E_comment_78(176)  => '\r'.
+	p(NT(176), (T(37)));
+//G344: __E_comment_78(176)  => '\n'.
+	p(NT(176), (T(38)));
+//G345: __E_comment_78(176)  => eof(1).
+	p(NT(176), (NT(1)));
+//G346: comment(173)         => '#' __E_comment_77(175) __E_comment_78(176).
+	p(NT(173), (T(39)+NT(175)+NT(176)));
 	#undef T
 	#undef NT
 	return loaded = true, p;
@@ -796,12 +802,12 @@ struct tgf_repl_parser_nonterminals {
 		set_sym, __E_set_cmd_27, __E___E_set_cmd_27_28, bool_value, __E___E_set_cmd_27_29, __E___E_set_cmd_27_30, enum_ev_option, __E___E_set_cmd_27_31, error_verbosity, __E_parse_input_32, 
 		__E_parse_input_33, error_verbosity_opt, __E_enum_ev_option_34, status_opt, __E_bool_option_35, colors_opt, __E_bool_option_36, print_ambiguity_opt, __E_bool_option_37, print_graphs_opt, 
 		__E_bool_option_38, print_rules_opt, __E_bool_option_39, print_facts_opt, __E_bool_option_40, print_terminals_opt, __E_bool_option_41, measure_parsing_opt, __E_bool_option_42, measure_each_pos_opt, 
-		__E_bool_option_43, measure_forest_opt, __E_bool_option_44, measure_preprocess_opt, __E_bool_option_45, debug_opt, __E_bool_option_46, auto_disambiguate_opt, __E_bool_option_47, trim_terminals_opt, 
-		__E_bool_option_48, inline_cc_opt, __E_bool_option_49, nodisambig_list_opt, __E_list_option_50, enabled_prods_opt, __E_list_option_51, trim_opt, trim_children_opt, __E_list_option_52, 
-		trim_children_terminals_opt, __E_list_option_53, inline_opt, __E_treepaths_option_54, true_value, __E_bool_value_55, false_value, __E_bool_value_56, basic_sym, __E_error_verbosity_57, 
-		detailed_sym, __E_error_verbosity_58, root_cause_sym, __E_error_verbosity_59, __E_symbol_60, __E_symbol_61, __E_symbol_62, __E_symbol_list_63, __E_symbol_list_64, treepath, 
-		__E_treepath_65, __E_treepath_66, __E_treepath_list_67, __E_treepath_list_68, quoted_string_char, __E_quoted_string_69, __E_unescaped_s_70, __E_unescaped_s_71, __E_escaped_s_72, __E___73, 
-		__E____74, comment, __E_comment_75, __E_comment_76, __E_comment_77, __N_0, 
+		__E_bool_option_43, measure_forest_opt, __E_bool_option_44, measure_preprocess_opt, __E_bool_option_45, gc_opt, __E_bool_option_46, debug_opt, __E_bool_option_47, auto_disambiguate_opt, 
+		__E_bool_option_48, trim_terminals_opt, __E_bool_option_49, inline_cc_opt, __E_bool_option_50, nodisambig_list_opt, __E_list_option_51, enabled_prods_opt, __E_list_option_52, trim_opt, 
+		trim_children_opt, __E_list_option_53, trim_children_terminals_opt, __E_list_option_54, inline_opt, __E_treepaths_option_55, true_value, __E_bool_value_56, false_value, __E_bool_value_57, 
+		basic_sym, __E_error_verbosity_58, detailed_sym, __E_error_verbosity_59, root_cause_sym, __E_error_verbosity_60, __E_symbol_61, __E_symbol_62, __E_symbol_63, __E_symbol_list_64, 
+		__E_symbol_list_65, treepath, __E_treepath_66, __E_treepath_67, __E_treepath_list_68, __E_treepath_list_69, quoted_string_char, __E_quoted_string_70, __E_unescaped_s_71, __E_unescaped_s_72, 
+		__E_escaped_s_73, __E___74, __E____75, comment, __E_comment_76, __E_comment_77, __E_comment_78, __N_0, 
 	};
 };
 
