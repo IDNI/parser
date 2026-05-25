@@ -57,5 +57,15 @@ inline static parser<char, char32_t>::encoder_type u32_to_utf8_conv =
 		return ss.str();
 	};
 
+template<typename C, typename T>
+typename parser<C, T>::options default_parser_options() {
+	typename parser<C, T>::options o;
+	if constexpr (std::is_same_v<C, char> && std::is_same_v<T, char32_t>) {
+		o.chars_to_terminals = utf8_to_u32_conv;
+		o.terminals_to_chars = u32_to_utf8_conv;
+	}
+	return o;
+}
+
 } // idni namespace
 #endif // __IDNI__PARSER__RECODERS_H__

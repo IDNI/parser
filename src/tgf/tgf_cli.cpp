@@ -19,6 +19,7 @@
 #include "tgf_test.h"
 #include "tgf_cli_options.h"
 #include "parser_strings.h"
+#include "recoders.h"
 
 #define PBOOL(bval) (( bval ) ? "true" : "false")
 
@@ -328,18 +329,6 @@ ostream& tgf_repl_evaluator::pretty_print(ostream& os, tref n,
 	return os;
 }
 
-static tgf_repl_evaluator::parser_type::options utf8_parser_options() {
-	tgf_repl_evaluator::parser_type::options o;
-	if constexpr (
-		!std::is_same_v<tgf_repl_evaluator::parser_type::char_type,
-		                tgf_repl_evaluator::parser_type::terminal_type>)
-	{
-		o.chars_to_terminals = idni::utf8_to_u32_conv;
-		o.terminals_to_chars = idni::u32_to_utf8_conv;
-	}
-	return o;
-}
-
 void tgf_repl_evaluator::flush_report() {
 	print_diagnostics_report(report, opt.print_json);
 	report.clear();
@@ -356,7 +345,9 @@ bool tgf_repl_evaluator::init_grammar(const string& filename) {
 		return false;
 	}
 	auto next_g = make_shared<grammar_type>(std::move(gr).value());
-	auto next_p = make_shared<parser_type>(*next_g, utf8_parser_options());
+	auto next_p = make_shared<parser_type>(*next_g,
+		default_parser_options<
+			parser_type::char_type, parser_type::terminal_type>());
 	report.append(std::move(gr).report());
 	nts = std::move(next_nts);
 	g = std::move(next_g);
