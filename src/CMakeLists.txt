@@ -1,22 +1,20 @@
 # public headers and sources
 set(TAU_PARSER_HEADERS
-	version_license.h
 	defs.h
 	devhelpers.h
 	forest.h
 	forest.tmpl.h
 	grammar.tmpl.h
+	parser.h
+	parser.tmpl.h
 	parser_result.tmpl.h
 	parser_strings.h
 	parser_strings.tmpl.h
 	parser_term_color_macros.h
-	parser.h
-	parser.tmpl.h
 	recoders.h
-	tgf_parser.generated.h
 	tgf.h
-	utility/tree.h
-	utility/tree.tmpl.h
+	tgf_parser.generated.h
+	version_license.h
 	utility/characters.h
 	utility/characters.impl.h
 	utility/charclasses.h
@@ -28,9 +26,11 @@ set(TAU_PARSER_HEADERS
 	utility/measure.h
 	utility/memory_map.h
 	utility/repl.h
-	utility/term_colors.h
 	utility/term.h
 	utility/term.impl.h
+	utility/term_colors.h
+	utility/tree.h
+	utility/tree.tmpl.h
 	CACHE STRING "Tau Parser headers files"
 )
 
