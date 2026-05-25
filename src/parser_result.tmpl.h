@@ -80,75 +80,125 @@ parser<C, T>::result::result(parser<C, T>& p, std::unique_ptr<input> in_,
 template <typename C, typename T>
 parser<C, T>& parser<C, T>::result::get_parser() const { return p; }
 
+// Iterative post-order count of distinct parse trees under an AMB-wrapped
+// bintree. Folds child counts into the parent via the traversal callback —
+// no manual children() walk, no recursion. Semantics:
+//   - leaf (no children visited):      count = 1
+//   - non-AMB internal node:           count = product of children counts
+//   - AMB internal node:               count = sum of children counts
+//                                              (empty AMB → 1)
+template <typename C, typename T>
+size_t count_bintree_parses(tref n, const lit<C, T>& amb) {
+	using tree  = typename parser<C, T>::tree;
+	using pnode = typename parser<C, T>::pnode;
+	if (!n) return 1;
+	std::unordered_map<tref, size_t> cnt;
+	auto fold = [&](tref node, tref parent) {
+		// On first visit, default a leaf's count to 1 (product
+		// identity / AMB-empty fallback). Internal nodes will have
+		// been pre-initialized by their first child below.
+		auto [it_n, _n] = cnt.try_emplace(node, 1);
+		size_t n_count = it_n->second;
+		if (!parent) return true;
+		const auto& pt = tree::get(parent);
+		bool parent_is_amb = pt.value.first.nt()
+			&& pt.value.first == amb;
+		auto [it_p, _p] = cnt.try_emplace(parent,
+			parent_is_amb ? 0 : 1);
+		if (parent_is_amb) it_p->second += n_count;
+		else               it_p->second *= n_count;
+		return true;
+	};
+	post_order<pnode>(n).search(fold);
+	auto it = cnt.find(n);
+	return it == cnt.end() ? 1 : it->second;
+}
+
 // Lazy reconstruction of a pforest from the tref (bintree path).
 // In forest_path the forest is already populated and this returns it.
 template <typename C, typename T>
 typename parser<C, T>::pforest* parser<C, T>::result::get_forest() const {
 	if (f) return f.get();
-	auto _rf = diag_report.open_if(measure_scopes,
-		p.keys().reconstruct_forest);
 	if (froot != 0) {
-		f = std::make_unique<pforest>();
-		if (!froot) return f.get();
-		tref root_t = froot->get();
-		const auto& rt = tree::get(root_t);
-		using pnt = pnode_type<C, T>;
-		auto root_value = [&]() -> pnt {
-			if (rt.value.first.nt() && rt.value.first == amb_node) {
-				if (tref alt0 = rt.first(); alt0) {
-					const auto& at = tree::get(alt0);
-					return pnt(at.value.first, at.value.second);
+		auto _rf = diag_report.open_if(
+			measure_scopes, p.keys().reconstruct_forest);
+		auto reconstruct = [&]() {
+			f = std::make_unique<pforest>();
+			if (!froot) return;
+			tref root_t = froot->get();
+			const auto& rt = tree::get(root_t);
+			using pnt = pnode_type<C, T>;
+			auto root_value = [&]() -> pnt {
+				if (rt.value.first.nt() && rt.value.first == amb_node) {
+					if (tref alt0 = rt.first(); alt0) {
+						const auto& at = tree::get(alt0);
+						return pnt(at.value.first, at.value.second);
+					}
 				}
-			}
-			return pnt(rt.value.first, rt.value.second);
-		};
-		f->root(root_value());
-		std::set<pnt> visited;
+				return pnt(rt.value.first, rt.value.second);
+			};
+			f->root(root_value());
+			std::set<pnt> visited;
 
-		auto child_pn = [&](tref c) -> pnt {
-			const auto& ct = tree::get(c);
-			if (ct.value.first.nt() && ct.value.first == amb_node) {
-				tref alt0 = ct.first();
-				if (alt0) {
-					const auto& at = tree::get(alt0);
-					return pnt(at.value.first, at.value.second);
+			auto child_pn = [&](tref c) -> pnt {
+				const auto& ct = tree::get(c);
+				if (ct.value.first.nt() && ct.value.first == amb_node) {
+					tref alt0 = ct.first();
+					if (alt0) {
+						const auto& at = tree::get(alt0);
+						return pnt(at.value.first, at.value.second);
+					}
 				}
-			}
-			return pnt(ct.value.first, ct.value.second);
-		};
+				return pnt(ct.value.first, ct.value.second);
+			};
 
-		std::function<void(tref)> walk = [&](tref n) {
-			if (!n) return;
-			const auto& nt = tree::get(n);
-			if (!nt.value.first.nt()) return;
-			if (nt.value.first == amb_node) {
-				tref alt0 = nt.first();
-				if (!alt0) return;
-				const auto& a0 = tree::get(alt0);
-				pnt shared(a0.value.first, a0.value.second);
-				if (!visited.insert(shared).second) return;
+			// Iterative pre-order walk replaces the std::function recursion.
+			// Returning false from enter skips the current subtree (used
+			// both for non-NT leaves and for nodes whose pn is already in
+			// the forest map).
+			auto enter = [&](tref n, tref parent) -> bool {
+				if (!n) return false;
+				const auto& nt = tree::get(n);
+				if (!nt.value.first.nt()) return false;
+				if (nt.value.first == amb_node) {
+					tref alt0 = nt.first();
+					if (!alt0) return false;
+					const auto& a0 = tree::get(alt0);
+					pnt shared(a0.value.first, a0.value.second);
+					if (!visited.insert(shared).second) return false;
+					typename pforest::nodes_set packs;
+					for (tref alt : nt.children()) {
+						const auto& at = tree::get(alt);
+						typename pforest::nodes pack;
+						for (tref c : at.children())
+							pack.push_back(child_pn(c));
+						packs.insert(pack);
+					}
+					(*f)[shared] = packs;
+					return true;  // descend into alts to reach their children
+				}
+				// Alt-wrapper node: a direct child of __AMB__. Its pnode
+				// equals shared (already in visited), so skip the forest
+				// insertion — but return true to descend into its children
+				// (the actual pack-member nodes that need forest entries).
+				if (parent && tree::get(parent).value.first == amb_node)
+					return true;
+				pnt me(nt.value.first, nt.value.second);
+				if (!visited.insert(me).second) return false;
+				typename pforest::nodes pack;
+				for (tref c : nt.children()) pack.push_back(child_pn(c));
 				typename pforest::nodes_set packs;
-				for (tref alt : nt.children()) {
-					const auto& at = tree::get(alt);
-					typename pforest::nodes pack;
-					for (tref c : at.children())
-						pack.push_back(child_pn(c));
-					packs.insert(pack);
-					for (tref c : at.children()) walk(c);
-				}
-				(*f)[shared] = packs;
-				return;
-			}
-			pnt me(nt.value.first, nt.value.second);
-			if (!visited.insert(me).second) return;
-			typename pforest::nodes pack;
-			for (tref c : nt.children()) pack.push_back(child_pn(c));
-			typename pforest::nodes_set packs;
-			packs.insert(pack);
-			(*f)[me] = packs;
-			for (tref c : nt.children()) walk(c);
+				packs.insert(pack);
+				(*f)[me] = packs;
+				return true;
+			};
+			auto all_pass = [](tref) { return true; };
+			auto noop_leave = [](tref, tref) {};
+			auto noop_between = [](tref, tref) {};
+			pre_order<pnode>(root_t).visit(enter, all_pass,
+				noop_leave, noop_between);
 		};
-		walk(root_t);
+		reconstruct();
 	}
 	return f.get();
 }
@@ -213,8 +263,9 @@ bool node_to_inline(const typename parser<C, T>::pnode& n,
 }
 
 template <typename C, typename T>
-typename parser<C, T>::psptree parser<C, T>::result::get_trimmed_tree(
-	const typename parser<C, T>::pnode& n, const shaping_options opts) const
+typename parser<C, T>::psptree
+	parser<C, T>::result::get_trimmed_forest_tree(
+		const pnode& n, const shaping_options opts) const
 {
 	//std::cerr << "get_trimmed_tree for node: `" << n.first.to_std_string() << "`" << std::endl;
 	auto get_children_nodes = [&](const pnode& n,
@@ -228,7 +279,7 @@ typename parser<C, T>::psptree parser<C, T>::result::get_trimmed_tree(
 				//std::cerr << " in: " << n.first.to_std_string() << std::endl;
 				continue;
 			}
-			auto x = get_trimmed_tree(c, opts);
+			auto x = get_trimmed_forest_tree(c, opts);
 			if (x) output.push_back(x);
 		}
 	};
@@ -269,15 +320,16 @@ typename parser<C, T>::psptree parser<C, T>::result::get_trimmed_tree(
 	return t;
 }
 template <typename C, typename T>
-typename parser<C, T>::psptree parser<C, T>::result::get_trimmed_tree(
-	const typename parser<C, T>::pnode& n) const
+typename parser<C, T>::psptree
+	parser<C, T>::result::get_trimmed_forest_tree(const pnode& n) const
 {
-	return get_trimmed_tree(n, shaping);
+	return get_trimmed_forest_tree(n, shaping);
 }
 
 template <typename C, typename T>
-typename parser<C, T>::psptree parser<C, T>::result::inline_tree_nodes(
-	const psptree& t, psptree& parent, const shaping_options opts) const
+typename parser<C, T>::psptree
+	parser<C, T>::result::inline_forest_tree_nodes(const psptree& t,
+		psptree& parent, const shaping_options opts) const
 {
 	psptree r = 0;
 	if (!t) return r;
@@ -290,7 +342,7 @@ typename parser<C, T>::psptree parser<C, T>::result::inline_tree_nodes(
 	if (!do_inline) r = std::make_shared<ptree>(t->value);
 	psptree& rf = do_inline ? parent : r;
 	for (auto& c : t->child) {
-		auto x = inline_tree_nodes(c, rf, opts);
+		auto x = inline_forest_tree_nodes(c, rf, opts);
 		if (x) //{
 			//std::cerr << "inlining child: `" << c->value.first.to_std_string() << "`" << std::endl;
 			//std::cerr << (do_inline ? "- inlined\t" : "- passed\t") << " `"
@@ -301,15 +353,17 @@ typename parser<C, T>::psptree parser<C, T>::result::inline_tree_nodes(
 	return r;
 }
 template <typename C, typename T>
-typename parser<C, T>::psptree parser<C, T>::result::inline_tree_nodes(
-	const psptree& t, psptree& parent) const
+typename parser<C, T>::psptree
+	parser<C, T>::result::inline_forest_tree_nodes(const psptree& t,
+		psptree& parent) const
 {
-	return inline_tree_nodes(t, parent, shaping);
+	return inline_forest_tree_nodes(t, parent, shaping);
 }
 
 template <typename C, typename T>
-typename parser<C, T>::psptree parser<C, T>::result::inline_tree_paths(
-	const psptree& t, const shaping_options opts) const
+typename parser<C, T>::psptree
+	parser<C, T>::result::inline_forest_tree_paths(const psptree& t,
+		const shaping_options opts) const
 {
 	psptree r = 0;
 	if (!t) return r;
@@ -334,39 +388,41 @@ typename parser<C, T>::psptree parser<C, T>::result::inline_tree_paths(
 			return 0;
 		};
 		const psptree p = go(t, 0);
-		if (p) return inline_tree_paths(p, opts);
+		if (p) return inline_forest_tree_paths(p, opts);
 	}
 	r = std::make_shared<ptree>(t->value);
 	for (auto& c : t->child) {
-		auto x = inline_tree_paths(c, opts);
+		auto x = inline_forest_tree_paths(c, opts);
 		if (x) r->child.push_back(x);
 	}
 	return r;
 }
 template <typename C, typename T>
-typename parser<C, T>::psptree parser<C, T>::result::inline_tree_paths(
-	const psptree& t) const
+typename parser<C, T>::psptree
+	parser<C, T>::result::inline_forest_tree_paths(const psptree& t) const
 {
-	return inline_tree_paths(t, shaping);
+	return inline_forest_tree_paths(t, shaping);
 }
 
 template <typename C, typename T>
-typename parser<C, T>::psptree parser<C, T>::result::inline_tree(
-	psptree& t, const shaping_options opts) const
+typename parser<C, T>::psptree
+	parser<C, T>::result::inline_forest_tree(psptree& t,
+		const shaping_options opts) const
 {
-	auto inlined = inline_tree_nodes(t, t, opts);
-	return inline_tree_paths(inlined, opts);
+	auto inlined = inline_forest_tree_nodes(t, t, opts);
+	return inline_forest_tree_paths(inlined, opts);
 }
 template <typename C, typename T>
-typename parser<C, T>::psptree parser<C, T>::result::inline_tree(
-	psptree& t) const
+typename parser<C, T>::psptree
+	parser<C, T>::result::inline_forest_tree(psptree& t) const
 {
-	return inline_tree(t, shaping);
+	return inline_forest_tree(t, shaping);
 }
 
 template <typename C, typename T>
-typename parser<C, T>::psptree parser<C, T>::result::trim_children_terminals(
-	const psptree& t, const shaping_options opts) const
+typename parser<C, T>::psptree
+	parser<C, T>::result::trim_forest_tree_child_terminals(
+		const psptree& t, const shaping_options opts) const
 {
 	psptree r = 0;
 	if (!t) return r;
@@ -381,55 +437,61 @@ typename parser<C, T>::psptree parser<C, T>::result::trim_children_terminals(
 	for (auto& c : t->child) {
 		auto& cl = c->value->first;
 		if (cl.nt() || cl.is_null() || !trim) {
-			auto x = trim_children_terminals(c, opts);
+			auto x = trim_forest_tree_child_terminals(c, opts);
 			if (x) r->child.push_back(x);
 		}
 	}
 	return r;
 }
 template <typename C, typename T>
-typename parser<C, T>::psptree parser<C, T>::result::trim_children_terminals(
-	const psptree& t) const
+typename parser<C, T>::psptree
+	parser<C, T>::result::trim_forest_tree_child_terminals(
+		const psptree& t) const
 {
-	return trim_children_terminals(t, shaping);
+	return trim_forest_tree_child_terminals(t, shaping);
 }
 
 template <typename C, typename T>
-typename parser<C, T>::psptree parser<C, T>::result::get_shaped_tree(
-	const typename parser<C, T>::pnode& n, const shaping_options opts) const
+typename parser<C, T>::psptree
+	parser<C, T>::result::get_shaped_forest_tree(const pnode& n,
+		const shaping_options opts) const
 {
 	//std::cout << "getting tree for " << n.first.to_std_string() << std::endl;
-	auto trimmed = get_trimmed_tree(n, opts);
-	auto inlined = inline_tree(trimmed, opts);
-	auto shaped  = trim_children_terminals(inlined, opts);
+	auto trimmed = get_trimmed_forest_tree(n, opts);
+	auto inlined = inline_forest_tree(trimmed, opts);
+	auto shaped  = trim_forest_tree_child_terminals(inlined, opts);
 	return shaped;
 }
 template <typename C, typename T>
-typename parser<C, T>::psptree parser<C, T>::result::get_shaped_tree(
-	const typename parser<C, T>::pnode& n) const
+typename parser<C, T>::psptree
+	parser<C, T>::result::get_shaped_forest_tree(const pnode& n) const
 {
-	return get_shaped_tree(n, shaping);
+	return get_shaped_forest_tree(n, shaping);
 }
 template <typename C, typename T>
-typename parser<C, T>::psptree parser<C, T>::result::get_shaped_tree(
-	const shaping_options opts) const
+typename parser<C, T>::psptree
+	parser<C, T>::result::get_shaped_forest_tree(
+		const shaping_options opts) const
 {
-	return get_shaped_tree(get_forest()->root(), opts);
+	return get_shaped_forest_tree(get_forest()->root(), opts);
 }
 template <typename C, typename T>
-typename parser<C, T>::psptree parser<C, T>::result::get_shaped_tree() const
+typename parser<C, T>::psptree
+	parser<C, T>::result::get_shaped_forest_tree() const
 {
-	return get_shaped_tree(shaping);
+	return get_shaped_forest_tree(shaping);
 }
 
 /// get a first parse tree from the parse_forest optionally provide root of the tree.
 template <typename C, typename T>
-parser<C, T>::psptree parser<C, T>::result::get_tree() {
-	return get_tree(get_forest()->root());
+typename parser<C, T>::psptree parser<C, T>::result::get_forest_tree() {
+	return get_forest_tree(get_forest()->root());
 }
 
 template <typename C, typename T>
-parser<C, T>::psptree parser<C, T>::result::get_tree(const pnode& n) {
+typename parser<C, T>::psptree
+	parser<C, T>::result::get_forest_tree(const pnode& n)
+{
 	psptree t;
 	auto extract = [this, &t, &n] {
 		get_forest()->extract_graphs(n, [this, &t](auto& g) {
@@ -442,6 +504,100 @@ parser<C, T>::psptree parser<C, T>::result::get_tree(const pnode& n) {
 		extract();
 	});
 	return t;
+}
+
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::get_trimmed_tree(
+	const pnode& n, const shaping_options opts) const
+{
+	return get_trimmed_forest_tree(n, opts);
+}
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::get_trimmed_tree(
+	const pnode& n) const
+{
+	return get_trimmed_forest_tree(n);
+}
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::inline_tree_nodes(
+	const psptree& t, psptree& parent, const shaping_options opts) const
+{
+	return inline_forest_tree_nodes(t, parent, opts);
+}
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::inline_tree_nodes(
+	const psptree& t, psptree& parent) const
+{
+	return inline_forest_tree_nodes(t, parent);
+}
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::inline_tree_paths(
+	const psptree& t, const shaping_options opts) const
+{
+	return inline_forest_tree_paths(t, opts);
+}
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::inline_tree_paths(
+	const psptree& t) const
+{
+	return inline_forest_tree_paths(t);
+}
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::inline_tree(
+	psptree& t, const shaping_options opts) const
+{
+	return inline_forest_tree(t, opts);
+}
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::inline_tree(
+	psptree& t) const
+{
+	return inline_forest_tree(t);
+}
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::trim_children_terminals(
+	const psptree& t, const shaping_options opts) const
+{
+	return trim_forest_tree_child_terminals(t, opts);
+}
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::trim_children_terminals(
+	const psptree& t) const
+{
+	return trim_forest_tree_child_terminals(t);
+}
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::get_shaped_tree(
+	const pnode& n, const shaping_options opts) const
+{
+	return get_shaped_forest_tree(n, opts);
+}
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::get_shaped_tree(
+	const pnode& n) const
+{
+	return get_shaped_forest_tree(n);
+}
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::get_shaped_tree(
+	const shaping_options opts) const
+{
+	return get_shaped_forest_tree(opts);
+}
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::get_shaped_tree() const
+{
+	return get_shaped_forest_tree();
+}
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::get_tree() {
+	return get_forest_tree();
+}
+template <typename C, typename T>
+typename parser<C, T>::psptree parser<C, T>::result::get_tree(
+	const pnode& n)
+{
+	return get_forest_tree(n);
 }
 
 template <typename C, typename T>
@@ -488,13 +644,96 @@ bool parser<C, T>::result::has_single_parse_tree() const {
 template <typename C, typename T>
 std::set<std::pair<typename parser<C, T>::pnode,
 	typename parser<C, T>::pnodes_set>>
+		parser<C, T>::result::ambiguous_nodes_from_bintree() const
+{
+	std::set<std::pair<pnode, pnodes_set>> r;
+	if (!froot || !amb_node.nt()) return r;
+
+	// Iterative pre-order over the bintree, gathering an entry per AMB:
+	//   - amb_ctx tracks the active AMB (shared pnode + accumulated packs);
+	//   - alt_ctx tracks the active alt under its AMB (collecting children
+	//     of the alt into a pack).
+	// Stacks handle nested AMBs (an alt that is itself an AMB). No
+	// .children() walks here — the traversal visits every node and the
+	// (n, parent) callback signature provides the structural context.
+	struct amb_ctx {
+		tref amb;
+		tref first_alt = nullptr; // tref, since pnode is non-assignable
+		pnodes_set packs{};
+	};
+	struct alt_ctx { tref alt; pnodes pack{}; };
+	std::vector<amb_ctx> ambs;
+	std::vector<alt_ctx> alts;
+
+	// When a pack member is itself a nested __AMB__ node, project it to
+	// the AMB's first alternative — mirrors child_pn() in get_forest, so
+	// the public ambiguity packs match the forest reconstruction.
+	auto unwrap_amb = [&](tref n, const pnode& v) -> pnode {
+		if (v.first != amb_node) return v;
+		tref alt0 = tree::get(n).first();
+		if (!alt0) return v;
+		return tree::get(alt0).value;
+	};
+	auto enter = [&](tref n, tref parent) {
+		if (!n) return true;
+		const auto& nt = tree::get(n);
+		// Pack-member of the innermost active alt (not a nested AMB):
+		if (!alts.empty() && parent == alts.back().alt
+			&& tree::get(alts.back().alt).value.first != amb_node)
+			alts.back().pack.push_back(unwrap_amb(n, nt.value));
+		// Alt of the innermost active AMB (skip when alt is __AMB__):
+		if (!ambs.empty() && parent == ambs.back().amb
+			&& nt.value.first != amb_node) {
+			if (!ambs.back().first_alt) ambs.back().first_alt = n;
+			alts.push_back({n, {}});
+		}
+		// Open a new amb_ctx if this node is itself an AMB:
+		if (nt.value.first == amb_node)
+			ambs.push_back({n});
+		return true;
+	};
+	auto leave = [&](tref n, tref) {
+		// Close inner AMB first (depth matches: amb opened in enter
+		// after the alt push, so it must close before the alt).
+		if (!ambs.empty() && ambs.back().amb == n) {
+			if (ambs.back().first_alt)
+				r.insert({tree::get(ambs.back().first_alt)
+						.value,
+					std::move(ambs.back().packs)});
+			ambs.pop_back();
+		}
+		// Then close the alt for the now-current AMB (not a nested AMB).
+		if (!alts.empty() && alts.back().alt == n
+			&& tree::get(n).value.first != amb_node) {
+			if (!ambs.empty()) ambs.back().packs.insert(
+					std::move(alts.back().pack));
+			alts.pop_back();
+		}
+	};
+	auto all = [](tref) { return true; };
+	auto no_between = [](tref, tref) {};
+	pre_order<pnode>(froot->get()).visit(enter, all, leave, no_between);
+	return r;
+}
+
+template <typename C, typename T>
+std::set<std::pair<typename parser<C, T>::pnode,
+	typename parser<C, T>::pnodes_set>>
+		parser<C, T>::result::ambiguous_nodes_from_forest() const
+{
+	std::set<std::pair<pnode, pnodes_set>> r;
+	if (!f) return r;
+	for (auto& kv : f->g) if (kv.second.size() > 1) r.insert(kv);
+	return r;
+}
+
+template <typename C, typename T>
+std::set<std::pair<typename parser<C, T>::pnode,
+	typename parser<C, T>::pnodes_set>>
 		parser<C, T>::result::ambiguous_nodes() const
 {
-	auto* pf = get_forest();
-	if (!pf) return {};
-	std::set<std::pair<pnode, pnodes_set>> r;
-	for (auto& kv : pf->g) if (kv.second.size() > 1) r.insert(kv);
-	return r;
+	if (froot != 0) return ambiguous_nodes_from_bintree();
+	return ambiguous_nodes_from_forest();
 }
 
 template <typename C, typename T>
@@ -502,16 +741,34 @@ std::ostream& parser<C, T>::result::print_ambiguous_nodes(std::ostream& os)
 	const
 {
 	if (!is_ambiguous()) return os;
+	if (froot != 0) {
+		os << "# n trees: " << count_bintree_parses(froot->get(), amb_node)
+			<< "\n# ambiguous nodes:\n";
+		for (auto& n : ambiguous_nodes()) {
+			os << "\t `" << n.first.first << "` [" << n.first.second[0]
+				<< "," << n.first.second[1] << "]\n";
+			size_t d = 0;
+			for (auto& ns : n.second) {
+				std::stringstream ss;
+				ss << "\t\t " << d++ << "\t";
+				for (auto& nt : ns) ss << " `" << nt->first << "`["
+					<< nt->second[0] << "," << nt->second[1] << "] ";
+				os << ss.str() << "\n";
+			}
+		}
+		return os;
+	}
 	auto* pf = get_forest();
+	if (!pf) return os;
 	os << "# n trees: " << pf->count_trees() << "\n# ambiguous nodes:\n";
 	for (auto& n : ambiguous_nodes()) {
 		os << "\t `" << n.first.first << "` [" << n.first.second[0]
 			<< "," << n.first.second[1] << "]\n";
 		size_t d = 0;
-		for (auto ns : n.second) {
+		for (auto& ns : n.second) {
 			std::stringstream ss;
 			ss << "\t\t " << d++ << "\t";
-			for (auto nt : ns) ss << " `" << nt->first << "`["
+			for (auto& nt : ns) ss << " `" << nt->first << "`["
 				<< nt->second[0] << "," << nt->second[1] << "] ";
 			os << ss.str() << "\n";
 		}

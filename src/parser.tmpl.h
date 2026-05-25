@@ -1,14 +1,14 @@
 // To view the license please visit
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
+#include <climits>
+
 #include "parser.h"
 
-#include <climits>
-#include <optional>
-
-#ifdef TAU_PARSER_MEASURE
+#if defined(TAU_PARSER_MEASURE_SCOPES) \
+	|| defined(TAU_PARSER_MEASURE_COUNTERS)
 #include "utility/measure.h"
-#endif // TAU_PARSER_MEASURE
+#endif
 
 namespace idni {
 
@@ -183,7 +183,8 @@ void parser<C, T>::input::decode() {
 }
 //------------------------------------------------------------------------------
 template <typename C, typename T>
-parser<C, T>::parser(grammar<C, T>& g, options o) : g(g), o(o) {
+parser<C, T>::parser(grammar<C, T>& g, options o) : g(g), o(o), po(o.parse_opts)
+{
 	for (size_t p = 0; p < g.size(); p++)
 		if (g.conjunctive(p)) { any_conj = true; break; }
 }
@@ -206,10 +207,12 @@ bool parser<C, T>::nullable(const item& i) const {
 }
 template <typename C, typename T>
 void parser<C, T>::remove_item(const item& i){
+	MC(count(cnt.remove_item_calls);)
 	if(i.set == 0) return;
 	bool inserted = gcready.insert(i).second;
 	if (!inserted) return; // return if already in gc_ready
 	const container_t& cont = S[i.from];
+	MC(count(cnt.remove_item_scan_total, cont.size());)
 	for (auto it = cont.begin(); it != cont.end(); ++it){
 		if (it->set == 0) continue;
 		if (!completed(*it) && get_lit(*it) == get_nt(i)) {
@@ -217,11 +220,11 @@ void parser<C, T>::remove_item(const item& i){
 			if (rit == refi.end()){
 				continue;
 			}
+			MC(count(cnt.refi_decrements);)
 			if (--rit->second == 0) {
+				MC(count(cnt.refi_zero_hits);)
 				refi.erase(rit);
-				if (o.enable_gc) {
-					remove_item(*it);
-				}
+				if (po.enable_gc) remove_item(*it);
 			}
 		}
 	}
@@ -290,19 +293,26 @@ template <typename C, typename T>
 void parser<C, T>::cascade_uncomplete(size_t nt_id, size_t from, size_t set,
 	container_t& c)
 {
+	MC(count(cnt.cascade_uncomplete_calls);)
 	if (nt_still_completed(nt_id, from, set)) return;
 	completion_key ckey{ nt_id, from, set };
 	auto dit = completion_deps.find(ckey);
 	if (dit == completion_deps.end()) return;
 	auto deps = std::move(dit->second);
 	completion_deps.erase(dit);
+	MC(count(cnt.cascade_dep_total, deps.size());)
 	for (const item& dep : deps) {
 		if (U.size() < S.size()) U.resize(S.size());
 		auto sit = S[dep.set].find(dep);
 		if (sit == S[dep.set].end()) continue;
 		S[dep.set].erase(sit);
 		U[dep.set].insert(dep);
+		if (!completed(dep) && get_lit(dep).nt()) {
+			auto cit = cache.find({get_lit(dep).n(), dep.set});
+			if (cit != cache.end()) cit->second.erase(dep);
+		}
 		if (auto fit = fromS.find(dep.from); fit != fromS.end()) {
+			MC(count(cnt.fromS_reads);)
 			fit->second.erase(dep.set);
 			if (fit->second.empty()) fromS.erase(fit);
 		}
@@ -323,6 +333,8 @@ void parser<C, T>::cascade_uncomplete(size_t nt_id, size_t from, size_t set,
 template <typename C, typename T>
 void parser<C, T>::resolve_conjunctions(container_t& c, container_t& t) {
 	if (c.size() == 0) return;
+	MC(count(cnt.conjunction_attempts);)
+	MC(maks(cnt.c_size_peak, c.size());)
 	DBGP(std::cout << TC.BLUE() << "resolve conjunctions...\n"
 		<< TC.CLEAR();)
 	std::map<std::pair<size_t, size_t>, std::set<item>> ps;
@@ -368,12 +380,14 @@ void parser<C, T>::resolve_conjunctions(container_t& c, container_t& t) {
 			if ((conj_failed = neg == found)) break;
 		}
 		if (conj_failed) {
+			MC(count(cnt.conjunction_failures);)
 			for (const auto& x : pr.second) {
 				DBGP(print(std::cout << "UNCOMPLETING: ", x) << std::endl;)
 				if (U.size() < S.size()) U.resize(S.size());
 				U[x.set].insert(x);
 				S[x.set].erase(x);
 				if (auto fit = fromS.find(x.from); fit != fromS.end()) {
+					MC(count(cnt.fromS_reads);)
 					fit->second.erase(x.set);
 					if (fit->second.empty()) fromS.erase(fit);
 				}
@@ -399,6 +413,7 @@ template <typename C, typename T>
 void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 	bool conj_resolved)
 {
+	MC(count(cnt.complete_calls);)
 	DBGP(std::cout << "    completing\n";)
 	if (!conj_resolved && g.conjunctive(i.prod)) {
 		DBGP(print(std::cout <<	TC.YELLOW() <<
@@ -434,6 +449,12 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 		const auto* it = &eit;
 		if (n_literals(*it) <= it->dot ||
 			get_lit(*it) != get_nt(i)) continue;
+		// Predictor may have been evicted from S; it can still drive
+		// completion only if conjunction-cascade machinery kept it in U.
+		bool in_S = S[it->set].find(*it) != S[it->set].end();
+		bool in_U = any_conj && it->set < U.size()
+			&& U[it->set].find(*it) != U[it->set].end();
+		if (!in_S && !in_U) continue;
 		DBGP(print(std::cout << " ?  checking \t\t\t\t", *it) << "\n";)
 		item j(*it); ++j.dot, j.set = i.set;
 		if (!negative(j) && completed(j) && g.conjunctive(j.prod)) {
@@ -441,14 +462,22 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 				" +  adding to c2 \t\t\t", j) << TC.CLEAR() <<
 				"\n";)
 			c.insert(j);
-			if (any_conj) completion_deps[ckey].push_back(j);
+			if (any_conj) {
+				completion_deps[ckey].push_back(j);
+				MC(maks(cnt.completion_deps_size_peak,
+					completion_deps[ckey].size());)
+			}
 			continue;
 		}
 		//DBGP(std::cout << "neg: " << g[it->prod][it->con].neg << "\n";)
 		// j is parent of i, but with next non-terminal advanced
 		if (add(t, j).second) {
-			if (any_conj) completion_deps[ckey].push_back(j);
-			if (o.enable_gc) {
+			if (any_conj) {
+				completion_deps[ckey].push_back(j);
+				MC(maks(cnt.completion_deps_size_peak,
+					completion_deps[ckey].size());)
+			}
+			if (po.enable_gc) {
 			// — record the new GC‐edge for parent → j
 			DBGP(print(std::cout << "Add Edge: ", *it) << " --> ";)
 			DBGP(print(std::cout, j) << std::endl;)
@@ -474,6 +503,7 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 }
 template <typename C, typename T>
 void parser<C, T>::predict(const item& i, container_t& t) {
+	MC(count(cnt.predict_calls);)
 	DBGP(std::cout << "    predicting\n";)
 	lit<C, T> parl = get_lit(i);
 	DBG(assert(parl.nt()));
@@ -493,6 +523,7 @@ void parser<C, T>::predict(const item& i, container_t& t) {
 			//just once
 			if (c==0 && parl.nt()) cache[{parl.n(), i.set}].insert(i);
 			item j(i.set, p, c, i.set, 0);
+			MC(count(cnt.predict_inserts);)
 			if (add(t, j).second) {
 				DBGP(print(std::cout <<" +  adding to t \t\t\t",
 					j) << "\n";)
@@ -501,24 +532,33 @@ void parser<C, T>::predict(const item& i, container_t& t) {
 					// j item is already present
 				//}
 			}
-			if(o.enable_gc) ++refi[i]; //insert and increment
+			if (po.enable_gc) {
+				MC(count(cnt.refi_increments);)
+				++refi[i];
+				MC(maks(cnt.refi_size_peak, refi.size());)
+			}
 		}
 	}
 }
 template <typename C, typename T>
 void parser<C, T>::scan(const item& i, size_t n, T ch) {
+	MC(count(cnt.scan_calls);)
 	DBGP(std::cout << "    scanning character: '"<<to_std_string(ch)<<"' ";)
 	item j(n + (ch == static_cast<T>(0) ? 0 : 1),
 		i.prod, i.con, i.from, i.dot + 1);
 	DBGP(std::cout << (ch == get_lit(i).t()?"SUCCESS":"FAIL") << "\n";)
 	if (ch != get_lit(i).t()) {
-		if(o.enable_gc) {
+		if(po.enable_gc) {
 			//when the item fails, decrement refcount of items that
 			//predicted it i.e predicting items ( only the one) for
 			// which refc was incremented when this item was predicted
 			auto rit = refi.find(i);
-			if (rit != refi.end() && --rit->second == 0) {
-				refi.erase(rit);
+			if (rit != refi.end()) {
+				MC(count(cnt.refi_decrements);)
+				if (--rit->second == 0) {
+					MC(count(cnt.refi_zero_hits);)
+					refi.erase(rit);
+				}
 			}
 			remove_item(i);
 		}
@@ -528,19 +568,24 @@ void parser<C, T>::scan(const item& i, size_t n, T ch) {
 	// and new item j will be created.
 	// hence, the previous item i can be marked
 	// for gc
-	if (!o.binarize && o.enable_gc) gcready.insert(i);
+	if (!o.binarize && po.enable_gc) gcready.insert(i);
 	if (j.set >= S.size()) S.resize(j.set + 1);
 	DBGP(print(std::cout << " +  adding from scan into S[" << j.set <<
 		"]: \t", j) << std::endl;)
-	S[j.set].insert(j), fromS[j.from].insert(j.set);
+	S[j.set].insert(j);
+	if (need_fromS) {
+		MC(count(cnt.fromS_writes);)
+		fromS[j.from].insert(j.set);
+	}
 	DBGP(print(std::cout << "Add Edge: ", i) << " --> ";)
-    DBGP(print(std::cout, j) << std::endl;)
+	DBGP(print(std::cout, j) << std::endl;)
 	//++refi[i];
 }
 template <typename C, typename T>
 void parser<C, T>::scan_cc_function(const item& i, size_t n, T ch,
 	container_t& c)
 {
+	MC(count(cnt.scan_cc_calls);)
 	DBGP(std::cout << "    scanning cc function for char: `"
 		<< to_std_string(ch) << "`[" << (int_t) ch << "]" << std::endl;)
 	size_t p = 0; // character's prod rule
@@ -564,72 +609,98 @@ void parser<C, T>::scan_cc_function(const item& i, size_t n, T ch,
 	DBGP(print(std::cout << " +  adding from cc scan into S[" << k.set <<
 		"] \t", k) << "\n";)
 	if (S.size() <= k.set) S.resize(k.set + 1);
-	S[k.set].insert(k), fromS[k.from].insert(k.set);
+	S[k.set].insert(k);
+	if (need_fromS) {
+		MC(count(cnt.fromS_writes);)
+		fromS[k.from].insert(k.set);
+	}
 	DBGP(print(std::cout << "Add Edge: ", i) << " --> ";)
 	DBGP(print(std::cout, k) << "\n";)
 	//++refi[i];
 	// i is scanned over and item k is completed so collectible.
-	if (!o.binarize && o.enable_gc ) gcready.insert(i);
+	if (!o.binarize && po.enable_gc ) gcready.insert(i);
 	//gcready.insert(k);
 	if (eof_fn) c.insert(k); // add current item for completion if eof_fn
 }
 
 template <typename C, typename T>
 parser<C, T>::result parser<C, T>::parse(const C* data, size_t size,
-	parse_options po)
+	parse_options popts)
 {
-	report_.clear();
+	po = popts;
+	return parse(data, size);
+}
+template <typename C, typename T>
+parser<C, T>::result parser<C, T>::parse(const C* data, size_t size) {
 	in_ = std::make_unique<input>(data, size,
 		po.max_length, o.chars_to_terminals, po.eof);
-	return _parse(po);
+	return _parse();
 }
 template <typename C, typename T>
 parser<C, T>::result parser<C, T>::parse(std::basic_istream<C>& is,
-	parse_options po)
+	parse_options popts)
 {
-	report_.clear();
+	po = popts;
+	return parse(is);
+}
+template <typename C, typename T>
+parser<C, T>::result parser<C, T>::parse(std::basic_istream<C>& is) {
 	in_ = std::make_unique<input>(is,
 		po.max_length, o.chars_to_terminals, po.eof);
-	return _parse(po);
+	return _parse();
 }
 template <typename C, typename T>
 parser<C, T>::result  parser<C, T>::parse(const std::string& fn,
-	parse_options po)
+	parse_options popts)
 {
-	report_.clear();
+	po = popts;
+	return parse(fn);
+}
+template <typename C, typename T>
+parser<C, T>::result  parser<C, T>::parse(const std::string& fn) {
 	in_ = std::make_unique<input>(fn,
 		po.max_length, o.chars_to_terminals, po.eof, &report_);
-	return _parse(po);
+	return _parse();
 }
 #ifdef _WIN32
 template <typename C, typename T>
 parser<C, T>::result parser<C, T>::parse(const std::wstring& fn,
-	parse_options po)
+	parse_options popts)
 {
-	report_.clear();
+	po = popts;
+	return parse(fn);
+}
+template <typename C, typename T>
+parser<C, T>::result parser<C, T>::parse(const std::wstring& fn) {
 	in_ = std::make_unique<input>(fn,
 		po.max_length, o.chars_to_terminals, po.eof, &report_);
-	return _parse(po);
+	return _parse();
 }
 #else
 template <typename C, typename T>
-parser<C, T>::result parser<C, T>::parse(int fd, parse_options po) {
-	report_.clear();
+parser<C, T>::result parser<C, T>::parse(int fd, parse_options popts) {
+	po = popts;
+	return parse(fd);
+}
+template <typename C, typename T>
+parser<C, T>::result parser<C, T>::parse(int fd) {
 	in_ = std::make_unique<input>(fd,
 		po.max_length, o.chars_to_terminals, po.eof);
-	return _parse(po);
+	return _parse();
 }
 #endif
 template <typename C, typename T>
-parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
-	this->po = po;
+parser<C, T>::result parser<C, T>::_parse() {
+	// Fresh report per parse.
+	report_.clear();
 	std::optional<idni::diagnostics::report::scope_guard> parse_scope;
 	if (po.measure_scopes)
 		parse_scope.emplace(report_.open(keys().parse));
+	else
+		report_.reset(keys().parse);
+#ifdef TAU_PARSER_MEASURE_COUNTERS
 	cnt = idni::parser_strings::counters{};
-	#ifdef TAU_PARSER_MEASURE
-	measures::start_timer("parsing", po.measure);
-	#endif // TAU_PARSER_MEASURE
+#endif
 	debug = po.debug;
 	if (debug) {
 		std::basic_string<C> tmp = in_->get_string();
@@ -644,24 +715,43 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 	std::unique_ptr<pforest> f;
 	if (po.tree_path == parse_tree_path::forest_path)
 		f = std::make_unique<pforest>();
-	S.clear(), U.clear(), bin_tnt.clear(), refi.clear(), cache.clear(),
-		gcready.clear(), sorted_citem.clear(), rsorted_citem.clear(),
-		completion_deps.clear(), completion_count.clear(),
-		complete_memo.clear();
+#ifdef TAU_PARSER_MEASURE_COUNTERS
+	auto flush_parsing_counters = [&]() {
+		idni::parser_strings::flush_counters(report_, cnt, keys());
+		report_.kb(keys().rss_after,
+			measures::current_rss_kb());
+		report_.kb(keys().peak_rss_after,
+			measures::peak_rss_kb());
+		report_.count(keys().input_length, in_->tpos());
+		report_.count(keys().position_count, in_->tpos());
+	};
+#endif
+
+	lit<C, T> start_lit;
+	auto run_earley = [&]() {
+	size_t n = 0;
+	// fromS is only read by GC drain and conjunctive cascade machinery.
+	// Skip every write for non-conjunctive grammars with GC off.
+	need_fromS = po.enable_gc || any_conj;
+	S.clear(), U.clear(), fromS.clear(), bin_tnt.clear(), refi.clear(),
+		cache.clear(), gcready.clear(), sorted_citem.clear(),
+		rsorted_citem.clear(), completion_deps.clear(),
+		completion_count.clear(), complete_memo.clear();
 	//pnode::nid().clear();
-	MS(int gcnt = 0;) // count of collected items
 	tid = 0;
 	S.resize(1);
-	lit<C, T> start_lit = po.start != SIZE_MAX ? g.nt(po.start)
-							: g.start_literal();
+	start_lit = po.start != SIZE_MAX ? g.nt(po.start)
+						: g.start_literal();
 	container_t t, c;
 	for (size_t p : g.prod_ids_of_literal(start_lit))
-		for (size_t c = 0; c != g.n_conjs(p); ++c)
-			++refi[*add(t, { 0, p, c, 0, 0 }).first];
+		for (size_t c = 0; c != g.n_conjs(p); ++c) {
+			auto [it, _] = add(t, { 0, p, c, 0, 0 });
+			if (po.enable_gc) ++refi[*it];
+		}
 	size_t r = 1, cb = 0; // row and cel beginning
 	size_t proc = 0;
 	T ch = 0;
-	size_t n = 0, cn = -1;
+	size_t cn = -1;
 	bool new_pos = true;
 	DBGP(print(std::cout << "\ninitial t:\n", t);)
 	do {
@@ -677,18 +767,22 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 			<< TC.CLEAR() <<std::endl;)
 		if (po.measure_each_pos && new_pos) {
 			if (in_->cur() == (C)'\n') (cb = n), r++;
-			#ifdef TAU_PARSER_MEASURE
-			measures::start_timer("current character parsing");
-			#endif // TAU_PARSER_MEASURE
 		}
 
+		MC(size_t pos_iters = 0;)
 		do {
+			MC(count(cnt.inner_loop_iterations);)
+			MC(count(pos_iters);)
+			MC(maks(cnt.t_size_peak, t.size());)
 			size_t lproc = 0;
 			//DBGP(print(std::cout << "t:\n", t);)
-			for (const item& x : t)
-				//print(std::cout << "adding from t into S[" << x.set << "]: ", x) << std::endl,
-				S[x.set].insert(x),
-				fromS[x.from].insert(x.set);
+			for (const item& x : t) {
+				S[x.set].insert(x);
+				if (need_fromS) {
+					MC(count(cnt.fromS_writes);)
+					fromS[x.from].insert(x.set);
+				}
+			}
 			t.clear();
 			const auto cont = S[n];
 			//DBGP(print(std::cout << "\nto process:\n", cont);)
@@ -716,15 +810,13 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 				c.clear();
 			}
 			//DBGP(if (!t.empty()) print(std::cout << "t not empty:\n", t) << "\n";)
-		} while (!t.empty());
+			} while (!t.empty());
+			MC(maks(cnt.inner_loop_iterations_max, pos_iters);)
+			MC(maks(cnt.s_max_per_pos, S[n].size());)
 
 		if (po.measure_each_pos && new_pos) {
 			std::cout << in_->pos() << " \tln: " << r << " col: "
 				<< (n - cb + 1) << " :: ";
-			#ifdef TAU_PARSER_MEASURE
-			measures::print_timer("current character parsing");
-			measures::restart_timer("current character parsing");
-			#endif // TAU_PARSER_MEASURE
 		}
 
 		if (po.tree_path == parse_tree_path::forest_path
@@ -740,24 +832,26 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 					build_forest(*f, curroot);
 				}
 		}
-		if (o.enable_gc) {
+		if (po.enable_gc) {
 			for (auto it = gcready.begin(); it != gcready.end();) {
 				auto rm = *it;
-				if ((rm.set + o.gc_lag) <= n) {
-					if (refi.find(rm) != refi.end() && refi[rm] <= 0)
-						refi.erase(rm);
+				if ((rm.set + po.gc_lag) <= n) {
+					bool can_remove = true;
+					if (auto rit = refi.find(rm); rit != refi.end()) {
+						if (rit->second > 0) {
+							can_remove = false;
+							MC(count(cnt.gcready_skipped_refcounted);)
+						} else refi.erase(rit);
+					}
+					if (!can_remove) { ++it; continue; }
 					auto its = S[rm.set].find(rm);
 					if ( its != S[rm.set].end() ){
 						S[rm.set].erase(its);
-						//also clean from cache
-
-						if (!completed(rm) && get_lit(rm).nt() ) {
-							if (auto fit = cache.find({get_lit(rm).n(), rm.set});
-								fit != cache.end()) {
-								fit->second.erase(rm);
-								if( fit->second.size() == 0 )
-									cache.erase(fit);
-							}
+						if (!completed(rm) && get_lit(rm).nt()) {
+							auto cit = cache.find(
+								{get_lit(rm).n(), rm.set});
+							if (cit != cache.end())
+								cit->second.erase(rm);
 						}
 
 						// also clean from fromS
@@ -768,7 +862,7 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 									fromS.erase(fit);
 						}
 
-						MS(gcnt++;)
+						MC(count(cnt.gc_collected);)
 					}
 					it = gcready.erase(it);
 				}
@@ -778,29 +872,30 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 		//DBGP(print_S(std::cout << "\n") << "\n";)
 
 	} while (in_->tnext());
+	};
 
-	#ifdef TAU_PARSER_MEASURE
-	measures::print_timer("parsing");
-	measures::stop_timer("parsing");
-	#endif // TAU_PARSER_MEASURE
-	if (po.measure_counters) {
-		idni::parser_strings::flush_counters(report_, cnt, keys());
-		report_.count(keys().input_length, in_->tpos());
-		report_.count(keys().position_count, in_->tpos());
+	{
+		auto _ = report_.open_if(po.measure_scopes, keys().parsing);
+		#ifdef TAU_PARSER_MEASURE_COUNTERS
+		if (po.measure_counters) {
+			report_.kb(keys().rss_before,
+				measures::current_rss_kb());
+			report_.kb(keys().peak_rss_before,
+				measures::peak_rss_kb());
+		}
+		#endif
+		run_earley();
+		MC(if (po.measure_counters) flush_parsing_counters();)
 	}
 
 	in_->clear();
-	// remaining total items
-	MS(size_t count = 0;)
-	MS(for (size_t i = 0; i < S.size(); i++) count += S[i].size();)
-	MS(std::cout << "\nGC: total input size = " << n;)
-	MS(std::cout << "\nGC: total remaining  = " << count;)
-	MS(std::cout << "\nGC: total collected  = " << gcnt;)
-	//MS(std::cout << "\nGC: unique collected  = " << unique_collected.size();)
-	MS(std::cout << "\nGC: gcready size = " << gcready.size();)
-	MS(std::cout << "\nGC: refi size = " << refi.size();)
-	MS(if (count + gcnt)
-		std::cout << "\nGC: % = " << 100*gcnt/(count+gcnt) <<std::endl);
+	MC({
+		size_t s_remaining = 0;
+		for (size_t i = 0; i < S.size(); i++) s_remaining += S[i].size();
+		count(cnt.s_total_remaining, s_remaining);
+		count(cnt.gcready_size_final, gcready.size());
+		count(cnt.refi_size_final, refi.size());
+	})
 
 	tref fr = 0;
 	if (po.tree_path == parse_tree_path::bintree_path) {
@@ -817,29 +912,39 @@ parser<C, T>::result parser<C, T>::_parse(const parse_options& po) {
 	error err = fnd ? error{} : get_error();
 
 	if (f) {
-		MS(auto usen = f->count_useful_nodes(f->root());)
-		MS(auto usenc = usen.first + usen.second;)
-
-		MS(std::cout << "\nGC: Useful nodes"
-			<<usen.first <<"+"<<usen.second << "=" << usenc <<"\n" );
-
-		MS(if (count + gcnt)
-			std::cout << "\nGC: useful% = " << 100*(usenc)
-			/(count+gcnt) <<std::endl );
-		MS(if (count + gcnt -usenc)
-			std::cout << "\nGC: achieved% = " << 100*gcnt
-			/(count+gcnt - usenc) <<std::endl);
-
-		MS(if (count + gcnt)
-			std::cout << "\nGC: potenial% = " << 100*(count+gcnt
-			- usenc)/(count + gcnt) <<std::endl);
+		DBGP(
+		MC({
+			auto usen = f->count_useful_nodes(f->root());
+			auto usenc = usen.first + usen.second;
+			const size_t total = cnt.s_total_remaining
+				+ cnt.gc_collected;
+			std::cout << "\nGC: Useful nodes"
+				<< usen.first << "+" << usen.second
+				<< "=" << usenc << "\n";
+			if (total)
+				std::cout << "\nGC: useful% = "
+					<< 100*usenc / total << std::endl;
+			if (total > usenc)
+				std::cout << "\nGC: achieved% = "
+					<< 100*cnt.gc_collected
+						/ (total - usenc) << std::endl;
+			if (total)
+				std::cout << "\nGC: potential% = "
+					<< 100*(total - usenc) / total
+					<< std::endl;
+		})
+		)
 	}
 
 	parse_scope.reset();
-	if (po.tree_path == parse_tree_path::bintree_path)
-		return result(*this, std::move(in_), fr, fnd, err);
-	else
-		return result(*this, std::move(in_), std::move(f), fnd, err);
+	if (po.tree_path == parse_tree_path::bintree_path) {
+		result r(*this, std::move(in_), fr, fnd, err);
+		po = o.parse_opts;
+		return r;
+	}
+	result r(*this, std::move(in_), std::move(f), fnd, err);
+	po = o.parse_opts;
+	return r;
 }
 template <typename C, typename T>
 bool parser<C, T>::found(size_t start) {
@@ -1078,6 +1183,28 @@ typename parser<C, T>::error parser<C, T>::get_error() {
 	return err;
 }
 template <typename C, typename T>
+int parser<C, T>::do_preprocess() {
+#if defined(TAU_PARSER_MEASURE_SCOPES) \
+	|| defined(TAU_PARSER_MEASURE_COUNTERS)
+	int count = 0;
+	auto run = [&]() {
+		for (size_t n = 0; n < in_->tpos() + 1; n++)
+			for (const item& i : S[n]) {
+				if (po.measure_counters) ++count;
+				pre_process(i);
+			}
+	};
+	report_.step(po.measure_scopes && po.measure_preprocess,
+		keys().preprocess, [&] { run(); });
+	return count;
+#else
+	for (size_t n = 0; n < in_->tpos() + 1; n++)
+		for (const item& i : S[n]) pre_process(i);
+	return 0;
+#endif
+}
+
+template <typename C, typename T>
 void parser<C, T>::pre_process(const item& i) {
 	//DBGP(print(std::cout << " *  preprocessing\t\t\t", i) << std::endl;)
 	//sorted_citem[G[i.prod][0].n()][i.from].emplace_back(i);
@@ -1120,26 +1247,8 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 	pnode root(start_lit, { 0, in_->tpos() });
 
 	// preprocess parser items for faster retrieval
-	#ifdef PARSER_MEASURE
-	measures::start_timer("preprocess", po.measure_preprocess);
-	int count = 0;
-	#endif // PARSER_MEASURE
-
-	for (size_t n = 0; n < in_->tpos() + 1; n++)
-		for (const item& i : S[n])
-			#ifdef PARSER_MEASURE
-			count++,
-			#endif // PARSER_MEASURE
-			pre_process(i);
-
-	#ifdef PARSER_MEASURE
-	measures::print_timer("preprocess");
-	measures::stop_timer("preprocess");
-	#endif // PARSER_MEASURE
-
-	#ifdef PARSER_MEASURE
-	measures::start_timer("forest building", po.measure_forest);
-	#endif // PARSER_MEASURE
+	int preprocess_count = do_preprocess();
+	if (po.debug) report_.info("preprocess size", preprocess_count);
 
 	auto check_allowed = [this](const pnode& n) {
 		if (!g.opt.auto_disambiguate) return false;
@@ -1275,12 +1384,8 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 		return r;
 	};
 
-	tref ret = build(root);
-
-	#ifdef PARSER_MEASURE
-	measures::print_timer("forest building");
-	measures::stop_timer("forest building");
-	#endif // PARSER_MEASURE
+	tref ret = report_.step(po.measure_scopes && po.measure_forest,
+		keys().build_bintree, [&] { return build(root); });
 
 	return ret;
 }
@@ -1300,38 +1405,16 @@ bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
 	f.root(root);
 
 	// preprocess parser items for faster retrieval
-	#ifdef TAU_PARSER_MEASURE
-	measures::start_timer("preprocess", po.measure_preprocess);
-	int count = 0;
-	#endif // TAU_PARSER_MEASURE
+	int preprocess_count = do_preprocess();
+	if (po.debug) {
+		report_.info("preprocess size", preprocess_count);
+		report_.info("sorted_citem size", sorted_citem.size());
+		report_.info("rsorted_citem size", rsorted_citem.size());
+	}
 
-	for (size_t n = 0; n < in_->tpos() + 1; n++)
-		for (const item& i : S[n])
-			#ifdef TAU_PARSER_MEASURE
-			count++,
-			#endif // TAU_PARSER_MEASURE
-			pre_process(i);
-
-	#ifdef TAU_PARSER_MEASURE
-	measures::print_timer("preprocess");
-	measures::stop_timer("preprocess");
-	std::cout << "preprocess size: " << count << "\n";
-	std::cout << "sorted sizes : " << sorted_citem.size()
-		<< " " << rsorted_citem.size() << " \n";
-	#endif // TAU_PARSER_MEASURE
-
-	// build forest
-	#ifdef TAU_PARSER_MEASURE
-	measures::start_timer("forest building", po.measure_forest);
-	#endif // TAU_PARSER_MEASURE
-
-	ret = build_forest(f, root);
+	ret = report_.step(po.measure_scopes && po.measure_forest,
+		keys().build_forest, [&] { return build_forest(f, root); });
 	// f.print_data(std::cout) << "\n";
-
-	#ifdef TAU_PARSER_MEASURE
-	measures::print_timer("forest building");
-	measures::stop_timer("forest building");
-	#endif // TAU_PARSER_MEASURE
 
 	return ret;
 }

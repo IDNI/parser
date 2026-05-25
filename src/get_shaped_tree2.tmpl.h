@@ -1,7 +1,6 @@
 // To view the license please visit
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
-#include <algorithm>
 #include "parser.h"
 
 // TODO change all recursive transformations to post_order and pre_order traversals where applicable
@@ -9,7 +8,7 @@
 namespace idni {
 
 template <typename C, typename T>
-tref parser<C, T>::result::get_trimmed_tree2(tref ref,
+tref parser<C, T>::result::get_trimmed_bintree(tref ref,
 	const shaping_options opts) const
 {
 	if (!ref) return nullptr;
@@ -27,17 +26,17 @@ tref parser<C, T>::result::get_trimmed_tree2(tref ref,
 			// std::cerr << "\t is trimmable, skipping" << std::endl;
 			continue;
 		}
-		if (auto x = get_trimmed_tree2(c, opts); x) ch.push_back(x);
+		if (auto x = get_trimmed_bintree(c, opts); x) ch.push_back(x);
 	}
 	return tree::get(t.value, ch);
 }
 template <typename C, typename T>
-tref parser<C, T>::result::get_trimmed_tree2(tref n) const {
-	return get_trimmed_tree2(n, shaping);
+tref parser<C, T>::result::get_trimmed_bintree(tref n) const {
+	return get_trimmed_bintree(n, shaping);
 }
 
 template <typename C, typename T>
-tref parser<C, T>::result::inline_tree_nodes2(tref ref,
+tref parser<C, T>::result::inline_bintree_nodes(tref ref,
 	const shaping_options opts) const
 {
 	if (!ref) return nullptr;
@@ -62,12 +61,12 @@ tref parser<C, T>::result::inline_tree_nodes2(tref ref,
 	return post_order<pnode>(ref).apply_unique(inliner);
 }
 template <typename C, typename T>
-tref parser<C, T>::result::inline_tree_nodes2(tref ref) const {
-	return inline_tree_nodes2(ref, shaping);
+tref parser<C, T>::result::inline_bintree_nodes(tref ref) const {
+	return inline_bintree_nodes(ref, shaping);
 }
 
 template <typename C, typename T>
-tref parser<C, T>::result::inline_tree_paths2(tref ref,
+tref parser<C, T>::result::inline_bintree_paths(tref ref,
 	const shaping_options opts) const
 {
 	if (!ref) return nullptr;
@@ -89,35 +88,35 @@ tref parser<C, T>::result::inline_tree_paths2(tref ref,
 				if (auto y = go(c, i + 1); y) return y;
 			return nullptr;
 		};
-		if (auto p = go(ref, 0); p) return inline_tree_paths2(p, opts);
+		if (auto p = go(ref, 0); p) return inline_bintree_paths(p, opts);
 	}
 	trefs ch;
 	for (const auto& c : t.children()) {
-		if (auto x = inline_tree_paths2(c, opts); x)
+		if (auto x = inline_bintree_paths(c, opts); x)
 			ch.push_back(x);
 	}
 	return tree::get(t.value, ch);
 }
 template <typename C, typename T>
-tref parser<C, T>::result::inline_tree_paths2(tref ref) const {
-	return inline_tree_paths2(ref, shaping);
+tref parser<C, T>::result::inline_bintree_paths(tref ref) const {
+	return inline_bintree_paths(ref, shaping);
 }
 
 template <typename C, typename T>
-tref parser<C, T>::result::inline_tree2(tref ref, const shaping_options opts)
-	const
+tref parser<C, T>::result::inline_bintree(tref ref,
+	const shaping_options opts) const
 {
-	ref = inline_tree_nodes2(ref, opts);
+	ref = inline_bintree_nodes(ref, opts);
 	// tree::get(ref).print(std::cout << "inlined tree nodes: ") << "\n\n";
-	return inline_tree_paths2(ref, opts);
+	return inline_bintree_paths(ref, opts);
 }
 template <typename C, typename T>
-tref parser<C, T>::result::inline_tree2(tref ref) const {
-	return inline_tree2(ref, shaping);
+tref parser<C, T>::result::inline_bintree(tref ref) const {
+	return inline_bintree(ref, shaping);
 }
 
 template <typename C, typename T>
-tref parser<C, T>::result::trim_children_terminals2(tref ref,
+tref parser<C, T>::result::trim_bintree_child_terminals(tref ref,
 	const shaping_options opts) const
 {
 	if (!ref) return nullptr;
@@ -132,74 +131,186 @@ tref parser<C, T>::result::trim_children_terminals2(tref ref,
 	for (const auto& c : t.children()) {
 		auto& ct = tree::get(c);
 		if (ct.is_nt() || ct.is_null() || !trim) {
-			auto x = trim_children_terminals2(c, opts);
+			auto x = trim_bintree_child_terminals(c, opts);
 			if (x) ch.push_back(x);
 		}
 	}
 	return tree::get(t.value, ch);
 }
 template <typename C, typename T>
-tref parser<C, T>::result::trim_children_terminals2(tref ref) const {
-	return trim_children_terminals2(ref, shaping);
+tref parser<C, T>::result::trim_bintree_child_terminals(tref ref) const {
+	return trim_bintree_child_terminals(ref, shaping);
 }
 
 template <typename C, typename T>
-tref parser<C, T>::result::get_shaped_tree2(tref t, const shaping_options opts){
-	// if (!t) return std::cerr << "error getting shaped tree. tree is null" << "\n", nullptr;
-	// tree::get(t).print(std::cout << "parsed tree: ") << "\n\n";
-	t = get_trimmed_tree2(t, opts);
-	// tree::get(t).print(std::cout << "trimmed tree: ") << "\n\n";
-	t = inline_tree2(t, opts);
-	// tree::get(t).print(std::cout << "inlined tree: ") << "\n\n";
-	t = trim_children_terminals2(t, opts);
-	// tree::get(t).print(std::cout << "trimmed terminals: ") << "\n\n";
+tref parser<C, T>::result::shape_tree2_impl(tref t,
+	const shaping_options& opts)
+{
+	auto _ = diag_report.open_if(measure_scopes, p.keys().shaped_tree);
+	t = diag_report.step(measure_scopes, p.keys().trim, [&] {
+		return get_trimmed_bintree(t, opts);
+	});
+	t = diag_report.step(measure_scopes, p.keys().inline_nodes, [&] {
+		return inline_bintree_nodes(t, opts);
+	});
+	t = diag_report.step(measure_scopes, p.keys().inline_paths, [&] {
+		return inline_bintree_paths(t, opts);
+	});
+	t = diag_report.step(measure_scopes, p.keys().trim_terminals, [&] {
+		return trim_bintree_child_terminals(t, opts);
+	});
 	return t;
 }
+
 template <typename C, typename T>
-tref parser<C, T>::result::get_shaped_tree2(tref t)
+tref parser<C, T>::result::get_shaped_bintree(tref t,
+	const shaping_options opts)
 {
-	return get_shaped_tree2(t, shaping);
+	return shape_tree2_impl(t, opts);
 }
 template <typename C, typename T>
-tref parser<C, T>::result::get_shaped_tree2(const shaping_options opts) {
-	if (froot != 0)
-		return get_shaped_tree2(froot->get(), opts);
-	else
-		return get_shaped_tree2(get_tree2(), opts);
+tref parser<C, T>::result::get_shaped_bintree(tref t)
+{
+	return get_shaped_bintree(t, shaping);
 }
 template <typename C, typename T>
-tref parser<C, T>::result::get_shaped_tree2() {
-	return get_shaped_tree2(shaping);
+tref parser<C, T>::result::get_shaped_bintree(const shaping_options opts) {
+	return shape_tree2_impl(get_bintree(), opts);
+}
+template <typename C, typename T>
+tref parser<C, T>::result::get_shaped_bintree() {
+	return get_shaped_bintree(shaping);
 }
 
 template <typename C, typename T>
-tref parser<C, T>::result::get_tree2() {
+tref parser<C, T>::result::get_bintree() {
 	if (froot != 0)
 		return froot->get();
 	else if (f)
-		return get_tree2(f->root());
+		return get_bintree(f->root());
 	return nullptr;
 }
 
 template <typename C, typename T>
-tref parser<C, T>::result::get_tree2(const pnode& n) {
-	if (froot != 0)
-		return froot->get();
+tref parser<C, T>::result::get_bintree(const pnode& n) {
+	auto same_pnode = [](const pnode& a, const pnode& b) {
+		return a.first == b.first && a.second == b.second;
+	};
+	if (froot != 0) {
+		tref root = froot->get();
+		if (!root) return nullptr;
+		tref found = nullptr;
+		auto search = [&](tref ref) {
+			const auto& t = tree::get(ref);
+			if (amb_node.nt() && t.value.first == amb_node) {
+				for (tref c : t.children())
+					if (same_pnode(tree::get(c).value, n)) {
+						found = ref;
+						return false;
+					}
+			} else if (same_pnode(t.value, n)) {
+				found = ref;
+				return false;
+			}
+			return true;
+		};
+		pre_order<pnode>(root).search_unique(search);
+		return found;
+	}
 	if (!f) return nullptr;
 	htref t;
-	MS(emeasure_time_start(s,e);)
-	MS(std::cout<<"\n extract_graph ";)
-	auto g = f->extract_first_graph(n);
-	MS(emeasure_time_end(s, e);)
-	MS(emeasure_time_start(s1,e1);)
-	MS(std::cout<<"\n inline_grammar ";)
-	inline_grammar_transformations(g);
-	MS(emeasure_time_end(s1, e1);)
-	MS(emeasure_time_start(s2,e2);)
-	MS(std::cout<<"\n extract_tree2 ";)
-	t = g.extract_tree2();
-	MS(emeasure_time_end(s2, e2);)
+	auto _rb = diag_report.open_if(measure_scopes,
+		p.keys().reconstruct_bintree);
+	typename pforest::graph g;
+	g = diag_report.step(measure_scopes, p.keys().extract_graph, [&] {
+		return f->extract_first_graph(n);
+	});
+	diag_report.step(measure_scopes, p.keys().inline_grammar, [&] {
+		inline_grammar_transformations(g);
+	});
+	t = diag_report.step(measure_scopes, p.keys().extract_tree2, [&] {
+		return g.extract_tree2();
+	});
 	return t->get();
+}
+
+template <typename C, typename T>
+tref parser<C, T>::result::get_tree2() {
+	return get_bintree();
+}
+
+template <typename C, typename T>
+tref parser<C, T>::result::get_tree2(const pnode& n) {
+	return get_bintree(n);
+}
+
+template <typename C, typename T>
+tref parser<C, T>::result::get_trimmed_tree2(tref ref,
+	const shaping_options opts) const
+{
+	return get_trimmed_bintree(ref, opts);
+}
+template <typename C, typename T>
+tref parser<C, T>::result::get_trimmed_tree2(tref ref) const {
+	return get_trimmed_bintree(ref);
+}
+template <typename C, typename T>
+tref parser<C, T>::result::inline_tree_nodes2(tref t,
+	const shaping_options opts) const
+{
+	return inline_bintree_nodes(t, opts);
+}
+template <typename C, typename T>
+tref parser<C, T>::result::inline_tree_nodes2(tref t) const {
+	return inline_bintree_nodes(t);
+}
+template <typename C, typename T>
+tref parser<C, T>::result::inline_tree_paths2(tref t,
+	const shaping_options opts) const
+{
+	return inline_bintree_paths(t, opts);
+}
+template <typename C, typename T>
+tref parser<C, T>::result::inline_tree_paths2(tref t) const {
+	return inline_bintree_paths(t);
+}
+template <typename C, typename T>
+tref parser<C, T>::result::inline_tree2(tref t,
+	const shaping_options opts) const
+{
+	return inline_bintree(t, opts);
+}
+template <typename C, typename T>
+tref parser<C, T>::result::inline_tree2(tref t) const {
+	return inline_bintree(t);
+}
+template <typename C, typename T>
+tref parser<C, T>::result::trim_children_terminals2(tref ref,
+	const shaping_options opts) const
+{
+	return trim_bintree_child_terminals(ref, opts);
+}
+template <typename C, typename T>
+tref parser<C, T>::result::trim_children_terminals2(tref ref) const {
+	return trim_bintree_child_terminals(ref);
+}
+template <typename C, typename T>
+tref parser<C, T>::result::get_shaped_tree2(tref t,
+	const shaping_options opts)
+{
+	return get_shaped_bintree(t, opts);
+}
+template <typename C, typename T>
+tref parser<C, T>::result::get_shaped_tree2(tref t) {
+	return get_shaped_bintree(t);
+}
+template <typename C, typename T>
+tref parser<C, T>::result::get_shaped_tree2(const shaping_options opts) {
+	return get_shaped_bintree(opts);
+}
+template <typename C, typename T>
+tref parser<C, T>::result::get_shaped_tree2() {
+	return get_shaped_bintree();
 }
 
 } // idni namespace

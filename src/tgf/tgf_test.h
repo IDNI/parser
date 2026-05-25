@@ -47,7 +47,7 @@ struct tgf_test {
 			auto s = test | tgf_test_parser::symbol | trv::terminals;
 			auto ts = test || tgf_test_parser::test_string;
 			std::cout << "testing symbol: " << s << "\n";
-			typename parser<C, T>::parse_options po{
+			tgf_test_parser::parse_options po{
 				.start = p->get_grammar().nt(s).n()
 			};
 			// std::cout << "test strings size: " << ts().size() << std::endl;
