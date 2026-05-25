@@ -8,7 +8,7 @@ namespace idni::measures {
 // ---- current_rss_kb -------------------------------------------------------
 
 [[maybe_unused]]
-inline long current_rss_kb() {
+inline size_t current_rss_kb() {
 #ifdef __linux__
 	std::ifstream f("/proc/self/statm");
 	if (!f.is_open()) return -1;
@@ -22,13 +22,13 @@ inline long current_rss_kb() {
 	if (task_info(mach_task_self(), TASK_VM_INFO,
 			(task_info_t)&vm_info, &count) != KERN_SUCCESS)
 		return -1;
-	return static_cast<long>(vm_info.phys_footprint / 1024);
+	return static_cast<size_t>(vm_info.phys_footprint / 1024);
 #elif defined(_WIN32)
 	HANDLE hProcess = GetCurrentProcess();
 	PROCESS_MEMORY_COUNTERS pmc;
 	pmc.cb = sizeof(pmc);
 	if (GetProcessMemoryInfo(hProcess, &pmc, sizeof(pmc)))
-		return static_cast<long>(pmc.WorkingSetSize / 1024);
+		return static_cast<size_t>(pmc.WorkingSetSize / 1024);
 	return -1;
 #else
 	return -1;
@@ -38,7 +38,7 @@ inline long current_rss_kb() {
 // ---- peak_rss_kb ----------------------------------------------------------
 
 [[maybe_unused]]
-inline long peak_rss_kb() {
+inline size_t peak_rss_kb() {
 #if defined(__linux__)
 	struct rusage ru;
 	if (getrusage(RUSAGE_SELF, &ru) != 0) return -1;
@@ -52,7 +52,7 @@ inline long peak_rss_kb() {
 	PROCESS_MEMORY_COUNTERS pmc;
 	pmc.cb = sizeof(pmc);
 	if (GetProcessMemoryInfo(hProcess, &pmc, sizeof(pmc)))
-		return static_cast<long>(pmc.PeakWorkingSetSize / 1024);
+		return static_cast<size_t>(pmc.PeakWorkingSetSize / 1024);
 	return -1;
 #else
 	return -1;

@@ -36,11 +36,11 @@ namespace idni::measures {
 
 /// current resident set size in KB
 [[maybe_unused]]
-inline long current_rss_kb();
+inline size_t current_rss_kb();
 
 /// peak resident set size since process start, in KB
 [[maybe_unused]]
-inline long peak_rss_kb();
+inline size_t peak_rss_kb();
 
 struct cpu_clock_tag {
 	using time_point = clock_t;
