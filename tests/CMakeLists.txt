@@ -34,10 +34,6 @@ foreach(X IN LISTS TESTS)
 	add_test(NAME ${N} COMMAND ${N})
 endforeach()
 
-# add required sources to test_cli
-target_sources("test_cli" PRIVATE
-	"${CMAKE_CURRENT_SOURCE_DIR}/../src/tgf/tgf_cli.cpp")
-
 set(DOCTEST_HEADER "${PROJECT_SOURCE_DIR}/src/doctest.h" CACHE PATH "Doctest header")
 if (NOT EXISTS "${DOCTEST_HEADER}")
 	message(STATUS "Downloading doctest to '${PROJECT_SOURCE_DIR}'")

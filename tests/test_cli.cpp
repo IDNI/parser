@@ -1,7 +1,7 @@
 // To view the license please visit
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
-#include "../src/tgf/tgf_cli.h"
+#include "../src/tgf/tgf_cli_options.h"
 
 #include "testing.h"
 
