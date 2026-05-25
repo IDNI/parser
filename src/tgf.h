@@ -183,8 +183,9 @@ private:
 			idni::diagnostics::report* diag = nullptr) {
 			auto statements  = t || tgf_parser::statement;
 			auto directives  = statements || tgf_parser::directive;
-			for (const auto& d : directives()) directive(d);
+			for (const auto& d : directives()) collect_cc_names(d);
 			cc = predefined_char_classes<C, T>(cc_names, nts, diag);
+			for (const auto& d : directives()) directive(d);
 			auto productions = statements || tgf_parser::production;
 			for (const auto& pr : productions()) production(pr);
 		}
@@ -228,6 +229,14 @@ private:
 		size_t node2nt(const trv& t) {
 			return nts.get(t | trv::terminals);
 		}
+		void collect_cc_names(const trv& t) {
+			auto d = t | tgf_parser::directive_body | trv::only_child;
+			if ((d | trv::nonterminal) != tgf_parser::use_dir) return;
+			for (auto& cc : (d
+				|| tgf_parser::use_param
+				|| tgf_parser::cc_name)())
+				cc_names.push_back(cc | trv::terminals);
+		}
 		void inline_dir(const trv& t) {
 			for (auto& n : (t || tgf_parser::inline_arg)())
 			if ((n | trv::only_child
@@ -247,16 +256,7 @@ private:
 			auto nt = d | trv::nonterminal;
 			//print_node(std::cout << "nt: " << nt << " directive_body: ", d.value()) << "\n";
 			switch (nt) {
-			case tgf_parser::use_dir:
-				for (auto& cc : (d
-					|| tgf_parser::use_param
-					|| tgf_parser::cc_name)())
-				{
-					auto s = cc | trv::terminals;
-					//std::cout << "use char class: `" << s << "`\n";
-					cc_names.push_back(s);
-				}
-				break;
+			case tgf_parser::use_dir: break;
 			case tgf_parser::start_dir:
 				start = prods_t(nts(d
 					| tgf_parser::sym | trv::terminals));
