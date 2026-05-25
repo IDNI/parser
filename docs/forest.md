@@ -14,7 +14,16 @@ It offers methods counting trees, traversal or tree or graph extractions.
 
 ### parse forest
 
-This library uses `forest` to represent all parse trees parsed from a given input. Each `parser<C, T>::parse(...)` call produces a `parser<C, T>::result` which contins a parsed forest (accessible with `get_forest()`). Parse nodes uses type (`NodeT`) `std::pair<lit<C, T>, std::array<size_t, 2>>` where `lit<C, T>` is a parsed literal and the array contains position span of a literal in an input string.
+This library uses `forest` to represent all parse trees parsed from a given input. Each `parser<C, T>::parse(...)` call produces a `parser<C, T>::result` which stores either a forest or a bintree depending on the parse mode.
+
+Access the representation you need via the central accessors on `result`:
+
+- `get_forest()` — returns the parse forest; in bintree mode lazily reconstructs it from the stored bintree root (`reconstruct_forest` in diagnostics).
+- `get_bintree()` — returns the first parse tree as a `tref`; in forest mode lazily extracts it via graph extraction (`reconstruct_bintree` and substeps in diagnostics).
+
+`get_tree2()` is a backward-compatible alias for `get_bintree()`. Only these accessors perform cross-representation conversion.
+
+Parse nodes use type (`NodeT`) `std::pair<lit<C, T>, std::array<size_t, 2>>` where `lit<C, T>` is a parsed literal and the array contains position span of a literal in an input string.
 
 `parser` provides type [`pnode`](parser_pnode.md) for used as `NodeT` templated type and type `pforest` for a parse forest:
 
@@ -160,7 +169,9 @@ function print_node(ostream& os, const parser<>::pnode& n) {
 };
 
 void main() {
-	grammar g(tgf<>::from_file("arithmetic.tgf"));
+	nonterminals<> nts;
+	grammar g = diagnostics::exit_on_fail(
+		tgf<>::from_file(nts, "arithmetic.tgf"));
 	parser p(g);
 	auto r = p.parse("1+2*3");
 	if (r.found) {

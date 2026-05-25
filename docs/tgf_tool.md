@@ -10,7 +10,15 @@ This library provides a command line tool `tgf` which takes a TGF file and allow
 
 Usage:
 ```
-tgf <tgf file> [ <command> [ <command options> ] ]
+tgf <tgf file> [ <global options> ] [ <command> [ <command options> ] ]
+```
+
+Global options (apply to any command):
+
+```
+        --help             -h      detailed information about options
+        --version          -v      print version and exit
+        --license          -L      print license and exit
 ```
 
 where command can be one of:
@@ -18,7 +26,8 @@ where command can be one of:
 repl       runs REPL UI (this is a default command if no command provided)
 gen        generate a parser code
 parse      parse an input string, file or stdin
-grammar    prints grammar
+grammar    show information about grammar
+test       run tester (requires a .tgf.test file)
 ```
 
 Options for `repl` command:
@@ -27,9 +36,12 @@ tgf <tgf file> [ repl ] [ <options> ]
         --help             -h      detailed information about options
         --start            -s      starting literal
         --grammar          -g      prints grammar
+        --json             -J      respond with JSON
         --print-ambiguity  -a      prints ambiguity info (true by default)
         --print-graphs     -p      prints parsed graph (true by default)
         --error-verbosity  -v      parse error is more verbose
+        --measure          -m      benchmark: measure and emit diagnostics report
+        --colors           -c      enable terminal colors (default: on)
         --tml-facts        -f      prints parsed graph in tml facts
         --tml-rules        -r      prints parsed graph in tml rules
         --evaluate         -e      run REPL command with input to evaluate and quit
@@ -38,14 +50,21 @@ tgf <tgf file> [ repl ] [ <options> ]
 Options for `gen` command:
 ```
 tgf <tgf file> gen [ <options> ]
+        --help             -h      detailed information about options
+        --start            -s      starting literal
+        --json             -J      respond with JSON
+        --char-type        -C      input character type (default: char)
+        --terminal-type    -T      terminal character type (default: char)
+        --utf8             -U      shorthand: char/char32_t with utf8 recoders
+        --name             -n      name of the generated parser struct
+        --output-dir       -O      output directory for output files
+        --output           -o      output file for parser
+        --auto-disambiguate
+                                   enables auto-disambiguation (default: on)
+        --nodisambig-list  -A      comma-separated list of non-disambiguation nodes
+        --namespace        -N      namespace for the generated parser code
         --decoder          -d      decoder function
         --encoder          -e      encoder function
-        --help             -h      detailed information about options
-        --namespace        -N      namespace to wrap the generated parser
-        --name             -n      name of the generated parser struct
-        --output-dir       -O      path to a directory to write output file
-        --output           -o      output file
-        --start            -s      starting literal
 ```
 For more information about decoder and encoder functions see [recoders](recoders.md)
 
@@ -58,10 +77,16 @@ tgf <tgf file> parse [ <options> ]
         --input-expression -e      parse input from a provided string
         --start            -s      starting literal
         --grammar          -g      prints grammar
+        --json             -J      respond with JSON
+        --measure          -m      benchmark: measure and emit diagnostics report
+        --colors           -c      enable terminal colors (default: on)
         --print-ambiguity  -a      prints ambiguity info (true by default)
         --print-input      -I      prints input
         --terminals        -t      prints all parsed terminals serialized
         --error-verbosity  -v      parse error is more verbose
+        --tree-path        -P      parse tree path: bintree or forest
+        --auto-disambiguate
+                                   enables auto-disambiguation (default: on)
         --print-graphs     -p      prints parsed graph (true by default)
         --tml-facts        -f      prints parsed graph in tml facts
         --tml-rules        -r      prints parsed graph in tml rules
@@ -73,6 +98,16 @@ tgf <tgf file> grammar [ <options> ]
         --help             -h      detailed information about options
         --start            -s      starting literal
         --grammar          -g      prints grammar (enabled by default)
+        --json             -J      respond with JSON
+        --measure          -m      benchmark: measure and emit diagnostics report
+        --colors           -c      enable terminal colors (default: on)
+        --nullable         -N      report nullable recursive productions
+```
+
+Options for `test` command:
+```
+tgf <tgf file> test [ <options> ]
+        --help             -h      detailed information about options
 ```
 
 ## REPL commands
@@ -278,6 +313,9 @@ These options can be additionally changed by `enable`, `disable` and `toggle` co
   measure-each-pos       measures parsing time of each pos  on/off
   measure-forest         measures forest building time      on/off
   measure-preprocess     measures forest preprocess time    on/off
+  gc                     Earley chart garbage collection    on/off
+  debug                  show debug information             on/off
+  auto-disambiguate      auto-disambiguation                on/off
   trim-terminals         trim terminals                     on/off
   inline-char-classes    inline character classes           on/off
 ```

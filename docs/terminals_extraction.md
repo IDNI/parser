@@ -46,7 +46,7 @@ const char* g_tgf =
 	" string     => '"' printable+ '"'. "
 	" start      => integer | string. ";
 nonterminals nts;
-grammar g(tgf<>::from_string(nts, g_tgf));
+grammar g = diagnostics::exit_on_fail(tgf<>::from_string(nts, g_tgf));
 parser p(g);
 
 auto f = p.parse("-245");
