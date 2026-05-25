@@ -1,11 +1,11 @@
 // To view the license please visit
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
-#include <cassert>
-#include <string.h>
 #include "parser.h"
+
 using namespace std;
 using namespace idni;
+using namespace idni::diagnostics;
 
 struct csv_parser {
 	const char* csv_tgf =
@@ -16,8 +16,9 @@ struct csv_parser {
 	"	line    => _ integer ( _ ',' _ integer _ )*."
 	"	start   => _ ( line el )* _.\n"
 	;
-	csv_parser() :
-		g(tgf<char>::from_string(nts, csv_tgf)), p(g, { true, true }) {}
+	csv_parser()
+		: g(exit_on_fail(tgf<char>::from_string(nts, csv_tgf))),
+		  p(g, { true, true }) {}
 	bool eval(const string& s) {
 		auto res = p.parse(s.c_str(), s.size());
 		if (!res.found) return cerr << res.parse_error, false;

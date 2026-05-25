@@ -19,6 +19,7 @@
 
 using namespace std;
 using namespace idni;
+using namespace idni::diagnostics;
 
 struct csv_parser {
 	// CSV grammar as a TGF string
@@ -53,7 +54,8 @@ struct csv_parser {
 	typedef vector<value> row;
 	typedef vector<row> rows;
 	// when initializing the CSV parser read the grammar from the TGF string
-	csv_parser() : g(tgf<>::from_string(nts, csv_tgf)), p(g) {}
+	csv_parser()
+		: g(exit_on_fail(tgf<>::from_string(nts, csv_tgf))), p(g) {}
 	optional<rows> parse(const char* data, size_t size) {
 		auto res = p.parse(data, size);
 		if (!res.found)	{

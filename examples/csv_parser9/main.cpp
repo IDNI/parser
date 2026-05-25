@@ -19,6 +19,7 @@
 
 using namespace std;
 using namespace idni;
+using namespace idni::diagnostics;
 
 struct csv_parser {
 	const char* csv_tgf =
@@ -46,7 +47,8 @@ struct csv_parser {
 	typedef variant<bool, int_t, string> value;
 	typedef vector<value> row;
 	typedef vector<row> rows;
-	csv_parser() : g(tgf<>::from_string(nts, csv_tgf)), p(g) {}
+	csv_parser()
+		: g(exit_on_fail(tgf<>::from_string(nts, csv_tgf))), p(g) {}
 	rows parse(const char* data, size_t size) {
 		auto res = p.parse(data, size);
 		if (!res.found)	{

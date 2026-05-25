@@ -6,6 +6,7 @@
 #include "parser.h"
 using namespace std;
 using namespace idni;
+using namespace idni::diagnostics;
 
 struct basic_arithmetic {
 	const char* ba_tgf =
@@ -25,8 +26,8 @@ struct basic_arithmetic {
 	"	neg          => '-' _ expr.\n"
 	"	integer      => digit+.\n"
 	;
-	basic_arithmetic() :
-		g(tgf<char>::from_string(nts, ba_tgf)), p(g) { }
+	basic_arithmetic()
+		: g(exit_on_fail(tgf<char>::from_string(nts, ba_tgf))), p(g) {}
 	bool eval(const string& s) {
 		auto r = p.parse(s.c_str(), s.size());
 		if (!r.found) {
