@@ -41,8 +41,11 @@ tref parser<C, T>::result::inline_tree_nodes2(tref ref,
 	const shaping_options opts) const
 {
 	if (!ref) return nullptr;
-	auto inliner = [&opts](tref n) {
+	const lit<C, T> amb = amb_node;
+	auto inliner = [&opts, &amb](tref n) {
 		const auto& t = tree::get(n);
+		// AMB protects children
+		if (t.value.first.nt() && t.value.first == amb) return n;
 		trefs ch;
 		bool changed = false;
 		for (tref c : t.children()) {
