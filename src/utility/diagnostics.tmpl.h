@@ -10,6 +10,7 @@
 #include <utility>
 
 #include "diagnostics.h"
+#include "term_colors.h"
 #include "../parser_strings.h"
 
 #include "../format/json.h"
@@ -61,15 +62,25 @@ inline void sink::operator()(std::string_view line) const {
 	if (write_) write_(line);
 }
 
-inline int64_t report::checked_i64(size_t v) {
+inline int64_t checked_i64(size_t v) {
+	DBG(assert(v <= static_cast<size_t>(
+		std::numeric_limits<int64_t>::max()));)
 	return v > static_cast<size_t>(std::numeric_limits<int64_t>::max())
 		? std::numeric_limits<int64_t>::max()
 		: static_cast<int64_t>(v);
 }
 
 inline report::scope_guard::scope_guard(report& r, key name,
-	code tag, int64_t initial_value)
+	code tag, int_t initial_value)
 	: r_(&r), idx_(r.push_scope(name, tag, initial_value)),
+	  timed_(tag == code::info_micros)
+{
+	if (timed_) timer_.start();
+}
+
+inline report::scope_guard::scope_guard(report& r, key name,
+	code tag, size_t initial_value)
+	: r_(&r), idx_(r.push_scope(name, tag, checked_i64(initial_value))),
 	  timed_(tag == code::info_micros)
 {
 	if (timed_) timer_.start();
@@ -89,24 +100,46 @@ inline report::scope_guard::~scope_guard() {
 	r_->pop_scope(idx_);
 }
 
-inline report::scope_guard report::open(key name, code tag, int64_t value) {
+inline report::scope_guard report::open(key name, code tag, int_t value) {
+	return scope_guard(*this, name, tag, value);
+}
+
+inline report::scope_guard report::open(key name, code tag, size_t value) {
 	return scope_guard(*this, name, tag, value);
 }
 
 inline report::scope_guard report::open(std::string_view name, code tag,
-	int64_t value)
+	int_t value)
+{
+	return open(intern(name), tag, value);
+}
+
+inline report::scope_guard report::open(std::string_view name, code tag,
+	size_t value)
 {
 	return open(intern(name), tag, value);
 }
 
 inline report::scope_guard report::open_if(bool enable, key name,
-	code tag, int64_t value)
+	code tag, int_t value)
+{
+	return enable ? open(name, tag, value) : scope_guard{};
+}
+
+inline report::scope_guard report::open_if(bool enable, key name,
+	code tag, size_t value)
 {
 	return enable ? open(name, tag, value) : scope_guard{};
 }
 
 inline report::scope_guard report::open_if(bool enable,
-	std::string_view name, code tag, int64_t value)
+	std::string_view name, code tag, int_t value)
+{
+	return enable ? open(intern(name), tag, value) : scope_guard{};
+}
+
+inline report::scope_guard report::open_if(bool enable,
+	std::string_view name, code tag, size_t value)
 {
 	return enable ? open(intern(name), tag, value) : scope_guard{};
 }
@@ -181,22 +214,14 @@ inline std::string_view report::str(key id) const {
 }
 
 inline void report::count(key name, int_t v) {
-	count(name, static_cast<int64_t>(v));
-}
-
-inline void report::count(key name, int64_t v) {
 	push_tagged(code::info_count, name, v);
 }
 
 inline void report::count(key name, size_t v) {
-	count(name, checked_i64(v));
+	push_tagged(code::info_count, name, checked_i64(v));
 }
 
 inline void report::count(std::string_view name, int_t v) {
-	count(intern(name), v);
-}
-
-inline void report::count(std::string_view name, int64_t v) {
 	count(intern(name), v);
 }
 
@@ -204,47 +229,92 @@ inline void report::count(std::string_view name, size_t v) {
 	count(intern(name), v);
 }
 
-inline void report::kb(key name, int64_t kilobytes) {
+inline void report::kb(key name, int_t kilobytes) {
 	DBG(assert(kilobytes >= 0);)
 	push_tagged(code::info_kb, name, kilobytes);
 }
 
-inline void report::kb(std::string_view name, int64_t kilobytes) {
+inline void report::kb(key name, size_t kilobytes) {
+	push_tagged(code::info_kb, name, checked_i64(kilobytes));
+}
+
+inline void report::kb(std::string_view name, int_t kilobytes) {
 	kb(intern(name), kilobytes);
 }
 
-inline void report::error(code c, key msg, int64_t primary,
+inline void report::kb(std::string_view name, size_t kilobytes) {
+	kb(intern(name), kilobytes);
+}
+
+inline void report::error(code c, key msg, int_t primary,
 	std::initializer_list<attr> extra)
 {
 	DBG(assert(is_error(c));)
 	push_tagged(c, msg, primary, extra);
 }
 
-inline void report::error(code c, std::string_view msg, int64_t primary,
+inline void report::error(code c, key msg, size_t primary,
+	std::initializer_list<attr> extra)
+{
+	DBG(assert(is_error(c));)
+	push_tagged(c, msg, checked_i64(primary), extra);
+}
+
+inline void report::error(code c, std::string_view msg, int_t primary,
 	std::initializer_list<attr> extra)
 {
 	error(c, intern_dynamic(msg), primary, extra);
 }
 
-inline void report::warning(key msg, int64_t primary,
+inline void report::error(code c, std::string_view msg, size_t primary,
+	std::initializer_list<attr> extra)
+{
+	error(c, intern_dynamic(msg), primary, extra);
+}
+
+inline void report::warning(key msg, int_t primary,
 	std::initializer_list<attr> extra)
 {
 	push_tagged(code::warning, msg, primary, extra);
 }
 
-inline void report::warning(std::string_view msg, int64_t primary,
+inline void report::warning(key msg, size_t primary,
+	std::initializer_list<attr> extra)
+{
+	push_tagged(code::warning, msg, checked_i64(primary), extra);
+}
+
+inline void report::warning(std::string_view msg, int_t primary,
 	std::initializer_list<attr> extra)
 {
 	warning(intern_dynamic(msg), primary, extra);
 }
 
-inline void report::info(key msg, int64_t primary,
+inline void report::warning(std::string_view msg, size_t primary,
+	std::initializer_list<attr> extra)
+{
+	warning(intern_dynamic(msg), primary, extra);
+}
+
+inline void report::info(key msg, int_t primary,
 	std::initializer_list<attr> extra)
 {
 	push_tagged(code::info, msg, primary, extra);
 }
 
-inline void report::info(std::string_view msg, int64_t primary,
+inline void report::info(key msg, size_t primary,
+	std::initializer_list<attr> extra)
+{
+	push_tagged(code::info, msg, checked_i64(primary), extra);
+}
+
+inline void report::info(std::string_view msg, int_t primary,
+	std::initializer_list<attr> extra)
+{
+	info(intern_dynamic(msg), primary, extra);
+}
+
+inline void report::info(std::string_view msg, size_t primary,
 	std::initializer_list<attr> extra)
 {
 	info(intern_dynamic(msg), primary, extra);
@@ -846,7 +916,7 @@ void result<T>::ensure_report_root() {
 }
 
 template <typename T>
-void result<T>::error(code c, std::string_view msg, int64_t primary,
+void result<T>::error(code c, std::string_view msg, int_t primary,
 		      std::initializer_list<attr> extra) {
 	ensure_report_root();
 	diag_rep_.error(c, msg, primary, extra);
@@ -854,14 +924,36 @@ void result<T>::error(code c, std::string_view msg, int64_t primary,
 }
 
 template <typename T>
-void result<T>::warning(std::string_view msg, int64_t primary,
+void result<T>::error(code c, std::string_view msg, size_t primary,
+		      std::initializer_list<attr> extra) {
+	ensure_report_root();
+	diag_rep_.error(c, msg, primary, extra);
+	this->enforce_error_no_value_invariant();
+}
+
+template <typename T>
+void result<T>::warning(std::string_view msg, int_t primary,
 			std::initializer_list<attr> extra) {
 	ensure_report_root();
 	diag_rep_.warning(msg, primary, extra);
 }
 
 template <typename T>
-void result<T>::info(std::string_view msg, int64_t primary,
+void result<T>::warning(std::string_view msg, size_t primary,
+			std::initializer_list<attr> extra) {
+	ensure_report_root();
+	diag_rep_.warning(msg, primary, extra);
+}
+
+template <typename T>
+void result<T>::info(std::string_view msg, int_t primary,
+		     std::initializer_list<attr> extra) {
+	ensure_report_root();
+	diag_rep_.info(msg, primary, extra);
+}
+
+template <typename T>
+void result<T>::info(std::string_view msg, size_t primary,
 		     std::initializer_list<attr> extra) {
 	ensure_report_root();
 	diag_rep_.info(msg, primary, extra);
@@ -941,28 +1033,56 @@ bool result<T>::is_well_formed() const {
 
 template <typename T>
 typename result<T>::scope_guard result<T>::open_if(bool enable,
-	report::key name, code tag, int64_t value)
+	report::key name, code tag, int_t value)
 {
 	return diag_rep_.open_if(enable, name, tag, value);
 }
 
 template <typename T>
 typename result<T>::scope_guard result<T>::open_if(bool enable,
-	std::string_view name, code tag, int64_t value)
+	report::key name, code tag, size_t value)
+{
+	return diag_rep_.open_if(enable, name, tag, value);
+}
+
+template <typename T>
+typename result<T>::scope_guard result<T>::open_if(bool enable,
+	std::string_view name, code tag, int_t value)
+{
+	return diag_rep_.open_if(enable, name, tag, value);
+}
+
+template <typename T>
+typename result<T>::scope_guard result<T>::open_if(bool enable,
+	std::string_view name, code tag, size_t value)
 {
 	return diag_rep_.open_if(enable, name, tag, value);
 }
 
 template <typename T>
 typename result<T>::scope_guard result<T>::open(report::key name, code tag,
-	int64_t value)
+	int_t value)
+{
+	return diag_rep_.open(name, tag, value);
+}
+
+template <typename T>
+typename result<T>::scope_guard result<T>::open(report::key name, code tag,
+	size_t value)
 {
 	return diag_rep_.open(name, tag, value);
 }
 
 template <typename T>
 typename result<T>::scope_guard result<T>::open(std::string_view name,
-	code tag, int64_t value)
+	code tag, int_t value)
+{
+	return diag_rep_.open(name, tag, value);
+}
+
+template <typename T>
+typename result<T>::scope_guard result<T>::open(std::string_view name,
+	code tag, size_t value)
 {
 	return diag_rep_.open(name, tag, value);
 }
@@ -1023,7 +1143,15 @@ result<T> fail(struct report rep) {
 }
 
 template <typename T>
-result<T> error(code c, std::string_view msg, int64_t primary,
+result<T> error(code c, std::string_view msg, int_t primary,
+		std::initializer_list<attr> extra) {
+	report r;
+	r.error(c, msg, primary, extra);
+	return fail<T>(std::move(r));
+}
+
+template <typename T>
+result<T> error(code c, std::string_view msg, size_t primary,
 		std::initializer_list<attr> extra) {
 	report r;
 	r.error(c, msg, primary, extra);

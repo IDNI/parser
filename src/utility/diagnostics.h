@@ -8,6 +8,7 @@
 #include <functional>
 #include <initializer_list>
 #include <iostream>
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -17,7 +18,6 @@
 
 #include "defs.h"
 #include "measure.h"
-#include "term_colors.h"
 
 namespace idni::diagnostics {
 
@@ -109,9 +109,15 @@ struct sinks {
 	sink info;      // tab-indented per tree depth; info+metric+scope
 };
 
+int64_t checked_i64(size_t v);
+
 struct attr {
-	int_t   key = 0;
+	int_t   key   = 0;
 	int64_t value = 0;
+
+	attr() = default;
+	attr(int_t key, int_t value) : key(key), value(value) {}
+	attr(int_t key, size_t value) : key(key), value(checked_i64(value)) {}
 };
 
 struct node {
@@ -134,7 +140,9 @@ struct report {
 
 		scope_guard(report& r, key name,
 			code tag = code::info_micros,
-			int64_t initial_value = 0);
+			int_t initial_value = 0);
+		scope_guard(report& r, key name,
+			code tag, size_t initial_value);
 		scope_guard(scope_guard&& o) noexcept;
 		scope_guard(const scope_guard&)            = delete;
 		scope_guard& operator=(const scope_guard&) = delete;
@@ -154,16 +162,23 @@ struct report {
 	/// RAII; other tags push the @p value untouched. Returns a
 	/// @ref scope_guard that pops on destruction.
 	[[nodiscard]] scope_guard open(key name,
-		code tag = code::info_micros, int64_t value = 0);
+		code tag = code::info_micros, int_t value = 0);
+	[[nodiscard]] scope_guard open(key name, code tag, size_t value);
 	[[nodiscard]] scope_guard open(std::string_view name,
-		code tag = code::info_micros, int64_t value = 0);
+		code tag = code::info_micros, int_t value = 0);
+	[[nodiscard]] scope_guard open(std::string_view name, code tag,
+		size_t value);
 
 	/// Like @ref open(key) but conditional. Disabled returns a no-op guard.
 	[[nodiscard]] scope_guard open_if(bool enable, key name,
-		code tag = code::info_micros, int64_t value = 0);
+		code tag = code::info_micros, int_t value = 0);
+	[[nodiscard]] scope_guard open_if(bool enable, key name,
+		code tag, size_t value);
 	[[nodiscard]] scope_guard open_if(bool enable,
 		std::string_view name,
-		code tag = code::info_micros, int64_t value = 0);
+		code tag = code::info_micros, int_t value = 0);
+	[[nodiscard]] scope_guard open_if(bool enable,
+		std::string_view name, code tag, size_t value);
 
 	template <typename F>
 	auto step(bool enable, key name, F&& f) -> decltype(f());
@@ -184,33 +199,45 @@ struct report {
 	std::string_view str(key id) const;
 
 	void count(key name, int_t v);
-	void count(key name, int64_t v);
 	void count(key name, size_t v);
 	void count(std::string_view name, int_t v);
-	void count(std::string_view name, int64_t v);
 	void count(std::string_view name, size_t v);
 
-	void kb(key name, int64_t kilobytes);
-	void kb(std::string_view name, int64_t kilobytes);
+	void kb(key name, int_t kilobytes);
+	void kb(key name, size_t kilobytes);
+	void kb(std::string_view name, int_t kilobytes);
+	void kb(std::string_view name, size_t kilobytes);
 
-	void error(code c, key msg, int64_t primary = 0,
+	void error(code c, key msg, int_t primary = 0,
 		   std::initializer_list<attr> extra = {});
-	void error(code c, std::string_view msg, int64_t primary = 0,
+	void error(code c, key msg, size_t primary,
+		   std::initializer_list<attr> extra = {});
+	void error(code c, std::string_view msg, int_t primary = 0,
+		   std::initializer_list<attr> extra = {});
+	void error(code c, std::string_view msg, size_t primary,
 		   std::initializer_list<attr> extra = {});
 	void error(code c, key msg, std::initializer_list<attr> extra);
 	void error(code c, std::string_view msg,
 		   std::initializer_list<attr> extra);
 
-	void warning(key msg, int64_t primary = 0,
+	void warning(key msg, int_t primary = 0,
 		     std::initializer_list<attr> extra = {});
-	void warning(std::string_view msg, int64_t primary = 0,
+	void warning(key msg, size_t primary,
+		     std::initializer_list<attr> extra = {});
+	void warning(std::string_view msg, int_t primary = 0,
+		     std::initializer_list<attr> extra = {});
+	void warning(std::string_view msg, size_t primary,
 		     std::initializer_list<attr> extra = {});
 	void warning(key msg, std::initializer_list<attr> extra);
 	void warning(std::string_view msg, std::initializer_list<attr> extra);
 
-	void info(key msg, int64_t primary = 0,
+	void info(key msg, int_t primary = 0,
 		  std::initializer_list<attr> extra = {});
-	void info(std::string_view msg, int64_t primary = 0,
+	void info(key msg, size_t primary,
+		  std::initializer_list<attr> extra = {});
+	void info(std::string_view msg, int_t primary = 0,
+		  std::initializer_list<attr> extra = {});
+	void info(std::string_view msg, size_t primary,
 		  std::initializer_list<attr> extra = {});
 	void info(key msg, std::initializer_list<attr> extra);
 	void info(std::string_view msg, std::initializer_list<attr> extra);
@@ -301,8 +328,6 @@ private:
 	// Format a node value with its unit suffix; time auto-scales to
 	// µs/ms/s and memory (stored as KB) to kb/mb/gb/tb.
 	static std::string format_value(int64_t v, code c);
-
-	static int64_t checked_i64(size_t v);
 
 	struct value_columns {
 		size_t num_w  = 0;
@@ -399,14 +424,20 @@ struct result {
 	/// message-only (severity is @ref node_kind).
 	/// NOTE: an error on a result that already holds a value will discard
 	/// that value (see @ref enforce_error_no_value_invariant).
-	void error(code c, std::string_view msg, int64_t primary = 0,
+	void error(code c, std::string_view msg, int_t primary = 0,
+		   std::initializer_list<attr> extra = {});
+	void error(code c, std::string_view msg, size_t primary,
 		   std::initializer_list<attr> extra = {});
 	void error(code c, std::string_view msg,
 		   std::initializer_list<attr> extra);
-	void warning(std::string_view msg, int64_t primary = 0,
+	void warning(std::string_view msg, int_t primary = 0,
+		     std::initializer_list<attr> extra = {});
+	void warning(std::string_view msg, size_t primary,
 		     std::initializer_list<attr> extra = {});
 	void warning(std::string_view msg, std::initializer_list<attr> extra);
-	void info(std::string_view msg, int64_t primary = 0,
+	void info(std::string_view msg, int_t primary = 0,
+		  std::initializer_list<attr> extra = {});
+	void info(std::string_view msg, size_t primary,
 		  std::initializer_list<attr> extra = {});
 	void info(std::string_view msg, std::initializer_list<attr> extra);
 
@@ -429,16 +460,24 @@ struct result {
 	/// Open a parent scope on this result's report. Tag-driven: info_micros
 	/// auto-times; other tags use @p value as the final node value.
 	[[nodiscard]] scope_guard open(report::key name,
-		code tag = code::info_micros, int64_t value = 0);
+		code tag = code::info_micros, int_t value = 0);
+	[[nodiscard]] scope_guard open(report::key name, code tag,
+		size_t value);
 	[[nodiscard]] scope_guard open(std::string_view name,
-		code tag = code::info_micros, int64_t value = 0);
+		code tag = code::info_micros, int_t value = 0);
+	[[nodiscard]] scope_guard open(std::string_view name, code tag,
+		size_t value);
 	/// Like @ref open but conditional. Returns a no-op guard when `enable` is `false`.
 	[[nodiscard]] scope_guard open_if(bool enable,
 		report::key name,
-		code tag = code::info_micros, int64_t value = 0);
+		code tag = code::info_micros, int_t value = 0);
+	[[nodiscard]] scope_guard open_if(bool enable, report::key name,
+		code tag, size_t value);
 	[[nodiscard]] scope_guard open_if(bool enable,
 		std::string_view name,
-		code tag = code::info_micros, int64_t value = 0);
+		code tag = code::info_micros, int_t value = 0);
+	[[nodiscard]] scope_guard open_if(bool enable,
+		std::string_view name, code tag, size_t value);
 
 	/// Convenience wrapper: open_if(enable, name) + run @p f + return its
 	/// result. Mirrors @ref report::step.
@@ -477,7 +516,10 @@ template <typename T>
 [[nodiscard]] result<T> fail(struct report rep);
 
 template <typename T>
-[[nodiscard]] result<T> error(code c, std::string_view msg, int64_t primary = 0,
+[[nodiscard]] result<T> error(code c, std::string_view msg, int_t primary = 0,
+			      std::initializer_list<attr> extra = {});
+template <typename T>
+[[nodiscard]] result<T> error(code c, std::string_view msg, size_t primary,
 			      std::initializer_list<attr> extra = {});
 
 /// Forward @p src's diagnostic report into a new @ref result<T> whose value
