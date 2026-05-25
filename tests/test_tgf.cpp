@@ -17,7 +17,9 @@ int main(int argc, char **argv) {
 
 	// test parsing of a TGF having a comment but no statements
 	nonterminals<char> nts;
-	tgf<char>::from_string(nts, "	# TGF only with ws and ws_comment \n");
+	auto gr = tgf<char>::from_string(nts,
+		"	# TGF only with ws and ws_comment \n");
+	if (!gr.print_and_ok(cerr << "comment-only TGF should load\n")) return 1;
 
 	TEST("basic", "char terminals")
 	run_test_tgf(" start => 'a'. ", "a");

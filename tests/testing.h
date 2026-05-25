@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <utility>
 #include "parser.h"
+#include "utility/devhelpers.h"
 
 namespace idni::testing
 {
@@ -24,6 +25,8 @@ namespace idni::testing
 
 	template <typename T = char>
 	typename parser<T>::options options;
+	template <typename T = char>
+	typename parser<T>::parse_options parse_options;
 	template <typename T = char>
 	typename grammar<T>::options grammar_options;
 
@@ -231,9 +234,9 @@ namespace idni::testing
 		if (!info(ss))
 			return true;
 		std::stringstream ssna;
-		// g.check_nullable_ambiguity(ssna);
+		// g.check_nullable_recursive_production(ssna);
 		// if (ssna.tellp())
-		//	ss << "\npossible nullable ambiguity...\n" << ssna.str() <<"\n";
+		//	ss << "\nnullable recursive production...\n" << ssna.str() <<"\n";
 		bool expect_fail = opts.error_expected.size() > 0;
 		if (verbosity == 0)
 			opts.dump = false;
@@ -246,7 +249,9 @@ namespace idni::testing
 					<< std::endl;
 		}
 		emeasure_time_start(start_p, end_p);
-		auto r = p.parse(input.c_str(), input.size(), {.start = opts.start, .debug = false});
+		auto r = p.parse(input.c_str(), input.size(),
+			{.start = opts.start, .debug = false,
+			 .enable_gc = parse_options<T>.enable_gc});
 		if (measure)
 		{
 			ss << "\nelapsed parsing: ";
@@ -255,7 +260,7 @@ namespace idni::testing
 		bool found = r.found;
 		bool found_orig = found;
 #ifdef PARSER_BINTREE_FOREST
-		tref froot = r.get_tree2();
+		tref froot = r.get_bintree();
 #else
 		auto *f = r.get_forest();
 #endif
@@ -397,8 +402,9 @@ namespace idni::testing
 		emeasure_time_start(start_tgf, end_tgf);
 		nonterminals<T> nts;
 		auto gr = tgf<T>::from_string(nts, g_tgf);
-		if (!gr.print_and_ok()) return false;
-		grammar<T> g = gr.value();
+		if (!gr.print_and_ok(std::cout << "\t# FAILED\n"))
+			return failed = true, false;
+		grammar<T> g = std::move(gr).value();
 		if (measure)
 		{
 			ss << "elapsed TGF: ";
@@ -616,8 +622,8 @@ namespace idni::testing
 			options<char32_t>.binarize = binarize;
 		options<char>.incr_gen_forest =
 			options<char32_t>.incr_gen_forest = incr_gen;
-		options<char>.enable_gc =
-			options<char32_t>.enable_gc = enable_gc;
+		parse_options<char>.enable_gc =
+			parse_options<char32_t>.enable_gc = enable_gc;
 		grammar_options<char>.auto_disambiguate =
 			grammar_options<char32_t>.auto_disambiguate = auto_disambg;
 	}
