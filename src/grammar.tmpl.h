@@ -662,6 +662,7 @@ template <typename C, typename T>
 std::ostream& grammar<C, T>::check_nullable_recursive_production(
 	std::ostream& os) const
 {
+	bool warned = false;
 	for (size_t p = 0; p != G.size(); ++p) {
 		const lit<C, T>& head = G[p].first;
 		if (!head.nt()) continue;
@@ -683,9 +684,11 @@ std::ostream& grammar<C, T>::check_nullable_recursive_production(
 					<< " in production: ";
 				print_production(os, p);
 				os << "\n";
+				warned = true;
 			}
 		}
 	}
+	if (!warned) os << "No nullable recursive productions found\n";
 	return os;
 }
 
