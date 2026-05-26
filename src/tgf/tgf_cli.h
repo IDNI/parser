@@ -3,6 +3,10 @@
 
 #ifndef __IDNI__PARSER__TGF__TGF_CLI_H__
 #define __IDNI__PARSER__TGF__TGF_CLI_H__
+
+#include <functional>
+#include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -11,8 +15,12 @@
 #include "utility/repl.h"
 #include "utility/term_colors.h"
 #include "tgf_repl_parser.generated.h"
+#include "tgf_cli_options.h"
 
 namespace idni {
+
+/// TGF entry point
+int tgf_run(int argc, char** argv);
 
 /// TGF options and descriptions
 cli::options tgf_options();
@@ -21,16 +29,19 @@ cli::options tgf_options();
 cli::commands tgf_commands();
 
 struct tgf_repl_evaluator {
+	friend struct repl<tgf_repl_evaluator>;
+
 	using parser_type = tgf_repl_parser::parser_type;
-	using nonterminals_type = nonterminals<
-		parser_type::char_type, parser_type::terminal_type>;
-	using grammar_type = grammar<
-		parser_type::char_type, parser_type::terminal_type>;
+	using char_type = parser_type::char_type;
+	using terminal_type = parser_type::terminal_type;
+	using nonterminals_type = nonterminals<char_type, terminal_type>;
+	using grammar_type = parser_type::grammar_type;
 	using tree = tgf_repl_parser::tree;
 	using trv  = tree::traverser;
 
-	std::string tgf_file;
 	struct options {
+		options() = default;
+
 		bool gc                 = true;
 		bool debug              = false;
 		bool status             = true;
@@ -62,23 +73,33 @@ struct tgf_repl_evaluator {
 		std::set<std::string> to_trim_children{};
 		std::set<std::string> to_trim_children_terminals{};
 		std::set<std::vector<std::string>> to_inline{};
-	} opt;
+	};
 
-	tgf_repl_evaluator(const std::string& tgf_file);
-	tgf_repl_evaluator(const std::string& tgf_file, options opt);
+	explicit tgf_repl_evaluator(std::string tgf_file);
+	tgf_repl_evaluator(std::string tgf_file, options opt);
+	tgf_repl_evaluator(parser_type& parser,
+		std::string grammar_filename,
+		std::string grammar_source);
+	tgf_repl_evaluator(parser_type& parser,
+		std::string grammar_filename,
+		std::string grammar_source,
+		options opt);
 
-	/// Load the TGF from @p filename into @ref nts, @ref g, @ref p.
-	/// On failure it appends diagnostics and returns @c false.
-	bool init_grammar(const std::string& filename);
+	[[nodiscard]] bool good() const noexcept { return p_ != nullptr; }
 
-	/// True when the grammar loaded successfully and the parser is ready.
-	[[nodiscard]] bool good() const noexcept {
-		return g != nullptr && p != nullptr;
-	}
+	parser_type& p() { return *p_; }
+	const parser_type& p() const { return *p_; }
+	grammar_type& g() { return p().get_grammar(); }
+	const grammar_type& g() const { return p().get_grammar(); }
 
-	/// Print and clear the accumulated diagnostics report.
+	[[nodiscard]] const std::string& filename() const noexcept;
+	[[nodiscard]] const std::string& source() const noexcept;
+	[[nodiscard]] bool has_fixed_grammar() const noexcept;
+
+	bool reload();
+	bool reload(const std::string& new_tgf_file);
+
 	void flush_report();
-
 	void set_repl(repl<tgf_repl_evaluator>& r_);
 	void reprompt();
 
@@ -90,9 +111,6 @@ struct tgf_repl_evaluator {
 	void parse(const std::string& infile);
 	void parsed(parser_type::result& r);
 
-	bool reload();
-	bool reload(const std::string& new_tgf_file);
-
 	void get_cmd(const trv& n);
 	void set_cmd(const trv& n);
 	void add_cmd(const trv& n);
@@ -101,21 +119,40 @@ struct tgf_repl_evaluator {
 		const std::function<bool(bool&)>& update_fn);
 
 	std::vector<std::string> treepath(const trv& tp) const;
-
 	void update_opts_by_grammar_opts();
 
-	parser_type::parse_options get_parse_options() const;
+	parser_type::parse_options get_parse_options();
 	std::ostream& pretty_print(std::ostream& os, tref n,
 		std::set<size_t> skip, bool nulls, size_t l);
-	repl<tgf_repl_evaluator>* r = 0;
-	std::shared_ptr<nonterminals_type> nts;
-	std::shared_ptr<grammar_type> g;
-	std::shared_ptr<parser_type> p;
-	term::colors TC;
+
+	size_t nt_id(const std::string& s);
+	std::string nt_name(size_t id) const;
 
 private:
+	options opt;
+	bool fixed_grammar = false;
+	std::string tgf_filename;
+	std::string grammar_source;
+
+	repl<tgf_repl_evaluator>* r = nullptr;
+	term::colors TC;
 	idni::diagnostics::report report;
+
+	std::unique_ptr<nonterminals_type> owned_nts;
+	std::unique_ptr<grammar_type> owned_g;
+	std::unique_ptr<parser_type> owned_p;
+	parser_type* p_ = nullptr;
+
+	bool load_file(const std::string& filename);
+	void print_source() const;
 };
 
+/// Specialized parser entry point (compiled-in grammar; no load/reload)
+int tgf_specialized_run(int argc, char** argv,
+	tgf_repl_evaluator::parser_type& parser,
+	const char* display_name,
+	const char* grammar_source);
+
 } // namespace idni
+
 #endif // __IDNI__PARSER__TGF__TGF_CLI_H__

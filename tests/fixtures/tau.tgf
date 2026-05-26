@@ -1,0 +1,287 @@
+# To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+@use char classes eof, space, digit, xdigit, alpha, alnum, punct, printable.
+
+@enable productions charvar.
+
+# default start symbol
+#
+start                  => spec.
+
+# start symbol posibilities:
+# spec, spec_multiline. cli, stream_def and fm_or_term (bellow)
+spec                   => [ definitions ] _ wff:main _ ['.' _].
+definitions            => (_ (rec_relation | input_def | output_def) _ '.')+.
+
+spec_multiline         => (_ spec_part _ '.')* _ spec_part [ _ '.' ] _ | _.
+spec_part              => rec_relation | input_def | output_def | main.
+
+rec_relation           => ref _ ":=" _ (capture | ref | wff | bf).
+input_def              => io_var_name [ typed ] _ ":=" _ "in"    __ stream.
+output_def             => io_var_name [ typed ] _ ":=" _ "out"   __ stream.
+stream                 => "file" _ '(' _ q_file_name  _ ')'
+                        | "console":console_sym
+                        . # in the future tcp, udp,...
+ref                    => sym [offsets] ref_args [typed] [_ "fallback" __ fp_fallback].
+fp_fallback            => "first":first_sym | "last":last_sym
+                        | capture | ref | wff | bf.
+ref_args               => '(' [ (_ bf:ref_arg) (_ ',' _ ref_arg)* ] _ ')'.
+
+# wff and bf expressions
+#
+wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
+                        | (("sometimes" | "<>")  _ wff)      :wff_sometimes
+                        | (("always"    | "[]")  _ wff)      :wff_always
+                        | (wff _ '?' _ wff _ ':' _ wff)      :wff_conditional
+                        | ("all"     __ q_vars  __ wff)      :wff_all
+                        | ("ex"      __ q_vars  __ wff)      :wff_ex
+                        | ref                                :wff_ref
+                        |                                     constraint
+                        | (wff   _ "->"  _ wff)              :wff_imply
+                        | (wff   _ "<-"  _ wff)              :wff_rimply
+                        | (wff   _ "<->" _ wff)              :wff_equiv
+                        | (wff   _ "||"  _ wff)              :wff_or
+                        | (wff   _ "^^"  _ wff)              :wff_xor
+                        | (wff   _ "&&"  _ wff)              :wff_and
+                        | ('!'   _ wff)                      :wff_neg
+                        | 'T'                                :wff_t
+                        | 'F'                                :wff_f
+                        | (bf    _ "<="  _ bf _ "<=" _ bf)   :bf_interval
+                        | (bf    _ '='   _ bf)               :bf_eq
+                        | (bf    _ "!="  _ bf)               :bf_neq
+                        | (bf    _ "<"   _ bf)               :bf_lt
+                        | (bf    _ "!<"  _ bf)               :bf_nlt
+                        | (bf    _ "<="  _ bf)               :bf_lteq
+                        | (bf    _ "!<=" _ bf)               :bf_nlteq
+                        | (bf    _ ">"   _ bf)               :bf_gt
+                        | (bf    _ "!>"  _ bf)               :bf_ngt
+                        | (bf    _ ">="  _ bf)               :bf_gteq
+                        | (bf    _ "!>=" _ bf)               :bf_ngteq
+                        |                                     capture.
+# relational operators for base types
+#
+# they are named bf_* as they involve boolean functions,
+# but they are not boolean functions themselves, they return a T/F wff value
+# and hence, should be considered as wffs
+bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
+                        |                                     ba_constant
+                        |                                     variable
+                        | ("fall"     __ q_vars  __ bf)      :bf_fall
+                        | ("fex"      __ q_vars  __ bf)      :bf_fex
+                        | ref                                :bf_ref
+                        | (bf  _ ">>" _      (bf & ~bf_shr)) :bf_shr
+                        | (bf  _ "<<" _      (bf & ~bf_shl)) :bf_shl
+                        | (bf  _ '+' _       bf)             :bf_add
+                        | (bf  _ '-' _       (bf & ~bf_sub)) :bf_sub
+                        | (bf  _ '%' _       (bf & ~bf_mod)) :bf_mod
+                        | (bf  _ '*' _       bf)             :bf_mul
+                        | (bf  _ '/' _       (bf & ~bf_div)) :bf_div
+                        | (bf  _ "!|" _      (bf & ~bf_nor)) :bf_nor
+                        | (bf  _ "!^" _      (bf & ~bf_xnor)):bf_xnor
+                        | (bf  _ "!&" _      (bf & ~bf_nand)):bf_nand
+                        | (bf  _ '|' _       bf)             :bf_or
+                        | (bf  _ '^' _       bf)             :bf_xor
+                        | ('1' [ typed ])                    :bf_t
+                        | ('0' [ typed ])                    :bf_f
+                        | (bf (_ '&' _ | __) bf)             :bf_and
+                          # bf_neg_oprnd can contain only unary operations
+                        | ((bf_parenthesis | ba_constant
+                          | variable | bf_ref
+                          | bf_t | bf_f | bf_neg | capture)
+                                :bf_neg_oprnd _ "'")         :bf_neg
+                          # bf_and alternation without a separator between operands
+                        | ((bf_parenthesis | variable
+                           | bf_ref | bf_neg
+                           | bf_and_nosep | capture)
+                                :bf_and_nosep_1st_oprnd
+                           (bf_parenthesis | ba_constant
+                           | variable | bf_ref
+                           | bf_neg | capture)
+                                :bf_and_nosep_2nd_oprnd)     :bf_and_nosep
+                        |                                     capture.
+
+# constant time constraints
+constraint =>
+          ("[" ctnvar _ "!=" _ num "]" | "[" num _ "!=" _ ctnvar "]"):ctn_neq
+        | ("[" ctnvar _ '='  _ num "]" | "[" num _ '='  _ ctnvar "]"):ctn_eq
+        | ("[" ctnvar _ ">=" _ num "]" | "[" num _ ">=" _ ctnvar "]"):ctn_gteq
+        | ("[" ctnvar _ ">"  _ num "]" | "[" num _ ">"  _ ctnvar "]"):ctn_gt
+        | ("[" ctnvar _ "<=" _ num "]" | "[" num _ "<=" _ ctnvar "]"):ctn_lteq
+        | ("[" ctnvar _ "<"  _ num "]" | "[" num _ "<"  _ ctnvar "]"):ctn_lt.
+
+# constants
+ba_constant            => '{' _ (capture | source) _ '}' [ typed ].
+source                 => src_c [ (src_c | space)* src_c ].
+src_c                  => alnum | punct & ~'{' & ~'}' | '{' (src_c | space)* '}'.
+
+# variables, io variables and and uninterpreted constants
+variable               => (uconst | io_var | var_name) [ typed ].
+var_name[charvar]      => (alpha & ~'T' & ~'F') digit*.
+var_name[var]          => (alpha & ~'T' & ~'F') (alnum | '_')*.
+io_var                 => io_var_name '[' offset ']'.
+io_var_name            => chars.
+uconst                 => '<' _ ([ chars _ ] ':' _ chars):uconst_name _ '>'.
+
+# quantifier variables
+q_vars                 => q_var (_ ',' _ q_var)*.
+q_var                  => capture | variable & ~uconst.
+
+# constraint variables
+ctnvar                 => chars.
+
+# offsets
+offsets                => '[' _ offset (_ ',' _ offset)* _ ']'.
+offset                 => integer | capture | shift | (variable & ~io_var).
+shift                  => (capture | (variable & ~io_var)) _ '-' _ num.
+
+# common elements
+chars                  => alpha (alnum | '_')*.
+digits                 => digit+.
+num                    => digits.
+integer                => [ '-' ] _ digits.
+sym                    => chars.
+capture                => '$' chars.
+typed                  => _ ':' _ type _ '[' _ subtype _ ']'
+                        | _ ':' _ (type & ~"bv").
+type                   => chars.
+subtype                => num.
+
+# whitespace and comments
+comment                => '#' (printable | '\t')* ('\n' | '\r' | eof).
+__                     => space | comment | __ space | __ comment. # whitespace
+_                      => __ | null.                      # optional whitespace
+
+################################################################################
+
+# cli related rules, using cli as a starting point for parsing
+#
+cli                    => _ | _ cli_command _ ('.' _ cli_command _)* ['.' _] .
+cli_command            =>
+          ("q" | "quit")   :quit_sym                          :quit_cmd
+        | ("v" | "version"):version_sym                       :version_cmd
+        | ("c" | "clear")  :clear_sym                         :clear_cmd
+        | (("h" | "help")  :help_sym   [__ help_arg])         :help_cmd
+# TODO (MEDIUM) remove file command, it is not used
+        | ("file"          :file_sym    __ q_string)          :file_cmd
+# TODO (HIGH) maybe we must also check for validity of wff and bf (the later
+# in the sense that is always 1). Also, what does it means for a spec to be valid?
+        | ("valid"         :valid_sym   __ spec_arg)          :valid_cmd
+# TODO (HIGH) maybe we should also check for the validity of the wff and bf (the
+# later in the sense that is not always 0)
+        | ("sat"           :sat_sym     __ spec_arg)          :sat_cmd
+        | ("unsat"         :unsat_sym   __ spec_arg)          :unsat_cmd
+# TODO (LOW) maybe we should also include a command lgrs to return the lgrs of
+# a wff if possible.
+        | ("solve":solve_sym [solve_options] __ wff_cmd_arg)  :solve_cmd
+        | ("lgrs" :lgrs_sym __ wff_cmd_arg)                   :lgrs_cmd
+        | (("r" | "run"):run_sym __ spec_arg)                 :run_cmd
+        | (("n" | "normalize")
+                  :normalize_sym __ spec_arg)                 :normalize_cmd
+# TODO (MEDIUM) maybe we could remove in the subst and inst commands the
+# possibility of using wff or bf as source expression as is kind of naive
+# to use them in this context. A more interesting feature would be to
+# allow such changes in rec relations, redifining the existing ones.
+        | (("s" | "subst" | "substitute")
+                :subst_sym __ nf_cmd_arg _ '[' _
+                        nf_cmd_arg _ '/' _ nf_cmd_arg _ ']')  :subst_cmd
+        | (("i" | "inst" | "instantiate")
+                :inst_sym __ inst_args)                       :inst_cmd
+# normal forms
+        | ("dnf":dnf_sym __ nf_cmd_arg)                       :dnf_cmd
+        | ("cnf":cnf_sym __ nf_cmd_arg)                       :cnf_cmd
+        | ("anf":anf_sym __ nf_cmd_arg)                       :anf_cmd
+        | ("nnf":nnf_sym __ nf_cmd_arg)                       :nnf_cmd
+        | ("pnf":pnf_sym __ nf_cmd_arg)                       :pnf_cmd
+        | ("mnf":mnf_sym __ nf_cmd_arg)                       :mnf_cmd
+        | ("onf":onf_sym __ variable __ onf_cmd_arg)          :onf_cmd
+# qelim
+        | ("qelim":qelim_sym __ wff_cmd_arg)                  :qelim_cmd
+# option commands
+        | ("get":get_sym        [__ option_name])             :get_cmd
+        | ("set":set_sym         __ option_name
+                                (__ | _ '=' _) option_value)  :set_cmd
+        | ("enable" :enable_sym  __ option_name)              :enable_cmd
+        | ("disable":disable_sym __ option_name)              :disable_cmd
+        | ("toggle" :toggle_sym  __ option_name)              :toggle_cmd
+# definitions (rec relations and i/o defs)
+        | (("defs" | "definitions"):def_sym)                  :def_list_cmd
+        | (                         def_sym __ num)           :def_print_cmd
+        |                           rec_relation              :def_rr_cmd
+        |                           input_def                 :def_input_cmd
+        |                           output_def                :def_output_cmd
+# outputs
+        | (("hist" | "history"):history_sym)                  :history_list_cmd
+        | (                     history_sym __ history)       :history_print_cmd
+        | (                     ref | wff | bf)               :history_store_cmd
+        .
+
+# options
+solve_options          => (__ solve_option)*.
+solve_option           => "--" (solver_mode | type).
+solver_mode            => ("minimum" | "min"):solver_mode_minimum
+                        | ("maximum" | "max"):solver_mode_maximum.
+
+q_file_name            => '"' file_name '"'.
+file_name              => printable+.
+option_name            => alnum+.
+option_value           => alnum+.
+
+# command arguments
+#
+bf_cmd_arg             => history | bf.
+wff_cmd_arg            => history | wff.
+nf_cmd_arg             => history | ref | wff | bf.
+onf_cmd_arg            => history | wff.
+# TODO (MEDIUM) check if we could simplify this as ref give us a bf or a wff
+spec_arg               => history | spec | ref | wff | bf.
+# TODO (MEDIUM) check if could we only have one case?
+inst_args              =>
+          wff_cmd_arg _ '[' _ bf      _ '/' _ bf_cmd_arg  _ ']'
+        | bf_cmd_arg  _ '[' _ bf      _ '/' _ bf_cmd_arg  _ ']'.
+
+# symbols usable for detailed help message
+#
+help_arg               => help_sym | version_sym | quit_sym
+                        | clear_sym | get_sym | set_sym
+                        | enable_sym | disable_sym | toggle_sym | file_sym
+                        | history_sym | abs_history_sym | rel_history_sym
+                        | selection_sym | def_sym
+                        | inst_sym | subst_sym | normalize_sym | execute_sym
+                        | solve_sym | valid_sym | sat_sym | unsat_sym | run_sym
+                        | dnf_sym | cnf_sym | anf_sym | snf_sym
+                        | nnf_sym | pnf_sym | mnf_sym | onf_sym | qelim_sym
+                        | ("example" 's'?):examples_sym.
+
+# history
+#
+# TODO (LOW) in the future maybe is intererting to also store the result of the
+# solve command in a history, so we could access it later. Maybe we could
+# use the notation %N[<var>] or %-N[<var>], where N is the id of the solution.
+history        => ( "%"
+                  | "%-":rel_history_sym [digits:history_id]):rel_history
+                | ( "%" :abs_history_sym         history_id) :abs_history.
+
+# starting symbols for parsing
+stream_def     => input_def | output_def.
+fm_or_term     => wff | bf.
+
+# shaping of the parsed tree
+#
+@trim _, __.  # trim whitespace
+
+# remove all terminals except those we need after parsing
+@trim all terminals except children of
+        sym, digits, type, subtype, integer,
+        source, capture, var_name, io_var_name, uconst_name, file_name,
+        ctnvar, option_name, option_value.
+
+# inline intermediate nodes and eliminate parenthesis
+@inline char classes, chars, q_var, src_c, uconst, spec_part,
+        inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg, spec_arg,
+        uconst > uconst_name,
+        wff > wff_parenthesis > wff,
+        bf > bf_parenthesis > bf,
+        bf_neg_oprnd > bf_parenthesis > bf,
+        bf_and_nosep_1st_oprnd > bf_parenthesis > bf,
+        bf_and_nosep_2nd_oprnd > bf_parenthesis > bf,
+        bf_and_nosep > bf_parenthesis > bf_and.

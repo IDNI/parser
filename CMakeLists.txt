@@ -53,7 +53,10 @@ option(TAU_PARSER_BUILD_TGF            "Build tgf tool"                     OFF)
 option(TAU_PARSER_BUILD_PIC            "Build position independent code"    OFF)
 option(TAU_PARSER_WINDOWS_PACKAGE      "Build Windows package"              OFF)
 option(TAU_PARSER_WINDOWS_ZIP_PACKAGE  "Build Windows zip package"          OFF)
-set(TAU_BUILD_JOBS "" CACHE STRING "Number of jobs to use for the build (0 to auto-detect)")
+set(TAU_BUILD_JOBS "" CACHE STRING
+	"Number of jobs to use for the build (0 to auto-detect)")
+set(TAU_PARSER_SPECIALIZE "" CACHE FILEPATH
+	"TGF grammar file to specialize into a _grammar executable")
 
 if (TAU_BUILD_JOBS STREQUAL "")
 	set(TAU_BUILD_JOBS 0 CACHE STRING "Number of jobs to use for the build (0 to auto-detect)")
@@ -212,6 +215,7 @@ message(STATUS "TAU_PARSER_BUILD_EMSCRIPTEN:     ${TAU_PARSER_BUILD_EMSCRIPTEN}"
 message(STATUS "TAU_PARSER_BUILD_TESTS:          ${TAU_PARSER_BUILD_TESTS}")
 message(STATUS "TAU_PARSER_BUILD_EXAMPLES:       ${TAU_PARSER_BUILD_EXAMPLES}")
 message(STATUS "TAU_PARSER_BUILD_TGF:            ${TAU_PARSER_BUILD_TGF}")
+message(STATUS "TAU_PARSER_SPECIALIZE:           ${TAU_PARSER_SPECIALIZE}")
 message(STATUS "TAU_PARSER_BUILD_PIC:            ${TAU_PARSER_BUILD_PIC}")
 message(STATUS "TAU_PARSER_ADDRESS_SANITIZER:    ${TAU_PARSER_ADDRESS_SANITIZER}")
 message(STATUS "TAU_PARSER_WINDOWS_PACKAGE:      ${TAU_PARSER_WINDOWS_PACKAGE}")
@@ -287,6 +291,15 @@ endif()
 
 if(TAU_PARSER_BUILD_TGF)
 	add_subdirectory(src/tgf)
+endif()
+
+if(TAU_PARSER_SPECIALIZE)
+	if(NOT TAU_PARSER_BUILD_TGF)
+		message(FATAL_ERROR
+			"TAU_PARSER_SPECIALIZE requires TAU_PARSER_BUILD_TGF=ON")
+	endif()
+	include("specialize")
+	add_tgf_specialization_for("${TAU_PARSER_SPECIALIZE}")
 endif()
 
 if(TAU_PARSER_BUILD_EXAMPLES)

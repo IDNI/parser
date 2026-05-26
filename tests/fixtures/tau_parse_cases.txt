@@ -1,0 +1,6 @@
+# One Tau spec per line; blank lines and # comments are ignored.
+x = 0.
+x = y && y = z.
+all x x = 0.
+1 = 1.
+ex x x = 0.

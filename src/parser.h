@@ -65,7 +65,7 @@ private:
 template <typename C = char, typename T = C>
 struct lit {
 	std::variant<size_t, T> data;
-	nonterminals<C, T>* nts = 0;
+	const nonterminals<C, T>* nts = 0;
 	bool is_null_ = false;
 	/**
 	 * @brief Creates a null literal.
@@ -78,7 +78,7 @@ struct lit {
 	/// Creates a terminal literal where \p t is a template type of the terminal.
 	lit(T t);
 	/// Creates a non-terminal literal.
-	lit(size_t n, nonterminals<C, T>* nts);
+	lit(size_t n, const nonterminals<C, T>* nts);
 	/**
 	 * @brief Returns true if the literal is nonterminal or false if it is terminal.
 	 *
@@ -440,7 +440,7 @@ struct grammar {
 	std::ostream& print_data(std::ostream& os, std::string prep = {}) const;
 #endif // DEBUG
 	/// Returns a literal of a nonterminal with id n.
-	lit<C, T> nt(size_t n);
+	lit<C, T> nt(size_t n) const;
 	/**
 	 * Returns a literal of a nonterminal named s. It is added into
 	 * nonterminals if it's not contained already.
@@ -853,9 +853,9 @@ public:
 		/// End of a stream
 		C eof = std::char_traits<C>::eof();
 		/// Record timed scopes in diagnostics report
-		bool measure_scopes = DEFAULT_MEASURE_SCOPES;
+		bool measure_scopes = false;
 		/// Record parse counters and RSS metrics in report
-		bool measure_counters = DEFAULT_MEASURE_COUNTERS;
+		bool measure_counters = false;
 		/// Measure time taken for parsing (legacy aggregate flag,
 		/// distinct from the scope-level measure_scopes).
 		bool measure = false;
@@ -1164,6 +1164,7 @@ public:
 	 */
 	error get_error();
 	grammar<C, T>& get_grammar() { return g; }
+	const grammar<C, T>& get_grammar() const { return g; }
 	bool debug = false;
 	std::pair<size_t, size_t> debug_at = { DEBUG_POS_FROM, DEBUG_POS_TO };
 private:

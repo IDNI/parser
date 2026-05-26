@@ -9,7 +9,7 @@
 #include "utility/characters.h"
 #endif
 
-namespace idni { int tgf_run(int argc, char** argv); }
+#include "tgf_cli.h"
 
 #ifdef _WIN32
 static int tgf_main_windows() {

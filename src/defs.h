@@ -37,18 +37,14 @@ using int_t = int32_t;
 
 #ifdef TAU_PARSER_MEASURE_SCOPES
 #	define MS(x) x
-#	define DEFAULT_MEASURE_SCOPES true
 #else
 #	define MS(x)
-#	define DEFAULT_MEASURE_SCOPES false
 #endif
 
 #ifdef TAU_PARSER_MEASURE_COUNTERS
 #	define MC(x) x
-#	define DEFAULT_MEASURE_COUNTERS true
 #else
 #	define MC(x)
-#	define DEFAULT_MEASURE_COUNTERS false
 #endif
 
 #define DBGP(x) if (debug) { x }

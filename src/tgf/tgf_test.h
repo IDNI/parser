@@ -5,6 +5,7 @@
 #define __IDNI__PARSER__TGF__TGF_TEST_H__
 #include <fstream>
 #include <streambuf>
+#include <type_traits>
 
 #include "tgf_test_parser.generated.h"
 
@@ -41,15 +42,18 @@ struct tgf_test {
 		return ss.str();
 	}
 
-	static int run_tests(auto p, const trv& tests) {
+	static int run_tests(auto& p, const trv& tests) {
 		int ret = 0;
 		for (auto& test : tests()) {
 			auto s = test | tgf_test_parser::symbol | trv::terminals;
 			auto ts = test || tgf_test_parser::test_string;
 			std::cout << "testing symbol: " << s << "\n";
 			tgf_test_parser::parse_options po{
-				.start = p->get_grammar().nt(s).n()
+				.start = p.get_grammar().nt(s).n()
 			};
+			using parse_options = typename std::remove_reference_t<
+				decltype(p)>::parse_options;
+			parse_options ppo{ .start = po.start };
 			// std::cout << "test strings size: " << ts().size() << std::endl;
 			for (auto& t : ts()) {
 				auto x = t | trv::only_child;
@@ -59,7 +63,7 @@ struct tgf_test {
 					? x | trv::terminals
 					: get_quoted_string(x);
 				std::cout << "\t\"" << in << "\"\t\t";
-				auto r = p->parse(in.c_str(), in.size(), po);
+				auto r = p.parse(in.c_str(), in.size(), ppo);
 				if (!r.found) {
 					std::cout << "FAIL\n";
 					std::cerr << "parse error: "
@@ -73,7 +77,7 @@ struct tgf_test {
 		return ret;
 	}
 
-	static int run_from_string(auto p, const std::basic_string<C>& s) {
+	static int run_from_string(auto& p, const std::basic_string<C>& s) {
 		auto& tp = tgf_test_parser::instance();
 		auto r = tp.parse(s.c_str(), s.size());
 		if (!r.found) return std::cerr << "TGF test: " <<
@@ -85,7 +89,7 @@ struct tgf_test {
 		return run_tests(p, tests);
 	}
 
-	static int run_from_file(auto p, const std::string& filename) {
+	static int run_from_file(auto& p, const std::string& filename) {
 		std::cout << "opening file: " << filename << std::endl;
 		std::ifstream ifs(filename);
 		if (!ifs) {

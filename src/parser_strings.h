@@ -189,6 +189,8 @@ inline void dict_reset(id_t) {
 struct messages {
 	using sv = std::string_view;
 	static constexpr sv cannot_open_file = "cannot open file: ";
+	static constexpr sv loading_grammars_unavailable =
+		"Loading grammars is not available in a specialized REPL";
 };
 
 // Materializes ids for every well-known name. The ids are compile-time constants

@@ -186,6 +186,44 @@ composed by the public presets above; see [`CMakePresets.json`](../CMakePresets.
 - Preset: `release-tgf` / `debug-tgf`, or `./dev preset release-tgf run -- …`
 - Clang: `release-tgf-clang` / `debug-tgf-clang`, or `./dev preset release-tgf-clang run -- --help`
 
+## Specialize
+
+`specialize <FILE.tgf> [<BUILD_TYPE>] [<CMAKE_OPTIONS>]` — build a grammar-baked
+REPL binary from a `.tgf` file.
+
+```bash
+./dev specialize tests/fixtures/tiny.tgf
+# → build/release/tiny_grammar
+
+./dev specialize tests/fixtures/tau.tgf Debug
+# → build/debug/tau_grammar
+```
+
+The resulting executable behaves like `tgf <file>.tgf` (same REPL, same
+`parse`/`grammar`/`get`/`set`/… commands), but the parser is generated and
+compiled in: no `.tgf` or `.generated.h` is needed at runtime. `load` and
+`reload` print a "not available" message in a specialized binary.
+
+| Item | Default | Override |
+|------|---------|----------|
+| Output name | `<basename>_grammar` | (not exposed in script) |
+| Build type | `Release` | first positional: `Debug`, `RelWithDebInfo`, … |
+| Build dir | `build/release` (preset layout) | follows the build type |
+
+Mechanism: the script invokes the main CMake build with
+`-DTAU_PARSER_SPECIALIZE=<absolute-path>` and the `*_grammar` target;
+[`cmake/specialize.cmake`](../cmake/specialize.cmake) runs `tgf <file>.tgf gen`
+at build time and emits an executable from
+[`cmake/specialize/specialized_main.cpp.in`](../cmake/specialize/specialized_main.cpp.in).
+
+Editing the `.tgf` file triggers a CMake reconfigure on the next build (via
+`CMAKE_CONFIGURE_DEPENDS`), which keeps the embedded grammar text in sync with
+the regenerated parser.
+
+Re-running `./dev specialize bar.tgf` replaces the active CMake target;
+previously built `*_grammar` executables remain in the build tree until
+`./dev clean`.
+
 ## Testing
 
 - `test-with-tau` — clone `tau-lang`, build against current parser, run its tests

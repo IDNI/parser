@@ -24,7 +24,7 @@ inline cli::options tgf_options() {
 
 // configure CLI commands, their options and descriptions
 //
-cli::commands tgf_commands() {
+inline cli::commands tgf_commands() {
 	cli::commands cs;
 	std::string lcmd = "", lopt = "";
 	auto CMD  = [&](const struct cli::command& cmd) {

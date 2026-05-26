@@ -82,7 +82,7 @@ lit<C, T>::lit() : data(static_cast<T>(0)), is_null_(true) { }
 template <typename C, typename T>
 lit<C, T>::lit(T c) : data(c), nts(0) { }
 template <typename C, typename T>
-lit<C, T>::lit(size_t n, nonterminals<C, T>* nts) : data(n), nts(nts) { }
+lit<C, T>::lit(size_t n, const nonterminals<C, T>* nts) : data(n), nts(nts) { }
 template <typename C, typename T>
 bool lit<C, T>::nt() const { return std::holds_alternative<size_t>(data); }
 template <typename C, typename T>
@@ -650,7 +650,7 @@ bool grammar<C, T>::all_nulls(const lits<C, T>& a) const {
 	return true;
 }
 template <typename C, typename T>
-lit<C, T> grammar<C, T>::nt(size_t n) { return lit<C, T>(n, &nts); }
+lit<C, T> grammar<C, T>::nt(size_t n) const { return lit<C, T>(n, &nts); }
 template <typename C, typename T>
 lit<C, T> grammar<C, T>::nt(const std::basic_string<C>& s) {
 	return nt(nts.get(s));
