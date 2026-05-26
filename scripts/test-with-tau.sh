@@ -7,6 +7,9 @@
 # It can be one of "debug" or "release".
 # "release" is default if no argument is provided
 
+set -euo pipefail
+
+DEV_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TAUDIR="./tau-lang"
 
 # check the first argument if it contains "release" or "debug".
@@ -49,5 +52,11 @@ rm -rf external/parser/*
 cp -r ../cmake ../src ../CMakeLists.txt ../VERSION ../LICENSE.md ../README.md \
 	external/parser
 
+# resolve TAU_BUILD_JOBS using shared devrc logic
+source "${DEV_ROOT}/scripts/devrc"
+DEV_CMAKE=()
+resolve_jobs
+
 # build tau with tests and run them
-./dev $BUILD_TYPE -DTAU_BUILD_TESTS=ON && ./dev test-$BUILD_TYPE
+echo "Building $BUILD_TYPE (TAU_BUILD_JOBS=$TAU_BUILD_JOBS)"
+./dev $BUILD_TYPE -DTAU_BUILD_TESTS=ON -DTAU_BUILD_JOBS=$TAU_BUILD_JOBS && ./dev test-$BUILD_TYPE
