@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+
+# To view the license please visit https://github.com/IDNI/parser/blob/main/LICENSE.md
+#
+# Wrapper used as CMAKE_{C,CXX}_COMPILER_LAUNCHER for icecream builds. It runs
+# icecc with ICECC_LOGFILE pointed at a per-invocation file, streams that log
+# to stderr, and (when TAU_ICECC_REQUIRE_REMOTE=1) aborts the build the moment
+# icecream falls back to local compilation. The log file is removed on
+# successful exit and retained on failure for postmortem inspection.
+
+set -euo pipefail
+
+log_dir="${ICECC_LOG_DIR:-${TMPDIR:-/tmp}}"
+mkdir -p "${log_dir}"
+log_file="$(mktemp "${log_dir}/icecc.XXXXXX.log")"
+tail_pid=""
+child_pid=""
+keep_log=0
+
+cleanup() {
+	if [[ -n "${tail_pid}" ]]; then
+		kill "${tail_pid}" 2>/dev/null || true
+		wait "${tail_pid}" 2>/dev/null || true
+	fi
+	if [[ "${keep_log}" -eq 0 ]]; then
+		rm -f "${log_file}"
+	fi
+}
+
+terminate() {
+	keep_log=1
+	if [[ -n "${child_pid}" ]]; then
+		kill "${child_pid}" 2>/dev/null || true
+		wait "${child_pid}" 2>/dev/null || true
+	fi
+	cleanup
+	exit 143
+}
+
+trap cleanup EXIT
+trap terminate INT TERM
+
+# stream icecc log to stderr for visibility
+tail -n +1 -f "${log_file}" >&2 &
+tail_pid="$!"
+
+export ICECC_LOGFILE="${log_file}"
+"$@" &
+child_pid="$!"
+
+# REQUIRE_REMOTE detection. Track byte offset and only scan the newly-
+# appended bytes each tick — O(file size) total, vs. O(file size^2) for the
+# previous "grep the whole file every poll" pattern.
+require_remote="${TAU_ICECC_REQUIRE_REMOTE:-0}"
+last_size=0
+while kill -0 "${child_pid}" 2>/dev/null; do
+	if [[ "${require_remote}" == "1" ]]; then
+		new_size="$(stat -c %s "${log_file}" 2>/dev/null || echo 0)"
+		if [[ "${new_size}" -gt "${last_size}" ]]; then
+			if tail -c +$((last_size + 1)) "${log_file}" \
+					| grep -q "building myself"; then
+				echo "icecc: refusing local compilation;" \
+					"scheduler selected localhost" >&2
+				kill "${child_pid}" 2>/dev/null || true
+				wait "${child_pid}" 2>/dev/null || true
+				child_pid=""
+				keep_log=1
+				exit 125
+			fi
+			last_size="${new_size}"
+		fi
+	fi
+	sleep 0.1
+done
+
+# Capture wait's status without tripping `set -e` on non-zero child exit.
+status=0
+wait "${child_pid}" 2>/dev/null || status=$?
+child_pid=""
+
+if [[ "${status}" -ne 0 ]]; then
+	keep_log=1
+fi
+
+sleep 0.05
+exit "${status}"

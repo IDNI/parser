@@ -1,0 +1,93 @@
+#!/bin/sh
+
+# To view the license please visit https://github.com/IDNI/parser/blob/main/LICENSE.md
+#
+# Find a cached icecc compiler-environment archive whose listing contains every
+# required entry, or run icecc-create-env to build a fresh one. Prints the
+# absolute path of the resolved archive on stdout. On failure, dumps the
+# create-env transcript to stderr and exits with create-env's status.
+
+set -eu
+
+usage() {
+	echo "usage: $0 --env-dir DIR --entries \"e1 e2 ...\" --create-env PATH -- [create-env-args...]" >&2
+	exit 64
+}
+
+env_dir=""
+entries=""
+create_env=""
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--env-dir)    [ $# -ge 2 ] || usage; env_dir="$2";    shift 2 ;;
+		--entries)    [ $# -ge 2 ] || usage; entries="$2";    shift 2 ;;
+		--create-env) [ $# -ge 2 ] || usage; create_env="$2"; shift 2 ;;
+		--)           shift; break ;;
+		*) usage ;;
+	esac
+done
+
+[ -n "$env_dir" ] && [ -n "$entries" ] && [ -n "$create_env" ] || usage
+[ -d "$env_dir" ] || { echo "icecc-env-resolve: env-dir not a directory: $env_dir" >&2; exit 66; }
+[ -x "$create_env" ] || { echo "icecc-env-resolve: create-env not executable: $create_env" >&2; exit 66; }
+
+archive_has_entries() {
+	archive="$1"
+	listing="$(tar -tzf "$archive" 2>/dev/null)" || return 1
+	for entry in $entries; do
+		# fixed-string + whole-line match handles regex metachars in entry
+		# names (g++, cc1plus, gcc.bin); accept optional ./ prefix.
+		if ! printf '%s\n' "$listing" | grep -Fxq "$entry" \
+				&& ! printf '%s\n' "$listing" \
+					| grep -Fxq "./$entry"; then
+			return 1
+		fi
+	done
+	return 0
+}
+
+abs_path() {
+	case "$1" in
+		/*) printf '%s\n' "$1" ;;
+		*)  printf '%s/%s\n' "$env_dir" "$1" ;;
+	esac
+}
+
+# 1. existing archive search
+for archive in "$env_dir"/*.tar.gz; do
+	[ -f "$archive" ] || continue
+	if archive_has_entries "$archive"; then
+		abs_path "$archive"
+		exit 0
+	fi
+done
+
+# 2. create a new env
+transcript="$(mktemp)"
+trap 'rm -f "$transcript"' EXIT
+status=0
+( cd "$env_dir" && "$create_env" "$@" ) >"$transcript" 2>&1 || status=$?
+
+if [ "$status" -ne 0 ]; then
+	cat "$transcript" >&2
+	exit "$status"
+fi
+
+# parse the produced archive path from create-env output. Prefer a
+# `creating <name>` line; otherwise fall back to the last *.tar.gz token.
+candidate="$(grep -E '(^|[[:space:]])creating[[:space:]]+[^[:space:]]+\.tar\.gz' \
+		"$transcript" \
+	| sed -E 's/.*creating[[:space:]]+([^[:space:]]+\.tar\.gz).*/\1/' \
+	| tail -n1)"
+if [ -z "$candidate" ]; then
+	candidate="$(grep -Eo '[^[:space:]]+\.tar\.gz' "$transcript" | tail -n1)"
+fi
+
+if [ -z "$candidate" ]; then
+	echo "icecc-env-resolve: create-env succeeded but no archive path found in output:" >&2
+	cat "$transcript" >&2
+	exit 70
+fi
+
+abs_path "$candidate"
