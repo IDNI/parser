@@ -325,19 +325,23 @@ preset_entry() {
 }
 
 resolve_script() {
+	local root="."
+	if [ -d "$1" ]; then
+		root="$1"; shift
+	fi
 	local script_name="$1"; shift
 	script_name="${script_name%.sh}"
 
-	if [ -f "scripts/${script_name}.sh" ]; then
-		exec "scripts/${script_name}.sh" "$@"
+	if [ -f "${root}/scripts/${script_name}.sh" ]; then
+		exec "${root}/scripts/${script_name}.sh" "$@"
 	fi
 
-	if [ -f "CMakePresets.json" ] && \
-	   grep -qE "\"name\"[[:space:]]*:[[:space:]]*\"${script_name}\"" CMakePresets.json && \
+	if [ -f "${root}/CMakePresets.json" ] && \
+	   grep -qE "\"name\"[[:space:]]*:[[:space:]]*\"${script_name}\"" "${root}/CMakePresets.json" && \
 	   [[ "$script_name" != _* ]]; then
 		read -p "Use preset '${script_name}'? [Y/n] " -r REPLY
 		[[ -z "$REPLY" || "$REPLY" =~ ^[Yy]([Ee][Ss])?$ ]] || exit 1
-		exec "${__devrc_dir}/preset.sh" "$script_name" "$@"
+		exec "${root}/scripts/preset.sh" "$script_name" "$@"
 	fi
 
 	return 1
