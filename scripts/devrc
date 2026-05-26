@@ -1,6 +1,9 @@
-# sourced by build.sh and preset.sh; not a standalone script
+# sourced by build.sh, preset.sh, and tau-lang scripts; not standalone
+#
+# devrc special-cases TAU_BUILD_JOBS and -G (GENERATOR). Other -D flags
+# (TAU_PARSER_*, TAU_BUILD_*, etc.) are passed through DEV_CMAKE by the caller.
 
-is_cmake_arg() {
+is_cmake_def() {
 	case "$1" in
 		-D*) return 0 ;;
 		*)   return 1 ;;
@@ -11,23 +14,84 @@ normalize_args() {
 	DEV_POSITIONAL=()
 	DEV_CMAKE=()
 	DEV_PROGRAM=()
+	VERBOSE=""
+	TARGET=""
+	GENERATOR=""
+	GENERATOR_EXPLICIT=""
+	BUILD_TYPE=""
+	PRESET=""
+	RUN=""
 	local past_dd=false
-	for arg in "$@"; do
+	local args=("$@")
+	local i=0 arg next
+	while [[ $i -lt ${#args[@]} ]]; do
+		arg="${args[$i]}"
 		if $past_dd; then
 			DEV_PROGRAM+=("$arg")
+			((i++)) || true
 			continue
 		fi
 		if [[ $arg == -- ]]; then
 			DEV_PROGRAM+=(--)
 			past_dd=true
+			((i++)) || true
 			continue
 		fi
-		if is_cmake_arg "$arg"; then
-			DEV_CMAKE+=("$arg")
-		else
-			DEV_POSITIONAL+=("$arg")
+		if [[ $arg == -G ]]; then
+			((i++)) || true
+			if [[ $i -ge ${#args[@]} ]]; then
+				echo "Missing value for -G" >&2
+				exit 1
+			fi
+			GENERATOR="${args[$i]}"
+			GENERATOR_EXPLICIT=1
+			((i++)) || true
+			continue
 		fi
+		if is_cmake_def "$arg"; then
+			DEV_CMAKE+=("$arg")
+			((i++)) || true
+			continue
+		fi
+		case "$arg" in
+			-v)
+				VERBOSE="1"
+				((i++)) || true
+				;;
+			--target)
+				((i++)) || true
+				if [[ $i -ge ${#args[@]} ]]; then
+					echo "Missing value for --target" >&2
+					exit 1
+				fi
+				TARGET="${args[$i]}"
+				((i++)) || true
+				;;
+			run)
+				RUN="run"
+				((i++)) || true
+				;;
+			Debug|Release|RelWithDebInfo|Coverage)
+				if [[ -n $BUILD_TYPE ]]; then
+					echo "Duplicate build type: ${arg}" >&2
+					exit 1
+				fi
+				BUILD_TYPE="$arg"
+				((i++)) || true
+				;;
+			*)
+				DEV_POSITIONAL+=("$arg")
+				((i++)) || true
+				;;
+		esac
 	done
+
+	[[ -z $BUILD_TYPE ]] && BUILD_TYPE="Release"
+	[[ -z $GENERATOR ]] && GENERATOR="Ninja"
+
+	if [[ ${#DEV_POSITIONAL[@]} -gt 0 ]]; then
+		PRESET="${DEV_POSITIONAL[0]}"
+	fi
 }
 
 resolve_jobs() {
@@ -58,12 +122,202 @@ resolve_jobs() {
 	export CMAKE_BUILD_PARALLEL_LEVEL="$jobs"
 }
 
-# Call at start of cmake driver scripts (build.sh, preset.sh).
-devrc_entry() {
+dev_entry() {
 	if [[ -z "${DEV_ROOT:-}" ]]; then
 		echo "devrc: DEV_ROOT not set" >&2
 		exit 1
 	fi
 	normalize_args "$@"
 	resolve_jobs
+}
+
+dev_check_no_extra_positionals() {
+	local context="${1:-argument}"
+	if [[ ${#DEV_POSITIONAL[@]} -gt 0 ]]; then
+		echo "Unknown ${context}: ${DEV_POSITIONAL[0]}" >&2
+		exit 1
+	fi
+}
+
+build_run() {
+	BUILD_DIR="build-${BUILD_TYPE}"
+	echo "Building in ${BUILD_DIR} directory"
+
+	if declare -f dev_pre_configure > /dev/null; then
+		dev_pre_configure
+	fi
+
+	mkdir -p "${BUILD_DIR}"
+	cd "${BUILD_DIR}"
+	rm -f ./CMakeCache.txt
+
+	if [[ $GENERATOR == Ninja ]]; then
+		local ninja_bin
+		ninja_bin="$(which ninja 2>/dev/null || true)"
+		if [[ -z $ninja_bin ]]; then
+			ninja_bin="$(which ninja-build 2>/dev/null || true)"
+		fi
+		if [[ -z $ninja_bin ]]; then
+			echo "Ninja is not available. Falling back to make."
+			GENERATOR="Unix Makefiles"
+		fi
+	fi
+
+	local verbose_flag=""
+	if [[ $VERBOSE == 1 ]]; then
+		if [[ $GENERATOR == Ninja ]]; then
+			verbose_flag="-v"
+		else
+			verbose_flag="VERBOSE=1"
+		fi
+	fi
+
+	echo "Configuring with ${GENERATOR} build system"
+	cmake .. -G "${GENERATOR}" -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+		"${DEV_CMAKE[@]}"
+
+	echo "Building with ${GENERATOR}"
+	echo "Parallel jobs: ${TAU_BUILD_JOBS}"
+	echo "Target: ${TARGET}"
+	local build_target=()
+	if [[ -n $TARGET ]]; then
+		build_target=(--target "$TARGET")
+	fi
+	cmake --build . "${build_target[@]}" -- -j "${TAU_BUILD_JOBS}" \
+		${verbose_flag}
+	local status=$?
+
+	cd ..
+	return $status
+}
+
+build_entry() {
+	dev_entry "$@"
+	dev_check_no_extra_positionals "build argument"
+	build_run
+	exit $?
+}
+
+test_entry() {
+	local build_type="${1:?test_entry: build type required}"
+	shift
+	dev_entry "${build_type}" "$@"
+	dev_check_no_extra_positionals "test argument"
+	build_run || exit $?
+	ctest -j "${TAU_BUILD_JOBS}" --test-dir "build-${BUILD_TYPE}" \
+		--output-on-failure
+	exit $?
+}
+
+preset_binary_dir() {
+	case "$1" in
+		release-mingw*|*-mingw-packages*)
+			echo "build/release-mingw"
+			;;
+		debug-mingw*)
+			echo "build/debug-mingw"
+			;;
+		relwithdebinfo*)
+			echo "build/relwithdebinfo"
+			;;
+		emscripten*)
+			echo "build/emscripten"
+			;;
+		release-clang|release-*-clang|release-make-clang \
+			|release-ninja-clang)
+			echo "build/release-clang"
+			;;
+		debug-clang|debug-*-clang|debug-make-clang \
+			|debug-ninja-clang)
+			echo "build/debug-clang"
+			;;
+		coverage*)
+			echo "build/coverage"
+			;;
+		debug*)
+			echo "build/debug"
+			;;
+		release*)
+			echo "build/release"
+			;;
+		all)
+			echo "build/release"
+			;;
+		*)
+			echo "build"
+			;;
+	esac
+}
+
+preset_entry() {
+	dev_entry "$@"
+	[[ -z $PRESET ]] && PRESET="release"
+	if [[ ${#DEV_POSITIONAL[@]} -gt 0 \
+			&& ${DEV_POSITIONAL[0]} == "$PRESET" ]]; then
+		DEV_POSITIONAL=("${DEV_POSITIONAL[@]:1}")
+	fi
+	dev_check_no_extra_positionals "preset argument"
+
+	PRESET_RUN_BIN="${PRESET_RUN_BIN:-tgf}"
+
+	local generator_args=()
+	if [[ ${GENERATOR_EXPLICIT:-} == 1 ]]; then
+		generator_args=(-G "${GENERATOR}")
+	fi
+
+	echo "Preset: ${PRESET}"
+	echo "Run: ${RUN}"
+	if [[ ${#generator_args[@]} -gt 0 || ${#DEV_CMAKE[@]} -gt 0 ]]; then
+		echo "CMake args: ${generator_args[*]} ${DEV_CMAKE[*]}"
+	fi
+
+	TAU_BUILD_JOBS="${TAU_BUILD_JOBS:-1}"
+
+	echo "Configuring with preset ${PRESET}"
+	cmake --fresh --preset "${PRESET}" "${generator_args[@]}" \
+		"${DEV_CMAKE[@]}"
+
+	echo "Building with preset ${PRESET}"
+	echo "Parallel jobs: ${TAU_BUILD_JOBS}"
+	cmake --build --preset "${PRESET}" "${generator_args[@]}" \
+		"${DEV_CMAKE[@]}" -- -j "${TAU_BUILD_JOBS}"
+	local status=$?
+	if [[ $status -ne 0 ]]; then
+		echo "Build failed"
+		exit $status
+	fi
+	echo "Preset '${PRESET}' build completed"
+
+	if [[ $PRESET == *package* ]]; then
+		local build_dir
+		build_dir="$(preset_binary_dir "${PRESET}")"
+		echo "Creating packages in ${build_dir} (Release)"
+		( cd "${build_dir}" && cpack -C Release )
+		status=$?
+		if [[ $status -ne 0 ]]; then
+			echo "Packaging failed"
+			exit $status
+		fi
+		echo "Packages created in ${build_dir}/packages"
+	elif [[ $RUN == "run" ]]; then
+		if [[ $PRESET == *test* ]] || [[ $PRESET == *-all ]] \
+				|| [[ $PRESET == "all" ]]; then
+			echo "Running tests"
+			ctest --preset "${PRESET}" -j "${TAU_BUILD_JOBS}" \
+				--output-on-failure "${DEV_CMAKE[@]}"
+			status=$?
+			if [[ $status -ne 0 ]]; then
+				echo "Running tests failed"
+				exit $status
+			fi
+			echo "All tests passed"
+		else
+			local build_dir run_args=("${DEV_PROGRAM[@]}")
+			build_dir="$(preset_binary_dir "${PRESET}")"
+			if [[ ${run_args[0]:-} == -- ]]; then
+				run_args=("${run_args[@]:1}")
+			fi
+			"./${build_dir}/${PRESET_RUN_BIN}" "${run_args[@]}"
+		fi
+	fi
 }

@@ -13,28 +13,35 @@ Run any script from the project root via `./dev`:
 ## How `./dev` handles arguments
 
 [`dev`](../dev) runs `scripts/*.sh`. CMake drivers [`build.sh`](build.sh) and
-[`preset.sh`](preset.sh) source [`devrc`](devrc) to normalize `-D` args and set
-`TAU_BUILD_JOBS`. You can call them directly: `./scripts/preset.sh …`.
+[`preset.sh`](preset.sh) source [`devrc`](devrc). `build_entry` and
+`preset_entry` call `dev_entry` internally; use `dev_entry` when you only need
+parsed args and `TAU_BUILD_JOBS`. `test_entry` runs a legacy build + `ctest`;
+pass CMake `-D` flags as arguments (e.g. `-DTAU_PARSER_BUILD_TESTS=ON`).
 
-Arguments are split into three groups:
+When embedded in **tau-lang**, the same `devrc` file is sourced from
+`external/parser/scripts/` (tau sets `DEV_ROOT` to the parser submodule path).
 
-| Group | Examples | Passed to the target script as |
-|-------|----------|--------------------------------|
-| Positional | preset name, `Debug`/`Release`, `run` | first, in order |
-| CMake defs | any `-D…` | after positionals |
-| Program args | everything after `--` | last (unchanged) |
+All of the following may appear **in any order** on the command line
+(`normalize_args` in `devrc` is the single parser):
 
-`-D` options may appear **anywhere** on the command line; `build.sh` and
-`preset.sh` move them after positional arguments via `devrc`. For example,
-these are equivalent:
+| Token | Effect |
+|-------|--------|
+| `-D…` | CMake definition (via `DEV_CMAKE`) |
+| `Debug` / `Release` / `RelWithDebInfo` / `Coverage` | legacy build type |
+| `-v` | verbose build |
+| `--target NAME` | build only this target |
+| `-G NAME` | sets `GENERATOR` (not `DEV_CMAKE`); legacy build defaults to Ninja; preset uses preset generator unless `-G` is passed |
+| preset name (e.g. `release-tests`) | preset to configure |
+| `run` | after preset build: run tests or `tgf` |
+| `--` | start of program args |
+
+Examples:
 
 ```bash
 ./dev preset release-tests run -DTAU_PARSER_BUILD_TESTS=ON
 ./dev preset -DTAU_PARSER_BUILD_TESTS=ON release-tests run
+./dev build -v Debug --target test_parser -DTAU_PARSER_BUILD_TESTS=ON
 ```
-
-Only `-D…` is treated as a CMake definition. Other flags (e.g. `-G`, `--fresh`)
-stay positional and must be placed where the target script expects them.
 
 Use `--` to pass arguments to a program run by a script (e.g. `tgf`):
 

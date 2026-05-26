@@ -53,7 +53,7 @@ option(TAU_PARSER_BUILD_TGF            "Build tgf tool"                     OFF)
 option(TAU_PARSER_BUILD_PIC            "Build position independent code"    OFF)
 option(TAU_PARSER_WINDOWS_PACKAGE      "Build Windows package"              OFF)
 option(TAU_PARSER_WINDOWS_ZIP_PACKAGE  "Build Windows zip package"          OFF)
-option(TAU_BUILD_JOBS                  "Number of jobs to use for the build (0 to auto-detect)" 0)
+set(TAU_BUILD_JOBS "" CACHE STRING "Number of jobs to use for the build (0 to auto-detect)")
 
 if (TAU_BUILD_JOBS STREQUAL "")
 	set(TAU_BUILD_JOBS 0 CACHE STRING "Number of jobs to use for the build (0 to auto-detect)")
