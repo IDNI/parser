@@ -3,6 +3,8 @@
 # devrc special-cases TAU_BUILD_JOBS and -G (GENERATOR). Other -D flags
 # (TAU_PARSER_*, TAU_BUILD_*, etc.) are passed through DEV_CMAKE by the caller.
 
+__devrc_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 is_cmake_def() {
 	case "$1" in
 		-D*) return 0 ;;
@@ -320,4 +322,23 @@ preset_entry() {
 			"./${build_dir}/${PRESET_RUN_BIN}" "${run_args[@]}"
 		fi
 	fi
+}
+
+resolve_script() {
+	local script_name="$1"; shift
+	script_name="${script_name%.sh}"
+
+	if [ -f "scripts/${script_name}.sh" ]; then
+		exec "scripts/${script_name}.sh" "$@"
+	fi
+
+	if [ -f "CMakePresets.json" ] && \
+	   grep -qE "\"name\"[[:space:]]*:[[:space:]]*\"${script_name}\"" CMakePresets.json && \
+	   [[ "$script_name" != _* ]]; then
+		read -p "Use preset '${script_name}'? [Y/n] " -r REPLY
+		[[ -z "$REPLY" || "$REPLY" =~ ^[Yy]([Ee][Ss])?$ ]] || exit 1
+		exec "${__devrc_dir}/preset.sh" "$script_name" "$@"
+	fi
+
+	return 1
 }

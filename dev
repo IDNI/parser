@@ -37,18 +37,10 @@ if [ "$script_name" == "help" ] || [ "$script_name" == "--help" ] || [ "$script_
 	exit 0
 fi
 
-script_name="${script_name%.sh}"  # remove .sh extension if provided
-script_path=""
+source scripts/devrc
 
-# Check if script exists (script must have .sh extension)
-if [ -f "scripts/${script_name}.sh" ]; then
-	script_path="scripts/${script_name}.sh"
+if resolve_script "$@"; then
+	exit 0
 else
-	error "'scripts/${script_name}.sh' not found"
+	error "'scripts/${script_name%.sh}.sh' not found"
 fi
-
-echo "Running: $script_path"
-
-# Execute the script and pass all remaining arguments
-shift  # Remove the first argument (script name)
-exec "$script_path" "$@"
