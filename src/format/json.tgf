@@ -1,0 +1,48 @@
+@use char class digit, printable, xdigit.
+
+@inline char classes,
+	integral, fractional, zero, nonzerodigit, nzintegral,
+	unescaped, anychar, esc, uni_cp, q_str > str.
+
+@trim _, __.
+@trim children true_sym, false_sym, null_sym.
+
+# start represengting JSON text is a value
+start          => _ value _.
+
+# whitespace
+__             => (' ' | '\t' | '\r' | '\n') _.
+_              => [__].
+
+# value
+value          => true_sym | false_sym | null_sym | number | q_str | arr | object.
+
+# constants
+true_sym       => "true".
+false_sym      => "false".
+null_sym       => "null".
+
+# number
+number         => '-'? integral fractional? exponent?.
+zero           => '0'.
+nonzerodigit   => digit & ~zero.
+nzintegral     => nonzerodigit digit*.
+integral       => '0' | nzintegral.
+fractional     => '.' digit+.
+exponent       => ('e' | 'E') ['+' | '-'] digit+.
+
+# string
+q_str          => '"' (unescaped | escaped)*:str '"'.
+unescaped      => anychar & ~('"' | '\\').
+anychar        => printable.
+esc            => '\\'.
+escaped        => esc ('"' | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't'| uni_cp).
+uni_cp         => 'u' xdigit xdigit xdigit xdigit.
+
+# array
+arr            => '[' _ [values _] ']'.
+values         => value (_ ',' _ value)*.
+
+# object
+object         => '{' _ [object_pair (_ ',' _ object_pair)* _] '}'.
+object_pair    => q_str _ ':' _ value.
