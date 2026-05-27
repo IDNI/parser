@@ -54,16 +54,17 @@ struct token {
 template <typename S>
 vector<token<S>> tokenize_(typename parser<S, token<S>>::input& in) {
 	using token_t = token<S>;
+	using namespace idni::charclasses;
 	vector<token_t> r{ {} };
 	token_t& t = r.back();
 	S ch = in.cur();
 	t.value = { ch };
-	if (ispunct(ch)) t.ttype = token_t::PUNCT, in.next();
-	else if (isspace(ch)) {
+	if (ispunct<S>(ch)) t.ttype = token_t::PUNCT, in.next();
+	else if (isspace<S>(ch)) {
 		t.ttype = token_t::WS;
-		while (in.next() && isspace(ch = in.cur())) t.value += ch;
-	} else if (isalnum(ch)) {
-		while (in.next() && isalnum(ch = in.cur())) t.value += ch;
+		while (in.next() && isspace<S>(ch = in.cur())) t.value += ch;
+	} else if (isalnum<S>(ch)) {
+		while (in.next() && isalnum<S>(ch = in.cur())) t.value += ch;
 		if (t.value == from_cstr<S>("Hello")
 		 || t.value == from_cstr<S>("Hi")) t.ttype = token_t::GREETINGS;
 		else if (t.value == from_cstr<S>("World"))

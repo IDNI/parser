@@ -1,4 +1,5 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+// To view the license please visit
+// https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #ifndef __IDNI__PARSER__TESTS__INIT_TEST_H__
 #define __IDNI__PARSER__TESTS__INIT_TEST_H__

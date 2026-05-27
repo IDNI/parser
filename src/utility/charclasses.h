@@ -4,8 +4,6 @@
 #ifndef __IDNI__PARSER__UTILITY__CHARCLASSES_H__
 #define __IDNI__PARSER__UTILITY__CHARCLASSES_H__
 
-#include <locale>
-
 namespace idni::charclasses {
 
 template <typename C> bool iseof(C c) {return c==std::char_traits<C>::eof();}

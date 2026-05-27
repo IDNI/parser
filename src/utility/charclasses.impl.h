@@ -2,7 +2,10 @@
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #include <cctype>
+#include <cstdint>
+#include <cstddef>
 #include "charclasses.h"
+#include "charclasses_unicode.generated.h"
 
 namespace idni::charclasses {
 
@@ -19,31 +22,22 @@ template<> inline bool isspace<char>(char c) { return std::isspace(static_cast<u
 template<> inline bool isupper<char>(char c) { return std::isupper(static_cast<unsigned char>(c)); }
 template<> inline bool isxdigit<char>(char c){ return std::isxdigit(static_cast<unsigned char>(c));}
 
-// Follows simplified versions of char class functions for Unicode symbols
-// TODO: use real Unicode character classes
-template<> inline bool isalnum<char32_t>(char32_t c) {
-	return !iseof<char32_t>(c) && (c > 160 || std::isalnum(c)); }
-template<> inline bool isalpha<char32_t>(char32_t c) {
-	return !iseof<char32_t>(c) && (c > 160 || std::isalpha(c)); }
-template<> inline bool isblank<char32_t>(char32_t c) {
-	return c < 128 && std::isblank(c); }
-template<> inline bool iscntrl<char32_t>(char32_t c) {
-	return c < 128 && std::iscntrl(c); }
-template<> inline bool isdigit<char32_t>(char32_t c) {
-	return c < 128 && std::isdigit(c); }
-template<> inline bool isgraph<char32_t>(char32_t c) {
-	return c < 128 && std::isgraph(c); }
-template<> inline bool islower<char32_t>(char32_t c) {
-	return c < 128 && std::islower(c); }
-template<> inline bool isprint<char32_t>(char32_t c) {
-	return !iseof<char32_t>(c) && (c > 160 || std::isprint(c)); }
-template<> inline bool ispunct<char32_t>(char32_t c) {
-	return c < 128 && std::ispunct(c); }
-template<> inline bool isspace<char32_t>(char32_t c) {
-	return c < 128 && std::isspace(c); }
-template<> inline bool isupper<char32_t>(char32_t c) {
-	return c < 128 && std::isupper(c); }
-template<> inline bool isxdigit<char32_t>(char32_t c) {
-	return c < 128 && std::isxdigit(c); }
+inline uint16_t char_props(char32_t cp) {
+	if (cp > 0x10FFFF) return 0;
+	return stage2[static_cast<size_t>(stage1[cp >> 8]) * 256 + (cp & 0xFF)];
+}
+
+template<> inline bool isalpha<char32_t>(char32_t cp) { return char_props(cp) & UC_ALPHA;  }
+template<> inline bool isalnum<char32_t>(char32_t cp) { return char_props(cp) & UC_ALNUM;  }
+template<> inline bool isblank<char32_t>(char32_t cp) { return char_props(cp) & UC_BLANK;  }
+template<> inline bool iscntrl<char32_t>(char32_t cp) { return char_props(cp) & UC_CNTRL;  }
+template<> inline bool isdigit<char32_t>(char32_t cp) { return char_props(cp) & UC_DIGIT;  }
+template<> inline bool isgraph<char32_t>(char32_t cp) { return char_props(cp) & UC_GRAPH;  }
+template<> inline bool islower<char32_t>(char32_t cp) { return char_props(cp) & UC_LOWER;  }
+template<> inline bool isprint<char32_t>(char32_t cp) { return char_props(cp) & UC_PRINT;  }
+template<> inline bool ispunct<char32_t>(char32_t cp) { return char_props(cp) & UC_PUNCT;  }
+template<> inline bool isspace<char32_t>(char32_t cp) { return char_props(cp) & UC_SPACE;  }
+template<> inline bool isupper<char32_t>(char32_t cp) { return char_props(cp) & UC_UPPER;  }
+template<> inline bool isxdigit<char32_t>(char32_t cp){ return char_props(cp) & UC_XDIGIT; }
 
 } // idni::charclasses namespace
