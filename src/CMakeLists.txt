@@ -38,6 +38,12 @@ set(TAU_PARSER_SOURCES
 	parser.cpp
 )
 
+set(TAU_PARSER_LIBS unordered_dense)
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
+	CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+	list(APPEND TAU_PARSER_LIBS psapi)
+endif()
+
 if(TAU_PARSER_BUILD_HEADER_ONLY)
 	add_library(tauparser INTERFACE)
 	target_include_directories(tauparser INTERFACE
@@ -46,7 +52,7 @@ if(TAU_PARSER_BUILD_HEADER_ONLY)
 	)
 	target_compile_definitions(tauparser INTERFACE TAU_PARSER_BUILD_HEADER_ONLY)
 	tauparser_setup(tauparser INTERFACE "")
-	target_link_libraries(tauparser INTERFACE unordered_dense)
+	target_link_libraries(tauparser INTERFACE ${TAU_PARSER_LIBS})
 else()
 	if(TAU_PARSER_BUILD_STATIC_LIBRARY)
 		add_library(tauparser_static STATIC ${TAU_PARSER_SOURCES})
@@ -58,7 +64,7 @@ else()
 			$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 		)
 		tauparser_setup(tauparser_static PUBLIC "")
-		target_link_libraries(tauparser_static PUBLIC unordered_dense)
+		target_link_libraries(tauparser_static PUBLIC ${TAU_PARSER_LIBS})
 	endif()
 
 	if(TAU_PARSER_BUILD_SHARED_LIBRARY)
@@ -71,7 +77,7 @@ else()
 			$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 		)
 		tauparser_setup(tauparser_shared PUBLIC "")
-		target_link_libraries(tauparser_shared PUBLIC unordered_dense)
+		target_link_libraries(tauparser_shared PUBLIC ${TAU_PARSER_LIBS})
 	endif()
 
 	# Create an alias target for backward compatibility

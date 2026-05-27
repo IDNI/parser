@@ -20,13 +20,13 @@ foreach(X IN LISTS TESTS)
 	target_compile_options(${N} PUBLIC "-Wno-parentheses")
 	if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
 		CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-			target_link_libraries(${N}
+			target_link_libraries(${N} PRIVATE
 				${PARSER_OBJECT_LIB_NAME}
 				-static-libgcc
 				-static-libstdc++
 			)
 	else()
-		target_link_libraries(${N} ${PARSER_OBJECT_LIB_NAME})
+		target_link_libraries(${N} PRIVATE ${PARSER_OBJECT_LIB_NAME})
 	endif()
 	target_include_directories(${N} PUBLIC
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
@@ -64,14 +64,14 @@ foreach(X IN LISTS DOCTESTS)
 	target_compile_options(${N} PUBLIC "-Wno-parentheses")
 	if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
 		CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-			target_link_libraries(${N}
+			target_link_libraries(${N} PRIVATE
 				tauparser
 				${TEST_FRAMEWORK}
 				-static-libgcc
 				-static-libstdc++
 			)
 	else()
-		target_link_libraries(${N} tauparser doctest)
+		target_link_libraries(${N} PRIVATE tauparser doctest)
 	endif()
 	target_include_directories(${N} PUBLIC
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
@@ -84,7 +84,7 @@ endforeach()
 add_executable(bench_enhancements bench_enhancements.cpp)
 tauparser_setup(bench_enhancements PRIVATE "")
 target_compile_options(bench_enhancements PUBLIC "-O3" "-Wno-parentheses")
-target_link_libraries(bench_enhancements tauparser)
+target_link_libraries(bench_enhancements PRIVATE tauparser)
 target_include_directories(bench_enhancements PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
 )

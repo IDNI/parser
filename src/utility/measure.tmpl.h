@@ -87,42 +87,50 @@ basic_timer<ClockTag>::basic_timer(bool silent) : silent_(silent) { }
 
 template <typename ClockTag>
 void basic_timer<ClockTag>::start() {
-	if (!started_) started_ = true, start_time_ = ClockTag::now();
-}
-
-template <typename ClockTag>
-double basic_timer<ClockTag>::restart() {
-	if (!started_) return start(), 0;
-	double ms = pause();
+	if (started_) return;
+	started_    = true;
+	paused_     = false;
+	ms_         = 0;
 	start_time_ = ClockTag::now();
-	return ms;
 }
 
 template <typename ClockTag>
 double basic_timer<ClockTag>::pause() {
-	if (!started_) return 0;
-	double ms = ClockTag::ms_between(start_time_, ClockTag::now());
-	ms_ += ms;
-	return ms;
+	if (!started_ || paused_) return ms_;
+	ms_ += ClockTag::ms_between(start_time_, ClockTag::now());
+	paused_ = true;
+	return ms_;
 }
 
 template <typename ClockTag>
 double basic_timer<ClockTag>::unpause() {
-	if (!started_) return start(), 0;
-	return start_time_ = ClockTag::now(), 0;
+	if (!started_) { start(); return 0; }
+	if (!paused_)  return 0;
+	paused_     = false;
+	start_time_ = ClockTag::now();
+	return 0;
 }
 
 template <typename ClockTag>
 double basic_timer<ClockTag>::stop() {
-	if (!started_) return 0;
-	pause();
-	return started_ = false, ms_;
+	if (!started_) return ms_;
+	if (!paused_) pause();
+	started_ = false;
+	paused_  = false;
+	return ms_;
 }
 
 template <typename ClockTag>
-double basic_timer<ClockTag>::get() {
-	if (!started_) return 0;
-	return pause();
+double basic_timer<ClockTag>::get() const {
+	if (!started_ || paused_) return ms_;
+	return ms_ + ClockTag::ms_between(start_time_, ClockTag::now());
+}
+
+template <typename ClockTag>
+double basic_timer<ClockTag>::restart() {
+	double prev = stop();
+	start();
+	return prev;
 }
 
 template <typename ClockTag>
@@ -186,7 +194,8 @@ static size_t increase_counter(const std::string& name) {
 
 [[maybe_unused]]
 static size_t get_counter(const std::string& name) {
-	return (counters.find(name) == counters.end()) ? counters[name] = 0 : counters[name];
+	auto it = counters.find(name);
+	return it == counters.end() ? 0 : it->second;
 }
 
 [[maybe_unused]]
@@ -209,8 +218,8 @@ static size_t increase_rule_counter(const rule<node_t>& r) {
 template<typename node_t>
 [[maybe_unused]]
 static size_t get_rule_counter(const rule<node_t>& r) {
-	return (rule_counters<node_t>.find(r) == rule_counters<node_t>.end())
-		? rule_counters<node_t>[r] = 0 : rule_counters<node_t>[r];
+	auto it = rule_counters<node_t>.find(r);
+	return it == rule_counters<node_t>.end() ? 0 : it->second;
 }
 
 template<typename node_t>
@@ -235,8 +244,8 @@ static size_t increase_rule_hit(const rule<node_t>& r) {
 template<typename node_t>
 [[maybe_unused]]
 static size_t get_rule_hit(const rule<node_t>& r) {
-	return (rule_hits<node_t>.find(r) == rule_hits<node_t>.end())
-		? rule_hits<node_t>[r] = 0 : rule_hits<node_t>[r];
+	auto it = rule_hits<node_t>.find(r);
+	return it == rule_hits<node_t>.end() ? 0 : it->second;
 }
 
 template<typename node_t>

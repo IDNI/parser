@@ -54,10 +54,21 @@ struct steady_clock_tag {
 	static double ms_between(time_point a, time_point b);
 };
 
-/// Elapsed-time accumulator.
+/// Elapsed-time accumulator with real pause/resume semantics.
 ///  `basic_timer<cpu_clock_tag>` measures process CPU time via clock();
 ///  `basic_timer<steady_clock_tag>` measures wall time via std::chrono::steady_clock.
-/// The two are interchangeable at the call site: start/pause/unpause/restart/stop/get all return milliseconds.
+///
+/// State machine: { stopped, running, paused }. Transitions:
+///   stopped --start--> running   (ms_ reset to 0)
+///   stopped --unpause-> running  (ms_ reset to 0; returns 0)
+///   stopped --restart-> running  (returns frozen ms_, initially 0; resets ms_)
+///   running --pause--> paused    (accumulates [start_time_, now] into ms_)
+///   paused  --unpause-> running  (start_time_ = now)
+///   running --stop--> stopped    (flushes active interval)
+///   paused  --stop--> stopped    (total unchanged)
+///   running/paused --restart--> running (returns previous total; resets ms_)
+/// All non-transitioning calls are idempotent (e.g. pause-when-paused is a no-op).
+/// get() is non-mutating: it samples the current total without changing state.
 template <typename ClockTag = cpu_clock_tag>
 struct basic_timer {
 
@@ -65,8 +76,9 @@ struct basic_timer {
 
 	time_point start_time_{};
 	bool started_ = false;
-	bool silent_ = false;
-	double ms_ = 0;
+	bool paused_  = false;
+	bool silent_  = false;
+	double ms_    = 0;
 
 	basic_timer(bool silent = false);
 
@@ -75,7 +87,7 @@ struct basic_timer {
 	double pause();
 	double unpause();
 	double stop();
-	double get();
+	double get() const;
 
 	~basic_timer();
 };
