@@ -1149,20 +1149,6 @@ public:
 	result parse(int filedescriptor);
 	result parse(int filedescriptor, parse_options popts);
 #endif
-	/**
-	 * @brief Whether the last parse method call matched a starting literal production rule.
-	 *
-	 * This means that the parsed input was parsed fully and successfully and
-	 * there exists at least one tree with a root being the starting literal.
-	 * If this method returns false use parser<C, T>::get_error() to obtain
-	 * more information.
-	 */
-	bool found(size_t start = SIZE_MAX);
-	/**
-	 * Returns parser<C, T>::error object containing information about a
-	 * parsing error if any happened, ie. found() call returned false.
-	 */
-	error get_error();
 	grammar<C, T>& get_grammar() { return g; }
 	const grammar<C, T>& get_grammar() const { return g; }
 	bool debug = false;
@@ -1197,6 +1183,8 @@ private:
 	options o;
 	parse_options po; /// current parse options
 	std::unique_ptr<input> in_ = 0;
+	bool found(size_t start = SIZE_MAX);
+	error get_error();
 	std::vector<container_t> S;
 	std::vector<container_t> U; /// uncompleted
 		///mapping from to position of end in S for items

@@ -1088,11 +1088,12 @@ std::vector<typename parser<C, T>::item> parser<C, T>::back_track(
 template <typename C, typename T>
 typename parser<C, T>::error parser<C, T>::get_error() {
 	error err;
-	auto near_ctxt = [this](int_t from, int_t pos) {
+	auto& in = *in_;
+	auto near_ctxt = [&in](int_t from, int_t pos) {
 		std::vector<T> errctxt;
 		// using from as delimiter..
 		while (pos >= from)
-			errctxt.push_back(in_->tat(pos--));
+			errctxt.push_back(in.tat(pos--));
 		return errctxt;
 	};
 	std::stringstream es;
@@ -1111,10 +1112,10 @@ typename parser<C, T>::error parser<C, T>::get_error() {
 		ept.prod_body = es.str();
 		return ept;
 	};	// find error location and build error stream
-	in_->clear();
-	//DBGP(std::cout << "tpos: " << in_->tpos() << "\n";)
+	in.clear();
+	//DBGP(std::cout << "tpos: " << in.tpos() << "\n";)
 	//DBGP(print_S(std::cout << "S:\n") << "\n";)
-	for (int_t i = (int_t) in_->tpos(); i >= 0; i--) if (S[i].size()) {
+	for (int_t i = (int_t) in.tpos(); i >= 0; i--) if (S[i].size()) {
 		//DBG(std::cout << "get_error i pos = " << i << "\n";)
 		size_t from = 0;
 		bool unexp_neg = false;
@@ -1151,7 +1152,7 @@ typename parser<C, T>::error parser<C, T>::get_error() {
 				{
 					err.unexp = {};
 					for (size_t i = t.from; i < t.set; ++i)
-						err.unexp.emplace_back(in_->tat(i));
+						err.unexp.emplace_back(in.tat(i));
 					err.loc = t.from, unexp_neg = true;
 				}
 				if (completed(t) || (get_lit(t).nt()
@@ -1170,14 +1171,14 @@ typename parser<C, T>::error parser<C, T>::get_error() {
 			}
 		}
 		if (!unexp_neg)
-			err.unexp = lits<C, T>{ { in_->tat(i) } }, err.loc = i;
+			err.unexp = lits<C, T>{ { in.tat(i) } }, err.loc = i;
 
 		break;
 	}
 	err.line = 1;
 	size_t line_loc = 0;
 	for (int_t j = 0; err.loc > -1 && j != err.loc; ++j)
-		if (in_->tat(j) == (T)'\n') err.line++, line_loc = j;
+		if (in.tat(j) == (T)'\n') err.line++, line_loc = j;
 	err.col = err.loc - line_loc + 1;
 	err.ctxt = near_ctxt(line_loc, err.loc + 1);
 	return err;
