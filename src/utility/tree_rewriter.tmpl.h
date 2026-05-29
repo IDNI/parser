@@ -1,6 +1,7 @@
 // To view the license please visit
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
+#include <algorithm>
 #include "tree.h"
 
 namespace idni {
