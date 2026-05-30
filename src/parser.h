@@ -1250,7 +1250,7 @@ private:
 	result _parse(const parse_options& po);
 	std::pair<container_iter, bool> add(container_t& t, const item& i);
 	bool nullable(const item& i) const;
-	void resolve_conjunctions(container_t& c, container_t& t);
+	void resolve_conjunctions(container_t& c);
 	void cascade_uncomplete(size_t nt_id, size_t from, size_t set,
 		container_t& c);
 	bool nt_still_completed(size_t nt_id, size_t from, size_t set) const;

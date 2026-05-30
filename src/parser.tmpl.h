@@ -331,7 +331,7 @@ void parser<C, T>::cascade_uncomplete(size_t nt_id, size_t from, size_t set,
 }
 
 template <typename C, typename T>
-void parser<C, T>::resolve_conjunctions(container_t& c, container_t& t) {
+void parser<C, T>::resolve_conjunctions(container_t& c) {
 	if (c.size() == 0) return;
 	MC(count(cnt.conjunction_attempts);)
 	MC(maks(cnt.c_size_peak, c.size());)
@@ -347,33 +347,19 @@ void parser<C, T>::resolve_conjunctions(container_t& c, container_t& t) {
 			DBGP(std::cout << "`" << g[p][con] << "`" << std::endl;)
 			bool neg = g[p][con].neg;
 			bool found = false;
-			auto check = [&neg, &p, &con, &found, this]
-				(const container_t& cont)
-			{
-				for (auto it=cont.begin();it!=cont.end();++it) {
-					DBGP(print(std::cout <<
-						" ?  checking cont \t\t\t\t",
-						*it) << "\n";)
-					if (it->prod == p && it->con == con
-						&& !neg && completed(*it)) {
-							found = true; break; }
-				}
-				return found;
-			};
 			for (const auto& x : pr.second) {
 				DBGP(print(std::cout << "\tcheck p: " << p
 					<< " c: " << con << " x.con: " << x.con
 					<< " ", x) << std::endl;)
 				if (x.con == con) { found = true; break; }
 				if (!neg) continue;
-				const auto& cont = S[x.set];
-				auto dbg =[](const std::string& /*DBG(msg)*/){
-					//DBG(std::cout << msg << "\n";)
-					return false;
-				};
-				dbg("check c")    || check(c) ||
-				dbg("check t")    || check(t) ||
-				dbg("check cont") || check(cont);
+				if (g[p][con].size() == 1
+					&& g[p][con][0].nt()
+					&& nt_still_completed(g[p][con][0].n(),
+						x.from, x.set))
+				{
+					found = true; break;
+				}
 			}
 			DBGP(std::cout << "found: " << found
 					<< " neg: " << neg << "\n";)
@@ -801,7 +787,7 @@ parser<C, T>::result parser<C, T>::_parse() {
 			//DBGP(print_S(std::cout << "S loop:\n") << "\n";)
 			//DBGP(print(std::cout << "t loop:\n", t) << "\n";)
 			if (t.empty()) {
-				resolve_conjunctions(c, t);
+				resolve_conjunctions(c);
 				//DBGP(print(std::cout << "c after resolve:\n", c) << std::endl;)
 				for (const auto& x : c) {
 					DBGP(print(std::cout << "complete after resolve\t\t", x) << "\n";)
