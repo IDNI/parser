@@ -146,17 +146,17 @@ template <typename C, typename T>
 tref parser<C, T>::result::shape_tree2_impl(tref t,
 	const shaping_options& opts)
 {
-	auto _ = diag_report.open_if(measure_scopes, p.keys().shaped_tree);
-	t = diag_report.step(measure_scopes, p.keys().trim, [&] {
+	auto _ = diag_report.open_if(measure_scopes, label::shaped_tree);
+	t = diag_report.step(measure_scopes, label::trim, [&] {
 		return get_trimmed_bintree(t, opts);
 	});
-	t = diag_report.step(measure_scopes, p.keys().inline_nodes, [&] {
+	t = diag_report.step(measure_scopes, label::inline_nodes, [&] {
 		return inline_bintree_nodes(t, opts);
 	});
-	t = diag_report.step(measure_scopes, p.keys().inline_paths, [&] {
+	t = diag_report.step(measure_scopes, label::inline_paths, [&] {
 		return inline_bintree_paths(t, opts);
 	});
-	t = diag_report.step(measure_scopes, p.keys().trim_terminals, [&] {
+	t = diag_report.step(measure_scopes, label::trim_terminals, [&] {
 		return trim_bintree_child_terminals(t, opts);
 	});
 	return t;
@@ -219,16 +219,16 @@ tref parser<C, T>::result::get_bintree(const pnode& n) {
 	}
 	if (!f) return nullptr;
 	htref t;
-	auto _rb = diag_report.open_if(measure_scopes,
-		p.keys().reconstruct_bintree);
+	auto _rb = diag_report
+			.open_if(measure_scopes, label::reconstruct_bintree);
 	typename pforest::graph g;
-	g = diag_report.step(measure_scopes, p.keys().extract_graph, [&] {
+	g = diag_report.step(measure_scopes, label::extract_graph, [&] {
 		return f->extract_first_graph(n);
 	});
-	diag_report.step(measure_scopes, p.keys().inline_grammar, [&] {
+	diag_report.step(measure_scopes, label::inline_grammar, [&] {
 		inline_grammar_transformations(g);
 	});
-	t = diag_report.step(measure_scopes, p.keys().extract_tree2, [&] {
+	t = diag_report.step(measure_scopes, label::extract_tree2, [&] {
 		return g.extract_tree2();
 	});
 	return t->get();

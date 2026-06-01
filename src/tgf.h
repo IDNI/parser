@@ -22,9 +22,8 @@ struct tgf {
 	using prods_t  = prods<C, T>;
 	using code     = idni::diagnostics::code;
 	using result   = idni::diagnostics::result<grammar<C, T>>;
-	using keys     = idni::parser_strings::keys;
-	using names    = idni::parser_strings::names;
 	using messages = idni::parser_strings::messages;
+	using label    = idni::parser_strings::label;
 
 	/// Parse TGF from string
 	static result from_string(nonterminals<C, T>& nts_,
@@ -40,12 +39,11 @@ struct tgf {
 
 		result R;
 		{
-			auto _ = R.open_if(measure, names::grammar_load);
-			keys dk{};
+			auto _ = R.open_if(measure, label::grammar_load);
 			std::optional<typename tgf_parser::result> pr;
 			tref n;
 			{
-				auto _p = R.open_if(measure, dk.tgf_parse);
+				auto _p = R.open_if(measure, label::tgf_parse);
 				pr.emplace(p.parse(s.c_str(), s.size(), po));
 				if (!pr->found) {
 					if (!pr->report().nodes().empty())
@@ -57,7 +55,7 @@ struct tgf {
 					R.append(std::move(pr->report()));
 			}
 			{
-				auto _b = R.open_if(measure, dk.tgf_build);
+				auto _b = R.open_if(measure, label::tgf_build);
 				grammar_builder b(nts_);
 				// build() / predefined_char_classes() take a raw
 				// report*, so errors written there do NOT trigger
@@ -79,7 +77,7 @@ struct tgf {
 		std::ifstream ifs(filename);
 		if (!ifs) {
 			result R;
-			R.report().reset(names::grammar_load);
+			R.report().reset(label::grammar_load);
 			R.error(code::io_error,
 				std::string(messages::cannot_open_file) + filename);
 			return R;
@@ -97,7 +95,7 @@ struct tgf {
 		tgf_parser::parse_options po = {})
 	{
 		result R;
-		R.report().reset(names::grammar_load);
+		R.report().reset(label::grammar_load);
 		grammar_builder b(nts_);
 		auto c = s.c_str();
 		size_t line = 0;
@@ -154,7 +152,7 @@ struct tgf {
 		std::ifstream ifs(filename);
 		if (!ifs) {
 			result R;
-			R.report().reset(names::grammar_load);
+			R.report().reset(label::grammar_load);
 			R.error(code::io_error,
 				std::string(messages::cannot_open_file) + filename);
 			return R;
@@ -197,13 +195,12 @@ private:
 			auto& p = tgf_parser::instance();
 			auto r = p.parse(s, l, po);
 			if (!r.found) {
-				keys k{};
 				auto verbosity = po.error_verbosity;
 				res.error(code::parse_error,
 					r.parse_error.to_str(verbosity, line),
 					r.parse_error.loc,
-					{{ k.line, line + r.parse_error.line },
-					 { k.col,  r.parse_error.col }});
+					{{ label::line, line + r.parse_error.line },
+					 { label::col,  r.parse_error.col }});
 				return 1;
 			}
 			build(trv(r.get_shaped_tree2()), &res.report());

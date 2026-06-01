@@ -681,9 +681,9 @@ parser<C, T>::result parser<C, T>::_parse() {
 	report_.clear();
 	std::optional<idni::diagnostics::report::scope_guard> parse_scope;
 	if (po.measure_scopes)
-		parse_scope.emplace(report_.open(keys().parse));
+		parse_scope.emplace(report_.open(label::parse));
 	else
-		report_.reset(keys().parse);
+		report_.reset(label::parse);
 #ifdef TAU_PARSER_MEASURE_COUNTERS
 	cnt = idni::parser_strings::counters{};
 #endif
@@ -703,13 +703,13 @@ parser<C, T>::result parser<C, T>::_parse() {
 		f = std::make_unique<pforest>();
 #ifdef TAU_PARSER_MEASURE_COUNTERS
 	auto flush_parsing_counters = [&]() {
-		idni::parser_strings::flush_counters(report_, cnt, keys());
-		report_.kb(keys().rss_after,
+		flush_counters(report_, cnt);
+		report_.kb(label::rss_after,
 			measures::current_rss_kb());
-		report_.kb(keys().peak_rss_after,
+		report_.kb(label::peak_rss_after,
 			measures::peak_rss_kb());
-		report_.count(keys().input_length, in_->tpos());
-		report_.count(keys().position_count, in_->tpos());
+		report_.count(label::input_length, in_->tpos());
+		report_.count(label::position_count, in_->tpos());
 	};
 #endif
 
@@ -861,12 +861,12 @@ parser<C, T>::result parser<C, T>::_parse() {
 	};
 
 	{
-		auto _ = report_.open_if(po.measure_scopes, keys().parsing);
+		auto _ = report_.open_if(po.measure_scopes, label::parsing);
 		#ifdef TAU_PARSER_MEASURE_COUNTERS
 		if (po.measure_counters) {
-			report_.kb(keys().rss_before,
+			report_.kb(label::rss_before,
 				measures::current_rss_kb());
-			report_.kb(keys().peak_rss_before,
+			report_.kb(label::peak_rss_before,
 				measures::peak_rss_kb());
 		}
 		#endif
@@ -1199,7 +1199,7 @@ int parser<C, T>::do_preprocess() {
 			}
 	};
 	report_.step(po.measure_scopes && po.measure_preprocess,
-		keys().preprocess, [&] { run(); });
+		label::preprocess, [&] { run(); });
 	return count;
 #else
 	for (size_t n = 0; n < in_->tpos() + 1; n++)
@@ -1389,7 +1389,7 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 	};
 
 	tref ret = report_.step(po.measure_scopes && po.measure_forest,
-		keys().build_bintree, [&] { return build(root); });
+		label::build_bintree, [&] { return build(root); });
 
 	return ret;
 }
@@ -1417,7 +1417,7 @@ bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
 	}
 
 	ret = report_.step(po.measure_scopes && po.measure_forest,
-		keys().build_forest, [&] { return build_forest(f, root); });
+		label::build_forest, [&] { return build_forest(f, root); });
 	// f.print_data(std::cout) << "\n";
 
 	return ret;

@@ -11,15 +11,15 @@ namespace idni {
 template <typename C, typename T>
 inline void report_parse_error(idni::diagnostics::report& r,
 	const typename parser<C, T>::error& err,
-	const idni::parser_strings::keys& k,
 	typename parser<C, T>::error::info_lvl verbosity =
 		parser<C, T>::error::INFO_DETAILED)
 {
 	using namespace idni::diagnostics;
+	using namespace idni::parser_strings;
 	auto msg = err.to_str(verbosity);
 	r.error(code::parse_error, msg, err.loc,
-		{{k.line, err.line},
-		 {k.col,  err.col}});
+		{{label::line, err.line},
+		 {label::col,  err.col}});
 }
 
 // __AMB__ is registered only when an ambiguity wrapper is actually present.
@@ -44,7 +44,7 @@ parser<C, T>::result::result(parser<C, T>& p, std::unique_ptr<input> in_,
 		diag_report(std::move(p.report_)),
 		p(p), in_(std::move(in_)), froot(tree::geth(f))
 {
-	if (!fnd) report_parse_error<C, T>(diag_report, err, p.keys(),
+	if (!fnd) report_parse_error<C, T>(diag_report, err,
 		p.po.error_verbosity);
 	if (!froot) return;
 	auto amb_name = from_str<C>(std::string("__AMB__"));
@@ -71,7 +71,7 @@ parser<C, T>::result::result(parser<C, T>& p, std::unique_ptr<input> in_,
 		diag_report(std::move(p.report_)),
 		p(p), in_(std::move(in_)), f(std::move(f))
 {
-	if (!fnd) report_parse_error<C, T>(diag_report, err, p.keys(),
+	if (!fnd) report_parse_error<C, T>(diag_report, err,
 		p.po.error_verbosity);
 	if (is_ambiguous())
 		amb_node = p.get_grammar().nt(from_str<C>(std::string("__AMB__")));
@@ -121,7 +121,7 @@ typename parser<C, T>::pforest* parser<C, T>::result::get_forest() const {
 	if (f) return f.get();
 	if (froot != 0) {
 		auto _rf = diag_report.open_if(
-			measure_scopes, p.keys().reconstruct_forest);
+			measure_scopes, label::reconstruct_forest);
 		auto reconstruct = [&]() {
 			f = std::make_unique<pforest>();
 			if (!froot) return;
@@ -500,9 +500,8 @@ typename parser<C, T>::psptree
 			return false;
 		});
 	};
-	diag_report.step(measure_scopes, p.keys().extract_graph, [&] {
-		extract();
-	});
+	diag_report.step(measure_scopes, label::extract_graph,
+		[&] { extract(); });
 	return t;
 }
 

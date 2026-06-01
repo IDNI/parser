@@ -126,7 +126,7 @@ std::basic_string<C> lit<C, T>::to_string(const std::basic_string<C>& nll)const{
 		ss << "'" << (r.size() ? r : idni::to_std_string(t())) << "'";
 		return ss.str();
 	} else if constexpr ((std::is_same_v<C,char32_t> &&
-							std::is_same_v<C, T>) ||
+						std::is_same_v<C, T>) ||
 		(std::is_same_v<C,char> && std::is_same_v<T,char32_t>))
 	{
 		std::basic_stringstream<C> ss;
@@ -463,6 +463,7 @@ char_class_fns<T> predefined_char_classes(
 	const std::vector<std::string>& cc_fn_names, nonterminals<C, T>& nts,
 	idni::diagnostics::report* diag)
 {
+	using namespace idni::parser_strings;
 	char_class_fns<T> r;
 	if constexpr (!std::is_same_v<T, char> && !std::is_same_v<T, char32_t>)
 		return r;
@@ -491,7 +492,7 @@ char_class_fns<T> predefined_char_classes(
 				auto cc_id = diag->intern_dynamic(cc);
 				diag->error(idni::diagnostics::code::unknown_char_class,
 					"unknown character class",
-					{{ idni::parser_strings::KEYS.name, cc_id }});
+					{{ label::name, cc_id }});
 			} else
 				std::cerr << "Unknown character class: "
 					<< to_string(cc) << '\n';

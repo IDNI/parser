@@ -510,7 +510,7 @@ public:
 enum class parse_tree_path { forest_path, bintree_path };
 
 template <typename C = char, typename T = C>
-class parser : public idni::parser_strings::keys {
+class parser {
 public:
 	struct input;
 	using char_type       = C;
@@ -523,6 +523,7 @@ public:
 	using location_type   = std::array<size_t, 2>;
 	using node_type       = std::pair<symbol_type, location_type>;
 	using parser_type     = idni::parser<char_type, terminal_type>;
+	using label           = idni::parser_strings::label;
 
 	using pnode = pnode_type<C, T>;
 	struct tree : public lcrs_tree<pnode> {
@@ -917,6 +918,7 @@ public:
 
 	/// Result of the parse call.
 	struct result {
+		using label = idni::parser_strings::label;
 		/// True if the parse was successful
 		const bool found;
 		/// Contains error information if the parse was unsuccessful
@@ -1170,12 +1172,6 @@ public:
 	/// infos). For error-only output use res.parse_error.to_str(...).
 	friend std::ostream& operator<<(std::ostream& os, const result& res) {
 		return os << res.report();
-	}
-	// `keys` data members are inherited from idni::parser_strings::keys.
-	// `keys()` below returns *this typed as the base so the call sites
-	// `p.keys().<field>` resolve.
-	const idni::parser_strings::keys& keys() const {
-		return *this;
 	}
 private:
 	mutable idni::diagnostics::report report_;
