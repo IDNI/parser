@@ -181,6 +181,9 @@ inline std::string wide_to_utf8(const std::wstring& w) {
 #endif
 
 #define utf_cont(ch) (((ch) & 0xc0) == 0x80)
+inline bool is_valid_codepoint(char32_t cp) {
+	return cp <= 0x10FFFF && !(cp >= 0xD800 && cp <= 0xDFFF);
+}
 inline bool is_mb_codepoint(utf8char ch, uint8_t p) {
 	auto i = static_cast<unsigned int>(ch);
 	if (p == 0) return i >= 0x80 && ((i - 0xc2) <= (0xf4 - 0xc2));

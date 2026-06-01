@@ -59,6 +59,12 @@ template <typename CharT>
 typename std::basic_string<CharT> from_str(const std::u32string&);
 
 /**
+* checks if character is a valid Unicode scalar value
+* @param cp Unicode scalar value
+* @return true if valid, false otherwise
+*/
+bool is_valid_codepoint(char32_t cp);
+/**
  * checks if character is a begining of a multibyte codepoint or
  * if it is a part of a multibyte codepoint
  */
