@@ -840,6 +840,7 @@ public:
 		/// List of expected token and respective productions
 		std::vector<exp_prod_t> expv;
 		error() : loc(-1) {}
+		bool at_eof() const;
 		/// Produces a string containing human readable information about the error.
 		std::string to_str(info_lvl lv = INFO_DETAILED,
 			size_t line_start = 0) const;

@@ -1007,15 +1007,32 @@ std::vector<typename parser<C, T>::item> parser<C, T>::rsorted_citem(
 */
 //------------------------------------------------------------------------------
 template <typename C, typename T>
+bool parser<C, T>::error::at_eof() const {
+	if (unexp.size() == 0) return false;
+	for (const auto& t : unexp)
+		if (t.nt() || t.is_null()
+			|| (t.t() != static_cast<T>(0)
+				&& t.t() != static_cast<T>(-1)))
+			return false;
+	return true;
+}
+//------------------------------------------------------------------------------
+template <typename C, typename T>
 std::string parser<C, T>::error::to_str(info_lvl elvl, size_t line_start) const{
 	if (ctxt.size() == 0) return "";
 	std::stringstream ss;
+	bool eof = unexp.size() != 0;
 	for (const auto& t : unexp) {
-		std::string s = t.to_std_string();
-		ss << s.substr(1, s.size() - 2);
+		if (t.nt() || t.is_null() || (t.t() != static_cast<T>(0)
+						&& t.t() != static_cast<T>(-1)))
+		{
+			eof = false;
+			std::string s = t.to_std_string();
+			if (s.size() >= 2) ss << s.substr(1, s.size() - 2);
+		}
 	}
 	std::string s{ ss.str() }; ss = {};
-	if (s.size() && s != "\\0") {
+	if (!eof && s.size()) {
 		char quote = unexp.size() > 1 ? '"' : '\'';
 		ss << quote << s << quote;
 	} else ss << "end of file";
