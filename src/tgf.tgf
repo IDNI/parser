@@ -61,7 +61,7 @@ directive_body         =>
 syms                   => sym (_ ',' _ sym)*.
 inline_arg             => tree_path | ("char" sep "class" "es"?):cc_sym.
 tree_path              => sym (_ '>' _ sym)*.
-use_param              => ("eof"   | "alnum" | "alpha" | "blank"
+use_param              => ("eof" | "any" | "ascii" | "alnum" | "alpha" | "blank"
                         | "cntrl" | "digit" | "graph" | "lower" | "printable"
                         | "punct" | "space" | "upper" | "xdigit"):cc_name.
 

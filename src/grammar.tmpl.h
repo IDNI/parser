@@ -468,6 +468,8 @@ char_class_fns<T> predefined_char_classes(
 		return r;
 	std::map<std::string, char_class_fn<T>> predef{
 		{ "eof",       charclasses::iseof<T>    },
+		{ "any",       charclasses::isany<T>    },
+		{ "ascii",     charclasses::isascii<T>  },
 		{ "alnum",     charclasses::isalnum<T>  },
 		{ "alpha",     charclasses::isalpha<T>  },
 		{ "blank",     charclasses::isblank<T>  },
