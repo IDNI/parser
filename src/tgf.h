@@ -164,6 +164,8 @@ struct tgf {
 
 private:
 	struct grammar_builder {
+		using label    = idni::parser_strings::label;
+		using messages = idni::parser_strings::messages;
 		prods_t ps, nul{ lit_t{} };
 		nonterminals<C, T>& nts;
 		/// set by @start ...
@@ -186,6 +188,26 @@ private:
 			for (const auto& d : directives()) directive(d);
 			auto productions = statements || tgf_parser::production;
 			for (const auto& pr : productions()) production(pr);
+			if (!diag) return;
+			std::set<size_t> defined, referenced;
+			for (const auto& p : ps) {
+				if (p.first.nt()) defined.insert(p.first.n());
+				for (const auto& cj : p.second)
+				for (const auto& lt : cj)
+				for (const auto& l : lt)
+					if (l.nt()) referenced.insert(l.n());
+			}
+			for (auto nt : referenced) {
+				if (defined.count(nt)) continue;
+				if (cc.is_fn(nt)) continue;
+				auto name = nts.get(nt);
+				if (name.size() >= 2 && name[0] == '_'
+					&& name[1] == '_') continue;
+				diag->warning(
+					messages::unproductive_nonterminal,
+					{{ label::name,
+						diag->intern_dynamic(name) }});
+			}
 		}
 		int parse(const char* s, size_t l, size_t line,
 			idni::diagnostics::result<grammar<C, T>>& res,
