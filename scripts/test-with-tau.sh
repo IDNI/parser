@@ -49,7 +49,7 @@ done
 rm -rf external/parser/*
 
 # copy current parser source to place where tau expects it
-cp -r ../cmake ../src ../CMakeLists.txt ../VERSION ../LICENSE.md ../README.md \
+cp -r ../cmake ../scripts ../src ../CMakeLists.txt ../VERSION ../LICENSE.md ../README.md \
 	external/parser
 
 # resolve TAU_BUILD_JOBS using shared devrc logic
