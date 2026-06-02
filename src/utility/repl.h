@@ -14,6 +14,7 @@
 #include <stdio.h>
 
 #include "term.h"
+#include "repl_history.h"
 
 namespace idni {
 
@@ -28,27 +29,9 @@ template <typename evaluator_t>
 struct repl {
 	repl(evaluator_t& re, std::string prompt = "> ",
 		std::string history_file = ".history")
-		: re_(re), prompt_(prompt), history_file_(history_file)
+		: re_(re), prompt_(prompt),
+		  history_(std::move(history_file))
 	{
-		auto unescape = [](const std::string& s) {
-			std::ostringstream oss;
-			for (size_t i = 0; i < s.length(); ++i) {
-				if (s[i] == '\\' && i + 1 < s.length()) {
-					char next = s[++i];
-					oss << (next == 'n' ? '\n'
-						: next == '\\' ? '\\' : next);
-				} else oss << s[i];
-			}
-			return oss.str();
-		};
-		// load history from file if exists
-		if (std::filesystem::exists(history_file_)) {
-			std::ifstream hf(history_file_);
-			std::string s;
-			while (std::getline(hf, s))
-				if (s.size()) history_.push_back(unescape(s));
-			hpos_ = history_.size();
-		}
 		re.r = this; // link evaluator to this repl
 		term::open();
 	}
@@ -138,7 +121,7 @@ struct repl {
 			input_.insert(input_.begin() + pos_ - 1, '\n');
 			return ret;
 		}
-		store(s);
+		history_.store(s);
 		if (ret == 1) return ret; // exit loop if 1
 		reset_input();
 		return 0;
@@ -295,46 +278,24 @@ private:
 	}
 	/// Previous history input
 	void up() {
-		if (history_.size() == 0 || hpos_ == 0) return;
-		// push current input into history if we are at the end
-		if (hpos_ == history_.size() && input_.size())
-			history_.push_back(get());
-		set(history_[--hpos_]);
+		if (auto t = history_.prev(get())) set(*t);
 	}
 	/// Next history input
 	void down() {
-		if (hpos_ == history_.size()) return;
-		if (++hpos_ == history_.size()) set();
-		else set(history_[hpos_]);
+		if (auto t = history_.next()) set(*t);
 	}
 	/// Go to first input in history
 	void ctrl_up() {
-		if (history_.size() == 0 || hpos_ == 0) return;
-		set(history_[hpos_ = 0]);
+		if (auto t = history_.first()) set(*t);
 	}
 	/// Go beyond the end of history into a new input
 	void ctrl_down() {
-		if (hpos_ == history_.size()) return;
-		hpos_ = history_.size(), set();
+		if (auto t = history_.past_end()) set(*t);
 	}
-	/// Store a string into history and return the string
-	const std::string& store(const std::string& s) {
-		auto escape = [](const std::string& s) {
-			std::ostringstream oss;
-			for (char c : s) oss << (c == '\\' ? "\\\\"
-						: c == '\n' ? "\\n"
-						: std::string(1, c));
-			return oss.str();
-		};
-		if (history_.size() && history_.back() == s)
-			return hpos_ = history_.size(), history_.back();
-		history_.push_back(s), hpos_ = history_.size();
-		std::ofstream file(history_file_, std::ios::app);
-		if (file) file << escape(history_[hpos_ - 1]) << '\n';
-		return history_[hpos_ - 1];
+	/// Store the string (mostly the current input) in history
+	void store(const std::string& s) {
+		history_.store(s);
 	}
-	/// Store current input into history and return the input as a string
-	const std::string& store() { return store(get()); }
 	size_t printed_size(const std::string& s) const {
 		size_t size = 0;
 		bool in_escape = false;
@@ -416,11 +377,9 @@ private:
 	}
 	evaluator_t& re_;
 	std::string prompt_;
-	std::string history_file_;
+	repl_history history_;
 	std::vector<char> input_;
-	std::vector<std::string> history_;
 	size_t pos_ = 0; /// cursor position in input
-	size_t hpos_ = 0; /// history position
 	size_t term_h_ = 0, term_w_ = 0; /// term height and width
 	size_t r_ = 0, c_ = 0; /// current cursor's row and column
 	std::vector<size_t> lws_{ 0 }; /// input line widths
