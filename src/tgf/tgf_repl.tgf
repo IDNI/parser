@@ -1,10 +1,11 @@
-@use char class eof, alnum, alpha, space, printable.
+@use char class eof, alnum, alpha, space, printable, xdigit.
 
 @inline char classes.
 
 @trim _, __.
 @trim all terminals except children of
-	symbol, quoted_string, unescaped_s, escaped_s, parse_input_char_seq.
+	symbol, quoted_string, unescaped_s, escaped_s, parse_input_char_seq,
+	escape_char, esc_hex, esc_u4, esc_U8.
 
 # TGF grammar
 start                  => _ [ statement (_ '.' _ statement)* _ ].
@@ -106,7 +107,12 @@ filename               => quoted_string.
 quoted_string          => '"' quoted_string_char* '"'.
 quoted_string_char     => unescaped_s | escaped_s.
 unescaped_s            => (space | printable) & ~( '"' | '\\' ).
-escaped_s              => '\\' ('"' | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't').
+escaped_s              => '\\' ('"' | escape_char).
+escape_char            => 'a' | 'b' | 'f' | 'n' | 'r' | 't' | 'v' | '\\' | '/'
+                        | esc_hex | esc_u4 | esc_U8.
+esc_hex                => ('x' | 'X') xdigit [ xdigit ].
+esc_u4                 => 'u' xdigit xdigit xdigit xdigit.
+esc_U8                 => 'U' xdigit xdigit xdigit xdigit xdigit xdigit xdigit xdigit.
 
 _                      => [ __ ].               # optional whitespace
 __                     => (space | comment) _.  # whitespace (includes comments)

@@ -68,23 +68,15 @@ static bool get_bool_value(const tt& t) {
 		== tgf_repl_parser::true_value;
 }
 
-static string unquote(const string& s) {
-	stringstream ss;
+static string unquote(const string& s, diagnostics::report& report) {
 	if (s.size() < 2 || s[0] != '"' || s[s.size() - 1] != '"') return s;
-	size_t l = s.size() - 2;
-	for (size_t i = 1; i != s.size() - 1; ++i) {
-		if (i != l && s[i] == '\\') {
-			switch (s[++i]) {
-			case 'r': ss << '\r'; break;
-			case 'n': ss << '\n'; break;
-			case 't': ss << '\t'; break;
-			case 'b': ss << '\b'; break;
-			case 'f': ss << '\f'; break;
-			default: ss << s[i];
-			}
-		} else ss << s[i];
+	auto dec = escapes::decode(
+		s.substr(1, s.size() - 2), escapes::tgf_string);
+	if (!dec.has_value()) {
+		report.append(std::move(dec.report()));
+		return {};
 	}
-	return ss.str();
+	return std::move(dec).value();
 }
 
 const std::string& tgf_repl_evaluator::filename() const noexcept {
@@ -810,8 +802,8 @@ int tgf_repl_evaluator::eval(const tt& s) {
 			break;
 		}
 		auto n = s | p::filename;
-		auto filename = unquote(n | tt::terminals);
-		DBG(assert(filename.size());)
+		auto filename = unquote(n | tt::terminals, report);
+		if (report.has_error()) break;
 		reload(filename);
 		break;
 	}
@@ -860,15 +852,15 @@ int tgf_repl_evaluator::eval(const tt& s) {
 		else if (auto qstr = i | p::quoted_string;
 			qstr.has_value()) input = unquote(qstr
 				|| p::quoted_string_char
-				|| tt::terminals);
+				|| tt::terminals, report);
 		//if (opt.debug) cout << "input: " << input << "\n";
 		parse(input.c_str(), input.size());
 		break;
 	}
 	case p::parse_file_cmd: {
 		auto n = s | p::filename;
-		auto filename = unquote(n | tt::terminals);
-		DBG(assert(filename.size());)
+		auto filename = unquote(n | tt::terminals, report);
+		if (report.has_error()) break;
 		parse(filename);
 		break;
 	}

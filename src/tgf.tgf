@@ -1,9 +1,10 @@
-@use char class eof, alnum, alpha, space, printable.
+@use char class eof, alnum, alpha, space, printable, xdigit.
 
 @trim __, _, sep.
 @trim all terminals except children of
-	sym, cc_name, escaped_s, unescaped_s, escaped_c, unescaped_c.
-@inline char classes, syms.
+	sym, cc_name, escaped_s, unescaped_s, escaped_c, unescaped_c,
+	terminal_hex, hex_bytes.
+@inline char classes, syms, escape_char, esc_hex, esc_u4, esc_U8.
 
 # start symbol
 start                  => (_ statement)* _.
@@ -15,7 +16,7 @@ start_statement	       => _ statement _.
 production             => sym [ _ '[' _ sym:production_guard _ ']' ]
                                                     _ "=>" _ alternation _ '.'.
 alternation            => conjunction   (_ '|' _ conjunction)*.
-conjunction            => concatenation (_ '&' _ concatenation)*.
+conjunction            => concatenation (_ '&' _ concatenation)*. 
 concatenation          => factor (__ factor)*.
 factor                 => (factor _ ':' sym)       :shorthand_rule
                         | (term '?')               :optional
@@ -30,14 +31,20 @@ term                   => ('(' _ alternation _ ')'):group
                         |                           sym.
 
 # literals
-terminal               => terminal_char | terminal_string.
+terminal               => terminal_char | terminal_string | terminal_hex.
+terminal_hex           => '0' 'x' (xdigit | (xdigit xdigit)+):hex_bytes.
 sym                    => (alpha | '_') (alnum | '_')*.
 terminal_char          => "'" (unescaped_c | escaped_c) "'".
 unescaped_c            => printable & ~( "'" | '\\').
-escaped_c              => '\\' ("'" | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't').
-terminal_string        => '"' ((unescaped_s | escaped_s):terminal_string_char)* '"'.
+escaped_c              => '\\' ("'" | escape_char).
+terminal_string        => '"' (unescaped_s | escaped_s)* '"'.
 unescaped_s            => printable & ~('"' | '\\').
-escaped_s              => '\\' ('"' | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't').
+escaped_s              => '\\' ('"' | escape_char).
+escape_char            => 'a' | 'b' | 'f' | 'n' | 'r' | 't' | 'v' | '\\' | '/'
+                               | esc_hex | esc_u4 | esc_U8.
+esc_hex                => ('x' | 'X') xdigit [ xdigit ].
+esc_u4                 => 'u' xdigit xdigit xdigit xdigit.
+esc_U8                 => 'U' xdigit xdigit xdigit xdigit xdigit xdigit xdigit xdigit.
 
 # directives
 directive              => '@' _ directive_body _ '.'.

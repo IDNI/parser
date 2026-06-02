@@ -11,6 +11,7 @@
 #include "parser_strings.h"
 #include "utility/devhelpers.h"
 #include "utility/diagnostics.h"
+#include "utility/escapes.h"
 
 namespace idni {
 
@@ -175,12 +176,14 @@ private:
 		/// grammar options
 		grammar<C, T>::options opt{};
 		char_class_fns<T> cc;
+		idni::diagnostics::report* diag = nullptr;
 		grammar_builder(nonterminals<C, T>& nts) : nts(nts) {}
 		grammar_builder(nonterminals<C, T>& nts, const trv& t,
 			idni::diagnostics::report* diag = nullptr)
 			: nts(nts) { build(t, diag); }
 		void build(const trv& t,
 			idni::diagnostics::report* diag = nullptr) {
+			this->diag = diag;
 			auto statements  = t || tgf_parser::statement;
 			auto directives  = statements || tgf_parser::directive;
 			for (const auto& d : directives()) collect_cc_names(d);
@@ -362,21 +365,13 @@ private:
 			return ps(nn, nr | (nr + nn)), nn;
 		}
 		std::basic_string<C> unescape(const std::string& s) {
-			std::basic_stringstream<C> ss;
-			size_t l = s.size() - 1;
-			for (size_t i = 0; i != s.size(); ++i) {
-				if (i != l && s[i] == '\\') {
-					switch (s[++i]) {
-					case 'r': ss << '\r'; break;
-					case 'n': ss << '\n'; break;
-					case 't': ss << '\t'; break;
-					case 'b': ss << '\b'; break;
-					case 'f': ss << '\f'; break;
-					default: ss << s[i];
-					}
-				} else ss << s[i];
+			auto dec = idni::escapes::decode(
+				s, idni::escapes::tgf_string);
+			if (!dec.has_value()) {
+				if (diag) diag->append(std::move(dec.report()));
+				return {};
 			}
-			return ss.str();
+			return from_str<C>(std::move(dec).value());
 		}
 		prods_t terminal_char(const trv& t) {
 			//print_node(std::cout << "terminal_char: ", t.value()) << "\n";
@@ -390,25 +385,40 @@ private:
 		}
 		prods_t terminal_string(const trv& t) {
 			prods_t r{};
-			auto cs = t || tgf_parser::terminal_string_char;
-			for (auto& ch : cs()) {
-				auto c = ch | tgf_parser::unescaped_s;
-				if (c.has_value())
-					r = r + prods_t(c | trv::terminals);
-				else {
-					c = ch | tgf_parser::escaped_s;
+			for (auto& ch : (t | trv::children)()) {
+				if ((ch | trv::nonterminal) == tgf_parser::unescaped_s)
+					r = r + prods_t(ch | trv::terminals);
+				else
 					r = r + prods_t(unescape(
-							c | trv::terminals));
-				}
+							(ch | tgf_parser::escaped_s) | trv::terminals));
 			}
 			return r;
+		}
+		prods_t terminal_hex(const trv& t) {
+			auto digits = (t | tgf_parser::hex_bytes) | trv::terminals;
+			std::string bytes;
+			if (digits.size() == 1) {
+				bytes.push_back(
+					(char)idni::escapes::hex_val(digits[0]));
+			} else {
+				for (size_t i = 0; i + 1 < digits.size(); i += 2) {
+					int hi = idni::escapes::hex_val(digits[i]);
+					int lo = idni::escapes::hex_val(digits[i+1]);
+					bytes.push_back(
+						(char)((hi << 4) | lo));
+				}
+			}
+			return prods_t(from_str<C>(bytes));
 		}
 		prods_t terminal(const trv& t) {
 			//print_node(std::cout << "terminal: ", t.value()) << "\n";
 			auto c = t | trv::only_child;
-			if ((c | trv::nonterminal) == tgf_parser::terminal_char)
+			auto nt = c | trv::nonterminal;
+			if (nt == tgf_parser::terminal_char)
 				return terminal_char(c);
-			else return terminal_string(c);
+			if (nt == tgf_parser::terminal_hex)
+				return terminal_hex(c);
+			return terminal_string(c);
 		}
 		prods_t term(const prods_t& sym, const trv& t) {
 			//print_node(std::cout << "term: ", t.value()) << "\n";

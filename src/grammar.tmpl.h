@@ -4,6 +4,7 @@
 #include <deque>
 #include <queue>
 #include "parser.h"
+#include "utility/escapes.h"
 
 namespace idni {
 
@@ -98,41 +99,23 @@ std::vector<T> lit<C, T>::to_terminals() const {
 }
 template <typename C, typename T>
 std::basic_string<C> lit<C, T>::to_string(const std::basic_string<C>& nll)const{
-	auto escape = [](const char& t) {
-		return t == '\n' ? "\\n" :
-			t == '\r' ? "\\r" :
-			t == '\t' ? "\\t" :
-			t == '\v' ? "\\v" :
-			t == '\'' ? "\\'" :
-			t == '\\' ? "\\\\" :
-			t == '\0' ? "\\0" : "";
-	};
-	auto escape32 = [](const char32_t& t) {
-		return t == U'\n' ? "\\n" :
-			t == U'\r' ? "\\r" :
-			t == U'\t' ? "\\t" :
-			t == U'\v' ? "\\v" :
-			t == U'\'' ? "\\'" :
-			t == U'\\' ? "\\\\" :
-			t == U'\0' ? "\\0" : "";
-	};
 	if (nt()) return nts->get(n());
 	else if (is_null()) return nll;
 	else if constexpr (std::is_same_v<T, bool>)
 		return from_cstr<C>(t() ? "1" : "0");
 	else if constexpr (std::is_same_v<C,char> && std::is_same_v<C, T>) {
-		std::basic_stringstream<C> ss;
-		std::string r = escape(t());
-		ss << "'" << (r.size() ? r : idni::to_std_string(t())) << "'";
-		return ss.str();
+		// byte terminal: escape in the byte domain
+		std::string body = idni::escapes::encode(
+			std::string(1, t()), idni::escapes::tgf_char);
+		return from_str<C>("'" + body + "'");
 	} else if constexpr ((std::is_same_v<C,char32_t> &&
 						std::is_same_v<C, T>) ||
 		(std::is_same_v<C,char> && std::is_same_v<T,char32_t>))
 	{
-		std::basic_stringstream<C> ss;
-		std::string r = escape32(t());
-		ss << "'" << (r.size() ? r : idni::to_std_string(t())) << "'";
-		return ss.str();
+		// codepoint terminal: escape in the codepoint domain
+		std::string body = idni::escapes::encode(
+			std::u32string(1, (char32_t)t()), idni::escapes::tgf_char);
+		return from_str<C>("'" + body + "'");
 	}
 	return nll;
 }
