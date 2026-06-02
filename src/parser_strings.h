@@ -77,7 +77,8 @@ using id_t = idni::int_t;
 	X(trim,               "trim") \
 	X(inline_nodes,       "inline nodes") \
 	X(inline_paths,       "inline paths") \
-	X(trim_terminals,     "trim terminals")
+	X(trim_terminals,     "trim terminals") \
+	X(offset,             "offset")
 
 // Human-readable labels for idni::diagnostics::code values.
 // Sentence form: capital first word, trailing period.
@@ -156,6 +157,22 @@ struct messages {
 	static constexpr sv loading_grammars_unavailable =
 		"Loading grammars is not available in a specialized REPL";
 	static constexpr sv unproductive_nonterminal    = "Unproductive nonterminal: ";
+	// escape decode errors
+	static constexpr sv escape_trailing         = "Trailing escape character.";
+	static constexpr sv escape_lone_delimiter   = "Lone delimiter not doubled.";
+	static constexpr sv escape_x_need           = "\\x must be followed by hex digits.";
+	static constexpr sv escape_x_overflow       = "\\x value exceeds 0xFF.";
+	static constexpr sv escape_u4_need_4        = "\\u requires exactly 4 hex digits.";
+	static constexpr sv escape_u4_high_no_low   = "High surrogate not followed by low surrogate.";
+	static constexpr sv escape_u4_lo_need_4     = "Low surrogate escape requires 4 hex digits.";
+	static constexpr sv escape_u4_bad_low       = "High surrogate not followed by valid low surrogate.";
+	static constexpr sv escape_u4_lone_low      = "Lone low surrogate.";
+	static constexpr sv escape_u4_invalid       = "\\u value is not a valid Unicode scalar.";
+	static constexpr sv escape_U8_need_8        = "\\U requires exactly 8 hex digits.";
+	static constexpr sv escape_U8_invalid       = "\\U value is not a valid Unicode scalar.";
+	static constexpr sv escape_octal_scalar     = "Octal value is not a valid Unicode scalar.";
+	static constexpr sv escape_octal_overflow   = "Octal byte value exceeds 0xFF.";
+	static constexpr sv escape_invalid_utf8     = "Invalid UTF-8.";
 };
 
 struct counters {
