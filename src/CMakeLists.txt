@@ -26,6 +26,8 @@ set(TAU_PARSER_HEADERS
 	utility/measure.h
 	utility/memory_map.h
 	utility/repl.h
+	utility/repl_ftxui.h
+	utility/repl_ftxui.tmpl.h
 	utility/term.h
 	utility/term.impl.h
 	utility/term_colors.h

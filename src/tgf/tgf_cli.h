@@ -14,6 +14,9 @@
 #include "utility/diagnostics.h"
 #include "utility/repl.h"
 #include "utility/term_colors.h"
+#ifdef TAU_PARSER_HAS_FTXUI
+#include "../utility/repl_ftxui.h"
+#endif
 #include "tgf_repl_parser.generated.h"
 #include "tgf_cli_options.h"
 
@@ -30,6 +33,9 @@ cli::commands tgf_commands();
 
 struct tgf_repl_evaluator {
 	friend struct repl<tgf_repl_evaluator>;
+#ifdef TAU_PARSER_HAS_FTXUI
+	friend struct repl_ftxui<tgf_repl_evaluator>;
+#endif
 
 	using parser_type = tgf_repl_parser::parser_type;
 	using char_type = parser_type::char_type;
@@ -136,6 +142,9 @@ private:
 	std::string grammar_source;
 
 	repl<tgf_repl_evaluator>* r = nullptr;
+#ifdef TAU_PARSER_HAS_FTXUI
+	repl_ftxui<tgf_repl_evaluator>* r_ftx = nullptr;
+#endif
 	term::colors TC;
 	idni::diagnostics::report report;
 

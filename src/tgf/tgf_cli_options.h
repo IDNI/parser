@@ -157,6 +157,8 @@ inline cli::commands tgf_commands() {
 	OPT(colors);
 	OPT(cli::option("evaluate", 'e', ""));
 		DESC("run repl command with input to evaluate and quit");
+	OPT(cli::option("legacy-repl", 'X', false));
+		DESC("use legacy terminal REPL instead of FTXUI");
 	//OPT(char_type);
 	//OPT(terminal_type);
 

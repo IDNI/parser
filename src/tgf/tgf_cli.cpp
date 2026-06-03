@@ -119,6 +119,9 @@ void tgf_repl_evaluator::reprompt() {
 		<< TC_STATUS << " ]" << TC.CLEAR() << " ";
 	ss << TC_PROMPT << "tgf>" << TC.CLEAR() << " ";
 	if (r) r->set_prompt(ss.str());
+#ifdef TAU_PARSER_HAS_FTXUI
+	if (r_ftx) r_ftx->set_prompt(ss.str());
+#endif
 }
 
 ostream& tgf_repl_evaluator::pretty_print(ostream& os, tref n,
@@ -150,7 +153,7 @@ void tgf_repl_evaluator::flush_report() {
 bool tgf_repl_evaluator::load_file(const std::string& filename) {
 	auto next_nts = make_unique<nonterminals_type>();
 	auto gr = tgf<char_type, terminal_type>::from_file(*next_nts, filename,
-		opt.measure || opt.print_json);
+		opt.measure);
 	if (!gr.has_value()) {
 		report.append(std::move(gr).report());
 		return false;
@@ -766,11 +769,18 @@ static void help(size_t nt, bool show_load_reload) {
 int tgf_repl_evaluator::eval(const tt& s) {
 	using p = tgf_repl_parser;
 	const auto nt = s | tt::nonterminal;
-	auto _ = report.open_if(opt.measure, tgf_repl_parser::instance().name(nt));
+	auto _ = report.open_if(opt.measure || nt == p::parse_cmd,
+		tgf_repl_parser::instance().name(nt),
+		idni::diagnostics::code::info_micros);
 	int ret = 0;
 	switch (nt) {
 	case p::quit_cmd: ret = (cout << "Quit.\n", 1); break;
-	case p::clear_cmd: if (r) r->clear(); break;
+	case p::clear_cmd:
+		if (r) r->clear();
+#ifdef TAU_PARSER_HAS_FTXUI
+		else if (r_ftx) r_ftx->clear();
+#endif
+		break;
 	case p::help_cmd: {
 		auto optarg = s | p::help_arg
 				| tt::only_child | tt::nonterminal;
@@ -1075,18 +1085,33 @@ static int run_command(cli& cl, const cli::command& cmd,
 	}
 
 	if (cmd.name() == "repl") {
-		if (cmd.get<string>("evaluate").size()) {
+		auto with_report_flush = [&](auto run) {
 			re.flush_report();
-			int ret = re.eval(cmd.get<string>("evaluate"));
+			int ret = run();
 			re.flush_report();
 			return ret;
-		}
-		re.flush_report();
-		repl<tgf_repl_evaluator> r(re, "tgf> ", ".tgf_history");
-		re.set_repl(r);
-		int ret = r.run();
-		re.flush_report();
-		return ret;
+		};
+		auto run_legacy = [&] {
+			repl<tgf_repl_evaluator> r(re, "tgf> ", ".tgf_history");
+			re.set_repl(r);
+			return r.run();
+		};
+		auto run_default = [&] {
+#ifdef TAU_PARSER_HAS_FTXUI
+			repl_ftxui<tgf_repl_evaluator> rftx(
+				re, "tgf> ", ".tgf_history");
+			return rftx.run(); // ctor sets re.r_ftx
+#else
+			// FTXUI not available: silently fall back to legacy REPL
+			return run_legacy();
+#endif
+		};
+
+		if (auto eval = cmd.get<string>("evaluate"); eval.size())
+			return with_report_flush([&] { return re.eval(eval); });
+		if (cmd.get<bool>("legacy-repl"))
+			return with_report_flush(run_legacy);
+		return with_report_flush(run_default);
 	}
 
 	if (cmd.name() == "parse") {
@@ -1184,5 +1209,9 @@ int tgf_run(int argc, char** argv) {
 
 	return run_command(cl, cmd, re);
 }
+
+#ifdef TAU_PARSER_HAS_FTXUI
+template struct repl_ftxui<tgf_repl_evaluator>;
+#endif
 
 } // namespace idni
