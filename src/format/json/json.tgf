@@ -1,13 +1,13 @@
-@use char class digit, printable, xdigit.
+@use char class digit, any, ascii, xdigit, cntrl.
 
 @inline char classes,
 	integral, fractional, zero, nonzerodigit, nzintegral,
-	unescaped, anychar, esc, uni_cp, q_str > str.
+	unescaped, esc, uni_cp, q_str > str, ascii_digit, ascii_xdigit.
 
 @trim _, __.
 @trim children true_sym, false_sym, null_sym.
 
-# start represengting JSON text is a value
+# start representing JSON text is a value
 start          => _ value _.
 
 # whitespace
@@ -25,19 +25,20 @@ null_sym       => "null".
 # number
 number         => '-'? integral fractional? exponent?.
 zero           => '0'.
-nonzerodigit   => digit & ~zero.
-nzintegral     => nonzerodigit digit*.
+nonzerodigit   => digit & ascii & ~zero.
+nzintegral     => nonzerodigit ascii_digit*.
 integral       => '0' | nzintegral.
-fractional     => '.' digit+.
-exponent       => ('e' | 'E') ['+' | '-'] digit+.
+fractional     => '.' ascii_digit+.
+exponent       => ('e' | 'E') ['+' | '-'] ascii_digit+.
+ascii_digit    => digit & ascii.
 
 # string
 q_str          => '"' (unescaped | escaped)*:str '"'.
-unescaped      => anychar & ~('"' | '\\').
-anychar        => printable.
+unescaped      => any & ~('"' | '\\' | cntrl & ascii & ~'\x7F').
 esc            => '\\'.
 escaped        => esc ('"' | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't'| uni_cp).
-uni_cp         => 'u' xdigit xdigit xdigit xdigit.
+uni_cp         => 'u' ascii_xdigit ascii_xdigit ascii_xdigit ascii_xdigit.
+ascii_xdigit   => xdigit & ascii.
 
 # array
 arr            => '[' _ [values _] ']'.
