@@ -254,6 +254,7 @@ std::pair<typename parser<C, T>::container_iter, bool>
 		if (add(t, j).second) {
 			DBGP(print(std::cout <<
 				" +  adding to t from nullable\t\t", j) <<"\n";)
+			if (any_conj) forward_deps[*it].push_back(j);
 		}
 	}
 	return { it, true };
@@ -290,6 +291,40 @@ bool parser<C, T>::nt_still_completed(size_t nt_id, size_t from, size_t set)
 }
 
 template <typename C, typename T>
+void parser<C, T>::retract_item(const item& x, container_t& c) {
+	if (U.size() < S.size()) U.resize(S.size());
+	c.erase(x);
+	if (x.set >= S.size()) return;
+	auto sit = S[x.set].find(x);
+	U[x.set].insert(x);
+	if (sit == S[x.set].end()) return;
+	S[x.set].erase(sit);
+	if (!completed(x) && get_lit(x).nt()) {
+		auto cit = cache.find({ get_lit(x).n(), x.set });
+		if (cit != cache.end()) cit->second.erase(x);
+	}
+	if (auto fit = fromS.find(x.from); fit != fromS.end()) {
+		MC(count(cnt.fromS_reads);)
+		fit->second.erase(x.set);
+		if (fit->second.empty()) fromS.erase(fit);
+	}
+	if (auto fwit = forward_deps.find(x); fwit != forward_deps.end()) {
+		auto fwd = std::move(fwit->second);
+		forward_deps.erase(fwit);
+		for (const item& d : fwd) retract_item(d, c);
+	}
+	if (completed(x) && get_nt(x).nt()) {
+		if (counted_completions.erase(x)) {
+			completion_key dkey{ get_nt(x).n(), x.from, x.set };
+			auto dcit = completion_count.find(dkey);
+			if (dcit != completion_count.end()
+				&& dcit->second > 0) --dcit->second;
+			cascade_uncomplete(get_nt(x).n(), x.from, x.set, c);
+		}
+	}
+}
+
+template <typename C, typename T>
 void parser<C, T>::cascade_uncomplete(size_t nt_id, size_t from, size_t set,
 	container_t& c)
 {
@@ -301,33 +336,7 @@ void parser<C, T>::cascade_uncomplete(size_t nt_id, size_t from, size_t set,
 	auto deps = std::move(dit->second);
 	completion_deps.erase(dit);
 	MC(count(cnt.cascade_dep_total, deps.size());)
-	for (const item& dep : deps) {
-		if (U.size() < S.size()) U.resize(S.size());
-		auto sit = S[dep.set].find(dep);
-		if (sit == S[dep.set].end()) continue;
-		S[dep.set].erase(sit);
-		U[dep.set].insert(dep);
-		if (!completed(dep) && get_lit(dep).nt()) {
-			auto cit = cache.find({get_lit(dep).n(), dep.set});
-			if (cit != cache.end()) cit->second.erase(dep);
-		}
-		if (auto fit = fromS.find(dep.from); fit != fromS.end()) {
-			MC(count(cnt.fromS_reads);)
-			fit->second.erase(dep.set);
-			if (fit->second.empty()) fromS.erase(fit);
-		}
-		c.erase(dep);
-		if (completed(dep) && get_nt(dep).nt()) {
-			completion_key dkey{
-				get_nt(dep).n(), dep.from, dep.set };
-			auto dcit = completion_count.find(dkey);
-			if (dcit != completion_count.end()
-				&& dcit->second > 0)
-				--dcit->second;
-			cascade_uncomplete(
-				get_nt(dep).n(), dep.from, dep.set, c);
-		}
-	}
+	for (const item& dep : deps) retract_item(dep, c);
 }
 
 template <typename C, typename T>
@@ -369,28 +378,8 @@ void parser<C, T>::resolve_conjunctions(container_t& c) {
 			MC(count(cnt.conjunction_failures);)
 			for (const auto& x : pr.second) {
 				DBGP(print(std::cout << "UNCOMPLETING: ", x) << std::endl;)
-				if (U.size() < S.size()) U.resize(S.size());
-				U[x.set].insert(x);
-				S[x.set].erase(x);
-				if (auto fit = fromS.find(x.from); fit != fromS.end()) {
-					MC(count(cnt.fromS_reads);)
-					fit->second.erase(x.set);
-					if (fit->second.empty()) fromS.erase(fit);
-				}
-				c.erase(x);
+				retract_item(x, c);
 			}
-			// decrement count for head NT and cascade
-			auto head = g(p);
-			auto it0 = pr.second.begin();
-			if (head.nt()) {
-				completion_key hkey{
-					head.n(), it0->from, it0->set };
-				auto cit = completion_count.find(hkey);
-				if (cit != completion_count.end()
-					&& cit->second > 0) --cit->second;
-			}
-			if (head.nt()) cascade_uncomplete(
-				head.n(), it0->from, it0->set, c);
 		}
 	}
 	//DBG(std::cout << "... conjunctions resolved\n";)
@@ -422,7 +411,8 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 	auto smbl = get_nt(i);
 	auto &rng = cache[{smbl.n(), i.from}];
 	completion_key ckey{ smbl.n(), i.from, i.set };
-	if (any_conj) ++completion_count[ckey];
+	if (any_conj && counted_completions.insert(i).second)
+		++completion_count[ckey];
 	// per-item memoization: only iterate cache entries new since last call.
 	const size_t cur_size = rng.size();
 	size_t& last_idx = complete_memo[i];
@@ -450,6 +440,7 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 			c.insert(j);
 			if (any_conj) {
 				completion_deps[ckey].push_back(j);
+				forward_deps[*it].push_back(j);
 				MC(maks(cnt.completion_deps_size_peak,
 					completion_deps[ckey].size());)
 			}
@@ -460,6 +451,7 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 		if (add(t, j).second) {
 			if (any_conj) {
 				completion_deps[ckey].push_back(j);
+				forward_deps[*it].push_back(j);
 				MC(maks(cnt.completion_deps_size_peak,
 					completion_deps[ckey].size());)
 			}
@@ -558,7 +550,10 @@ void parser<C, T>::scan(const item& i, size_t n, T ch) {
 	if (j.set >= S.size()) S.resize(j.set + 1);
 	DBGP(print(std::cout << " +  adding from scan into S[" << j.set <<
 		"]: \t", j) << std::endl;)
-	S[j.set].insert(j);
+	if (S[j.set].find(j) == S[j.set].end()) {
+		S[j.set].insert(j);
+		if (any_conj) forward_deps[i].push_back(j);
+	}
 	if (need_fromS) {
 		MC(count(cnt.fromS_writes);)
 		fromS[j.from].insert(j.set);
@@ -722,7 +717,8 @@ parser<C, T>::result parser<C, T>::_parse() {
 	S.clear(), U.clear(), fromS.clear(), bin_tnt.clear(), refi.clear(),
 		cache.clear(), gcready.clear(), sorted_citem.clear(),
 		rsorted_citem.clear(), completion_deps.clear(),
-		completion_count.clear(), complete_memo.clear();
+		completion_count.clear(), complete_memo.clear(),
+		forward_deps.clear(), counted_completions.clear();
 	//pnode::nid().clear();
 	tid = 0;
 	S.resize(1);

@@ -1206,7 +1206,12 @@ private:
 	std::unordered_map<completion_key, std::vector<item>>
 		completion_deps;
 	/// O(1) "is anything still completed?" predicate.
-	std::unordered_map<completion_key, size_t> completion_count;
+	ankerl::unordered_dense::map<completion_key, size_t> completion_count;
+	/// completed items currently counted in completion_count (one count per live item)
+	ankerl::unordered_dense::set<item, item_hash> counted_completions;
+	/// predecessor->derived edges: items produced by advancing the key item
+	ankerl::unordered_dense::map<item, std::vector<item>, item_hash>
+		forward_deps;
 	/// True iff any production in `g` is conjunctive. Cascade machinery
 	/// is dead code when this is false, so its bookkeeping is skipped.
 	bool any_conj = false;
@@ -1250,6 +1255,7 @@ private:
 	void resolve_conjunctions(container_t& c);
 	void cascade_uncomplete(size_t nt_id, size_t from, size_t set,
 		container_t& c);
+	void retract_item(const item& x, container_t& c);
 	bool nt_still_completed(size_t nt_id, size_t from, size_t set) const;
 	void predict(const item& i, container_t& t);
 	void scan(const item& i, size_t n, T ch);
