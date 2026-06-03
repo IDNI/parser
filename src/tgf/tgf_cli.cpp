@@ -23,6 +23,7 @@
 #include "utility/devhelpers.h"
 #endif
 #include "defs.h"
+#include "format/json/json.h"
 
 namespace idni {
 
@@ -35,7 +36,7 @@ static void print_diagnostics_report(
 	bool json, bool print_names = true)
 {
 	if (report.nodes().empty()) return;
-	if (json) report.to_json(std::cout, print_names) << '\n';
+	if (json) format::json::print(report, std::cout, print_names) << '\n';
 	else report.print();
 }
 
