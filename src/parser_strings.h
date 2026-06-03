@@ -105,7 +105,8 @@ using id_t = idni::int_t;
 	X(info,                     "Info.") \
 	X(info_micros,              "Time.") \
 	X(info_kb,                  "Memory.") \
-	X(info_count,               "Count.")
+	X(info_count,               "Count.") \
+	X(info_scope,               "Scope.")
 
 struct label {
 	enum : id_t { none = 0,

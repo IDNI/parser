@@ -13,7 +13,6 @@
 #include "term_colors.h"
 #include "../parser_strings.h"
 
-#include "../format/json.h"
 
 namespace idni::diagnostics {
 
@@ -41,16 +40,14 @@ constexpr bool is_metric(code c) {
 constexpr bool uses_micros_scale(code c) { return c == code::info_micros; }
 
 inline const char* code_name(code c) {
-	using sk = idni::parser_strings::static_key;
-	sk k = sk::code_unknown;
+	using cl = idni::parser_strings::code_label;
+	id_t k = cl::none;
 	switch (c) {
-#define PARSER_CODE_LABEL_CASE(id, label) \
-	case code::id: k = sk::code_##id; break;
-	PARSER_CODE_LABELS(PARSER_CODE_LABEL_CASE)
-#undef PARSER_CODE_LABEL_CASE
+#define CASE(nm, s) case code::nm: k = cl::nm; break;
+	CODE_LABELS(CASE)
+#undef CASE
 	}
-	return idni::parser_strings::dict(
-		idni::parser_strings::key_id(k)).c_str();
+	return idni::parser_strings::str_code(k).data();
 }
 
 inline sink::sink(std::ostream* os)
@@ -169,7 +166,7 @@ inline void report::reset(key root) {
 	attrs_.clear();
 	scope_stack_.clear();
 	has_error_ = false;
-	push_scope(root);
+	push_scope(root, code::info_scope);
 }
 
 inline void report::clear() {
@@ -183,13 +180,13 @@ inline void report::clear() {
 
 inline report::key report::intern(const char* s) {
 	if (!s || !*s) return none;
-	key k = idni::parser_strings::dict(s);
+	key k = idni::parser_strings::label_of(s);
 	return k != none ? k : intern_dynamic(s);
 }
 
 inline report::key report::intern(std::string_view s) {
 	if (s.empty()) return none;
-	key k = idni::parser_strings::dict(s);
+	key k = idni::parser_strings::label_of(s);
 	return k != none ? k : intern_dynamic(s);
 }
 
@@ -205,12 +202,19 @@ inline report::key report::intern_dynamic(std::string_view s) {
 }
 
 inline std::string_view report::str(key id) const {
-	if (id > 0) return idni::parser_strings::dict(id);
+	if (id > 0) return idni::parser_strings::str(id);
 	if (id < 0) {
 		size_t i = static_cast<size_t>(-id - 1);
 		return i < dyn_strings_.size() ? dyn_strings_[i] : std::string_view{};
 	}
 	return {};
+}
+
+inline std::string report::format_attr_value(key k, int64_t v) const {
+	// `name` stores an interned string key; resolve it back to text.
+	if (k == idni::parser_strings::label::name)
+		return std::string(str(static_cast<key>(v)));
+	return std::to_string(v);
 }
 
 inline void report::count(key name, int_t v) {
@@ -430,7 +434,7 @@ inline std::string report::format_message(size_t node_idx) const {
 	for (uint8_t i = 0; i < n.attr_cnt; ++i) {
 		const auto& a = attrs_[n.attr_off + i];
 		append_extra(std::string(str(a.key)) + '='
-			+ std::to_string(a.value));
+			+ format_attr_value(a.key, a.value));
 	}
 	// parse_error nodes always carry a byte offset (loc=0 is the first
 	// byte of input, a common error site). Other errors store whatever
@@ -471,38 +475,13 @@ inline void report::print() const {
 		.info = &std::cout });
 }
 
-inline std::ostream& report::to_json(std::ostream& os,
-	bool print_names) const
-{
-	os << "{\n  \"nodes\": [\n";
-	for (size_t i = 0; i < nodes_.size(); ++i) {
-		if (i) os << ",\n";
-		const auto& n = nodes_[i];
-		os << "    {\"tag\": " << static_cast<unsigned>(n.tag);
-		if (print_names) {
-			os << ", \"message\": ";
-			idni::format::json::escape(os, code_name(n.tag));
-		}
-		os << ", \"key\": ";
-		idni::format::json::escape(os, str(n.key));
-		os << ", \"parent\": " << n.parent
-		   << ", \"value\": " << n.value
-		   << ", \"attrs\": [";
-		for (uint8_t a = 0; a < n.attr_cnt; ++a) {
-			if (a) os << ", ";
-			const auto& at = attrs_[n.attr_off + a];
-			os << "{\"key\": ";
-			idni::format::json::escape(os, str(at.key));
-			os << ", \"value\": " << at.value << "}";
-		}
-		os << "]}";
-	}
-	os << "\n  ]\n}";
-	return os;
-}
 
 inline const std::vector<node>& report::nodes() const {
 	return nodes_;
+}
+
+inline const std::vector<attr>& report::attrs() const {
+	return attrs_;
 }
 
 inline void report::set_node_value(int32_t idx, int64_t v) {
@@ -691,7 +670,9 @@ inline std::string report::color_info_line(const node& n, size_t level,
 	// the value/unit columns (and their label padding) to avoid the
 	// misleading "0 ms" noise.
 	const bool suppress_value =
-		level == 0 && n.value == 0 && n.tag == code::info_micros;
+		level == 0 && n.value == 0
+		&& (n.tag == code::info_micros
+		 || n.tag == code::info_scope);
 	if (!suppress_value) {
 		size_t pos = level * print_tab_width + key.size() + 1;
 		if (pos < label_w) line.append(label_w - pos, ' ');
@@ -717,7 +698,7 @@ inline std::string report::color_info_line(const node& n, size_t level,
 			if (i) line += ' ';
 			line += std::string(str(a.key));
 			line += '=';
-			line += std::to_string(a.value);
+			line += format_attr_value(a.key, a.value);
 		}
 		line += ')';
 		line += TC.CLEAR();
@@ -734,6 +715,9 @@ inline void report::print_node(const sinks& s,
 		s.error(TC.RED() + format_message(idx) + TC.CLEAR());
 	} else if (is_warning(n.tag)) {
 		s.warning(TC.YELLOW() + format_message(idx) + TC.CLEAR());
+	} else if (n.tag == code::info_scope
+		&& children[idx].empty()) {
+		// silent container with nothing to show — skip
 	} else {
 		s.info(color_info_line(n, level, label_w, cols));
 	}

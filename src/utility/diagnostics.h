@@ -66,8 +66,10 @@ enum class code : uint16_t {
 	                                // also the tag used by timed scopes
 	info_kb                  = 0x8002, // memory, kilobytes
 	info_count               = 0x8003, // counter, dimensionless
+	info_scope               = 0x8004, // structural container; silent when
+	                                   // it has no children
 	// Adding a new metric tag: extend is_metric() (whitelist, not
-	// range check) and PARSER_CODE_LABELS in parser_strings.h.
+	// range check) and CODE_LABELS in parser_strings.h.
 };
 
 constexpr bool is_error(code c);
@@ -78,9 +80,11 @@ constexpr bool uses_micros_scale(code c);
 
 /// Human-readable sentence-form label for @p c (e.g. "Parse error.",
 /// "Unknown character class."). Capitalized first word, trailing
-/// period. Strings live in @ref idni::parser_strings::dict_strings and
-/// are the form emitted by @ref report::to_json as the `tag_name`
-/// field. Returns "Unknown." for any value outside the @ref code enum.
+/// period. Strings live in the @ref idni::parser_strings::CODE_LABELS
+/// table and are looked up via @ref idni::parser_strings::str_code.
+/// This is the form emitted as the `message` field by
+/// @ref idni::format::json::print when called with print_names = true.
+/// Returns "Unknown." for any value outside the @ref code enum.
 const char* code_name(code c);
 
 /// Single output slot for one severity band. Accepts either a stream
@@ -261,13 +265,8 @@ struct report {
 	void print(const sink& s) const;
 	/// Default routing: errors/warnings → std::cerr, info → std::cout.
 	void print() const;
-	/// Serialize the report tree as JSON. With @p print_names = true,
-	/// each node carries an extra "tag_name" field with the symbolic
-	/// @ref code name (e.g. "parse_error") alongside the numeric tag.
-	std::ostream& to_json(std::ostream& os,
-		bool print_names = false) const;
-
 	[[nodiscard]] const std::vector<node>& nodes() const;
+	[[nodiscard]] const std::vector<attr>& attrs() const;
 
 	/// Write @p v as the value of the node at @p idx (no-op if @p idx is
 	/// out of range). Used by @ref scope_guard to record elapsed time on
@@ -328,6 +327,11 @@ private:
 	// Format a node value with its unit suffix; time auto-scales to
 	// µs/ms/s and memory (stored as KB) to kb/mb/gb/tb.
 	static std::string format_value(int64_t v, code c);
+
+	// Render an attribute's value for display. Most attributes carry a
+	// numeric value; string-valued ones (e.g. `name`) store an interned
+	// key, which is resolved back to its string via str().
+	std::string format_attr_value(key k, int64_t v) const;
 
 	struct value_columns {
 		size_t num_w  = 0;
