@@ -45,6 +45,7 @@ struct tgf_repl_evaluator {
 		bool gc                 = true;
 		bool debug              = false;
 		bool status             = true;
+		bool continue_on_eof    = true;
 		bool colors             = true;
 		bool print_input        = false;
 		bool print_terminals    = true;

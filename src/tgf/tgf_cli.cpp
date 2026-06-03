@@ -875,6 +875,7 @@ int tgf_repl_evaluator::eval(const string& src) {
 	int quit = 0;
 	auto r = rp.parse(src.c_str(), src.size());
 	if (!r.found) {
+		if (opt.continue_on_eof && r.parse_error.at_eof()) return 2;
 		report.append(std::move(r.report()));
 		flush_report();
 	} else {
