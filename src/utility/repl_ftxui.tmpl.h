@@ -5,6 +5,7 @@
 #define __IDNI__PARSER__UTILITY__REPL_FTXUI_TMPL_H__
 
 #include <algorithm>
+#include <cctype>
 #include <iostream>
 #include <sstream>
 #include <streambuf>
@@ -293,6 +294,50 @@ int repl_ftxui<evaluator_t>::run_interactive() {
 		}
 		if (e == Event::ArrowUpCtrl) return history_first(), true;
 		if (e == Event::ArrowDownCtrl) return history_last(), true;
+		// Ctrl+A / Ctrl+E: Home / End
+		if (e == Event::CtrlA) return cursor_pos_ = 0, true;
+		if (e == Event::CtrlE)
+			return cursor_pos_ = (int)input_text_.size(), true;
+		// Ctrl+K: kill to end of line.
+		if (e == Event::CtrlK) {
+			size_t cp = std::min((size_t)cursor_pos_,
+			                     input_text_.size());
+			size_t nl = input_text_.find('\n', cp);
+			if (nl == std::string::npos)
+				nl = input_text_.size();
+			input_text_.erase(cp, nl - cp);
+			// cursor_pos_ stays at cp (text after it was removed)
+			return true;
+		}
+		// Ctrl+U: kill to start of line.
+		if (e == Event::CtrlU) {
+			size_t cp = std::min((size_t)cursor_pos_,
+			                     input_text_.size());
+			size_t sol = input_text_.rfind('\n',
+			        cp > 0 ? cp - 1 : std::string::npos);
+			size_t from = sol == std::string::npos ? 0 : sol + 1;
+			input_text_.erase(from, cp - from);
+			cursor_pos_ = (int)from;
+			return true;
+		}
+		// Ctrl+W: delete word backward (alphanumeric word boundaries).
+		if (e == Event::CtrlW) {
+			int cp = std::min(cursor_pos_,
+			                  (int)input_text_.size());
+			if (cp == 0) return true;
+			int end = cp;
+			// skip trailing non-alnum
+			while (cp > 0 && !std::isalnum(
+			        (unsigned char)input_text_[cp - 1]))
+				--cp;
+			// skip alnum word
+			while (cp > 0 && std::isalnum(
+			        (unsigned char)input_text_[cp - 1]))
+				--cp;
+			input_text_.erase(cp, end - cp);
+			cursor_pos_ = cp;
+			return true;
+		}
 		// Ctrl+C: cancel a non-empty buffer in place (FTXUI redraws a clean
 		// empty prompt); exit when the buffer is already empty.
 		if (e == Event::CtrlC) {
