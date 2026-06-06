@@ -5,11 +5,12 @@
 #define __CSV_PARSER_H__
 
 #include "parser.h"
+#include "recoders.h"
 
 namespace csv_parser_data {
 
 using char_type     = char;
-using terminal_type = char;
+using terminal_type = char32_t;
 
 inline static constexpr size_t nt_bits = 5;
 inline const std::vector<std::string> symbol_names{
@@ -21,7 +22,7 @@ inline const std::vector<std::string> symbol_names{
 inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
 
 inline std::vector<terminal_type> terminals{
-	'\0', '-', '"', '\\', '\r', '\n', ',', 
+	U'\0', U'-', U'"', U'\\', U'\r', U'\n', U',', 
 };
 
 inline ::idni::char_class_fns<terminal_type> char_classes =
@@ -41,8 +42,12 @@ inline struct ::idni::grammar<char_type, terminal_type>::options
 	}
 };
 
-inline ::idni::parser<char_type, terminal_type>::options parser_options{
-};
+inline auto make_parser_options() {
+	auto o = ::idni::default_parser_options<char_type, terminal_type>();
+	o.codec.decode = idni::utf8_to_u32_conv;
+	o.codec.encode = idni::u32_to_utf8_conv;
+	return o;
+}
 
 inline ::idni::prods<char_type, terminal_type> start_symbol{ nts(24) };
 
@@ -137,14 +142,14 @@ struct csv_parser_nonterminals {
 	};
 };
 
-struct csv_parser : public idni::parser<char, char>, public csv_parser_nonterminals {
+struct csv_parser : public idni::parser<char, char32_t>, public csv_parser_nonterminals {
 	static csv_parser& instance() {
 		static csv_parser inst;
 		return inst;
 	}
 	csv_parser() : idni::parser<char_type, terminal_type>(
 		csv_parser_data::grammar,
-		csv_parser_data::parser_options) {}
+		csv_parser_data::make_parser_options()) {}
 	size_t id(const std::basic_string<char_type>& name) {
 		return csv_parser_data::nts.get(name);
 	}

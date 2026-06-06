@@ -614,7 +614,7 @@ parser<C, T>::result parser<C, T>::parse(const C* data, size_t size,
 template <typename C, typename T>
 parser<C, T>::result parser<C, T>::parse(const C* data, size_t size) {
 	in_ = std::make_unique<input>(data, size,
-		po.max_length, o.chars_to_terminals, po.eof);
+		po.max_length, o.codec.decode, po.eof);
 	return _parse();
 }
 template <typename C, typename T>
@@ -627,7 +627,7 @@ parser<C, T>::result parser<C, T>::parse(std::basic_istream<C>& is,
 template <typename C, typename T>
 parser<C, T>::result parser<C, T>::parse(std::basic_istream<C>& is) {
 	in_ = std::make_unique<input>(is,
-		po.max_length, o.chars_to_terminals, po.eof);
+		po.max_length, o.codec.decode, po.eof);
 	return _parse();
 }
 template <typename C, typename T>
@@ -640,7 +640,7 @@ parser<C, T>::result  parser<C, T>::parse(const std::string& fn,
 template <typename C, typename T>
 parser<C, T>::result  parser<C, T>::parse(const std::string& fn) {
 	in_ = std::make_unique<input>(fn,
-		po.max_length, o.chars_to_terminals, po.eof, &report_);
+		po.max_length, o.codec.decode, po.eof, &report_);
 	return _parse();
 }
 #ifdef _WIN32
@@ -654,7 +654,7 @@ parser<C, T>::result parser<C, T>::parse(const std::wstring& fn,
 template <typename C, typename T>
 parser<C, T>::result parser<C, T>::parse(const std::wstring& fn) {
 	in_ = std::make_unique<input>(fn,
-		po.max_length, o.chars_to_terminals, po.eof, &report_);
+		po.max_length, o.codec.decode, po.eof, &report_);
 	return _parse();
 }
 #else
@@ -666,7 +666,7 @@ parser<C, T>::result parser<C, T>::parse(int fd, parse_options popts) {
 template <typename C, typename T>
 parser<C, T>::result parser<C, T>::parse(int fd) {
 	in_ = std::make_unique<input>(fd,
-		po.max_length, o.chars_to_terminals, po.eof);
+		po.max_length, o.codec.decode, po.eof);
 	return _parse();
 }
 #endif

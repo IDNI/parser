@@ -184,10 +184,10 @@ void generate_parser_cpp(const std::string& tgf_filename,
 	};
 	auto gen_opts = [&opt]() {
 		std::stringstream os;
-		if (opt.decoder.size()) os << "\t.chars_to_terminals = "
-			<< opt.decoder << ",\n";
-		if (opt.encoder.size()) os << "\t.terminals_to_chars = "
-			<< opt.encoder << "\n";
+		if (opt.decoder.size()) os << "\to.codec.decode = "
+			<< opt.decoder << ";\n";
+		if (opt.encoder.size()) os << "\to.codec.encode = "
+			<< opt.encoder << ";\n";
 		return os.str();
 	};
 	auto gen_prods = [&g, &gi, &ts]() {
@@ -267,9 +267,12 @@ void generate_parser_cpp(const std::string& tgf_filename,
 			<< gen_grammar_opts() <<
 		"};\n"
 		"\n"
-		"inline ::idni::parser<char_type, terminal_type>::options parser_options{\n"
+		"inline auto make_parser_options() {\n"
+		"\tauto o = ::idni::default_parser_options"
+			"<char_type, terminal_type>();\n"
 			<< gen_opts() <<
-		"};\n"
+		"\treturn o;\n"
+		"}\n"
 		"\n"
 		"inline ::idni::prods<char_type, terminal_type> start_symbol{ nts("
 						<< gi.start().n() << ") };\n"
@@ -307,7 +310,7 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		"	}\n"
 		"	" << opt.name << "() : idni::parser<char_type, terminal_type>(\n"
 		"		" << opt.name << "_data::grammar,\n"
-		"		" << opt.name << "_data::parser_options) {}\n"
+		"		" << opt.name << "_data::make_parser_options()) {}\n"
 		"	size_t id(const std::basic_string<char_type>& name) {\n"
 		"		return " << opt.name << "_data::nts.get(name);\n"
 		"	}\n"

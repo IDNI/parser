@@ -884,6 +884,22 @@ public:
 		/// Garbage collection lag
 		size_t gc_lag = DEFAULT_GC_LAG;
 	};
+	/// Bundled decode + encode for character-terminal conversion.
+	template <typename C2, typename T2>
+	struct terminal_codec {
+		/// Decode input chars -> terminals.  Called by parser::input::tcur().
+		/// May consume 0..N input bytes, emit 0..N terminals.
+		using decode_fn = std::function<std::vector<T2>(
+			typename parser<C2,T2>::input&)>;
+
+		/// Encode terminals → input chars.
+		using encode_fn = std::function<std::basic_string<C2>(
+			const std::vector<T2>&)>;
+
+		decode_fn decode = {};
+		encode_fn encode = {};
+	};
+
 	/// Parser options for its constructor
 	struct options {
 		/// Applying binarization to ensure every forest node
@@ -892,24 +908,14 @@ public:
 		/// Build forest incrementally as soon any
 		/// item is completed
 		bool incr_gen_forest = DEFAULT_INCR_GEN_FOREST;
-		/**
-		 * Decoder function reading an input converting element or elements of
-		 * a type C to a vector of elements of type T according to template
-		 * type parameters T and C. More about these recorders here.
-		 *
-		 * Default value is 0, ie. no decoder function.
-		 */
-		decoder_type chars_to_terminals = 0;
-		/**
-		 * Encoder function converting vector of terminals of a type T to a
-		 * std::basic_string\<C> according to template type parameters T and C.
-		 *
-		 * Default value is 0, ie. no encoder function.
-		 */
-		encoder_type terminals_to_chars = 0;
-		/**
-		 * Default parse options for parse call.
-		 */
+		/// Bundled codec replaces chars_to_terminals / terminals_to_chars
+		terminal_codec<C,T> codec;
+
+		// DEPRECATED — kept as alias during migration, then removed:
+		decoder_type& chars_to_terminals = codec.decode;
+		encoder_type& terminals_to_chars = codec.encode;
+
+		/// Default parse options for parse call.
 		/// Default per-parse options for this parser. The parse(...)
 		/// overloads that take a parse_options use it for that one parse
 		/// and restore this default afterwards.

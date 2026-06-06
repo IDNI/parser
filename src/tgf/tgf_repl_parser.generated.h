@@ -72,10 +72,12 @@ inline struct ::idni::grammar<char_type, terminal_type>::options
 	}
 };
 
-inline ::idni::parser<char_type, terminal_type>::options parser_options{
-	.chars_to_terminals = idni::utf8_to_u32_conv,
-	.terminals_to_chars = idni::u32_to_utf8_conv
-};
+inline auto make_parser_options() {
+	auto o = ::idni::default_parser_options<char_type, terminal_type>();
+	o.codec.decode = idni::utf8_to_u32_conv;
+	o.codec.encode = idni::u32_to_utf8_conv;
+	return o;
+}
 
 inline ::idni::prods<char_type, terminal_type> start_symbol{ nts(18) };
 
@@ -847,7 +849,7 @@ struct tgf_repl_parser : public idni::parser<char, char32_t>, public tgf_repl_pa
 	}
 	tgf_repl_parser() : idni::parser<char_type, terminal_type>(
 		tgf_repl_parser_data::grammar,
-		tgf_repl_parser_data::parser_options) {}
+		tgf_repl_parser_data::make_parser_options()) {}
 	size_t id(const std::basic_string<char_type>& name) {
 		return tgf_repl_parser_data::nts.get(name);
 	}
