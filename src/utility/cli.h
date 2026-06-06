@@ -5,6 +5,7 @@
 #define __IDNI__PARSER__UTILITY__CLI_H__
 
 #include <variant>
+#include <sstream>
 #include <string>
 #include <map>
 #include <vector>

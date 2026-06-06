@@ -18,7 +18,7 @@ struct csv_parser {
 	;
 	csv_parser()
 		: g(exit_on_fail(tgf<char>::from_string(nts, csv_tgf))),
-		  p(g, { true, true }) {}
+		  p(g) {}
 	bool eval(const string& s) {
 		auto res = p.parse(s.c_str(), s.size());
 		if (!res.found) return cerr << res.parse_error, false;

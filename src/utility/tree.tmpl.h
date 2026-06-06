@@ -438,7 +438,7 @@ bool subtree_bool_bool_tuple_less<node>::operator()(
 template<typename node>
 bool subtree_vec_contains(const trefs& vec, tref val) {
 	using tree = lcrs_tree<node>;
-	return std::ranges::find_if(vec, [&val](tref v) {
+	return std::find_if(vec.begin(), vec.end(), [&val](tref v) {
 		return tree::get(v) == tree::get(val);
 	}) != vec.end();
 }

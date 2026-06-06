@@ -13,6 +13,7 @@
 #include <unordered_set>
 #include <memory>
 #include <iostream>
+#include <sstream>
 #include <cassert>
 #include <iterator>
 #include <shared_mutex>

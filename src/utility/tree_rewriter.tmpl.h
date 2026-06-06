@@ -348,9 +348,10 @@ trefs select_top(tref input, predicate_t& query) {
 		if (!query(n)) return true;
 		// we return false to avoid visiting the children of the node
 		// since we are only interested in the top nodes.
-		if (std::ranges::find_if(selected, [&n](const auto& el)
-			{return tree::get(el) == tree::get(n);})
-				== selected.end()) selected.push_back(n);
+		const auto& t = tree::get(n);
+		if (std::find_if(selected.begin(), selected.end(),
+				[&t](tref el) { return tree::get(el) == t; }
+			) == selected.end()) selected.push_back(n);
 		return false;
 	};
 	pre_order<node>(input).visit_unique(select);

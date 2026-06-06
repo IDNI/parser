@@ -157,11 +157,10 @@ struct traverser {
 		assert(values_.size() <= 1
 			&& "cannot use operator| on multiple nodes — use operator||");
 		if (values_.size() > 1) return *this;
-		auto v = values_[0]->child
-			| std::ranges::views::filter([nt,this](const node_t& n){
-				return is_non_terminal(n, nt); })
-			| std::ranges::views::take(1);
-		return v.empty() ? traverser() : traverser(v.front());
+		// Find first child matching the nonterminal (replaces std::ranges::views)
+		for (const auto& n : values_[0]->child)
+			if (is_non_terminal(n, nt)) return traverser(n);
+		return traverser();
 	}
 	traverser operator||(const nonterminal_t& nt) const {
 		if (!has_value_) return traverser();

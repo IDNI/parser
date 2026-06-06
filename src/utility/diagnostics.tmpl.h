@@ -41,6 +41,7 @@ constexpr bool uses_micros_scale(code c) { return c == code::info_micros; }
 
 inline const char* code_name(code c) {
 	using cl = idni::parser_strings::code_label;
+	using idni::parser_strings::id_t;
 	id_t k = cl::none;
 	switch (c) {
 #define CASE(nm, s) case code::nm: k = cl::nm; break;

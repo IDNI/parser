@@ -1190,8 +1190,11 @@ int tgf_run(int argc, char** argv) {
 		if (i == 1 && argv[i][0] != '-') {
 			if (cmds.find(argv[i]) != cmds.end())
 				args.push_back(argv[i]);
-			else provided = true,
-				exists = filesystem::exists(tgf_file = argv[i]);
+			else {
+				provided = true, tgf_file = argv[i];
+				if (std::ifstream f(tgf_file); f.good())
+					exists = true;
+			}
 		} else args.push_back(argv[i]);
 
 	cli cl("tgf", args, cmds, "repl", options);

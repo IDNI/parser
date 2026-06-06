@@ -73,7 +73,8 @@ struct csv_reader {
 			else if (id == csv_parser::integer)
 				r.back().push_back(get_int(n));
 			else if (id == csv_parser::str)
-				r.back().push_back(res.get_terminals(n));
+				r.back().push_back(
+					to_std_string(res.get_terminals(n)));
 			else if (id == csv_parser::nullvalue)
 				r.back().push_back(true);
 		};
