@@ -1,7 +1,7 @@
 // To view the license please visit
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
-#include <sstream>
+#include <ostream>
 #include <string.h>
 #include "characters.h"
 
@@ -55,23 +55,30 @@ inline utf8string to_utf8string(char32_t ch) {
 	return utf8string(s, l);
 }
 inline utf8string to_utf8string(const std::u32string& str) {
-	std::basic_ostringstream<utf8char> ss;
-	auto it = str.begin();
-	while (it != str.end()) emit_codepoint(ss, *(it++));
-	return ss.str();
+	utf8string out;
+	out.reserve(str.size());
+	utf8char buf[4];
+	for (auto ch : str) {
+		size_t l = emit_codepoint(ch, buf);
+		out.append(buf, l);
+	}
+	return out;
 }
 inline std::u32string to_u32string(const utf8string& str) {
-	std::basic_ostringstream<char32_t> ss;
+	std::u32string result;
+	result.reserve(str.size());
 	char32_t ch;
 	const utf8char* s = str.c_str();
 	size_t chl, sl = str.size();
-	while ((chl = peek_codepoint(s, sl, ch)) > 0) {
+	while (sl) {
+		chl = peek_codepoint(s, sl, ch);
+		if (chl == 0 || chl == static_cast<size_t>(-1)) break;
 		sl -= chl;
 		s += chl;
-		ss.put(ch);
+		result.push_back(ch);
 	}
 	// if (chl == (size_t) -1) return U""; // throw invalid UTF-8?
-	return ss.str();
+	return result;
 }
 inline std::u32string to_u32string(const std::u32string& str) { return str; }
 inline std::u32string to_u32string(const std::string& str) {
@@ -267,6 +274,12 @@ inline std::basic_ostream<utf8char>& emit_codepoint(std::basic_ostream<utf8char>
 			.put((utf8char) (0x80 + ((ch >> 12) & 0x3F)))
 			.put((utf8char) (0x80 + ((ch >> 6) & 0x3F)))
 			.put((utf8char) (0x80 + (ch & 0x3F)));
+	return o;
+}
+inline std::vector<utf8char>& emit_codepoint(std::vector<utf8char>& o, char32_t ch) {
+	utf8char s[4];
+	size_t l = emit_codepoint(ch, s);
+	for (size_t i = 0; i < l; i++) o.push_back(s[i]);
 	return o;
 }
 inline std::basic_ostream<char32_t>& operator<<(std::basic_ostream<char32_t>& ss, const char* c){
