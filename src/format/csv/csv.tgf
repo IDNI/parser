@@ -1,0 +1,31 @@
+# CSV grammar
+
+# RFC 4180 uses comma and crlf
+# enable production `tab` or `lf` to support other dialects
+
+@enable productions comma, crlf. 
+
+@use char class printable.
+
+@inline char classes, TEXTDATA, field.
+@trim DQUOTE, SEP, EOL.
+
+file        => record ( EOL record )* [ EOL ]
+             | header EOL record ( EOL record )* [ EOL ].
+header      => name ( SEP name )*.
+record      => field ( SEP field )*.
+name        => field.
+field       => escaped | non_escaped.
+escaped     => DQUOTE ( TEXTDATA | SEP | CR | LF | DQUOTE DQUOTE )* DQUOTE.
+non_escaped => TEXTDATA*.
+
+SEP[comma]  => ','.
+SEP[tab]    => '\t'.
+CR          => '\r'.
+LF          => '\n'.
+EOL[crlf]   => CR LF.
+EOL[lf]     => LF.
+DQUOTE      => '"'.
+TEXTDATA    => printable & ~( DQUOTE | SEP | CR | LF ).
+
+start       => file.
