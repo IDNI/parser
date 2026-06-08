@@ -16,7 +16,7 @@
 #include "parser_strings.h"
 #include "parser_term_color_macros.h"
 #include "recoders.h"
-#include "tgf.h"
+#include "format/tgf/tgf.h"
 #include "tgf_cli.h"
 #include "tgf_test.h"
 #ifndef DEBUG

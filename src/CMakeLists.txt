@@ -12,8 +12,8 @@ set(TAU_PARSER_HEADERS
 	parser_strings.tmpl.h
 	parser_term_color_macros.h
 	recoders.h
-	tgf.h
-	tgf_parser.generated.h
+	format/tgf/tgf.h
+	format/tgf/tgf_parser.generated.h
 	version_license.h
 	utility/characters.h
 	utility/characters.impl.h
