@@ -119,6 +119,13 @@ if(TAU_PARSER_BUILD_ALL)
 	set(TAU_PARSER_BUILD_DOC ON)
 endif()
 
+# TGF executable requires performance measures
+if(TAU_PARSER_BUILD_TGF)
+	set(TAU_PARSER_MEASURE ON CACHE BOOL "Allow performance measures (scopes+counters)" FORCE)
+	set(TAU_PARSER_MEASURE_SCOPES ON CACHE BOOL "Measure timed scopes in reports" FORCE)
+	set(TAU_PARSER_MEASURE_COUNTERS ON CACHE BOOL "Measure parse counters and metrics" FORCE)
+endif()
+
 if(TAU_PARSER_BUILD_HEADER_ONLY AND (TAU_PARSER_BUILD_STATIC_LIBRARY OR TAU_PARSER_BUILD_SHARED_LIBRARY))
 	message(FATAL_ERROR "Cannot build header-only library together with static or shared libraries")
 endif()

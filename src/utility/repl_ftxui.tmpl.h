@@ -41,7 +41,7 @@ private:
 // Renders a string carrying ANSI SGR sequences (as produced by term::colors)
 // into a styled FTXUI element. Only the finite palette term::colors emits is
 // handled; unrecognized codes are ignored.
-static ftxui::Element ansi_to_element(const std::string& s) {
+static inline ftxui::Element ansi_to_element(const std::string& s) {
 	using namespace ftxui;
 	auto base_color = [](int idx, bool bright) -> Color {
 		switch (idx) {
@@ -171,7 +171,11 @@ void repl_ftxui<evaluator_t>::history_last() {
 
 template <typename evaluator_t>
 int repl_ftxui<evaluator_t>::run() {
+#ifdef __EMSCRIPTEN__
+	return run_interactive();
+#else
 	return isatty(STDIN_FILENO) ? run_interactive() : run_pipe();
+#endif
 }
 
 template <typename evaluator_t>

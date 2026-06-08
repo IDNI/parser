@@ -1,8 +1,5 @@
 add_library(tgf_cli_core STATIC
 	"${CMAKE_CURRENT_SOURCE_DIR}/tgf_cli.cpp")
-target_compile_definitions(tgf_cli_core PUBLIC
-	TAU_PARSER_MEASURE_SCOPES
-	TAU_PARSER_MEASURE_COUNTERS)
 tauparser_setup(tgf_cli_core PUBLIC tauparser)
 target_include_directories(tgf_cli_core PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
