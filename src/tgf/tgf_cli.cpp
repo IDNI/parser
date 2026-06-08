@@ -1071,6 +1071,14 @@ static int show_command(const cli::command& cmd,
 static int run_command(cli& cl, const cli::command& cmd,
 	tgf_repl_evaluator& re)
 {
+	// apply --productions from command line
+	if (string prods = cmd.get<string>("productions"); !prods.empty()) {
+		std::set<std::string> grds;
+		for (auto&& g : prods | views::split(','))
+			grds.emplace(g.begin(), g.end());
+		re.g().set_enabled_productions(grds);
+	}
+
 	if (cmd.name() == "grammar") return show_command(cmd, re);
 
 	if (cmd.name() == "gen") return gen_command(cmd, re);

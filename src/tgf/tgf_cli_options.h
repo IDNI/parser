@@ -52,6 +52,10 @@ inline cli::commands tgf_commands() {
 			"report");
 	auto colors = OPT(cli::option("colors", 'c', true));
 		DESC("enable terminal colors for output");
+	auto productions = cli::option("productions", 'G', "");
+		productions.set_description(
+			"comma-separated list of enabled productions");
+	OPT(productions);
 	OPT(cli::option("nullable", 'N', false));
 		DESC("report nullable recursive productions");
 	OPT(print_json);
@@ -66,6 +70,7 @@ inline cli::commands tgf_commands() {
 	OPT(print_json);
 	OPT(measure);
 	OPT(colors);
+	OPT(productions);
 	OPT(cli::option("input", 'i',
 		"")),
 		DESC("parse input from file or STDIN if -");
@@ -155,6 +160,7 @@ inline cli::commands tgf_commands() {
 	OPT(error_verbosity);
 	OPT(measure);
 	OPT(colors);
+	OPT(productions);
 	OPT(cli::option("evaluate", 'e', ""));
 		DESC("run repl command with input to evaluate and quit");
 	OPT(cli::option("legacy-repl", 'X', false));
@@ -166,6 +172,7 @@ inline cli::commands tgf_commands() {
 
 	CMD(cli::command("test", "run tester (with provided tgf.test file)"));
 	OPT(help);
+	OPT(productions);
 
 	return cs;
 }
