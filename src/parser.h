@@ -908,12 +908,8 @@ public:
 		/// Build forest incrementally as soon any
 		/// item is completed
 		bool incr_gen_forest = DEFAULT_INCR_GEN_FOREST;
-		/// Bundled codec replaces chars_to_terminals / terminals_to_chars
+		/// Bundled decode + encode for character-terminal conversion.
 		terminal_codec<C,T> codec;
-
-		// DEPRECATED — kept as alias during migration, then removed:
-		decoder_type& chars_to_terminals = codec.decode;
-		encoder_type& terminals_to_chars = codec.encode;
 
 		/// Default parse options for parse call.
 		/// Default per-parse options for this parser. The parse(...)
