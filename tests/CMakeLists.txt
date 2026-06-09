@@ -1,9 +1,9 @@
 set(TESTS
-	term_colors
+	cli
 	input
 	parser
+	term_colors
 	tgf
-	cli
 	tree
 )
 
@@ -46,11 +46,16 @@ add_library(doctest INTERFACE)
 target_compile_definitions(doctest INTERFACE TAU_USE_DOCTEST)
 set(DOCTEST_CONFIG_ASSERTION_PARAMETERS_BY_VALUE "true")
 
+if(NOT EMSCRIPTEN)
 add_link_options("-flto")
+endif()
 
 enable_testing()
 
 set(DOCTESTS
+	escapes
+	input
+	measure
 	tree
 	tree_traversals
 	enhancements

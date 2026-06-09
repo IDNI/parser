@@ -6,11 +6,13 @@
 using namespace std;
 using namespace idni;
 
+#ifndef __EMSCRIPTEN__
 auto noconv = [](parser<char32_t, char32_t>::input& in) {
 	auto x = in.cur();
 	//cout << " <" << to_std_string(x) << ">" << endl;
 	return in.next(), vector<char32_t>{ x };
 };
+#endif
 auto u8conv = [](parser<char, char32_t>::input& in) {
 	vector<char32_t> r;
 	utf8char s[4] = {0,0,0,0};
@@ -29,11 +31,13 @@ auto bconv = [](parser<char, bool>::input& in) {
 	for (int i = 7; i >= 0; --i) r.push_back(in.cur() & (1 << i));
 	return in.next(), r;
 };
+#ifndef __EMSCRIPTEN__
 auto b32conv = [](parser<char32_t, bool>::input& in) {
 	vector<bool> r;
 	for (int i = 31; i >= 0; --i) r.push_back(in.cur() & (1 << i));
 	return in.next(), r;
 };
+#endif
 template<typename S>
 struct token {
 	enum type { NONE, WS, GREETINGS, ADDRESS, GREEK, PUNCT } ttype{ NONE };
@@ -76,11 +80,13 @@ vector<token<S>> tokenize_(typename parser<S, token<S>>::input& in) {
 auto tokenize = [](typename parser<char, token<char>>::input& in) {
 	return tokenize_<char>(in);
 };
+#ifndef __EMSCRIPTEN__
 auto tokenize32 = [](
 	typename parser<char32_t, token<char32_t>>::input& in)
 {
 	return tokenize_<char32_t>(in);
 };
+#endif
 template <typename C, typename T = C>
 bool test(const char* msg, const basic_string<C>& istr,
 	typename parser<C, T>::decoder_type decoder = 0, bool stream = false)
@@ -118,7 +124,9 @@ bool test(const char* msg, const basic_string<C>& istr,
 
 int main() {
 	const string    i  ( "Hello τ World!");
+#ifndef __EMSCRIPTEN__
 	const u32string i32(U"Hello τ World!");
+#endif
 	const bool stream = true;
 
 	test<char>("<char>", "");
@@ -127,16 +135,22 @@ int main() {
 	test<char>("<char> stream", "a", 0, stream);
 	test<char>("<char>", i);
 	test<char>("<char> stream", i, 0, stream);
+#ifndef __EMSCRIPTEN__
 	test<char32_t>("<char32_t>", i32);
 	test<char32_t>("<char32_t> noconversion", i32, noconv);
+#endif
 	test<char, char32_t>("<char, char32_t> utf8decode", i, u8conv);
 	test<char, char32_t>("<char, char32_t> utf8decode stream",
 							i, u8conv, stream);
 	test<char, bool>("<char, bool> binarize", i, bconv);
 	test<char, bool>("<char, bool> binarize stream", i, bconv, stream);
+#ifndef __EMSCRIPTEN__
 	test<char32_t, bool>("<char32_t, bool>  binarize", i32, b32conv);
+#endif
 	test<char, token<char>>("<char, token<char>> tokenize", i, tokenize);
+#ifndef __EMSCRIPTEN__
 	test<char32_t, token<char32_t>>("<char32_t, token<char32_t>> tokenize",
 							i32, tokenize32);
+#endif
 	cout << "\n" << endl;
 }

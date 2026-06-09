@@ -618,14 +618,16 @@ namespace idni::testing
 			std::cout << std::endl;
 		}
 
-		options<char>.binarize =
-			options<char32_t>.binarize = binarize;
-		options<char>.incr_gen_forest =
-			options<char32_t>.incr_gen_forest = incr_gen;
-		parse_options<char>.enable_gc =
-			parse_options<char32_t>.enable_gc = enable_gc;
-		grammar_options<char>.auto_disambiguate =
-			grammar_options<char32_t>.auto_disambiguate = auto_disambg;
+		options<char>.binarize = binarize;
+		options<char>.incr_gen_forest = incr_gen;
+		parse_options<char>.enable_gc = enable_gc;
+		grammar_options<char>.auto_disambiguate = auto_disambg;
+#ifndef __EMSCRIPTEN__
+		options<char32_t>.binarize = binarize;
+		options<char32_t>.incr_gen_forest = incr_gen;
+		parse_options<char32_t>.enable_gc = enable_gc;
+		grammar_options<char32_t>.auto_disambiguate = auto_disambg;
+#endif
 	}
 
 } // namespace idni::testing

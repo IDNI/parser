@@ -277,7 +277,7 @@ int main(int argc, char **argv)
 *       ENCODING
 *******************************************************************************/
 
-#ifndef WIN32
+#if !defined(WIN32) && !defined(__EMSCRIPTEN__)
 	// char32_t parser with Unicode
 	TEST("encoding", "u32")
 	nonterminals<char32_t> nt32;
