@@ -1,15 +1,5 @@
-// LICENSE
-// This software is free for use and redistribution while including this
-// license notice, unless:
-// 1. is used for commercial or non-personal purposes, or
-// 2. used for a product which includes or associated with a blockchain or other
-// decentralized database technology, or
-// 3. used for a product which includes or associated with the issuance or use
-// of cryptographic or electronic currencies/coins/tokens.
-// On all of the mentiTd cases, an explicit and written permission is required
-// from the Author (Ohad Asor).
-// Contact ohad@idni.org for requesting a permission. This license may be
-// modified over time by the Author.
+// To view the license please visit
+// https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
@@ -192,7 +182,7 @@ TEST_SUITE("basic test") {
 			CHECK( t[3] == tree::get(t.child(3)) );
 			// prev tree handle that was out of scope is garbage out
 			bintree<nd_t>::gc();
-			
+
 			// print through sh handle (different id) but same tree
 			const auto& t2 = tree::get(sh);
 			// t2.print(std::cout);
@@ -280,7 +270,7 @@ TEST_SUITE("basic test") {
 			CHECK( t[3] == tree::get(t.child(3)) );
 			// prev tree handle that was out of scope is garbage out
 			bintree<nd_t>::gc();
-			
+
 			// print through sh handle (different id) but same tree
 			const auto& t2 = tree::get(sh);
 			// t2.print(std::cout);
@@ -898,7 +888,7 @@ TEST_SUITE("trim_top") {
 }
 
 
-// TEST_SUITE("select_subnodes") { }	
+// TEST_SUITE("select_subnodes") { }
 
 
 TEST_SUITE("select_top") {

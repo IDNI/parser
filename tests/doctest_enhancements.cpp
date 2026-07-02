@@ -1,3 +1,6 @@
+// To view the license please visit
+// https://github.com/IDNI/parser/blob/main/LICENSE.md
+
 // Tests for the 8 library enhancements:
 //   0/8. segmented_map in M() — stable addresses after many insertions
 //   1.   fixpoint operator
