@@ -1111,12 +1111,11 @@ template <typename wrapped_t, typename input_node_t,
 	typename output_node_t = input_node_t>
 struct map_node_transformer {
 
-	// REVIEW (MEDIUM) check the implementation of this transformer, it seems buggy
 	map_node_transformer(wrapped_t& wrapped) : wrapped(wrapped) {}
 
 	output_node_t operator()(const input_node_t& n) {
 		auto nn = wrapped(n);
-		if (nn != n) { changes[n] == nn; return nn; };
+		if (nn != n) { changes[n] = nn; return nn; };
 		std::vector<output_node_t> child;
 		for (const auto& c : n->child)
 			if (auto it = changes.find(c); it != changes.end())

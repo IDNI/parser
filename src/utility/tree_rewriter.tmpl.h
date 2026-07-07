@@ -241,7 +241,6 @@ tref map_transformer<node, wrapped_t>::operator()(tref& n) {
 
 // visitor that produces nodes transformed accordingly to the
 // given transformer. It only works with post order traversals.
-// REVIEW (MEDIUM) check the implementation of this transformer, it seems buggy
 template <typename node, typename wrapped_t>
 map_node_transformer<node, wrapped_t>::map_node_transformer(
 	wrapped_t& wrapped) : wrapped(wrapped) {}
@@ -250,7 +249,7 @@ template <typename node, typename wrapped_t>
 tref map_node_transformer<node, wrapped_t>::operator()(tref n) {
 	DBG(assert(n != nullptr);)
 	auto nn = wrapped(n);
-	if (nn != n) { changes[n] == nn; return nn; };
+	if (nn != n) { changes[n] = nn; return nn; };
 	trefs ch;
 	const auto& nt = lcrs_tree<node>::get(n);
 	for (tref c : nt.children())
