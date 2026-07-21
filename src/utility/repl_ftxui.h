@@ -12,6 +12,14 @@ namespace ftxui { class ScreenInteractive; }
 
 namespace idni {
 
+/// What an evaluator's optional `on_repl_key(key)` hook asks the REPL to do
+/// with a single keypress: pass it to normal editing, swallow it, or submit
+/// `line` through eval() as if typed (used for single-key prompts).
+struct repl_key_action {
+	enum kind_t { pass_through, consume, submit } kind = pass_through;
+	std::string line{};
+};
+
 /// FTXUI-based REPL.
 ///
 /// Same api as `repl<evaluator_t>` (see repl.h):
@@ -19,6 +27,11 @@ namespace idni {
 /// 0 = ok, 1 = exit, 2 = incomplete, and a
 /// `repl_ftxui<evaluator_t>* r_ftx` back-pointer (declare this struct a
 /// friend if it is private).
+///
+/// Optionally, evaluator_t may provide
+/// `repl_key_action on_repl_key(const std::string& key)`: when present it is
+/// consulted for each keypress before normal editing (key is "enter",
+/// "ctrl-c", "escape", or the character), enabling single-key prompts.
 ///
 /// Should be in parity with `repl<>`: same key bindings, history
 /// behaviour and file format, multiline continuation and pipe-mode fallback.

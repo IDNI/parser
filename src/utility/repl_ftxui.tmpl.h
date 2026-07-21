@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <concepts>
 #include <iostream>
 #include <sstream>
 #include <streambuf>
@@ -24,6 +25,23 @@
 
 namespace idni {
 namespace repl_ftxui_detail {
+
+// True when evaluator_t opts into single-key handling (see repl_key_action).
+template <typename E>
+concept has_on_repl_key = requires(E& e, const std::string& k) {
+	{ e.on_repl_key(k) } -> std::convertible_to<repl_key_action>;
+};
+
+// Neutral key token for on_repl_key: named for specials, else the character.
+static inline std::string key_token(const ftxui::Event& e) {
+	using namespace ftxui;
+	if (e == Event::Return) return "enter";
+	if (e == Event::Escape) return "escape";
+	if (e == Event::CtrlC)  return "ctrl-c";
+	if (e == Event::CtrlD)  return "ctrl-d";
+	if (e.is_character())   return e.character();
+	return {};
+}
 
 struct scoped_stream_redirect {
 	scoped_stream_redirect(std::ostream& os, std::streambuf* next)
@@ -244,46 +262,64 @@ int repl_ftxui<evaluator_t>::run_interactive() {
 		return input_text_.find('\n', cp) == std::string::npos;
 	};
 
+	// Runs `text` through eval() with stdout/stderr captured, then emits it
+	// cleanly. Stores history when `store`; exits on ret==1. Returns eval()'s
+	// code so the caller can handle ret==2 (incomplete) as it sees fit.
+	auto run_line = [&](const std::string& text, bool store) -> int {
+		std::ostringstream out_cap, err_cap;
+		int                ret = 0;
+		{
+			repl_ftxui_detail::scoped_stream_redirect
+				out_redirect(std::cout, out_cap.rdbuf());
+			repl_ftxui_detail::scoped_stream_redirect
+				err_redirect(std::cerr, err_cap.rdbuf());
+			ret = re_.eval(text);
+		}
+		if (ret == 2) return ret; // caller decides
+		screen_->WithRestoredIO([&] {
+			std::cout << "\n" << out_cap.str();
+			std::cerr << err_cap.str();
+			std::cout.flush();
+			std::cerr.flush();
+		})();
+		if (store) store_history(text);
+		if (ret == 1) screen_->Exit();
+		return ret;
+	};
+
 	Component root = CatchEvent(line, [&](Event e) {
+		// Single-key hook: let the evaluator claim a keypress (e.g. a
+		// single-key continue/quit prompt) before normal editing sees it.
+		if constexpr (repl_ftxui_detail::has_on_repl_key<evaluator_t>) {
+			if (std::string k = repl_ftxui_detail::key_token(e);
+				!k.empty())
+			{
+				auto act = re_.on_repl_key(k);
+				if (act.kind == repl_key_action::consume)
+					return true;
+				if (act.kind == repl_key_action::submit) {
+					if (run_line(act.line, false) != 1)
+						clear_input();
+					return true;
+				}
+			}
+		}
 		// Enter: evaluate. On incomplete input (eval == 2) break the line and
 		// keep editing; otherwise emit output and commit (or exit).
 		if (e == Event::Return) {
 			if (input_text_.empty())
 				return true; // ignore empty enter
-			// Run eval quietly so we can decide before touching the terminal.
-			std::ostringstream out_cap, err_cap;
-			int                ret = 0;
-			{
-				repl_ftxui_detail::scoped_stream_redirect
-				        out_redirect(std::cout,
-				                     out_cap.rdbuf());
-				repl_ftxui_detail::scoped_stream_redirect
-				        err_redirect(std::cerr,
-				                     err_cap.rdbuf());
-				ret = re_.eval(input_text_);
-			}
+			int ret = run_line(input_text_, true);
 			// incomplete: insert newline at cursor, continue
 			if (ret == 2) {
 				size_t cp = std::min((size_t) cursor_pos_,
-				                     input_text_.size());
+							input_text_.size());
 				input_text_.insert(input_text_.begin() + cp,
-				                   '\n');
+							'\n');
 				cursor_pos_ = (int) cp + 1;
 				return true;
 			}
-			// complete / quit: emit captured output, then commit / exit
-			screen_->WithRestoredIO([&] {
-				std::cout << "\n" << out_cap.str();
-				std::cerr << err_cap.str();
-				std::cout.flush();
-				std::cerr.flush();
-			})();
-			store_history(input_text_); // store on ok and quit (matches repl<>)
-			if (ret == 1) {
-				screen_->Exit();
-				return true;
-			}
-			clear_input();
+			if (ret != 1) clear_input();
 			return true;
 		}
 		// Up/Down: history at the buffer's first/last line, otherwise let the
