@@ -7,6 +7,9 @@
 #include <vector>
 #include <initializer_list>
 #include <utility>
+#include <tuple>
+#include <functional>
+#include <type_traits>
 #include <set>
 #include <map>
 #include <unordered_map>
@@ -134,6 +137,48 @@ rules merge(const rules& rs1, const rules& rs2);
 
 //------------------------------------------------------------------------------
 
+// Concept satisfied by a type that explicitly enumerates the trefs it holds,
+// via `void for_each_tref(f) const` calling `f(tref)` for each one. This is
+// how a key/value type opts in to being walked by `for_each_tref_in()` below;
+// see that function for why opting in (rather than reflecting blindly) is
+// required.
+template <typename V>
+concept HasForEachTref = requires(const V& v) {
+	{ v.for_each_tref([](tref) {}) };
+};
+
+/**
+ * @brief Invoke `f(t)` for every `tref` reachable from `v`, for the shapes a
+ * gc cache is allowed to introspect: `v` itself if `V` is `tref`, each
+ * element if `V` is a fixed-arity tuple/pair (recursively), or whatever `v`
+ * yields if `V` satisfies `HasForEachTref`.
+ *
+ * Deliberately NOT walked: containers like `std::vector<tref>`/`trefs`. A
+ * `tref` is an untyped pointer with no record of which `bintree<T>` it
+ * belongs to, and some caches legitimately store trefs from a *different*
+ * `bintree<T>` than the one the cache is registered under in a container
+ * (e.g. `bdd_fv_cache_t` in `tau_bdd.h`, keyed by a BDD-tree tref but valued
+ * with a `trefs` of outer formula-tree trefs) - blindly walking such a
+ * container here would check/mark those trefs against the wrong tree's
+ * `M()`. Fixed-arity tuple/pair shapes and `HasForEachTref` opt-ins are safe
+ * because whoever wrote that key/value type already committed to a single,
+ * specific `bintree<T>` universe for those fields.
+ */
+template <typename V, typename F>
+void for_each_tref_in(const V& v, F&& f) {
+	using D = std::decay_t<V>;
+	if constexpr (std::is_same_v<D, tref>) {
+		f(v);
+	} else if constexpr (HasForEachTref<D>) {
+		v.for_each_tref(f);
+	} else if constexpr (requires { std::tuple_size<D>::value; }) {
+		std::apply([&](const auto&... elems) {
+			(for_each_tref_in(elems, f), ...);
+		}, v);
+	}
+	// else: nothing to collect (e.g. a plain size_t/int_t/htref field).
+}
+
 // Concept for caches holding bintree nodes
 template <typename cache_t>
 concept CacheType = requires {
@@ -250,6 +295,20 @@ struct bintree {
 	 * collection in order to clean created caches from invalid references
 	 */
 	inline static std::vector<gc_callback> gc_callbacks{};
+
+	using gc_expand_callback = std::function<void(
+		const std::unordered_set<tref>& reachable,
+		std::unordered_set<tref>& to_mark)>;
+	/**
+	 * @brief Vector of functions consulted, to a fixpoint, BEFORE the sweep
+	 * phase of gc. Each is given the currently-reachable set and may add
+	 * further trefs to `to_mark` (e.g. "this cache's key is reachable, so
+	 * its value's trefs must be preserved too") - such trefs get marked
+	 * reachable and are not swept. Needed because a cache's key -> value
+	 * association is not part of the tree's own l/r structure, so nothing
+	 * else would keep those value trefs alive across a sweep.
+	 */
+	inline static std::vector<gc_expand_callback> gc_expand_callbacks{};
 
 	/**
 	 * @brief Create a cache of type cache_t that is garbage collected

@@ -189,6 +189,20 @@ void bintree<T>::gc(std::unordered_set<tref>& keep) {
 		return;
 	}
 
+	// Expand: a cache entry whose key is already reachable must keep its
+	// value's trefs reachable too, even though they are not children of
+	// the key in the tree's own l/r structure. Run to a fixpoint since a
+	// newly-marked value tref may itself complete another entry's key
+	// (in this cache or another).
+	bool grown = true;
+	while (grown) {
+		grown = false;
+		std::unordered_set<tref> to_mark;
+		for (const auto& cb : gc_expand_callbacks) cb(next, to_mark);
+		for (tref t : to_mark)
+			if (!next.contains(t)) mark(t, mark), grown = true;
+	}
+
 	/*
 	DBG(assert(next.size() != M().size()));
 	decltype(V) nv;
@@ -245,50 +259,47 @@ template <typename T>
 template <CacheType cache_t>
 cache_t& bintree<T>::create_cache(const cache_t& init) {
 	static std::deque<cache_t> caches;
-	// Protect both caches and gc_callbacks under the exclusive lock.
+	// Protect both caches and the gc callback lists under the exclusive lock.
 	std::unique_lock lock(mtx_);
 	cache_t& cache = caches.emplace_back(init);
-	// add callback to rebuild cache on gc
+
+	// Pre-sweep: once this entry's key is fully reachable, its value's
+	// trefs must be too - promote them before the sweep runs, since the
+	// key -> value link is invisible to ordinary tree-structural marking.
+	gc_expand_callbacks.push_back([&cache](
+			const std::unordered_set<tref>& reachable,
+			std::unordered_set<tref>& to_mark)
+	{
+		for (auto it = cache.begin(); it != cache.end(); it++) {
+			bool key_alive = true;
+			for_each_tref_in(it->first, [&](tref t) {
+				key_alive = key_alive && reachable.contains(t);
+			});
+			if (!key_alive) continue;
+			for_each_tref_in(it->second, [&](tref t) {
+				if (!reachable.contains(t)) to_mark.insert(t);
+			});
+		}
+	});
+
+	// Post-sweep: drop entries referencing a tref that did not survive
+	// (dead key, or a value tref belonging to another bintree<T> universe
+	// that for_each_tref_in deliberately never introspects, so it can
+	// never wrongly veto such an entry - it just isn't checked at all).
 	gc_callbacks.push_back([&cache](const std::unordered_set<tref>& kept) {
-		using std::is_same_v, std::tuple_size_v, std::decay_t;
-		using key_type    = typename cache_t::key_type;
-		using mapped_type = typename cache_t::mapped_type;
 		cache_t new_cache{};
 		for (auto it = cache.begin(); it != cache.end(); it++) {
-			// checked tref must be contained in kept (from gc)
 			bool ok = true;
-			const auto check = [&ok, &kept](tref n) {
-				ok = ok && kept.contains(n);
+			auto check = [&ok, &kept](tref t) {
+				ok = ok && kept.contains(t);
 			};
-			const auto key_tuple_check = [&check](
-				const auto&... args)
-			{
-				([&]() { if constexpr (
-					is_same_v<decay_t<decltype(args)>,tref>)
-						check(args); }(), ...);
-			};
-			const auto& key  = it->first;
-			// check key for tref
-			if constexpr (is_same_v<key_type, tref>) check(key);
-			// check key for tref in tuple
-			else if constexpr (tuple_size_v<key_type> > 0)
-				std::apply(key_tuple_check, key);
-			else { // check key for pair
-				if constexpr (is_same_v<decay_t<
-						decltype(key.first)>, tref>)
-					check(key.first);
-				if constexpr (is_same_v<decay_t<
-						decltype(key.second)>, tref>)
-					check(key.second);
-			}
-			// check value for tref in pair
-			if constexpr (is_same_v<mapped_type, tref>)
-				check(it->second);
-			// add to new cache if all checks passed
-			if (ok) new_cache.emplace(key, it->second);
+			for_each_tref_in(it->first, check);
+			for_each_tref_in(it->second, check);
+			if (ok) new_cache.emplace(it->first, it->second);
 		}
 		cache = std::move(new_cache);
 	});
+
 	return cache;
 }
 
