@@ -1,3 +1,6 @@
+// To view the license please visit
+// https://github.com/IDNI/parser/blob/main/LICENSE.md
+
 // Benchmark: compare node interning throughput before/after the ankerl
 // segmented_map switch and measure new APIs.
 //

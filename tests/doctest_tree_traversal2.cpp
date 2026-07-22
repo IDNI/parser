@@ -11,7 +11,7 @@ auto id = [] (tref n) { return n; };
 /*
 auto is_e = [] (tref n) {
         return chtree::get(n).value == 'e';
-}; 
+};
 
 auto is_not_e = [] (tref n) {
         return chtree::get(n).value != 'e';
@@ -179,7 +179,7 @@ TEST_SUITE("pre_order") {
 
                 // bintree<char>::gc();
         }
-        
+
         TEST_CASE_FIXTURE(test_tree_fixture, "visit(visit, visit_subtree, up, between)") {
 
         }

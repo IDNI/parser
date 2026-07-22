@@ -198,7 +198,6 @@ struct map_transformer {
 // given transformer. It only works with post order traversals.
 template <typename node, typename wrapped_t>
 struct map_node_transformer {
-	// REVIEW (MEDIUM) check the implementation of this transformer, it seems buggy
 	map_node_transformer(wrapped_t& wrapped);
 	tref operator()(tref n);
 	subtree_map<node, tref> changes;

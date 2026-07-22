@@ -57,7 +57,9 @@ set(DOCTESTS
 	input
 	measure
 	tree
-	tree_traversals
+	tree_traversal1
+	tree_traversal2
+	tree_rewriter
 	enhancements
 	utf8
 )

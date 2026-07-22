@@ -182,7 +182,7 @@ TEST_SUITE("basic test") {
 			CHECK( t[3] == tree::get(t.child(3)) );
 			// prev tree handle that was out of scope is garbage out
 			bintree<nd_t>::gc();
-			
+
 			// print through sh handle (different id) but same tree
 			const auto& t2 = tree::get(sh);
 			// t2.print(std::cout);
@@ -270,7 +270,7 @@ TEST_SUITE("basic test") {
 			CHECK( t[3] == tree::get(t.child(3)) );
 			// prev tree handle that was out of scope is garbage out
 			bintree<nd_t>::gc();
-			
+
 			// print through sh handle (different id) but same tree
 			const auto& t2 = tree::get(sh);
 			// t2.print(std::cout);
@@ -888,7 +888,7 @@ TEST_SUITE("trim_top") {
 }
 
 
-// TEST_SUITE("select_subnodes") { }	
+// TEST_SUITE("select_subnodes") { }
 
 
 TEST_SUITE("select_top") {
