@@ -1360,7 +1360,12 @@ struct std::hash<idni::pnode_type<C,T>> {
 #include "parser_tree.tmpl.h" // for parser::tree
 #include "parser_result.tmpl.h" // for parser::result
 #include "get_shaped_tree2.tmpl.h"
+// every generated parser needs idni::default_parser_options() from here,
+// which used to arrive only via tgf.h
+#include "recoders.h"
+#ifndef TAU_PARSER_NO_TGF
 #include "format/tgf/tgf.h" // Tau Grammar Format
+#endif // TAU_PARSER_NO_TGF
 
 #ifdef DEBUG
 #include "utility/devhelpers.h"   // various helpers for converting forest
