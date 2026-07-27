@@ -1072,7 +1072,10 @@ static int run_command(cli& cl, const cli::command& cmd,
 	tgf_repl_evaluator& re)
 {
 	// apply --productions from command line
-	if (string prods = cmd.get<string>("productions"); !prods.empty()) {
+	if (string prods = cmd.has("productions")
+			? cmd.get<string>("productions") : string{};
+		!prods.empty())
+	{
 		std::set<std::string> grds;
 		for (auto&& g : prods | views::split(','))
 			grds.emplace(g.begin(), g.end());
