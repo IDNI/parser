@@ -249,15 +249,17 @@ std::pair<typename parser<C, T>::container_iter, bool>
 		return { sit, false };
 	auto [it, inserted] = t.insert(i);
 	if (!inserted) return { it, false };
+	const size_t pos = static_cast<size_t>(std::distance(t.begin(), it));
 	if (nullable(*it)) {
 		item j(it->set, it->prod, it->con, it->from, it->dot + 1);
 		if (add(t, j).second) {
 			DBGP(print(std::cout <<
 				" +  adding to t from nullable\t\t", j) <<"\n";)
-			if (any_conj) forward_deps[*it].push_back(j);
+			if (any_conj) forward_deps[*std::next(t.begin(), pos)]
+								.push_back(j);
 		}
 	}
-	return { it, true };
+	return { std::next(t.begin(), pos), true };
 }
 template <typename C, typename T>
 size_t parser<C, T>::n_literals(const item& i) const {
