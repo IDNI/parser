@@ -21,6 +21,17 @@ function(target_setup target access compile_definitions compile_options link_opt
 			-Werror
 			# -Wfatal-errors
 		)
+		if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+			# GCC's -O2+ interprocedural array-bounds analysis produces a
+			# false positive when it inlines ankerl::unordered_dense's
+			# memset-based clear_buckets() (observed: GCC 13.3.0, -O3).
+			# Keep the warning (still visible, just non-fatal) rather than
+			# letting -Werror above turn third-party header code into a
+			# hard build failure.
+			target_compile_options(${target} ${access}
+				-Wno-error=array-bounds
+			)
+		endif()
 		if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
 				CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 			target_compile_options(${target} ${access}

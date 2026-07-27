@@ -284,6 +284,18 @@ else()
 	FetchContent_MakeAvailable(unordered_dense)
 endif()
 
+# Treat unordered_dense's headers as system includes: some compiler
+# versions (observed: GCC 13.3.0 at -O3) emit a false-positive
+# -Warray-bounds inside its memset-based clear_buckets() once inlined,
+# which downstream -Werror consumers (e.g. tauparser_static) would
+# otherwise turn into a hard build failure over third-party code.
+get_target_property(unordered_dense_include_dirs unordered_dense
+	INTERFACE_INCLUDE_DIRECTORIES)
+if(unordered_dense_include_dirs)
+	set_target_properties(unordered_dense PROPERTIES
+		INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${unordered_dense_include_dirs}")
+endif()
+
 ################################################################################
 
 include(version_license)
