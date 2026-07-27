@@ -1,6 +1,6 @@
 namespace idni::tauparser {
 
-constexpr char build_date[]   = "@BUILD_DATE_ISO@";
+constexpr char commit_date[]  = "@COMMIT_DATE_ISO@";
 constexpr char version[]      = "@VERSION@";
 constexpr char full_version[] = "TGF version @VERSION@ ("
 				TAU_PARSER_GIT_COMMIT_HASH ")";

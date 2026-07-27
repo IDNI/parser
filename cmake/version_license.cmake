@@ -2,9 +2,8 @@
 # takes a template file and replaces the following placeholders:
 #   @VERSION@          with content of VERSION file
 #   @LICENSE_CONTENT@  with content of LICENSE.md file
-#   @BUILD_DATE_ISO@   with current date in ISO format
+#   @COMMIT_DATE_ISO@  with the commit date in ISO format
 # and writes the result to the output file
-# TODO generic BOM removal
 function(version_license template_file output_file)
 	# @VERSION@
 	set(version_file "${PROJECT_SOURCE_DIR}/VERSION")
@@ -18,16 +17,20 @@ function(version_license template_file output_file)
 		set(license_file "${PROJECT_SOURCE_DIR}/LICENSE.txt")
 	endif()
 	file(READ ${license_file} LICENSE_CONTENT ENCODING UTF-8)
-	# remove BOM if any. Expects word License to be the start of the text
-	string(FIND "${LICENSE_CONTENT}" "License" LICENSE_CONTENT_START)
-	string(SUBSTRING "${LICENSE_CONTENT}" ${LICENSE_CONTENT_START} -1 LICENSE_CONTENT)
-	string(REPLACE "\"" "\\\"" LICENSE_CONTENT "${LICENSE_CONTENT}")
+	# strip the UTF-8 BOM; the template's raw string literal needs no escaping
+	string(ASCII 239 187 191 UTF8_BOM)
+	string(REGEX REPLACE "^${UTF8_BOM}" "" LICENSE_CONTENT "${LICENSE_CONTENT}")
 
-	# @BUILD_DATE_ISO@
-	execute_process(COMMAND date -I
-			OUTPUT_VARIABLE BUILD_DATE_ISO
-			OUTPUT_STRIP_TRAILING_WHITESPACE)
-	string(REPLACE "\"" "\\\"" BUILD_DATE_ISO "${BUILD_DATE_ISO}")
+	# @COMMIT_DATE_ISO@
+	execute_process(COMMAND git log -1 --format=%cs
+			WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+			OUTPUT_VARIABLE COMMIT_DATE_ISO
+			OUTPUT_STRIP_TRAILING_WHITESPACE
+			ERROR_QUIET)
+	if(NOT COMMIT_DATE_ISO)
+		string(TIMESTAMP COMMIT_DATE_ISO "%Y-%m-%d" UTC)
+	endif()
+	string(REPLACE "\"" "\\\"" COMMIT_DATE_ISO "${COMMIT_DATE_ISO}")
 
 	configure_file(${template_file} ${output_file} @ONLY)
 endfunction()
