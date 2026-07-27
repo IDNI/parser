@@ -21,6 +21,8 @@ struct parser_gen_options {
 	std::string encoder                          = "";
 	bool auto_disambiguate                       = true;
 	std::vector<std::string> nodisambig_list     = {};
+	// false emits productions() into a companion .cpp instead of the header
+	bool header_only                             = true;
 };
 
 template <typename C = char, typename T = C>
@@ -276,20 +278,28 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		"\n"
 		"inline ::idni::prods<char_type, terminal_type> start_symbol{ nts("
 						<< gi.start().n() << ") };\n"
-		"\n"
-		"inline idni::prods<char_type, terminal_type>& productions() {\n"
+		"\n";
+
+	// grammar table; inline in the header it lands in every including TU
+	const std::string productions_body =
 		"	static bool loaded = false;\n"
 		"	static idni::prods<char_type, terminal_type>\n"
 		"		p, nul(idni::lit<char_type, terminal_type>{});\n"
 		"	if (loaded) return p;\n"
 		"	#define  T(x) (idni::prods<char_type, terminal_type>{ terminals[x] })\n"
 		"	#define NT(x) (idni::prods<char_type, terminal_type>{ nts(x) })\n"
-			<< ps <<
+		+ ps +
 		"	#undef T\n"
 		"	#undef NT\n"
-		"	return loaded = true, p;\n"
-		"}\n"
-		"\n"
+		"	return loaded = true, p;\n";
+
+	if (opt.header_only) os <<
+		"inline idni::prods<char_type, terminal_type>& productions() {\n"
+			<< productions_body <<
+		"}\n";
+	else os << "idni::prods<char_type, terminal_type>& productions();\n";
+
+	os <<	"\n"
 		"inline ::idni::grammar<char_type, terminal_type> grammar(\n"
 		"	nts, productions(), start_symbol, char_classes, grammar_options);\n"
 		"\n"
@@ -324,6 +334,30 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		"\n";
 	if (opt.ns.size()) os << "\n} // " <<opt.ns<< " namespace\n";
 	os <<	"#endif // __" << guard << "_H__\n";
+
+	if (opt.header_only) return;
+
+	// companion translation unit holding the grammar table, compiled once
+	const std::string cpp_name = opt.name + ".generated.cpp";
+	std::ofstream cs(opt.output_dir + cpp_name);
+	cs <<	"// This file is generated from a file " <<
+					tgf_filename_stripped << " by\n"
+		"//       https://github.com/IDNI/parser/src/tgf\n"
+		"//\n"
+		"// productions() lives here so the table is compiled once, "
+			"not per TU.\n"
+		"//\n"
+		"#include \"" << opt.output << "\"\n"
+		"\n";
+	if (opt.ns.size()) cs << "namespace " << opt.ns << " {\n\n";
+	cs <<	"namespace " << opt.name << "_data {\n"
+		"\n"
+		"idni::prods<char_type, terminal_type>& productions() {\n"
+			<< productions_body <<
+		"}\n"
+		"\n"
+		"} // namespace " << opt.name << "_data\n";
+	if (opt.ns.size()) cs << "\n} // " << opt.ns << " namespace\n";
 }
 
 // generate_parser_cpp_from_* returns a result<bool> whose report is the

@@ -138,6 +138,12 @@ inline cli::commands tgf_commands() {
 	OPT(cli::option("namespace", 'N',
 		"")),
 		DESC("namespace for the generated parser code");
+	OPT(cli::option("header-only", 'H',
+		true)),
+		DESC("keep the generated parser in a single header (default). "
+			"--header-only false emits productions() into a "
+			"companion .cpp so the grammar table is compiled once "
+			"instead of in every translation unit");
 	OPT(cli::option("decoder", 'd',
 		"")),
 		DESC("decoder function");

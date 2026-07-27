@@ -1037,7 +1037,8 @@ static parser_gen_options gen_options_from_cmd(const cli::command& cmd) {
 		.decoder             = decoder,
 		.encoder             = encoder,
 		.auto_disambiguate   = cmd.get<bool>("auto-disambiguate"),
-		.nodisambig_list     = nodisambig_list
+		.nodisambig_list     = nodisambig_list,
+		.header_only         = cmd.get<bool>("header-only")
 	};
 }
 
