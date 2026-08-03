@@ -141,6 +141,10 @@ dev_check_no_extra_positionals() {
 	fi
 }
 
+ninja_available() {
+	which ninja > /dev/null 2>&1 || which ninja-build > /dev/null 2>&1
+}
+
 build_run() {
 	BUILD_DIR="build-${BUILD_TYPE}"
 	echo "Building in ${BUILD_DIR} directory"
@@ -153,16 +157,9 @@ build_run() {
 	cd "${BUILD_DIR}"
 	rm -f ./CMakeCache.txt
 
-	if [[ $GENERATOR == Ninja ]]; then
-		local ninja_bin
-		ninja_bin="$(which ninja 2>/dev/null || true)"
-		if [[ -z $ninja_bin ]]; then
-			ninja_bin="$(which ninja-build 2>/dev/null || true)"
-		fi
-		if [[ -z $ninja_bin ]]; then
-			echo "Ninja is not available. Falling back to make."
-			GENERATOR="Unix Makefiles"
-		fi
+	if [[ $GENERATOR == Ninja ]] && ! ninja_available; then
+		echo "Ninja is not available. Falling back to make."
+		GENERATOR="Unix Makefiles"
 	fi
 
 	local verbose_flag=""
@@ -262,9 +259,13 @@ preset_entry() {
 
 	PRESET_RUN_BIN="${PRESET_RUN_BIN:-tgf}"
 
+	# only the configure step takes a generator or cache variables
 	local generator_args=()
 	if [[ ${GENERATOR_EXPLICIT:-} == 1 ]]; then
 		generator_args=(-G "${GENERATOR}")
+	elif ! ninja_available; then
+		echo "Ninja is not available. Falling back to make."
+		generator_args=(-G "Unix Makefiles")
 	fi
 
 	echo "Preset: ${PRESET}"
@@ -281,8 +282,7 @@ preset_entry() {
 
 	echo "Building with preset ${PRESET}"
 	echo "Parallel jobs: ${TAU_BUILD_JOBS}"
-	cmake --build --preset "${PRESET}" "${generator_args[@]}" \
-		"${DEV_CMAKE[@]}" -- -j "${TAU_BUILD_JOBS}"
+	cmake --build --preset "${PRESET}" -- -j "${TAU_BUILD_JOBS}"
 	local status=$?
 	if [[ $status -ne 0 ]]; then
 		echo "Build failed"
@@ -306,7 +306,7 @@ preset_entry() {
 				|| [[ $PRESET == "all" ]]; then
 			echo "Running tests"
 			ctest --preset "${PRESET}" -j "${TAU_BUILD_JOBS}" \
-				--output-on-failure "${DEV_CMAKE[@]}"
+				--output-on-failure
 			status=$?
 			if [[ $status -ne 0 ]]; then
 				echo "Running tests failed"
