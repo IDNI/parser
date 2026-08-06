@@ -275,7 +275,10 @@ struct bintree {
 	 */
 	inline static std::atomic<bool> gc_enabled{true};
 	// Protects M() and gc_callbacks; shared for reads, exclusive for writes/gc.
-	inline static std::shared_mutex mtx_{};
+	static std::shared_mutex& mutex() {
+		static std::shared_mutex value;
+		return value;
+	}
 
 	/**
 	 * @brief Garbage collect tree nodes
@@ -891,7 +894,10 @@ struct lcrs_tree : public bintree<T> {
 		= std::function<tref(const T&, const tref*, size_t, tref)>;
 	inline static hook_function hook = nullptr;
 	// Protects hook and use_hooks (shared for reads, exclusive for set/reset).
-	inline static std::shared_mutex hook_mtx_{};
+	static std::shared_mutex& hook_mutex() {
+		static std::shared_mutex value;
+		return value;
+	}
 	inline static void set_hook(hook_function h);
 	inline static void reset_hook();
 	inline static bool is_hooked();
