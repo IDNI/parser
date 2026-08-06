@@ -104,7 +104,7 @@ tref bintree<T>::get() const { return reinterpret_cast<tref>(this); }
 template <typename T>
 const htref bintree<T>::geth(tref h) {
 	if (h == NULL) return htree::null();
-	std::unique_lock lock(mtx_);
+	std::unique_lock lock(mutex());
 	auto res = M().find(*reinterpret_cast<const bintree*>(h));
 	if (auto sp = res->second.lock()) return sp;
 	htref ret(new htree(h));
@@ -129,13 +129,13 @@ tref bintree<T>::get(const T& v, tref l, tref r) {
 	bintree bn(v, l, r);
 	// Fast path: shared lock for the common case where the node already exists.
 	{
-		std::shared_lock lock(mtx_);
+		std::shared_lock lock(mutex());
 		auto it = M().find(bn);
 		if (it != M().end())
 			return reinterpret_cast<tref>(std::addressof(it->first));
 	}
 	// Slow path: exclusive lock to insert (double-check after acquiring).
-	std::unique_lock lock(mtx_);
+	std::unique_lock lock(mutex());
 	auto res = M().emplace(bn, htree::wp());
 	return reinterpret_cast<tref>(std::addressof(res.first->first));
 }
@@ -164,7 +164,7 @@ void bintree<T>::gc() {
 template <typename T>
 void bintree<T>::gc(std::unordered_set<tref>& keep) {
 	if (!gc_enabled.load(std::memory_order_relaxed)) return;
-	std::unique_lock lock(mtx_);
+	std::unique_lock lock(mutex());
 	// DBG(dump();)
 	//DBG(htree::dump();)
 
@@ -260,7 +260,7 @@ template <CacheType cache_t>
 cache_t& bintree<T>::create_cache(const cache_t& init) {
 	static std::deque<cache_t> caches;
 	// Protect both caches and the gc callback lists under the exclusive lock.
-	std::unique_lock lock(mtx_);
+	std::unique_lock lock(mutex());
 	cache_t& cache = caches.emplace_back(init);
 
 	// Pre-sweep: once this entry's key is fully reachable, its value's
@@ -525,10 +525,10 @@ tref lcrs_tree<T>::get_raw(const T& v, const tref* ch, size_t len, tref r) {
 template <typename T>
 tref lcrs_tree<T>::get(const T& v, const tref* ch, size_t len, tref r) {
 	// Snapshot hook under shared lock; call it after releasing the lock
-	// to avoid holding hook_mtx_ while bintree::get() acquires mtx_.
+	// to avoid holding hook_mutex() while bintree::get() acquires mutex().
 	hook_function h;
 	{
-		std::shared_lock lock(hook_mtx_);
+		std::shared_lock lock(hook_mutex());
 		if (!use_hooks || !hook) return get_raw(v, ch, len, r);
 		h = hook;
 	}
@@ -993,19 +993,19 @@ std::string dump_to_str(const subtree_map<node, tref>& m, bool subtree) {
 
 template <typename node>
 void lcrs_tree<node>::set_hook(hook_function h) {
-	std::unique_lock lock(hook_mtx_);
+	std::unique_lock lock(hook_mutex());
 	hook = h;
 }
 
 template <typename node>
 void lcrs_tree<node>::reset_hook() {
-	std::unique_lock lock(hook_mtx_);
+	std::unique_lock lock(hook_mutex());
 	hook = nullptr;
 }
 
 template <typename node>
 bool lcrs_tree<node>::is_hooked() {
-	std::shared_lock lock(hook_mtx_);
+	std::shared_lock lock(hook_mutex());
 	return hook != nullptr;
 }
 

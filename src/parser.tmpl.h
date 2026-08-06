@@ -430,7 +430,8 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 		// Predictor may have been evicted from S; it can still drive
 		// completion only if conjunction-cascade machinery kept it in U.
 		bool in_S = S[it->set].find(*it) != S[it->set].end();
-		bool in_U = any_conj && it->set < U.size()
+		const size_t predictor_set = it->set;
+		bool in_U = any_conj && predictor_set < U.size()
 			&& U[it->set].find(*it) != U[it->set].end();
 		if (!in_S && !in_U) continue;
 		DBGP(print(std::cout << " ?  checking \t\t\t\t", *it) << "\n";)
