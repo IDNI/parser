@@ -7,14 +7,12 @@
 #include <string>
 #include <cstdint>
 
-#ifdef __EMSCRIPTEN__
-#include "unsigned_char_traits.h"
-#endif
+#include "utf8char_traits.h"
 
 namespace idni {
 
 typedef unsigned char utf8char;
-typedef std::basic_string<utf8char> utf8string;
+typedef std::basic_string<utf8char, utf8char_traits> utf8string;
 
 // converting to utf8string
 utf8string to_utf8string(int32_t v);
@@ -48,15 +46,23 @@ std::string to_std_string(const char32_t& ch);
 std::wstring utf8_to_wide(const std::string& s);
 std::string  wide_to_utf8(const std::wstring& w);
 #endif
+// traits to use for basic_string<CharT>: utf8char_traits for utf8char,
+// std::char_traits<CharT> otherwise. A specialization (not conditional_t)
+// so std::char_traits<utf8char> is never named.
+template <typename CharT> struct char_traits_for { using type = std::char_traits<CharT>; };
+template <> struct char_traits_for<utf8char> { using type = utf8char_traits; };
+template <typename CharT>
+using char_traits_for_t = typename char_traits_for<CharT>::type;
+
 // from char*/string/char32_t*/u32string to string or u32string
 template <typename CharT>
-typename std::basic_string<CharT> from_cstr(const char *);
+std::basic_string<CharT, char_traits_for_t<CharT>> from_cstr(const char *);
 template <typename CharT>
-typename std::basic_string<CharT> from_str(const std::string&);
+std::basic_string<CharT, char_traits_for_t<CharT>> from_str(const std::string&);
 template <typename CharT>
-typename std::basic_string<CharT> from_cstr(const char32_t *);
+std::basic_string<CharT, char_traits_for_t<CharT>> from_cstr(const char32_t *);
 template <typename CharT>
-typename std::basic_string<CharT> from_str(const std::u32string&);
+std::basic_string<CharT, char_traits_for_t<CharT>> from_str(const std::u32string&);
 
 /**
 * checks if character is a valid Unicode scalar value
@@ -109,8 +115,8 @@ size_t emit_codepoint(char32_t ch, utf8char *s);
  * @param ch unicode codepoint
  * @return output stream
  */
-std::basic_ostream<utf8char>& emit_codepoint(
-	std::basic_ostream<utf8char>& os, char32_t ch);
+std::basic_ostream<utf8char, utf8char_traits>& emit_codepoint(
+	std::basic_ostream<utf8char, utf8char_traits>& os, char32_t ch);
 /**
  * Converts char32_t to a 1-4 utf8chars and outputs them into a vector
  * @param os resulting vector

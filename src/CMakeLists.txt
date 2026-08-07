@@ -33,6 +33,7 @@ set(TAU_PARSER_HEADERS
 	utility/term_colors.h
 	utility/tree.h
 	utility/tree.tmpl.h
+	utility/utf8char_traits.h
 	CACHE STRING "Tau Parser headers files"
 )
 

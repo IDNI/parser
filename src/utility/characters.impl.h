@@ -259,7 +259,9 @@ inline size_t emit_codepoint(char32_t ch, utf8char *s) {
 		return 4;
 	} else return 0;
 }
-inline std::basic_ostream<utf8char>& emit_codepoint(std::basic_ostream<utf8char>& o,char32_t ch){
+inline std::basic_ostream<utf8char, utf8char_traits>& emit_codepoint(
+	std::basic_ostream<utf8char, utf8char_traits>& o, char32_t ch)
+{
 	if (ch < 0x80)
 		return o.put((utf8char) ch);
 	else if (ch < 0x800)
