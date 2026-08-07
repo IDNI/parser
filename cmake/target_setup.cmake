@@ -18,7 +18,7 @@ function(target_setup target access compile_definitions compile_options link_opt
 			-Wstrict-aliasing=2
 			-Wfloat-equal
 			-Wwrite-strings
-			-Werror
+			$<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:-Werror>
 			# -Wfatal-errors
 		)
 		if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
