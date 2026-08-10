@@ -148,7 +148,7 @@ Default preset name is `release` if omitted.
 | `relwithdebinfo` (+ `-tests`, `-tgf`, …) | RelWithDebInfo variants | `build/relwithdebinfo` |
 | `release-mingw`, `debug-mingw` | Windows cross-compile | `build/release-mingw`, … |
 | `release-mingw-packages`, `release-mingw-packages-zip` | MinGW + cpack (NSIS or ZIP) | `build/release-mingw` |
-| `emscripten` | Emscripten (`EMSCRIPTEN_DIR` in preset) | `build/emscripten` |
+| `emscripten` | Emscripten (`EMSCRIPTEN_DIR` defaults via `TAU_SHARED_PREFIX`) | `build/emscripten` |
 
 Hidden building blocks (`_build-tests`, `_build-packages`, `_build-all`, …) are
 composed by the public presets above; see [`CMakePresets.json`](../CMakePresets.json).
@@ -176,9 +176,17 @@ composed by the public presets above; see [`CMakePresets.json`](../CMakePresets.
 
 ## Emscripten
 
-- `get-emsdk` — download emsdk into `external/emsdk`
-- `js-debug`, `js-release` — legacy `build-Debug` / `build-Release` + Emscripten `-D`
-- Preset: `./dev preset emscripten` (sets `EMSCRIPTEN_DIR` in the preset)
+- `dep-emsdk` — download and install emsdk into `<TAU_SHARED_PREFIX>/emsdk`,
+  i.e. `~/.tau/emsdk` by default; relocate with `-DTAU_SHARED_PREFIX=<prefix>`
+  or the `TAU_SHARED_PREFIX` environment variable. Requires `unzip`. Skips the
+  download when `<dir>/upstream/emscripten/emcc` already exists.
+- Presets: `./dev preset emscripten` (Release) and `./dev preset
+  debug-emscripten`. Both build into `build/emscripten` and place
+  `tauparser.html` / `tauparser.node.js` beside the built `tauparser.js`.
+- `EMSCRIPTEN_DIR` is not set by the preset; it defaults to
+  `<TAU_SHARED_PREFIX>/emsdk/upstream/emscripten` (same resolution as
+  `dep-emsdk`: `-DTAU_SHARED_PREFIX=`, else `$TAU_SHARED_PREFIX`, else
+  `~/.tau`). Override with `-DEMSCRIPTEN_DIR=<dir>`.
 
 ## TGF
 
