@@ -12,6 +12,8 @@ set -euo pipefail
 DEV_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TAUDIR="./tau-lang"
 
+source "${DEV_ROOT}/scripts/devrc"
+
 # check the first argument if it contains "release" or "debug".
 # if no argument is provided "release" is used
 BUILD_TYPE="${1:-release}"
@@ -35,15 +37,7 @@ fi
 cd $TAUDIR
 
 # initialize submodule to prevent init when building
-git submodule status | while read -r LINE; do
-	GIT_SUBMOD=$(echo $LINE | awk '{print $2}')
-	if [[ $LINE == -* ]]; then
-		echo "Initializing submodule $GIT_SUBMOD"
-		git submodule update --init --recursive $GIT_SUBMOD
-	else
-		echo "Submodule ${GIT_SUBMOD} is already initialized"
-	fi
-done
+git_submodules_init
 
 # remove content of the submodule to be replaced by current code
 rm -rf external/parser/*
@@ -53,7 +47,6 @@ cp -r ../cmake ../scripts ../src ../CMakeLists.txt ../VERSION ../LICENSE.md ../R
 	external/parser
 
 # resolve TAU_BUILD_JOBS using shared devrc logic
-source "${DEV_ROOT}/scripts/devrc"
 DEV_CMAKE=()
 resolve_jobs
 

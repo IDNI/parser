@@ -136,6 +136,25 @@ ninja_available() {
 	which ninja > /dev/null 2>&1 || which ninja-build > /dev/null 2>&1
 }
 
+# Initializes every submodule `git submodule status` reports as not yet
+# checked out (a leading "-" on its status line), leaving already-initialized
+# ones alone. Reads the status output via a here-string, which keeps the
+# while loop out of a subshell (bash runs a pipeline's last stage in one).
+git_submodules_init() {
+	local status_output line submod
+	status_output="$(git submodule status)"
+	while IFS= read -r line; do
+		[[ -z $line ]] && continue
+		submod="$(awk '{print $2}' <<<"$line")"
+		if [[ $line == -* ]]; then
+			echo "Initializing submodule ${submod}"
+			git submodule update --init --recursive "${submod}"
+		else
+			echo "Submodule ${submod} is already initialized"
+		fi
+	done <<<"$status_output"
+}
+
 build_run() {
 	BUILD_DIR="build-${BUILD_TYPE}"
 	echo "Building in ${BUILD_DIR} directory"
@@ -239,6 +258,13 @@ preset_binary_dir() {
 	esac
 }
 
+# cd into the build dir in a subshell, so the caller's cwd is untouched even
+# if cpack fails.
+run_cpack() {
+	local build_dir="$1"
+	( cd "${build_dir}" && cpack -C Release )
+}
+
 preset_entry() {
 	dev_entry "$@"
 	[[ -z $PRESET ]] && PRESET="release"
@@ -285,7 +311,7 @@ preset_entry() {
 		local build_dir
 		build_dir="$(preset_binary_dir "${PRESET}")"
 		echo "Creating packages in ${build_dir} (Release)"
-		( cd "${build_dir}" && cpack -C Release )
+		run_cpack "${build_dir}"
 		status=$?
 		if [[ $status -ne 0 ]]; then
 			echo "Packaging failed"
