@@ -346,3 +346,105 @@ resolve_script() {
 
 	return 1
 }
+
+# --- dep-*.sh helpers --------------------------------------------------
+#
+# dep-cvc5.sh, dep-boost.sh and dep-emsdk.sh each pull a handful of -D
+# options, a --w64/--darwin platform switch, an idempotency guard, and a
+# clone-once git checkout. dep_entry parses those options generically.
+
+# Declared at load time, not only inside dep_entry, so dep_var works for a
+# caller that just wants dep_shared_prefix and never parses arguments. With
+# DEP_VARS undeclared, bash reads DEP_VARS[$name] as an *arithmetic* subscript
+# and evaluates the variable named by $name: an exported TAU_SHARED_PREFIX=/opt/x
+# then dies with "arithmetic syntax error" and dep_var returns empty instead of
+# the fallback -- silently yielding an empty prefix.
+declare -gA DEP_VARS=()
+DEP_POSITIONAL=()
+DEP_TARGET="native"
+
+dep_entry() {
+	declare -gA DEP_VARS=()
+	DEP_POSITIONAL=()
+	DEP_TARGET="native"
+	local arg name value
+	for arg in "$@"; do
+		case "$arg" in
+			--w64)
+				DEP_TARGET="w64"
+				;;
+			--darwin)
+				DEP_TARGET="darwin"
+				;;
+			-D*=*)
+				name="${arg#-D}"
+				name="${name%%=*}"
+				value="${arg#-D"${name}"=}"
+				DEP_VARS[$name]="$value"
+				;;
+			*)
+				DEP_POSITIONAL+=("$arg")
+				;;
+		esac
+	done
+}
+
+# An empty value falls back to the default: `-DTAU_BUILD_JOBS=` reaches here
+# whenever the caller interpolates an unset variable (CMakeLists.txt passes
+# -DTAU_BUILD_JOBS=${TAU_BUILD_JOBS}), and an empty jobs count would expand to
+# a bare `make -j`, i.e. unbounded parallelism.
+dep_var() {
+	local name="$1" default="${2:-}"
+	if [[ -v DEP_VARS[$name] && -n "${DEP_VARS[$name]}" ]]; then
+		echo "${DEP_VARS[$name]}"
+	else
+		echo "$default"
+	fi
+}
+
+# -D beats the environment beats ~/.tau, mirroring how dep_jobs treats
+# TAU_BUILD_JOBS. This is the single definition of the rule: cmake asks this
+# function rather than restating it (see cmake/tau-shared-prefix.cmake), so
+# the shell and CMake sides cannot disagree about where a dependency landed.
+dep_shared_prefix() {
+	dep_var TAU_SHARED_PREFIX "${TAU_SHARED_PREFIX:-${HOME}/.tau}"
+}
+
+# -D beats the environment beats half the logical core count (rounded up,
+# minimum 1). This is the single definition of the rule: resolve_jobs and
+# cmake/tau-build-jobs.cmake both ask this function rather than restating it,
+# so the shell and CMake sides cannot disagree about how many jobs to use.
+dep_jobs() {
+	local jobs
+	jobs="$(dep_var TAU_BUILD_JOBS "${TAU_BUILD_JOBS:-0}")"
+	if [[ $jobs -eq 0 ]]; then
+		# message() with no mode writes to stderr, and it is always the
+		# last line the script prints, warning or not.
+		jobs=$(cmake -P "${__devrc_dir}/../cmake/processor-counter.cmake" \
+			2>&1 | tail -n 1)
+		[[ $jobs =~ ^[0-9]+$ ]] || jobs=1
+		jobs=$(( (jobs + 1) / 2 ))
+		[[ $jobs -lt 1 ]] && jobs=1
+	fi
+	echo "$jobs"
+}
+
+dep_done_if_exists() {
+	local path="$1" label="$2"
+	if [[ -e "$path" ]]; then
+		echo "${path} already exists, skipping ${label}"
+		exit 0
+	fi
+}
+
+dep_git_source() {
+	local repo="$1" dir="$2" tag="${3:-}"
+	if [[ ! -d "$dir" ]]; then
+		git clone "$repo" "$dir"
+		cd "$dir"
+		[[ -n "$tag" ]] && git checkout "$tag"
+	else
+		echo "${dir} already exists, skipping clone and checkout"
+		cd "$dir"
+	fi
+}
