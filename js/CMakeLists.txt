@@ -49,7 +49,7 @@ target_setup(tauparser PRIVATE
 message(STATUS "JSLIB_LINK_OPTIONS: ${JSLIB_LINK_OPTIONS}")
 target_sources(tauparser PRIVATE ${JSLIB_SOURCES})	
 target_include_directories(tauparser PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
-target_link_libraries(tauparser PRIVATE embind)
+target_link_libraries(tauparser PRIVATE embind unordered_dense)
 set_target_properties(tauparser PROPERTIES LINK_FLAGS ${JSLIB_LINK_OPTIONS})
 target_compile_definitions(tauparser PRIVATE
         "-DNODEFSMOUNT")
