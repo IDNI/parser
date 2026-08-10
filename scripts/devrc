@@ -97,20 +97,11 @@ normalize_args() {
 }
 
 resolve_jobs() {
-	local jobs=0 arg
-	for arg in "${DEV_CMAKE[@]}"; do
-		if [[ $arg == -DTAU_BUILD_JOBS=* ]]; then
-			jobs="${arg#-DTAU_BUILD_JOBS=}"
-		fi
-	done
-	if [[ $jobs -eq 0 && -n "${TAU_BUILD_JOBS:-}" ]]; then
-		jobs="${TAU_BUILD_JOBS}"
-	fi
-	if [[ $jobs -eq 0 ]]; then
-		jobs=$(cmake -P "${DEV_ROOT}/cmake/processor-counter.cmake" 2>/dev/null \
-			|| echo 1)
-		jobs=$((jobs / 2))
-		[[ $jobs -lt 1 ]] && jobs=1
+	dep_entry "${DEV_CMAKE[@]}"
+	local requested jobs
+	requested="$(dep_var TAU_BUILD_JOBS "${TAU_BUILD_JOBS:-0}")"
+	jobs="$(dep_jobs)"
+	if [[ $requested -eq 0 ]]; then
 		echo "TAU_BUILD_JOBS: ${jobs} (half of available cores)"
 	fi
 	# preset configure uses env; cmake --preset rejects -DTAU_BUILD_JOBS
