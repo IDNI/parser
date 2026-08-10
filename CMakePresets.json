@@ -37,12 +37,6 @@
 		},
 
 		{
-			"name": "_toolchain-emscripten",
-			"hidden": true,
-			"toolchainFile": "cmake/emscripten-toolchain.cmake"
-		},
-
-		{
 			"name": "_build_dir-release",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/release"
@@ -223,8 +217,7 @@
 			"name": "_emscripten",
 			"hidden": true,
 			"cacheVariables": {
-				"TAU_PARSER_BUILD_EMSCRIPTEN": "ON",
-				"EMSCRIPTEN_DIR": "${sourceDir}/external/emsdk/upstream/emscripten"
+				"TAU_PARSER_BUILD_EMSCRIPTEN": "ON"
 			}
 		},
 
@@ -522,9 +515,18 @@
 			"inherits": [
 				"_build_dir-emscripten",
 				"_generator-make",
-				"_toolchain-emscripten",
 				"_emscripten",
 				"_build-type-release"
+			]
+		},
+
+		{
+			"name": "debug-emscripten",
+			"inherits": [
+				"_build_dir-emscripten",
+				"_generator-make",
+				"_emscripten",
+				"_build-type-debug"
 			]
 		}
 	],
@@ -604,6 +606,10 @@
 		{
 			"name": "emscripten",
 			"configurePreset": "emscripten"
+		},
+		{
+			"name": "debug-emscripten",
+			"configurePreset": "debug-emscripten"
 		},
 		{
 			"name": "release-make-gcc",

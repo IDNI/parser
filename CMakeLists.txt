@@ -16,7 +16,7 @@ message(STATUS "Parser version: ${TAU_PARSER_TARGET_VERSION} / ${TAU_PARSER_VERS
 include(CMakeLocalLists.txt OPTIONAL)
 
 if(TAU_PARSER_BUILD_EMSCRIPTEN)
-	include(emscripten-toolchain)
+	include(use-emscripten)
 	set_emscripten_toolchain()
 endif()
 
