@@ -3,6 +3,9 @@ cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 message(STATUS "Adding ${CMAKE_CURRENT_SOURCE_DIR}/cmake to CMAKE_MODULE_PATH")
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
+# take TAU_SHARED_PREFIX from env and args
+include(tau-shared-prefix)
+
 # Read version from file and strip prerelease information for cmake project VERSION property
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" TAU_PARSER_VERSION)
 string(STRIP "${TAU_PARSER_VERSION}" TAU_PARSER_VERSION)
