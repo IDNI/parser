@@ -367,8 +367,9 @@ resolve_script() {
 # --- dep-*.sh helpers --------------------------------------------------
 #
 # dep-cvc5.sh, dep-boost.sh and dep-emsdk.sh each pull a handful of -D
-# options, a --w64/--darwin platform switch, an idempotency guard, and a
-# clone-once git checkout. dep_entry parses those options generically.
+# options, a --w64/--darwin/--emscripten platform switch, an idempotency
+# guard, and a clone-once git checkout. dep_entry parses those options
+# generically.
 
 # Declared at load time, not only inside dep_entry, so dep_var works for a
 # caller that just wants dep_shared_prefix and never parses arguments. With
@@ -392,6 +393,9 @@ dep_entry() {
 				;;
 			--darwin)
 				DEP_TARGET="darwin"
+				;;
+			--emscripten)
+				DEP_TARGET="emscripten"
 				;;
 			-D*=*)
 				name="${arg#-D}"
