@@ -230,7 +230,7 @@ preset_binary_dir() {
 			echo "build/relwithdebinfo"
 			;;
 		*emscripten*)
-			echo "build/emscripten"
+			echo "build/$1"
 			;;
 		release-clang|release-*-clang|release-make-clang \
 			|release-ninja-clang)

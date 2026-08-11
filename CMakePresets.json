@@ -85,6 +85,12 @@
 		},
 
 		{
+			"name": "_build_dir-debug-emscripten",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-emscripten"
+		},
+
+		{
 			"name": "_build-type-debug",
 			"hidden": true,
 			"cacheVariables": {
@@ -523,7 +529,7 @@
 		{
 			"name": "debug-emscripten",
 			"inherits": [
-				"_build_dir-emscripten",
+				"_build_dir-debug-emscripten",
 				"_generator-make",
 				"_emscripten",
 				"_build-type-debug"

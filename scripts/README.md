@@ -90,7 +90,7 @@ Two layouts coexist on purpose:
 | `Debug` | `build-Debug` | `build/debug` |
 | `RelWithDebInfo` | `build-RelWithDebInfo` | `build/relwithdebinfo` |
 | MinGW Release | `build-Release` + toolchain `-D` | `build/release-mingw` |
-| Emscripten | `build-Release` + `-D` | `build/emscripten` |
+| Emscripten Release | `build-Release` + `-D` | `build/emscripten` |
 
 Legacy wrappers are unchanged. Prefer presets for new work; use the matching
 `build/…` tree when running `cpack` after a preset build.
@@ -148,7 +148,7 @@ Default preset name is `release` if omitted.
 | `relwithdebinfo` (+ `-tests`, `-tgf`, …) | RelWithDebInfo variants | `build/relwithdebinfo` |
 | `release-mingw`, `debug-mingw` | Windows cross-compile | `build/release-mingw`, … |
 | `release-mingw-packages`, `release-mingw-packages-zip` | MinGW + cpack (NSIS or ZIP) | `build/release-mingw` |
-| `emscripten` | Emscripten (`EMSCRIPTEN_DIR` defaults via `TAU_SHARED_PREFIX`) | `build/emscripten` |
+| `emscripten`, `debug-emscripten` | Emscripten (`EMSCRIPTEN_DIR` defaults via `TAU_SHARED_PREFIX`) | `build/emscripten`, … |
 
 Hidden building blocks (`_build-tests`, `_build-packages`, `_build-all`, …) are
 composed by the public presets above; see [`CMakePresets.json`](../CMakePresets.json).
@@ -180,8 +180,8 @@ composed by the public presets above; see [`CMakePresets.json`](../CMakePresets.
   i.e. `~/.tau/emsdk` by default; relocate with `-DTAU_SHARED_PREFIX=<prefix>`
   or the `TAU_SHARED_PREFIX` environment variable. Requires `unzip`. Skips the
   download when `<dir>/upstream/emscripten/emcc` already exists.
-- Presets: `./dev preset emscripten` (Release) and `./dev preset
-  debug-emscripten`. Both build into `build/emscripten` and place
+- Presets: `./dev preset emscripten` (Release, `build/emscripten`) and
+  `./dev preset debug-emscripten` (`build/debug-emscripten`). Each places
   `tauparser.html` / `tauparser.node.js` beside the built `tauparser.js`.
 - `EMSCRIPTEN_DIR` is not set by the preset; it defaults to
   `<TAU_SHARED_PREFIX>/emsdk/upstream/emscripten` (same resolution as
