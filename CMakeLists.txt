@@ -165,7 +165,11 @@ set(TAU_PARSER_DEFINITIONS
 	TAU_PARSER_MEASURE
 	TAU_PARSER_MEASURE_SCOPES
 	TAU_PARSER_MEASURE_COUNTERS)
-set(TAU_PARSER_LINK_OPTIONS "-flto=auto")
+if(EMSCRIPTEN)
+	set(TAU_PARSER_LINK_OPTIONS "")
+else()
+	set(TAU_PARSER_LINK_OPTIONS "-flto=auto")
+endif()
 
 # compile options for different build types
 set(TAU_PARSER_DEBUG_OPTIONS          "-O0;-DDEBUG;-ggdb3")
