@@ -4,8 +4,9 @@
 # Then it runs tau-lang tests to check if parser changes do not break tau-lang.
 #
 # This script accepts an optional argument: BUILD_TYPE.
-# It can be one of "debug" or "release".
-# "release" is default if no argument is provided
+# It can be any build type devrc recognises (debug, release, relwithdebinfo,
+# coverage), case-insensitively. "release" is default if no argument is
+# provided.
 
 set -euo pipefail
 
@@ -14,16 +15,23 @@ TAUDIR="./tau-lang"
 
 source "${DEV_ROOT}/scripts/devrc"
 
-# check the first argument if it contains "release" or "debug".
-# if no argument is provided "release" is used
-BUILD_TYPE="${1:-release}"
-BUILD_TYPE=$(echo "$BUILD_TYPE" | tr '[:upper:]' '[:lower:]')
-BUILD_TYPES=("release" "debug")
-if [[ ! " ${BUILD_TYPES[@]} " =~ " ${BUILD_TYPE} " ]]; then
-	echo "Invalid build type: ${BUILD_TYPE}"
-	echo "Valid build types are: ${BUILD_TYPES[*]}"
-	exit 1
-fi
+# canonicalize the case, then let devrc's own parsing recognize every build
+# type it knows about instead of hand-rolling a second, shorter list
+BUILD_TYPE_ARG="${1:-Release}"
+[[ $# -ge 1 ]] && shift
+case "$(echo "${BUILD_TYPE_ARG}" | tr '[:upper:]' '[:lower:]')" in
+	debug)          BUILD_TYPE_ARG="Debug" ;;
+	release)        BUILD_TYPE_ARG="Release" ;;
+	relwithdebinfo) BUILD_TYPE_ARG="RelWithDebInfo" ;;
+	coverage)       BUILD_TYPE_ARG="Coverage" ;;
+	*)
+		echo "Invalid build type: ${BUILD_TYPE_ARG}"
+		echo "Valid build types are: debug release relwithdebinfo coverage"
+		exit 1
+		;;
+esac
+dev_entry "${BUILD_TYPE_ARG}" "$@"
+BUILD_TYPE="${BUILD_TYPE,,}"
 
 # clone tau
 if [ ! -d "$TAUDIR" ]; then
