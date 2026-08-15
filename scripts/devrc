@@ -132,6 +132,28 @@ dev_check_no_extra_positionals() {
 	fi
 }
 
+# A single-purpose wrapper (release.sh, debug.sh, ...) hardcodes its build
+# type and forwards "$@" into build_entry/test_entry, so a caller-supplied
+# build type collides with it there and surfaces as "Duplicate build type" --
+# true, but blind to which wrapper caused it. Call this before forwarding,
+# naming the wrapper and its fixed type so the message points at the actual
+# mistake: passing a build type to a wrapper that already has one.
+# Usage: dev_reject_build_type <wrapper> <fixed-type> "$@"
+dev_reject_build_type() {
+	local wrapper="$1" fixed_type="$2"
+	shift 2
+	local arg
+	for arg in "$@"; do
+		case "$arg" in
+			Debug|Release|RelWithDebInfo|Coverage)
+				echo "${wrapper} always builds ${fixed_type}; drop the '${arg}' argument" >&2
+				echo "(use './dev build ${arg}' for a ${arg} build)" >&2
+				exit 1
+				;;
+		esac
+	done
+}
+
 ninja_available() {
 	which ninja > /dev/null 2>&1 || which ninja-build > /dev/null 2>&1
 }
