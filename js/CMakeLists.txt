@@ -49,8 +49,16 @@ target_setup(tauparser PRIVATE
 message(STATUS "JSLIB_LINK_OPTIONS: ${JSLIB_LINK_OPTIONS}")
 target_sources(tauparser PRIVATE ${JSLIB_SOURCES})	
 target_include_directories(tauparser PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
-target_link_libraries(tauparser PRIVATE embind)
+target_link_libraries(tauparser PRIVATE embind unordered_dense)
 set_target_properties(tauparser PROPERTIES LINK_FLAGS ${JSLIB_LINK_OPTIONS})
 target_compile_definitions(tauparser PRIVATE
         "-DNODEFSMOUNT")
+
+# tauparser.node.js does require('./tauparser.js'), so the harnesses go in the
+# target's own output directory rather than this list file's binary dir
+add_custom_command(TARGET tauparser POST_BUILD
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		${CMAKE_CURRENT_SOURCE_DIR}/tauparser.html
+		${CMAKE_CURRENT_SOURCE_DIR}/tauparser.node.js
+		$<TARGET_FILE_DIR:tauparser>)
 

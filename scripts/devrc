@@ -97,20 +97,11 @@ normalize_args() {
 }
 
 resolve_jobs() {
-	local jobs=0 arg
-	for arg in "${DEV_CMAKE[@]}"; do
-		if [[ $arg == -DTAU_BUILD_JOBS=* ]]; then
-			jobs="${arg#-DTAU_BUILD_JOBS=}"
-		fi
-	done
-	if [[ $jobs -eq 0 && -n "${TAU_BUILD_JOBS:-}" ]]; then
-		jobs="${TAU_BUILD_JOBS}"
-	fi
-	if [[ $jobs -eq 0 ]]; then
-		jobs=$(cmake -P "${DEV_ROOT}/cmake/processor-counter.cmake" 2>/dev/null \
-			|| echo 1)
-		jobs=$((jobs / 2))
-		[[ $jobs -lt 1 ]] && jobs=1
+	dep_entry "${DEV_CMAKE[@]}"
+	local requested jobs
+	requested="$(dep_var TAU_BUILD_JOBS "${TAU_BUILD_JOBS:-0}")"
+	jobs="$(dep_jobs)"
+	if [[ $requested -eq 0 ]]; then
 		echo "TAU_BUILD_JOBS: ${jobs} (half of available cores)"
 	fi
 	# preset configure uses env; cmake --preset rejects -DTAU_BUILD_JOBS
@@ -141,8 +132,49 @@ dev_check_no_extra_positionals() {
 	fi
 }
 
+# A single-purpose wrapper (release.sh, debug.sh, ...) hardcodes its build
+# type and forwards "$@" into build_entry/test_entry, so a caller-supplied
+# build type collides with it there and surfaces as "Duplicate build type" --
+# true, but blind to which wrapper caused it. Call this before forwarding,
+# naming the wrapper and its fixed type so the message points at the actual
+# mistake: passing a build type to a wrapper that already has one.
+# Usage: dev_reject_build_type <wrapper> <fixed-type> "$@"
+dev_reject_build_type() {
+	local wrapper="$1" fixed_type="$2"
+	shift 2
+	local arg
+	for arg in "$@"; do
+		case "$arg" in
+			Debug|Release|RelWithDebInfo|Coverage)
+				echo "${wrapper} always builds ${fixed_type}; drop the '${arg}' argument" >&2
+				echo "(use './dev build ${arg}' for a ${arg} build)" >&2
+				exit 1
+				;;
+		esac
+	done
+}
+
 ninja_available() {
 	which ninja > /dev/null 2>&1 || which ninja-build > /dev/null 2>&1
+}
+
+# Initializes every submodule `git submodule status` reports as not yet
+# checked out (a leading "-" on its status line), leaving already-initialized
+# ones alone. Reads the status output via a here-string, which keeps the
+# while loop out of a subshell (bash runs a pipeline's last stage in one).
+git_submodules_init() {
+	local status_output line submod
+	status_output="$(git submodule status)"
+	while IFS= read -r line; do
+		[[ -z $line ]] && continue
+		submod="$(awk '{print $2}' <<<"$line")"
+		if [[ $line == -* ]]; then
+			echo "Initializing submodule ${submod}"
+			git submodule update --init --recursive "${submod}"
+		else
+			echo "Submodule ${submod} is already initialized"
+		fi
+	done <<<"$status_output"
 }
 
 build_run() {
@@ -219,8 +251,8 @@ preset_binary_dir() {
 		relwithdebinfo*)
 			echo "build/relwithdebinfo"
 			;;
-		emscripten*)
-			echo "build/emscripten"
+		*emscripten*)
+			echo "build/$1"
 			;;
 		release-clang|release-*-clang|release-make-clang \
 			|release-ninja-clang)
@@ -246,6 +278,13 @@ preset_binary_dir() {
 			echo "build"
 			;;
 	esac
+}
+
+# cd into the build dir in a subshell, so the caller's cwd is untouched even
+# if cpack fails.
+run_cpack() {
+	local build_dir="$1"
+	( cd "${build_dir}" && cpack -C Release )
 }
 
 preset_entry() {
@@ -294,7 +333,7 @@ preset_entry() {
 		local build_dir
 		build_dir="$(preset_binary_dir "${PRESET}")"
 		echo "Creating packages in ${build_dir} (Release)"
-		( cd "${build_dir}" && cpack -C Release )
+		run_cpack "${build_dir}"
 		status=$?
 		if [[ $status -ne 0 ]]; then
 			echo "Packaging failed"
@@ -345,4 +384,110 @@ resolve_script() {
 	fi
 
 	return 1
+}
+
+# --- dep-*.sh helpers --------------------------------------------------
+#
+# dep-cvc5.sh, dep-boost.sh and dep-emsdk.sh each pull a handful of -D
+# options, a --w64/--darwin/--emscripten platform switch, an idempotency
+# guard, and a clone-once git checkout. dep_entry parses those options
+# generically.
+
+# Declared at load time, not only inside dep_entry, so dep_var works for a
+# caller that just wants dep_shared_prefix and never parses arguments. With
+# DEP_VARS undeclared, bash reads DEP_VARS[$name] as an *arithmetic* subscript
+# and evaluates the variable named by $name: an exported TAU_SHARED_PREFIX=/opt/x
+# then dies with "arithmetic syntax error" and dep_var returns empty instead of
+# the fallback -- silently yielding an empty prefix.
+declare -gA DEP_VARS=()
+DEP_POSITIONAL=()
+DEP_TARGET="native"
+
+dep_entry() {
+	declare -gA DEP_VARS=()
+	DEP_POSITIONAL=()
+	DEP_TARGET="native"
+	local arg name value
+	for arg in "$@"; do
+		case "$arg" in
+			--w64)
+				DEP_TARGET="w64"
+				;;
+			--darwin)
+				DEP_TARGET="darwin"
+				;;
+			--emscripten)
+				DEP_TARGET="emscripten"
+				;;
+			-D*=*)
+				name="${arg#-D}"
+				name="${name%%=*}"
+				value="${arg#-D"${name}"=}"
+				DEP_VARS[$name]="$value"
+				;;
+			*)
+				DEP_POSITIONAL+=("$arg")
+				;;
+		esac
+	done
+}
+
+# An empty value falls back to the default: `-DTAU_BUILD_JOBS=` reaches here
+# whenever the caller interpolates an unset variable (CMakeLists.txt passes
+# -DTAU_BUILD_JOBS=${TAU_BUILD_JOBS}), and an empty jobs count would expand to
+# a bare `make -j`, i.e. unbounded parallelism.
+dep_var() {
+	local name="$1" default="${2:-}"
+	if [[ -v DEP_VARS[$name] && -n "${DEP_VARS[$name]}" ]]; then
+		echo "${DEP_VARS[$name]}"
+	else
+		echo "$default"
+	fi
+}
+
+# -D beats the environment beats ~/.tau, mirroring how dep_jobs treats
+# TAU_BUILD_JOBS. This is the single definition of the rule: cmake asks this
+# function rather than restating it (see cmake/tau-shared-prefix.cmake), so
+# the shell and CMake sides cannot disagree about where a dependency landed.
+dep_shared_prefix() {
+	dep_var TAU_SHARED_PREFIX "${TAU_SHARED_PREFIX:-${HOME}/.tau}"
+}
+
+# -D beats the environment beats half the logical core count (rounded up,
+# minimum 1). This is the single definition of the rule: resolve_jobs and
+# cmake/tau-build-jobs.cmake both ask this function rather than restating it,
+# so the shell and CMake sides cannot disagree about how many jobs to use.
+dep_jobs() {
+	local jobs
+	jobs="$(dep_var TAU_BUILD_JOBS "${TAU_BUILD_JOBS:-0}")"
+	if [[ $jobs -eq 0 ]]; then
+		# message() with no mode writes to stderr, and it is always the
+		# last line the script prints, warning or not.
+		jobs=$(cmake -P "${__devrc_dir}/../cmake/processor-counter.cmake" \
+			2>&1 | tail -n 1)
+		[[ $jobs =~ ^[0-9]+$ ]] || jobs=1
+		jobs=$(( (jobs + 1) / 2 ))
+		[[ $jobs -lt 1 ]] && jobs=1
+	fi
+	echo "$jobs"
+}
+
+dep_done_if_exists() {
+	local path="$1" label="$2"
+	if [[ -e "$path" ]]; then
+		echo "${path} already exists, skipping ${label}"
+		exit 0
+	fi
+}
+
+dep_git_source() {
+	local repo="$1" dir="$2" tag="${3:-}"
+	if [[ ! -d "$dir" ]]; then
+		git clone "$repo" "$dir"
+		cd "$dir"
+		[[ -n "$tag" ]] && git checkout "$tag"
+	else
+		echo "${dir} already exists, skipping clone and checkout"
+		cd "$dir"
+	fi
 }

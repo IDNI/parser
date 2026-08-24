@@ -103,11 +103,11 @@ struct lit {
 	/// Returns true if the literal is null.
 	bool is_null() const;
 	size_t hashit() const {
-		std::size_t seed = grcprime;
+		std::uint64_t seed = grcprime;
 		hash_combine(seed, static_cast<bool>(nt()));
 		if (nt()) hash_combine(seed, n());
 		else hash_combine(seed, t());
-		return seed;
+		return static_cast<size_t>(seed);
 	}
 
 	// IDEA maybe we could use directly the default operator<=> for lit
@@ -496,9 +496,9 @@ public:
 	friend std::ostream& operator<<<>(std::ostream& os, const node_type& n);
 	inline size_t _mpsize() const { return nid().size(); }
 	std::size_t hashit() const {
-		std::size_t seed = this->first.hashit();
+		std::uint64_t seed = this->first.hashit();
 		hash_combine(seed, this->second[0], this->second[1]);
-		return seed;
+		return static_cast<size_t>(seed);
 	}
 	//inline lit<C,T> &first() const { return this->first; }
 	//inline std::array<size_t, 2>& second() const { return this->second; }
@@ -728,9 +728,9 @@ public:
 	};
 	struct item_hash {
 		size_t operator()(const item& i) const {
-			size_t seed = grcprime;
+			std::uint64_t seed = grcprime;
 			hash_combine(seed, i.set, i.prod, i.con, i.from, i.dot);
-			return seed;
+			return static_cast<size_t>(seed);
 		}
 	};
 

@@ -14,19 +14,13 @@ shift
 dev_entry "$@"
 BASENAME="$(basename "$TGF_FILE" .tgf)"
 EXE_NAME="${BASENAME}_grammar"
-BUILD_TYPE="${DEV_POSITIONAL[0]:-Release}"
-case "${BUILD_TYPE}" in
-	Release)        BUILD_DIR="build/release" ;;
-	Debug)          BUILD_DIR="build/debug" ;;
-	RelWithDebInfo) BUILD_DIR="build/relwithdebinfo" ;;
-	*)              BUILD_DIR="build-${BUILD_TYPE}" ;;
-esac
+BUILD_DIR="$(preset_binary_dir "${BUILD_TYPE,,}")"
 
 cmake -B "${DEV_ROOT}/${BUILD_DIR}" \
 	-DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
 	-DTAU_PARSER_BUILD_TGF=ON \
 	-DTAU_PARSER_SPECIALIZE="${TGF_FILE}" \
-	"${DEV_CMAKE[@]}" "$@" \
+	"${DEV_CMAKE[@]}" \
 	"${DEV_ROOT}"
 
 cmake --build "${DEV_ROOT}/${BUILD_DIR}" \

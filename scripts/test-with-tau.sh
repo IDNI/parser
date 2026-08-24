@@ -4,24 +4,34 @@
 # Then it runs tau-lang tests to check if parser changes do not break tau-lang.
 #
 # This script accepts an optional argument: BUILD_TYPE.
-# It can be one of "debug" or "release".
-# "release" is default if no argument is provided
+# It can be any build type devrc recognises (debug, release, relwithdebinfo,
+# coverage), case-insensitively. "release" is default if no argument is
+# provided.
 
 set -euo pipefail
 
 DEV_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TAUDIR="./tau-lang"
 
-# check the first argument if it contains "release" or "debug".
-# if no argument is provided "release" is used
-BUILD_TYPE="${1:-release}"
-BUILD_TYPE=$(echo "$BUILD_TYPE" | tr '[:upper:]' '[:lower:]')
-BUILD_TYPES=("release" "debug")
-if [[ ! " ${BUILD_TYPES[@]} " =~ " ${BUILD_TYPE} " ]]; then
-	echo "Invalid build type: ${BUILD_TYPE}"
-	echo "Valid build types are: ${BUILD_TYPES[*]}"
-	exit 1
-fi
+source "${DEV_ROOT}/scripts/devrc"
+
+# canonicalize the case, then let devrc's own parsing recognize every build
+# type it knows about instead of hand-rolling a second, shorter list
+BUILD_TYPE_ARG="${1:-Release}"
+[[ $# -ge 1 ]] && shift
+case "$(echo "${BUILD_TYPE_ARG}" | tr '[:upper:]' '[:lower:]')" in
+	debug)          BUILD_TYPE_ARG="Debug" ;;
+	release)        BUILD_TYPE_ARG="Release" ;;
+	relwithdebinfo) BUILD_TYPE_ARG="RelWithDebInfo" ;;
+	coverage)       BUILD_TYPE_ARG="Coverage" ;;
+	*)
+		echo "Invalid build type: ${BUILD_TYPE_ARG}"
+		echo "Valid build types are: debug release relwithdebinfo coverage"
+		exit 1
+		;;
+esac
+dev_entry "${BUILD_TYPE_ARG}" "$@"
+BUILD_TYPE="${BUILD_TYPE,,}"
 
 # clone tau
 if [ ! -d "$TAUDIR" ]; then
@@ -35,15 +45,7 @@ fi
 cd $TAUDIR
 
 # initialize submodule to prevent init when building
-git submodule status | while read -r LINE; do
-	GIT_SUBMOD=$(echo $LINE | awk '{print $2}')
-	if [[ $LINE == -* ]]; then
-		echo "Initializing submodule $GIT_SUBMOD"
-		git submodule update --init --recursive $GIT_SUBMOD
-	else
-		echo "Submodule ${GIT_SUBMOD} is already initialized"
-	fi
-done
+git_submodules_init
 
 # remove content of the submodule to be replaced by current code
 rm -rf external/parser/*
@@ -53,7 +55,6 @@ cp -r ../cmake ../scripts ../src ../CMakeLists.txt ../VERSION ../LICENSE.md ../R
 	external/parser
 
 # resolve TAU_BUILD_JOBS using shared devrc logic
-source "${DEV_ROOT}/scripts/devrc"
 DEV_CMAKE=()
 resolve_jobs
 

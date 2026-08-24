@@ -3,6 +3,9 @@ cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 message(STATUS "Adding ${CMAKE_CURRENT_SOURCE_DIR}/cmake to CMAKE_MODULE_PATH")
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
+# take TAU_SHARED_PREFIX from env and args
+include(tau-shared-prefix)
+
 # Read version from file and strip prerelease information for cmake project VERSION property
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" TAU_PARSER_VERSION)
 string(STRIP "${TAU_PARSER_VERSION}" TAU_PARSER_VERSION)
@@ -13,7 +16,7 @@ message(STATUS "Parser version: ${TAU_PARSER_TARGET_VERSION} / ${TAU_PARSER_VERS
 include(CMakeLocalLists.txt OPTIONAL)
 
 if(TAU_PARSER_BUILD_EMSCRIPTEN)
-	include(emscripten-toolchain)
+	include(use-emscripten)
 	set_emscripten_toolchain()
 endif()
 
@@ -54,36 +57,33 @@ option(TAU_PARSER_DONT_USE_FTXUI       "Disable FTXUI"                      OFF)
 option(TAU_PARSER_BUILD_PIC            "Build position independent code"    OFF)
 option(TAU_PARSER_WINDOWS_PACKAGE      "Build Windows package"              OFF)
 option(TAU_PARSER_WINDOWS_ZIP_PACKAGE  "Build Windows zip package"          OFF)
-set(TAU_BUILD_JOBS "" CACHE STRING
-	"Number of jobs to use for the build (0 to auto-detect)")
 set(TAU_PARSER_SPECIALIZE "" CACHE FILEPATH
 	"TGF grammar file to specialize into a _grammar executable")
 
-if (TAU_BUILD_JOBS STREQUAL "")
-	set(TAU_BUILD_JOBS 0 CACHE STRING "Number of jobs to use for the build (0 to auto-detect)")
+# Hash policy for idni::hash_combine / idni::portable_hash (utility/hashing.h):
+#   default -- std::hash<T>, reproduces this file's committed behaviour
+#     bit-for-bit on every platform where size_t is 64 bits (native). Not
+#     portable across pointer widths (e.g. wasm32).
+#   fnv1a / wyhash -- canonical: same hash for the same logical value on
+#     every little-endian target, native or wasm32.
+set(TAU_PARSER_HASH_POLICY "default" CACHE STRING
+	"Hash policy: default, fnv1a, or wyhash")
+set_property(CACHE TAU_PARSER_HASH_POLICY PROPERTY STRINGS default fnv1a wyhash)
+if(TAU_PARSER_HASH_POLICY STREQUAL "default")
+	set(TAU_HASH_POLICY_DEFINE TAU_HASH_POLICY_DEFAULT)
+elseif(TAU_PARSER_HASH_POLICY STREQUAL "fnv1a")
+	set(TAU_HASH_POLICY_DEFINE TAU_HASH_POLICY_FNV1A)
+elseif(TAU_PARSER_HASH_POLICY STREQUAL "wyhash")
+	set(TAU_HASH_POLICY_DEFINE TAU_HASH_POLICY_WYHASH)
+else()
+	message(FATAL_ERROR
+		"Unknown TAU_PARSER_HASH_POLICY '${TAU_PARSER_HASH_POLICY}' (expected default, fnv1a, or wyhash)")
 endif()
 
-if(TAU_BUILD_JOBS EQUAL 0 AND DEFINED ENV{TAU_BUILD_JOBS}
-		AND NOT "$ENV{TAU_BUILD_JOBS}" STREQUAL "")
-	set(TAU_BUILD_JOBS "$ENV{TAU_BUILD_JOBS}" CACHE STRING
-		"Number of jobs to use for the build (0 to auto-detect)" FORCE)
-	message(STATUS "TAU_BUILD_JOBS from environment: ${TAU_BUILD_JOBS}")
-endif()
+# take TAU_BUILD_JOBS from env and args
+include(tau-build-jobs)
 
-message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS}")
-
-if (TAU_BUILD_JOBS EQUAL 0)
-	include(ProcessorCount)
-	ProcessorCount(TAU_BUILD_JOBS)
-	if(TAU_BUILD_JOBS EQUAL 0)
-		message(WARNING "Could not detect number of logical CPU cores, defaulting to 1")
-		set(TAU_BUILD_JOBS 1)
-	else()
-		math(EXPR TAU_BUILD_JOBS "( ${TAU_BUILD_JOBS} + 1 ) / 2")
-		message(STATUS "Auto setting TAU_BUILD_JOBS: ${TAU_BUILD_JOBS} (half of available cores)")
-	endif()
-endif()
-set(ENV{CMAKE_BUILD_PARALLEL_LEVEL} "${TAU_BUILD_JOBS}")
+message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX}")
 
 set_property(CACHE TAU_PARSER_MEASURE               PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_MEASURE_SCOPES        PROPERTY STRINGS "OFF" "ON")
@@ -106,7 +106,6 @@ set_property(CACHE TAU_PARSER_BUILD_TGF             PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_DONT_USE_FTXUI        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_WINDOWS_PACKAGE       PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_WINDOWS_ZIP_PACKAGE   PROPERTY STRINGS "OFF" "ON")
-set_property(CACHE TAU_BUILD_JOBS                   PROPERTY STRINGS "0" "1" "2" "3" "4" "5" "6" "7" "8" "9" "10" "11" "12" "13" "14" "15" "16" "17" "18" "19" "20")
 
 # build all
 if(TAU_PARSER_BUILD_ALL)
@@ -186,7 +185,11 @@ set(TAU_PARSER_DEFINITIONS
 	TAU_PARSER_MEASURE
 	TAU_PARSER_MEASURE_SCOPES
 	TAU_PARSER_MEASURE_COUNTERS)
-set(TAU_PARSER_LINK_OPTIONS "-flto=auto")
+if(EMSCRIPTEN)
+	set(TAU_PARSER_LINK_OPTIONS "")
+else()
+	set(TAU_PARSER_LINK_OPTIONS "-flto=auto")
+endif()
 
 # compile options for different build types
 set(TAU_PARSER_DEBUG_OPTIONS          "-O0;-DDEBUG;-ggdb3")
@@ -263,6 +266,7 @@ function(tauparser_setup target access libs)
 		"${TAU_PARSER_LINK_OPTIONS}"
 		"${libs}")
 	target_git_definitions(${target} INTERFACE)
+	target_compile_definitions(${target} ${access} ${TAU_HASH_POLICY_DEFINE})
 endfunction()
 
 ################################################################################

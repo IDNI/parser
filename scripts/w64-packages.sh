@@ -1,11 +1,10 @@
 #!/bin/bash
 
-./dev packages \
-	-DTAU_PARSER_WINDOWS_ZIP_PACKAGE=ON \
-	-DCMAKE_TOOLCHAIN_FILE=../cmake/mingw-w64-x86_64.cmake \
-	"$@"
+set -euo pipefail
 
-./dev packages \
-	-DTAU_PARSER_WINDOWS_PACKAGE=ON \
-	-DCMAKE_TOOLCHAIN_FILE=../cmake/mingw-w64-x86_64.cmake \
-	"$@"
+for PACKAGE_FLAG in TAU_PARSER_WINDOWS_ZIP_PACKAGE TAU_PARSER_WINDOWS_PACKAGE; do
+	./dev packages \
+		"-D${PACKAGE_FLAG}=ON" \
+		-DCMAKE_TOOLCHAIN_FILE=../cmake/mingw-w64-x86_64.cmake \
+		"$@"
+done
