@@ -1,8 +1,8 @@
-# take TAU_SHARED_PREFIX from env and args
-include("${CMAKE_CURRENT_LIST_DIR}/tau-shared-prefix.cmake")
+# resolve TAU_SHARED_PREFIX from -D, env, or default
+include("${CMAKE_CURRENT_LIST_DIR}/tau-resolve.cmake")
 
 if(NOT EMSCRIPTEN_DIR)
-	set(EMSCRIPTEN_DIR "${TAU_SHARED_PREFIX}/emsdk/upstream/emscripten")
+	set(EMSCRIPTEN_DIR "${TAU_SHARED_PREFIX_RESOLVED}/emsdk/upstream/emscripten")
 endif()
 
 set(EMSCRIPTEN_CMAKE "${EMSCRIPTEN_DIR}/cmake/Modules/Platform/Emscripten.cmake")

@@ -98,12 +98,9 @@ normalize_args() {
 
 resolve_jobs() {
 	dep_entry "${DEV_CMAKE[@]}"
-	local requested jobs
-	requested="$(dep_var TAU_BUILD_JOBS "${TAU_BUILD_JOBS:-0}")"
+	local jobs
 	jobs="$(dep_jobs)"
-	if [[ $requested -eq 0 ]]; then
-		echo "TAU_BUILD_JOBS: ${jobs} (half of available cores)"
-	fi
+	echo "TAU_BUILD_JOBS: ${jobs}"
 	# preset configure uses env; cmake --preset rejects -DTAU_BUILD_JOBS
 	local filtered=() arg
 	for arg in "${DEV_CMAKE[@]}"; do
@@ -388,10 +385,10 @@ resolve_script() {
 
 # --- dep-*.sh helpers --------------------------------------------------
 #
-# dep-cvc5.sh, dep-boost.sh and dep-emsdk.sh each pull a handful of -D
-# options, a --w64/--darwin/--emscripten platform switch, an idempotency
-# guard, and a clone-once git checkout. dep_entry parses those options
-# generically.
+# The dep-*.sh scripts here and in tau-lang (e.g. dep-emsdk.sh in this repo)
+# each pull a handful of -D options, a --w64/--darwin/--emscripten platform
+# switch, an idempotency guard, and a clone-once git checkout. dep_entry
+# parses those options generically.
 
 # Declared at load time, not only inside dep_entry, so dep_var works for a
 # caller that just wants dep_shared_prefix and never parses arguments. With
@@ -433,9 +430,9 @@ dep_entry() {
 }
 
 # An empty value falls back to the default: `-DTAU_BUILD_JOBS=` reaches here
-# whenever the caller interpolates an unset variable (CMakeLists.txt passes
-# -DTAU_BUILD_JOBS=${TAU_BUILD_JOBS}), and an empty jobs count would expand to
-# a bare `make -j`, i.e. unbounded parallelism.
+# whenever a caller interpolates an unset variable into a -D flag, and an
+# empty jobs count would otherwise expand to a bare `make -j`, i.e.
+# unbounded parallelism.
 dep_var() {
 	local name="$1" default="${2:-}"
 	if [[ -v DEP_VARS[$name] && -n "${DEP_VARS[$name]}" ]]; then
@@ -445,31 +442,38 @@ dep_var() {
 	fi
 }
 
-# -D beats the environment beats ~/.tau, mirroring how dep_jobs treats
-# TAU_BUILD_JOBS. This is the single definition of the rule: cmake asks this
-# function rather than restating it (see cmake/tau-shared-prefix.cmake), so
-# the shell and CMake sides cannot disagree about where a dependency landed.
+# cmake -P warns and ignores a trailing empty-string command-line argument,
+# so only pass "requested" through when dep_var actually found a -D; a
+# missing arg is exactly what tau-resolve.cmake treats as "none given"
+# anyway.
+_tau_resolve() {
+	local var="$1" requested="$2"
+	if [[ -n "$requested" ]]; then
+		cmake -P "${__devrc_dir}/../cmake/tau-resolve.cmake" "$var" "$requested"
+	else
+		cmake -P "${__devrc_dir}/../cmake/tau-resolve.cmake" "$var"
+	fi
+}
+
+# -D beats the environment beats ~/.tau. cmake/tau-resolve.cmake is the
+# single definition of the rule; this asks it (via `cmake -P`) rather than
+# restating the rule in bash, so the shell and CMake sides cannot disagree
+# about where a dependency landed. Only the explicit -D value (if any) is
+# passed through as "requested" -- tau-resolve.cmake itself checks the
+# TAU_SHARED_PREFIX environment variable and falls back to ~/.tau.
 dep_shared_prefix() {
-	dep_var TAU_SHARED_PREFIX "${TAU_SHARED_PREFIX:-${HOME}/.tau}"
+	_tau_resolve TAU_SHARED_PREFIX "$(dep_var TAU_SHARED_PREFIX "")"
 }
 
 # -D beats the environment beats half the logical core count (rounded up,
-# minimum 1). This is the single definition of the rule: resolve_jobs and
-# cmake/tau-build-jobs.cmake both ask this function rather than restating it,
-# so the shell and CMake sides cannot disagree about how many jobs to use.
+# minimum 1). cmake/tau-resolve.cmake is the single definition of the rule;
+# this asks it (via `cmake -P`) rather than restating the rule in bash, so
+# the shell and CMake sides cannot disagree about how many jobs to use. Only
+# the explicit -D value (if any) is passed through as "requested" --
+# tau-resolve.cmake itself checks the TAU_BUILD_JOBS environment variable
+# and falls back to auto-detection.
 dep_jobs() {
-	local jobs
-	jobs="$(dep_var TAU_BUILD_JOBS "${TAU_BUILD_JOBS:-0}")"
-	if [[ $jobs -eq 0 ]]; then
-		# message() with no mode writes to stderr, and it is always the
-		# last line the script prints, warning or not.
-		jobs=$(cmake -P "${__devrc_dir}/../cmake/processor-counter.cmake" \
-			2>&1 | tail -n 1)
-		[[ $jobs =~ ^[0-9]+$ ]] || jobs=1
-		jobs=$(( (jobs + 1) / 2 ))
-		[[ $jobs -lt 1 ]] && jobs=1
-	fi
-	echo "$jobs"
+	_tau_resolve TAU_BUILD_JOBS "$(dep_var TAU_BUILD_JOBS "")"
 }
 
 dep_done_if_exists() {

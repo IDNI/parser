@@ -3,8 +3,10 @@ cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 message(STATUS "Adding ${CMAKE_CURRENT_SOURCE_DIR}/cmake to CMAKE_MODULE_PATH")
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-# take TAU_SHARED_PREFIX from env and args
-include(tau-shared-prefix)
+# resolve TAU_SHARED_PREFIX (and TAU_BUILD_JOBS) from -D, env, or defaults;
+# needed this early because use-emscripten.cmake reads TAU_SHARED_PREFIX_RESOLVED
+# before project() below
+include(tau-resolve)
 
 # Read version from file and strip prerelease information for cmake project VERSION property
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" TAU_PARSER_VERSION)
@@ -80,10 +82,13 @@ else()
 		"Unknown TAU_PARSER_HASH_POLICY '${TAU_PARSER_HASH_POLICY}' (expected default, fnv1a, or wyhash)")
 endif()
 
-# take TAU_BUILD_JOBS from env and args
-include(tau-build-jobs)
+# Feed the TAU_BUILD_JOBS resolved by include(tau-resolve) above into
+# CMAKE_BUILD_PARALLEL_LEVEL, so `cmake --build`/ctest and anything else
+# that reads that env var agree with TAU_BUILD_JOBS.
+set(ENV{CMAKE_BUILD_PARALLEL_LEVEL} "${TAU_BUILD_JOBS_RESOLVED}")
 
-message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX}")
+message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS_RESOLVED}")
+message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX_RESOLVED}")
 
 set_property(CACHE TAU_PARSER_MEASURE               PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_MEASURE_SCOPES        PROPERTY STRINGS "OFF" "ON")
@@ -151,11 +156,11 @@ endif()
 
 # parallel processing
 # cmake_host_system_information(RESULT CORE_COUNT QUERY NUMBER_OF_LOGICAL_CORES)
-if(TAU_BUILD_JOBS GREATER 1)
+if(TAU_BUILD_JOBS_RESOLVED GREATER 1)
 	if(NOT DEFINED CMAKE_BUILD_PARALLEL_LEVEL)
-		set(CMAKE_BUILD_PARALLEL_LEVEL ${TAU_BUILD_JOBS})
+		set(CMAKE_BUILD_PARALLEL_LEVEL ${TAU_BUILD_JOBS_RESOLVED})
 	endif()
-	message(STATUS "Parallel processing enabled (${TAU_BUILD_JOBS} cores)")
+	message(STATUS "Parallel processing enabled (${TAU_BUILD_JOBS_RESOLVED} cores)")
 endif()
 
 if(TAU_PARSER_ADDRESS_SANITIZER)
