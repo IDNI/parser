@@ -176,7 +176,7 @@ struct bintree {
 	/**
 	 * @brief Hash of binary tree node
 	 */
-	const std::uint64_t hash;
+	const size_t hash;
 
 	/**
 	 * @brief Get nodes's tref id
@@ -305,7 +305,7 @@ protected:
 	/**
 	 * Use to produce hash for bintree node
 	 */
-	std::uint64_t hashit (const T& _value, tref _l, tref _r);
+	size_t hashit (const T& _value, tref _l, tref _r);
 
 	/**
 	 * @brief Get the string representation of the node (for debugging)

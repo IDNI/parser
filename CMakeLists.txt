@@ -62,26 +62,6 @@ option(TAU_PARSER_WINDOWS_ZIP_PACKAGE  "Build Windows zip package"          OFF)
 set(TAU_PARSER_SPECIALIZE "" CACHE FILEPATH
 	"TGF grammar file to specialize into a _grammar executable")
 
-# Hash policy for idni::hash_combine / idni::portable_hash (utility/hashing.h):
-#   default -- std::hash<T>, reproduces this file's committed behaviour
-#     bit-for-bit on every platform where size_t is 64 bits (native). Not
-#     portable across pointer widths (e.g. wasm32).
-#   fnv1a / wyhash -- canonical: same hash for the same logical value on
-#     every little-endian target, native or wasm32.
-set(TAU_PARSER_HASH_POLICY "default" CACHE STRING
-	"Hash policy: default, fnv1a, or wyhash")
-set_property(CACHE TAU_PARSER_HASH_POLICY PROPERTY STRINGS default fnv1a wyhash)
-if(TAU_PARSER_HASH_POLICY STREQUAL "default")
-	set(TAU_HASH_POLICY_DEFINE TAU_HASH_POLICY_DEFAULT)
-elseif(TAU_PARSER_HASH_POLICY STREQUAL "fnv1a")
-	set(TAU_HASH_POLICY_DEFINE TAU_HASH_POLICY_FNV1A)
-elseif(TAU_PARSER_HASH_POLICY STREQUAL "wyhash")
-	set(TAU_HASH_POLICY_DEFINE TAU_HASH_POLICY_WYHASH)
-else()
-	message(FATAL_ERROR
-		"Unknown TAU_PARSER_HASH_POLICY '${TAU_PARSER_HASH_POLICY}' (expected default, fnv1a, or wyhash)")
-endif()
-
 # Feed the TAU_BUILD_JOBS resolved by include(tau-resolve) above into
 # CMAKE_BUILD_PARALLEL_LEVEL, so `cmake --build`/ctest and anything else
 # that reads that env var agree with TAU_BUILD_JOBS.
@@ -280,7 +260,6 @@ function(tauparser_setup target access libs)
 		"${TAU_PARSER_LINK_OPTIONS}"
 		"${libs}")
 	target_git_definitions(${target} INTERFACE)
-	target_compile_definitions(${target} ${access} ${TAU_HASH_POLICY_DEFINE})
 endfunction()
 
 ################################################################################

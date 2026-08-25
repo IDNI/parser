@@ -328,8 +328,8 @@ bintree<T>::bintree(const T& _value, tref _l, tref _r)
 	: value(_value), l(_l), r(_r), hash(hashit(_value, _l, _r)) { }
 
 template<typename T>
-std::uint64_t bintree<T>::hashit(const T& _value, tref _l, tref _r) {
-	std::uint64_t seed = 0;
+size_t bintree<T>::hashit(const T& _value, tref _l, tref _r) {
+	size_t seed = 0;
 	hash_combine(seed, _value,
 		_l == nullptr ? 0 : get(_l).hash,
 		_r == nullptr ? 0 : get(_r).hash);
@@ -372,12 +372,12 @@ size_t hash_tref<T>::operator()(tref r) const {
 template<typename T>
 size_t hash_lcrs_tref<T>::operator()(tref r) const {
 	const lcrs_tree<T>& n = lcrs_tree<T>::get(r);
-	std::uint64_t seed = 0;
+	size_t seed = 0;
 	const size_t hash_l = n.l == nullptr ? 0 : lcrs_tree<T>::get(n.l).hash;
 	if constexpr (requires { n.value.hash; })
 		hash_combine(seed, n.value.hash, hash_l);
 	else    hash_combine(seed, n.value, hash_l);
-	return static_cast<size_t>(seed);
+	return seed;
 }
 
 template <typename T>
