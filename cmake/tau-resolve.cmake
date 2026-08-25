@@ -3,7 +3,10 @@
 # Single source of truth for two build settings that CMake and scripts/devrc
 # both need to agree on:
 #
-#   TAU_BUILD_JOBS     -D  >  environment  >  auto = (cores + 1) / 2, min 1
+#   TAU_BUILD_JOBS     -D  >  environment  >  auto
+#                       auto = min((cores + 1) / 2, available_MiB / TAU_BUILD_JOB_MEMORY_MB), min 1
+#                       (TAU_BUILD_JOB_MEMORY_MB itself resolves -D > environment > default;
+#                       see _tau_resolve_job_memory_mb below)
 #   TAU_SHARED_PREFIX  -D  >  environment  >  $HOME/.tau
 #
 # include()d from CMakeLists.txt, this module declares the two settings as
@@ -36,9 +39,27 @@
 
 include_guard(GLOBAL)
 
+# Default memory budget (MiB) per compile job when auto-detecting
+# TAU_BUILD_JOBS. Single source for the two places this literal is needed:
+# the TAU_BUILD_JOB_MEMORY_MB cache variable's default (include mode) and
+# the fallback _tau_resolve_job_memory_mb uses when neither -D nor the
+# environment supplied a value (script mode has no cache to default).
+set(TAU_BUILD_JOB_MEMORY_MB_DEFAULT 1300)
+
 # Auto-detection path for _tau_resolve_build_jobs, below: half the logical
-# core count, rounded up, minimum 1.
-function(_tau_resolve_auto_build_jobs out_var)
+# core count (rounded up, minimum 1), capped by however many compile jobs
+# fit in available memory without swapping. mem_budget is the caller's
+# already-resolved TAU_BUILD_JOB_MEMORY_MB (see _tau_resolve_job_memory_mb).
+# The memory cap only ever lowers the core-count answer, never raises it,
+# and is skipped outright (falling back to the core-count answer alone)
+# whenever either input to it is unusable:
+#   - mem_budget is 0 or not a positive integer.
+#   - AVAILABLE_PHYSICAL_MEMORY comes back empty or 0, which
+#     cmake_host_system_information() does on platforms it can't query.
+# out_reason is set to a plain-text (unparenthesised) explanation of
+# whichever bound won, for callers that want to report it; callers that
+# don't care can pass any variable name and ignore it.
+function(_tau_resolve_auto_build_jobs mem_budget out_var out_reason)
 	include(ProcessorCount)
 	ProcessorCount(cores)
 	if(cores EQUAL 0)
@@ -50,7 +71,38 @@ function(_tau_resolve_auto_build_jobs out_var)
 	if(cores_jobs LESS 1)
 		set(cores_jobs 1)
 	endif()
+
+	# Default to the core-count answer; each guard clause below returns
+	# early and keeps it whenever the memory cap can't be applied.
 	set("${out_var}" "${cores_jobs}" PARENT_SCOPE)
+	set("${out_reason}" "half of ${cores} cores" PARENT_SCOPE)
+
+	if(NOT mem_budget MATCHES "^[1-9][0-9]*$")
+		# 0 or not a positive integer -- treat as "no cap"
+		return()
+	endif()
+
+	cmake_host_system_information(RESULT mem_available
+		QUERY AVAILABLE_PHYSICAL_MEMORY)
+	if(NOT mem_available MATCHES "^[1-9][0-9]*$")
+		# unsupported/empty/0 on this platform -- skip the memory cap
+		return()
+	endif()
+
+	math(EXPR mem_jobs "${mem_available} / ${mem_budget}")
+	if(NOT mem_jobs LESS cores_jobs)
+		# memory allows at least as many jobs as the core count already
+		# does -- keep the core-count answer
+		return()
+	endif()
+
+	if(mem_jobs LESS 1)
+		set(mem_jobs 1)
+	endif()
+	set("${out_var}" "${mem_jobs}" PARENT_SCOPE)
+	set("${out_reason}"
+		"memory-limited: ${mem_available} MiB available / ${mem_budget} MiB per job; ${cores_jobs} by core count"
+		PARENT_SCOPE)
 endfunction()
 
 # -D (or, standalone, the <requested> argument) beats the environment beats
@@ -60,17 +112,45 @@ endfunction()
 # it does NOT fall through to consult TAU_BUILD_JOBS from the environment.
 # Only a genuinely absent/empty requested falls through to the environment,
 # where (as before) a positive env value is used verbatim and a
-# non-positive or unset one means auto.
-function(_tau_resolve_build_jobs requested out_var)
+# non-positive or unset one means auto. mem_budget_requested is the -D (or
+# standalone <requested>) value for TAU_BUILD_JOB_MEMORY_MB; it's resolved
+# the same way, via _tau_resolve_job_memory_mb, only if/when the auto-detect
+# path actually needs it. out_reason is "" unless jobs came from
+# auto-detection, in which case it explains which bound won.
+function(_tau_resolve_build_jobs requested mem_budget_requested out_var out_reason)
 	set(jobs "${requested}")
+	set(reason "")
 	if(NOT jobs MATCHES "^[1-9][0-9]*$")
 		if(NOT requested STREQUAL "0" AND DEFINED ENV{TAU_BUILD_JOBS} AND "$ENV{TAU_BUILD_JOBS}" MATCHES "^[1-9][0-9]*$")
 			set(jobs "$ENV{TAU_BUILD_JOBS}")
 		else()
-			_tau_resolve_auto_build_jobs(jobs)
+			_tau_resolve_job_memory_mb("${mem_budget_requested}" mem_budget)
+			_tau_resolve_auto_build_jobs("${mem_budget}" jobs reason)
 		endif()
 	endif()
 	set("${out_var}" "${jobs}" PARENT_SCOPE)
+	set("${out_reason}" "${reason}" PARENT_SCOPE)
+endfunction()
+
+# -D (or, standalone, the <requested> argument) beats the environment beats
+# ${TAU_BUILD_JOB_MEMORY_MB_DEFAULT}. Unlike TAU_BUILD_JOBS there is no
+# "explicit auto" sentinel here: any non-empty requested or env value --
+# valid or not -- is passed straight through as-is, and it's
+# _tau_resolve_auto_build_jobs's job to treat a non-positive-integer budget
+# as "disable the memory cap" (that's the escape hatch: an explicit 0 or
+# garbage value, from either -D or the environment, must disable the cap
+# rather than fall through to the default). Only a genuinely empty/absent
+# value at every level falls through to the next one.
+function(_tau_resolve_job_memory_mb requested out_var)
+	set(budget "${requested}")
+	if(budget STREQUAL "")
+		if(DEFINED ENV{TAU_BUILD_JOB_MEMORY_MB} AND NOT "$ENV{TAU_BUILD_JOB_MEMORY_MB}" STREQUAL "")
+			set(budget "$ENV{TAU_BUILD_JOB_MEMORY_MB}")
+		else()
+			set(budget "${TAU_BUILD_JOB_MEMORY_MB_DEFAULT}")
+		endif()
+	endif()
+	set("${out_var}" "${budget}" PARENT_SCOPE)
 endfunction()
 
 # -D (or, standalone, the <requested> argument) beats the environment beats
@@ -102,7 +182,15 @@ if(CMAKE_SCRIPT_MODE_FILE)
 	set(_tau_resolve_requested "${CMAKE_ARGV4}")
 
 	if(_tau_resolve_var STREQUAL "TAU_BUILD_JOBS")
-		_tau_resolve_build_jobs("${_tau_resolve_requested}" _tau_resolve_result)
+		# _tau_resolve_reason is discarded here: stdout must stay exactly
+		# the resolved value (see comment above), so the "why" only ever
+		# gets printed by the include()d branch below. There's no -D/
+		# <requested> equivalent for TAU_BUILD_JOB_MEMORY_MB in script
+		# mode (no cache to hold one), so pass "" and let
+		# _tau_resolve_job_memory_mb fall through to its environment
+		# variable / default -- this is what makes that env var reachable
+		# on the cmake -P / devrc path.
+		_tau_resolve_build_jobs("${_tau_resolve_requested}" "" _tau_resolve_result _tau_resolve_reason)
 	elseif(_tau_resolve_var STREQUAL "TAU_SHARED_PREFIX")
 		_tau_resolve_shared_prefix("${_tau_resolve_requested}" _tau_resolve_result)
 	else()
@@ -116,16 +204,19 @@ else()
 	# cache (user-intent) variables and resolve them into separate, uncached
 	# variables that get recomputed on every configure.
 	set(TAU_BUILD_JOBS_DOC
-		"Number of jobs to use for the build (empty to auto-detect from the TAU_BUILD_JOBS env var, or half the cores; 0 to force auto-detection, ignoring the TAU_BUILD_JOBS env var)")
+		"Number of jobs to use for the build (empty to auto-detect from the TAU_BUILD_JOBS env var, or half the cores, capped by TAU_BUILD_JOB_MEMORY_MB; 0 to force auto-detection, ignoring the TAU_BUILD_JOBS env var)")
 	set(TAU_BUILD_JOBS "" CACHE STRING "${TAU_BUILD_JOBS_DOC}")
 	set_property(CACHE TAU_BUILD_JOBS PROPERTY STRINGS
 		"" "0" "1" "2" "3" "4" "5" "6" "7" "8" "9" "10"
 		"11" "12" "13" "14" "15" "16" "17" "18" "19" "20")
+	set(TAU_BUILD_JOB_MEMORY_MB_DOC
+		"Memory budgeted per compile job in MiB, used only when auto-detecting TAU_BUILD_JOBS (empty to auto-detect from the TAU_BUILD_JOB_MEMORY_MB env var, or ${TAU_BUILD_JOB_MEMORY_MB_DEFAULT}; 0 or any other non-positive-integer value -- from either -D or the environment -- disables the memory cap entirely, leaving the core-count answer)")
+	set(TAU_BUILD_JOB_MEMORY_MB "" CACHE STRING "${TAU_BUILD_JOB_MEMORY_MB_DOC}")
 	# Passing the cache entry straight through here is what keeps a
 	# changed TAU_BUILD_JOBS env value honoured across reconfigures of the
 	# same build directory, as long as the cache entry itself is still
 	# the empty default.
-	_tau_resolve_build_jobs("${TAU_BUILD_JOBS}" TAU_BUILD_JOBS_RESOLVED)
+	_tau_resolve_build_jobs("${TAU_BUILD_JOBS}" "${TAU_BUILD_JOB_MEMORY_MB}" TAU_BUILD_JOBS_RESOLVED TAU_BUILD_JOBS_REASON)
 
 	set(TAU_SHARED_PREFIX_DOC
 		"Install prefix for shared dependencies (empty to auto-detect from the TAU_SHARED_PREFIX env var, or ~/.tau)")
@@ -133,5 +224,6 @@ else()
 	_tau_resolve_shared_prefix("${TAU_SHARED_PREFIX}" TAU_SHARED_PREFIX_RESOLVED)
 
 	unset(TAU_BUILD_JOBS_DOC)
+	unset(TAU_BUILD_JOB_MEMORY_MB_DOC)
 	unset(TAU_SHARED_PREFIX_DOC)
 endif()

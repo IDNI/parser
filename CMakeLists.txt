@@ -87,7 +87,16 @@ endif()
 # that reads that env var agree with TAU_BUILD_JOBS.
 set(ENV{CMAKE_BUILD_PARALLEL_LEVEL} "${TAU_BUILD_JOBS_RESOLVED}")
 
-message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS_RESOLVED}")
+# tau-resolve.cmake hands back TAU_BUILD_JOBS_REASON as plain text (empty
+# unless the value came from auto-detection); wrap it into this status
+# line's "(...)" suffix here rather than in the resolver, so the resolver
+# doesn't need to know how its caller wants the reason formatted.
+set(_tau_build_jobs_reason_suffix "")
+if(TAU_BUILD_JOBS_REASON)
+	set(_tau_build_jobs_reason_suffix " (${TAU_BUILD_JOBS_REASON})")
+endif()
+message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS_RESOLVED}${_tau_build_jobs_reason_suffix}")
+unset(_tau_build_jobs_reason_suffix)
 message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX_RESOLVED}")
 
 set_property(CACHE TAU_PARSER_MEASURE               PROPERTY STRINGS "OFF" "ON")
