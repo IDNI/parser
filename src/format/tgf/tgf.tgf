@@ -4,7 +4,7 @@
 @trim all terminals except children of
 	sym, cc_name, escaped_s, unescaped_s, escaped_c, unescaped_c,
 	terminal_hex, hex_bytes.
-@inline char classes, syms, escape_char, esc_hex, esc_u4, esc_U8.
+@inline char classes, syms, dynamic_decls, dynamic_values, escape_char, esc_hex, esc_u4, esc_U8.
 
 # start symbol
 start                  => (_ statement)* _.
@@ -63,9 +63,14 @@ directive_body         =>
 	| ("disable" __ ["auto" sep] "disambig" "uation"?)  :disable_ad_dir
 	| ("enable" __ "productions" __ syms)               :enable_prods_dir
 	| ("ambiguous" __ syms)                             :ambiguous_dir
+	| ("dynamic" __ dynamic_decls)                      :dynamic_dir
 	.
 
 syms                   => sym (_ ',' _ sym)*.
+dynamic_decls          => dynamic_decl (_ ';' _ dynamic_decl)*.
+dynamic_decl           => sym:dynamic_name [__ "defaults" __ dynamic_values].
+dynamic_values         => dynamic_value (_ ',' _ dynamic_value)*.
+dynamic_value          => sym | terminal_string.
 inline_arg             => tree_path | ("char" sep "class" "es"?):cc_sym.
 tree_path              => sym (_ '>' _ sym)*.
 use_param              => ("eof" | "any" | "ascii" | "alnum" | "alpha" | "blank"

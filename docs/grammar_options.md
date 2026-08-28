@@ -27,6 +27,13 @@ If `auto_disambiguate` is set to `true` this list contains nonterminal ids of sy
 This list can be set by TGF directive: `@ambiguous symbol1, symbol2.`
 
 
+### std::map<std::basic_string<C>, std::vector<std::basic_string<C>>> dynamic;
+
+Alternatives for a `@dynamic` nonterminal, keyed by nonterminal name. The TGF directive `@dynamic` fills this map with its `defaults` values.
+
+`grammar::add_dynamic` adds more values to it at run time.
+
+
 ### shaping_options shaping;
 
 parsed tree [`shaping_options`](shaping_options.md)

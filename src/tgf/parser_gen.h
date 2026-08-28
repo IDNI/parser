@@ -7,6 +7,7 @@
 #include <cmath>
 #include "parser.h"
 #include "grammar_inspector.h"
+#include "utility/escapes.h"
 
 namespace idni {
 
@@ -21,6 +22,9 @@ struct parser_gen_options {
 	std::string encoder                          = "";
 	bool auto_disambiguate                       = true;
 	std::vector<std::string> nodisambig_list     = {};
+	// extra default values per @dynamic nonterminal, added after the ones
+	// the .tgf file declares
+	std::map<std::string, std::vector<std::string>> dynamic = {};
 	// false emits productions() into a companion .cpp instead of the header
 	bool header_only                             = true;
 };
@@ -114,7 +118,7 @@ void generate_parser_cpp(const std::string& tgf_filename,
 				<< to_std_string(x[fn.first]) << "\",\n";
 		return os.str();
 	};
-	auto gen_grammar_opts = [&g]() {
+	auto gen_grammar_opts = [&g, &opt]() {
 		std::stringstream os;
 		std::array<const char*, 2> pbool = { "false", "true" };
 		auto plist = [](std::ostream& os,
@@ -179,6 +183,51 @@ void generate_parser_cpp(const std::string& tgf_filename,
 			for (const auto& s : g.opt.enabled_guards) os << (i ? "," : "")
 				<< (i % 10 == 0 ? "\n\t\t" : " ")
 				<< "\"" << s << "\"", i++;
+			os << "\n\t}";
+		}
+		// g.opt.dynamic keeps the .tgf file's names and default
+		// values; opt.dynamic (the command line) only adds values
+		std::map<std::string, std::vector<std::string>> dyn;
+		for (const auto& [name, values] : g.opt.dynamic) {
+			auto& vs = dyn[to_std_string(name)];
+			for (const auto& v : values)
+				vs.push_back(to_std_string(v));
+		}
+		for (const auto& [name, values] : opt.dynamic) {
+			auto it = dyn.find(name);
+			if (it == dyn.end()) {
+				std::cerr << "Unknown @dynamic nonterminal: "
+					<< name << '\n';
+				continue;
+			}
+			for (const auto& v : values)
+				if (std::find(it->second.begin(),
+					it->second.end(), v)
+						== it->second.end())
+					it->second.push_back(v);
+		}
+		if (dyn.size()) {
+			os << ",\n\t.dynamic = {";
+			size_t i = 0;
+			for (const auto& [name, values] : dyn) {
+				os << (i++ ? "," : "") << "\n\t\t{ \""
+					<< escapes::encode(name,
+						escapes::c_like)
+					<< "\", ";
+				if (values.empty()) os << "{}";
+				else {
+					os << "{ ";
+					size_t j = 0;
+					for (const auto& v : values)
+						os << (j++ ? ", " : "")
+							<< "\""
+							<< escapes::encode(v,
+								escapes::c_like)
+							<< "\"";
+					os << " }";
+				}
+				os << " }";
+			}
 			os << "\n\t}";
 		}
 		os << "\n";

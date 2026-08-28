@@ -380,6 +380,9 @@ struct grammar {
 		shaping_options shaping = {};
 		/// Production guard names
 		std::set<std::string> enabled_guards = {};
+		/// Alternatives supplied by the host for a @dynamic nonterminal.
+		std::map<std::basic_string<C>, std::vector<std::basic_string<C>>>
+			dynamic = {};
 	} opt;
 	grammar(nonterminals<C, T>& nts, options opt = {});
 	grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
@@ -389,6 +392,15 @@ struct grammar {
 	void set_enabled_productions(const std::set<std::string>&);
 	void productions_enable(const std::string& guard);
 	void productions_disable(const std::string& guard);
+	/**
+	 * Adds an alternative for every value of a @dynamic nonterminal nt.
+	 * Every value becomes a terminal string production. A value added
+	 * already is skipped. The grammar object is shared by every parser
+	 * using it, so this affects all of them and it must not run while a
+	 * parse is running.
+	 */
+	void add_dynamic(const std::basic_string<C>& nt,
+		const std::vector<std::basic_string<C>>& values);
 	/// Returns number of productions (every disjunction has a prod rule)
 	size_t size() const;
 	/// Returns head of the prod rule - literal
@@ -454,6 +466,9 @@ struct grammar {
 	derive_all(const std::vector<std::pair<lit<C,T>, size_t>>& seeds) const;
 private:
 	bool all_nulls(const lits<C, T>& a) const;
+	void add_dynamic_prods(const lit<C, T>& l,
+		const std::vector<std::basic_string<C>>& values);
+	void compute_nullables();
 	nonterminals<C, T>& nts;
 	lit<C, T> start;
 	char_class_fns<T> cc_fns = {};
@@ -463,6 +478,7 @@ private:
 	std::set<size_t> nullables = {};
 	std::set<size_t> conjunctives = {};
 	std::vector<production> G;
+	std::map<lit<C, T>, std::set<std::basic_string<C>>> dynm = {};
 };
 
 /**

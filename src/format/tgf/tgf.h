@@ -206,6 +206,8 @@ private:
 				auto name = nts.get(nt);
 				if (name.size() >= 2 && name[0] == '_'
 					&& name[1] == '_') continue;
+				// a @dynamic nonterminal has no alternatives yet
+				if (opt.dynamic.count(name)) continue;
 				diag->warning(
 					messages::unproductive_nonterminal,
 					{{ label::name,
@@ -272,6 +274,17 @@ private:
 				opt.shaping.to_inline.insert(tree_path);
 			}
 		}
+		void dynamic_decl(const trv& t) {
+			auto& kept = opt.dynamic[from_str<C>(std::string(
+				t | tgf_parser::dynamic_name
+				  | tgf_parser::sym | trv::terminals))];
+			std::set<std::basic_string<C>> seen(
+				kept.begin(), kept.end());
+			for (auto& v : (t || tgf_parser::dynamic_value)())
+				if (auto s = dynamic_value(v);
+					seen.insert(s).second)
+						kept.push_back(s);
+		}
 		void directive(const trv& t) {
 			//print_node(std::cout << "directive: ", t.value()) << "\n";
 			auto d = t | tgf_parser::directive_body | trv::only_child;
@@ -314,6 +327,10 @@ private:
 				for (auto& n : (d || tgf_parser::sym)())
 					opt.enabled_guards
 						.insert(n | trv::terminals);
+				break;
+			case tgf_parser::dynamic_dir:
+				for (auto& dd : (d || tgf_parser::dynamic_decl)())
+					dynamic_decl(dd);
 				break;
 			default: return;
 			}
@@ -389,8 +406,23 @@ private:
 				if ((ch | trv::nonterminal) == tgf_parser::unescaped_s)
 					r = r + prods_t(ch | trv::terminals);
 				else
-					r = r + prods_t(unescape(
-							(ch | tgf_parser::escaped_s) | trv::terminals));
+					r = r + prods_t(unescape(ch | trv::terminals));
+			}
+			return r;
+		}
+		std::basic_string<C> dynamic_value(const trv& t) {
+			auto c = t | trv::only_child;
+			if ((c | trv::nonterminal) == tgf_parser::sym)
+				return from_str<C>(std::string(
+					c | trv::terminals));
+			// a quoted value carries escapes, decode them
+			std::basic_string<C> r{};
+			for (auto& ch : (c | trv::children)()) {
+				if ((ch | trv::nonterminal) == tgf_parser::unescaped_s)
+					r += from_str<C>(std::string(
+						ch | trv::terminals));
+				else
+					r += unescape(ch | trv::terminals);
 			}
 			return r;
 		}

@@ -1017,6 +1017,23 @@ static parser_gen_options gen_options_from_cmd(const cli::command& cmd) {
 	for (auto&& s : cmd.get<string>("nodisambig-list")
 		| views::split(',')) nodisambig_list
 				.emplace_back(s.begin(), s.end());
+	// several @dynamic nonterminals separated by ';', values by ','
+	map<string, vector<string>> dynamic;
+	for (auto&& e : cmd.get<string>("dynamic") | views::split(';')) {
+		string entry(e.begin(), e.end());
+		if (entry.empty()) continue;
+		auto eq = entry.find('=');
+		if (eq == string::npos) {
+			cerr << "invalid --dynamic entry (missing '='): "
+				<< entry << '\n';
+			continue;
+		}
+		vector<string> values;
+		for (auto&& v : string_view(entry).substr(eq + 1)
+			| views::split(',')) values
+					.emplace_back(v.begin(), v.end());
+		dynamic[entry.substr(0, eq)] = values;
+	}
 	string char_type     = cmd.get<string>("char-type");
 	string terminal_type = cmd.get<string>("terminal-type");
 	string decoder       = cmd.get<string>("decoder");
@@ -1038,6 +1055,7 @@ static parser_gen_options gen_options_from_cmd(const cli::command& cmd) {
 		.encoder             = encoder,
 		.auto_disambiguate   = cmd.get<bool>("auto-disambiguate"),
 		.nodisambig_list     = nodisambig_list,
+		.dynamic             = dynamic,
 		.header_only         = cmd.get<bool>("header-only")
 	};
 }

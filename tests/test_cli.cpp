@@ -202,6 +202,19 @@ int main(int argc, char** argv) {
 		{ "output", "-" }
 	}});
 
+	TEST("command options", "gen command with dynamic option")
+	o2.args = { "cmd", "gen", "--dynamic", "ba_type=sbf,tau" };
+	run_test(o2, { .status = 0, .cmd_name = "gen", .options = {
+		{ "help", false }
+	}, .cmd_options = {
+		{ "help", false },
+		{ "name", "my_parser" },
+		{ "decoder", "" },
+		{ "encoder", "" },
+		{ "output", "-" },
+		{ "dynamic", "ba_type=sbf,tau" }
+	}});
+
 	TEST("command options", "gen command with invalid option")
 	o2.args = { "cmd", "gen", "--invalid" };
 	run_test(o2, { .status = 1, .cmd_name = "gen" });

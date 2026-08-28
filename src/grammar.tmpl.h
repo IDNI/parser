@@ -529,15 +529,11 @@ grammar<C, T>::grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
 			grdm[G.size()-1] = gid;
 		}
 	}
+	for (const auto& [name, values] : opt.dynamic)
+		add_dynamic_prods(nt(name), values);
 	// set guards to create ntsm: nt -> prod rule map
 	set_enabled_productions(opt.enabled_guards);
-	size_t k;
-	do { // find all nullables
-		k = nullables.size();
-		for (const auto& p : G)
-			for (const auto& a : p.second)
-				if (all_nulls(a)) nullables.insert(p.first.n());
-	} while (k != nullables.size());
+	compute_nullables();
 	//DBG(print_data(std::cout << "\n", "\t") << "\n\n";)
 }
 template <typename C, typename T>
@@ -563,6 +559,21 @@ template <typename C, typename T>
 void grammar<C, T>::productions_disable(const std::string& guard) {
 	opt.enabled_guards.erase(guard);
 	set_enabled_productions(opt.enabled_guards);
+}
+template <typename C, typename T>
+void grammar<C, T>::add_dynamic(const std::basic_string<C>& nt_name,
+	const std::vector<std::basic_string<C>>& values)
+{
+	auto l = nt(nt_name);
+	auto had = dynm[l];
+	add_dynamic_prods(l, values);
+	// append only new values, in the given order, so opt.dynamic keeps the
+	// host's order and the generated parser adds productions in that order
+	auto& kept = opt.dynamic[nt_name];
+	for (const auto& v : values)
+		if (had.insert(v).second) kept.push_back(v);
+	set_enabled_productions(opt.enabled_guards);
+	compute_nullables();
 }
 template <typename C, typename T>
 size_t grammar<C, T>::size() const { return G.size(); }
@@ -601,6 +612,21 @@ size_t grammar<C, T>::add_char_class_production(lit<C, T> l, T ch) {
 	return cc_fns.ps[l.n()][ch] = G.size() - 1;
 }
 template <typename C, typename T>
+void grammar<C, T>::add_dynamic_prods(const lit<C, T>& l,
+	const std::vector<std::basic_string<C>>& values)
+{
+	auto& added = dynm[l];
+	for (const std::basic_string<C>& v : values) {
+		// a second production for one value would make l ambiguous
+		if (!added.insert(v).second) continue;
+		lits<C, T> a;
+		// an empty value is the null literal, the same as nul in a prod
+		if (v.empty()) a.emplace_back();
+		else for (const C& c : v) a.emplace_back(c);
+		G.emplace_back(l, std::vector<lits<C, T>>{ a });
+	}
+}
+template <typename C, typename T>
 size_t grammar<C, T>::get_char_class_production(lit<C, T> l, T ch) {
 	//DBG(std::cout << "get_char_class_prod: " << l.n() << std::endl;)
 	auto& x = cc_fns.ps[l.n()];
@@ -634,6 +660,18 @@ bool grammar<C, T>::all_nulls(const lits<C, T>& a) const {
 			nullables.find(a[k].n()) == nullables.end()))
 				return false;
 	return true;
+}
+template <typename C, typename T>
+void grammar<C, T>::compute_nullables() {
+	nullables.clear();
+	size_t k;
+	do {
+		k = nullables.size();
+		for (size_t n = 0; n != G.size(); ++n)
+			for (const auto& a : G[n].second)
+				if (all_nulls(a))
+					nullables.insert(G[n].first.n());
+	} while (k != nullables.size());
 }
 template <typename C, typename T>
 lit<C, T> grammar<C, T>::nt(size_t n) const { return lit<C, T>(n, &nts); }

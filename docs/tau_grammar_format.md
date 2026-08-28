@@ -253,6 +253,27 @@ Accepts a comma separated list of symbols which are not disambiguated according 
 `@ambiguous symbol1, symbol2.`
 
 
+#### @dynamic
+
+A `@dynamic` nonterminal takes its alternatives from the host program at run time, not from the grammar file. Each alternative is a plain terminal string.
+
+A `defaults` clause after the nonterminal name sets initial values. `,` separates the values inside one `defaults` clause. `;` separates several `@dynamic` declarations on one line. A value is a symbol or a quoted string, and a quoted string may hold an escape.
+
+A `@dynamic` nonterminal with no values matches nothing. This is not an error and produces no warning.
+
+Add values at run time with `grammar::add_dynamic` (see [grammar methods](grammar.md#methods)).
+
+A cast like `(u8[4])x` is ambiguous with an indexed variable unless the grammar lists every type name in advance. `@dynamic type_name.` removes that requirement. The parser accepts the cast only for a type name the host adds later.
+
+Usage:
+```
+@dynamic type_name.
+@dynamic ba_type defaults sbf, tau.
+@dynamic ba_type defaults tau, sbf; a.
+@dynamic ba_type defaults "a b", sbf.
+```
+
+
 #### @inline
 
 Inlining is a parsed tree shaping action which takes a node and replaces it with children or with a child from its subtree.

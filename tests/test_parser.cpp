@@ -432,6 +432,84 @@ int main(int argc, char **argv)
 	ps.clear();
 
 /*******************************************************************************
+*       DYNAMIC
+*******************************************************************************/
+
+	// add_dynamic() adds alternatives for a @dynamic nonterminal at run time,
+	// skipping a value already added. run_test() builds its grammar from
+	// prods before construction, so it cannot exercise add_dynamic(); these
+	// tests build a grammar and a parser directly instead.
+	auto check = [](bool cond, const char* name) {
+		if (cond) cout << "\n\t# OK " << name;
+		else cout << "\n\t# FAILED " << name, testing::failed = true;
+	};
+	auto parse_ok = [](parser<>& p, const string& in) {
+		return p.parse(in.c_str(), in.size()).found;
+	};
+
+	TEST("dynamic", "empty")
+	{
+		nonterminals<> dnt;
+		prods<> dps, dstart(dnt("start")), dtype(dnt("type")),
+			dtype_name(dnt("type_name"));
+		dps(dstart, dtype);
+		dps(dtype, dtype_name);
+		grammar<>::options dopt;
+		dopt.dynamic["type_name"] = {};
+		grammar<> dg(dnt, dps, dstart, {}, dopt);
+		check(dg.size() != 0, "empty @dynamic nonterminal builds a grammar");
+		parser<> dp(dg);
+		check(!parse_ok(dp, "u8"), "empty @dynamic nonterminal matches nothing");
+	}
+
+	TEST("dynamic", "add")
+	{
+		nonterminals<> dnt;
+		prods<> dps, dstart(dnt("start")), dtype(dnt("type")),
+			dtype_name(dnt("type_name"));
+		dps(dstart, dtype);
+		dps(dtype, dtype_name);
+		grammar<> dg(dnt, dps, dstart, {});
+		parser<> dp(dg);
+		dg.add_dynamic("type_name", { "u8", "u16" });
+		check(parse_ok(dp, "u8"),  "add_dynamic first values: u8 accepted");
+		check(parse_ok(dp, "u16"), "add_dynamic first values: u16 accepted");
+		dg.add_dynamic("type_name", { "i32" });
+		check(parse_ok(dp, "i32"), "add_dynamic adds: i32 accepted");
+		check(parse_ok(dp, "u8"),  "add_dynamic adds: u8 still accepted");
+		check(parse_ok(dp, "u16"), "add_dynamic adds: u16 still accepted");
+		size_t before = dg.size();
+		dg.add_dynamic("type_name", { "u8" });
+		check(dg.size() == before,
+			"repeated value adds no production");
+		string in = "u8";
+		auto r = dp.parse(in.c_str(), in.size());
+		check(r.found && !r.is_ambiguous(),
+			"repeated value still parses as a single tree");
+	}
+
+	TEST("dynamic", "guard")
+	{
+		nonterminals<> dnt;
+		prods<> dps, dstart(dnt("start")), dtype(dnt("type")),
+			dtype_name(dnt("type_name")), dextra(dnt("extra"));
+		dps(dstart, dtype | dextra);
+		dps(dtype, dtype_name);
+		dextra.back().guard = "e";
+		dps(dextra, {"zz"});
+		grammar<>::options dopt;
+		dopt.enabled_guards = {};
+		grammar<> dg(dnt, dps, dstart, {}, dopt);
+		parser<> dp(dg);
+		dg.add_dynamic("type_name", { "u8" });
+		check(parse_ok(dp, "u8"),  "dynamic value accepted, guard e disabled");
+		check(!parse_ok(dp, "zz"), "guarded production stays off");
+		dg.productions_enable("e");
+		check(parse_ok(dp, "zz"), "guarded production on after productions_enable");
+		check(parse_ok(dp, "u8"), "dynamic value still accepted, guard index map intact");
+	}
+
+/*******************************************************************************
 *       STRESS
 *******************************************************************************/
 

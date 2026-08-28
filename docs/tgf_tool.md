@@ -62,6 +62,8 @@ tgf <tgf file> gen [ <options> ]
         --auto-disambiguate
                                    enables auto-disambiguation (default: on)
         --nodisambig-list  -A      comma-separated list of non-disambiguation nodes
+        --dynamic          -D      default values for a @dynamic nonterminal, for
+                                   example ba_type=sbf,tau. Use ; between nonterminals.
         --namespace        -N      namespace for the generated parser code
         --decoder          -d      decoder function
         --encoder          -e      encoder function

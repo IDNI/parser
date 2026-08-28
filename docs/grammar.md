@@ -140,6 +140,25 @@ It returns production rule index or `(size_t) -1` if the check fails, ie. charac
 Adds a new production rule: `l => ch` and returns index of it.
 
 
+### void add_dynamic(const std::basic_string<C>& nt, const std::vector<std::basic_string<C>>& values);
+
+Adds a production rule for every value in `values` that a nonterminal named `nt` does not have yet. Each value becomes one terminal string alternative. `add_dynamic` skips a value already added and never removes a production.
+
+One grammar object serves every parser that holds a reference to it. So `add_dynamic` changes the grammar for all of them. It is not per parser.
+
+`add_dynamic` writes the grammar. A parse must not run at the same time. Call it before the first parse.
+
+```
+nonterminals<char> nts;
+prods<char> ps, start(nts("start")), type_name(nts("type_name"));
+ps(start, type_name);
+grammar<char> g(nts, ps, start, {});
+g.add_dynamic("type_name", { "u8", "u16" });
+parser<char> p(g);
+// p.parse("u8", 2).found == true
+```
+
+
 ### const std::set<size_t>& prod_ids_of_literal(const lit<C, T>& l);
 
 Returns indexes of all production rules for a nonterminal `l`.
