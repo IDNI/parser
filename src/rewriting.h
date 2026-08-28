@@ -111,10 +111,10 @@ struct node {
 	const size_t hash;
 private:
 	size_t calc_hash (const symbol_t v, const child_type& c) const {
-		size_t seed = grcprime;
+		std::uint64_t seed = grcprime;
 		hash_combine(seed, v);
 		for (const std::shared_ptr<node>& _c : c) hash_combine(seed, *_c);
-		return seed;
+		return static_cast<size_t>(seed);
 	}
 };
 
