@@ -356,13 +356,18 @@ private:
 			auto nn = get_new_name(sym);
 			return ps(nn, t), ps(nn, nul), nn;
 		}
+		// Repetitions expand left-recursively: the Earley parser
+		// completes a left-recursive list in linear time, a
+		// right-recursive one in about n^3 (a 1 200-character run of
+		// single-character items took ~30 s). Same language; the
+		// helper is inlined, so the parsed tree is the same either way.
 		prods_t repeat(const prods_t& sym, const prods_t& t) {
 			auto nn = get_new_name(sym);
-			return ps(nn, t | (t + nn)), nn;
+			return ps(nn, t | (nn + t)), nn;
 		}
 		prods_t none_or_repeat(const prods_t& sym, const prods_t& t) {
 			auto nn = get_new_name(sym);
-			return ps(nn, (t + nn) | nul), nn;
+			return ps(nn, (nn + t) | nul), nn;
 		}
 		prods_t group(const prods_t& sym, const trv& t) {
 			auto nn = get_new_name(sym);
@@ -379,7 +384,7 @@ private:
 			auto nn = get_new_name(sym);
 			auto nr = get_new_name(sym);
 			alternation(nr.to_lit(), t | tgf_parser::alternation);
-			return ps(nn, nr | (nr + nn)), nn;
+			return ps(nn, nr | (nn + nr)), nn;
 		}
 		std::basic_string<C> unescape(const std::string& s) {
 			auto dec = idni::escapes::decode(
