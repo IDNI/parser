@@ -262,6 +262,12 @@ struct report {
 
 	[[nodiscard]] bool has_error() const;
 
+	/// Rewrite every error-tagged node to @ref code::warning in place,
+	/// keeping its message and attrs, and clear @ref has_error() to
+	/// false. Used to keep failure history visible after a recovery
+	/// that no longer wants the report to read as failed.
+	void demote_errors_to_warnings();
+
 	std::string format_message(size_t node_idx) const;
 
 	/// Single pre-order walk over the tree. Errors and warnings emit
@@ -532,7 +538,45 @@ struct result {
 	[[nodiscard]] std::optional<U> take_or_error(result<U>&& child,
 		code c, std::string_view msg);
 
+	/// Chain a fallible step. On value, calls @p f with the moved value and
+	/// returns its @ref result<U>, this result's report merged in before
+	/// the child's so message order stays this-then-child. On error,
+	/// @p f is not called; returns a @ref result<U> carrying the moved
+	/// report. F: T -> result<U>.
+	template <typename F>
+	[[nodiscard]] auto and_then(F&& f) && -> std::invoke_result_t<F, T&&>;
+
+	/// Chain an infallible transform. On value, wraps @c f(value) in a
+	/// @ref result<U> together with the moved report; a null pointer @c U
+	/// is rejected the same way @ref emplace rejects one. On error,
+	/// @p f is not called; returns a @ref result<U> carrying the moved
+	/// report. F: T -> U.
+	template <typename F>
+	[[nodiscard]] auto transform(F&& f) &&
+		-> result<std::invoke_result_t<F, T&&>>;
+
+	/// Recover from an error. On value, returns this result unchanged and
+	/// @p f is not called. On error, calls @p f with this result's report
+	/// and returns its alternative @ref result<T>, this result's report
+	/// merged in before the alternative's. When @p f succeeds, this
+	/// result's error nodes are demoted to warnings first, so the merged
+	/// report keeps the failure history without leaving the recovered
+	/// result in a has_value() && has_error() state; a failed @p f leaves
+	/// the report as is and the chain stays failed.
+	/// F: const diagnostics_report& -> result<T>.
+	template <typename F>
+	[[nodiscard]] result<T> or_else(F&& f) &&;
+
+	/// The value, or @p fallback on error. The report is dropped by this
+	/// call by design; read it beforehand if it is still needed.
+	[[nodiscard]] T value_or(T fallback) &&;
+
 private:
+	/// Merge this result's report before @p r's, then hand @p r back
+	/// carrying the combined report. Shared by and_then/transform/or_else.
+	template <typename U>
+	result<U> carry_report(result<U>&& r);
+
 	void enforce_error_no_value_invariant();
 
 	std::optional<T> value_ {};

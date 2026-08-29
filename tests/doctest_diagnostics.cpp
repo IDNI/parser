@@ -5,7 +5,8 @@
 //
 // Focused on the ergonomics surface: closing a scope_guard early, the
 // measure() sugar, null-pointer rejection on result<T*>, forward_as<T> for
-// a type result<T>(T) cannot construct, and take_or_error().
+// a type result<T>(T) cannot construct, take_or_error(), and the
+// expected-style chain: and_then(), transform(), or_else(), value_or().
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
@@ -145,5 +146,164 @@ TEST_SUITE("diagnostics: take_or_error") {
 		CHECK_FALSE(v.has_value());
 		CHECK(outer.has_error());
 		CHECK(outer.report().nodes().back().tag == code::internal_error);
+	}
+}
+
+TEST_SUITE("diagnostics: and_then") {
+
+	TEST_CASE("on value, calls f and keeps this result's report before the child's") {
+		result<int> r;
+		r.report().count("before", 1);
+		r = 3;
+		auto r2 = std::move(r).and_then([](int v) {
+			result<int> out;
+			out = v + 1;
+			out.report().count("child", 1);
+			return out;
+		});
+		CHECK(r2.has_value());
+		CHECK(*r2 == 4);
+		CHECK(r2.report().nodes().size() == 2);
+		CHECK(r2.report().str(r2.report().nodes()[0].key) == "before");
+		CHECK(r2.report().str(r2.report().nodes()[1].key) == "child");
+	}
+
+	TEST_CASE("on error, f is not called and the report carries the error") {
+		result<int> r;
+		r.error(code::internal_error, "boom");
+		bool called = false;
+		auto r2 = std::move(r).and_then([&](int v) {
+			called = true;
+			result<int> out;
+			out = v + 1;
+			return out;
+		});
+		CHECK_FALSE(called);
+		CHECK_FALSE(r2.has_value());
+		CHECK(r2.has_error());
+		CHECK(r2.report().nodes().back().tag == code::internal_error);
+	}
+}
+
+TEST_SUITE("diagnostics: transform") {
+
+	TEST_CASE("on value, wraps f(value) with the moved report") {
+		result<int> r;
+		r.report().count("before", 1);
+		r = 3;
+		auto r2 = std::move(r).transform([](int v) { return v * 2; });
+		CHECK(r2.has_value());
+		CHECK(*r2 == 6);
+		CHECK(r2.report().nodes().size() == 1);
+		CHECK(r2.report().str(r2.report().nodes()[0].key) == "before");
+	}
+
+	TEST_CASE("on error, f is not called and the report carries the error") {
+		result<int> r;
+		r.error(code::internal_error, "boom");
+		bool called = false;
+		auto r2 = std::move(r).transform([&](int v) { called = true; return v; });
+		CHECK_FALSE(called);
+		CHECK_FALSE(r2.has_value());
+		CHECK(r2.has_error());
+	}
+
+	TEST_CASE("a null pointer result is rejected like emplace rejects one") {
+		result<int> r;
+		r = 5;
+		auto r2 = std::move(r).transform(
+			[](int) -> int* { return nullptr; });
+		CHECK_FALSE(r2.has_value());
+		CHECK(r2.has_error());
+	}
+}
+
+TEST_SUITE("diagnostics: or_else") {
+
+	TEST_CASE("on value, returns this result unchanged and f is not called") {
+		result<int> r;
+		r = 9;
+		bool called = false;
+		auto r2 = std::move(r).or_else([&](const report&) {
+			called = true;
+			result<int> alt;
+			alt = -1;
+			return alt;
+		});
+		CHECK_FALSE(called);
+		CHECK(r2.has_value());
+		CHECK(*r2 == 9);
+	}
+
+	TEST_CASE("on successful recovery, the original error is demoted to a "
+		"warning so the recovered result reads as ok")
+	{
+		result<int> r;
+		r.error(code::internal_error, "boom");
+		auto r2 = std::move(r).or_else([](const report&) {
+			result<int> alt;
+			alt = 7;
+			alt.report().count("recovered", 1);
+			return alt;
+		});
+		CHECK(r2.has_value());
+		CHECK_FALSE(r2.has_error());
+		CHECK(*r2 == 7);
+		CHECK(r2.report().nodes().size() == 2);
+		CHECK(r2.report().nodes()[0].tag == code::warning);
+		CHECK(r2.report().str(r2.report().nodes()[0].key) == "boom");
+		CHECK(r2.report().nodes()[1].tag == code::info_count);
+	}
+
+	TEST_CASE("on a failed alternative, the original error is left as is "
+		"and the chain stays failed")
+	{
+		result<int> r;
+		r.error(code::internal_error, "boom");
+		auto r2 = std::move(r).or_else([](const report&) {
+			result<int> alt;
+			alt.error(code::parse_error, "still bad");
+			return alt;
+		});
+		CHECK_FALSE(r2.has_value());
+		CHECK(r2.has_error());
+		CHECK(r2.report().nodes().size() == 2);
+		CHECK(r2.report().nodes()[0].tag == code::internal_error);
+		CHECK(r2.report().nodes()[1].tag == code::parse_error);
+	}
+}
+
+TEST_SUITE("diagnostics: value_or") {
+
+	TEST_CASE("on value, returns the value and drops the report") {
+		result<int> r;
+		r = 4;
+		CHECK(std::move(r).value_or(-1) == 4);
+	}
+
+	TEST_CASE("on error, returns the fallback") {
+		result<int> r;
+		r.error(code::internal_error, "boom");
+		CHECK(std::move(r).value_or(-1) == -1);
+	}
+}
+
+TEST_SUITE("diagnostics: chained and_then().transform()") {
+
+	TEST_CASE("a two-step chain applies both steps and keeps report order") {
+		result<int> r;
+		r = 2;
+		auto r2 = std::move(r)
+			.and_then([](int v) {
+				result<int> out;
+				out = v * 2;
+				out.report().count("doubled", 1);
+				return out;
+			})
+			.transform([](int v) { return v + 1; });
+		CHECK(r2.has_value());
+		CHECK(*r2 == 5);
+		CHECK(r2.report().nodes().size() == 1);
+		CHECK(r2.report().str(r2.report().nodes()[0].key) == "doubled");
 	}
 }

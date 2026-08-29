@@ -434,6 +434,12 @@ inline bool report::has_error() const {
 	return has_error_;
 }
 
+inline void report::demote_errors_to_warnings() {
+	for (auto& n : nodes_)
+		if (is_error(n.tag)) n.tag = code::warning;
+	has_error_ = false;
+}
+
 inline std::string report::format_message(size_t node_idx) const {
 	if (node_idx >= nodes_.size()) return {};
 	const auto& n = nodes_[node_idx];
@@ -1175,6 +1181,53 @@ std::optional<U> result<T>::take_or_error(result<U>&& child,
 		error(c, msg);
 
 	return v;
+}
+
+template <typename T>
+template <typename U>
+result<U> result<T>::carry_report(result<U>&& r) {
+	diag_rep_.append(std::move(r.diag_rep_));
+	r.diag_rep_ = std::move(diag_rep_);
+	return std::move(r);
+}
+
+template <typename T>
+template <typename F>
+auto result<T>::and_then(F&& f) && -> std::invoke_result_t<F, T&&> {
+	using R = std::invoke_result_t<F, T&&>;
+	using U = typename R::value_type;
+	if (has_value())
+		return carry_report(
+			std::invoke(std::forward<F>(f), std::move(*this).value()));
+	return result<U>(std::move(diag_rep_));
+}
+
+template <typename T>
+template <typename F>
+auto result<T>::transform(F&& f) &&
+	-> result<std::invoke_result_t<F, T&&>>
+{
+	using U = std::invoke_result_t<F, T&&>;
+	if (has_value()) {
+		result<U> r;
+		r = std::invoke(std::forward<F>(f), std::move(*this).value());
+		return carry_report(std::move(r));
+	}
+	return result<U>(std::move(diag_rep_));
+}
+
+template <typename T>
+template <typename F>
+result<T> result<T>::or_else(F&& f) && {
+	if (has_value()) return std::move(*this);
+	result<T> alt = std::invoke(std::forward<F>(f), diag_rep_);
+	if (alt.has_value()) diag_rep_.demote_errors_to_warnings();
+	return carry_report(std::move(alt));
+}
+
+template <typename T>
+T result<T>::value_or(T fallback) && {
+	return has_value() ? std::move(*this).value() : std::move(fallback);
 }
 
 // Invariant: a result holding an error carries no value. If both are present
