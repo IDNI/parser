@@ -91,11 +91,16 @@ inline report::scope_guard::scope_guard(scope_guard&& o) noexcept
 	o.r_ = nullptr;
 }
 
-inline report::scope_guard::~scope_guard() {
+inline void report::scope_guard::close() {
 	if (!r_) return;
 	if (timed_) r_->set_node_value(idx_,
 		static_cast<int64_t>(timer_.stop() * 1000));
 	r_->pop_scope(idx_);
+	r_ = nullptr;
+}
+
+inline report::scope_guard::~scope_guard() {
+	close();
 }
 
 inline report::scope_guard report::open(key name, code tag, int_t value) {
@@ -156,6 +161,16 @@ auto report::step(bool enable, std::string_view name, F&& f)
 	// allocation-free.
 	if (!enable) return f();
 	return step(enable, intern(name), std::forward<F>(f));
+}
+
+template <typename F>
+auto report::measure(key name, F&& f) -> decltype(f()) {
+	return step(true, name, std::forward<F>(f));
+}
+
+template <typename F>
+auto report::measure(std::string_view name, F&& f) -> decltype(f()) {
+	return step(true, name, std::forward<F>(f));
 }
 
 inline void report::reset(std::string_view root_name) {
@@ -450,6 +465,10 @@ inline std::string report::format_message(size_t node_idx) const {
 }
 
 inline void report::print(const sinks& s) const {
+	// An open scope has not yet had its elapsed time written by
+	// scope_guard::close(), so its printed value would be stale.
+	DBG(assert(scope_stack_.empty()
+		&& "printing a report with open scopes");)
 	if (nodes_.empty()) return;
 	// Three passes over nodes_ — children index, label-width pass, value-
 	// column pass — kept separate for clarity. Reports stay small enough
@@ -814,6 +833,13 @@ template <typename T>
 T& result<T>::emplace(T&& v) {
 	DBG(assert(!diag_rep_.has_error()
 		&& "emplace on errored result silently drops the value");)
+	if constexpr (std::is_pointer_v<T>) {
+		if (v == nullptr) {
+			error(code::invalid_argument, "null pointer value");
+			static T null_value{};
+			return null_value;
+		}
+	}
 	value_.emplace(std::move(v));
 	this->enforce_error_no_value_invariant();
 	return value();
@@ -824,6 +850,14 @@ template <typename... Args>
 T& result<T>::emplace(Args&&... args) {
 	DBG(assert(!diag_rep_.has_error()
 		&& "emplace on errored result silently drops the value");)
+	if constexpr (std::is_pointer_v<T> && sizeof...(Args) == 1) {
+		auto&& only_arg = (args, ...);
+		if (only_arg == nullptr) {
+			error(code::invalid_argument, "null pointer value");
+			static T null_value{};
+			return null_value;
+		}
+	}
 	value_.emplace(std::forward<Args>(args)...);
 	this->enforce_error_no_value_invariant();
 	return value();
@@ -832,6 +866,12 @@ T& result<T>::emplace(Args&&... args) {
 template <typename T>
 template <typename U>
 result<T>& result<T>::operator=(U&& v) {
+	if constexpr (std::is_pointer_v<T>) {
+		if (v == nullptr) {
+			error(code::invalid_argument, "null pointer value");
+			return *this;
+		}
+	}
 	DBG(assert(!diag_rep_.has_error()
 		&& "assigning to an errored result silently drops the value");)
 	value_.emplace(std::forward<U>(v));
@@ -896,14 +936,8 @@ typename result<T>::diagnostics_report&& result<T>::report() && {
 }
 
 template <typename T>
-void result<T>::ensure_report_root() {
-	if (diag_rep_.nodes().empty()) diag_rep_.reset("root");
-}
-
-template <typename T>
 void result<T>::error(code c, std::string_view msg, int_t primary,
 		      std::initializer_list<attr> extra) {
-	ensure_report_root();
 	diag_rep_.error(c, msg, primary, extra);
 	this->enforce_error_no_value_invariant();
 }
@@ -911,7 +945,6 @@ void result<T>::error(code c, std::string_view msg, int_t primary,
 template <typename T>
 void result<T>::error(code c, std::string_view msg, size_t primary,
 		      std::initializer_list<attr> extra) {
-	ensure_report_root();
 	diag_rep_.error(c, msg, primary, extra);
 	this->enforce_error_no_value_invariant();
 }
@@ -919,28 +952,24 @@ void result<T>::error(code c, std::string_view msg, size_t primary,
 template <typename T>
 void result<T>::warning(std::string_view msg, int_t primary,
 			std::initializer_list<attr> extra) {
-	ensure_report_root();
 	diag_rep_.warning(msg, primary, extra);
 }
 
 template <typename T>
 void result<T>::warning(std::string_view msg, size_t primary,
 			std::initializer_list<attr> extra) {
-	ensure_report_root();
 	diag_rep_.warning(msg, primary, extra);
 }
 
 template <typename T>
 void result<T>::info(std::string_view msg, int_t primary,
 		     std::initializer_list<attr> extra) {
-	ensure_report_root();
 	diag_rep_.info(msg, primary, extra);
 }
 
 template <typename T>
 void result<T>::info(std::string_view msg, size_t primary,
 		     std::initializer_list<attr> extra) {
-	ensure_report_root();
 	diag_rep_.info(msg, primary, extra);
 }
 
@@ -1087,6 +1116,18 @@ auto result<T>::step(bool enable, std::string_view name, F&& f)
 }
 
 template <typename T>
+template <typename F>
+auto result<T>::measure(report::key name, F&& f) -> decltype(f()) {
+	return diag_rep_.measure(name, std::forward<F>(f));
+}
+
+template <typename T>
+template <typename F>
+auto result<T>::measure(std::string_view name, F&& f) -> decltype(f()) {
+	return diag_rep_.measure(name, std::forward<F>(f));
+}
+
+template <typename T>
 void result<T>::append(typename result<T>::diagnostics_report&& child) {
 	diag_rep_.append(std::move(child));
 	this->enforce_error_no_value_invariant();
@@ -1112,6 +1153,27 @@ std::optional<U> result<T>::merge_take(result<U>&& child) {
 	std::optional<U> v;
 	if (child.has_value()) v = std::move(child).value();
 	merge(std::move(child));
+	return v;
+}
+
+template <typename T>
+template <typename U>
+std::optional<U> result<T>::take_or_error(result<U>&& child,
+	code c, std::string_view msg)
+{
+	const bool child_well_formed = child.is_well_formed();
+
+	std::optional<U> v;
+	if (child.has_value())
+		v.emplace(std::move(child).value());
+
+	merge(std::move(child));
+
+	// Child errors already propagated through merge(). Only synthesize an
+	// error for the malformed child state: no value and no error.
+	if (!v && !child_well_formed && !has_error())
+		error(c, msg);
+
 	return v;
 }
 
@@ -1145,13 +1207,10 @@ result<T> error(code c, std::string_view msg, size_t primary,
 
 template <typename T, typename U>
 result<T> forward_as(result<U>&& src, T value) {
-	if (!src.has_value()) {
-		auto rep = std::move(src).report();
-		return result<T>(std::move(rep));
-	}
-	result<T> r(std::move(value));
-	auto rep = std::move(src).report();
-	r.append(std::move(rep));
+	const bool ok = src.has_value();
+	result<T> r;
+	if (ok) r = std::move(value);
+	r.append(std::move(src).report());
 	return r;
 }
 

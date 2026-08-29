@@ -53,6 +53,7 @@ endif()
 enable_testing()
 
 set(DOCTESTS
+	diagnostics
 	escapes
 	input
 	measure

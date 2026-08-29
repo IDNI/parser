@@ -155,6 +155,10 @@ struct report {
 		// without a stricter contract. Move-construct alone covers our uses.
 		scope_guard& operator=(scope_guard&&)      = delete;
 		~scope_guard();
+
+		/// Finalize the scope now instead of at destruction. Idempotent:
+		/// the destructor calls this too.
+		void close();
 	private:
 		report*                r_     = nullptr;
 		int32_t                idx_   = -1;
@@ -188,6 +192,13 @@ struct report {
 	auto step(bool enable, key name, F&& f) -> decltype(f());
 	template <typename F>
 	auto step(bool enable, std::string_view name, F&& f) -> decltype(f());
+
+	/// Sugar for @c step(true, name, f) — an always-enabled timed scope
+	/// around @p f, closed before this call returns.
+	template <typename F>
+	auto measure(key name, F&& f) -> decltype(f());
+	template <typename F>
+	auto measure(std::string_view name, F&& f) -> decltype(f());
 
 	/// Drop nodes and attrs and push a fresh root. Keeps interned
 	/// dynamic strings so re-interning the same name across resets is
@@ -382,7 +393,7 @@ struct result {
 
 	explicit operator bool() const;
 
-	operator T() const
+	explicit operator T() const
 		requires std::is_pointer_v<T>;
 
 	bool operator==(std::nullptr_t) const
@@ -490,6 +501,12 @@ struct result {
 	template <typename F>
 	auto step(bool enable, std::string_view name, F&& f) -> decltype(f());
 
+	/// Sugar for @c step(true, name, f).
+	template <typename F>
+	auto measure(report::key name, F&& f) -> decltype(f());
+	template <typename F>
+	auto measure(std::string_view name, F&& f) -> decltype(f());
+
 	void append(diagnostics_report&& child);
 
 	/// Merge a child @ref result's report into this one. The child's value
@@ -508,8 +525,14 @@ struct result {
 	template <typename U>
 	[[nodiscard]] std::optional<U> merge_take(result<U>&& child);
 
+	/// Like @ref merge_take, but synthesizes @p c / @p msg on this result
+	/// when @p child is malformed (neither value nor error) after the
+	/// merge — the ordinary error/value cases pass through unchanged.
+	template <typename U>
+	[[nodiscard]] std::optional<U> take_or_error(result<U>&& child,
+		code c, std::string_view msg);
+
 private:
-	void ensure_report_root();
 	void enforce_error_no_value_invariant();
 
 	std::optional<T> value_ {};
