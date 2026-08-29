@@ -346,7 +346,14 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		"inline idni::prods<char_type, terminal_type>& productions() {\n"
 			<< productions_body <<
 		"}\n";
-	else os << "idni::prods<char_type, terminal_type>& productions();\n";
+	else os <<
+		"#ifdef TAU_PARSER_BUILD_HEADER_ONLY\n"
+		"inline idni::prods<char_type, terminal_type>& productions() {\n"
+			<< productions_body <<
+		"}\n"
+		"#else\n"
+		"idni::prods<char_type, terminal_type>& productions();\n"
+		"#endif\n";
 
 	os <<	"\n"
 		"inline ::idni::grammar<char_type, terminal_type> grammar(\n"
@@ -396,14 +403,20 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		"// productions() lives here so the table is compiled once, "
 			"not per TU.\n"
 		"//\n"
+		// parser.h first, so its guard opens before this header's
+		// does: tgf.h re-includes this header, and if this header's
+		// guard opens first that nested include short-circuits early
+		"#include \"parser.h\"\n"
 		"#include \"" << opt.output << "\"\n"
 		"\n";
 	if (opt.ns.size()) cs << "namespace " << opt.ns << " {\n\n";
 	cs <<	"namespace " << opt.name << "_data {\n"
 		"\n"
+		"#ifndef TAU_PARSER_BUILD_HEADER_ONLY\n"
 		"idni::prods<char_type, terminal_type>& productions() {\n"
 			<< productions_body <<
 		"}\n"
+		"#endif\n"
 		"\n"
 		"} // namespace " << opt.name << "_data\n";
 	if (opt.ns.size()) cs << "\n} // " << opt.ns << " namespace\n";

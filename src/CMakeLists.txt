@@ -39,6 +39,7 @@ set(TAU_PARSER_HEADERS
 
 set(TAU_PARSER_SOURCES
 	parser.cpp
+	format/tgf/tgf_parser.generated.cpp
 )
 
 set(TAU_PARSER_LIBS unordered_dense)

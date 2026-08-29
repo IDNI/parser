@@ -1,93 +1,15 @@
 // This file is generated from a file src/format/tgf/tgf.tgf by
 //       https://github.com/IDNI/parser/src/tgf
 //
-#ifndef __TGF_PARSER_H__
-#define __TGF_PARSER_H__
-
+// productions() lives here so the table is compiled once, not per TU.
+//
 #include "parser.h"
-#include "recoders.h"
+#include "tgf_parser.generated.h"
 
 namespace tgf_parser_data {
 
-using char_type     = char;
-using terminal_type = char32_t;
-
-inline static constexpr size_t nt_bits = 8;
-inline const std::vector<std::string> symbol_names{
-	"", "eof", "alnum", "alpha", "space", "printable", "xdigit", "__", "_", "sep", 
-	"sym", "cc_name", "escaped_s", "unescaped_s", "escaped_c", "unescaped_c", "terminal_hex", "hex_bytes", "syms", "dynamic_decls", 
-	"dynamic_values", "escape_char", "esc_hex", "esc_u4", "esc_U8", "start", "__E_start_0", "statement", "__E_start_1", "directive", 
-	"production", "start_statement", "__E_production_2", "production_guard", "alternation", "conjunction", "__E_alternation_3", "__E_alternation_4", "concatenation", "__E_conjunction_5", 
-	"__E_conjunction_6", "factor", "__E_concatenation_7", "__E_concatenation_8", "shorthand_rule", "__E_factor_9", "optional", "__E_factor_10", "term", "repeat", 
-	"__E_factor_11", "none_or_repeat", "__E_factor_12", "neg", "__E_factor_13", "group", "__E_term_14", "optional_group", "__E_term_15", "repeat_group", 
-	"__E_term_16", "terminal", "terminal_char", "terminal_string", "__E_terminal_hex_17", "__E___E_terminal_hex_17_18", "__E___E_terminal_hex_17_19", "__E_sym_20", "__E_sym_21", "__E_sym_22", 
-	"__E_terminal_char_23", "__E_unescaped_c_24", "__E_escaped_c_25", "__E_terminal_string_26", "__E_terminal_string_27", "__E_unescaped_s_28", "__E_escaped_s_29", "__E_esc_hex_30", "__E_esc_hex_31", "directive_body", 
-	"start_dir", "__E_directive_body_32", "inline_dir", "__E_directive_body_33", "inline_arg", "__E___E_directive_body_33_34", "__E___E_directive_body_33_35", "trim_children_dir", "__E_directive_body_36", "trim_children_terminals_dir", 
-	"__E_directive_body_37", "trim_all_terminals_dir", "__E_directive_body_38", "__E___E_directive_body_38_39", "__E___E___E_directive_body_38_39_40", "trim_dir", "__E_directive_body_41", "use_dir", "__E_directive_body_42", "use_from", 
-	"cc_sym", "use_param", "__E___E_directive_body_42_43", "__E___E_directive_body_42_44", "disable_ad_dir", "__E_directive_body_45", "__E___E_directive_body_45_46", "__E___E_directive_body_45_47", "enable_prods_dir", "__E_directive_body_48", 
-	"ambiguous_dir", "__E_directive_body_49", "dynamic_dir", "__E_directive_body_50", "__E_syms_51", "__E_syms_52", "dynamic_decl", "__E_dynamic_decls_53", "__E_dynamic_decls_54", "dynamic_name", 
-	"__E_dynamic_decl_55", "dynamic_value", "__E_dynamic_values_56", "__E_dynamic_values_57", "tree_path", "__E_inline_arg_58", "__E___E_inline_arg_58_59", "__E_tree_path_60", "__E_tree_path_61", "__E_use_param_62", 
-	"__E_sep_63", "sep_required", "comment", "__E_comment_64", "__E_comment_65", "__E_comment_66", "__N_0", "__N_1", 
-};
-
-inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
-
-inline std::vector<terminal_type> terminals{
-	U'\0', U'[', U']', U'=', U'>', U'.', U'|', U'&', U':', 
-	U'?', U'+', U'*', U'~', U'(', U')', U'{', U'}', U'0', U'x', 
-	U'_', U'\'', U'\\', U'"', U'a', U'b', U'f', U'n', U'r', U't', 
-	U'v', U'/', U'X', U'u', U'U', U'@', U's', U',', U'i', U'l', 
-	U'e', U'm', U'c', U'h', U'd', U'o', U'p', U'g', U'y', U';', 
-	U'k', U'w', U'-', U'\t', U'\r', U'\n', U'#', 
-};
-
-inline ::idni::char_class_fns<terminal_type> char_classes =
-	::idni::predefined_char_classes<char_type, terminal_type>({
-		"eof",
-		"alnum",
-		"alpha",
-		"space",
-		"printable",
-		"xdigit",
-	}, nts);
-
-inline struct ::idni::grammar<char_type, terminal_type>::options
-	grammar_options
-{
-	.transform_negation = false,
-	.auto_disambiguate = true,
-	.shaping = {
-		.to_trim = {
-			7, 8, 9
-		},
-		.trim_terminals = true,
-		.dont_trim_terminals_of = {
-			10, 11, 12, 13, 14, 15, 16, 17
-		},
-		.to_inline = {
-			{ 18 },
-			{ 19 },
-			{ 20 },
-			{ 21 },
-			{ 22 },
-			{ 23 },
-			{ 24 }
-		},
-		.inline_char_classes = true
-	}
-};
-
-inline auto make_parser_options() {
-	auto o = ::idni::default_parser_options<char_type, terminal_type>();
-	o.codec.decode = idni::utf8_to_u32_conv;
-	o.codec.encode = idni::u32_to_utf8_conv;
-	return o;
-}
-
-inline ::idni::prods<char_type, terminal_type> start_symbol{ nts(25) };
-
-#ifdef TAU_PARSER_BUILD_HEADER_ONLY
-inline idni::prods<char_type, terminal_type>& productions() {
+#ifndef TAU_PARSER_BUILD_HEADER_ONLY
+idni::prods<char_type, terminal_type>& productions() {
 	static bool loaded = false;
 	static idni::prods<char_type, terminal_type>
 		p, nul(idni::lit<char_type, terminal_type>{});
@@ -542,51 +464,6 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	#undef NT
 	return loaded = true, p;
 }
-#else
-idni::prods<char_type, terminal_type>& productions();
 #endif
 
-inline ::idni::grammar<char_type, terminal_type> grammar(
-	nts, productions(), start_symbol, char_classes, grammar_options);
-
 } // namespace tgf_parser_data
-
-struct tgf_parser_nonterminals {
-	enum nonterminal {
-		nul, eof, alnum, alpha, space, printable, xdigit, __, _, sep, 
-		sym, cc_name, escaped_s, unescaped_s, escaped_c, unescaped_c, terminal_hex, hex_bytes, syms, dynamic_decls, 
-		dynamic_values, escape_char, esc_hex, esc_u4, esc_U8, start, __E_start_0, statement, __E_start_1, directive, 
-		production, start_statement, __E_production_2, production_guard, alternation, conjunction, __E_alternation_3, __E_alternation_4, concatenation, __E_conjunction_5, 
-		__E_conjunction_6, factor, __E_concatenation_7, __E_concatenation_8, shorthand_rule, __E_factor_9, optional, __E_factor_10, term, repeat, 
-		__E_factor_11, none_or_repeat, __E_factor_12, neg, __E_factor_13, group, __E_term_14, optional_group, __E_term_15, repeat_group, 
-		__E_term_16, terminal, terminal_char, terminal_string, __E_terminal_hex_17, __E___E_terminal_hex_17_18, __E___E_terminal_hex_17_19, __E_sym_20, __E_sym_21, __E_sym_22, 
-		__E_terminal_char_23, __E_unescaped_c_24, __E_escaped_c_25, __E_terminal_string_26, __E_terminal_string_27, __E_unescaped_s_28, __E_escaped_s_29, __E_esc_hex_30, __E_esc_hex_31, directive_body, 
-		start_dir, __E_directive_body_32, inline_dir, __E_directive_body_33, inline_arg, __E___E_directive_body_33_34, __E___E_directive_body_33_35, trim_children_dir, __E_directive_body_36, trim_children_terminals_dir, 
-		__E_directive_body_37, trim_all_terminals_dir, __E_directive_body_38, __E___E_directive_body_38_39, __E___E___E_directive_body_38_39_40, trim_dir, __E_directive_body_41, use_dir, __E_directive_body_42, use_from, 
-		cc_sym, use_param, __E___E_directive_body_42_43, __E___E_directive_body_42_44, disable_ad_dir, __E_directive_body_45, __E___E_directive_body_45_46, __E___E_directive_body_45_47, enable_prods_dir, __E_directive_body_48, 
-		ambiguous_dir, __E_directive_body_49, dynamic_dir, __E_directive_body_50, __E_syms_51, __E_syms_52, dynamic_decl, __E_dynamic_decls_53, __E_dynamic_decls_54, dynamic_name, 
-		__E_dynamic_decl_55, dynamic_value, __E_dynamic_values_56, __E_dynamic_values_57, tree_path, __E_inline_arg_58, __E___E_inline_arg_58_59, __E_tree_path_60, __E_tree_path_61, __E_use_param_62, 
-		__E_sep_63, sep_required, comment, __E_comment_64, __E_comment_65, __E_comment_66, __N_0, __N_1, 
-	};
-};
-
-struct tgf_parser : public idni::parser<char, char32_t>, public tgf_parser_nonterminals {
-	static tgf_parser& instance() {
-		static tgf_parser inst;
-		return inst;
-	}
-	tgf_parser() : idni::parser<char_type, terminal_type>(
-		tgf_parser_data::grammar,
-		tgf_parser_data::make_parser_options()) {}
-	size_t id(const std::basic_string<char_type>& name) {
-		return tgf_parser_data::nts.get(name);
-	}
-	const std::basic_string<char_type>& name(size_t id) {
-		return tgf_parser_data::nts.get(id);
-	}
-	symbol_type literal(const nonterminal& nt) {
-		return symbol_type(nt, &tgf_parser_data::nts);
-	}
-};
-
-#endif // __TGF_PARSER_H__

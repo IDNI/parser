@@ -11,6 +11,7 @@ option(WITH_THREADS "use Threads" FALSE)
 
 set(JSLIB_SOURCES
 	../src/parser.cpp
+	../src/format/tgf/tgf_parser.generated.cpp
         embindings.cpp
 )
 
