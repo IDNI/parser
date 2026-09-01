@@ -14,6 +14,8 @@ set(TAU_PARSER_HEADERS
 	recoders.h
 	format/tgf/tgf.h
 	format/tgf/tgf_parser.generated.h
+	format/json/json.h
+	format/json/json_parser.generated.h
 	version_license.h
 	utility/characters.h
 	utility/characters.impl.h
@@ -40,6 +42,7 @@ set(TAU_PARSER_HEADERS
 set(TAU_PARSER_SOURCES
 	parser.cpp
 	format/tgf/tgf_parser.generated.cpp
+	format/json/json_parser.generated.cpp
 )
 
 set(TAU_PARSER_LIBS unordered_dense)

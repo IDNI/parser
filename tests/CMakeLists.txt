@@ -56,6 +56,7 @@ set(DOCTESTS
 	diagnostics
 	escapes
 	input
+	json
 	measure
 	tree
 	tree_traversal1
