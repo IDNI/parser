@@ -716,7 +716,8 @@ parser<C, T>::result parser<C, T>::_parse() {
 	// fromS is only read by GC drain and conjunctive cascade machinery.
 	// Skip every write for non-conjunctive grammars with GC off.
 	need_fromS = po.enable_gc || any_conj;
-	S.clear(), U.clear(), fromS.clear(), bin_tnt.clear(), refi.clear(),
+	S.clear(), U.clear(), snapshot_.clear(), fromS.clear(),
+		bin_tnt.clear(), refi.clear(),
 		cache.clear(), gcready.clear(), sorted_citem.clear(),
 		rsorted_citem.clear(), completion_deps.clear(),
 		completion_count.clear(), complete_memo.clear(),
@@ -768,19 +769,19 @@ parser<C, T>::result parser<C, T>::_parse() {
 				}
 			}
 			t.clear();
-			const auto cont = S[n];
-			//DBGP(print(std::cout << "\nto process:\n", cont);)
-			for (auto it = cont.begin(); it != cont.end(); ++it) {
+			snapshot_.assign(S[n].begin(), S[n].end());
+			//DBGP(print(std::cout << "\nto process:\n", snapshot_);)
+			for (const item& x : snapshot_) {
 				DBGP(print(std::cout << "----------------------"
 					"-----------------\n... processing ("
 					<< lproc++ << " / " << proc++ << ")" <<
-					" at S[" << n << "]: \t", *it) << "\n";)
-				if (completed(*it)) complete(*it, t, c);
-				else if (get_lit(*it).nt()) {
-					if (g.is_cc_fn(get_lit(*it).n()))
-						scan_cc_function(*it, n, ch, c);
-					else predict(*it, t);
-				} else scan(*it, n, ch);
+					" at S[" << n << "]: \t", x) << "\n";)
+				if (completed(x)) complete(x, t, c);
+				else if (get_lit(x).nt()) {
+					if (g.is_cc_fn(get_lit(x).n()))
+						scan_cc_function(x, n, ch, c);
+					else predict(x, t);
+				} else scan(x, n, ch);
 			}
 			//DBGP(print_S(std::cout << "S loop:\n") << "\n";)
 			//DBGP(print(std::cout << "t loop:\n", t) << "\n";)

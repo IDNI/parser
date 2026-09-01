@@ -1209,6 +1209,8 @@ private:
 	error get_error();
 	std::vector<container_t> S;
 	std::vector<container_t> U; /// uncompleted
+	/// reused across fixpoint iterations so the item snapshot allocates once
+	std::vector<item> snapshot_ = {};
 		///mapping from to position of end in S for items
 	ankerl::unordered_dense::map<size_t,
 		ankerl::unordered_dense::set<size_t>> fromS;
