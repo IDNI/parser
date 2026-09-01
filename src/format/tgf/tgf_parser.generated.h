@@ -98,8 +98,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(26), (NT(8)+NT(27)));
 //G1:   __E_start_1(28)      => null.
 	p(NT(28), (nul));
-//G2:   __E_start_1(28)      => __E_start_0(26) __E_start_1(28).
-	p(NT(28), (NT(26)+NT(28)));
+//G2:   __E_start_1(28)      => __E_start_1(28) __E_start_0(26).
+	p(NT(28), (NT(28)+NT(26)));
 //G3:   start(25)            => __E_start_1(28) _(8).
 	p(NT(25), (NT(28)+NT(8)));
 //G4:   statement(27)        => directive(29).
@@ -120,24 +120,24 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(36), (NT(8)+T(6)+NT(8)+NT(35)));
 //G12:  __E_alternation_4(37) => null.
 	p(NT(37), (nul));
-//G13:  __E_alternation_4(37) => __E_alternation_3(36) __E_alternation_4(37).
-	p(NT(37), (NT(36)+NT(37)));
+//G13:  __E_alternation_4(37) => __E_alternation_4(37) __E_alternation_3(36).
+	p(NT(37), (NT(37)+NT(36)));
 //G14:  alternation(34)      => conjunction(35) __E_alternation_4(37).
 	p(NT(34), (NT(35)+NT(37)));
 //G15:  __E_conjunction_5(39) => _(8) '&' _(8) concatenation(38).
 	p(NT(39), (NT(8)+T(7)+NT(8)+NT(38)));
 //G16:  __E_conjunction_6(40) => null.
 	p(NT(40), (nul));
-//G17:  __E_conjunction_6(40) => __E_conjunction_5(39) __E_conjunction_6(40).
-	p(NT(40), (NT(39)+NT(40)));
+//G17:  __E_conjunction_6(40) => __E_conjunction_6(40) __E_conjunction_5(39).
+	p(NT(40), (NT(40)+NT(39)));
 //G18:  conjunction(35)      => concatenation(38) __E_conjunction_6(40).
 	p(NT(35), (NT(38)+NT(40)));
 //G19:  __E_concatenation_7(42) => __(7) factor(41).
 	p(NT(42), (NT(7)+NT(41)));
 //G20:  __E_concatenation_8(43) => null.
 	p(NT(43), (nul));
-//G21:  __E_concatenation_8(43) => __E_concatenation_7(42) __E_concatenation_8(43).
-	p(NT(43), (NT(42)+NT(43)));
+//G21:  __E_concatenation_8(43) => __E_concatenation_8(43) __E_concatenation_7(42).
+	p(NT(43), (NT(43)+NT(42)));
 //G22:  concatenation(38)    => factor(41) __E_concatenation_8(43).
 	p(NT(38), (NT(41)+NT(43)));
 //G23:  __E_factor_9(45)     => factor(41) _(8) ':' sym(10).
@@ -206,8 +206,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(65), (NT(6)+NT(6)));
 //G55:  __E___E_terminal_hex_17_19(66) => __E___E_terminal_hex_17_18(65).
 	p(NT(66), (NT(65)));
-//G56:  __E___E_terminal_hex_17_19(66) => __E___E_terminal_hex_17_18(65) __E___E_terminal_hex_17_19(66).
-	p(NT(66), (NT(65)+NT(66)));
+//G56:  __E___E_terminal_hex_17_19(66) => __E___E_terminal_hex_17_19(66) __E___E_terminal_hex_17_18(65).
+	p(NT(66), (NT(66)+NT(65)));
 //G57:  __E_terminal_hex_17(64) => __E___E_terminal_hex_17_19(66).
 	p(NT(64), (NT(66)));
 //G58:  hex_bytes(17)        => __E_terminal_hex_17(64).
@@ -224,8 +224,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(68), (T(19)));
 //G64:  __E_sym_22(69)       => null.
 	p(NT(69), (nul));
-//G65:  __E_sym_22(69)       => __E_sym_21(68) __E_sym_22(69).
-	p(NT(69), (NT(68)+NT(69)));
+//G65:  __E_sym_22(69)       => __E_sym_22(69) __E_sym_21(68).
+	p(NT(69), (NT(69)+NT(68)));
 //G66:  sym(10)              => __E_sym_20(67) __E_sym_22(69).
 	p(NT(10), (NT(67)+NT(69)));
 //G67:  __E_terminal_char_23(70) => unescaped_c(15).
@@ -254,8 +254,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(73), (NT(12)));
 //G79:  __E_terminal_string_27(74) => null.
 	p(NT(74), (nul));
-//G80:  __E_terminal_string_27(74) => __E_terminal_string_26(73) __E_terminal_string_27(74).
-	p(NT(74), (NT(73)+NT(74)));
+//G80:  __E_terminal_string_27(74) => __E_terminal_string_27(74) __E_terminal_string_26(73).
+	p(NT(74), (NT(74)+NT(73)));
 //G81:  terminal_string(63)  => '"' __E_terminal_string_27(74) '"'.
 	p(NT(63), (T(22)+NT(74)+T(22)));
 //G82:  __E_unescaped_s_28(75) => '"'.
@@ -322,8 +322,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(85), (NT(8)+T(36)+NT(8)+NT(84)));
 //G113: __E___E_directive_body_33_35(86) => null.
 	p(NT(86), (nul));
-//G114: __E___E_directive_body_33_35(86) => __E___E_directive_body_33_34(85) __E___E_directive_body_33_35(86).
-	p(NT(86), (NT(85)+NT(86)));
+//G114: __E___E_directive_body_33_35(86) => __E___E_directive_body_33_35(86) __E___E_directive_body_33_34(85).
+	p(NT(86), (NT(86)+NT(85)));
 //G115: __E_directive_body_33(83) => 'i' 'n' 'l' 'i' 'n' 'e' __(7) inline_arg(84) __E___E_directive_body_33_35(86).
 	p(NT(83), (T(37)+T(26)+T(38)+T(37)+T(26)+T(39)+NT(7)+NT(84)+NT(86)));
 //G116: inline_dir(82)       => __E_directive_body_33(83).
@@ -368,8 +368,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(102), (NT(8)+T(36)+NT(8)+NT(101)));
 //G136: __E___E_directive_body_42_44(103) => null.
 	p(NT(103), (nul));
-//G137: __E___E_directive_body_42_44(103) => __E___E_directive_body_42_43(102) __E___E_directive_body_42_44(103).
-	p(NT(103), (NT(102)+NT(103)));
+//G137: __E___E_directive_body_42_44(103) => __E___E_directive_body_42_44(103) __E___E_directive_body_42_43(102).
+	p(NT(103), (NT(103)+NT(102)));
 //G138: __E_directive_body_42(98) => 'u' 's' 'e' __(7) use_from(99) __(7) use_param(101) __E___E_directive_body_42_44(103).
 	p(NT(98), (T(32)+T(35)+T(39)+NT(7)+NT(99)+NT(7)+NT(101)+NT(103)));
 //G139: use_dir(97)          => __E_directive_body_42(98).
@@ -412,16 +412,16 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(114), (NT(8)+T(36)+NT(8)+NT(10)));
 //G158: __E_syms_52(115)     => null.
 	p(NT(115), (nul));
-//G159: __E_syms_52(115)     => __E_syms_51(114) __E_syms_52(115).
-	p(NT(115), (NT(114)+NT(115)));
+//G159: __E_syms_52(115)     => __E_syms_52(115) __E_syms_51(114).
+	p(NT(115), (NT(115)+NT(114)));
 //G160: syms(18)             => sym(10) __E_syms_52(115).
 	p(NT(18), (NT(10)+NT(115)));
 //G161: __E_dynamic_decls_53(117) => _(8) ';' _(8) dynamic_decl(116).
 	p(NT(117), (NT(8)+T(48)+NT(8)+NT(116)));
 //G162: __E_dynamic_decls_54(118) => null.
 	p(NT(118), (nul));
-//G163: __E_dynamic_decls_54(118) => __E_dynamic_decls_53(117) __E_dynamic_decls_54(118).
-	p(NT(118), (NT(117)+NT(118)));
+//G163: __E_dynamic_decls_54(118) => __E_dynamic_decls_54(118) __E_dynamic_decls_53(117).
+	p(NT(118), (NT(118)+NT(117)));
 //G164: dynamic_decls(19)    => dynamic_decl(116) __E_dynamic_decls_54(118).
 	p(NT(19), (NT(116)+NT(118)));
 //G165: dynamic_name(119)    => sym(10).
@@ -436,8 +436,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(122), (NT(8)+T(36)+NT(8)+NT(121)));
 //G170: __E_dynamic_values_57(123) => null.
 	p(NT(123), (nul));
-//G171: __E_dynamic_values_57(123) => __E_dynamic_values_56(122) __E_dynamic_values_57(123).
-	p(NT(123), (NT(122)+NT(123)));
+//G171: __E_dynamic_values_57(123) => __E_dynamic_values_57(123) __E_dynamic_values_56(122).
+	p(NT(123), (NT(123)+NT(122)));
 //G172: dynamic_values(20)   => dynamic_value(121) __E_dynamic_values_57(123).
 	p(NT(20), (NT(121)+NT(123)));
 //G173: dynamic_value(121)   => sym(10).
@@ -460,8 +460,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(127), (NT(8)+T(4)+NT(8)+NT(10)));
 //G182: __E_tree_path_61(128) => null.
 	p(NT(128), (nul));
-//G183: __E_tree_path_61(128) => __E_tree_path_60(127) __E_tree_path_61(128).
-	p(NT(128), (NT(127)+NT(128)));
+//G183: __E_tree_path_61(128) => __E_tree_path_61(128) __E_tree_path_60(127).
+	p(NT(128), (NT(128)+NT(127)));
 //G184: tree_path(124)       => sym(10) __E_tree_path_61(128).
 	p(NT(124), (NT(10)+NT(128)));
 //G185: __E_use_param_62(129) => 'e' 'o' 'f'.
@@ -528,8 +528,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(133), (T(52)));
 //G216: __E_comment_65(134)  => null.
 	p(NT(134), (nul));
-//G217: __E_comment_65(134)  => __E_comment_64(133) __E_comment_65(134).
-	p(NT(134), (NT(133)+NT(134)));
+//G217: __E_comment_65(134)  => __E_comment_65(134) __E_comment_64(133).
+	p(NT(134), (NT(134)+NT(133)));
 //G218: __E_comment_66(135)  => '\r'.
 	p(NT(135), (T(53)));
 //G219: __E_comment_66(135)  => '\n'.

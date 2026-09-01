@@ -74,16 +74,16 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(14), (NT(15)+NT(8)+T(1)+NT(8)));
 //G1:   __E_start_1(16)      => null.
 	p(NT(16), (nul));
-//G2:   __E_start_1(16)      => __E_start_0(14) __E_start_1(16).
-	p(NT(16), (NT(14)+NT(16)));
+//G2:   __E_start_1(16)      => __E_start_1(16) __E_start_0(14).
+	p(NT(16), (NT(16)+NT(14)));
 //G3:   start(13)            => _(8) __E_start_1(16).
 	p(NT(13), (NT(8)+NT(16)));
 //G4:   __E_test_2(18)       => _(8) ',' _(8) test_string(17).
 	p(NT(18), (NT(8)+T(2)+NT(8)+NT(17)));
 //G5:   __E_test_3(19)       => null.
 	p(NT(19), (nul));
-//G6:   __E_test_3(19)       => __E_test_2(18) __E_test_3(19).
-	p(NT(19), (NT(18)+NT(19)));
+//G6:   __E_test_3(19)       => __E_test_3(19) __E_test_2(18).
+	p(NT(19), (NT(19)+NT(18)));
 //G7:   test(15)             => symbol(9) _(8) ':' _(8) test_string(17) __E_test_3(19).
 	p(NT(15), (NT(9)+NT(8)+T(3)+NT(8)+NT(17)+NT(19)));
 //G8:   __E_symbol_4(20)     => alpha(2).
@@ -96,8 +96,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(21), (T(4)));
 //G12:  __E_symbol_6(22)     => null.
 	p(NT(22), (nul));
-//G13:  __E_symbol_6(22)     => __E_symbol_5(21) __E_symbol_6(22).
-	p(NT(22), (NT(21)+NT(22)));
+//G13:  __E_symbol_6(22)     => __E_symbol_6(22) __E_symbol_5(21).
+	p(NT(22), (NT(22)+NT(21)));
 //G14:  symbol(9)            => __E_symbol_4(20) __E_symbol_6(22).
 	p(NT(9), (NT(20)+NT(22)));
 //G15:  test_string(17)      => quoted_string(23).
@@ -106,14 +106,14 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(17), (NT(10)));
 //G17:  __E_string_7(24)     => graph(5).
 	p(NT(24), (NT(5)));
-//G18:  __E_string_7(24)     => graph(5) __E_string_7(24).
-	p(NT(24), (NT(5)+NT(24)));
+//G18:  __E_string_7(24)     => __E_string_7(24) graph(5).
+	p(NT(24), (NT(24)+NT(5)));
 //G19:  string(10)           => __E_string_7(24).
 	p(NT(10), (NT(24)));
 //G20:  __E_quoted_string_8(26) => null.
 	p(NT(26), (nul));
-//G21:  __E_quoted_string_8(26) => quoted_string_char(25) __E_quoted_string_8(26).
-	p(NT(26), (NT(25)+NT(26)));
+//G21:  __E_quoted_string_8(26) => __E_quoted_string_8(26) quoted_string_char(25).
+	p(NT(26), (NT(26)+NT(25)));
 //G22:  quoted_string(23)    => '"' __E_quoted_string_8(26) '"'.
 	p(NT(23), (T(5)+NT(26)+T(5)));
 //G23:  quoted_string_char(25) => unescaped_s(11).
@@ -168,8 +168,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(33), (T(13)));
 //G48:  __E_comment_15(34)   => null.
 	p(NT(34), (nul));
-//G49:  __E_comment_15(34)   => __E_comment_14(33) __E_comment_15(34).
-	p(NT(34), (NT(33)+NT(34)));
+//G49:  __E_comment_15(34)   => __E_comment_15(34) __E_comment_14(33).
+	p(NT(34), (NT(34)+NT(33)));
 //G50:  __E_comment_16(35)   => '\r'.
 	p(NT(35), (T(14)));
 //G51:  __E_comment_16(35)   => '\n'.

@@ -92,8 +92,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(21), (NT(7)+T(1)+NT(7)+NT(20)));
 //G1:   __E___E_start_0_2(22) => null.
 	p(NT(22), (nul));
-//G2:   __E___E_start_0_2(22) => __E___E_start_0_1(21) __E___E_start_0_2(22).
-	p(NT(22), (NT(21)+NT(22)));
+//G2:   __E___E_start_0_2(22) => __E___E_start_0_2(22) __E___E_start_0_1(21).
+	p(NT(22), (NT(22)+NT(21)));
 //G3:   __E_start_0(19)      => statement(20) __E___E_start_0_2(22) _(7).
 	p(NT(19), (NT(20)+NT(22)+NT(7)));
 //G4:   __E_start_0(19)      => null.
@@ -362,8 +362,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(104), (T(27)));
 //G136: __E_parse_input_33(105) => __E_parse_input_32(104).
 	p(NT(105), (NT(104)));
-//G137: __E_parse_input_33(105) => __E_parse_input_32(104) __E_parse_input_33(105).
-	p(NT(105), (NT(104)+NT(105)));
+//G137: __E_parse_input_33(105) => __E_parse_input_33(105) __E_parse_input_32(104).
+	p(NT(105), (NT(105)+NT(104)));
 //G138: parse_input_char_seq(13) => __E_parse_input_33(105).
 	p(NT(13), (NT(105)));
 //G139: parse_input(45)      => parse_input_char_seq(13).
@@ -684,40 +684,40 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(162), (T(31)));
 //G297: __E_symbol_63(163)   => null.
 	p(NT(163), (nul));
-//G298: __E_symbol_63(163)   => __E_symbol_62(162) __E_symbol_63(163).
-	p(NT(163), (NT(162)+NT(163)));
+//G298: __E_symbol_63(163)   => __E_symbol_63(163) __E_symbol_62(162).
+	p(NT(163), (NT(163)+NT(162)));
 //G299: symbol(9)            => __E_symbol_61(161) __E_symbol_63(163).
 	p(NT(9), (NT(161)+NT(163)));
 //G300: __E_symbol_list_64(164) => _(7) ',' _(7) symbol(9).
 	p(NT(164), (NT(7)+T(32)+NT(7)+NT(9)));
 //G301: __E_symbol_list_65(165) => null.
 	p(NT(165), (nul));
-//G302: __E_symbol_list_65(165) => __E_symbol_list_64(164) __E_symbol_list_65(165).
-	p(NT(165), (NT(164)+NT(165)));
+//G302: __E_symbol_list_65(165) => __E_symbol_list_65(165) __E_symbol_list_64(164).
+	p(NT(165), (NT(165)+NT(164)));
 //G303: symbol_list(82)      => symbol(9) __E_symbol_list_65(165).
 	p(NT(82), (NT(9)+NT(165)));
 //G304: __E_treepath_66(167) => _(7) '>' _(7) symbol(9).
 	p(NT(167), (NT(7)+T(33)+NT(7)+NT(9)));
 //G305: __E_treepath_67(168) => null.
 	p(NT(168), (nul));
-//G306: __E_treepath_67(168) => __E_treepath_66(167) __E_treepath_67(168).
-	p(NT(168), (NT(167)+NT(168)));
+//G306: __E_treepath_67(168) => __E_treepath_67(168) __E_treepath_66(167).
+	p(NT(168), (NT(168)+NT(167)));
 //G307: treepath(166)        => symbol(9) __E_treepath_67(168).
 	p(NT(166), (NT(9)+NT(168)));
 //G308: __E_treepath_list_68(169) => _(7) ',' _(7) treepath(166).
 	p(NT(169), (NT(7)+T(32)+NT(7)+NT(166)));
 //G309: __E_treepath_list_69(170) => null.
 	p(NT(170), (nul));
-//G310: __E_treepath_list_69(170) => __E_treepath_list_68(169) __E_treepath_list_69(170).
-	p(NT(170), (NT(169)+NT(170)));
+//G310: __E_treepath_list_69(170) => __E_treepath_list_69(170) __E_treepath_list_68(169).
+	p(NT(170), (NT(170)+NT(169)));
 //G311: treepath_list(84)    => treepath(166) __E_treepath_list_69(170).
 	p(NT(84), (NT(166)+NT(170)));
 //G312: filename(48)         => quoted_string(10).
 	p(NT(48), (NT(10)));
 //G313: __E_quoted_string_70(172) => null.
 	p(NT(172), (nul));
-//G314: __E_quoted_string_70(172) => quoted_string_char(171) __E_quoted_string_70(172).
-	p(NT(172), (NT(171)+NT(172)));
+//G314: __E_quoted_string_70(172) => __E_quoted_string_70(172) quoted_string_char(171).
+	p(NT(172), (NT(172)+NT(171)));
 //G315: quoted_string(10)    => '"' __E_quoted_string_70(172) '"'.
 	p(NT(10), (T(34)+NT(172)+T(34)));
 //G316: quoted_string_char(171) => unescaped_s(11).
@@ -798,8 +798,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(181), (T(27)));
 //G354: __E_comment_79(182)  => null.
 	p(NT(182), (nul));
-//G355: __E_comment_79(182)  => __E_comment_78(181) __E_comment_79(182).
-	p(NT(182), (NT(181)+NT(182)));
+//G355: __E_comment_79(182)  => __E_comment_79(182) __E_comment_78(181).
+	p(NT(182), (NT(182)+NT(181)));
 //G356: __E_comment_80(183)  => '\r'.
 	p(NT(183), (T(39)));
 //G357: __E_comment_80(183)  => '\n'.
