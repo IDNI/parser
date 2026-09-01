@@ -211,7 +211,7 @@ int repl_ftxui<evaluator_t>::run_pipe() {
 		cout << line << "\n";
 		string full = acc.empty() ? line : acc + "\n" + line;
 		if (full.empty()) continue;
-		int ret = re_.eval(full);
+		int ret = re_.eval(full).value_or(0);
 		if (ret == 2) {
 			acc = std::move(full);
 			continue;
@@ -273,7 +273,7 @@ int repl_ftxui<evaluator_t>::run_interactive() {
 				out_redirect(std::cout, out_cap.rdbuf());
 			repl_ftxui_detail::scoped_stream_redirect
 				err_redirect(std::cerr, err_cap.rdbuf());
-			ret = re_.eval(text);
+			ret = re_.eval(text).value_or(0);
 		}
 		if (ret == 2) return ret; // caller decides
 		screen_->WithRestoredIO([&] {

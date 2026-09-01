@@ -288,6 +288,32 @@ TEST_SUITE("diagnostics: value_or") {
 	}
 }
 
+// Mirrors the recovery a REPL evaluator does for an incomplete-input status
+// code: a child report built from a failed parse still needs to reach the
+// caller, but the status code (a value) must survive the append.
+TEST_SUITE("diagnostics: append() after demote_errors_to_warnings()") {
+
+	TEST_CASE("append of an error report drops the value") {
+		result<int> res(2);
+		report child;
+		child.error(code::parse_error, "unexpected end of input");
+		res.append(std::move(child));
+		CHECK_FALSE(res.has_value());
+		CHECK(res.has_error());
+	}
+
+	TEST_CASE("demoting the child report before append keeps the value") {
+		result<int> res(2);
+		report child;
+		child.error(code::parse_error, "unexpected end of input");
+		child.demote_errors_to_warnings();
+		res.append(std::move(child));
+		CHECK(res.has_value());
+		CHECK_FALSE(res.has_error());
+		CHECK(std::move(res).value_or(-1) == 2);
+	}
+}
+
 TEST_SUITE("diagnostics: chained and_then().transform()") {
 
 	TEST_CASE("a two-step chain applies both steps and keeps report order") {

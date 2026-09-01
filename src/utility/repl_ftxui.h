@@ -23,8 +23,9 @@ struct repl_key_action {
 /// FTXUI-based REPL.
 ///
 /// Same api as `repl<evaluator_t>` (see repl.h):
-/// evaluator_t must provide `int eval(const std::string&)` returning
-/// 0 = ok, 1 = exit, 2 = incomplete, and a
+/// evaluator_t must provide `idni::diagnostics::result<int> eval(const std::string&)`,
+/// with a status code always carried as a value (0 = ok, 1 = exit,
+/// 2 = incomplete) and a valueless result meaning the command failed; and a
 /// `repl_ftxui<evaluator_t>* r_ftx` back-pointer (declare this struct a
 /// friend if it is private).
 ///

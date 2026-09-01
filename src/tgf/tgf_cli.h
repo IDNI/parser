@@ -110,8 +110,8 @@ struct tgf_repl_evaluator {
 	void set_repl(repl<tgf_repl_evaluator>& r_);
 	void reprompt();
 
-	int eval(const trv& n);
-	int eval(const std::string& src);
+	idni::diagnostics::result<int> eval(const trv& n);
+	idni::diagnostics::result<int> eval(const std::string& src);
 
 	void parse(const char* input, size_t size);
 	void parse(std::istream& instream);

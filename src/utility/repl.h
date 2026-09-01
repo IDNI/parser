@@ -19,10 +19,11 @@
 namespace idni {
 
 /// evaluator_t must be a class with:
-/// - a method int eval(const std::string&)
+/// - a method idni::diagnostics::result<int> eval(const std::string&)
 ///         which allows to plug own evaluation logic.
-///         The method should return 0 for normal operation
-///         1 if the repl should exit and 2 if the input was incomplete
+///         A status code is always a value: 0 for normal operation, 1 if
+///         the repl should exit, 2 if the input was incomplete. A
+///         valueless result means the command failed.
 /// - a member repl<evaluator_t>* r = 0; accessible to this struct
 ///         if r is private, add friend struct repl<evaluator_t>;
 template <typename evaluator_t>
@@ -115,7 +116,7 @@ struct repl {
 		print_input(), go(r, 0);
 	}
 	int evaluate(const std::string& s) {
-		auto ret = re_.eval(s);
+		auto ret = re_.eval(s).value_or(0);
 		TDBG(std::cerr << " <EVAL: " << ret << ">";)
 		if (ret == 2) { // Unexpected end of file, continue
 			input_.insert(input_.begin() + pos_ - 1, '\n');

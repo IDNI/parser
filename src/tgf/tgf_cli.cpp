@@ -766,7 +766,7 @@ static void help(size_t nt, bool show_load_reload) {
 	}
 }
 
-int tgf_repl_evaluator::eval(const tt& s) {
+idni::diagnostics::result<int> tgf_repl_evaluator::eval(const tt& s) {
 	using p = tgf_repl_parser;
 	const auto nt = s | tt::nonterminal;
 	auto _ = report.open_if(opt.measure || nt == p::parse_cmd,
@@ -877,15 +877,22 @@ int tgf_repl_evaluator::eval(const tt& s) {
 	}
 	default: cout << "error: unknown command\n"; break;
 	}
-	return ret;
+	return idni::diagnostics::result<int>(ret);
 }
 
-int tgf_repl_evaluator::eval(const string& src) {
+idni::diagnostics::result<int> tgf_repl_evaluator::eval(const string& src) {
 	static tgf_repl_parser rp;
 	int quit = 0;
 	auto r = rp.parse(src.c_str(), src.size());
 	if (!r.found) {
-		if (opt.continue_on_eof && r.parse_error.at_eof()) return 2;
+		if (opt.continue_on_eof && r.parse_error.at_eof()) {
+			// incomplete input is a recovery, not a failure: demote
+			// before append so the invariant does not drop the value
+			idni::diagnostics::result<int> res(2);
+			r.report().demote_errors_to_warnings();
+			res.append(std::move(r.report()));
+			return res;
+		}
 		report.append(std::move(r.report()));
 		flush_report();
 	} else {
@@ -899,14 +906,14 @@ int tgf_repl_evaluator::eval(const string& src) {
 		auto t = tt(ref);
 		auto statements = t || tgf_repl_parser::statement;
 		for (const auto& statement : statements()) {
-			quit = eval(statement | tt::only_child);
+			quit = eval(statement | tt::only_child).value_or(0);
 			flush_report();
-			if (quit == 1) return quit;
+			if (quit == 1) return idni::diagnostics::result<int>(quit);
 		}
 	}
 	cout << endl;
 	if (quit == 0) reprompt();
-	return quit;
+	return idni::diagnostics::result<int>(quit);
 }
 
 tgf_repl_evaluator::tgf_repl_evaluator(std::string tgf_file)
@@ -1138,7 +1145,9 @@ static int run_command(cli& cl, const cli::command& cmd,
 		};
 
 		if (auto eval = cmd.get<string>("evaluate"); eval.size())
-			return with_report_flush([&] { return re.eval(eval); });
+			return with_report_flush([&] {
+				return re.eval(eval).value_or(0);
+			});
 		if (cmd.get<bool>("legacy-repl"))
 			return with_report_flush(run_legacy);
 		return with_report_flush(run_default);
