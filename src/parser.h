@@ -57,8 +57,13 @@ struct nonterminals : public std::vector<std::basic_string<C>> {
 	lit<C, T> operator()(const std::basic_string<C>& s);
 	/// Returns a non-terminal literal by it's id.
 	lit<C, T> operator()(size_t n);
+	/// Identifies this table across the process-wide node store, so two
+	/// tables with an equal-id nonterminal do not hash as equal.
+	size_t id() const { return id_; }
 private:
 	std::map<std::basic_string<C>, size_t> m;
+	static size_t next_id() { static size_t counter = 0; return counter++; }
+	size_t id_ = next_id();
 };
 
 /// Literal containing terminal (c where if c = 0 then null) or nonterminal (n)
@@ -105,8 +110,10 @@ struct lit {
 	size_t hashit() const {
 		std::uint64_t seed = grcprime;
 		hash_combine(seed, static_cast<bool>(nt()));
-		if (nt()) hash_combine(seed, n());
-		else hash_combine(seed, t());
+		// hash what operator== compares: the table for a nonterminal,
+		// the null flag for a terminal
+		if (nt()) hash_combine(seed, n(), nts ? nts->id() : (size_t)0);
+		else hash_combine(seed, t(), is_null_);
 		return static_cast<size_t>(seed);
 	}
 
