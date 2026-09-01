@@ -1435,36 +1435,36 @@ void parser<C, T>::sbl_chd_forest(const item& eitem,
 		return;
 	}
 	// curchd.size() refers to index of cur literal to process in the rhs of production
-	pnode nxtl = { g[eitem.prod][eitem.con][curchd.size()], {} };
+	const lit<C, T>& nxtlit = g[eitem.prod][eitem.con][curchd.size()];
 	// set the span start/end of the terminal symbol
-	if (!nxtl.first.nt()) {
-		nxtl.second[0] = xfrom;
+	if (!nxtlit.nt()) {
+		size_t from = xfrom, to;
 		// for empty, use same span edge as from
-		if (nxtl.first.is_null()) nxtl.second[1] = xfrom;
+		if (nxtlit.is_null()) to = xfrom;
 		// ensure well-formed combination (matching input) early
 		else if (xfrom < in_->tpos()
-			 && in_->tat(xfrom) == nxtl.first.t())
-				nxtl.second[1] = ++xfrom;
+			 && in_->tat(xfrom) == nxtlit.t())
+				to = ++xfrom;
 		else // if not building the correction variation, prune this path quickly
 			return;
 		// build from the next in the line
 		size_t lastpos = curchd.size();
-		curchd.push_back(nxtl),
+		curchd.push_back(pnode(nxtlit, { from, to })),
 		sbl_chd_forest(eitem, curchd, xfrom, ambset);
 		curchd.erase(curchd.begin() + lastpos, curchd.end());
 	} else {
 		// get the from/to span of all non-terminals in the rhs of production.
-		nxtl.second[0] = xfrom;
+		size_t from = xfrom;
 
 		//auto& nxtl_froms = sorted_citem[nxtl.n()][xfrom];
-		auto& nxtl_froms = sorted_citem[{ nxtl.first.n(), xfrom }];
+		auto& nxtl_froms = sorted_citem[{ nxtlit.n(), xfrom }];
 		for (auto& v : nxtl_froms) {
 			// ignore beyond the span
 			if (v.set > eitem.set) continue;
 			// store current and recursively build for next nt
 			size_t lastpos = curchd.size();
-			nxtl.second[1] = v.set,
-			curchd.push_back(nxtl), xfrom = v.set,
+			curchd.push_back(pnode(nxtlit, { from, v.set })),
+			xfrom = v.set,
 			sbl_chd_forest(eitem, curchd, xfrom, ambset);
 			curchd.erase(curchd.begin() + lastpos, curchd.end());
 		}
@@ -1476,22 +1476,21 @@ bool parser<C, T>::binarize_comb(const item& eitem,
 {
 	std::vector<pnode> rcomb, lcomb;
 	if (eitem.dot < 1) return false;
-	pnode right = { g[eitem.prod][eitem.con][eitem.dot - 1], {} };
-	if (!right.first.nt()) {
-		right.second[1] = eitem.set;
-		if (right.first.is_null())
-			right.second[0] = right.second[1];
-		else if (in_->tat(eitem.set - 1) == right.first.t())
-			right.second[0] = eitem.set - 1;
+	const lit<C, T>& rightlit = g[eitem.prod][eitem.con][eitem.dot - 1];
+	if (!rightlit.nt()) {
+		size_t rto = eitem.set, rfrom;
+		if (rightlit.is_null())
+			rfrom = rto;
+		else if (in_->tat(eitem.set - 1) == rightlit.t())
+			rfrom = eitem.set - 1;
 		else return false;
-		rcomb.emplace_back(right);
+		rcomb.emplace_back(rightlit, std::array<size_t, 2>{ rfrom, rto });
 	} else {
-		auto &rightit = rsorted_citem[{ right.first.n(), eitem.set }];
+		auto &rightit = rsorted_citem[{ rightlit.n(), eitem.set }];
 		for (auto& it : rightit) {
 			if (eitem.from <= it.from)
-				right.second[1] = it.set,
-				right.second[0] = it.from,
-				rcomb.emplace_back(right);
+				rcomb.emplace_back(rightlit,
+					std::array<size_t, 2>{ it.from, it.set });
 		}
 	}
 	// many literals in rhs
@@ -1500,38 +1499,37 @@ bool parser<C, T>::binarize_comb(const item& eitem,
 		std::vector<lit<C, T>> v(g[eitem.prod][eitem.con].begin(),
 			g[eitem.prod][eitem.con].begin() + eitem.dot - 1);
 		//DBG(assert(bin_tnt.find(v) != bin_tnt.end());)
-		pnode left = { bin_tnt[v], {} };
+		const lit<C, T>& leftlit = bin_tnt[v];
 		//DBG(std::cout << "\n" << d->get(bin_tnt[v].n()) << std::endl);
-		auto &leftit = sorted_citem[{ left.first.n(), eitem.from }];
+		auto &leftit = sorted_citem[{ leftlit.n(), eitem.from }];
 		// doing left right optimization
 		for (auto& it : leftit) for (auto& rit : rcomb) {
-			if (it.set == rit.second[0]) left.second[0] = it.from,
-				left.second[1] = it.set,
-				ambset.insert({ left, rit });
+			if (it.set == rit.second[0])
+				ambset.insert({ pnode(leftlit,
+					{ it.from, it.set }), rit });
 		}
 	}
 	// exact two literals in rhs
 	else if (eitem.dot == 2) {
-		pnode left = { g[eitem.prod][eitem.con][eitem.dot - 2], {} };
-		auto& l = left.first;
+		const lit<C, T>& l = g[eitem.prod][eitem.con][eitem.dot - 2];
 		if (!l.nt()) {
-			left.second[0] = eitem.from;
-			if (l.is_null()) left.second[1] = left.second[0];
+			size_t lfrom = eitem.from, lto;
+			if (l.is_null()) lto = lfrom;
 			else if (in_->tat(eitem.from) == l.t() )
-				left.second[1] = eitem.from + 1;
+				lto = eitem.from + 1;
 			else return false;
 			//do Left right optimisation
 			for (auto& rit : rcomb)
-				if (left.second[1] == rit.second[0])
-					ambset.insert({ left, rit });
+				if (lto == rit.second[0])
+					ambset.insert({ pnode(l,
+						{ lfrom, lto }), rit });
 		}
 		else {
 			auto &leftit = sorted_citem[{ l.n(), eitem.from }];
 			for (auto& it : leftit) for (auto& rit : rcomb) {
 				if (it.set == rit.second[0])
-					left.second[0] = it.from,
-					left.second[1] = it.set,
-					ambset.insert({ left, rit });
+					ambset.insert({ pnode(l,
+						{ it.from, it.set }), rit });
 			}
 		}
 	}

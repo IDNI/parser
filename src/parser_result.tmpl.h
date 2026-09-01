@@ -307,8 +307,8 @@ typename parser<C, T>::psptree
 		// move ambiguous children sets each into its separate child
 		// copy them also a value of amb. node
 		// and replace value of amb. node with nt: __AMB_<ID>
-		pnode x = t->value;
-		x.first = amb_node;
+		pnode v = t->value;
+		pnode x(amb_node, v.second);
 		t = std::make_shared<ptree>(x);
 		//std::cout << "Ambigous node " << n.first.to_std_string() << std::endl;
 		for (auto& nodes : pack) {
