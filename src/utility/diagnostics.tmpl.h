@@ -403,7 +403,11 @@ void report::append_impl(Other&& other) {
 		if (i >= other.dyn_strings_.size()) return none;
 		return -static_cast<int_t>(dyn_base + i + 1);
 	};
-	nodes_.reserve(base + other.nodes_.size());
+	// reserve() allocates exactly the requested count, so growing by
+	// other.nodes_.size() each call makes repeated append() quadratic.
+	if (const size_t need = base + other.nodes_.size();
+		nodes_.capacity() < need)
+		nodes_.reserve(std::max(need, nodes_.capacity() * 2));
 	for (auto n : other.nodes_) {
 		if (n.parent < 0)
 			n.parent = attach_parent;
