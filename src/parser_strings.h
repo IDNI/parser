@@ -42,7 +42,11 @@ using id_t = idni::int_t;
 	X(s_total_remaining,          "S total remaining") \
 	X(gc_collected,               "gc collected") \
 	X(gcready_size_final,         "gcready size final") \
-	X(refi_size_final,            "refi size final")
+	X(refi_size_final,            "refi size final") \
+	X(bintree_get_hits,           "bintree get() hits") \
+	X(bintree_get_misses,         "bintree get() misses") \
+	X(bintree_geth_calls,         "bintree geth() calls") \
+	X(bintree_nodes,              "bintree nodes, global across all parsers")
 
 // Well-known diagnostic label strings. Positive ids are O(1) lookups via
 // str(label). Unknown/dynamic labels are stored per-report with negative ids.

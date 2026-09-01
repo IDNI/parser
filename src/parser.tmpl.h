@@ -683,6 +683,12 @@ parser<C, T>::result parser<C, T>::_parse() {
 		report_.reset(label::parse);
 #ifdef TAU_PARSER_MEASURE_COUNTERS
 	cnt = idni::parser_strings::counters{};
+	// Snapshot, don't reset: the tree statics accumulate for the whole
+	// process (post-parse shaping and other parsers share them), so
+	// bintree_get_hits/misses/geth_calls below are read back as deltas.
+	size_t bintree_hits_before   = tree::get_hits();
+	size_t bintree_misses_before = tree::get_misses();
+	size_t bintree_geth_before   = tree::geth_calls();
 #endif
 	debug = po.debug;
 	if (debug) {
@@ -890,6 +896,27 @@ parser<C, T>::result parser<C, T>::_parse() {
 		if (!o.incr_gen_forest) init_forest(*f, start_lit, po);
 		else f->root(pnode(start_lit, { 0, in_->tpos() }));
 	}
+	// Read after build_bintree/init_forest, where tree::get() interning
+	// actually happens; deltas cover only this parse. bintree_nodes and
+	// the tree statics themselves stay process-wide (see snapshot above).
+	MC(if (po.measure_counters) {
+		cnt.bintree_get_hits   = tree::get_hits()   - bintree_hits_before;
+		cnt.bintree_get_misses = tree::get_misses() - bintree_misses_before;
+		cnt.bintree_geth_calls = tree::geth_calls() - bintree_geth_before;
+		cnt.bintree_nodes      = tree::node_count();
+		if (cnt.bintree_get_hits)
+			report_.count(label::bintree_get_hits,
+				cnt.bintree_get_hits);
+		if (cnt.bintree_get_misses)
+			report_.count(label::bintree_get_misses,
+				cnt.bintree_get_misses);
+		if (cnt.bintree_geth_calls)
+			report_.count(label::bintree_geth_calls,
+				cnt.bintree_geth_calls);
+		if (cnt.bintree_nodes)
+			report_.count(label::bintree_nodes,
+				cnt.bintree_nodes);
+	})
 
 	if (debug) debug = false;
 

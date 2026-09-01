@@ -2,6 +2,7 @@
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <filesystem>
 #include <fstream>
@@ -38,6 +39,63 @@ static void print_diagnostics_report(
 	if (report.nodes().empty()) return;
 	if (json) format::json::print(report, std::cout, print_names) << '\n';
 	else report.print();
+}
+
+// bintree<pnode>::M() and its hit/miss/geth counters are process-wide
+// statics (shared by grammar loading, the target parse and post-parse
+// tree shaping), so they are read here once, not folded into per-parse
+// diagnostics::report counters.
+static void print_bintree_process_totals() {
+	using tree_t = tgf_repl_evaluator::parser_type::tree;
+	size_t buckets = 0, entries = 0, max_chain = 0;
+	double load_factor = 0.0, mean_chain = 0.0;
+	std::array<size_t, 8> chain_len_histogram{};
+	tree_t::bucket_stats(buckets, entries, load_factor, max_chain,
+		mean_chain, &chain_len_histogram);
+	cout << "bintree lookups (whole process): get hits: "
+		<< tree_t::get_hits() << ", get misses: "
+		<< tree_t::get_misses() << ", geth calls: "
+		<< tree_t::geth_calls() << "\n";
+	cout << "bintree M() buckets: " << buckets
+		<< ", entries: " << entries
+		<< ", load factor: " << load_factor
+		<< ", max chain: " << max_chain
+		<< ", mean chain: " << mean_chain << "\n";
+	static constexpr const char* bin_names[8] = {
+		"0", "1", "2", "3", "4-7", "8-15", "16-63", "64+" };
+	cout << "bintree M() chain length histogram:";
+	for (size_t i = 0; i != 8; ++i)
+		cout << " [" << bin_names[i] << "]=" << chain_len_histogram[i];
+	cout << "\n";
+	size_t distinct_hashes = 0, largest_group_size = 0;
+	std::array<size_t, 5> top_group_sizes{}, top_group_triples{};
+	size_t distinct_values = 0, distinct_child_pairs = 0, leaf_count = 0;
+	std::vector<std::string> sample_values;
+	size_t stale_hash_count = 0, largest_group_stale_count = 0;
+	std::uint64_t largest_group_hash = 0;
+	tree_t::hash_group_stats(distinct_hashes, largest_group_size,
+		top_group_sizes, top_group_triples, distinct_values,
+		distinct_child_pairs, leaf_count, sample_values,
+		stale_hash_count, largest_group_hash,
+		largest_group_stale_count);
+	cout << "bintree M() hash groups: distinct hashes: " << distinct_hashes
+		<< ", largest group size: " << largest_group_size << "\n";
+	cout << "bintree M() top 5 hash groups (size/distinct (value,l,r) triples):";
+	for (size_t i = 0; i != 5; ++i)
+		cout << " [" << top_group_sizes[i] << "/"
+			<< top_group_triples[i] << "]";
+	cout << "\n";
+	cout << "bintree M() largest hash group: distinct values: "
+		<< distinct_values << ", distinct child pairs: "
+		<< distinct_child_pairs << ", leaf count: " << leaf_count
+		<< "\n";
+	cout << "bintree M() largest hash group sample values:";
+	for (auto& s : sample_values) cout << " [" << s << "]";
+	cout << "\n";
+	cout << "bintree M() stale hash check: stale_hash_count (whole map): "
+		<< stale_hash_count << ", largest_group_hash: "
+		<< largest_group_hash << ", largest_group_stale_count: "
+		<< largest_group_stale_count << "\n";
 }
 
 static void print_version() {
@@ -1168,6 +1226,7 @@ static int run_command(cli& cl, const cli::command& cmd,
 		else
 			re.parse(inexp.c_str(), inexp.size());
 		re.flush_report();
+		if (cmd.get<bool>("measure")) print_bintree_process_totals();
 	}
 	return 0;
 }

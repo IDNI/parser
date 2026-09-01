@@ -4,6 +4,7 @@
 #ifndef __IDNI__UTILITY__TREE_H__
 #define __IDNI__UTILITY__TREE_H__
 
+#include <array>
 #include <vector>
 #include <initializer_list>
 #include <utility>
@@ -293,6 +294,37 @@ struct bintree {
 
 	bool operator<(const bintree& o) const;
 	bool operator==(const bintree& o) const;
+
+	// Public so parser code can snapshot/read these around a parse; counted
+	// in get() beside M(), guarded by MC() so they cost nothing when off.
+	// Never reset, so they also serve as whole-process totals.
+	static size_t& get_hits();
+	static size_t& get_misses();
+	static size_t& geth_calls();
+	static size_t node_count();
+
+	/// bucket health of the intern map, for diagnosing lookup cost
+	static void bucket_stats(size_t& buckets, size_t& entries,
+		double& load_factor, size_t& max_chain, double& mean_chain,
+		std::array<size_t, 8>* chain_len_histogram = nullptr);
+
+	/// groups M() entries by stored hash, to tell whether the largest
+	/// chain is real hash_combine collisions or a missing hash input.
+	/// The last 4 params detail the largest group only, by real equality.
+	/// stale_hash_count/largest_group_hash/largest_group_stale_count check
+	/// stored node.hash against a freshly recomputed hashit(), whole map
+	/// and largest group respectively, to test for a stale cached hash.
+	static void hash_group_stats(size_t& distinct_hashes,
+		size_t& largest_group_size,
+		std::array<size_t, 5>& top_group_sizes,
+		std::array<size_t, 5>& top_group_triples,
+		size_t& distinct_values,
+		size_t& distinct_child_pairs,
+		size_t& leaf_count,
+		std::vector<std::string>& sample_values,
+		size_t& stale_hash_count,
+		std::uint64_t& largest_group_hash,
+		size_t& largest_group_stale_count);
 protected:
 	/**
 	 * @brief Constructor for a new tree node from value and left and right children
@@ -305,7 +337,7 @@ protected:
 	/**
 	 * Use to produce hash for bintree node
 	 */
-	std::uint64_t hashit (const T& _value, tref _l, tref _r);
+	std::uint64_t hashit (const T& _value, tref _l, tref _r) const;
 
 	/**
 	 * @brief Get the string representation of the node (for debugging)

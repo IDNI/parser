@@ -104,6 +104,7 @@ tref bintree<T>::get() const { return reinterpret_cast<tref>(this); }
 template <typename T>
 const htref bintree<T>::geth(tref h) {
 	if (h == NULL) return htree::null();
+	MC(++geth_calls();)
 	std::unique_lock lock(mtx_);
 	auto res = M().find(*reinterpret_cast<const bintree*>(h));
 	if (auto sp = res->second.lock()) return sp;
@@ -133,12 +134,15 @@ tref bintree<T>::get(const T& v, tref l, tref r) {
 	{
 		std::shared_lock lock(mtx_);
 		auto it = M().find(bn);
-		if (it != M().end())
+		if (it != M().end()) {
+			MC(++get_hits();)
 			return reinterpret_cast<tref>(std::addressof(it->first));
+		}
 	}
 	// Slow path: exclusive lock to insert (double-check after acquiring).
 	std::unique_lock lock(mtx_);
 	auto res = M().emplace(bn, htree::wp());
+	MC(res.second ? ++get_misses() : ++get_hits();)
 	return reinterpret_cast<tref>(std::addressof(res.first->first));
 }
 
@@ -330,7 +334,7 @@ bintree<T>::bintree(const T& _value, tref _l, tref _r)
 	: value(_value), l(_l), r(_r), hash(hashit(_value, _l, _r)) { }
 
 template<typename T>
-std::uint64_t bintree<T>::hashit(const T& _value, tref _l, tref _r) {
+std::uint64_t bintree<T>::hashit(const T& _value, tref _l, tref _r) const {
 	std::uint64_t seed = 0;
 	hash_combine(seed, _value,
 		_l == nullptr ? 0 : get(_l).hash,
@@ -362,6 +366,133 @@ template <typename T>
 std::unordered_map<bintree<T>, htree::wp>& bintree<T>::M() {
 	static std::unordered_map<bintree<T>, htree::wp> m;
 	return m;
+}
+
+template <typename T>
+size_t& bintree<T>::get_hits() {
+	static size_t n = 0;
+	return n;
+}
+
+template <typename T>
+size_t& bintree<T>::get_misses() {
+	static size_t n = 0;
+	return n;
+}
+
+template <typename T>
+size_t& bintree<T>::geth_calls() {
+	static size_t n = 0;
+	return n;
+}
+
+template <typename T>
+size_t bintree<T>::node_count() { return M().size(); }
+
+template <typename T>
+void bintree<T>::bucket_stats(size_t& buckets, size_t& entries,
+	double& load_factor, size_t& max_chain, double& mean_chain,
+	std::array<size_t, 8>* chain_len_histogram)
+{
+	std::shared_lock lock(mtx_);
+	auto& m = M();
+	buckets = m.bucket_count();
+	entries = m.size();
+	load_factor = m.load_factor();
+	max_chain = 0;
+	if (chain_len_histogram) chain_len_histogram->fill(0);
+	size_t nonempty = 0, sum = 0;
+	for (size_t i = 0; i < buckets; ++i) {
+		size_t bs = m.bucket_size(i);
+		if (bs > max_chain) max_chain = bs;
+		if (bs) ++nonempty, sum += bs;
+		if (chain_len_histogram) {
+			// bins: 0, 1, 2, 3, 4-7, 8-15, 16-63, 64+
+			size_t bin = bs <= 3 ? bs
+				: bs <=  7 ? 4 : bs <= 15 ? 5
+				: bs <= 63 ? 6 : 7;
+			++(*chain_len_histogram)[bin];
+		}
+	}
+	mean_chain = nonempty ? double(sum) / double(nonempty) : 0.0;
+}
+
+template <typename T>
+void bintree<T>::hash_group_stats(size_t& distinct_hashes,
+	size_t& largest_group_size,
+	std::array<size_t, 5>& top_group_sizes,
+	std::array<size_t, 5>& top_group_triples,
+	size_t& distinct_values,
+	size_t& distinct_child_pairs,
+	size_t& leaf_count,
+	std::vector<std::string>& sample_values,
+	size_t& stale_hash_count,
+	std::uint64_t& largest_group_hash,
+	size_t& largest_group_stale_count)
+{
+	std::shared_lock lock(mtx_);
+	auto& m = M();
+	std::unordered_map<std::uint64_t, std::vector<const bintree*>> groups;
+	for (auto& [node, wp] : m) groups[node.hash].push_back(&node);
+	distinct_hashes = groups.size();
+	std::multimap<size_t, std::uint64_t, std::greater<size_t>> by_size;
+	for (auto& [h, nodes] : groups) by_size.emplace(nodes.size(), h);
+	largest_group_size = by_size.empty() ? 0 : by_size.begin()->first;
+	top_group_sizes.fill(0);
+	top_group_triples.fill(0);
+	distinct_values = 0;
+	distinct_child_pairs = 0;
+	leaf_count = 0;
+	sample_values.clear();
+	stale_hash_count = 0;
+	largest_group_hash = by_size.empty() ? 0 : by_size.begin()->second;
+	largest_group_stale_count = 0;
+	for (auto& [node, wp] : m)
+		if (node.hashit(node.value, node.l, node.r) != node.hash)
+			++stale_hash_count;
+	size_t i = 0;
+	for (auto it = by_size.begin(); it != by_size.end() && i < 5; ++it, ++i) {
+		auto& nodes = groups[it->second];
+		top_group_sizes[i] = nodes.size();
+		std::set<std::tuple<std::uint64_t, std::uint64_t, std::uint64_t>> triples;
+		for (auto* n : nodes) {
+			std::uint64_t vh = portable_hash(n->value);
+			std::uint64_t lh = n->l == nullptr ? 0 : get(n->l).hash;
+			std::uint64_t rh = n->r == nullptr ? 0 : get(n->r).hash;
+			triples.emplace(vh, lh, rh);
+		}
+		top_group_triples[i] = triples.size();
+		if (i == 0) {
+			// compare real values (operator<), not their hashes,
+			// to tell a genuine value collision from children
+			// whose stored hashes collide while unequal.
+			std::set<T> values;
+			std::set<std::pair<tref, tref>> child_pairs;
+			for (auto* n : nodes) {
+				values.insert(n->value);
+				child_pairs.emplace(n->l, n->r);
+				if (n->l == nullptr && n->r == nullptr)
+					++leaf_count;
+				if (n->hashit(n->value, n->l, n->r) != n->hash)
+					++largest_group_stale_count;
+			}
+			distinct_values = values.size();
+			distinct_child_pairs = child_pairs.size();
+			for (size_t k = 0; k < nodes.size() && k < 3; ++k) {
+				std::stringstream ss;
+				ss << nodes[k]->value
+					<< " (l=" << (nodes[k]->l == nullptr
+						? "null" : "set")
+					<< ", r=" << (nodes[k]->r == nullptr
+						? "null" : "set")
+					<< ") stored hash=" << nodes[k]->hash
+					<< " recomputed hash="
+					<< nodes[k]->hashit(nodes[k]->value,
+						nodes[k]->l, nodes[k]->r);
+				sample_values.push_back(ss.str());
+			}
+		}
+	}
 }
 
 //------------------------------------------------------------------------------
