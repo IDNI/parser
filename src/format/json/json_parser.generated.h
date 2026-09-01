@@ -147,8 +147,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(9), (NT(1)) & (NT(3)) & ~(NT(52)));
 //G29:  __E_nzintegral_5(34) => null.
 	p(NT(34), (nul));
-//G30:  __E_nzintegral_5(34) => ascii_digit(16) __E_nzintegral_5(34).
-	p(NT(34), (NT(16)+NT(34)));
+//G30:  __E_nzintegral_5(34) => __E_nzintegral_5(34) ascii_digit(16).
+	p(NT(34), (NT(34)+NT(16)));
 //G31:  nzintegral(10)       => nonzerodigit(9) __E_nzintegral_5(34).
 	p(NT(10), (NT(9)+NT(34)));
 //G32:  integral(6)          => '0'.
@@ -157,8 +157,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(6), (NT(10)));
 //G34:  __E_fractional_6(35) => ascii_digit(16).
 	p(NT(35), (NT(16)));
-//G35:  __E_fractional_6(35) => ascii_digit(16) __E_fractional_6(35).
-	p(NT(35), (NT(16)+NT(35)));
+//G35:  __E_fractional_6(35) => __E_fractional_6(35) ascii_digit(16).
+	p(NT(35), (NT(35)+NT(16)));
 //G36:  fractional(7)        => '.' __E_fractional_6(35).
 	p(NT(7), (T(16)+NT(35)));
 //G37:  __E_exponent_7(36)   => 'e'.
@@ -173,8 +173,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(37), (nul));
 //G42:  __E_exponent_9(38)   => ascii_digit(16).
 	p(NT(38), (NT(16)));
-//G43:  __E_exponent_9(38)   => ascii_digit(16) __E_exponent_9(38).
-	p(NT(38), (NT(16)+NT(38)));
+//G43:  __E_exponent_9(38)   => __E_exponent_9(38) ascii_digit(16).
+	p(NT(38), (NT(38)+NT(16)));
 //G44:  exponent(32)         => __E_exponent_7(36) __E_exponent_8(37) __E_exponent_9(38).
 	p(NT(32), (NT(36)+NT(37)+NT(38)));
 //G45:  ascii_digit(16)      => digit(1) & ascii(3).	 # conjunctive
@@ -185,8 +185,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(39), (NT(40)));
 //G48:  __E_q_str_11(41)     => null.
 	p(NT(41), (nul));
-//G49:  __E_q_str_11(41)     => __E_q_str_10(39) __E_q_str_11(41).
-	p(NT(41), (NT(39)+NT(41)));
+//G49:  __E_q_str_11(41)     => __E_q_str_11(41) __E_q_str_10(39).
+	p(NT(41), (NT(41)+NT(39)));
 //G50:  str(15)              => __E_q_str_11(41).
 	p(NT(15), (NT(41)));
 //G51:  q_str(14)            => '"' str(15) '"'.
@@ -239,16 +239,16 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(46), (NT(18)+T(26)+NT(18)+NT(24)));
 //G75:  __E_values_16(47)    => null.
 	p(NT(47), (nul));
-//G76:  __E_values_16(47)    => __E_values_15(46) __E_values_16(47).
-	p(NT(47), (NT(46)+NT(47)));
+//G76:  __E_values_16(47)    => __E_values_16(47) __E_values_15(46).
+	p(NT(47), (NT(47)+NT(46)));
 //G77:  values(45)           => value(24) __E_values_16(47).
 	p(NT(45), (NT(24)+NT(47)));
 //G78:  __E___E_object_17_18(50) => _(18) ',' _(18) object_pair(49).
 	p(NT(50), (NT(18)+T(26)+NT(18)+NT(49)));
 //G79:  __E___E_object_17_19(51) => null.
 	p(NT(51), (nul));
-//G80:  __E___E_object_17_19(51) => __E___E_object_17_18(50) __E___E_object_17_19(51).
-	p(NT(51), (NT(50)+NT(51)));
+//G80:  __E___E_object_17_19(51) => __E___E_object_17_19(51) __E___E_object_17_18(50).
+	p(NT(51), (NT(51)+NT(50)));
 //G81:  __E_object_17(48)    => object_pair(49) __E___E_object_17_19(51) _(18).
 	p(NT(48), (NT(49)+NT(51)+NT(18)));
 //G82:  __E_object_17(48)    => null.
