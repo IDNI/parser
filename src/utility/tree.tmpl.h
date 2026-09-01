@@ -127,6 +127,8 @@ const bintree<T>& bintree<T>::get(const htref& h) {
 template <typename T>
 tref bintree<T>::get(const T& v, tref l, tref r) {
 	bintree bn(v, l, r);
+	// a cached value hash that no longer matches its content poisons the map
+	DBG(if constexpr (requires { v.hash; v.hashit(); }) { assert(v.hash == v.hashit()); })
 	// Fast path: shared lock for the common case where the node already exists.
 	{
 		std::shared_lock lock(mtx_);
