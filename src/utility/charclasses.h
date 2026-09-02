@@ -4,6 +4,11 @@
 #ifndef __IDNI__PARSER__UTILITY__CHARCLASSES_H__
 #define __IDNI__PARSER__UTILITY__CHARCLASSES_H__
 
+#include <cctype>
+
+// mingw-w64 (<= 11.x) defines isascii as a macro, even for C++
+#undef isascii
+
 namespace idni::charclasses {
 
 template <typename C> bool iseof(C c)  {return c == std::char_traits<C>::eof();}
