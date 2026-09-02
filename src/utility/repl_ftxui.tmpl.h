@@ -206,6 +206,18 @@ int repl_ftxui<evaluator_t>::run_pipe() {
 	while (true) {
 		if (!getline(cin, line)) {
 			cout << "\n";
+			// End of piped input while a statement is still
+			// accumulating (last eval returned 2): report it and exit
+			// non-zero instead of silently dropping the buffer --
+			// otherwise everything after a swallowed statement passes
+			// by absence with exit code 0. (Same guard as repl<>.)
+			if (!acc.empty()) {
+				cerr << "error: end of input inside an"
+					" incomplete statement (a line kept the"
+					" parser waiting for a continuation and"
+					" no continuation ever came)\n";
+				return 1;
+			}
 			break;
 		}
 		cout << line << "\n";
