@@ -73,7 +73,7 @@ normalize_args() {
 				RUN="run"
 				((i++)) || true
 				;;
-			Debug|Release|RelWithDebInfo|Coverage)
+			Debug|Release|RelWithDebInfo|Coverage|Devel)
 				if [[ -n $BUILD_TYPE ]]; then
 					echo "Duplicate build type: ${arg}" >&2
 					exit 1
@@ -261,6 +261,9 @@ preset_binary_dir() {
 			;;
 		coverage*)
 			echo "build/coverage"
+			;;
+		devel*)
+			echo "build/devel"
 			;;
 		debug*)
 			echo "build/debug"
