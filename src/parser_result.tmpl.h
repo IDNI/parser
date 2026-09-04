@@ -77,42 +77,58 @@ parser<C, T>::result::result(parser<C, T>& p, std::unique_ptr<input> in_,
 		amb_node = p.get_grammar().nt(from_str<C>(std::string("__AMB__")));
 }
 
-template <typename C, typename T>
-parser<C, T>& parser<C, T>::result::get_parser() const { return p; }
-
-// Iterative post-order count of distinct parse trees under an AMB-wrapped
-// bintree. Folds child counts into the parent via the traversal callback —
-// no manual children() walk, no recursion. Semantics:
-//   - leaf (no children visited):      count = 1
-//   - non-AMB internal node:           count = product of children counts
-//   - AMB internal node:               count = sum of children counts
-//                                              (empty AMB → 1)
+// Distinct parse trees under an AMB-wrapped bintree: product over a node's
+// child chain (`l`, `l->r`, ...; `r` is a sibling, never a child), sum over
+// AMB alternatives, memoized per node. Saturates like forest::count_trees().
 template <typename C, typename T>
 size_t count_bintree_parses(tref n, const lit<C, T>& amb) {
-	using tree  = typename parser<C, T>::tree;
-	using pnode = typename parser<C, T>::pnode;
+	using tree = typename parser<C, T>::tree;
 	if (!n) return 1;
-	std::unordered_map<tref, size_t> cnt;
-	auto fold = [&](tref node, tref parent) {
-		// On first visit, default a leaf's count to 1 (product
-		// identity / AMB-empty fallback). Internal nodes will have
-		// been pre-initialized by their first child below.
-		auto [it_n, _n] = cnt.try_emplace(node, 1);
-		size_t n_count = it_n->second;
-		if (!parent) return true;
-		const auto& pt = tree::get(parent);
-		bool parent_is_amb = pt.value.first.nt()
-			&& pt.value.first == amb;
-		auto [it_p, _p] = cnt.try_emplace(parent,
-			parent_is_amb ? 0 : 1);
-		if (parent_is_amb) it_p->second += n_count;
-		else               it_p->second *= n_count;
-		return true;
+	auto sat_add = [](size_t a, size_t b) {
+		if (a == SIZE_MAX || b == SIZE_MAX) return SIZE_MAX;
+		size_t s = a + b;
+		return s < a ? SIZE_MAX : s;
 	};
-	post_order<pnode>(n).search(fold);
-	auto it = cnt.find(n);
-	return it == cnt.end() ? 1 : it->second;
+	auto sat_mul = [](size_t a, size_t b) {
+		if (a == 0 || b == 0) return (size_t) 0;
+		if (a == SIZE_MAX || b == SIZE_MAX) return SIZE_MAX;
+		size_t pr = a * b;
+		return pr / a != b ? SIZE_MAX : pr;
+	};
+	// count of trees rooted at a node, siblings excluded
+	std::unordered_map<tref, size_t> cnt;
+	// explicit stack of (node, children_pushed) - no recursion
+	std::vector<std::pair<tref, bool>> st;
+	st.emplace_back(n, false);
+	while (!st.empty()) {
+		auto [x, pushed] = st.back();
+		if (cnt.find(x) != cnt.end()) { st.pop_back(); continue; }
+		const auto& xt = tree::get(x);
+		if (!pushed) {
+			st.back().second = true;
+			for (tref c = xt.l; c; c = tree::get(c).r)
+				if (cnt.find(c) == cnt.end())
+					st.emplace_back(c, false);
+			continue;
+		}
+		st.pop_back();
+		bool is_amb = xt.value.first.nt() && xt.value.first == amb;
+		size_t acc;
+		if (!xt.l) acc = 1; // leaf, or empty AMB
+		else if (is_amb) {
+			acc = 0;
+			for (tref c = xt.l; c; c = tree::get(c).r)
+				acc = sat_add(acc, cnt[c]);
+		} else {
+			acc = 1;
+			for (tref c = xt.l; c; c = tree::get(c).r)
+				acc = sat_mul(acc, cnt[c]);
+		}
+		cnt.emplace(x, acc);
+	}
+	return cnt[n];
 }
+
 
 // Lazy reconstruction of a pforest from the tref (bintree path).
 // In forest_path the forest is already populated and this returns it.
