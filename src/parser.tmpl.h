@@ -482,7 +482,19 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 	//gcready.insert(i);
 }
 template <typename C, typename T>
-void parser<C, T>::predict(const item& i, container_t& t) {
+bool parser<C, T>::first_can_match(size_t p, size_t c, T ch) {
+	const auto& conj = g[p][c];
+	if (conj.size() == 0) return true;
+	const lit<C, T>& l = conj[0];
+	if (l.is_null()) return true;
+	if (!l.nt()) return l.t() == ch;
+	if (!g.is_cc_fn(l.n())) return true;
+	if (g.is_eof_fn(l.n()))
+		return ch == static_cast<T>(0) || ch == static_cast<T>(-1);
+	return g.get_char_class_production(l, ch) != static_cast<size_t>(-1);
+}
+template <typename C, typename T>
+void parser<C, T>::predict(const item& i, container_t& t, T ch) {
 	MC(count(cnt.predict_calls);)
 	DBGP(std::cout << "    predicting\n";)
 	lit<C, T> parl = get_lit(i);
@@ -502,6 +514,17 @@ void parser<C, T>::predict(const item& i, container_t& t) {
 		for (size_t c = 0; c != g.n_conjs(p); ++c) {
 			//just once
 			if (c==0 && parl.nt()) cache[{parl.n(), i.set}].insert(i);
+			// One-character lookahead: a conjunct that starts with a
+			// terminal or a character class the current character
+			// cannot satisfy would only be scanned and dropped at
+			// this same position; skip creating it. A conjunct that
+			// is never predicted never completes, which is exactly
+			// what its scan failure would have produced, for
+			// positive and negated conjuncts alike.
+			if (!first_can_match(p, c, ch)) {
+				MC(count(cnt.predict_lookahead_skips);)
+				continue;
+			}
 			item j(i.set, p, c, i.set, 0);
 			MC(count(cnt.predict_inserts);)
 			if (add(t, j).second) {
@@ -786,7 +809,7 @@ parser<C, T>::result parser<C, T>::_parse() {
 				else if (get_lit(x).nt()) {
 					if (g.is_cc_fn(get_lit(x).n()))
 						scan_cc_function(x, n, ch, c);
-					else predict(x, t);
+					else predict(x, t, ch);
 				} else scan(x, n, ch);
 			}
 			//DBGP(print_S(std::cout << "S loop:\n") << "\n";)
@@ -1115,6 +1138,25 @@ std::vector<typename parser<C, T>::item> parser<C, T>::back_track(
 	return ret;
 }
 template <typename C, typename T>
+void parser<C, T>::predict_all_at(size_t n) {
+	// Re-create exactly the items predict() skipped at set `n`: every
+	// conjunct whose first literal could not match the character
+	// there. Nothing below such a conjunct was reachable, so no
+	// deeper prediction is needed, and a skipped conjunct starts with
+	// a terminal or a character class, so no nullable advance either.
+	if (n >= S.size()) return;
+	T ch = n < in_->tpos() ? in_->tat(n) : static_cast<T>(0);
+	std::vector<item> snapshot(S[n].begin(), S[n].end());
+	for (const item& x : snapshot) {
+		if (completed(x) || !get_lit(x).nt()
+			|| g.is_cc_fn(get_lit(x).n())) continue;
+		for (size_t p : g.prod_ids_of_literal(get_lit(x)))
+			for (size_t c = 0; c != g.n_conjs(p); ++c)
+				if (!first_can_match(p, c, ch))
+					S[n].insert(item(n, p, c, n, 0));
+	}
+}
+template <typename C, typename T>
 typename parser<C, T>::error parser<C, T>::get_error() {
 	error err;
 	auto& in = *in_;
@@ -1146,6 +1188,10 @@ typename parser<C, T>::error parser<C, T>::get_error() {
 	//DBGP(print_S(std::cout << "S:\n") << "\n";)
 	for (int_t i = (int_t) in.tpos(); i >= 0; i--) if (S[i].size()) {
 		//DBG(std::cout << "get_error i pos = " << i << "\n";)
+		// predict() skipped every production whose first literal
+		// could not match the character here; the report must
+		// still list them as expected.
+		predict_all_at(i);
 		size_t from = 0;
 		bool unexp_neg = false;
 		// smallest length item that may be used as delimiter
