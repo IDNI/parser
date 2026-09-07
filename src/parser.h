@@ -480,6 +480,9 @@ private:
 	lit<C, T> start;
 	char_class_fns<T> cc_fns = {};
 	std::map<lit<C, T>, std::set<size_t>> ntsm = {};
+	/// ntsm restricted to nonterminals, indexed by nonterminal id, so the
+	/// per-prediction lookup is O(1) instead of a map walk over lit<=>.
+	std::vector<std::set<size_t>> ntsm_by_nt = {};
 	std::map<size_t, size_t> grdm = {};
 	std::vector<std::string> guards = {};
 	std::set<size_t> nullables = {};

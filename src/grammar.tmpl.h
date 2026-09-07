@@ -543,11 +543,15 @@ void grammar<C, T>::set_enabled_productions(const std::set<std::string>& grds) {
 	for (size_t gid = 0; gid != guards.size(); ++gid)
 		if (opt.enabled_guards.count(guards[gid]))
 			gids.insert(gid);
-	ntsm.clear();
+	ntsm.clear(), ntsm_by_nt.clear();
 	for (size_t n = 0; n != G.size(); ++n) {
 		auto it = grdm.find(n); // if not guarded or guard is enabled
 		if (it == grdm.end() || gids.count(it->second))
 			ntsm[G[n].first].insert(n);
+	}
+	for (const auto& [l, ps] : ntsm) if (l.nt()) {
+		if (ntsm_by_nt.size() <= l.n()) ntsm_by_nt.resize(l.n() + 1);
+		ntsm_by_nt[l.n()] = ps;
 	}
 }
 template <typename C, typename T>
@@ -609,6 +613,10 @@ template <typename C, typename T>
 size_t grammar<C, T>::add_char_class_production(lit<C, T> l, T ch) {
 	G.push_back(production{ l, { { { { lit<C, T>{ ch } } } } } });
 	ntsm[G.back().first].insert(G.size() - 1);
+	if (l.nt()) {
+		if (ntsm_by_nt.size() <= l.n()) ntsm_by_nt.resize(l.n() + 1);
+		ntsm_by_nt[l.n()].insert(G.size() - 1);
+	}
 	return cc_fns.ps[l.n()][ch] = G.size() - 1;
 }
 template <typename C, typename T>
@@ -642,6 +650,8 @@ const std::set<size_t>& grammar<C, T>::prod_ids_of_literal(const lit<C, T>& l)
 	const
 {
 	static std::set<size_t> empty{};
+	if (l.nt()) return l.n() < ntsm_by_nt.size() ? ntsm_by_nt[l.n()]
+							: empty;
 	if (!ntsm.contains(l)) return empty;
 	return ntsm.at(l);
 }
