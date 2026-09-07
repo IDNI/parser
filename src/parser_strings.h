@@ -20,6 +20,7 @@ using id_t = idni::int_t;
 	X(complete_calls,             "complete calls") \
 	X(predict_calls,              "predict calls") \
 	X(predict_inserts,            "predict inserts") \
+	X(predict_lookahead_skips,    "predict lookahead skips") \
 	X(scan_calls,                 "scan calls") \
 	X(scan_cc_calls,              "scan cc calls") \
 	X(s_max_per_pos,              "s max per pos") \

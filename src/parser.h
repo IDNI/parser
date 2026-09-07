@@ -1284,7 +1284,16 @@ private:
 		container_t& c);
 	void retract_item(const item& x, container_t& c);
 	bool nt_still_completed(size_t nt_id, size_t from, size_t set) const;
-	void predict(const item& i, container_t& t);
+	/// Predict the productions of the nonterminal after the dot of `i`.
+	/// `ch` is the character at the item's set; a production whose first
+	/// literal is a terminal or character-class function that cannot
+	/// match it is not predicted (one-character lookahead).
+	void predict(const item& i, container_t& t, T ch);
+	/// true iff conjunct `c` of production `p` may start with `ch`.
+	bool first_can_match(size_t p, size_t c, T ch);
+	/// Predict, without lookahead, everything predictable at set `n`,
+	/// so an error report lists every alternative the lookahead skipped.
+	void predict_all_at(size_t n);
 	void scan(const item& i, size_t n, T ch);
 	void scan_cc_function(const item& i, size_t n, T ch, container_t& t);
 	void complete(const item& i, container_t& t, container_t& c,
