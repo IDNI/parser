@@ -107,6 +107,10 @@ const htref bintree<T>::geth(tref h) {
 	MC(++geth_calls();)
 	std::unique_lock lock(mtx_);
 	auto res = M().find(*reinterpret_cast<const bintree*>(h));
+	if (res == M().end()) {
+		DBG(assert(false && "geth: stale tref not found in M()");)
+		return htree::null();
+	}
 	if (auto sp = res->second.lock()) return sp;
 	htref ret(new htree(h));
 	res->second = ret;
