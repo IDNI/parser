@@ -23,6 +23,7 @@ using id_t = idni::int_t;
 	X(predict_lookahead_skips,    "predict lookahead skips") \
 	X(scan_calls,                 "scan calls") \
 	X(scan_cc_calls,              "scan cc calls") \
+	X(dynamic_grow_calls,         "dynamic grow calls") \
 	X(s_max_per_pos,              "s max per pos") \
 	X(t_size_peak,                "t size peak") \
 	X(c_size_peak,                "c size peak") \

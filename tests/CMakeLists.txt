@@ -54,6 +54,7 @@ enable_testing()
 
 set(DOCTESTS
 	diagnostics
+	dynamic_grow
 	escapes
 	input
 	json

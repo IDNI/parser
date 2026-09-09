@@ -530,7 +530,7 @@ grammar<C, T>::grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
 		}
 	}
 	for (const auto& [name, values] : opt.dynamic)
-		add_dynamic_prods(nt(name), values);
+		host_dynamic_values(nt(name), values);
 	// set guards to create ntsm: nt -> prod rule map
 	set_enabled_productions(opt.enabled_guards);
 	compute_nullables();
@@ -545,6 +545,7 @@ void grammar<C, T>::set_enabled_productions(const std::set<std::string>& grds) {
 			gids.insert(gid);
 	ntsm.clear(), ntsm_by_nt.assign(nts.size(), {});
 	for (size_t n = 0; n != G.size(); ++n) {
+		if (is_retired(n)) continue;
 		auto it = grdm.find(n); // if not guarded or guard is enabled
 		if (it == grdm.end() || gids.count(it->second))
 			ntsm[G[n].first].insert(n);
@@ -566,15 +567,51 @@ void grammar<C, T>::add_dynamic(const std::basic_string<C>& nt_name,
 	const std::vector<std::basic_string<C>>& values)
 {
 	auto l = nt(nt_name);
-	auto had = dynm[l];
-	add_dynamic_prods(l, values);
-	// append only new values, in the given order, so opt.dynamic keeps the
-	// host's order and the generated parser adds productions in that order
+	auto& idx_for_l = dynamic_idx_[l];
 	auto& kept = opt.dynamic[nt_name];
-	for (const auto& v : values)
-		if (had.insert(v).second) kept.push_back(v);
+	std::set<std::basic_string<C>> seen;
+	for (const auto& v : values) {
+		auto it = idx_for_l.find(v);
+		bool already = it != idx_for_l.end() &&
+			(dynamic_[it->second].st == dynamic_entry::state::host ||
+			dynamic_[it->second].st == dynamic_entry::state::committed);
+		if (!already && seen.insert(v).second) kept.push_back(v);
+	}
+	host_dynamic_values(l, values);
 	set_enabled_productions(opt.enabled_guards);
 	compute_nullables();
+}
+template <typename C, typename T>
+void grammar<C, T>::host_dynamic_values(const lit<C, T>& l,
+	const std::vector<std::basic_string<C>>& values)
+{
+	auto& idx_for_l = dynamic_idx_[l];
+	for (const std::basic_string<C>& v : values) {
+		if (auto it = idx_for_l.find(v); it != idx_for_l.end()) {
+			auto& e = dynamic_[it->second];
+			if (e.st == dynamic_entry::state::host) continue;
+			if (e.st == dynamic_entry::state::pending)
+				unpend(it->second);
+			bool need_link = e.st == dynamic_entry::state::retired;
+			e.st = dynamic_entry::state::host;
+			e.grown_by.clear(), e.confirmed = false;
+			if (need_link) link(it->second);
+			continue;
+		}
+		lits<C, T> a;
+		// an empty value is the null literal, the same as nul in a prod
+		if (v.empty()) a.emplace_back();
+		else for (const C& c : v) a.emplace_back(c);
+		G.emplace_back(l, std::vector<lits<C, T>>{ a });
+		size_t idx = G.size() - 1;
+		std::basic_string<T> value_t;
+		value_t.reserve(v.size());
+		for (const C& c : v) value_t.push_back(static_cast<T>(c));
+		dynamic_[idx] = dynamic_entry{ dynamic_entry::state::host, l, v,
+			value_t, {}, false };
+		idx_for_l[v] = idx;
+		link(idx);
+	}
 }
 template <typename C, typename T>
 size_t grammar<C, T>::size() const { return G.size(); }
@@ -619,19 +656,167 @@ size_t grammar<C, T>::add_char_class_production(lit<C, T> l, T ch) {
 	return cc_fns.ps[l.n()][ch] = G.size() - 1;
 }
 template <typename C, typename T>
-void grammar<C, T>::add_dynamic_prods(const lit<C, T>& l,
-	const std::vector<std::basic_string<C>>& values)
+std::optional<size_t> grammar<C, T>::add_dynamic_production_from(
+	const lit<C, T>& l, const std::basic_string<C>& value)
 {
-	auto& added = dynm[l];
-	for (const std::basic_string<C>& v : values) {
-		// a second production for one value would make l ambiguous
-		if (!added.insert(v).second) continue;
-		lits<C, T> a;
-		// an empty value is the null literal, the same as nul in a prod
-		if (v.empty()) a.emplace_back();
-		else for (const C& c : v) a.emplace_back(c);
-		G.emplace_back(l, std::vector<lits<C, T>>{ a });
+	// an empty value would make l nullable, which needs the full
+	// compute_nullables() this method skips; use add_dynamic for that.
+	if (value.empty()) return std::nullopt;
+	std::pair<size_t, size_t> pc =
+		active_grow_.second != static_cast<size_t>(-1)
+			? active_grow_
+			: std::make_pair(static_cast<size_t>(-1), l.n());
+	auto& idx_for_l = dynamic_idx_[l];
+	if (auto it = idx_for_l.find(value); it != idx_for_l.end()) {
+		size_t idx = it->second;
+		auto& e = dynamic_[idx];
+		if (e.st == dynamic_entry::state::host ||
+			e.st == dynamic_entry::state::committed)
+			return std::nullopt; // already live and permanent enough
+		if (e.st == dynamic_entry::state::pending) {
+			// already pending, maybe from another parent: tag this pair
+			// too, so whichever registered parent completes first still
+			// confirms it
+			e.grown_by.insert(pc);
+			return idx;
+		}
+		// retired: re-link its old index instead of appending a new one
+		e.st = dynamic_entry::state::pending;
+		e.grown_by = { pc }, e.confirmed = false;
+		link(idx);
+		pending_.push_back(idx);
+		return idx;
 	}
+	lits<C, T> a;
+	for (const C& c : value) a.emplace_back(c);
+	G.push_back(production{ l, { a } });
+	size_t idx = G.size() - 1;
+	// same conversion the production body above uses per character; kept
+	// alongside value so confirm_dynamic can match against what
+	// input::get_terminals resolves a span to, in the terminal alphabet
+	std::basic_string<T> value_t;
+	value_t.reserve(value.size());
+	for (const C& c : value) value_t.push_back(static_cast<T>(c));
+	dynamic_[idx] = dynamic_entry{ dynamic_entry::state::pending, l, value,
+		value_t, { pc }, false };
+	idx_for_l[value] = idx;
+	link(idx);
+	pending_.push_back(idx);
+	// compute_nullables() is skipped: the new production holds a
+	// non-null terminal, so all_nulls() rejects it and l's nullability
+	// is unchanged.
+	return idx;
+}
+template <typename C, typename T>
+bool grammar<C, T>::commit_dynamic(dynamic_context<C>& ctx) {
+	bool any_confirmed = false;
+	for (size_t idx : pending_) {
+		auto& e = dynamic_[idx];
+		if (e.confirmed) {
+			e.st = dynamic_entry::state::committed; // stays linked already
+			ctx.values[e.l.n()].insert(e.value);
+			any_confirmed = true;
+		} else retire(idx);
+		e.grown_by.clear(), e.confirmed = false;
+	}
+	pending_.clear();
+	return any_confirmed;
+}
+template <typename C, typename T>
+void grammar<C, T>::rollback_dynamic() {
+	for (size_t idx : pending_) {
+		retire(idx);
+		auto& e = dynamic_[idx];
+		e.grown_by.clear(), e.confirmed = false;
+	}
+	pending_.clear();
+}
+template <typename C, typename T>
+void grammar<C, T>::sync_dynamic_context(const dynamic_context<C>& ctx) {
+	// every nonterminal dynamic_idx_ or ctx currently has an opinion about
+	std::set<size_t> nids;
+	for (const auto& [l, m] : dynamic_idx_) nids.insert(l.n());
+	for (const auto& [nid, s] : ctx.values) nids.insert(nid);
+	static const std::set<std::basic_string<C>> no_values{};
+	for (size_t nid : nids) {
+		lit<C, T> l = nt(nid);
+		auto cit = ctx.values.find(nid);
+		const auto& target = cit != ctx.values.end() ? cit->second
+								: no_values;
+		auto& idx_for_l = dynamic_idx_[l];
+		// retire every committed value absent from ctx
+		for (const auto& [value, idx] : idx_for_l) {
+			if (dynamic_[idx].st != dynamic_entry::state::committed)
+				continue;
+			if (!target.count(value)) retire(idx);
+		}
+		// (re)link every ctx value not already live
+		for (const auto& value : target) {
+			if (value.empty()) continue;
+			if (auto it = idx_for_l.find(value); it != idx_for_l.end()) {
+				auto& e = dynamic_[it->second];
+				if (e.st == dynamic_entry::state::host ||
+					e.st == dynamic_entry::state::committed)
+					continue;
+				if (e.st == dynamic_entry::state::pending)
+					unpend(it->second);
+				e.st = dynamic_entry::state::committed;
+				e.grown_by.clear(), e.confirmed = false;
+				link(it->second);
+				continue;
+			}
+			lits<C, T> a;
+			for (const C& c : value) a.emplace_back(c);
+			G.emplace_back(l, std::vector<lits<C, T>>{ a });
+			size_t idx = G.size() - 1;
+			std::basic_string<T> value_t;
+			value_t.reserve(value.size());
+			for (const C& c : value) value_t.push_back(static_cast<T>(c));
+			dynamic_[idx] = dynamic_entry{ dynamic_entry::state::committed,
+				l, value, value_t, {}, false };
+			idx_for_l[value] = idx;
+			link(idx);
+		}
+	}
+}
+template <typename C, typename T>
+void grammar<C, T>::confirm_dynamic(size_t parent, const lit<C, T>& l,
+	const std::basic_string<T>& value)
+{
+	for (size_t idx : pending_) {
+		auto& e = dynamic_[idx];
+		if (e.value_t == value && (e.grown_by.count({ parent, l.n() }) ||
+			e.grown_by.count({ static_cast<size_t>(-1), l.n() })))
+			e.confirmed = true;
+	}
+}
+template <typename C, typename T>
+bool grammar<C, T>::is_retired(size_t idx) const {
+	auto it = dynamic_.find(idx);
+	return it != dynamic_.end() &&
+		it->second.st == dynamic_entry::state::retired;
+}
+template <typename C, typename T>
+void grammar<C, T>::link(size_t idx) {
+	auto& l = dynamic_[idx].l;
+	ntsm[l].insert(idx);
+	// keep ntsm_by_nt in sync: predict() reads it instead of ntsm
+	if (l.nt()) {
+		if (ntsm_by_nt.size() <= l.n()) ntsm_by_nt.resize(l.n() + 1);
+		ntsm_by_nt[l.n()].insert(idx);
+	}
+}
+template <typename C, typename T>
+void grammar<C, T>::retire(size_t idx) {
+	auto& e = dynamic_[idx];
+	if (auto it = ntsm.find(e.l); it != ntsm.end()) it->second.erase(idx);
+	if (e.l.nt() && e.l.n() < ntsm_by_nt.size())
+		ntsm_by_nt[e.l.n()].erase(idx);
+	e.st = dynamic_entry::state::retired;
+}
+template <typename C, typename T>
+void grammar<C, T>::unpend(size_t idx) {
+	std::erase(pending_, idx);
 }
 template <typename C, typename T>
 size_t grammar<C, T>::get_char_class_production(lit<C, T> l, T ch) {
@@ -899,6 +1084,7 @@ grammar<C,T>::derive_all(
 		// Unit-rule propagation: for every production A -> B (single literal body)
 		// where B == proven_lit, derive A with the same span.
 		for (size_t p = 0; p < G.size(); ++p) {
+			if (is_retired(p)) continue;
 			const lit<C,T>& head = G[p].first;
 			const std::vector<lits<C,T>>& conjs = G[p].second;
 			// A production fires as a unit rule when every conjunction has

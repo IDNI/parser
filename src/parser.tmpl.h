@@ -185,6 +185,14 @@ void parser<C, T>::input::decode() {
 template <typename C, typename T>
 parser<C, T>::parser(grammar<C, T>& g, options o) : g(g), o(o), po(o.parse_opts)
 {
+	// a pair rejected here would confirm on the child's own completion,
+	// confirming every prefix; a misused caller still hits the assert
+	for (auto it = this->o.dynamic_grow_nts.begin();
+		it != this->o.dynamic_grow_nts.end();)
+		if (it->first == it->second) {
+			DBG(assert(it->first != it->second);)
+			it = this->o.dynamic_grow_nts.erase(it);
+		} else ++it;
 	for (size_t p = 0; p < g.size(); p++)
 		if (g.conjunctive(p)) { any_conj = true; break; }
 }
@@ -252,6 +260,15 @@ std::pair<typename parser<C, T>::container_iter, bool>
 	const size_t pos = static_cast<size_t>(std::distance(t.begin(), it));
 	if (nullable(*it)) {
 		item j(it->set, it->prod, it->con, it->from, it->dot + 1);
+		// j shares i's set: the dot only skips a nullable literal, so
+		// nothing has advanced past a child yet. Carry the entries onto
+		// j without firing, the rule predict() follows for the same
+		// reason.
+		if (!o.dynamic_grow_nts.empty() && !dyn_child_span.empty()) {
+			auto ann = dyn_child_span.find(*it);
+			if (ann != dyn_child_span.end())
+				merge_dyn_child_span(j, ann->second);
+		}
 		if (add(t, j).second) {
 			DBGP(print(std::cout <<
 				" +  adding to t from nullable\t\t", j) <<"\n";)
@@ -387,6 +404,24 @@ void parser<C, T>::resolve_conjunctions(container_t& c) {
 	//DBG(std::cout << "... conjunctions resolved\n";)
 }
 template <typename C, typename T>
+void parser<C, T>::confirm_dynamic_parent(const item& x) {
+	if (o.dynamic_grow_nts.empty()) return;
+	lit<C, T> h = get_nt(x);
+	if (!h.nt()) return;
+	// x's own head is a parent for some pair; mark each of its
+	// registered children's spans confirmed. Growing happens earlier,
+	// on propagation past a child (complete()/scan()), not here.
+	auto lo = o.dynamic_grow_nts.lower_bound({ h.n(), 0 });
+	if (lo == o.dynamic_grow_nts.end() || lo->first != h.n()) return;
+	auto ann = dyn_child_span.find(x);
+	if (ann == dyn_child_span.end()) return;
+	for (const auto& e : ann->second) {
+		if (!o.dynamic_grow_nts.count({ h.n(), e.child_nt })) continue;
+		g.confirm_dynamic(h.n(), g.nt(e.child_nt),
+			in_->get_terminals(e.from, e.to));
+	}
+}
+template <typename C, typename T>
 void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 	bool conj_resolved)
 {
@@ -409,6 +444,9 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 		//if (refi.count(i) && refi[i] > 0) --refi[i];
 		//return;
 	}
+	// i is genuinely completed here; the parked return above never
+	// reaches this point.
+	if (!negative(i)) confirm_dynamic_parent(i);
 	//const container_t& cont = S[i.from];
 	auto smbl = get_nt(i);
 	auto &rng = cache[{smbl.n(), i.from}];
@@ -422,6 +460,13 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 	const auto& vec = rng.values();
 	const size_t start_idx = last_idx;
 	last_idx = cur_size;
+	// i's own head (smbl) is what just completed. Whether a given
+	// predictor gets i's span depends on that predictor's own head:
+	// only the pair's registered parent does, so the pair lookup below
+	// runs per predictor; this only screens whether smbl is EVER a
+	// registered child, so an unused hook still costs nothing.
+	bool smbl_is_dyn_child = !o.dynamic_grow_nts.empty() && smbl.nt() &&
+		dyn_child_ids.count(smbl.n());
 	for (size_t k = start_idx; k < cur_size; k++) {
 		const auto& eit = vec[k];
 		const auto* it = &eit;
@@ -435,6 +480,37 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 		if (!in_S && !in_U) continue;
 		DBGP(print(std::cout << " ?  checking \t\t\t\t", *it) << "\n";)
 		item j(*it); ++j.dot, j.set = i.set;
+		if (!o.dynamic_grow_nts.empty()) {
+			auto ann = dyn_child_span.find(*it);
+			bool inherits = ann != dyn_child_span.end();
+			// i is this predictor's registered child only when the pair
+			// (predictor's own head, smbl) is registered: a left-recursive
+			// predictor sharing the child's own head is not its parent.
+			bool i_is_dyn_child = smbl_is_dyn_child &&
+				o.dynamic_grow_nts.count({ get_nt(*it).n(), smbl.n() });
+			if (i_is_dyn_child || inherits) {
+				std::vector<dyn_child_entry> entries =
+					inherits ? ann->second
+						: std::vector<dyn_child_entry>{};
+				if (i_is_dyn_child)
+					entries.push_back(
+						{ smbl.n(), i.from, i.set });
+				// grow: j is the parent making progress past a
+				// child's span, the moment j's position leaves it
+				// strictly behind. Precondition: the parent's
+				// production requires at least one consumed
+				// terminal after the child, so j.set moves past
+				// the child's end instead of stopping there.
+				for (auto& e : entries) {
+					if (e.fired || !(e.to < j.set)) continue;
+					e.fired = true;
+					MC(count(cnt.dynamic_grow_calls);)
+					fire_dynamic_grow(get_nt(*it).n(), e.child_nt,
+						e.from, e.to);
+				}
+				merge_dyn_child_span(j, entries);
+			}
+		}
 		if (!negative(j) && completed(j) && g.conjunctive(j.prod)) {
 			DBGP(print(std::cout << TC.YELLOW() <<
 				" +  adding to c2 \t\t\t", j) << TC.CLEAR() <<
@@ -500,6 +576,26 @@ void parser<C, T>::predict(const item& i, container_t& t, T ch) {
 	lit<C, T> parl = get_lit(i);
 	DBG(assert(parl.nt()));
 	DBG(assert(!completed(i)));
+	// i's own annotation, if any, is looked up once here rather than
+	// once per predicted item. A predicted item shares i's span
+	// (j.set == i.set), so nothing has advanced past a child yet. Fire
+	// stays in scan() and complete(). This only forwards the entries so
+	// a group nonterminal predicted here can still reach the child.
+	// Copy out first: dyn_child_span is a flat hashmap, so the
+	// operator[] insert below can reallocate its backing storage and
+	// invalidate ann.
+	std::vector<dyn_child_entry> inherited;
+	bool has_inherited = false;
+	if (!o.dynamic_grow_nts.empty() && !dyn_child_span.empty()) {
+		auto ann = dyn_child_span.find(i);
+		if (ann != dyn_child_span.end() && std::any_of(
+			ann->second.begin(), ann->second.end(),
+			[](const auto& e) { return !e.fired; }))
+		{
+			inherited = ann->second;
+			has_inherited = true;
+		}
+	}
 	for (size_t p : g.prod_ids_of_literal(get_lit(i))) {
 		// predicting item should have ref count increased
 		// since predicting item, for its advancement over
@@ -535,6 +631,7 @@ void parser<C, T>::predict(const item& i, container_t& t, T ch) {
 					// j item is already present
 				//}
 			}
+			if (has_inherited) merge_dyn_child_span(j, inherited);
 			if (po.enable_gc) {
 				MC(count(cnt.refi_increments);)
 				++refi[i];
@@ -566,6 +663,29 @@ void parser<C, T>::scan(const item& i, size_t n, T ch) {
 			remove_item(i);
 		}
 		return;
+	}
+	// a terminal literal carries no head of its own to register against,
+	// so j only ever inherits i's entries, matching children registered
+	// further back in this same parent's production
+	if (!o.dynamic_grow_nts.empty()) {
+		auto ann = dyn_child_span.find(i);
+		if (ann != dyn_child_span.end()) {
+			// copy out first: dyn_child_span is a flat hashmap, so
+			// the operator[] insert below can reallocate its backing
+			// storage and invalidate ann
+			std::vector<dyn_child_entry> entries = ann->second;
+			// grow: j is the parent making progress past a child's
+			// span, the moment j's position leaves it strictly
+			// behind. See complete() for the precondition.
+			for (auto& e : entries) {
+				if (e.fired || !(e.to < j.set)) continue;
+				e.fired = true;
+				MC(count(cnt.dynamic_grow_calls);)
+				fire_dynamic_grow(get_nt(i).n(), e.child_nt,
+					e.from, e.to);
+			}
+			merge_dyn_child_span(j, entries);
+		}
 	}
 	// by this time, terminal is advanced over
 	// and new item j will be created.
@@ -739,6 +859,15 @@ parser<C, T>::result parser<C, T>::_parse() {
 	};
 #endif
 
+	// Grammar productions must be in their final shape before run_earley
+	// predicts anything, so the confirmed context syncs in here, ahead
+	// of the algorithm proper, and commits or rolls back after it. The
+	// context itself is resolved regardless of dynamic_grow_nts, so a
+	// hook added outside dynamic_grow_nts firing still gets decided.
+	dynamic_context<C>* dyn_ctx = po.dynamic_ctx ? po.dynamic_ctx
+		: &internal_dynamic_ctx;
+	if (!o.dynamic_grow_nts.empty()) g.sync_dynamic_context(*dyn_ctx);
+
 	lit<C, T> start_lit;
 	auto run_earley = [&]() {
 	size_t n = 0;
@@ -750,7 +879,15 @@ parser<C, T>::result parser<C, T>::_parse() {
 		cache.clear(), gcready.clear(), sorted_citem.clear(),
 		rsorted_citem.clear(), completion_deps.clear(),
 		completion_count.clear(), complete_memo.clear(),
-		forward_deps.clear(), counted_completions.clear();
+		forward_deps.clear(), counted_completions.clear(),
+		dyn_child_span.clear();
+	dyn_child_ids.clear();
+	// no callback to grow anything means no annotation work is needed
+	// either, so a registered pair alone never calls an empty
+	// std::function
+	if (o.on_dynamic_grow)
+		for (const auto& [p, ch] : o.dynamic_grow_nts)
+			dyn_child_ids.insert(ch);
 	//pnode::nid().clear();
 	tid = 0;
 	S.resize(1);
@@ -945,6 +1082,12 @@ parser<C, T>::result parser<C, T>::_parse() {
 
 	bool fnd = found(po.start);
 	error err = fnd ? error{} : get_error();
+	// progress past a child is strong evidence, not proof the parent
+	// completes, so a confirmed grow only survives a successful parse;
+	// this runs regardless of dynamic_grow_nts, so a hook added outside
+	// its firing is decided too, by the end of the very next parse
+	if (fnd) g.commit_dynamic(*dyn_ctx);
+	else g.rollback_dynamic();
 
 	if (f) {
 		DBGP(

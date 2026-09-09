@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <initializer_list>
 #include <map>
+#include <optional>
 #include <set>
 
 #include "ankerl/unordered_dense.h"
@@ -342,6 +343,19 @@ struct shaping_options {
 };
 
 
+/**
+ * @brief Values a dynamic_grow_nts hook has confirmed across parses.
+ *
+ * Supplied through parser::parse_options::dynamic_ctx; a parser owns one
+ * internally for when that pointer is null. Two parsers (or two parses)
+ * using different containers never see each other's grown values.
+ */
+template <typename C = char>
+struct dynamic_context {
+	/// Nonterminal id -> values kept from earlier successful parses.
+	std::map<size_t, std::set<std::basic_string<C>>> values = {};
+};
+
 template <typename C, typename T> struct grammar_inspector;
 template <typename C, typename T> class parser;
 /**
@@ -432,6 +446,43 @@ struct grammar {
 	size_t get_char_class_production(lit<C, T> l, T ch);
 	/// Adds a new production rule: l => ch and returns index of it.
 	size_t add_char_class_production(lit<C, T> l, T ch);
+	/**
+	 * Adds one pending alternative to a @dynamic nonterminal l, skipping
+	 * the full rebuild add_dynamic does (same trade as
+	 * add_char_class_production). Dedups against dynamic_idx_: a value
+	 * already host or committed adds nothing; a value already pending for
+	 * l from another registered parent is not re-added, but the calling
+	 * parent's pair joins that entry's grown_by so either parent can
+	 * still confirm it; a retired value is re-linked with its old index.
+	 * Returns the production index, or nullopt if nothing was added (an
+	 * empty value, or a value already host or committed). The caller
+	 * resolves the value's span against its own input, so this takes a
+	 * plain string rather than depending on parser::input.
+	 */
+	std::optional<size_t> add_dynamic_production_from(const lit<C, T>& l,
+		const std::basic_string<C>& value);
+	/**
+	 * Decides every value add_dynamic_production_from added since the last
+	 * commit or rollback: a confirmed one moves to the committed state and
+	 * is written into ctx's values, staying linked in ntsm; an unconfirmed
+	 * one is retired the same way rollback_dynamic retires it. Never
+	 * writes into opt.dynamic, which holds @dynamic host values only.
+	 * Returns true if anything was confirmed.
+	 */
+	bool commit_dynamic(dynamic_context<C>& ctx);
+	/**
+	 * Retires every value add_dynamic_production_from added since the last
+	 * commit or rollback, confirmed or not. A retired production keeps its
+	 * place in G, so this call never invalidates a production index: only
+	 * its index leaves ntsm and its entry moves to the retired state.
+	 * predict() reads ntsm fresh on every call, so a retired production
+	 * stops matching from that point on. A retired value reuses its
+	 * production's index if it is added again.
+	 */
+	void rollback_dynamic();
+	/// True when add_dynamic_production_from added a value not yet
+	/// decided by commit_dynamic or rollback_dynamic.
+	bool has_pending_dynamic() const { return !pending_.empty(); }
 	/// Returns indexes of all production rules for a nonterminal l.
 	const std::set<size_t>& prod_ids_of_literal(const lit<C, T>& l) const;
 	/// Returns the starting nonterminal literal.
@@ -473,9 +524,45 @@ struct grammar {
 	derive_all(const std::vector<std::pair<lit<C,T>, size_t>>& seeds) const;
 private:
 	bool all_nulls(const lits<C, T>& a) const;
-	void add_dynamic_prods(const lit<C, T>& l,
+	/// Adds each value as a host value for l: a brand new production, or
+	/// an existing pending/committed/retired one promoted to host so
+	/// sync_dynamic_context never retires it. Shared by the
+	/// constructor's opt.dynamic loop and add_dynamic.
+	void host_dynamic_values(const lit<C, T>& l,
 		const std::vector<std::basic_string<C>>& values);
 	void compute_nullables();
+	/**
+	 * Relinks every nonterminal dynamic_idx_ or ctx has an opinion about
+	 * so exactly ctx's values are committed, alongside host values, which
+	 * stay live regardless. A committed value absent from ctx is retired;
+	 * a ctx value without a live production is (re)linked, reusing a
+	 * retired index when dynamic_idx_ already has one. Called once per
+	 * parser::_parse() call, before the Earley algorithm itself starts.
+	 */
+	void sync_dynamic_context(const dynamic_context<C>& ctx);
+	/**
+	 * Marks a pending value added by add_dynamic_production_from as
+	 * confirmed, identified by the completing (parent, l) pair (matched
+	 * against an entry's grown_by tags, not l's own target literal) and
+	 * value, given in the terminal alphabet (matching what
+	 * parser::input::get_terminals resolves a span to). A no-op if no
+	 * pending entry matches. parser calls this when an item whose head is
+	 * a registered parent completes, passing that head as parent.
+	 */
+	void confirm_dynamic(size_t parent, const lit<C, T>& l,
+		const std::basic_string<T>& value);
+	/// True iff idx names a dynamic production currently retired.
+	bool is_retired(size_t idx) const;
+	/// Links idx into ntsm. The only place a dynamic entry gets linked.
+	void link(size_t idx);
+	/// Marks idx's entry retired and unlinks it from ntsm. The only
+	/// place a dynamic entry gets unlinked.
+	void retire(size_t idx);
+	/// Removes idx from pending_, for an entry promoted out of the
+	/// pending state without going through commit_dynamic or
+	/// rollback_dynamic (a host or context value grown earlier this
+	/// parse, then claimed before the parse's own end decides it).
+	void unpend(size_t idx);
 	nonterminals<C, T>& nts;
 	lit<C, T> start;
 	char_class_fns<T> cc_fns = {};
@@ -488,7 +575,49 @@ private:
 	std::set<size_t> nullables = {};
 	std::set<size_t> conjunctives = {};
 	std::vector<production> G;
-	std::map<lit<C, T>, std::set<std::basic_string<C>>> dynm = {};
+	/// A dynamic production's full lifecycle state. host: from opt.dynamic
+	/// or add_dynamic, never retired by sync_dynamic_context. committed:
+	/// confirmed by a parse, or supplied by sync_dynamic_context's ctx.
+	/// pending: grown by add_dynamic_production_from this parse, not yet
+	/// decided. retired: linked into neither ntsm nor any live parse.
+	struct dynamic_entry {
+		enum class state { host, committed, pending, retired };
+		state st;
+		lit<C, T> l;
+		std::basic_string<C> value;
+		/// value in the terminal alphabet, matching what
+		/// parser::input::get_terminals resolves a span to; this is
+		/// what confirm_dynamic compares against.
+		std::basic_string<T> value_t;
+		/// Meaningful in pending: every (parent, child) dynamic_grow_nts
+		/// pair this grow is associated with, for confirm_dynamic's
+		/// lookup. active_grow_ at each add call for this (l, value), or
+		/// ((size_t)-1, l's own id) when a call happens outside a
+		/// grow-hook firing. More than one pair joins here when separate
+		/// registered parents grow the same value.
+		std::set<std::pair<size_t, size_t>> grown_by;
+		/// Meaningful in pending: whether some registered parent has
+		/// completed over this value's span during the current parse.
+		bool confirmed = false;
+	};
+	/// The single owner of dynamic lifecycle state, keyed by the
+	/// production's index in G.
+	std::map<size_t, dynamic_entry> dynamic_ = {};
+	/// (l, value) -> production index. Append-only and never erased, so
+	/// a production index is never reused for another value: this cannot
+	/// drift from dynamic_.
+	std::map<lit<C, T>, std::map<std::basic_string<C>, size_t>>
+		dynamic_idx_ = {};
+	/// Production indices with dynamic_[idx].st == pending, in the order
+	/// add_dynamic_production_from grew them this parse. Cleared by
+	/// commit_dynamic and rollback_dynamic.
+	std::vector<size_t> pending_ = {};
+	/// The (parent, child) pair parser is currently firing
+	/// on_dynamic_grow for, read by add_dynamic_production_from to tag
+	/// new entries; parser sets this immediately around the callback.
+	/// ((size_t)-1, (size_t)-1) outside a firing.
+	std::pair<size_t, size_t> active_grow_ =
+		{ static_cast<size_t>(-1), static_cast<size_t>(-1) };
 };
 
 /**
@@ -909,6 +1038,9 @@ public:
 		bool enable_gc = DEFAULT_ENABLE_GC;
 		/// Garbage collection lag
 		size_t gc_lag = DEFAULT_GC_LAG;
+		/// Values this parse can match, and where its confirmed grows
+		/// are kept. Null uses the parser's own internal container.
+		dynamic_context<C>* dynamic_ctx = nullptr;
 	};
 	/// Bundled decode + encode for character-terminal conversion.
 	template <typename C2, typename T2>
@@ -942,6 +1074,24 @@ public:
 		/// overloads that take a parse_options use it for that one parse
 		/// and restore this default afterwards.
 		parse_options parse_opts = {};
+
+		/// Parent nonterminal id, child nonterminal id. The parent
+		/// advancing past a registered child grows the grammar; the
+		/// parent's own completion later confirms exactly the spans it
+		/// grew. A pair whose parent equals its child is dropped
+		/// wherever this option is consumed (the constructor,
+		/// set_dynamic_grow). Empty disables the hook.
+		std::set<std::pair<size_t, size_t>> dynamic_grow_nts = {};
+
+		/// Fired when a parent in dynamic_grow_nts advances to a
+		/// strictly greater input position after consuming a registered
+		/// child. Args: the input, the child id, and the child span
+		/// [from, to).
+		using dynamic_grow_fn =
+			std::function<void(input&, size_t, size_t, size_t)>;
+		/// Called for progress past a child of any pair in
+		/// dynamic_grow_nts. Unset (default) disables the hook.
+		dynamic_grow_fn on_dynamic_grow = {};
 	};
 
 	/// Result of the parse call.
@@ -1182,9 +1332,33 @@ public:
 #endif
 	grammar<C, T>& get_grammar() { return g; }
 	const grammar<C, T>& get_grammar() const { return g; }
+	/**
+	 * Sets the dynamic grow hook (options::on_dynamic_grow and
+	 * options::dynamic_grow_nts) on a parser already constructed, such
+	 * as a generated singleton whose options are built at construction.
+	 * Call this between parses. Returns false and changes nothing if any
+	 * pair has an equal parent and child.
+	 */
+	bool set_dynamic_grow(typename options::dynamic_grow_fn fn,
+		std::set<std::pair<size_t, size_t>> nts)
+	{
+		if (!dynamic_grow_nts_valid(nts)) return false;
+		o.on_dynamic_grow = fn;
+		o.dynamic_grow_nts = std::move(nts);
+		return true;
+	}
 	bool debug = false;
 	std::pair<size_t, size_t> debug_at = { DEBUG_POS_FROM, DEBUG_POS_TO };
 private:
+	/// True unless some pair has an equal parent and child. Such a pair
+	/// would confirm on the child's own completion, confirming every
+	/// prefix: exactly the defect dynamic_grow_nts's split design removes.
+	static bool dynamic_grow_nts_valid(
+		const std::set<std::pair<size_t, size_t>>& nts)
+	{
+		for (const auto& [p, c] : nts) if (p == c) return false;
+		return true;
+	}
 	using container_t    = ankerl::unordered_dense::set<item, item_hash>;
 	using container_iter = typename container_t::iterator;
 public:
@@ -1251,6 +1425,66 @@ private:
 	/// only grows during a parse, so indices into its underlying vector
 	/// are stable.
 	ankerl::unordered_dense::map<item, size_t, item_hash> complete_memo;
+	/// One registered child's span, consumed on the way to some item's
+	/// own parent in o.dynamic_grow_nts. fired marks that on_dynamic_grow
+	/// already ran for this span, so a later propagation step (the entry
+	/// is copied forward as-is) does not run it again.
+	struct dyn_child_entry { size_t child_nt, from, to; bool fired = false; };
+	/// Per-parse: item -> the registered children's spans consumed on
+	/// the way to that item, one entry per child completion crossed.
+	/// Propagated forward through complete() and scan() as an item's
+	/// remaining literals match. on_dynamic_grow fires there, for an
+	/// entry whose span the parent has just progressed strictly past;
+	/// read again when a parent completes, filtered to entries whose
+	/// (parent, child_nt) is a registered pair, to confirm them.
+	/// Cleared at the start of each parse.
+	ankerl::unordered_dense::map<item, std::vector<dyn_child_entry>,
+		item_hash> dyn_child_span;
+	/// Nonterminal ids that are a child in some o.dynamic_grow_nts pair.
+	/// Left empty when on_dynamic_grow is unset, so a registered pair
+	/// with no callback never grows an annotation to fire on. Recomputed
+	/// at the start of each parse.
+	std::set<size_t> dyn_child_ids;
+	/// Used by parse_options::dynamic_ctx when null.
+	dynamic_context<C> internal_dynamic_ctx;
+	/// Merges incoming into dyn_child_span[j]: an entry whose
+	/// (child_nt, from, to) is not already there is appended; a present
+	/// one keeps fired once either side has set it. Never drops an
+	/// entry another derivation already recorded for j.
+	void merge_dyn_child_span(const item& j,
+		const std::vector<dyn_child_entry>& incoming)
+	{
+		auto it = dyn_child_span.find(j);
+		std::vector<dyn_child_entry> merged = it != dyn_child_span.end()
+			? it->second : std::vector<dyn_child_entry>{};
+		for (const auto& e : incoming) {
+			auto mit = std::find_if(merged.begin(), merged.end(),
+				[&e](const dyn_child_entry& m) {
+					return m.child_nt == e.child_nt &&
+						m.from == e.from && m.to == e.to;
+				});
+			if (mit == merged.end()) merged.push_back(e);
+			else mit->fired = mit->fired || e.fired;
+		}
+		// copy-then-insert: dyn_child_span is a flat hashmap, so this
+		// operator[] can reallocate its backing storage; incoming and
+		// the old entries are already fully read by this point.
+		dyn_child_span[j] = std::move(merged);
+	}
+	/// Calls o.on_dynamic_grow with g.active_grow_ scoped to
+	/// (parent_nt, child_nt), restoring the previous pair after so a
+	/// nested firing does not clobber an outer one. A no-op when
+	/// on_dynamic_grow is unset, so a registered pair with no callback
+	/// never calls an empty std::function.
+	void fire_dynamic_grow(size_t parent_nt, size_t child_nt, size_t from,
+		size_t to)
+	{
+		if (!o.on_dynamic_grow) return;
+		auto prev = g.active_grow_;
+		g.active_grow_ = { parent_nt, child_nt };
+		o.on_dynamic_grow(*in_, child_nt, from, to);
+		g.active_grow_ = prev;
+	}
 
 	/// binarized temporary intermediate non-terminals
 	std::map<std::vector<lit<C, T>>, lit<C, T>> bin_tnt;
@@ -1301,6 +1535,10 @@ private:
 	void scan_cc_function(const item& i, size_t n, T ch, container_t& t);
 	void complete(const item& i, container_t& t, container_t& c,
 						bool conj_resolved = false);
+	/// Confirms every registered child span x's completion grew, once x
+	/// is genuinely completed (not a conjunct parked for later
+	/// resolution). Called from complete(), never for a negative x.
+	void confirm_dynamic_parent(const item& x);
 	bool completed(const item& i) const;
 	bool negative(const item& i) const;
 	/// returns number of literals for a given item
