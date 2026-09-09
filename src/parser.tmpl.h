@@ -1194,6 +1194,18 @@ typename parser<C, T>::error parser<C, T>::get_error() {
 		predict_all_at(i);
 		size_t from = 0;
 		bool unexp_neg = false;
+		// decide the negation report before the main pass, so it
+		// does not depend on this set's insertion order
+		for (const item& t : S[i])
+			if (!g.conjunctive(t.prod) && completed(t) &&
+				get_nt(t).to_std_string().rfind("__N_", 0)
+					== 0)
+			{
+				err.unexp = {};
+				for (size_t k = t.from; k < t.set; ++k)
+					err.unexp.emplace_back(in.tat(k));
+				err.loc = t.from, unexp_neg = true;
+			}
 		// smallest length item that may be used as delimiter
 		for (const item& t : S[i]) {
 			//DBG(print(std::cout << "t0 = ", t) << "\n";)
@@ -1222,14 +1234,6 @@ typename parser<C, T>::error parser<C, T>::get_error() {
 				}
 			} else {
 				//ignoring empty string, completed and nts
-				if (completed(t) && (get_nt(t).to_std_string()
-						.rfind("__N_", 0) == 0))
-				{
-					err.unexp = {};
-					for (size_t i = t.from; i < t.set; ++i)
-						err.unexp.emplace_back(in.tat(i));
-					err.loc = t.from, unexp_neg = true;
-				}
 				if (completed(t) || (get_lit(t).nt()
 					&& !g.is_cc_fn(get_lit(t).n())) ||
 						(!get_lit(t).nt()
@@ -1242,7 +1246,6 @@ typename parser<C, T>::error parser<C, T>::get_error() {
 				auto bv = back_track(x);
 				for (const item& b : bv) err.expv.back()
 						.bktrk.emplace_back(item2_ept(b));
-				unexp_neg = false;
 			}
 		}
 		if (!unexp_neg)
