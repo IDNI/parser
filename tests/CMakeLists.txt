@@ -59,6 +59,7 @@ set(DOCTESTS
 	input
 	json
 	measure
+	repl_history
 	tree
 	tree_traversal1
 	tree_traversal2

@@ -29,6 +29,7 @@ struct repl_history {
 	// Append `s` (deduplicated against the most recent entry) and persist
 	// it to the file. Resets the navigation cursor to the end.
 	void store(const std::string& s) {
+		stash_.reset();
 		if (!entries_.empty() && entries_.back() == s) {
 			hpos_ = entries_.size();
 			return;
@@ -39,20 +40,23 @@ struct repl_history {
 		if (f) f << escape(s) << '\n';
 	}
 
-	// Previous entry (↑). `current` is the live edit buffer; when stepping
-	// up from the end it is stashed as a transient tail entry so ↓ can
-	// restore it (matches the existing behavior).
+	// Previous entry (↑). `current` is the live edit buffer; stepping up
+	// from the end stashes it (not as a real entry) so ↓ can restore it.
 	std::optional<std::string> prev(const std::string& current) {
 		if (entries_.empty() || hpos_ == 0) return std::nullopt;
 		if (hpos_ == entries_.size() && !current.empty())
-			entries_.push_back(current);
+			stash_ = current;
 		return entries_[--hpos_];
 	}
-	// Next entry (↓). Returns empty string (clear) when stepping past the
-	// newest entry back to the live buffer.
+	// Next entry (↓). Returns the stashed live buffer (or empty) when
+	// stepping past the newest entry back to it.
 	std::optional<std::string> next() {
 		if (hpos_ == entries_.size()) return std::nullopt;
-		if (++hpos_ == entries_.size()) return std::string{};
+		if (++hpos_ == entries_.size()) {
+			auto s = stash_.value_or(std::string{});
+			stash_.reset();
+			return s;
+		}
 		return entries_[hpos_];
 	}
 	// First entry (Ctrl-↑).
@@ -96,9 +100,10 @@ private:
 		return oss.str();
 	}
 
-	std::string              file_path_;
-	std::vector<std::string> entries_;
-	size_t                   hpos_ = 0; // navigation cursor, 0..size()
+	std::string                file_path_;
+	std::vector<std::string>   entries_;
+	size_t                     hpos_ = 0; // navigation cursor, 0..size()
+	std::optional<std::string> stash_; // live edit buffer parked by prev()
 };
 
 } // namespace idni
