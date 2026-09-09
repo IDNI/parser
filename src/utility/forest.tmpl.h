@@ -531,6 +531,9 @@ bool forest<NodeT>::replace_nodes(graph& g, nodes& s) {
 	}
 
 	MC(std::cout << "Total replaced count: " << total_replacements << "\n";)
+	// g was mutated in place; predecessors()/traverse_backward() would
+	// otherwise walk a stale index.
+	if (gchange) invalidate_reverse_index();
 	return gchange;
 }
 
@@ -586,6 +589,7 @@ bool forest<NodeT>::replace_node(graph& g, const node& torepl,
 				*/
 			}
 		}
+	if (gchange) invalidate_reverse_index();
 	return gchange;
 }
 
