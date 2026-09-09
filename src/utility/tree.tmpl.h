@@ -162,14 +162,14 @@ void bintree<T>::dump() {
 
 template <typename T>
 void bintree<T>::gc() {
-	if (!gc_enabled.load(std::memory_order_relaxed)) return;
+	if (gc_pause_depth.load(std::memory_order_relaxed) > 0) return;
 	std::unordered_set<tref> keep{};
 	gc(keep);
 }
 
 template <typename T>
 void bintree<T>::gc(std::unordered_set<tref>& keep) {
-	if (!gc_enabled.load(std::memory_order_relaxed)) return;
+	if (gc_pause_depth.load(std::memory_order_relaxed) > 0) return;
 	std::unique_lock lock(mtx_);
 	// DBG(dump();)
 	//DBG(htree::dump();)

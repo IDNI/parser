@@ -228,9 +228,21 @@ struct bintree {
 	static void dump();
 
 	/**
-	 * @brief Controls if garbage collection is active
+	 * @brief Nesting depth of gc_pause scopes; gc() is a no-op while > 0
 	 */
-	inline static std::atomic<bool> gc_enabled{true};
+	inline static std::atomic<int> gc_pause_depth{0};
+
+	/**
+	 * @brief RAII scope disabling gc for its lifetime; nests safely, unlike
+	 * a raw flag a nested traversal would clear on the way out.
+	 */
+	struct gc_pause {
+		gc_pause() { gc_pause_depth.fetch_add(1, std::memory_order_relaxed); }
+		~gc_pause() { gc_pause_depth.fetch_sub(1, std::memory_order_relaxed); }
+		gc_pause(const gc_pause&) = delete;
+		gc_pause& operator=(const gc_pause&) = delete;
+	};
+
 	// Protects M() and gc_callbacks; shared for reads, exclusive for writes/gc.
 	inline static std::shared_mutex mtx_{};
 

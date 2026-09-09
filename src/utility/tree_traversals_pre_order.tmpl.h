@@ -15,9 +15,8 @@ template <typename node>
 template<size_t slot>
 tref pre_order<node>::apply_unique(auto& f, auto& visit_subtree, auto& up) {
 	if (visit_subtree(root)) {
-		bintree<node>::gc_enabled = false;
+		typename bintree<node>::gc_pause pause_gc;
 		tref res = traverse<false, slot, true>(root, f, visit_subtree, up);
-		bintree<node>::gc_enabled = true;
 		return res;
 	}
 
@@ -28,10 +27,9 @@ template <typename node>
 template<size_t slot>
 tref pre_order<node>::apply_unique(auto& f, auto& visit_subtree) {
 	if (visit_subtree(root)) {
-		bintree<node>::gc_enabled = false;
+		typename bintree<node>::gc_pause pause_gc;
 		tref res = traverse<false, slot, true>(root, f, visit_subtree,
 								identity);
-		bintree<node>::gc_enabled = true;
 		return res;
 	}
 	else return root;
@@ -40,9 +38,8 @@ tref pre_order<node>::apply_unique(auto& f, auto& visit_subtree) {
 template <typename node>
 template<size_t slot>
 tref pre_order<node>::apply_unique(auto& f) {
-	bintree<node>::gc_enabled = false;
+	typename bintree<node>::gc_pause pause_gc;
 	tref res = traverse<false, slot, true>(root, f, all, identity);
-	bintree<node>::gc_enabled = true;
 	return res;
 }
 
@@ -50,9 +47,8 @@ template <typename node>
 template<size_t slot>
 tref pre_order<node>::apply(auto& f, auto& visit_subtree, auto& up) {
 	if (visit_subtree(root)) {
-		bintree<node>::gc_enabled = false;
+		typename bintree<node>::gc_pause pause_gc;
 		tref res = traverse<false, slot, false>(root, f, visit_subtree, up);
-		bintree<node>::gc_enabled = true;
 		return res;
 	}
 	else return root;
@@ -61,9 +57,8 @@ tref pre_order<node>::apply(auto& f, auto& visit_subtree, auto& up) {
 template <typename node>
 template<size_t slot>
 tref pre_order<node>::apply(auto& f) {
-	bintree<node>::gc_enabled = false;
+	typename bintree<node>::gc_pause pause_gc;
 	tref res = traverse<false, slot, false>(root, f, all, identity);
-	bintree<node>::gc_enabled = true;
 	return res;
 }
 
@@ -73,9 +68,8 @@ tref pre_order<node>::apply_unique_until_change(auto& f, auto& visit_subtree,
 	auto& up)
 {
 	if (visit_subtree(root)) {
-		bintree<node>::gc_enabled = false;
+		typename bintree<node>::gc_pause pause_gc;
 		tref res = traverse<true, slot, true>(root, f, visit_subtree, up);
-		bintree<node>::gc_enabled = true;
 		return res;
 	}
 	else return root;
@@ -85,10 +79,9 @@ template <typename node>
 template<size_t slot>
 tref pre_order<node>::apply_unique_until_change(auto& f, auto& visit_subtree){
 	if (visit_subtree(root)) {
-		bintree<node>::gc_enabled = false;
+		typename bintree<node>::gc_pause pause_gc;
 		tref res = traverse<true, slot, true>(
 					root, f, visit_subtree, identity);
-		bintree<node>::gc_enabled = true;
 		return res;
 	}
 	else return root;
@@ -98,9 +91,8 @@ tref pre_order<node>::apply_unique_until_change(auto& f, auto& visit_subtree){
 template <typename node>
 template<size_t slot>
 tref pre_order<node>::apply_unique_until_change(auto& f) {
-	bintree<node>::gc_enabled = false;
+	typename bintree<node>::gc_pause pause_gc;
 	tref res = traverse<true, slot, true>(root, f, all, identity);
-	bintree<node>::gc_enabled = true;
 	return res;
 }
 
@@ -110,9 +102,8 @@ tref pre_order<node>::apply_until_change(auto& f, auto& visit_subtree,
 	auto& up)
 {
 	if (visit_subtree(root)) {
-		bintree<node>::gc_enabled = false;
+		typename bintree<node>::gc_pause pause_gc;
 		tref res = traverse<true, slot, false>(root, f, visit_subtree, up);
-		bintree<node>::gc_enabled = true;
 		return res;
 	}
 	else return root;
@@ -121,9 +112,8 @@ tref pre_order<node>::apply_until_change(auto& f, auto& visit_subtree,
 template <typename node>
 template<size_t slot>
 tref pre_order<node>::apply_until_change(auto& f) {
-	bintree<node>::gc_enabled = false;
+	typename bintree<node>::gc_pause pause_gc;
 	tref res = traverse<true, slot, false>(root, f, all, identity);
-	bintree<node>::gc_enabled = true;
 	return res;
 }
 
@@ -132,28 +122,25 @@ void pre_order<node>::visit(auto& visit, auto& visit_subtree, auto& up,
 	auto& between)
 {
 	if (visit_subtree(root)) {
-		bintree<node>::gc_enabled = false;
+		typename bintree<node>::gc_pause pause_gc;
 		const_traverse<false, false>(root,
 					visit, visit_subtree, up, between);
-		bintree<node>::gc_enabled = true;
 	}
 }
 
 template <typename node>
 void pre_order<node>::visit(auto& visit, auto& visit_subtree, auto& up) {
 	if (visit_subtree(root)) {
-		bintree<node>::gc_enabled = false;
+		typename bintree<node>::gc_pause pause_gc;
 		const_traverse<false, false>(root,
 					visit, visit_subtree, up, do_nothing);
-		bintree<node>::gc_enabled = true;
 	}
 }
 
 template <typename node>
 void pre_order<node>::visit(auto& visit) {
-	bintree<node>::gc_enabled = false;
+	typename bintree<node>::gc_pause pause_gc;
 	const_traverse<false, false>(root, visit, all, identity, do_nothing);
-	bintree<node>::gc_enabled = true;
 }
 
 template <typename node>
@@ -161,64 +148,57 @@ void pre_order<node>::search(auto& visit, auto& visit_subtree, auto& up,
 	auto& between)
 {
 	if (visit_subtree(root)) {
-		bintree<node>::gc_enabled = false;
+		typename bintree<node>::gc_pause pause_gc;
 		const_traverse<true, false>(root,
 					visit, visit_subtree, up, between);
-		bintree<node>::gc_enabled = true;
 	}
 }
 
 template <typename node>
 void pre_order<node>::search(auto& visit, auto& visit_subtree, auto& up) {
 	if (visit_subtree(root)) {
-		bintree<node>::gc_enabled = false;
+		typename bintree<node>::gc_pause pause_gc;
 		const_traverse<true, false>(root,
 					visit, visit_subtree, up, do_nothing);
-		bintree<node>::gc_enabled = true;
 	}
 }
 
 template <typename node>
 void pre_order<node>::search(auto& visit) {
-	bintree<node>::gc_enabled = false;
+	typename bintree<node>::gc_pause pause_gc;
 	const_traverse<true, false>(root, visit, all, identity, do_nothing);
-	bintree<node>::gc_enabled = true;
 }
 
 template <typename node>
 void pre_order<node>::visit_unique(auto& visit, auto& visit_subtree, auto& up)
 {
 	if (visit_subtree(root)) {
-		bintree<node>::gc_enabled = false;
+		typename bintree<node>::gc_pause pause_gc;
 		const_traverse<false, true>(root,
 					visit, visit_subtree, up, do_nothing);
-		bintree<node>::gc_enabled = true;
 	}
 }
 
 template <typename node>
 void pre_order<node>::visit_unique(auto& visit) {
-	bintree<node>::gc_enabled = false;
+	typename bintree<node>::gc_pause pause_gc;
 	const_traverse<false, true>(root, visit, all, identity, do_nothing);
-	bintree<node>::gc_enabled = true;
 }
 
 template <typename node>
 void pre_order<node>::search_unique(auto&visit, auto& visit_subtree, auto& up)
 {
 	if (visit_subtree(root)) {
-		bintree<node>::gc_enabled = false;
+		typename bintree<node>::gc_pause pause_gc;
 		const_traverse<true, true>(root,
 					visit, visit_subtree, up, do_nothing);
-		bintree<node>::gc_enabled = true;
 	}
 }
 
 template <typename node>
 void pre_order<node>::search_unique(auto&visit) {
-	bintree<node>::gc_enabled = false;
+	typename bintree<node>::gc_pause pause_gc;
 	const_traverse<true, true>(root, visit, all, identity, do_nothing);
-	bintree<node>::gc_enabled = true;
 }
 
 

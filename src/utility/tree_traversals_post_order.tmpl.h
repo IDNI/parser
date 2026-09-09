@@ -15,9 +15,8 @@ template <typename node>
 template <size_t slot>
 tref post_order<node>::apply_unique(auto& f, auto& visit_subtree) {
 	if (visit_subtree(root)) {
-		bintree<node>::gc_enabled = false;
+		typename bintree<node>::gc_pause pause_gc;
 		tref res = traverse<slot>(root, f, visit_subtree);
-		bintree<node>::gc_enabled = true;
 		return res;
 	}
 	else return root;
@@ -26,42 +25,37 @@ tref post_order<node>::apply_unique(auto& f, auto& visit_subtree) {
 template <typename node>
 template <size_t slot>
 tref post_order<node>::apply_unique(auto& f) {
-	bintree<node>::gc_enabled = false;
+	typename bintree<node>::gc_pause pause_gc;
 	tref res = traverse<slot>(root, f, all);
-	bintree<node>::gc_enabled = true;
 	return res;
 }
 
 template <typename node>
 void post_order<node>::search(auto& visit, auto& visit_subtree) {
 	if (visit_subtree(root)) {
-		bintree<node>::gc_enabled = false;
+		typename bintree<node>::gc_pause pause_gc;
 		const_traverse<false>(root, visit, visit_subtree);
-		bintree<node>::gc_enabled = true;
 	}
 }
 
 template <typename node>
 void post_order<node>::search(auto& visit) {
-	bintree<node>::gc_enabled = false;
+	typename bintree<node>::gc_pause pause_gc;
 	const_traverse<false>(root, visit, all);
-	bintree<node>::gc_enabled = true;
 }
 
 template <typename node>
 void post_order<node>::search_unique(auto& visit, auto& visit_subtree) {
 	if (visit_subtree(root)) {
-		bintree<node>::gc_enabled = false;
+		typename bintree<node>::gc_pause pause_gc;
 		const_traverse<true>(root, visit, visit_subtree);
-		bintree<node>::gc_enabled = true;
 	}
 }
 
 template <typename node>
 void post_order<node>::search_unique(auto& visit) {
-	bintree<node>::gc_enabled = false;
+	typename bintree<node>::gc_pause pause_gc;
 	const_traverse<true>(root, visit, all);
-	bintree<node>::gc_enabled = true;
 }
 
 template <typename node>
