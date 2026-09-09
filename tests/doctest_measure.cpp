@@ -4,8 +4,8 @@
 // Unit tests for the measurement facility (namespace idni::measures).
 //
 // Tests only the timer / counter / rule-counter / rule-hit registries and
-// the RSS helpers. Each TU including measure.h gets its own static 
-// `timers`/`counters` maps; tests reset the relevant registries on entry
+// the RSS helpers. The `timers`/`counters` maps are one shared instance
+// across the whole program; tests reset the relevant registries on entry
 // so case order is irrelevant.
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN

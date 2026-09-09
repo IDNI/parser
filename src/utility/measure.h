@@ -95,83 +95,83 @@ struct basic_timer {
 using timer        = basic_timer<cpu_clock_tag>;
 using steady_timer = basic_timer<steady_clock_tag>;
 
-static std::map<std::string, timer> timers;
-static std::map<std::string, size_t> counters;
+inline std::map<std::string, timer> timers;
+inline std::map<std::string, size_t> counters;
 
 template<typename node_t>
 using rule = std::pair<node_t, node_t>;
 
 template<typename node_t>
-static std::map<rule<node_t>, size_t> rule_counters;
+inline std::map<rule<node_t>, size_t> rule_counters;
 
 template<typename node_t>
-static std::map<rule<node_t>, size_t> rule_hits;
+inline std::map<rule<node_t>, size_t> rule_hits;
 
 [[maybe_unused]]
-static void start_timer(const std::string& name, bool silent = false);
+inline void start_timer(const std::string& name, bool silent = false);
 
 [[maybe_unused]]
-static void restart_timer(const std::string& name);
+inline void restart_timer(const std::string& name);
 
 [[maybe_unused]]
-static void pause_timer(const std::string& name);
+inline void pause_timer(const std::string& name);
 
 [[maybe_unused]]
-static void unpause_timer(const std::string& name);
+inline void unpause_timer(const std::string& name);
 
 [[maybe_unused]]
-static double get_timer(const std::string& name);
+inline double get_timer(const std::string& name);
 
 [[maybe_unused]]
-static void stop_timer(const std::string& name);
+inline void stop_timer(const std::string& name);
 
 [[maybe_unused]]
-static void print_timer(const std::string& name);
+inline void print_timer(const std::string& name);
 
 [[maybe_unused]]
-static void remove_timer(const std::string& name);
+inline void remove_timer(const std::string& name);
 
 [[maybe_unused]]
-static void remove_all_timers();
+inline void remove_all_timers();
 
 [[maybe_unused]]
-static size_t increase_counter(const std::string& name);
+inline size_t increase_counter(const std::string& name);
 
 [[maybe_unused]]
-static size_t get_counter(const std::string& name);
+inline size_t get_counter(const std::string& name);
 
 [[maybe_unused]]
-static void remove_counter(const std::string& name);
+inline void remove_counter(const std::string& name);
 
 [[maybe_unused]]
-static void remove_all_counters();
+inline void remove_all_counters();
 
 template<typename node_t>
-static size_t increase_rule_counter(const rule<node_t>& r);
+inline size_t increase_rule_counter(const rule<node_t>& r);
 
 template<typename node_t>
-static size_t get_rule_counter(const rule<node_t>& r);
+inline size_t get_rule_counter(const rule<node_t>& r);
 
 template<typename node_t>
-static void remove_rule_counter(const rule<node_t>& r);
+inline void remove_rule_counter(const rule<node_t>& r);
 
 template<typename node_t>
-static void remove_all_rule_counters();
+inline void remove_all_rule_counters();
 
 template<typename node_t>
-static size_t increase_rule_hit(const rule<node_t>& r);
+inline size_t increase_rule_hit(const rule<node_t>& r);
 
 template<typename node_t>
-static size_t get_rule_hit(const rule<node_t>& r);
+inline size_t get_rule_hit(const rule<node_t>& r);
 
 template<typename node_t>
-static void remove_rule_hit(const rule<node_t>& r);
+inline void remove_rule_hit(const rule<node_t>& r);
 
 template<typename node_t>
-static void remove_all_rule_hits();
+inline void remove_all_rule_hits();
 
 template<typename node_t>
-static void remove_all();
+inline void remove_all();
 
 } // namespace idni::measures
 

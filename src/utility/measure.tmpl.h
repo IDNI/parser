@@ -139,130 +139,130 @@ basic_timer<ClockTag>::~basic_timer() { stop(); }
 // ---- timer helpers --------------------------------------------------------
 
 [[maybe_unused]]
-static void start_timer(const std::string& name, bool silent) {
+inline void start_timer(const std::string& name, bool silent) {
 	if (timers.find(name) == timers.end()) timers[name] = timer(silent);
 	timers[name].start();
 }
 
 [[maybe_unused]]
-static void restart_timer(const std::string& name) {
+inline void restart_timer(const std::string& name) {
 	if (timers.find(name) != timers.end()) timers[name].restart();
 }
 
 [[maybe_unused]]
-static void pause_timer(const std::string& name) {
+inline void pause_timer(const std::string& name) {
 	if (timers.find(name) != timers.end()) timers[name].pause();
 }
 
 [[maybe_unused]]
-static void unpause_timer(const std::string& name) {
+inline void unpause_timer(const std::string& name) {
 	if (timers.find(name) != timers.end()) timers[name].unpause();
 }
 
 [[maybe_unused]]
-static double get_timer(const std::string& name) {
+inline double get_timer(const std::string& name) {
 	return (timers.find(name) != timers.end()) ? timers[name].get() : 0;
 }
 
 [[maybe_unused]]
-static void stop_timer(const std::string& name) {
+inline void stop_timer(const std::string& name) {
 	if (timers.find(name) != timers.end()) timers[name].stop();
 }
 
 [[maybe_unused]]
-static void print_timer(const std::string& name) {
+inline void print_timer(const std::string& name) {
 	if (timers.find(name) != timers.end() && !timers[name].silent_)
 		std::cout << std::fixed << std::setprecision(2)
 			<< name << " time: " << timers[name].get() << " ms\n";
 }
 
 [[maybe_unused]]
-static void remove_timer(const std::string& name) {
+inline void remove_timer(const std::string& name) {
 	if (timers.find(name) != timers.end()) timers.erase(name);
 }
 
 [[maybe_unused]]
-static void remove_all_timers() { timers.clear(); }
+inline void remove_all_timers() { timers.clear(); }
 
 // ---- counter helpers ------------------------------------------------------
 
 [[maybe_unused]]
-static size_t increase_counter(const std::string& name) {
+inline size_t increase_counter(const std::string& name) {
 	if (counters.find(name) == counters.end()) counters[name] = 0;
 	return ++counters[name];
 }
 
 [[maybe_unused]]
-static size_t get_counter(const std::string& name) {
+inline size_t get_counter(const std::string& name) {
 	auto it = counters.find(name);
 	return it == counters.end() ? 0 : it->second;
 }
 
 [[maybe_unused]]
-static void remove_counter(const std::string& name) {
+inline void remove_counter(const std::string& name) {
 	if (counters.find(name) != counters.end()) counters.erase(name);
 }
 
 [[maybe_unused]]
-static void remove_all_counters() { counters.clear(); }
+inline void remove_all_counters() { counters.clear(); }
 
 // ---- rule counter helpers -------------------------------------------------
 
 template<typename node_t>
 [[maybe_unused]]
-static size_t increase_rule_counter(const rule<node_t>& r) {
+inline size_t increase_rule_counter(const rule<node_t>& r) {
 	if (rule_counters<node_t>.find(r) == rule_counters<node_t>.end()) rule_counters<node_t>[r] = 0;
 	return ++rule_counters<node_t>[r];
 }
 
 template<typename node_t>
 [[maybe_unused]]
-static size_t get_rule_counter(const rule<node_t>& r) {
+inline size_t get_rule_counter(const rule<node_t>& r) {
 	auto it = rule_counters<node_t>.find(r);
 	return it == rule_counters<node_t>.end() ? 0 : it->second;
 }
 
 template<typename node_t>
 [[maybe_unused]]
-static void remove_rule_counter(const rule<node_t>& r) {
+inline void remove_rule_counter(const rule<node_t>& r) {
 	if (rule_counters<node_t>.find(r) != rule_counters<node_t>.end()) rule_counters<node_t>.erase(r);
 }
 
 template<typename node_t>
 [[maybe_unused]]
-static void remove_all_rule_counters() { rule_counters<node_t>.clear(); }
+inline void remove_all_rule_counters() { rule_counters<node_t>.clear(); }
 
 // ---- rule hit helpers -----------------------------------------------------
 
 template<typename node_t>
 [[maybe_unused]]
-static size_t increase_rule_hit(const rule<node_t>& r) {
+inline size_t increase_rule_hit(const rule<node_t>& r) {
 	if (rule_hits<node_t>.find(r) == rule_hits<node_t>.end()) rule_hits<node_t>[r] = 0;
 	return ++rule_hits<node_t>[r];
 }
 
 template<typename node_t>
 [[maybe_unused]]
-static size_t get_rule_hit(const rule<node_t>& r) {
+inline size_t get_rule_hit(const rule<node_t>& r) {
 	auto it = rule_hits<node_t>.find(r);
 	return it == rule_hits<node_t>.end() ? 0 : it->second;
 }
 
 template<typename node_t>
 [[maybe_unused]]
-static void remove_rule_hit(const rule<node_t>& r) {
+inline void remove_rule_hit(const rule<node_t>& r) {
 	if (rule_hits<node_t>.find(r) != rule_hits<node_t>.end()) rule_hits<node_t>.erase(r);
 }
 
 template<typename node_t>
 [[maybe_unused]]
-static void remove_all_rule_hits() { rule_hits<node_t>.clear(); }
+inline void remove_all_rule_hits() { rule_hits<node_t>.clear(); }
 
 // ---- remove_all -----------------------------------------------------------
 
 template<typename node_t>
 [[maybe_unused]]
-static void remove_all() {
+inline void remove_all() {
 	remove_all_timers();
 	remove_all_counters();
 	remove_all_rule_counters<node_t>();
