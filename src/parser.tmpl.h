@@ -482,7 +482,7 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 	//gcready.insert(i);
 }
 template <typename C, typename T>
-bool parser<C, T>::first_can_match(size_t p, size_t c, T ch) {
+bool parser<C, T>::first_can_match(size_t p, size_t c, T ch) const {
 	const auto& conj = g[p][c];
 	if (conj.size() == 0) return true;
 	const lit<C, T>& l = conj[0];
@@ -491,7 +491,7 @@ bool parser<C, T>::first_can_match(size_t p, size_t c, T ch) {
 	if (!g.is_cc_fn(l.n())) return true;
 	if (g.is_eof_fn(l.n()))
 		return ch == static_cast<T>(0) || ch == static_cast<T>(-1);
-	return g.get_char_class_production(l, ch) != static_cast<size_t>(-1);
+	return !g.char_class_check(l, ch);
 }
 template <typename C, typename T>
 void parser<C, T>::predict(const item& i, container_t& t, T ch) {

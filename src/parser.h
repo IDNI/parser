@@ -1293,7 +1293,7 @@ private:
 	/// match it is not predicted (one-character lookahead).
 	void predict(const item& i, container_t& t, T ch);
 	/// true iff conjunct `c` of production `p` may start with `ch`.
-	bool first_can_match(size_t p, size_t c, T ch);
+	bool first_can_match(size_t p, size_t c, T ch) const;
 	/// Predict, without lookahead, everything predictable at set `n`,
 	/// so an error report lists every alternative the lookahead skipped.
 	void predict_all_at(size_t n);

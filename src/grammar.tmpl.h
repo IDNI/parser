@@ -543,16 +543,13 @@ void grammar<C, T>::set_enabled_productions(const std::set<std::string>& grds) {
 	for (size_t gid = 0; gid != guards.size(); ++gid)
 		if (opt.enabled_guards.count(guards[gid]))
 			gids.insert(gid);
-	ntsm.clear(), ntsm_by_nt.clear();
+	ntsm.clear(), ntsm_by_nt.assign(nts.size(), {});
 	for (size_t n = 0; n != G.size(); ++n) {
 		auto it = grdm.find(n); // if not guarded or guard is enabled
 		if (it == grdm.end() || gids.count(it->second))
 			ntsm[G[n].first].insert(n);
 	}
-	for (const auto& [l, ps] : ntsm) if (l.nt()) {
-		if (ntsm_by_nt.size() <= l.n()) ntsm_by_nt.resize(l.n() + 1);
-		ntsm_by_nt[l.n()] = ps;
-	}
+	for (const auto& [l, ps] : ntsm) if (l.nt()) ntsm_by_nt[l.n()] = ps;
 }
 template <typename C, typename T>
 void grammar<C, T>::productions_enable(const std::string& guard) {
@@ -606,8 +603,10 @@ template <typename C, typename T>
 bool grammar<C, T>::char_class_check(lit<C, T> l, T ch) const
 {
 	//DBG(std::cout << "char_class_check: " << l.n() << std::endl;)
-	auto& x = cc_fns.ps[l.n()];
-	return (x.find(ch) == x.end()) && !cc_fns.fns[l.n()](ch);
+	auto pit = cc_fns.ps.find(l.n());
+	if (pit != cc_fns.ps.end() && pit->second.contains(ch)) return false;
+	auto fit = cc_fns.fns.find(l.n());
+	return fit == cc_fns.fns.end() || !fit->second(ch);
 }
 template <typename C, typename T>
 size_t grammar<C, T>::add_char_class_production(lit<C, T> l, T ch) {
