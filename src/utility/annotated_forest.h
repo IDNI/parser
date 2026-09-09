@@ -5,6 +5,7 @@
 #define __IDNI__UTILITY__ANNOTATED_FOREST_H__
 
 #include <map>
+#include <optional>
 #include "forest.h"
 
 namespace idni {
@@ -24,9 +25,17 @@ struct annotated_forest {
 
     explicit annotated_forest(forest<NodeT>& f_) : f(f_) {}
 
+    // Explicit insert-or-get mutator: inserts a default LabelT on a miss,
+    // so probing for an existing label must go through has_label/get_label.
     LabelT&       label(const node& n)       { return labels[n]; }
     const LabelT& label(const node& n) const { return labels.at(n); }
     bool has_label(const node& n)      const { return labels.count(n) > 0; }
+    // Non-inserting read: nullopt on a miss, never creates a label.
+    std::optional<LabelT> get_label(const node& n) const {
+        auto it = labels.find(n);
+        return it == labels.end() ? std::nullopt
+                                   : std::optional<LabelT>(it->second);
+    }
 
     // For each edge (parent -> child), call update_fn(label(parent), label(child))
     // and store result at child. Returns true if any label changed.
