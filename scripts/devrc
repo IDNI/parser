@@ -399,21 +399,32 @@ resolve_script() {
 # switch, an idempotency guard, and a clone-once git checkout. dep_entry
 # parses those options generically.
 
-# Declared at load time, not only inside dep_entry, so dep_var works for a
-# caller that just wants dep_shared_prefix and never parses arguments. With
-# DEP_VARS undeclared, bash reads DEP_VARS[$name] as an *arithmetic* subscript
-# and evaluates the variable named by $name: an exported TAU_SHARED_PREFIX=/opt/x
-# then dies with "arithmetic syntax error" and dep_var returns empty instead of
-# the fallback -- silently yielding an empty prefix.
-declare -gA DEP_VARS=()
+# -D values are kept in plain DEP_VAR_<key> variables; bash 3.2 has no
+# associative arrays. Reset at load time so dep_var works without dep_entry.
+
+# Keys come from the command line, so fold non-identifier characters.
+dep_var_key() {
+	local k="${1//[^A-Za-z0-9_]/_}"
+	printf 'DEP_VAR_%s' "$k"
+}
+
+# what to unset on the next reset
+DEP_VAR_KEYS=""
+dep_vars_reset() {
+	local k
+	for k in $DEP_VAR_KEYS; do unset "$k"; done
+	DEP_VAR_KEYS=""
+}
+
+dep_vars_reset
 DEP_POSITIONAL=()
 DEP_TARGET="native"
 
 dep_entry() {
-	declare -gA DEP_VARS=()
+	dep_vars_reset
 	DEP_POSITIONAL=()
 	DEP_TARGET="native"
-	local arg name value
+	local arg name value key
 	for arg in "$@"; do
 		case "$arg" in
 			--w64)
@@ -429,7 +440,9 @@ dep_entry() {
 				name="${arg#-D}"
 				name="${name%%=*}"
 				value="${arg#-D"${name}"=}"
-				DEP_VARS[$name]="$value"
+				key="$(dep_var_key "$name")"
+				printf -v "$key" '%s' "$value"
+				DEP_VAR_KEYS="$DEP_VAR_KEYS $key"
 				;;
 			*)
 				DEP_POSITIONAL+=("$arg")
@@ -443,9 +456,12 @@ dep_entry() {
 # empty jobs count would otherwise expand to a bare `make -j`, i.e.
 # unbounded parallelism.
 dep_var() {
-	local name="$1" default="${2:-}"
-	if [[ -v DEP_VARS[$name] && -n "${DEP_VARS[$name]}" ]]; then
-		echo "${DEP_VARS[$name]}"
+	local name="$1" default="${2:-}" key value
+	key="$(dep_var_key "$name")"
+	# unset and empty both fall back to the default
+	value="${!key-}"
+	if [[ -n "$value" ]]; then
+		echo "$value"
 	else
 		echo "$default"
 	fi
