@@ -36,7 +36,12 @@ void print_stack(const std::vector<tref>& stack, tref current) {
 #	define DBGT(x)
 #endif // LOG_TRAVERSALS_ENABLED
 
+// Traversal depth accounting. Off by default: the traversals call TD() at
+// every point where a frame is opened or closed, which is too many places to
+// spell as #ifdef blocks without burying the loop they are measuring.
 #ifdef MEASURE_TRAVERSER_DEPTH
+
+#	define TD(x) x
 
 static size_t depth = 0;
 static size_t max_depth = 0;
@@ -73,6 +78,8 @@ std::pair<size_t, size_t> pre_order<node>::get_tree_depth_and_size() {
 	return {t_max_depth - c_depth, size};
 }
 
+#else
+#	define TD(x)
 #endif // MEASURE_TRAVERSER_DEPTH
 
 } // idni namespace

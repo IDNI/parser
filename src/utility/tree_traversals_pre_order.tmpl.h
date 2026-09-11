@@ -252,9 +252,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 	if (r == nullptr) return nullptr;
 	if constexpr (break_on_change) {
 		if (r == n) {
-#ifdef MEASURE_TRAVERSER_DEPTH
-			inc_depth();
-#endif //MEASURE_TRAVERSER_DEPTH
+			TD(inc_depth();)
 			upos.push_back(0);
 		} else {
 			r = call(up, r);
@@ -263,9 +261,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 	// If the transformed node should not be
 	// visited, do not add it to upos
 	else if (visit_subtree(r)) {
-#ifdef MEASURE_TRAVERSER_DEPTH
-		inc_depth();
-#endif //MEASURE_TRAVERSER_DEPTH
+		TD(inc_depth();)
 		upos.push_back(0);
 	} else {
 		r = call(up, r);
@@ -289,9 +285,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				if (it != m.end()) {
 					c_node = it->second;
 					upos.pop_back();
-#ifdef MEASURE_TRAVERSER_DEPTH
-					dec_depth();
-#endif //MEASURE_TRAVERSER_DEPTH
+					TD(dec_depth();)
 					continue;
 				}
 			} else {
@@ -299,9 +293,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				if (it != cache.end()) {
 					c_node = it->second;
 					upos.pop_back();
-#ifdef MEASURE_TRAVERSER_DEPTH
-					dec_depth();
-#endif //MEASURE_TRAVERSER_DEPTH
+					TD(dec_depth();)
 					continue;
 				}
 			}
@@ -312,9 +304,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 			upos.pop_back();
 			c_node = call(up, c_node);
 			if (c_node == nullptr) return nullptr;
-#ifdef MEASURE_TRAVERSER_DEPTH
-			dec_depth();
-#endif //MEASURE_TRAVERSER_DEPTH
+			TD(dec_depth();)
 			continue;
 		}
 		// Get next child position
@@ -342,9 +332,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				c_node = res;
 				// Pop children from stacks
 				stack.erase(stack.end() - c_pos, stack.end());
-#ifdef MEASURE_TRAVERSER_DEPTH
-				dec_depth();
-#endif //MEASURE_TRAVERSER_DEPTH
+				TD(dec_depth();)
 				continue;
 			}
 			// Make new node if children are different
@@ -367,9 +355,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				else cache.emplace(c_node, res);
 			}
 			c_node = res;
-#ifdef MEASURE_TRAVERSER_DEPTH
-			dec_depth();
-#endif //MEASURE_TRAVERSER_DEPTH
+			TD(dec_depth();)
 		} else {
 			// Add next child
 			if (visit_subtree(c)) {
@@ -378,9 +364,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				if (r == nullptr) return nullptr;
 				if constexpr (break_on_change) {
 					if (r == c) {
-#ifdef MEASURE_TRAVERSER_DEPTH
-						inc_depth();
-#endif //MEASURE_TRAVERSER_DEPTH
+						TD(inc_depth();)
 						upos.push_back(stack.size());
 					} else {
 						r = call(up, r);
@@ -389,9 +373,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				// If the transformed node should not be
 				// visited, do not add it to upos
 				else if (visit_subtree(r)) {
-#ifdef MEASURE_TRAVERSER_DEPTH
-					inc_depth();
-#endif //MEASURE_TRAVERSER_DEPTH
+					TD(inc_depth();)
 					upos.push_back(stack.size());
 				} else {
 					r = call(up, r);
@@ -446,9 +428,7 @@ void pre_order<node>::const_traverse(tref n, auto& visitor,
 	if constexpr (search) { if (ret) return; }
 	stack.push_back(n);
 	if (!ret) {
-#ifdef MEASURE_TRAVERSER_DEPTH
-		inc_depth();
-#endif //MEASURE_TRAVERSER_DEPTH
+		TD(inc_depth();)
 		upos.push_back(0);
 	}
 	if constexpr (unique) cache.emplace(n);
@@ -467,9 +447,7 @@ void pre_order<node>::const_traverse(tref n, auto& visitor,
 			call(up, c_node, get_parent(), "up1");
 			if (c_tree.has_right_sibling())
 				call(between, c_node, get_parent(), "between");
-#ifdef MEASURE_TRAVERSER_DEPTH
-			dec_depth();
-#endif //MEASURE_TRAVERSER_DEPTH
+			TD(dec_depth();)
 			continue;
 		}
 		// Get next child
@@ -492,9 +470,7 @@ void pre_order<node>::const_traverse(tref n, auto& visitor,
 			// Node is finished. Call between if has right sibling
 			if (c_tree.has_right_sibling())
 				call(between, c_node, get_parent(), "between");
-#ifdef MEASURE_TRAVERSER_DEPTH
-			dec_depth();
-#endif //MEASURE_TRAVERSER_DEPTH
+			TD(dec_depth();)
 		} else {
 			// Add next child
 			stack.push_back(c);
@@ -504,9 +480,7 @@ void pre_order<node>::const_traverse(tref n, auto& visitor,
 				ret = !call(visitor, c, c_node, "visitor");
 				if constexpr (search) { if (ret) return; }
 				if (!ret) {
-#ifdef MEASURE_TRAVERSER_DEPTH
-					inc_depth();
-#endif //MEASURE_TRAVERSER_DEPTH
+					TD(inc_depth();)
 					upos.push_back(stack.size() - 1);
 				}
 			}
