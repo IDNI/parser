@@ -233,6 +233,29 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 	auto get_parent = [&frames, &stack]() -> tref {
 		return frames.empty() ? nullptr : stack[frames.back().pos];
 	};
+	// What the memo holds for `n`, or null. A node is only looked up once,
+	// where its frame would be opened, so this is the single place that
+	// reads either memo. While a frame is open only its own descendants
+	// are added, and a descendant is never equal to the node it sits
+	// under, so a later look could not find anything this one did not.
+	auto memoized = [&cache](tref n) -> tref {
+		if constexpr (!unique) return (void) n, nullptr;
+		else {
+			TS(++tstats().cache_probes;)
+			if constexpr (slot != 0) {
+				const auto it = m.find(std::make_pair(n, slot));
+				if (it == m.end()) return nullptr;
+				TS(++tstats().cache_hits;)
+				return it->second;
+			} else {
+				const auto it = cache.find(n);
+				if (it == cache.end()) return nullptr;
+				TS(++tstats().cache_hits;)
+				return it->second;
+			}
+		}
+	};
+
 	// Writes a finished node back into the slot its frame occupied and
 	// tells the parent whether it changed. Called after the frame is
 	// popped, because `up` must see the parent rather than the node it
@@ -265,9 +288,14 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 	if (r == nullptr) return nullptr;
 	if constexpr (break_on_change) {
 		if (r == n) {
-			TD(inc_depth();)
-			TS(++tstats().frames_opened;)
-			frames.push_back({ 0, tree::get(r).left_child(), false });
+			if (const tref hit = memoized(r); hit != nullptr)
+				r = hit;
+			else {
+				TD(inc_depth();)
+				TS(++tstats().frames_opened;)
+				frames.push_back({ 0,
+					tree::get(r).left_child(), false });
+			}
 		} else {
 			r = call(up, r);
 		}
@@ -275,9 +303,13 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 	// If the transformed node should not be
 	// visited, do not open a frame for it
 	else if (visit_subtree(r)) {
-		TD(inc_depth();)
-		TS(++tstats().frames_opened;)
-		frames.push_back({ 0, tree::get(r).left_child(), false });
+		if (const tref hit = memoized(r); hit != nullptr) r = hit;
+		else {
+			TD(inc_depth();)
+			TS(++tstats().frames_opened;)
+			frames.push_back({ 0,
+				tree::get(r).left_child(), false });
+		}
 	} else {
 		r = call(up, r);
 		if (r == nullptr) return nullptr;
@@ -292,37 +324,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 		DBGT(std::cout << "\nnon-const loop begin: "
 			<< tree::get(c_node).dump_to_str() << "\n";)
 		DBGT(print_stack<node>(stack, c_node);)
-		// Check cache first
-		// If we want to visit all nodes, deactivate caching/memory
-		if constexpr (unique) {
-			if constexpr (slot != 0) {
-				TS(++tstats().cache_probes;)
-				const auto it = m.find(
-						std::make_pair(c_node, slot));
-				if (it != m.end()) {
-					TS(++tstats().cache_hits;)
-					const tref hit = it->second;
-					const size_t pos = fr.pos;
-					frames.pop_back();
-					finish(pos, hit);
-					TD(dec_depth();)
-					continue;
-				}
-			} else {
-				TS(++tstats().cache_probes;)
-				const auto it = cache.find(c_node);
-				if (it != cache.end()) {
-					TS(++tstats().cache_hits;)
-					const tref hit = it->second;
-					const size_t pos = fr.pos;
-					frames.pop_back();
-					finish(pos, hit);
-					TD(dec_depth();)
-					continue;
-				}
-			}
-		}
-		// // Check if node has children
+		// Check if node has children
 		if (!tree::get(c_node).has_child()) {
 			// Call up and move to next
 			const size_t pos = fr.pos;
@@ -401,11 +403,15 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				if (r == nullptr) return nullptr;
 				if constexpr (break_on_change) {
 					if (r == c) {
+						if (const tref hit = memoized(r);
+							hit != nullptr) r = hit;
+						else {
 						TD(inc_depth();)
 						TS(++tstats().frames_opened;)
 						frames.push_back({ stack.size(),
 						  tree::get(r).left_child(),
 						  false });
+						}
 					} else {
 						r = call(up, r);
 					}
@@ -413,11 +419,15 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				// If the transformed node should not be
 				// visited, do not open a frame for it
 				else if (visit_subtree(r)) {
+					if (const tref hit = memoized(r);
+						hit != nullptr) r = hit;
+					else {
 					TD(inc_depth();)
 					TS(++tstats().frames_opened;)
 					frames.push_back({ stack.size(),
 						tree::get(r).left_child(),
 						false });
+					}
 				} else {
 					r = call(up, r);
 					if (r == nullptr) return nullptr;
