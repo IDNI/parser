@@ -649,8 +649,20 @@ const htref lcrs_tree<T>::geth(tref h) { return bintree<T>::geth(h); }
 
 template <typename T>
 tref lcrs_tree<T>::get_raw(const T& v, const tref* ch, size_t len, tref r) {
+	// The children arrive as separate subtrees and the sibling chain
+	// linking them is what has to be interned. Where the tail of the list
+	// is already chained exactly as it needs to be - the common case when
+	// a rewrite changed only an early child, since the untouched children
+	// still carry the links they had - that part can be taken as it
+	// stands. Interning is canonical, so rebuilding it would hand back
+	// the very same nodes; this just skips asking.
+	size_t i = len;
 	tref pr = nullptr;
-	for (size_t i = len; i > 0; ) --i,
+	if (len > 0 && get(ch[len - 1]).r == nullptr) {
+		pr = ch[--i];
+		while (i > 0 && get(ch[i - 1]).r == pr) pr = ch[--i];
+	}
+	while (i > 0) --i,
 		pr = bintree<T>::get(get(ch[i]).value, get(ch[i]).l, pr);
 	return bintree<T>::get(v, pr, r);
 }
