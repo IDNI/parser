@@ -229,9 +229,9 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 	if (n == nullptr) return nullptr;
 	subtree_unordered_map<node, tref> cache;
 	trefs stack;
-	std::vector<size_t> upos;
-	auto get_parent = [&upos, &stack]() -> tref {
-		return upos.empty() ? nullptr : stack[upos.back()];
+	std::vector<frame> frames;
+	auto get_parent = [&frames, &stack]() -> tref {
+		return frames.empty() ? nullptr : stack[frames.back().pos];
 	};
 	auto call = [&get_parent](auto& cb, tref n) -> tref {
 		tref nn;
@@ -254,17 +254,17 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 		if (r == n) {
 			TD(inc_depth();)
 			TS(++tstats().frames_opened;)
-			upos.push_back(0);
+			frames.push_back({ 0, tree::get(r).left_child() });
 		} else {
 			r = call(up, r);
 		}
 	}
 	// If the transformed node should not be
-	// visited, do not add it to upos
+	// visited, do not open a frame for it
 	else if (visit_subtree(r)) {
 		TD(inc_depth();)
 		TS(++tstats().frames_opened;)
-		upos.push_back(0);
+		frames.push_back({ 0, tree::get(r).left_child() });
 	} else {
 		r = call(up, r);
 		if (r == nullptr) return nullptr;
@@ -272,9 +272,10 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 	stack.emplace_back(r);
 	while (true) {
 		// If no unprocessed position exists, we are done
-		if (upos.empty()) return stack[0];
+		if (frames.empty()) return stack[0];
 		// Find first unprocessed position
-		tref& c_node = stack[upos.back()];
+		frame& fr = frames.back();
+		tref& c_node = stack[fr.pos];
 		DBGT(std::cout << "\nnon-const loop begin: "
 			<< tree::get(c_node).dump_to_str() << "\n";)
 		DBGT(print_stack<node>(stack, c_node);)
@@ -288,7 +289,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				if (it != m.end()) {
 					TS(++tstats().cache_hits;)
 					c_node = it->second;
-					upos.pop_back();
+					frames.pop_back();
 					TD(dec_depth();)
 					continue;
 				}
@@ -298,7 +299,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				if (it != cache.end()) {
 					TS(++tstats().cache_hits;)
 					c_node = it->second;
-					upos.pop_back();
+					frames.pop_back();
 					TD(dec_depth();)
 					continue;
 				}
@@ -307,28 +308,29 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 		// // Check if node has children
 		if (!tree::get(c_node).has_child()) {
 			// Call up and move to next
-			upos.pop_back();
+			frames.pop_back();
 			c_node = call(up, c_node);
 			if (c_node == nullptr) return nullptr;
 			TD(dec_depth();)
 			continue;
 		}
-		// Get next child position
-		size_t c_pos = (stack.size() - 1) - upos.back();
-		TS(tstats().sibling_steps += c_pos;)
-		tref c = tree::get(c_node).child(c_pos);
+		const tref c = fr.next_child;
 		DBGT(std::cout << "\tmove to a child: " << c << " \t"
 			<< (stack.back() == c_node ? "LC" : "RS") << "\n";)
 		// Are all children visited?
 		if (c == nullptr) {
+			// `fr` does not survive the pops below, so take what
+			// is still needed from it first
+			const size_t pos = fr.pos;
+			const size_t c_pos = (stack.size() - 1) - pos;
 			// Check if children actually changed
 			auto ch_range = tree::get(c_node).children();
 			TS(tstats().children_compared += c_pos;)
-			if (std::equal(stack.begin() + (upos.back() + 1),
+			if (std::equal(stack.begin() + (pos + 1),
 				stack.end(), ch_range.begin(), ch_range.end()))
 			{
 				// Call up
-				upos.pop_back();
+				frames.pop_back();
 				auto res = call(up, c_node);
 				if (res == nullptr) return nullptr;
 				if constexpr (unique) {
@@ -346,7 +348,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 			// Make new node if children are different
 			TS(++tstats().rebuilds;)
 			tref res = tree::get(tree::get(c_node).value,
-				&stack[upos.back() + 1],
+				&stack[pos + 1],
 				c_pos,
 				tree::get(c_node).right_sibling());
 			DBGT(std::cout << "\tnew node: " << tree::get(res).dump_to_str() << "\n";)
@@ -354,7 +356,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 			stack.erase(stack.end() - c_pos, stack.end());
 			if (res == nullptr) return nullptr;
 			// Call up
-			upos.pop_back();
+			frames.pop_back();
 			res = call(up, res);
 			if (res == nullptr) return nullptr;
 			if constexpr (unique) {
@@ -366,6 +368,12 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 			c_node = res;
 			TD(dec_depth();)
 		} else {
+			// Advance this frame before anything can reallocate
+			// either vector, which would leave `fr` and `c_node`
+			// dangling. The callbacks below still see the parent
+			// frame on top, so get_parent() stays correct.
+			TS(++tstats().sibling_steps;)
+			fr.next_child = tree::get(c).right_sibling();
 			// Add next child
 			if (visit_subtree(c)) {
 				// Apply f and save on stack
@@ -375,17 +383,19 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 					if (r == c) {
 						TD(inc_depth();)
 						TS(++tstats().frames_opened;)
-						upos.push_back(stack.size());
+						frames.push_back({ stack.size(),
+						  tree::get(r).left_child() });
 					} else {
 						r = call(up, r);
 					}
 				}
 				// If the transformed node should not be
-				// visited, do not add it to upos
+				// visited, do not open a frame for it
 				else if (visit_subtree(r)) {
 					TD(inc_depth();)
 					TS(++tstats().frames_opened;)
-					upos.push_back(stack.size());
+					frames.push_back({ stack.size(),
+						tree::get(r).left_child() });
 				} else {
 					r = call(up, r);
 					if (r == nullptr) return nullptr;
