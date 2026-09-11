@@ -50,14 +50,7 @@ struct traversal_buffers {
 	std::vector<position_t> positions;
 	cache_t cache;
 
-	void clear() {
-		stack.clear(), positions.clear();
-		// clearing a hash table memsets its whole bucket array, so a
-		// cache that was never touched - every traversal that does
-		// not memoize has one - must not be made to pay for the
-		// buckets some earlier, larger traversal left behind
-		if (!cache.empty()) cache.clear();
-	}
+	void clear() { stack.clear(), positions.clear(), cache.clear(); }
 };
 
 // Nesting depth of the traversals running on this thread. A callback may
@@ -102,6 +95,105 @@ struct scratch {
 	const bool outermost;
 };
 
+// Marks a table that stores keys only, so that a set costs no more per slot
+// than the key it holds.
+struct no_value {};
+
+/**
+ * @brief Open addressed table of subtrees, for the caches a traversal keeps.
+ *
+ * std::unordered_map allocates a node per insert and frees every one of them
+ * on clear. The traversals are dominated by short calls - a rewrite rule
+ * application walks a handful of nodes - and for those, that allocation is
+ * more work than the traversal itself. Here the storage is one flat array
+ * whose slots carry the generation they were written in, so clearing is an
+ * increment: nothing is allocated, nothing is freed, and the capacity earned
+ * by earlier traversals is kept.
+ *
+ * Keys are compared by subtree identity, as elsewhere: the same hash and
+ * equality the std:: containers were given.
+ */
+template <typename node, typename value_t>
+class subtree_table {
+public:
+	bool empty() const { return count_ == 0; }
+
+	void clear() {
+		count_ = 0;
+		// A wrap would make stale slots look live again, so on the
+		// one occasion it happens the table is blanked instead.
+		if (++generation_ == 0) {
+			slots_.assign(slots_.size(), slot{});
+			generation_ = 1;
+		}
+	}
+
+	/// @return the stored value for `key`, or nullptr if it has none
+	const value_t* find(tref key) const {
+		if (slots_.empty()) return nullptr;
+		for (size_t i = index_of(key); ; i = (i + 1) & mask_) {
+			const slot& s = slots_[i];
+			if (s.generation != generation_) return nullptr;
+			if (subtree_equality<node>{}(s.key, key))
+				return &s.value;
+		}
+	}
+
+	bool contains(tref key) const { return find(key) != nullptr; }
+
+	/// Stores `value` under `key`, replacing any value already there.
+	void insert(tref key, value_t value = {}) {
+		if ((count_ + 1) * 2 > slots_.size()) grow();
+		for (size_t i = index_of(key); ; i = (i + 1) & mask_) {
+			slot& s = slots_[i];
+			if (s.generation != generation_) {
+				s.generation = generation_, s.key = key,
+					s.value = value;
+				++count_;
+				return;
+			}
+			if (subtree_equality<node>{}(s.key, key))
+				return (void) (s.value = value);
+		}
+	}
+
+private:
+	struct slot {
+		std::uint32_t generation = 0;
+		tref key = nullptr;
+		[[no_unique_address]] value_t value{};
+	};
+
+	size_t index_of(tref key) const {
+		return hash_lcrs_tref<node>{}(key) & mask_;
+	}
+
+	void grow() {
+		const size_t wanted = slots_.empty() ? 16 : slots_.size() * 2;
+		std::vector<slot> live;
+		live.reserve(count_);
+		for (const slot& s : slots_)
+			if (s.generation == generation_) live.push_back(s);
+		slots_.assign(wanted, slot{});
+		mask_ = wanted - 1;
+		// a fresh array has no stale slots, so the generation can
+		// start over and every live entry is written back under it
+		generation_ = 1, count_ = 0;
+		for (const slot& s : live) insert(s.key, s.value);
+	}
+
+	std::vector<slot> slots_;
+	size_t mask_ = 0;
+	size_t count_ = 0;
+	std::uint32_t generation_ = 1;
+};
+
+template <typename node>
+using subtree_memo = subtree_table<node, tref>;
+
+template <typename node>
+using subtree_seen = subtree_table<node, no_value>;
+
 // One entry per node a read-only traversal is still working through: the node
 // itself, so a child can be told who its parent is, and how far along its
 // children the traversal has got.
@@ -119,13 +211,7 @@ struct walk_buffers {
 	std::vector<walk_frame> frames;
 	cache_t cache;
 
-	void clear() {
-		frames.clear();
-		// clearing a hash table memsets its whole bucket array, so a
-		// cache that was never touched must not pay for the buckets
-		// some earlier, larger traversal left behind
-		if (!cache.empty()) cache.clear();
-	}
+	void clear() { frames.clear(), cache.clear(); }
 };
 
 // One entry per node whose children a rewriting traversal is still working

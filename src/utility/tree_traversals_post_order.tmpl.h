@@ -63,7 +63,7 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 			return tree::get(it->second,
 					tree::get(n).right_sibling());
 	}
-	scratch<node, traversal_buffers<subtree_unordered_map<node, tref>, frame>> s;
+	scratch<node, traversal_buffers<subtree_memo<node>, frame>> s;
 	auto& cache = s.buffers->cache;
 	auto& stack = s.buffers->stack;
 	auto& frames = s.buffers->positions;
@@ -98,11 +98,10 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 			return tree::get(it->second,
 					tree::get(n).right_sibling());
 		} else {
-			const auto it = cache.find(n);
-			if (it == cache.end()) return nullptr;
+			const tref* found = cache.find(n);
+			if (found == nullptr) return nullptr;
 			TS(++tstats().cache_hits;)
-			return tree::get(it->second,
-					tree::get(n).right_sibling());
+			return tree::get(*found, tree::get(n).right_sibling());
 		}
 	};
 
@@ -148,7 +147,7 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 				if (res == nullptr) return nullptr;
 				if constexpr (slot != 0) m.emplace(
 					std::make_pair(key, slot), res);
-				else cache.emplace(key, res);
+				else cache.insert(key, res);
 				// Pop children from stacks
 				stack.erase(stack.end() - c_pos, stack.end());
 				const size_t pos = fr.pos;
@@ -172,7 +171,7 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 			if (res == nullptr) return nullptr;
 			if constexpr (slot != 0)
 				m.emplace(std::make_pair(key, slot), res);
-			else cache.emplace(key, res);
+			else cache.insert(key, res);
 			const size_t pos = fr.pos;
 			frames.pop_back();
 			finish(pos, res);
@@ -223,7 +222,7 @@ void post_order<node>::const_traverse(tref n, auto& visitor,
 	auto& visit_subtree)
 {
 	if (n == nullptr) return;
-	scratch<node, walk_buffers<subtree_unordered_set<node>>> s;
+	scratch<node, walk_buffers<subtree_seen<node>>> s;
 	auto& cache = s.buffers->cache;
 	auto& frames = s.buffers->frames;
 	// The node being worked on and its cursor stay in locals rather than
