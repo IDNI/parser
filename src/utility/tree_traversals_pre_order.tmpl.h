@@ -370,14 +370,16 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				if (r == nullptr) return nullptr;
 				if constexpr (break_on_change) {
 					if (r == c) {
-						if (const tref hit = memoized(r);
-							hit != nullptr) r = hit;
+						const tref first =
+							tree::get(r).left_child();
+						const tref hit = first == nullptr
+							? nullptr : memoized(r);
+						if (hit != nullptr) r = hit;
 						else {
 						TD(inc_depth();)
 						TS(++tstats().frames_opened;)
 						frames.push_back({ stack.size(),
-						  tree::get(r).left_child(),
-						  false });
+							first, false });
 						}
 					} else {
 						r = call(up, r);
@@ -386,14 +388,19 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				// If the transformed node should not be
 				// visited, do not open a frame for it
 				else if (visit_subtree(r)) {
-					if (const tref hit = memoized(r);
-						hit != nullptr) r = hit;
+					// see post_order: a leaf is never in
+					// the memo, so looking one up is a
+					// guaranteed miss
+					const tref first =
+						tree::get(r).left_child();
+					const tref hit = first == nullptr
+						? nullptr : memoized(r);
+					if (hit != nullptr) r = hit;
 					else {
 					TD(inc_depth();)
 					TS(++tstats().frames_opened;)
 					frames.push_back({ stack.size(),
-						tree::get(r).left_child(),
-						false });
+							first, false });
 					}
 				} else {
 					r = call(up, r);

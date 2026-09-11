@@ -194,17 +194,23 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 				// later look could not find anything this one
 				// did not. A subtree that is not visited is
 				// not looked up either, as before.
-				if (const tref hit = memoized(c);
-					hit != nullptr)
-				{
+				// A leaf is never put in the memo: entries are
+				// only made where a node's children finish.
+				// Subtree identity includes the child list,
+				// so a leaf can never match a memoized node
+				// either - looking one up is always a miss,
+				// and leaves are about half of a binary tree.
+				const tref first = tree::get(c).left_child();
+				const tref hit = first == nullptr ? nullptr
+							: memoized(c);
+				if (hit != nullptr) {
 					stack.back() = hit;
 					if (hit != c) fr.dirty = true;
 				} else {
 					TD(inc_depth();)
 					TS(++tstats().frames_opened;)
 					frames.push_back({ stack.size() - 1,
-						tree::get(c).left_child(),
-						false });
+							first, false });
 				}
 			}
 		}
