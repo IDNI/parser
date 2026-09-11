@@ -84,10 +84,9 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 		tref nn = cb(n);
 		if (nn == n) return n;
 		if (nn == nullptr) return nullptr;
-		const auto& c_tree = tree::get(nn);
-		return bintree<node>::get(c_tree.value,
-						c_tree.left_child(),
-						tree::get(n).right_sibling());
+		// the result takes the sibling the original had; this form
+		// skips the intern lookup when it already has it
+		return tree::get(nn, tree::get(n).right_sibling());
 	};
 
 	while (true) {
@@ -212,7 +211,7 @@ void post_order<node>::const_traverse(tref n, auto& visitor,
 	};
 	stack.push_back(n);
 	upos.push_back(0);
-	if constexpr (unique) cache.emplace(n);
+	if constexpr (unique) cache.insert(n);
 	TD(inc_depth();)
 	while (true) {
 		// If no unprocessed position exists, we are done
@@ -258,7 +257,7 @@ void post_order<node>::const_traverse(tref n, auto& visitor,
 				TS(++tstats().frames_opened;)
 				upos.push_back(stack.size() - 1);
 			}
-			if constexpr (unique) cache.emplace(c);
+			if constexpr (unique) cache.insert(c);
 		}
 	}
 }

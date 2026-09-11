@@ -411,8 +411,11 @@ void pre_order<node>::const_traverse(tref n, auto& visitor,
 	};
 	// Call callback with parent if it is invocable with tref, tref
 	// Otherwise, call it just with tref
+	// `name` only labels the log line, so it stays a plain pointer: a
+	// std::string parameter would construct and destroy a temporary at
+	// every call site on every node, including when logging is off
 	auto call = [](auto& cb, tref x, tref parent,
-		[[maybe_unused]] const std::string& name) -> bool
+		[[maybe_unused]] const char* name) -> bool
 	{
 		DBGT(std::cerr << "!! calling " << name << "("
 			<< tree::get(x).value << ")";)
@@ -442,7 +445,7 @@ void pre_order<node>::const_traverse(tref n, auto& visitor,
 		TD(inc_depth();)
 		upos.push_back(0);
 	}
-	if constexpr (unique) cache.emplace(n);
+	if constexpr (unique) cache.insert(n);
 	while (true) {
 		// If no unprocessed position exists, we are done
 		if (upos.empty()) return;
@@ -503,7 +506,7 @@ void pre_order<node>::const_traverse(tref n, auto& visitor,
 					upos.push_back(stack.size() - 1);
 				}
 			}
-			if constexpr (unique) cache.emplace(c);
+			if constexpr (unique) cache.insert(c);
 		}
 	}
 }
