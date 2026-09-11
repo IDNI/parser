@@ -217,13 +217,18 @@ void post_order<node>::const_traverse(tref n, auto& visitor,
 	auto& visit_subtree)
 {
 	if (n == nullptr) return;
-	scratch<node, traversal_buffers<subtree_unordered_set<node>, size_t>> s;
+	scratch<node, walk_buffers<subtree_unordered_set<node>>> s;
 	auto& cache = s.buffers->cache;
-	auto& stack = s.buffers->stack;
-	auto& upos = s.buffers->positions;
-	auto get_parent = [&upos, &stack]() -> tref {
-		return upos.size() < 2 ? nullptr : stack[upos[upos.size() - 2]];
-	};
+	auto& frames = s.buffers->frames;
+	// The node being worked on and its cursor stay in locals rather than
+	// being read back out of `frames` each turn. Stepping to the next
+	// sibling through a reference into the vector puts a store and a
+	// dependent reload on the loop's critical path, which costs more than
+	// the sibling walking it replaces; `frames` is touched only when the
+	// traversal actually descends or returns.
+	tref current = n;
+	tref cursor = tree::get(n).left_child();
+
 	// Call callback with parent if it is invocable with tref, tref
 	// Otherwise, call it just with tref
 	auto call = [](auto& cb, tref x, tref parent) -> bool {
@@ -237,56 +242,45 @@ void post_order<node>::const_traverse(tref n, auto& visitor,
 		} else cb(x);
 		return true;
 	};
-	stack.push_back(n);
-	upos.push_back(0);
 	if constexpr (unique) cache.insert(n);
 	TD(inc_depth();)
 	while (true) {
-		// If no unprocessed position exists, we are done
-		if (upos.empty()) return;
-		// Find first unprocessed position
-		tref c_node = stack[upos.back()];
-		const auto& c_tree = tree::get(c_node);
-		// Check if node has children
-		if (!c_tree.has_child()) {
-			// Process node and move to next
-			if (!call(visitor, c_node, get_parent())) return;
-			upos.pop_back();
+		// Every child visited - a node with none arrives here at once
+		if (cursor == nullptr) {
+			if (frames.empty()) {
+				// the root: nothing above it to return to
+				call(visitor, current, nullptr);
+				return;
+			}
+			// one read of the frame below serves as this node's
+			// parent and as where to carry on
+			const walk_frame below = frames.back();
+			frames.pop_back();
+			if (!call(visitor, current, below.node)) return;
+			current = below.node;
+			cursor = below.next_child;
 			TD(dec_depth();)
 			continue;
 		}
-		// Get next child
+		const tref c = cursor;
 		TS(++tstats().sibling_steps;)
-		tref c = (stack.back() == c_node) ? c_tree.left_child()
-				: tree::get(stack.back()).right_sibling();
-		// Are all children visited?
-		if (c == nullptr) {
-			if (!call(visitor, c_node, get_parent())) return;
-			// Get child position
-			size_t c_pos = (stack.size() - 1) - upos.back();
-			// Pop children from stacks
-			stack.erase(stack.end() - c_pos, stack.end());
-			upos.pop_back();
-			TD(dec_depth();)
-		} else {
-			// Add next child
-			stack.push_back(c);
-			// if unique, skip already visited nodes
-			if constexpr (unique) {
-				TS(++tstats().cache_probes;)
-				if (cache.contains(c)) {
-					TS(++tstats().cache_hits;)
-					continue;
-				}
+		cursor = tree::get(c).right_sibling();
+		// if unique, skip already visited nodes
+		if constexpr (unique) {
+			TS(++tstats().cache_probes;)
+			if (cache.contains(c)) {
+				TS(++tstats().cache_hits;)
+				continue;
 			}
-			// c_node can become invalid due to push_back
-			if (call(visit_subtree, c, c_node)) {
-				TD(inc_depth();)
-				TS(++tstats().frames_opened;)
-				upos.push_back(stack.size() - 1);
-			}
-			if constexpr (unique) cache.insert(c);
 		}
+		if (call(visit_subtree, c, current)) {
+			TD(inc_depth();)
+			TS(++tstats().frames_opened;)
+			frames.push_back({ current, cursor });
+			current = c;
+			cursor = tree::get(c).left_child();
+		}
+		if constexpr (unique) cache.insert(c);
 	}
 }
 

@@ -102,6 +102,32 @@ struct scratch {
 	const bool outermost;
 };
 
+// One entry per node a read-only traversal is still working through: the node
+// itself, so a child can be told who its parent is, and how far along its
+// children the traversal has got.
+struct walk_frame {
+	tref node;
+	tref next_child;
+};
+
+// What a read-only traversal needs. It never rebuilds a node, so unlike a
+// rewriting traversal it has no use for a buffer of finished children: the
+// frames it has open, and the subtrees already seen when it visits each only
+// once, are the whole of its state.
+template <typename cache_t>
+struct walk_buffers {
+	std::vector<walk_frame> frames;
+	cache_t cache;
+
+	void clear() {
+		frames.clear();
+		// clearing a hash table memsets its whole bucket array, so a
+		// cache that was never touched must not pay for the buckets
+		// some earlier, larger traversal left behind
+		if (!cache.empty()) cache.clear();
+	}
+};
+
 // One entry per node whose children a rewriting traversal is still working
 // through. `next_child` walks the node's own sibling chain rather than being
 // read back out of the traversal's stack: a memoized result written into the
