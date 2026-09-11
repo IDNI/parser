@@ -15,9 +15,7 @@ template <typename node>
 template <size_t slot>
 tref post_order<node>::apply_unique(auto& f, auto& visit_subtree) {
 	if (visit_subtree(root)) {
-		bintree<node>::gc_enabled = false;
 		tref res = traverse<slot>(root, f, visit_subtree);
-		bintree<node>::gc_enabled = true;
 		return res;
 	}
 	else return root;
@@ -26,42 +24,32 @@ tref post_order<node>::apply_unique(auto& f, auto& visit_subtree) {
 template <typename node>
 template <size_t slot>
 tref post_order<node>::apply_unique(auto& f) {
-	bintree<node>::gc_enabled = false;
 	tref res = traverse<slot>(root, f, all);
-	bintree<node>::gc_enabled = true;
 	return res;
 }
 
 template <typename node>
 void post_order<node>::search(auto& visit, auto& visit_subtree) {
 	if (visit_subtree(root)) {
-		bintree<node>::gc_enabled = false;
 		const_traverse<false>(root, visit, visit_subtree);
-		bintree<node>::gc_enabled = true;
 	}
 }
 
 template <typename node>
 void post_order<node>::search(auto& visit) {
-	bintree<node>::gc_enabled = false;
 	const_traverse<false>(root, visit, all);
-	bintree<node>::gc_enabled = true;
 }
 
 template <typename node>
 void post_order<node>::search_unique(auto& visit, auto& visit_subtree) {
 	if (visit_subtree(root)) {
-		bintree<node>::gc_enabled = false;
 		const_traverse<true>(root, visit, visit_subtree);
-		bintree<node>::gc_enabled = true;
 	}
 }
 
 template <typename node>
 void post_order<node>::search_unique(auto& visit) {
-	bintree<node>::gc_enabled = false;
 	const_traverse<true>(root, visit, all);
-	bintree<node>::gc_enabled = true;
 }
 
 template <typename node>
@@ -71,9 +59,11 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 	// Check cache first
 	if constexpr (slot != 0) {
 		const auto it = m.find(std::make_pair(n, slot));
-		if (it != m.end()) return it->second;
+		if (it != m.end())
+			return tree::get(it->second,
+					tree::get(n).right_sibling());
 	}
-	scratch<traversal_buffers<subtree_unordered_map<node, tref>, frame>> s;
+	scratch<node, traversal_buffers<subtree_unordered_map<node, tref>, frame>> s;
 	auto& cache = s.buffers->cache;
 	auto& stack = s.buffers->stack;
 	auto& frames = s.buffers->positions;
@@ -97,16 +87,22 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 	// so this is the single place that reads either memo.
 	auto memoized = [&cache](tref n) -> tref {
 		TS(++tstats().cache_probes;)
+	// A memo entry is keyed by subtree identity, which ignores the right
+	// sibling, so the node it hands back may carry a different one than
+	// the node being looked up. Re-attach the caller's sibling; this
+	// costs a compare when it already matches.
 		if constexpr (slot != 0) {
 			const auto it = m.find(std::make_pair(n, slot));
 			if (it == m.end()) return nullptr;
 			TS(++tstats().cache_hits;)
-			return it->second;
+			return tree::get(it->second,
+					tree::get(n).right_sibling());
 		} else {
 			const auto it = cache.find(n);
 			if (it == cache.end()) return nullptr;
 			TS(++tstats().cache_hits;)
-			return it->second;
+			return tree::get(it->second,
+					tree::get(n).right_sibling());
 		}
 	};
 
@@ -221,7 +217,7 @@ void post_order<node>::const_traverse(tref n, auto& visitor,
 	auto& visit_subtree)
 {
 	if (n == nullptr) return;
-	scratch<traversal_buffers<subtree_unordered_set<node>, size_t>> s;
+	scratch<node, traversal_buffers<subtree_unordered_set<node>, size_t>> s;
 	auto& cache = s.buffers->cache;
 	auto& stack = s.buffers->stack;
 	auto& upos = s.buffers->positions;

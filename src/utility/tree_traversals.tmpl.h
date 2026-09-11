@@ -71,20 +71,35 @@ inline size_t& traversal_depth() {
 // Holds one traversal's buffers for as long as it runs, and returns them
 // cleared. A deque is the store because growing it never invalidates a
 // reference a running traversal is already holding.
-template <typename buffers_t>
+//
+// It also suspends garbage collection, because a traversal mints interned
+// nodes that nothing roots yet and a collection partway through would sweep
+// them. Only the outermost traversal touches the flag: a nested one restoring
+// it on the way out would expose the nodes its caller is still building. The
+// stores are relaxed to match the loads in bintree::gc() - the flag is a
+// policy hint, and what actually keeps gc out of node creation is the intern
+// map's mutex.
+template <typename node, typename buffers_t>
 struct scratch {
-	scratch() {
+	scratch() : outermost(traversal_depth()++ == 0) {
 		static thread_local std::deque<buffers_t> pool;
-		const size_t depth = traversal_depth()++;
+		const size_t depth = traversal_depth() - 1;
 		while (pool.size() <= depth) pool.emplace_back();
 		buffers = &pool[depth];
+		if (outermost) bintree<node>::gc_enabled.store(false,
+					std::memory_order_relaxed);
 	}
-	~scratch() { buffers->clear(), --traversal_depth(); }
+	~scratch() {
+		if (outermost) bintree<node>::gc_enabled.store(true,
+					std::memory_order_relaxed);
+		buffers->clear(), --traversal_depth();
+	}
 
 	scratch(const scratch&) = delete;
 	scratch& operator=(const scratch&) = delete;
 
 	buffers_t* buffers;
+	const bool outermost;
 };
 
 // One entry per node whose children a rewriting traversal is still working
