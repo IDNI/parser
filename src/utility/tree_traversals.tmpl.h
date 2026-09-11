@@ -42,9 +42,14 @@ void print_stack(const std::vector<tref>& stack, tref current) {
 // stack can carry a different right sibling than the child it replaced, so
 // the stack is not a safe place to take the chain from. Walking it also costs
 // one link per child, where locating the n-th child costs n.
+// `dirty` records whether any child came back different from the one it
+// replaced. That is exactly the question the node's rebuild asks, so tracking
+// it as children are finished answers it for free, where comparing the
+// finished children against the original chain costs one comparison per child.
 struct frame {
 	size_t pos;       // where in the traversal's stack this node sits
 	tref next_child;  // null once every child has been visited
+	bool dirty;       // did any child below this node change?
 };
 
 // Traversal work counters. Off by default. They are deterministic and machine

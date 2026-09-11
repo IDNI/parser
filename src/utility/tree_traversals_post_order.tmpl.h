@@ -77,8 +77,20 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 	std::vector<tref> stack;
 	std::vector<frame> frames;
 	stack.push_back(n);
-	frames.push_back({ 0, tree::get(n).left_child() });
+	frames.push_back({ 0, tree::get(n).left_child(), false });
 	TD(inc_depth();)
+
+	// Writes a finished node back into the slot its frame occupied and
+	// tells the parent whether it changed. Called after the frame is
+	// popped, so `frames.back()` is the parent. Every close goes through
+	// here, so no path can forget to report a change upwards.
+	auto finish = [&stack, &frames](size_t pos, tref res) {
+		tref& dest = stack[pos];
+		if (res != dest) {
+			dest = res;
+			if (!frames.empty()) frames.back().dirty = true;
+		}
+	};
 
 	auto call = [](auto& cb, tref n) -> tref {
 		tref nn = cb(n);
@@ -103,8 +115,10 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 			const auto it = m.find(std::make_pair(c_node, slot));
 			if (it != m.end()) {
 				TS(++tstats().cache_hits;)
-				c_node = it->second;
+				const tref hit = it->second;
+				const size_t pos = fr.pos;
 				frames.pop_back();
+				finish(pos, hit);
 				TD(dec_depth();)
 				continue;
 			}
@@ -113,8 +127,10 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 			const auto it = cache.find(c_node);
 			if (it != cache.end()) {
 				TS(++tstats().cache_hits;)
-				c_node = it->second;
+				const tref hit = it->second;
+				const size_t pos = fr.pos;
 				frames.pop_back();
+				finish(pos, hit);
 				TD(dec_depth();)
 				continue;
 			}
@@ -122,9 +138,11 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 		// Check if node has children
 		if (!tree::get(c_node).has_child()) {
 			// Process node and move to next
-			c_node = call(f, c_node);
-			if (c_node == nullptr) return nullptr;
+			const tref res = call(f, c_node);
+			if (res == nullptr) return nullptr;
+			const size_t pos = fr.pos;
 			frames.pop_back();
+			finish(pos, res);
 			TD(dec_depth();)
 			continue;
 		}
@@ -135,26 +153,25 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 		if (c == nullptr) {
 			// Get child position
 			const size_t c_pos = (stack.size() - 1) - fr.pos;
-			// Check if children actually changed
-			auto ch_range = tree::get(c_node).children();
-			TS(tstats().children_compared += c_pos;)
-			if (std::equal(stack.begin() + (fr.pos + 1),
-				stack.end(), ch_range.begin(), ch_range.end()))
-			{
-				tref res = call(f, c_node);
+			// No child changed, so the node stands as it is
+			if (!fr.dirty) {
+				const tref key = c_node;
+				tref res = call(f, key);
 				if (res == nullptr) return nullptr;
 				if constexpr (slot != 0) m.emplace(
-					std::make_pair(c_node, slot), res);
-				else cache.emplace(c_node, res);
-				c_node = res;
+					std::make_pair(key, slot), res);
+				else cache.emplace(key, res);
 				// Pop children from stacks
 				stack.erase(stack.end() - c_pos, stack.end());
+				const size_t pos = fr.pos;
 				frames.pop_back();
+				finish(pos, res);
 				TD(dec_depth();)
 				continue;
 			}
 			// Make new node if children are different
 			TS(++tstats().rebuilds;)
+			const tref key = c_node;
 			tref res = tree::get(tree::get(c_node).value,
 				&stack[fr.pos + 1],
 				c_pos,
@@ -166,10 +183,11 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 			res = call(f, res);
 			if (res == nullptr) return nullptr;
 			if constexpr (slot != 0)
-				m.emplace(std::make_pair(c_node, slot), res);
-			else cache.emplace(c_node, res);
-			c_node = res;
+				m.emplace(std::make_pair(key, slot), res);
+			else cache.emplace(key, res);
+			const size_t pos = fr.pos;
 			frames.pop_back();
+			finish(pos, res);
 			TD(dec_depth();)
 		} else {
 			// Advance this frame before touching either vector:
@@ -183,7 +201,7 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 				TD(inc_depth();)
 				TS(++tstats().frames_opened;)
 				frames.push_back({ stack.size() - 1,
-						tree::get(c).left_child() });
+					tree::get(c).left_child(), false });
 			}
 		}
 	}
