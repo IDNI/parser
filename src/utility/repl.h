@@ -100,14 +100,31 @@ struct repl {
 				//if (pos_ - 1 < input_.size()) split_line();
 				//else {
 					auto ret = evaluate(s);
+					last_eval_ret_ = ret;
 					if (ret == 1) break;
 					if (ret == 2) continue;
 				//}
 			}
-			if (read == 0 && is_pipe_) break;
+			if (read == 0 && is_pipe_) {
+				// End of piped input while the evaluator still waits
+				// for a continuation (last eval returned 2): the
+				// buffered statement never completed. Report it and
+				// exit non-zero instead of silently dropping it --
+				// otherwise everything after a swallowed statement
+				// "passes" by absence with exit code 0.
+				if (last_eval_ret_ == 2) {
+					std::cerr << "error: end of input inside an"
+						" incomplete statement (a line kept the"
+						" parser waiting for a continuation and"
+						" no continuation ever came)\n";
+					return 1;
+				}
+				break;
+			}
 		}
 		return 0;
 	}
+	int last_eval_ret_ = 0;
 	void split_line() {
 		if (is_pipe_) return;
 		size_t r = r_;
