@@ -36,6 +36,34 @@ void print_stack(const std::vector<tref>& stack, tref current) {
 #	define DBGT(x)
 #endif // LOG_TRAVERSALS_ENABLED
 
+// Traversal work counters. Off by default. They are deterministic and machine
+// independent, which is what makes them useful: whether a change actually
+// removed work is a question a wall clock cannot settle once the difference is
+// smaller than the machine's noise.
+#ifdef TAU_PARSER_TRAVERSAL_STATS
+
+struct traversal_stats {
+	size_t frames_opened = 0;     // nodes descended into
+	size_t sibling_steps = 0;     // links followed to find the next child
+	size_t cache_probes = 0;      // memo and unique set lookups
+	size_t cache_hits = 0;
+	size_t children_compared = 0; // children examined by the change check
+	size_t rebuilds = 0;          // nodes rebuilt from a changed child list
+
+	void reset() { *this = traversal_stats{}; }
+};
+
+inline traversal_stats& tstats() {
+	static traversal_stats s;
+	return s;
+}
+
+#	define TS(x) x
+
+#else
+#	define TS(x)
+#endif // TAU_PARSER_TRAVERSAL_STATS
+
 // Traversal depth accounting. Off by default: the traversals call TD() at
 // every point where a frame is opened or closed, which is too many places to
 // spell as #ifdef blocks without burying the loop they are measuring.

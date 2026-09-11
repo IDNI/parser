@@ -99,16 +99,20 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 		DBGT(print_stack<node>(stack, c_node);)
 		// Check cache first
 		if constexpr (slot != 0) {
+			TS(++tstats().cache_probes;)
 			const auto it = m.find(std::make_pair(c_node, slot));
 			if (it != m.end()) {
+				TS(++tstats().cache_hits;)
 				c_node = it->second;
 				upos.pop_back();
 				TD(dec_depth();)
 				continue;
 			}
 		} else {
+			TS(++tstats().cache_probes;)
 			const auto it = cache.find(c_node);
 			if (it != cache.end()) {
+				TS(++tstats().cache_hits;)
 				c_node = it->second;
 				upos.pop_back();
 				TD(dec_depth();)
@@ -126,6 +130,7 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 		}
 		// Get next child position
 		size_t c_pos = (stack.size() - 1) - upos.back();
+		TS(tstats().sibling_steps += c_pos;)
 		tref c = tree::get(c_node).child(c_pos);
 		DBGT(std::cout << "\tmove to a child: " << c << " \t"
 			<< (stack.back() == c_node ? "LC" : "RS") << "\n";)
@@ -133,6 +138,7 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 		if (c == nullptr) {
 			// Check if children actually changed
 			auto ch_range = tree::get(c_node).children();
+			TS(tstats().children_compared += c_pos;)
 			if (std::equal(stack.begin() + (upos.back() + 1),
 				stack.end(), ch_range.begin(), ch_range.end()))
 			{
@@ -149,6 +155,7 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 				continue;
 			}
 			// Make new node if children are different
+			TS(++tstats().rebuilds;)
 			tref res = tree::get(tree::get(c_node).value,
 				&stack[upos.back() + 1],
 				c_pos,
@@ -171,6 +178,7 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 			// c_node can become invalid due to push_back
 			if (visit_subtree(c)) {
 				TD(inc_depth();)
+				TS(++tstats().frames_opened;)
 				upos.push_back(stack.size() - 1);
 			}
 		}
@@ -221,6 +229,7 @@ void post_order<node>::const_traverse(tref n, auto& visitor,
 			continue;
 		}
 		// Get next child
+		TS(++tstats().sibling_steps;)
 		tref c = (stack.back() == c_node) ? c_tree.left_child()
 				: tree::get(stack.back()).right_sibling();
 		// Are all children visited?
@@ -236,10 +245,17 @@ void post_order<node>::const_traverse(tref n, auto& visitor,
 			// Add next child
 			stack.push_back(c);
 			// if unique, skip already visited nodes
-			if constexpr (unique) if (cache.contains(c)) continue;
+			if constexpr (unique) {
+				TS(++tstats().cache_probes;)
+				if (cache.contains(c)) {
+					TS(++tstats().cache_hits;)
+					continue;
+				}
+			}
 			// c_node can become invalid due to push_back
 			if (call(visit_subtree, c, c_node)) {
 				TD(inc_depth();)
+				TS(++tstats().frames_opened;)
 				upos.push_back(stack.size() - 1);
 			}
 			if constexpr (unique) cache.emplace(c);
