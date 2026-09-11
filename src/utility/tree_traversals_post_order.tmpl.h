@@ -75,9 +75,9 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 	}
 	subtree_unordered_map<node, tref> cache;
 	std::vector<tref> stack;
-	std::vector<size_t> upos;
+	std::vector<frame> frames;
 	stack.push_back(n);
-	upos.push_back(0);
+	frames.push_back({ 0, tree::get(n).left_child() });
 	TD(inc_depth();)
 
 	auto call = [](auto& cb, tref n) -> tref {
@@ -91,8 +91,9 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 
 	while (true) {
 		// If no unprocessed position exists, we are done
-		if (upos.empty()) return stack[0];
-		tref& c_node = stack[upos.back()];
+		if (frames.empty()) return stack[0];
+		frame& fr = frames.back();
+		tref& c_node = stack[fr.pos];
 		DBGT(std::cout << "\nnon-const loop begin: "
 			<< tree::get(c_node).dump_to_str() << "\n";)
 		DBGT(print_stack<node>(stack, c_node);)
@@ -103,7 +104,7 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 			if (it != m.end()) {
 				TS(++tstats().cache_hits;)
 				c_node = it->second;
-				upos.pop_back();
+				frames.pop_back();
 				TD(dec_depth();)
 				continue;
 			}
@@ -113,7 +114,7 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 			if (it != cache.end()) {
 				TS(++tstats().cache_hits;)
 				c_node = it->second;
-				upos.pop_back();
+				frames.pop_back();
 				TD(dec_depth();)
 				continue;
 			}
@@ -123,22 +124,21 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 			// Process node and move to next
 			c_node = call(f, c_node);
 			if (c_node == nullptr) return nullptr;
-			upos.pop_back();
+			frames.pop_back();
 			TD(dec_depth();)
 			continue;
 		}
-		// Get next child position
-		size_t c_pos = (stack.size() - 1) - upos.back();
-		TS(tstats().sibling_steps += c_pos;)
-		tref c = tree::get(c_node).child(c_pos);
+		const tref c = fr.next_child;
 		DBGT(std::cout << "\tmove to a child: " << c << " \t"
 			<< (stack.back() == c_node ? "LC" : "RS") << "\n";)
 		// Are all children visited?
 		if (c == nullptr) {
+			// Get child position
+			const size_t c_pos = (stack.size() - 1) - fr.pos;
 			// Check if children actually changed
 			auto ch_range = tree::get(c_node).children();
 			TS(tstats().children_compared += c_pos;)
-			if (std::equal(stack.begin() + (upos.back() + 1),
+			if (std::equal(stack.begin() + (fr.pos + 1),
 				stack.end(), ch_range.begin(), ch_range.end()))
 			{
 				tref res = call(f, c_node);
@@ -149,14 +149,14 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 				c_node = res;
 				// Pop children from stacks
 				stack.erase(stack.end() - c_pos, stack.end());
-				upos.pop_back();
+				frames.pop_back();
 				TD(dec_depth();)
 				continue;
 			}
 			// Make new node if children are different
 			TS(++tstats().rebuilds;)
 			tref res = tree::get(tree::get(c_node).value,
-				&stack[upos.back() + 1],
+				&stack[fr.pos + 1],
 				c_pos,
 				tree::get(c_node).right_sibling());
 			DBGT(std::cout << "\tnew node: " << tree::get(res).dump_to_str() << "\n";)
@@ -169,16 +169,21 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 				m.emplace(std::make_pair(c_node, slot), res);
 			else cache.emplace(c_node, res);
 			c_node = res;
-			upos.pop_back();
+			frames.pop_back();
 			TD(dec_depth();)
 		} else {
+			// Advance this frame before touching either vector:
+			// pushing can reallocate, which would leave `fr` and
+			// `c_node` dangling
+			TS(++tstats().sibling_steps;)
+			fr.next_child = tree::get(c).right_sibling();
 			// Add next child
 			stack.push_back(c);
-			// c_node can become invalid due to push_back
 			if (visit_subtree(c)) {
 				TD(inc_depth();)
 				TS(++tstats().frames_opened;)
-				upos.push_back(stack.size() - 1);
+				frames.push_back({ stack.size() - 1,
+						tree::get(c).left_child() });
 			}
 		}
 	}

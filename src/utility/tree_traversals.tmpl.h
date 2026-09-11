@@ -36,6 +36,17 @@ void print_stack(const std::vector<tref>& stack, tref current) {
 #	define DBGT(x)
 #endif // LOG_TRAVERSALS_ENABLED
 
+// One entry per node whose children a rewriting traversal is still working
+// through. `next_child` walks the node's own sibling chain rather than being
+// read back out of the traversal's stack: a memoized result written into the
+// stack can carry a different right sibling than the child it replaced, so
+// the stack is not a safe place to take the chain from. Walking it also costs
+// one link per child, where locating the n-th child costs n.
+struct frame {
+	size_t pos;       // where in the traversal's stack this node sits
+	tref next_child;  // null once every child has been visited
+};
+
 // Traversal work counters. Off by default. They are deterministic and machine
 // independent, which is what makes them useful: whether a change actually
 // removed work is a question a wall clock cannot settle once the difference is
