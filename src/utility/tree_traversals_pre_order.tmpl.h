@@ -227,9 +227,10 @@ template<bool break_on_change, size_t slot, bool unique>
 tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 {
 	if (n == nullptr) return nullptr;
-	subtree_unordered_map<node, tref> cache;
-	trefs stack;
-	std::vector<frame> frames;
+	scratch<traversal_buffers<subtree_unordered_map<node, tref>, frame>> s;
+	auto& cache = s.buffers->cache;
+	auto& stack = s.buffers->stack;
+	auto& frames = s.buffers->positions;
 	auto get_parent = [&frames, &stack]() -> tref {
 		return frames.empty() ? nullptr : stack[frames.back().pos];
 	};
@@ -447,9 +448,10 @@ void pre_order<node>::const_traverse(tref n, auto& visitor,
 	auto& visit_subtree, auto& up, auto& between)
 {
 	if (n == nullptr) return;
-	subtree_unordered_set<node> cache;
-	std::vector<tref> stack;
-	std::vector<size_t> upos;
+	scratch<traversal_buffers<subtree_unordered_set<node>, size_t>> s;
+	auto& cache = s.buffers->cache;
+	auto& stack = s.buffers->stack;
+	auto& upos = s.buffers->positions;
 	auto get_parent = [&upos, &stack]() -> tref {
 		return upos.empty() ? nullptr : stack[upos.back()];
 	};

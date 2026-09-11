@@ -4,6 +4,8 @@
 #ifndef __IDNI__PARSER__TREE_TRAVERSALS_TMPL_H__
 #define __IDNI__PARSER__TREE_TRAVERSALS_TMPL_H__
 
+#include <deque>
+
 #include "tree.h"
 
 namespace idni {
@@ -35,6 +37,55 @@ void print_stack(const std::vector<tref>& stack, tref current) {
 #else
 #	define DBGT(x)
 #endif // LOG_TRAVERSALS_ENABLED
+
+// The buffers one traversal needs. They are pooled rather than built per
+// call: the dominant workload is a great many tiny traversals - a rewrite
+// rule application walks a handful of nodes - and for those, allocating a
+// stack and a hash table costs more than the walk itself. Reusing them keeps
+// the capacity earned by earlier traversals, so the steady state allocates
+// nothing at all.
+template <typename cache_t, typename position_t>
+struct traversal_buffers {
+	trefs stack;
+	std::vector<position_t> positions;
+	cache_t cache;
+
+	void clear() {
+		stack.clear(), positions.clear();
+		// clearing a hash table memsets its whole bucket array, so a
+		// cache that was never touched - every traversal that does
+		// not memoize has one - must not be made to pay for the
+		// buckets some earlier, larger traversal left behind
+		if (!cache.empty()) cache.clear();
+	}
+};
+
+// Nesting depth of the traversals running on this thread. A callback may
+// start another traversal, so buffers are handed out per depth instead of
+// from a single shared set.
+inline size_t& traversal_depth() {
+	static thread_local size_t depth = 0;
+	return depth;
+}
+
+// Holds one traversal's buffers for as long as it runs, and returns them
+// cleared. A deque is the store because growing it never invalidates a
+// reference a running traversal is already holding.
+template <typename buffers_t>
+struct scratch {
+	scratch() {
+		static thread_local std::deque<buffers_t> pool;
+		const size_t depth = traversal_depth()++;
+		while (pool.size() <= depth) pool.emplace_back();
+		buffers = &pool[depth];
+	}
+	~scratch() { buffers->clear(), --traversal_depth(); }
+
+	scratch(const scratch&) = delete;
+	scratch& operator=(const scratch&) = delete;
+
+	buffers_t* buffers;
+};
 
 // One entry per node whose children a rewriting traversal is still working
 // through. `next_child` walks the node's own sibling chain rather than being
