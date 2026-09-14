@@ -10,8 +10,10 @@
 #include <vector>
 #include <string>
 #include <climits>
-#include <unistd.h>
 #include <stdio.h>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 
 #include "term.h"
 #include "repl_history.h"

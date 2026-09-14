@@ -114,8 +114,10 @@ static vector<T> collect_terminals(const basic_string<C>& src,
 	cout << "\"" << to_std_string(src) << "\"" << endl;
 	vector<T> result;
 	basic_stringstream<C> is(src);
-	auto in = stream ? input_t(is, 0, decoder)
-			 : input_t(src.c_str(), src.size(), 0, decoder);
+	auto in = [&]() {
+		if (stream) return input_t(is, 0, decoder);
+		return input_t(src.c_str(), src.size(), 0, decoder);
+	}();
 	size_t counter = 0;
 	auto terminal_out = [&counter](T c) {
 		size_t n = counter++;

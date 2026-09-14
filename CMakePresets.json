@@ -37,6 +37,35 @@
 		},
 
 		{
+			"name": "_condition-windows",
+			"hidden": true,
+			"condition": {
+				"type": "equals",
+				"lhs": "${hostSystemName}",
+				"rhs": "Windows"
+			}
+		},
+
+		{
+			"name": "_toolchain-msvc",
+			"hidden": true,
+			"generator": "Ninja",
+			"architecture": {
+				"value": "x64",
+				"strategy": "external"
+			},
+			"cacheVariables": {
+				"CMAKE_C_COMPILER": "cl",
+				"CMAKE_CXX_COMPILER": "cl"
+			},
+			"vendor": {
+				"microsoft.com/VisualStudioSettings/CMake/1.0": {
+					"intelliSenseMode": "windows-msvc-x64"
+				}
+			}
+		},
+
+		{
 			"name": "_build_dir-release",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/release"
@@ -70,6 +99,18 @@
 			"name": "_build_dir-debug-mingw",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/debug-mingw"
+		},
+
+		{
+			"name": "_build_dir-release-msvc",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/release-msvc"
+		},
+
+		{
+			"name": "_build_dir-debug-msvc",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-msvc"
 		},
 
 		{
@@ -328,6 +369,95 @@
 		},
 
 		{
+			"name": "release-msvc",
+			"displayName": "Release (MSVC / Ninja / x64)",
+			"description": "Native Windows. Requires cl.exe on PATH (x64 Native Tools prompt or vcvars64).",
+			"inherits": [
+				"_condition-windows",
+				"_build_dir-release-msvc",
+				"_toolchain-msvc",
+				"_build-type-release",
+				"_build-static"
+			]
+		},
+
+		{
+			"name": "debug-msvc",
+			"displayName": "Debug (MSVC / Ninja / x64)",
+			"inherits": [
+				"_condition-windows",
+				"_build_dir-debug-msvc",
+				"_toolchain-msvc",
+				"_build-type-debug",
+				"_build-static"
+			]
+		},
+
+		{
+			"name": "release-msvc-tgf",
+			"inherits": ["release-msvc", "_build-tgf"]
+		},
+
+		{
+			"name": "debug-msvc-tgf",
+			"inherits": ["debug-msvc", "_build-tgf"]
+		},
+
+		{
+			"name": "release-msvc-tests",
+			"inherits": ["release-msvc", "_build-tests"]
+		},
+
+		{
+			"name": "debug-msvc-tests",
+			"inherits": ["debug-msvc", "_build-tests"]
+		},
+
+		{
+			"name": "release-msvc-examples",
+			"inherits": ["release-msvc", "_build-examples"]
+		},
+
+		{
+			"name": "debug-msvc-examples",
+			"inherits": ["debug-msvc", "_build-examples"]
+		},
+
+		{
+			"name": "release-msvc-all",
+			"displayName": "Release all targets (MSVC)",
+			"inherits": ["release-msvc", "_build-all"]
+		},
+
+		{
+			"name": "debug-msvc-all",
+			"inherits": ["debug-msvc", "_build-all"]
+		},
+
+		{
+			"name": "all-msvc",
+			"inherits": ["release-msvc-all"]
+		},
+
+		{
+			"name": "release-msvc-packages",
+			"inherits": [
+				"release-msvc",
+				"_build-packages",
+				"_windows-package"
+			]
+		},
+
+		{
+			"name": "release-msvc-packages-zip",
+			"inherits": [
+				"release-msvc",
+				"_build-packages",
+				"_windows-zip-package"
+			]
+		},
+
+		{
 			"name": "relwithdebinfo-make-gcc",
 			"inherits": [
 				"_build_dir-relwithdebinfo",
@@ -399,6 +529,11 @@
 		{
 			"name": "release-tgf",
 			"inherits": ["release", "_build-tgf"]
+		},
+
+		{
+			"name": "release-ninja-tgf",
+			"inherits": ["release-ninja", "_build-tgf"]
 		},
 
 		{
@@ -590,6 +725,10 @@
 			"configurePreset": "release-tgf"
 		},
 		{
+			"name": "release-ninja-tgf",
+			"configurePreset": "release-ninja-tgf"
+		},
+		{
 			"name": "release-tgf-clang",
 			"configurePreset": "release-tgf-clang"
 		},
@@ -656,6 +795,58 @@
 		{
 			"name": "debug-mingw",
 			"configurePreset": "debug-mingw"
+		},
+		{
+			"name": "release-msvc",
+			"configurePreset": "release-msvc"
+		},
+		{
+			"name": "debug-msvc",
+			"configurePreset": "debug-msvc"
+		},
+		{
+			"name": "release-msvc-tgf",
+			"configurePreset": "release-msvc-tgf"
+		},
+		{
+			"name": "debug-msvc-tgf",
+			"configurePreset": "debug-msvc-tgf"
+		},
+		{
+			"name": "release-msvc-tests",
+			"configurePreset": "release-msvc-tests"
+		},
+		{
+			"name": "debug-msvc-tests",
+			"configurePreset": "debug-msvc-tests"
+		},
+		{
+			"name": "release-msvc-examples",
+			"configurePreset": "release-msvc-examples"
+		},
+		{
+			"name": "debug-msvc-examples",
+			"configurePreset": "debug-msvc-examples"
+		},
+		{
+			"name": "release-msvc-all",
+			"configurePreset": "release-msvc-all"
+		},
+		{
+			"name": "debug-msvc-all",
+			"configurePreset": "debug-msvc-all"
+		},
+		{
+			"name": "all-msvc",
+			"configurePreset": "all-msvc"
+		},
+		{
+			"name": "release-msvc-packages",
+			"configurePreset": "release-msvc-packages"
+		},
+		{
+			"name": "release-msvc-packages-zip",
+			"configurePreset": "release-msvc-packages-zip"
 		},
 		{
 			"name": "relwithdebinfo",
@@ -738,6 +929,26 @@
 		{
 			"name": "relwithdebinfo-all",
 			"configurePreset": "relwithdebinfo-all"
+		},
+		{
+			"name": "release-msvc-tests",
+			"configurePreset": "release-msvc-tests"
+		},
+		{
+			"name": "debug-msvc-tests",
+			"configurePreset": "debug-msvc-tests"
+		},
+		{
+			"name": "release-msvc-all",
+			"configurePreset": "release-msvc-all"
+		},
+		{
+			"name": "debug-msvc-all",
+			"configurePreset": "debug-msvc-all"
+		},
+		{
+			"name": "all-msvc",
+			"configurePreset": "all-msvc"
 		}
 	]
 }
