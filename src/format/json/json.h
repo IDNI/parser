@@ -7,6 +7,11 @@
 #include <cassert>
 #include <charconv>
 #include <ostream>
+#include <version>
+#if !defined(__cpp_lib_to_chars) || __cpp_lib_to_chars < 201611L
+#include <locale>
+#include <sstream>
+#endif
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -116,6 +121,22 @@ inline value build_string(const trv& t, result& R) {
 	return value::string(std::move(dec).value());
 }
 
+// strtod would read the decimal point of the current locale, and the write
+// side uses to_chars, so both directions must ignore it. libc++ ships
+// to_chars for a double but not from_chars, hence the stream fallback.
+inline bool parse_number(const std::string& s, double& d) {
+#if defined(__cpp_lib_to_chars) && __cpp_lib_to_chars >= 201611L
+	auto fc = std::from_chars(s.data(), s.data() + s.size(), d);
+	return fc.ec == std::errc{} && fc.ptr == s.data() + s.size();
+#else
+	std::istringstream is(s);
+	is.imbue(std::locale::classic());
+	// from_chars refuses leading whitespace, and this path must agree
+	is >> std::noskipws >> d;
+	return !is.fail() && is.peek() == std::char_traits<char>::eof();
+#endif
+}
+
 /// @p t is a "value" node; it always has exactly one child, the actual
 /// variant (true_sym/false_sym/null_sym/number/str/arr/object).
 inline value build(const trv& t, result& R) {
@@ -127,10 +148,7 @@ inline value build(const trv& t, result& R) {
 	case json_parser::number: {
 		std::string s = v | trv::terminals;
 		double d = 0;
-		// from_chars, not strtod: output already uses to_chars, so
-		// neither direction depends on the current locale.
-		auto fc = std::from_chars(s.data(), s.data() + s.size(), d);
-		if (fc.ec != std::errc{} || fc.ptr != s.data() + s.size()) {
+		if (!parse_number(s, d)) {
 			R.error(code::parse_error, "invalid JSON number: " + s);
 			return {};
 		}
