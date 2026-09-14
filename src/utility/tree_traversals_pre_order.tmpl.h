@@ -194,18 +194,11 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 	auto get_parent = [&frames]() -> tref {
 		return frames.empty() ? nullptr : frames.back().node;
 	};
-	// The per call memo pays off only where subtrees repeat. A traversal
-	// that has gone this many nodes without a hit stops adding to it. `f`
-	// is a function of the subtree alone, so this changes how often `f`
-	// runs, never the result.
-	constexpr size_t give_up_after = 512;
-	size_t misses = 0;
-
 	// What the memo holds for `n`, or null. The only place either memo is
 	// read, once per node, where its frame is opened. While a frame is
 	// open only its descendants are added, and none of those matches the
 	// node above them.
-	auto memoized = [&cache, &misses](tref n) -> tref {
+	auto memoized = [&cache](tref n) -> tref {
 		if constexpr (!unique) return (void) n, nullptr;
 		else {
 			TS(++tstats().cache_probes;)
@@ -220,12 +213,10 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				return tree::get(it->second,
 					tree::get(n).right_sibling());
 			} else {
-				if (misses >= give_up_after) return nullptr;
-				const tref* found = cache.find(n);
-				if (found == nullptr) return ++misses, nullptr;
-				misses = 0;
+				const tref found = cache.find(n);
+				if (found == nullptr) return nullptr;
 				TS(++tstats().cache_hits;)
-				return tree::get(*found,
+				return tree::get(found,
 					tree::get(n).right_sibling());
 			}
 		}
@@ -327,8 +318,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 			if constexpr (unique) if (has_children) {
 				if constexpr (slot != 0) m.emplace(
 					std::make_pair(finished, slot), res);
-				else if (misses < give_up_after)
-					cache.insert(finished, res);
+				else cache.insert(finished, res);
 			}
 			if (frames.empty()) return res;
 			child_done(origin, res);

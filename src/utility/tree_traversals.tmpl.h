@@ -49,9 +49,12 @@ struct traversal_buffers {
 	void clear() { stack.clear(), positions.clear(), cache.clear(); }
 };
 
-// How many traversals are running on this thread. A callback may start
-// another traversal, so each depth gets buffers of its own.
-inline size_t& traversal_depth() {
+// How many traversals of this node type are running on this thread. A
+// callback may start another traversal, so each depth gets buffers of its
+// own; counting per type keeps a nested traversal of another type from being
+// taken for a nested one of this type, whose collection is already suspended.
+template <typename node>
+size_t& traversal_depth() {
 	static thread_local size_t depth = 0;
 	return depth;
 }
@@ -67,25 +70,29 @@ inline size_t& traversal_depth() {
 // creation.
 template <typename node, typename buffers_t>
 struct scratch {
-	scratch() : outermost(traversal_depth()++ == 0) {
+	scratch() {
 		static thread_local std::deque<buffers_t> pool;
-		const size_t depth = traversal_depth() - 1;
+		const size_t depth = traversal_depth<node>();
 		while (pool.size() <= depth) pool.emplace_back();
 		buffers = &pool[depth];
+		outermost = depth == 0;
+		// raised only once nothing above it can throw, so a failed
+		// allocation cannot leave the count raised for good
+		++traversal_depth<node>();
 		if (outermost) bintree<node>::gc_enabled.store(false,
 					std::memory_order_relaxed);
 	}
 	~scratch() {
 		if (outermost) bintree<node>::gc_enabled.store(true,
 					std::memory_order_relaxed);
-		buffers->clear(), --traversal_depth();
+		buffers->clear(), --traversal_depth<node>();
 	}
 
 	scratch(const scratch&) = delete;
 	scratch& operator=(const scratch&) = delete;
 
 	buffers_t* buffers;
-	const bool outermost;
+	bool outermost;
 };
 
 // Value type of a table that stores keys alone.
@@ -115,18 +122,16 @@ public:
 		}
 	}
 
-	/// @return the stored value for `key`, or nullptr if it has none
-	const value_t* find(tref key) const {
-		if (slots_.empty()) return nullptr;
-		for (size_t i = index_of(key); ; i = (i + 1) & mask_) {
-			const slot& s = slots_[i];
-			if (s.generation != generation_) return nullptr;
-			if (subtree_equality<node>{}(s.key, key))
-				return &s.value;
-		}
+	/// @return the value stored for `key`, or a default constructed one
+	/// when it holds none. Callers store no default constructed value, so
+	/// that is how a miss reads. By value, because a later insert can
+	/// move the storage a pointer would refer to.
+	value_t find(tref key) const {
+		const size_t at = slot_of(key);
+		return at == slots_.size() ? value_t{} : slots_[at].value;
 	}
 
-	bool contains(tref key) const { return find(key) != nullptr; }
+	bool contains(tref key) const { return slot_of(key) != slots_.size(); }
 
 	/// Stores `value` under `key`, replacing any value already there.
 	void insert(tref key, value_t value = {}) {
@@ -153,6 +158,16 @@ private:
 
 	size_t index_of(tref key) const {
 		return hash_lcrs_tref<node>{}(key) & mask_;
+	}
+
+	/// index of the slot holding `key`, or slots_.size() when none does
+	size_t slot_of(tref key) const {
+		if (slots_.empty()) return 0;  // which is also slots_.size()
+		for (size_t i = index_of(key); ; i = (i + 1) & mask_) {
+			const slot& s = slots_[i];
+			if (s.generation != generation_) return slots_.size();
+			if (subtree_equality<node>{}(s.key, key)) return i;
+		}
 	}
 
 	void grow() {
