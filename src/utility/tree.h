@@ -394,6 +394,17 @@ struct subtree_pair_equal {
 			const std::pair<tref, PT>& b) const;
 };
 
+// Hashes a pair the way subtree_pair_equal compares one: by subtree identity,
+// which ignores the right sibling. std::hash would hash the tref as a plain
+// pointer, so two keys that compare equal could land in different buckets -
+// which an unordered container forbids, and which costs exactly the hits a
+// subtree keyed cache exists for, since the same subtree in another position
+// is a different pointer.
+template <typename T, typename PT>
+struct subtree_pair_hash {
+	size_t operator()(const std::pair<tref, PT>& p) const;
+};
+
 template <typename T, typename PT>
 struct subtree_pair_less {
 	bool operator()(const std::pair<tref, PT>& a,
@@ -1041,7 +1052,7 @@ struct post_order {
 private:
 	tref root;
 	using cache_t = std::unordered_map<std::pair<tref, size_t>, tref,
-		std::hash<std::pair<tref, size_t> >, subtree_pair_equal<node,
+		subtree_pair_hash<node, size_t>, subtree_pair_equal<node,
 			size_t>>;
 	inline static cache_t& m = bintree<node>::template create_cache<cache_t>();
 
@@ -1281,7 +1292,7 @@ struct pre_order {
 private:
 	tref root;
 	using cache_t = std::unordered_map<std::pair<tref, size_t>, tref,
-		std::hash<std::pair<tref, size_t> >, subtree_pair_equal<node,
+		subtree_pair_hash<node, size_t>, subtree_pair_equal<node,
 			size_t>>;
 	inline static cache_t& m = bintree<node>::template create_cache<cache_t>();
 

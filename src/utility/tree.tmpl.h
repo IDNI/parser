@@ -545,6 +545,17 @@ bool subtree_pair_equal<T, PT>::operator()(const std::pair<tref, PT>& a,
 }
 
 template <typename T, typename PT>
+size_t subtree_pair_hash<T, PT>::operator()(const std::pair<tref, PT>& p) const
+{
+	std::uint64_t seed = 0;
+	if constexpr (std::is_same_v<PT, tref>)
+		hash_combine(seed, hash_lcrs_tref<T>{}(p.first),
+					hash_lcrs_tref<T>{}(p.second));
+	else hash_combine(seed, hash_lcrs_tref<T>{}(p.first), p.second);
+	return static_cast<size_t>(seed);
+}
+
+template <typename T, typename PT>
 bool subtree_pair_less<T, PT>::operator()(const std::pair<tref, PT>& a,
 					const std::pair<tref, PT>& b) const
 {
