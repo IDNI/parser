@@ -71,10 +71,9 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 	frames.push_back({ 0, tree::get(n).left_child(), false });
 	TD(inc_depth();)
 
-	// Writes a finished node back into the slot its frame occupied and
-	// tells the parent whether it changed. Called after the frame is
-	// popped, so `frames.back()` is the parent. Every close goes through
-	// here, so no path can forget to report a change upwards.
+	// Writes a finished node back into the slot its frame held and tells
+	// the parent whether it changed. Called after the frame is popped, so
+	// `frames.back()` is the parent. Every close goes through here.
 	auto finish = [&stack, &frames](size_t pos, tref res) {
 		tref& dest = stack[pos];
 		if (res != dest) {
@@ -83,22 +82,20 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 		}
 	};
 
-	// The per call memo only pays where subtrees repeat. Where they do not
-	// - a formula with no shared subterms - every probe and insert is dead
-	// weight, so a traversal that has gone a long way without a hit stops
-	// paying in. `f` is documented as a function of the subtree alone, so
-	// dropping entries changes how often it is called, never the result.
+	// The per call memo pays off only where subtrees repeat. A traversal
+	// that has gone this many nodes without a hit stops adding to it. `f`
+	// is a function of the subtree alone, so this changes how often `f`
+	// runs, never the result.
 	constexpr size_t give_up_after = 512;
 	size_t misses = 0;
 
-	// What the memo holds for `n`, or null. A node is only looked up once,
-	// so this is the single place that reads either memo.
+	// What the memo holds for `n`, or null. The only place either memo is
+	// read.
 	auto memoized = [&cache, &misses](tref n) -> tref {
 		TS(++tstats().cache_probes;)
-	// A memo entry is keyed by subtree identity, which ignores the right
-	// sibling, so the node it hands back may carry a different one than
-	// the node being looked up. Re-attach the caller's sibling; this
-	// costs a compare when it already matches.
+		// Memo keys are subtree identities, which ignore the right
+		// sibling, so the stored node may carry a different one.
+		// Re-attach `n`'s sibling; a compare when it already matches.
 		if constexpr (slot != 0) {
 			const auto it = m.find(std::make_pair(n, slot));
 			if (it == m.end()) return nullptr;
@@ -119,8 +116,7 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 		tref nn = cb(n);
 		if (nn == n) return n;
 		if (nn == nullptr) return nullptr;
-		// the result takes the sibling the original had; this form
-		// skips the intern lookup when it already has it
+		// give the result the sibling `n` had
 		return tree::get(nn, tree::get(n).right_sibling());
 	};
 
@@ -189,28 +185,19 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 			finish(pos, res);
 			TD(dec_depth();)
 		} else {
-			// Advance this frame before touching either vector:
-			// pushing can reallocate, which would leave `fr` and
-			// `c_node` dangling
+			// advance before pushing: a push can reallocate and
+			// leave `fr` and `c_node` dangling
 			TS(++tstats().sibling_steps;)
 			fr.next_child = tree::get(c).right_sibling();
 			// Add next child
 			stack.push_back(c);
 			if (visit_subtree(c)) {
-				// The memo is consulted here, once, rather
-				// than on every turn around the loop: while a
-				// frame is open only its own descendants are
-				// added to the memo, and a descendant is
-				// never equal to the node it sits under, so a
-				// later look could not find anything this one
-				// did not. A subtree that is not visited is
-				// not looked up either, as before.
-				// A leaf is never put in the memo: entries are
-				// only made where a node's children finish.
-				// Subtree identity includes the child list,
-				// so a leaf can never match a memoized node
-				// either - looking one up is always a miss,
-				// and leaves are about half of a binary tree.
+				// The memo is read once per node. While a
+				// frame is open only its descendants are
+				// added, and none of those matches the node
+				// above them. A leaf is never in the memo,
+				// since entries are made only where a node's
+				// children finish.
 				const tref first = tree::get(c).left_child();
 				const tref hit = first == nullptr ? nullptr
 							: memoized(c);
@@ -237,12 +224,8 @@ void post_order<node>::const_traverse(tref n, auto& visitor,
 	scratch<node, walk_buffers<subtree_seen<node>>> s;
 	auto& cache = s.buffers->cache;
 	auto& frames = s.buffers->frames;
-	// The node being worked on and its cursor stay in locals rather than
-	// being read back out of `frames` each turn. Stepping to the next
-	// sibling through a reference into the vector puts a store and a
-	// dependent reload on the loop's critical path, which costs more than
-	// the sibling walking it replaces; `frames` is touched only when the
-	// traversal actually descends or returns.
+	// The current node and its cursor are kept in locals; `frames` is
+	// touched only on a descent or a return.
 	tref current = n;
 	tref cursor = tree::get(n).left_child();
 
@@ -269,8 +252,8 @@ void post_order<node>::const_traverse(tref n, auto& visitor,
 				call(visitor, current, nullptr);
 				return;
 			}
-			// one read of the frame below serves as this node's
-			// parent and as where to carry on
+			// the frame below gives both this node's parent and
+			// where to carry on
 			const walk_frame below = frames.back();
 			frames.pop_back();
 			if (!call(visitor, current, below.node)) return;

@@ -38,12 +38,8 @@ void print_stack(const std::vector<tref>& stack, tref current) {
 #	define DBGT(x)
 #endif // LOG_TRAVERSALS_ENABLED
 
-// The buffers one traversal needs. They are pooled rather than built per
-// call: the dominant workload is a great many tiny traversals - a rewrite
-// rule application walks a handful of nodes - and for those, allocating a
-// stack and a hash table costs more than the walk itself. Reusing them keeps
-// the capacity earned by earlier traversals, so the steady state allocates
-// nothing at all.
+// Buffers for one traversal, lent from a pool so that later traversals reuse
+// the capacity earlier ones built up.
 template <typename cache_t, typename position_t>
 struct traversal_buffers {
 	trefs stack;
@@ -53,25 +49,22 @@ struct traversal_buffers {
 	void clear() { stack.clear(), positions.clear(), cache.clear(); }
 };
 
-// Nesting depth of the traversals running on this thread. A callback may
-// start another traversal, so buffers are handed out per depth instead of
-// from a single shared set.
+// How many traversals are running on this thread. A callback may start
+// another traversal, so each depth gets buffers of its own.
 inline size_t& traversal_depth() {
 	static thread_local size_t depth = 0;
 	return depth;
 }
 
-// Holds one traversal's buffers for as long as it runs, and returns them
-// cleared. A deque is the store because growing it never invalidates a
-// reference a running traversal is already holding.
+// Lends a traversal its buffers and returns them cleared. The pool is a deque
+// so that growing it leaves references held by running traversals valid.
 //
-// It also suspends garbage collection, because a traversal mints interned
-// nodes that nothing roots yet and a collection partway through would sweep
-// them. Only the outermost traversal touches the flag: a nested one restoring
-// it on the way out would expose the nodes its caller is still building. The
-// stores are relaxed to match the loads in bintree::gc() - the flag is a
-// policy hint, and what actually keeps gc out of node creation is the intern
-// map's mutex.
+// Garbage collection is suspended for the duration: a traversal creates
+// interned nodes that nothing refers to yet, and a collection would sweep
+// them. Only the outermost traversal sets the flag, so nested ones stay
+// covered until it ends. The stores are relaxed, matching the loads in
+// bintree::gc(); the intern map's mutex is what excludes gc from node
+// creation.
 template <typename node, typename buffers_t>
 struct scratch {
 	scratch() : outermost(traversal_depth()++ == 0) {
@@ -95,23 +88,18 @@ struct scratch {
 	const bool outermost;
 };
 
-// Marks a table that stores keys only, so that a set costs no more per slot
-// than the key it holds.
+// Value type of a table that stores keys alone.
 struct no_value {};
 
 /**
- * @brief Open addressed table of subtrees, for the caches a traversal keeps.
+ * @brief Open addressed table of subtrees, used for a traversal's caches.
  *
- * std::unordered_map allocates a node per insert and frees every one of them
- * on clear. The traversals are dominated by short calls - a rewrite rule
- * application walks a handful of nodes - and for those, that allocation is
- * more work than the traversal itself. Here the storage is one flat array
- * whose slots carry the generation they were written in, so clearing is an
- * increment: nothing is allocated, nothing is freed, and the capacity earned
- * by earlier traversals is kept.
+ * Storage is a single flat array. Every slot records the generation it was
+ * written in, so clearing the table is one increment and the array is reused:
+ * nothing is allocated per entry and nothing freed per clear.
  *
- * Keys are compared by subtree identity, as elsewhere: the same hash and
- * equality the std:: containers were given.
+ * Keys are compared by subtree identity, with the same hash and equality as
+ * the subtree_unordered_* containers.
  */
 template <typename node, typename value_t>
 class subtree_table {
@@ -120,8 +108,7 @@ public:
 
 	void clear() {
 		count_ = 0;
-		// A wrap would make stale slots look live again, so on the
-		// one occasion it happens the table is blanked instead.
+		// on wrap, stale slots would read as live, so blank them
 		if (++generation_ == 0) {
 			slots_.assign(slots_.size(), slot{});
 			generation_ = 1;
@@ -176,8 +163,7 @@ private:
 			if (s.generation == generation_) live.push_back(s);
 		slots_.assign(wanted, slot{});
 		mask_ = wanted - 1;
-		// a fresh array has no stale slots, so the generation can
-		// start over and every live entry is written back under it
+		// the new array holds no stale slots, so generations restart
 		generation_ = 1, count_ = 0;
 		for (const slot& s : live) insert(s.key, s.value);
 	}
@@ -194,18 +180,15 @@ using subtree_memo = subtree_table<node, tref>;
 template <typename node>
 using subtree_seen = subtree_table<node, no_value>;
 
-// One entry per node a read-only traversal is still working through: the node
-// itself, so a child can be told who its parent is, and how far along its
-// children the traversal has got.
+// One open node of a read-only traversal: the node, which its children are
+// given as their parent, and the next child to descend into.
 struct walk_frame {
 	tref node;
 	tref next_child;
 };
 
-// What a read-only traversal needs. It never rebuilds a node, so unlike a
-// rewriting traversal it has no use for a buffer of finished children: the
-// frames it has open, and the subtrees already seen when it visits each only
-// once, are the whole of its state.
+// State of a read-only traversal: the nodes it has open, and the subtrees
+// already seen when it visits each of them only once.
 template <typename cache_t>
 struct walk_buffers {
 	std::vector<walk_frame> frames;
@@ -214,26 +197,19 @@ struct walk_buffers {
 	void clear() { frames.clear(), cache.clear(); }
 };
 
-// One entry per node whose children a rewriting traversal is still working
-// through. `next_child` walks the node's own sibling chain rather than being
-// read back out of the traversal's stack: a memoized result written into the
-// stack can carry a different right sibling than the child it replaced, so
-// the stack is not a safe place to take the chain from. Walking it also costs
-// one link per child, where locating the n-th child costs n.
-// `dirty` records whether any child came back different from the one it
-// replaced. That is exactly the question the node's rebuild asks, so tracking
-// it as children are finished answers it for free, where comparing the
-// finished children against the original chain costs one comparison per child.
+// One open node of a rewriting traversal.
+//
+// `next_child` follows the node's own sibling chain. The traversal's stack is
+// not a safe source for it: a memoized result written there can carry a
+// different right sibling than the child it replaced.
 struct frame {
-	size_t pos;       // where in the traversal's stack this node sits
+	size_t pos;       // index of this node in the traversal's stack
 	tref next_child;  // null once every child has been visited
-	bool dirty;       // did any child below this node change?
+	bool dirty;       // did a child finish as a different node?
 };
 
-// Traversal work counters. Off by default. They are deterministic and machine
-// independent, which is what makes them useful: whether a change actually
-// removed work is a question a wall clock cannot settle once the difference is
-// smaller than the machine's noise.
+// Counters for the work a traversal does, off by default. The counts are
+// deterministic, so they measure work independently of timing.
 #ifdef TAU_PARSER_TRAVERSAL_STATS
 
 struct traversal_stats {
@@ -258,9 +234,8 @@ inline traversal_stats& tstats() {
 #	define TS(x)
 #endif // TAU_PARSER_TRAVERSAL_STATS
 
-// Traversal depth accounting. Off by default: the traversals call TD() at
-// every point where a frame is opened or closed, which is too many places to
-// spell as #ifdef blocks without burying the loop they are measuring.
+// Traversal depth accounting, off by default. TD() wraps each point where a
+// frame is opened or closed.
 #ifdef MEASURE_TRAVERSER_DEPTH
 
 #	define TD(x) x

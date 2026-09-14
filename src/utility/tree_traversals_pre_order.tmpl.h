@@ -194,27 +194,25 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 	auto get_parent = [&frames, &stack]() -> tref {
 		return frames.empty() ? nullptr : stack[frames.back().pos];
 	};
-	// The per call memo only pays where subtrees repeat. Where they do not
-	// - a formula with no shared subterms - every probe and insert is dead
-	// weight, so a traversal that has gone a long way without a hit stops
-	// paying in. `f` is documented as a function of the subtree alone, so
-	// dropping entries changes how often it is called, never the result.
+	// The per call memo pays off only where subtrees repeat. A traversal
+	// that has gone this many nodes without a hit stops adding to it. `f`
+	// is a function of the subtree alone, so this changes how often `f`
+	// runs, never the result.
 	constexpr size_t give_up_after = 512;
 	size_t misses = 0;
 
-	// What the memo holds for `n`, or null. A node is only looked up once,
-	// where its frame would be opened, so this is the single place that
-	// reads either memo. While a frame is open only its own descendants
-	// are added, and a descendant is never equal to the node it sits
-	// under, so a later look could not find anything this one did not.
+	// What the memo holds for `n`, or null. The only place either memo is
+	// read, once per node, where its frame is opened. While a frame is
+	// open only its descendants are added, and none of those matches the
+	// node above them.
 	auto memoized = [&cache, &misses](tref n) -> tref {
 		if constexpr (!unique) return (void) n, nullptr;
 		else {
 			TS(++tstats().cache_probes;)
-	// A memo entry is keyed by subtree identity, which ignores the right
-	// sibling, so the node it hands back may carry a different one than
-	// the node being looked up. Re-attach the caller's sibling; this
-	// costs a compare when it already matches.
+			// Memo keys are subtree identities, which ignore the
+			// right sibling, so the stored node may carry a
+			// different one. Re-attach `n`'s sibling; that is a
+			// compare when it already matches.
 			if constexpr (slot != 0) {
 				const auto it = m.find(std::make_pair(n, slot));
 				if (it == m.end()) return nullptr;
@@ -233,11 +231,9 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 		}
 	};
 
-	// Writes a finished node back into the slot its frame occupied and
-	// tells the parent whether it changed. Called after the frame is
-	// popped, because `up` must see the parent rather than the node it
-	// has just finished. Every close goes through here, so no path can
-	// forget to report a change upwards.
+	// Writes a finished node back into the slot its frame held and tells
+	// the parent whether it changed. Called after the frame is popped, so
+	// that `up` sees the parent. Every close goes through here.
 	auto finish = [&stack, &frames](size_t pos, tref res) {
 		tref& dest = stack[pos];
 		if (res != dest) {
@@ -317,8 +313,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 			<< (stack.back() == c_node ? "LC" : "RS") << "\n";)
 		// Are all children visited?
 		if (c == nullptr) {
-			// `fr` does not survive the pops below, so take what
-			// is still needed from it first
+			// `fr` does not survive the pops below
 			const size_t pos = fr.pos;
 			const size_t c_pos = (stack.size() - 1) - pos;
 			const bool dirty = fr.dirty;
@@ -366,14 +361,14 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 			finish(pos, res);
 			TD(dec_depth();)
 		} else {
-			// Advance this frame before anything can reallocate
-			// either vector, which would leave `fr` and `c_node`
-			// dangling. The callbacks below still see the parent
-			// frame on top, so get_parent() stays correct.
+			// advance before pushing: a push can reallocate and
+			// leave `fr` and `c_node` dangling. The callbacks
+			// below still run with the parent frame on top, so
+			// get_parent() names the parent.
 			TS(++tstats().sibling_steps;)
 			fr.next_child = tree::get(c).right_sibling();
-			// opening a frame below can move `frames`, so reach
-			// the parent by index rather than through `fr`
+			// opening a frame below can move `frames`, so the
+			// parent is reached by index
 			const size_t parent = frames.size() - 1;
 			// Add next child
 			if (visit_subtree(c)) {
@@ -400,9 +395,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				// If the transformed node should not be
 				// visited, do not open a frame for it
 				else if (visit_subtree(r)) {
-					// see post_order: a leaf is never in
-					// the memo, so looking one up is a
-					// guaranteed miss
+					// a leaf is never in the memo
 					const tref first =
 						tree::get(r).left_child();
 					const tref hit = first == nullptr
@@ -442,9 +435,7 @@ void pre_order<node>::const_traverse(tref n, auto& visitor,
 	};
 	// Call callback with parent if it is invocable with tref, tref
 	// Otherwise, call it just with tref
-	// `name` only labels the log line, so it stays a plain pointer: a
-	// std::string parameter would construct and destroy a temporary at
-	// every call site on every node, including when logging is off
+	// `name` only labels the log line, so it stays a plain pointer
 	auto call = [](auto& cb, tref x, tref parent,
 		[[maybe_unused]] const char* name) -> bool
 	{

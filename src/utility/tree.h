@@ -394,12 +394,10 @@ struct subtree_pair_equal {
 			const std::pair<tref, PT>& b) const;
 };
 
-// Hashes a pair the way subtree_pair_equal compares one: by subtree identity,
-// which ignores the right sibling. std::hash would hash the tref as a plain
-// pointer, so two keys that compare equal could land in different buckets -
-// which an unordered container forbids, and which costs exactly the hits a
-// subtree keyed cache exists for, since the same subtree in another position
-// is a different pointer.
+// Hashes a pair by subtree identity, ignoring the right sibling, to match how
+// subtree_pair_equal compares one. An unordered container requires that equal
+// keys hash alike, and the same subtree in another position is a different
+// pointer with the same identity.
 template <typename T, typename PT>
 struct subtree_pair_hash {
 	size_t operator()(const std::pair<tref, PT>& p) const;
