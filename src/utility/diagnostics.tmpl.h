@@ -890,6 +890,21 @@ result<T>& result<T>::operator=(U&& v) {
 }
 
 template <typename T>
+template <typename U>
+result<T>&& result<T>::with_value(U&& v) {
+	*this = std::forward<U>(v);
+	return std::move(*this);
+}
+
+template <typename T>
+template <typename U>
+result<T>&& result<T>::with_assert_check_value(U&& v) {
+	*this = std::forward<U>(v);
+	DBG(assert(this->is_well_formed());)
+	return std::move(*this);
+}
+
+template <typename T>
 void result<T>::clear_value() {
 	value_.reset();
 }
@@ -960,6 +975,36 @@ void result<T>::error(code c, std::string_view msg, size_t primary,
 }
 
 template <typename T>
+result<T>&& result<T>::with_error(code c, std::string_view msg, int_t primary,
+		      std::initializer_list<attr> extra) {
+	error(c, msg, primary, extra);
+	return std::move(*this);
+}
+
+template <typename T>
+result<T>&& result<T>::with_assert_check_error(code c, std::string_view msg, int_t primary,
+		      std::initializer_list<attr> extra) {
+	error(c, msg, primary, extra);
+	DBG(assert(this->is_well_formed());)
+	return std::move(*this);
+}
+
+template <typename T>
+result<T>&& result<T>::with_error(code c, std::string_view msg, size_t primary,
+		      std::initializer_list<attr> extra) {
+	error(c, msg, primary, extra);
+	return std::move(*this);
+}
+
+template <typename T>
+result<T>&& result<T>::with_assert_check_error(code c, std::string_view msg, size_t primary,
+		      std::initializer_list<attr> extra) {
+	error(c, msg, primary, extra);
+	DBG(assert(this->is_well_formed());)
+	return std::move(*this);
+}
+
+template <typename T>
 void result<T>::warning(std::string_view msg, int_t primary,
 			std::initializer_list<attr> extra) {
 	diag_rep_.warning(msg, primary, extra);
@@ -987,6 +1032,21 @@ template <typename T>
 void result<T>::error(code c, std::string_view msg,
 		      std::initializer_list<attr> extra) {
 	error(c, msg, 0, extra);
+}
+
+template <typename T>
+result<T>&& result<T>::with_error(code c, std::string_view msg,
+		      std::initializer_list<attr> extra) {
+	error(c, msg, extra);
+	return std::move(*this);
+}
+
+template <typename T>
+result<T>&& result<T>::with_assert_check_error(code c, std::string_view msg,
+		      std::initializer_list<attr> extra) {
+	error(c, msg, extra);
+	DBG(assert(this->is_well_formed());)
+	return std::move(*this);
 }
 
 template <typename T>

@@ -435,6 +435,15 @@ struct result {
 	template <typename U = T>
 	result& operator=(U&& v);
 
+	/// @ref operator=, and it returns the result, so a caller returns in
+	/// one statement. The rvalue return admits no further call.
+	template <typename U = T>
+	[[nodiscard]] result&& with_value(U&& v);
+
+	/// @ref with_value, plus a DBG assertion of @ref is_well_formed.
+	template <typename U = T>
+	[[nodiscard]] result&& with_assert_check_value(U&& v);
+
 	void clear_value();
 
 	[[nodiscard]] diagnostics_report&      report() &;
@@ -450,6 +459,24 @@ struct result {
 	void error(code c, std::string_view msg, size_t primary,
 		   std::initializer_list<attr> extra = {});
 	void error(code c, std::string_view msg,
+		   std::initializer_list<attr> extra);
+
+	/// @ref error, and it returns the result, so a caller returns in one
+	/// statement. It discards a held value the same way, and the rvalue
+	/// return admits no further call.
+	[[nodiscard]] result&& with_error(code c, std::string_view msg, int_t primary = 0,
+		   std::initializer_list<attr> extra = {});
+	[[nodiscard]] result&& with_error(code c, std::string_view msg, size_t primary,
+		   std::initializer_list<attr> extra = {});
+	[[nodiscard]] result&& with_error(code c, std::string_view msg,
+		   std::initializer_list<attr> extra);
+
+	/// @ref with_error, plus a DBG assertion of @ref is_well_formed.
+	[[nodiscard]] result&& with_assert_check_error(code c, std::string_view msg, int_t primary = 0,
+		   std::initializer_list<attr> extra = {});
+	[[nodiscard]] result&& with_assert_check_error(code c, std::string_view msg, size_t primary,
+		   std::initializer_list<attr> extra = {});
+	[[nodiscard]] result&& with_assert_check_error(code c, std::string_view msg,
 		   std::initializer_list<attr> extra);
 	void warning(std::string_view msg, int_t primary = 0,
 		     std::initializer_list<attr> extra = {});

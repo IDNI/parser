@@ -314,6 +314,175 @@ TEST_SUITE("diagnostics: append() after demote_errors_to_warnings()") {
 	}
 }
 
+// Proves with_error/with_value compile in the shape they exist for: a
+// `return` on the very line that calls them, from a function returning
+// result<T> by value (result's copy ctor is deleted).
+static result<int> fails_with_error() {
+	result<int> r;
+	return r.with_error(code::internal_error, "boom", 7);
+}
+
+static result<int> fails_after_merge() {
+	result<int> r;
+	result<int> child;
+	child.report().count("child-metric", 1);
+	r.merge(std::move(child));
+	return r.with_error(code::solver_error, "backend failed");
+}
+
+static result<int> succeeds_with_value() {
+	result<int> r;
+	return r.with_value(5);
+}
+
+static result<int> succeeds_with_value_after_merge() {
+	result<int> r;
+	result<int> child;
+	child.report().count("child-metric", 1);
+	r.merge(std::move(child));
+	return r.with_value(5);
+}
+
+TEST_SUITE("diagnostics: with_error") {
+
+	TEST_CASE("with_error sets the same error as error") {
+		result<int> a;
+		a.error(code::internal_error, "boom", 7);
+		result<int> b = fails_with_error();
+		CHECK(a.report().nodes().size() == b.report().nodes().size());
+		CHECK(a.report().nodes().back().tag == b.report().nodes().back().tag);
+		CHECK(a.report().nodes().back().value == b.report().nodes().back().value);
+		CHECK(a.report().str(a.report().nodes().back().key) ==
+			b.report().str(b.report().nodes().back().key));
+	}
+
+	TEST_CASE("with_error returns from a by-value result<T> function") {
+		result<int> r = fails_with_error();
+		CHECK_FALSE(r.has_value());
+		CHECK(r.has_error());
+		CHECK(r.report().nodes().back().tag == code::internal_error);
+	}
+
+	TEST_CASE("a report merged before with_error survives the call") {
+		result<int> r = fails_after_merge();
+		CHECK(r.report().nodes().size() == 2);
+		CHECK(r.report().str(r.report().nodes()[0].key) == "child-metric");
+		CHECK(r.report().nodes().back().tag == code::solver_error);
+		CHECK(r.report().str(r.report().nodes().back().key) ==
+			"backend failed");
+	}
+}
+
+TEST_SUITE("diagnostics: with_value") {
+
+	TEST_CASE("with_value sets the same value as operator=") {
+		result<int> a;
+		a = 5;
+		result<int> b = succeeds_with_value();
+		CHECK(a.has_value());
+		CHECK(b.has_value());
+		CHECK(*a == *b);
+	}
+
+	TEST_CASE("with_value returns from a by-value result<T> function") {
+		result<int> r = succeeds_with_value();
+		CHECK(r.has_value());
+		CHECK_FALSE(r.has_error());
+		CHECK(*r == 5);
+	}
+
+	TEST_CASE("a report merged before with_value survives the call") {
+		result<int> r = succeeds_with_value_after_merge();
+		CHECK(r.has_value());
+		CHECK(*r == 5);
+		CHECK(r.report().nodes().size() == 1);
+		CHECK(r.report().str(r.report().nodes()[0].key) == "child-metric");
+	}
+}
+
+static result<int> fails_with_assert_check_error() {
+	result<int> r;
+	return r.with_assert_check_error(code::internal_error, "boom", 7);
+}
+
+static result<int> fails_with_assert_check_error_after_merge() {
+	result<int> r;
+	result<int> child;
+	child.report().count("child-metric", 1);
+	r.merge(std::move(child));
+	return r.with_assert_check_error(code::solver_error, "backend failed");
+}
+
+static result<int> succeeds_with_assert_check_value() {
+	result<int> r;
+	return r.with_assert_check_value(5);
+}
+
+static result<int> succeeds_with_assert_check_value_after_merge() {
+	result<int> r;
+	result<int> child;
+	child.report().count("child-metric", 1);
+	r.merge(std::move(child));
+	return r.with_assert_check_value(5);
+}
+
+TEST_SUITE("diagnostics: with_assert_check_error") {
+
+	TEST_CASE("with_assert_check_error sets the same error as error") {
+		result<int> a;
+		a.error(code::internal_error, "boom", 7);
+		result<int> b = fails_with_assert_check_error();
+		CHECK(a.report().nodes().size() == b.report().nodes().size());
+		CHECK(a.report().nodes().back().tag == b.report().nodes().back().tag);
+		CHECK(a.report().nodes().back().value == b.report().nodes().back().value);
+		CHECK(a.report().str(a.report().nodes().back().key) ==
+			b.report().str(b.report().nodes().back().key));
+	}
+
+	TEST_CASE("with_assert_check_error returns from a by-value result<T> function") {
+		result<int> r = fails_with_assert_check_error();
+		CHECK_FALSE(r.has_value());
+		CHECK(r.has_error());
+		CHECK(r.report().nodes().back().tag == code::internal_error);
+	}
+
+	TEST_CASE("a report merged before with_assert_check_error survives the call") {
+		result<int> r = fails_with_assert_check_error_after_merge();
+		CHECK(r.report().nodes().size() == 2);
+		CHECK(r.report().str(r.report().nodes()[0].key) == "child-metric");
+		CHECK(r.report().nodes().back().tag == code::solver_error);
+		CHECK(r.report().str(r.report().nodes().back().key) ==
+			"backend failed");
+	}
+}
+
+TEST_SUITE("diagnostics: with_assert_check_value") {
+
+	TEST_CASE("with_assert_check_value sets the same value as operator=") {
+		result<int> a;
+		a = 5;
+		result<int> b = succeeds_with_assert_check_value();
+		CHECK(a.has_value());
+		CHECK(b.has_value());
+		CHECK(*a == *b);
+	}
+
+	TEST_CASE("with_assert_check_value returns from a by-value result<T> function") {
+		result<int> r = succeeds_with_assert_check_value();
+		CHECK(r.has_value());
+		CHECK_FALSE(r.has_error());
+		CHECK(*r == 5);
+	}
+
+	TEST_CASE("a report merged before with_assert_check_value survives the call") {
+		result<int> r = succeeds_with_assert_check_value_after_merge();
+		CHECK(r.has_value());
+		CHECK(*r == 5);
+		CHECK(r.report().nodes().size() == 1);
+		CHECK(r.report().str(r.report().nodes()[0].key) == "child-metric");
+	}
+}
+
 TEST_SUITE("diagnostics: chained and_then().transform()") {
 
 	TEST_CASE("a two-step chain applies both steps and keeps report order") {
