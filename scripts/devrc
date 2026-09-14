@@ -155,6 +155,10 @@ ninja_available() {
 	which ninja > /dev/null 2>&1 || which ninja-build > /dev/null 2>&1
 }
 
+make_available() {
+	which make > /dev/null 2>&1
+}
+
 # Initializes every submodule `git submodule status` reports as not yet
 # checked out (a leading "-" on its status line), leaving already-initialized
 # ones alone. Reads the status output via a here-string, which keeps the
@@ -305,6 +309,9 @@ preset_entry() {
 	elif ! ninja_available; then
 		echo "Ninja is not available. Falling back to make."
 		generator_args=(-G "Unix Makefiles")
+	elif ! make_available; then
+		echo "Make is not available. Using Ninja."
+		generator_args=(-G "Ninja")
 	fi
 
 	echo "Preset: ${PRESET}"
