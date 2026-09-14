@@ -194,12 +194,20 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 	auto get_parent = [&frames, &stack]() -> tref {
 		return frames.empty() ? nullptr : stack[frames.back().pos];
 	};
+	// The per call memo only pays where subtrees repeat. Where they do not
+	// - a formula with no shared subterms - every probe and insert is dead
+	// weight, so a traversal that has gone a long way without a hit stops
+	// paying in. `f` is documented as a function of the subtree alone, so
+	// dropping entries changes how often it is called, never the result.
+	constexpr size_t give_up_after = 512;
+	size_t misses = 0;
+
 	// What the memo holds for `n`, or null. A node is only looked up once,
 	// where its frame would be opened, so this is the single place that
 	// reads either memo. While a frame is open only its own descendants
 	// are added, and a descendant is never equal to the node it sits
 	// under, so a later look could not find anything this one did not.
-	auto memoized = [&cache](tref n) -> tref {
+	auto memoized = [&cache, &misses](tref n) -> tref {
 		if constexpr (!unique) return (void) n, nullptr;
 		else {
 			TS(++tstats().cache_probes;)
@@ -214,8 +222,10 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				return tree::get(it->second,
 					tree::get(n).right_sibling());
 			} else {
+				if (misses >= give_up_after) return nullptr;
 				const tref* found = cache.find(n);
-				if (found == nullptr) return nullptr;
+				if (found == nullptr) return ++misses, nullptr;
+				misses = 0;
 				TS(++tstats().cache_hits;)
 				return tree::get(*found,
 					tree::get(n).right_sibling());
@@ -323,7 +333,8 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 					if constexpr (slot != 0) m.emplace(
 						std::make_pair(key, slot),
 						res);
-					else cache.insert(key, res);
+					else if (misses < give_up_after)
+						cache.insert(key, res);
 				}
 				// Pop children from stacks
 				stack.erase(stack.end() - c_pos, stack.end());
@@ -349,7 +360,8 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				if constexpr (slot != 0)
 					m.emplace(std::make_pair(key, slot),
 									res);
-				else cache.insert(key, res);
+				else if (misses < give_up_after)
+					cache.insert(key, res);
 			}
 			finish(pos, res);
 			TD(dec_depth();)
