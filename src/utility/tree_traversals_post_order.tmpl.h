@@ -70,9 +70,9 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 	frames.push_back({ n, tree::get(n).left_child(), nullptr, 0, false });
 	TD(inc_depth();)
 
-	// Records what a child finished as. Nothing is buffered while every
-	// child so far is unchanged; the first change buffers the children
-	// before it, and every child after it is buffered too.
+	// Records what a child finished as. Nothing is buffered until a child
+	// changes; that first change buffers the children before it, and
+	// every child after it.
 	auto child_done = [&stack, &frames](tref original, tref res) {
 		build_frame& fr = frames.back();
 		if (!fr.dirty) {
@@ -129,7 +129,7 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 		const tref c = fr.next_child;
 		DBGT(std::cout << "\nnon-const loop begin: "
 			<< tree::get(fr.node).dump_to_str() << "\n";)
-		// Every child visited - a node with none arrives here at once
+		// All children done; a leaf reaches this on its first turn
 		if (c == nullptr) {
 			const tref finished = fr.node;
 			const tref origin = fr.origin;
@@ -148,8 +148,8 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 			}
 			res = call(f, res);
 			if (res == nullptr) return nullptr;
-			// A leaf is never memoized, so that looking one up
-			// can be skipped as a certain miss
+			// Leaves are kept out of the memo, so that looking
+			// one up can be skipped as a certain miss
 			if (has_children) {
 				if constexpr (slot != 0) m.emplace(
 					std::make_pair(finished, slot), res);
@@ -170,7 +170,7 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 			child_done(c, c);
 			continue;
 		}
-		// The memo is read once per node. While a frame is open only
+		// The memo is read once per node: while a frame is open only
 		// its descendants are added, and none of those matches the
 		// node above them.
 		const tref first = tree::get(c).left_child();
@@ -215,7 +215,7 @@ void post_order<node>::const_traverse(tref n, auto& visitor,
 	if constexpr (unique) cache.insert(n);
 	TD(inc_depth();)
 	while (true) {
-		// Every child visited - a node with none arrives here at once
+		// All children done; a leaf reaches this on its first turn
 		if (cursor == nullptr) {
 			if (frames.empty()) {
 				// the root: nothing above it to return to

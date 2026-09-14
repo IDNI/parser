@@ -231,9 +231,9 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 		}
 	};
 
-	// Records what a child finished as. Nothing is buffered while every
-	// child so far is unchanged; the first change buffers the children
-	// before it, and every child after it is buffered too.
+	// Records what a child finished as. Nothing is buffered until a child
+	// changes; that first change buffers the children before it, and
+	// every child after it.
 	auto child_done = [&stack, &frames](tref original, tref res) {
 		build_frame& fr = frames.back();
 		if (!fr.dirty) {
@@ -261,9 +261,9 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 		DBGT(std::cout << "\tcall returned: " << tree::get(nn).dump_to_str() << "\n";)
 		return nn;
 	};
-	// Opens a frame for `node`, unless the memo already holds its result,
-	// in which case `node` becomes that result. `origin` is the parent's
-	// child this node was reached as.
+	// Opens a frame for `x`, unless the memo already holds its result, in
+	// which case `x` becomes that result. `origin` is the parent's child
+	// it was reached as.
 	auto open = [&frames, &stack, &memoized](tref origin, tref& x) -> bool {
 		const tref first = tree::get(x).left_child();
 		// a leaf is never in the memo
@@ -279,8 +279,8 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 		return true;
 	};
 
-	// Apply f to the root. If it is not descended into, its result is the
-	// whole answer.
+	// Apply f to the root. If the root is not descended into, its result
+	// is the whole answer.
 	tref r = call(f, n);
 	if (r == nullptr) return nullptr;
 	bool descended = false;
@@ -299,7 +299,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 		const tref c = fr.next_child;
 		DBGT(std::cout << "\nnon-const loop begin: "
 			<< tree::get(fr.node).dump_to_str() << "\n";)
-		// Every child visited - a node with none arrives here at once
+		// All children done; a leaf reaches this on its first turn
 		if (c == nullptr) {
 			const tref finished = fr.node;
 			const tref origin = fr.origin;
@@ -317,13 +317,13 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				if (res == nullptr) return nullptr;
 			}
 			// `up` runs with the frame popped, so that it sees
-			// the parent rather than the node it just finished
+			// the parent
 			frames.pop_back();
 			TD(dec_depth();)
 			res = call(up, res);
 			if (res == nullptr) return nullptr;
-			// A leaf is never memoized, so that looking one up
-			// can be skipped as a certain miss
+			// Leaves are kept out of the memo, so that looking
+			// one up can be skipped as a certain miss
 			if constexpr (unique) if (has_children) {
 				if constexpr (slot != 0) m.emplace(
 					std::make_pair(finished, slot), res);
@@ -344,7 +344,8 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 			child_done(c, c);
 			continue;
 		}
-		// Apply f, then descend into the result unless it is done
+		// Apply f to the child, then descend into the result or
+		// finish it here
 		r = call(f, c);
 		if (r == nullptr) return nullptr;
 		bool into = false;
