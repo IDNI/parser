@@ -187,12 +187,12 @@ template<bool break_on_change, size_t slot, bool unique>
 tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 {
 	if (n == nullptr) return nullptr;
-	scratch<node, traversal_buffers<subtree_memo<node>, frame>> s;
+	scratch<node, traversal_buffers<subtree_memo<node>, build_frame>> s;
 	auto& cache = s.buffers->cache;
 	auto& stack = s.buffers->stack;
 	auto& frames = s.buffers->positions;
-	auto get_parent = [&frames, &stack]() -> tref {
-		return frames.empty() ? nullptr : stack[frames.back().pos];
+	auto get_parent = [&frames]() -> tref {
+		return frames.empty() ? nullptr : frames.back().node;
 	};
 	// The per call memo pays off only where subtrees repeat. A traversal
 	// that has gone this many nodes without a hit stops adding to it. `f`
@@ -231,15 +231,20 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 		}
 	};
 
-	// Writes a finished node back into the slot its frame held and tells
-	// the parent whether it changed. Called after the frame is popped, so
-	// that `up` sees the parent. Every close goes through here.
-	auto finish = [&stack, &frames](size_t pos, tref res) {
-		tref& dest = stack[pos];
-		if (res != dest) {
-			dest = res;
-			if (!frames.empty()) frames.back().dirty = true;
+	// Records what a child finished as. Nothing is buffered while every
+	// child so far is unchanged; the first change buffers the children
+	// before it, and every child after it is buffered too.
+	auto child_done = [&stack, &frames](tref original, tref res) {
+		build_frame& fr = frames.back();
+		if (!fr.dirty) {
+			if (res == original) return;
+			fr.dirty = true;
+			for (tref c = tree::get(fr.node).left_child();
+					c != original;
+					c = tree::get(c).right_sibling())
+				stack.push_back(c);
 		}
+		stack.push_back(res);
 	};
 
 	auto call = [&get_parent](auto& cb, tref n) -> tref {
@@ -256,167 +261,103 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 		DBGT(std::cout << "\tcall returned: " << tree::get(nn).dump_to_str() << "\n";)
 		return nn;
 	};
-	// Apply f and save on stack
+	// Opens a frame for `node`, unless the memo already holds its result,
+	// in which case `node` becomes that result. `origin` is the parent's
+	// child this node was reached as.
+	auto open = [&frames, &stack, &memoized](tref origin, tref& x) -> bool {
+		const tref first = tree::get(x).left_child();
+		// a leaf is never in the memo
+		if (const tref hit = first == nullptr ? nullptr : memoized(x);
+			hit != nullptr)
+		{
+			x = hit;
+			return false;
+		}
+		TD(inc_depth();)
+		TS(++tstats().frames_opened;)
+		frames.push_back({ x, first, origin, stack.size(), false });
+		return true;
+	};
+
+	// Apply f to the root. If it is not descended into, its result is the
+	// whole answer.
 	tref r = call(f, n);
 	if (r == nullptr) return nullptr;
+	bool descended = false;
 	if constexpr (break_on_change) {
-		if (r == n) {
-			if (const tref hit = memoized(r); hit != nullptr)
-				r = hit;
-			else {
-				TD(inc_depth();)
-				TS(++tstats().frames_opened;)
-				frames.push_back({ 0,
-					tree::get(r).left_child(), false });
-			}
-		} else {
-			r = call(up, r);
-		}
+		if (r == n) descended = open(nullptr, r);
+		else r = call(up, r);
 	}
 	// If the transformed node should not be
 	// visited, do not open a frame for it
-	else if (visit_subtree(r)) {
-		if (const tref hit = memoized(r); hit != nullptr) r = hit;
-		else {
-			TD(inc_depth();)
-			TS(++tstats().frames_opened;)
-			frames.push_back({ 0,
-				tree::get(r).left_child(), false });
-		}
-	} else {
-		r = call(up, r);
-		if (r == nullptr) return nullptr;
-	}
-	stack.emplace_back(r);
+	else if (visit_subtree(r)) descended = open(nullptr, r);
+	else r = call(up, r);
+	if (!descended) return r;
+
 	while (true) {
-		// If no unprocessed position exists, we are done
-		if (frames.empty()) return stack[0];
-		// Find first unprocessed position
-		frame& fr = frames.back();
-		tref& c_node = stack[fr.pos];
-		DBGT(std::cout << "\nnon-const loop begin: "
-			<< tree::get(c_node).dump_to_str() << "\n";)
-		DBGT(print_stack<node>(stack, c_node);)
-		// Check if node has children
-		if (!tree::get(c_node).has_child()) {
-			// Call up and move to next
-			const size_t pos = fr.pos;
-			frames.pop_back();
-			const tref res = call(up, stack[pos]);
-			if (res == nullptr) return nullptr;
-			finish(pos, res);
-			TD(dec_depth();)
-			continue;
-		}
+		build_frame& fr = frames.back();
 		const tref c = fr.next_child;
-		DBGT(std::cout << "\tmove to a child: " << c << " \t"
-			<< (stack.back() == c_node ? "LC" : "RS") << "\n";)
-		// Are all children visited?
+		DBGT(std::cout << "\nnon-const loop begin: "
+			<< tree::get(fr.node).dump_to_str() << "\n";)
+		// Every child visited - a node with none arrives here at once
 		if (c == nullptr) {
-			// `fr` does not survive the pops below
-			const size_t pos = fr.pos;
-			const size_t c_pos = (stack.size() - 1) - pos;
-			const bool dirty = fr.dirty;
-			const tref key = c_node;
-			// No child changed, so the node stands as it is
-			if (!dirty) {
-				// Call up
-				frames.pop_back();
-				const tref res = call(up, key);
+			const tref finished = fr.node;
+			const tref origin = fr.origin;
+			const size_t start = fr.buffer_start;
+			const bool has_children =
+				tree::get(finished).left_child() != nullptr;
+			tref res = finished;
+			if (fr.dirty) {
+				// Rebuild from the buffered children
+				TS(++tstats().rebuilds;)
+				res = tree::get(tree::get(finished).value,
+					&stack[start], stack.size() - start,
+					tree::get(finished).right_sibling());
+				stack.resize(start);
 				if (res == nullptr) return nullptr;
-				if constexpr (unique) {
-					if constexpr (slot != 0) m.emplace(
-						std::make_pair(key, slot),
-						res);
-					else if (misses < give_up_after)
-						cache.insert(key, res);
-				}
-				// Pop children from stacks
-				stack.erase(stack.end() - c_pos, stack.end());
-				finish(pos, res);
-				TD(dec_depth();)
-				continue;
 			}
-			// Make new node if children are different
-			TS(++tstats().rebuilds;)
-			tref res = tree::get(tree::get(c_node).value,
-				&stack[pos + 1],
-				c_pos,
-				tree::get(c_node).right_sibling());
-			DBGT(std::cout << "\tnew node: " << tree::get(res).dump_to_str() << "\n";)
-			// Pop children from stacks
-			stack.erase(stack.end() - c_pos, stack.end());
-			if (res == nullptr) return nullptr;
-			// Call up
+			// `up` runs with the frame popped, so that it sees
+			// the parent rather than the node it just finished
 			frames.pop_back();
+			TD(dec_depth();)
 			res = call(up, res);
 			if (res == nullptr) return nullptr;
-			if constexpr (unique) {
-				if constexpr (slot != 0)
-					m.emplace(std::make_pair(key, slot),
-									res);
+			// A leaf is never memoized, so that looking one up
+			// can be skipped as a certain miss
+			if constexpr (unique) if (has_children) {
+				if constexpr (slot != 0) m.emplace(
+					std::make_pair(finished, slot), res);
 				else if (misses < give_up_after)
-					cache.insert(key, res);
+					cache.insert(finished, res);
 			}
-			finish(pos, res);
-			TD(dec_depth();)
-		} else {
-			// advance before pushing: a push can reallocate and
-			// leave `fr` and `c_node` dangling. The callbacks
-			// below still run with the parent frame on top, so
-			// get_parent() names the parent.
-			TS(++tstats().sibling_steps;)
-			fr.next_child = tree::get(c).right_sibling();
-			// opening a frame below can move `frames`, so the
-			// parent is reached by index
-			const size_t parent = frames.size() - 1;
-			// Add next child
-			if (visit_subtree(c)) {
-				// Apply f and save on stack
-				r = call(f, c);
-				if (r == nullptr) return nullptr;
-				if constexpr (break_on_change) {
-					if (r == c) {
-						const tref first =
-							tree::get(r).left_child();
-						const tref hit = first == nullptr
-							? nullptr : memoized(r);
-						if (hit != nullptr) r = hit;
-						else {
-						TD(inc_depth();)
-						TS(++tstats().frames_opened;)
-						frames.push_back({ stack.size(),
-							first, false });
-						}
-					} else {
-						r = call(up, r);
-					}
-				}
-				// If the transformed node should not be
-				// visited, do not open a frame for it
-				else if (visit_subtree(r)) {
-					// a leaf is never in the memo
-					const tref first =
-						tree::get(r).left_child();
-					const tref hit = first == nullptr
-						? nullptr : memoized(r);
-					if (hit != nullptr) r = hit;
-					else {
-					TD(inc_depth();)
-					TS(++tstats().frames_opened;)
-					frames.push_back({ stack.size(),
-							first, false });
-					}
-				} else {
-					r = call(up, r);
-					if (r == nullptr) return nullptr;
-				}
-				// tell the parent whether this child changed
-				if (r != c) frames[parent].dirty = true;
-				stack.emplace_back(r);
-			}
-			else stack.push_back(c);
+			if (frames.empty()) return res;
+			child_done(origin, res);
+			continue;
 		}
+		// advance before descending: opening a frame can move
+		// `frames`, which would leave `fr` dangling. The callbacks
+		// below still run with the parent frame on top, so
+		// get_parent() names the parent.
+		TS(++tstats().sibling_steps;)
+		fr.next_child = tree::get(c).right_sibling();
+		if (!visit_subtree(c)) {
+			child_done(c, c);
+			continue;
+		}
+		// Apply f, then descend into the result unless it is done
+		r = call(f, c);
+		if (r == nullptr) return nullptr;
+		bool into = false;
+		if constexpr (break_on_change) {
+			if (r == c) into = open(c, r);
+			else r = call(up, r);
+		}
+		// If the transformed node should not be
+		// visited, do not open a frame for it
+		else if (visit_subtree(r)) into = open(c, r);
+		else r = call(up, r);
+		if (r == nullptr) return nullptr;
+		if (!into) child_done(c, r);
 	}
 }
 

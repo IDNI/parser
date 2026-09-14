@@ -197,28 +197,14 @@ struct walk_buffers {
 	void clear() { frames.clear(), cache.clear(); }
 };
 
-// One open node of a rewriting traversal that buffers children lazily: the
-// node keeps no buffer at all until one of its children finishes as a
-// different node, at which point the children before it are buffered and
-// every child after it is too. `origin` is the child of the parent that this
-// node was reached as, which is what the parent compares the result against.
+// One open node of a rewriting traversal.
 struct build_frame {
 	tref node;
 	tref next_child;      // null once every child has been visited
-	tref origin;          // the parent's child this node was reached as
+	tref origin;          // the parent's child this node was reached as,
+			      // which the parent compares its result against
 	size_t buffer_start;  // where this node's buffered children begin
 	bool dirty;           // has a child finished as a different node?
-};
-
-// One open node of a rewriting traversal.
-//
-// `next_child` follows the node's own sibling chain. The traversal's stack is
-// not a safe source for it: a memoized result written there can carry a
-// different right sibling than the child it replaced.
-struct frame {
-	size_t pos;       // index of this node in the traversal's stack
-	tref next_child;  // null once every child has been visited
-	bool dirty;       // did a child finish as a different node?
 };
 
 // Counters for the work a traversal does, off by default. The counts are
