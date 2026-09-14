@@ -1061,6 +1061,11 @@ private:
 	void const_traverse(tref n, auto& visit, auto& visit_subtree);
 };
 
+// Post order walk in constant space, done by temporarily rewriting the right
+// pointers of the tree it walks. That is unsafe here: nodes are interned, so
+// the rewrite is seen by every holder of the same subtree, and it invalidates
+// the hash each node is stored under. Use post_order, which walks iteratively
+// in space proportional to depth.
 template <typename node>
 struct morris_post_order
 {
