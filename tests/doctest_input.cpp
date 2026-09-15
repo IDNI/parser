@@ -14,12 +14,10 @@ using namespace idni;
 // decoder functions (from old test_input.cpp)
 // ---------------------------------------------------------------------------
 
-#ifndef __EMSCRIPTEN__
 static auto noconv = [](parser<char32_t, char32_t>::input& in) {
 	auto x = in.cur();
 	return in.next(), vector<char32_t>{ x };
 };
-#endif
 
 static auto u8conv = [](parser<char, char32_t>::input& in) {
 	vector<char32_t> r;
@@ -40,13 +38,11 @@ static auto bconv = [](parser<char, bool>::input& in) {
 	return in.next(), r;
 };
 
-#ifndef __EMSCRIPTEN__
 static auto b32conv = [](parser<char32_t, bool>::input& in) {
 	vector<bool> r;
 	for (int i = 31; i >= 0; --i) r.push_back(in.cur() & (1 << i));
 	return in.next(), r;
 };
-#endif
 
 template<typename S>
 struct token {
@@ -93,13 +89,11 @@ static auto tokenize = [](typename parser<char, token<char>>::input& in) {
 	return tokenize_<char>(in);
 };
 
-#ifndef __EMSCRIPTEN__
 static auto tokenize32 = [](
 	typename parser<char32_t, token<char32_t>>::input& in)
 {
 	return tokenize_<char32_t>(in);
 };
-#endif
 
 // ---------------------------------------------------------------------------
 // helper: collect terminals from an input into a vector
@@ -193,7 +187,6 @@ TEST_SUITE("input: char") {
 // TEST SUITE: char32_t input & terminals
 // ---------------------------------------------------------------------------
 
-#ifndef __EMSCRIPTEN__
 TEST_SUITE("input: char32_t") {
 
 	TEST_CASE("empty") {
@@ -220,7 +213,6 @@ TEST_SUITE("input: char32_t") {
 		CHECK(actual == U"Hello τ World!");
 	}
 }
-#endif
 
 // ---------------------------------------------------------------------------
 // TEST SUITE: char -> char32_t (UTF-8 decode)
@@ -293,7 +285,6 @@ TEST_SUITE("input: binarize (char -> bool)") {
 // TEST SUITE: char32_t -> bool (binarize)
 // ---------------------------------------------------------------------------
 
-#ifndef __EMSCRIPTEN__
 TEST_SUITE("input: binarize32 (char32_t -> bool)") {
 
 	// b32conv emits 32 bits MSB-first; r[0] is bit 31, r[31] is bit 0.
@@ -317,7 +308,6 @@ TEST_SUITE("input: binarize32 (char32_t -> bool)") {
 		CHECK(r == bits32(0x000003C4));
 	}
 }
-#endif
 
 // ---------------------------------------------------------------------------
 // TEST SUITE: char -> token<char> (tokenize)
@@ -356,7 +346,6 @@ TEST_SUITE("input: tokenize (char -> token<char>)") {
 // TEST SUITE: char32_t -> token<char32_t> (tokenize32)
 // ---------------------------------------------------------------------------
 
-#ifndef __EMSCRIPTEN__
 TEST_SUITE("input: tokenize32 (char32_t -> token<char32_t>)") {
 
 	TEST_CASE("Hello τ World!") {
@@ -377,4 +366,3 @@ TEST_SUITE("input: tokenize32 (char32_t -> token<char32_t>)") {
 		CHECK(r[5].value == U"!");
 	}
 }
-#endif

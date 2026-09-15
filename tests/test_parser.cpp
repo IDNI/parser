@@ -277,7 +277,6 @@ int main(int argc, char **argv)
 *       ENCODING
 *******************************************************************************/
 
-#if !defined(WIN32) && !defined(__EMSCRIPTEN__)
 	// char32_t parser with Unicode
 	TEST("encoding", "u32")
 	nonterminals<char32_t> nt32;
@@ -288,7 +287,6 @@ int main(int argc, char **argv)
 	run_test<char32_t>(ps32, nt32, start32,
 		U"τžluťoučkýτᚠᛇᚻ᛫ᛒᛦᚦ᛫ᚠᚱᚩᚠᚢᚱ᛫ᚠᛁᚱᚪ᛫ᚷᛖᚻᚹᛦᛚᚳᚢᛗτξεσκεπάζωτ", {}, o);
 	ps32.clear();
-#endif
 
 /*******************************************************************************
 *       BOOLEAN
