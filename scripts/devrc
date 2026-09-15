@@ -23,6 +23,7 @@ normalize_args() {
 	BUILD_TYPE=""
 	PRESET=""
 	RUN=""
+	KEEP_CACHE=""
 	local past_dd=false
 	local args=("$@")
 	local i=0 arg next
@@ -58,6 +59,10 @@ normalize_args() {
 		case "$arg" in
 			-v)
 				VERBOSE="1"
+				((i++)) || true
+				;;
+			--keep-cache)
+				KEEP_CACHE="1"
 				((i++)) || true
 				;;
 			--target)
@@ -322,8 +327,14 @@ preset_entry() {
 
 	TAU_BUILD_JOBS="${TAU_BUILD_JOBS:-1}"
 
+	# --keep-cache layers a preset on a finished build directory. Every
+	# cache value set there before stays until a -D overrides it.
+	local fresh=(--fresh)
+	if [[ ${KEEP_CACHE:-} == 1 ]]; then
+		fresh=()
+	fi
 	echo "Configuring with preset ${PRESET}"
-	cmake --fresh --preset "${PRESET}" "${generator_args[@]}" \
+	cmake "${fresh[@]}" --preset "${PRESET}" "${generator_args[@]}" \
 		"${DEV_CMAKE[@]}"
 
 	echo "Building with preset ${PRESET}"
