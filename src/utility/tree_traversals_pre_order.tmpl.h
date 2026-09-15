@@ -358,13 +358,9 @@ void pre_order<node>::const_traverse(tref n, auto& visitor,
 	auto& visit_subtree, auto& up, auto& between)
 {
 	if (n == nullptr) return;
-	scratch<node, traversal_buffers<subtree_seen<node>, size_t>> s;
+	scratch<node, walk_buffers<subtree_seen<node>>> s;
 	auto& cache = s.buffers->cache;
-	auto& stack = s.buffers->stack;
-	auto& upos = s.buffers->positions;
-	auto get_parent = [&upos, &stack]() -> tref {
-		return upos.empty() ? nullptr : stack[upos.back()];
-	};
+	auto& frames = s.buffers->frames;
 	// Call callback with parent if it is invocable with tref, tref
 	// Otherwise, call it just with tref
 	// `name` only labels the log line, so it stays a plain pointer
@@ -389,82 +385,64 @@ void pre_order<node>::const_traverse(tref n, auto& visitor,
 		DBGT(std::cerr << " N/A\n";)
 		return true;
 	};
-	// visit n and save on stack
+	// visit the root; it is descended into only if the visitor says so
 	if (!call(visit_subtree, n, nullptr, "visit_subtree"))
 		return;
 	bool ret = !call(visitor, n, nullptr, "visitor0");
 	if constexpr (search) { if (ret) return; }
-	stack.push_back(n);
-	if (!ret) {
-		TD(inc_depth();)
-		upos.push_back(0);
-	}
 	if constexpr (unique) cache.insert(n);
+	if (ret) return;
+	TD(inc_depth();)
+	// The node being descended and the next of its children to visit are
+	// kept in locals; `frames` is touched only on a descent or a return,
+	// so a child that is not descended into costs no push.
+	tref current = n;
+	tref cursor = tree::get(n).left_child();
 	while (true) {
-		// If no unprocessed position exists, we are done
-		if (upos.empty()) return;
-		// Find first unprocessed position
-		tref c_node = stack[upos.back()];
 		DBGT(std::cout << "-- non-const loop begin: "
-			<< tree::get(c_node).value << "\n";)
-		DBGT(print_stack<node>(stack, c_node);)
-		const auto& c_tree = tree::get(c_node);
-		if (!c_tree.has_child()) { // If node has no children
-			// Call up and move to next
-			upos.pop_back();
-			call(up, c_node, get_parent(), "up1");
-			if (c_tree.has_right_sibling())
-				call(between, c_node, get_parent(), "between");
+			<< tree::get(current).value << "\n";)
+		// All children done; a leaf reaches this on its first turn.
+		// The frame below gives both this node's parent and where to
+		// carry on.
+		if (cursor == nullptr) {
+			const tref parent = frames.empty() ? nullptr
+						: frames.back().node;
+			call(up, current, parent, "up");
+			if (tree::get(current).has_right_sibling())
+				call(between, current, parent, "between");
 			TD(dec_depth();)
+			if (frames.empty()) return;
+			const walk_frame below = frames.back();
+			frames.pop_back();
+			current = below.node;
+			cursor = below.next_child;
 			continue;
 		}
-		// Get next child
+		const tref c = cursor;
 		TS(++tstats().sibling_steps;)
-		tref c = (stack.back() == c_node) ? c_tree.left_child()
-				: tree::get(stack.back()).right_sibling();
-		DBGT(std::cout << "-- move to a child: " << c;)
-		DBGT(if (c) std::cout << tree::get(c).value;)
-		DBGT(std::cout << " " << (stack.back() == c_node
-						? "LC" : "RS") << "\n\n";)
-		// Are all children visited?
-		if (c == nullptr) {
-			// Get child position
-			size_t c_pos = (stack.size() - 1) - upos.back();
-			upos.pop_back();
-			// Call up
-			call(up, c_node, get_parent(), "up2");
-
-			// Pop children from stacks
-			stack.erase(stack.end() - c_pos, stack.end());
-			// Node is finished. Call between if has right sibling
-			if (c_tree.has_right_sibling())
-				call(between, c_node, get_parent(), "between");
-			TD(dec_depth();)
-		} else {
-			// Add next child
-			stack.push_back(c);
-			if constexpr (unique) {
-				TS(++tstats().cache_probes;)
-				if (cache.contains(c)) {
-					TS(++tstats().cache_hits;)
-					continue;
-				}
-			}
-			if (call(visit_subtree, c, c_node, "visit_subtree")) {
-				// visit c and save on stack
-				ret = !call(visitor, c, c_node, "visitor");
-				if constexpr (search) { if (ret) return; }
-				if (!ret) {
-					TD(inc_depth();)
-					TS(++tstats().frames_opened;)
-					upos.push_back(stack.size() - 1);
-				}
-				// Seen only once admitted: a node this predicate
-				// turns away here may be admitted elsewhere, and
-				// has to stay reachable there.
-				if constexpr (unique) cache.insert(c);
+		cursor = tree::get(c).right_sibling();
+		DBGT(std::cout << "-- move to a child: " << c << " "
+			<< tree::get(c).value << "\n\n";)
+		if constexpr (unique) {
+			TS(++tstats().cache_probes;)
+			if (cache.contains(c)) {
+				TS(++tstats().cache_hits;)
+				continue;
 			}
 		}
+		if (!call(visit_subtree, c, current, "visit_subtree")) continue;
+		ret = !call(visitor, c, current, "visitor");
+		if constexpr (search) { if (ret) return; }
+		// Seen only once admitted: a node this predicate turns away
+		// here may be admitted elsewhere, and has to stay reachable
+		// there.
+		if constexpr (unique) cache.insert(c);
+		if (ret) continue;
+		TD(inc_depth();)
+		TS(++tstats().frames_opened;)
+		frames.push_back({ current, cursor });
+		current = c;
+		cursor = tree::get(c).left_child();
 	}
 }
 
