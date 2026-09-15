@@ -34,6 +34,16 @@ if (TAU_PARSER_WINDOWS_PACKAGE)
 elseif (TAU_PARSER_WINDOWS_ZIP_PACKAGE)
 	set(CPACK_GENERATOR "ZIP")
 	set(CPACK_ARCHIVE_COMPONENT_INSTALL OFF)
+elseif (TAU_PARSER_MACOS_PACKAGE)
+	set(CPACK_GENERATOR "ZIP")
+	set(CPACK_ARCHIVE_COMPONENT_INSTALL OFF)
+	# DragNDrop runs hdiutil, which exists only on macOS. The ZIP stays in
+	# the list on every host.
+	if (APPLE)
+		list(APPEND CPACK_GENERATOR "DragNDrop")
+		set(CPACK_DMG_VOLUME_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}")
+		set(CPACK_DMG_FORMAT "UDZO")
+	endif()
 else()
 	set(CPACK_GENERATOR "DEB;RPM")
 	# DEB specific settings

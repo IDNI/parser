@@ -66,6 +66,25 @@
 		},
 
 		{
+			"name": "_toolchain-clang-cl",
+			"hidden": true,
+			"generator": "Ninja",
+			"architecture": {
+				"value": "x64",
+				"strategy": "external"
+			},
+			"cacheVariables": {
+				"CMAKE_C_COMPILER": "clang-cl",
+				"CMAKE_CXX_COMPILER": "clang-cl"
+			},
+			"vendor": {
+				"microsoft.com/VisualStudioSettings/CMake/1.0": {
+					"intelliSenseMode": "windows-clang-x64"
+				}
+			}
+		},
+
+		{
 			"name": "_build_dir-release",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/release"
@@ -105,6 +124,12 @@
 			"name": "_build_dir-release-msvc",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/release-msvc"
+		},
+
+		{
+			"name": "_build_dir-release-clang-cl",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/release-clang-cl"
 		},
 
 		{
@@ -257,6 +282,14 @@
 			"hidden": true,
 			"cacheVariables": {
 				"TAU_PARSER_WINDOWS_ZIP_PACKAGE": "ON"
+			}
+		},
+
+		{
+			"name": "_macos-package",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_PARSER_MACOS_PACKAGE": "ON"
 			}
 		},
 
@@ -427,6 +460,20 @@
 			"name": "release-msvc-all",
 			"displayName": "Release all targets (MSVC)",
 			"inherits": ["release-msvc", "_build-all"]
+		},
+
+		{
+			"name": "release-clang-cl-all",
+			"displayName": "Release all targets (clang-cl / Ninja / x64)",
+			"description": "Native Windows. Requires clang-cl on PATH, inside an MSVC environment.",
+			"inherits": [
+				"_condition-windows",
+				"_build_dir-release-clang-cl",
+				"_toolchain-clang-cl",
+				"_build-type-release",
+				"_build-static",
+				"_build-all"
+			]
 		},
 
 		{
@@ -615,6 +662,11 @@
 				"_build-packages",
 				"_windows-zip-package"
 			]
+		},
+
+		{
+			"name": "release-macos-packages",
+			"inherits": ["release", "_build-packages", "_macos-package"]
 		},
 
 		{
@@ -833,6 +885,10 @@
 			"configurePreset": "release-msvc-all"
 		},
 		{
+			"name": "release-clang-cl-all",
+			"configurePreset": "release-clang-cl-all"
+		},
+		{
 			"name": "debug-msvc-all",
 			"configurePreset": "debug-msvc-all"
 		},
@@ -875,6 +931,10 @@
 		{
 			"name": "release-mingw-packages-zip",
 			"configurePreset": "release-mingw-packages-zip"
+		},
+		{
+			"name": "release-macos-packages",
+			"configurePreset": "release-macos-packages"
 		},
 		{
 			"name": "relwithdebinfo-tests",
@@ -941,6 +1001,10 @@
 		{
 			"name": "release-msvc-all",
 			"configurePreset": "release-msvc-all"
+		},
+		{
+			"name": "release-clang-cl-all",
+			"configurePreset": "release-clang-cl-all"
 		},
 		{
 			"name": "debug-msvc-all",
