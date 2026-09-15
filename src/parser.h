@@ -7,6 +7,7 @@
 #include <variant>
 #include <iostream>
 #include <istream>
+#include <streambuf>
 #include <algorithm>
 #include <initializer_list>
 #include <map>
@@ -898,7 +899,10 @@ public:
 		size_t max_l = 0;
 		/// input data pointer if needed
 		const C* d = 0;
-		std::basic_istream<C> s;
+		/// libc++ and MSVC define no ctype<C> for char32_t, so the stream
+		/// is read through its buffer and never through basic_istream<C>
+		std::basic_streambuf<C>* sb = nullptr;
+		bool sgood = false;
 		/// all collected terminals
 		std::vector<T> ts{};
 		/// current terminal pos

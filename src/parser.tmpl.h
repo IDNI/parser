@@ -54,12 +54,12 @@ template <typename C, typename T>
 parser<C, T>::input::input(const C* data, size_t l, size_t max_l,
 	decoder_type decoder, int_type eof) :
 		itype(POINTER), e(eof), decoder(decoder), mm(),
-		l(l), max_l(max_l > l ? l : max_l), d(data), s(nullptr) {}
+		l(l), max_l(max_l > l ? l : max_l), d(data) {}
 template <typename C, typename T>
 parser<C, T>::input::input(std::basic_istream<C>& is, size_t max_l,
 	decoder_type decoder, int_type eof) : itype(STREAM), e(eof),
-	decoder(decoder), mm(), l(0), max_l(max_l), d(0), s(nullptr)
-	{ s.rdbuf(is.rdbuf()); }
+	decoder(decoder), mm(), l(0), max_l(max_l), d(0), sb(is.rdbuf()),
+	sgood(sb != nullptr) {}
 template <typename C, typename T>
 parser<C, T>::input::input(const std::string& filename, size_t max_l,
 	decoder_type decoder, int_type eof,
@@ -71,7 +71,7 @@ parser<C, T>::input::input(const std::string& filename, size_t max_l,
 	mm(filename, 0, MMAP_READ),
 #endif
 	l(mm.size()),
-	max_l(max_l), d(reinterpret_cast<const C*>(mm.data())), s(nullptr)
+	max_l(max_l), d(reinterpret_cast<const C*>(mm.data()))
 {
 	if (mm.error) {
 		if (diag) diag->error(idni::diagnostics::code::io_error,
@@ -85,7 +85,7 @@ parser<C, T>::input::input(const std::wstring& filename, size_t max_l,
 	decoder_type decoder, int_type eof,
 	idni::diagnostics::report* diag) : itype(MMAP), e(eof),
 	decoder(decoder), mm(filename, 0, MMAP_READ), l(mm.size()),
-	max_l(max_l), d(reinterpret_cast<const C*>(mm.data())), s(nullptr)
+	max_l(max_l), d(reinterpret_cast<const C*>(mm.data()))
 {
 	if (mm.error) {
 		if (diag) diag->error(idni::diagnostics::code::io_error,
@@ -97,7 +97,7 @@ parser<C, T>::input::input(const std::wstring& filename, size_t max_l,
 template <typename C, typename T>
 parser<C, T>::input::input(int fd, size_t max_l, decoder_type decoder,
 	int_type eof) : itype(MMAP), e(eof), decoder(decoder),
-	l(0), max_l(max_l), d(0), s({})
+	l(0), max_l(max_l), d(0)
 {
 	if (fd != -1) {
 		l = lseek(fd, 0, SEEK_END);
@@ -116,7 +116,7 @@ parser<C, T>::input::~input() {
 }
 template <typename C, typename T>
 bool parser<C, T>::input::good() const {
-	return    itype == STREAM ? s.good()
+	return    itype == STREAM ? sgood
 		: itype == MMAP   ? !mm.error
 		:                   true;
 }
@@ -124,17 +124,21 @@ bool parser<C, T>::input::good() const {
 template <typename C, typename T>
 bool parser<C, T>::input::isstream() const { return itype == STREAM; }
 template <typename C, typename T>
-void parser<C, T>::input::clear() { if (isstream()) s.clear(); }
+void parser<C, T>::input::clear() { if (isstream()) sgood = sb != nullptr; }
 template <typename C, typename T>
 C parser<C, T>::input::cur() {
-	if (isstream()) return s.good() ? s.peek() : e;
+	if (isstream()) return sgood ? sb->sgetc() : e;
 	return n < l && (max_l == 0 || n < max_l) ? d[n] : e;
 }
 template <typename C, typename T>
 bool parser<C, T>::input::next() {
-	C ch{0};
-	if (isstream())	return !s.good() ? false
-		: n = s.tellg(), s.get(ch), l = n + (ch == e ? 0 : 1), true;
+	if (isstream()) {
+		if (!sgood) return false;
+		n = sb->pubseekoff(0, std::ios_base::cur, std::ios_base::in);
+		int_type c = sb->sbumpc();
+		if (c == e) sgood = false;
+		return l = n + (c == e ? 0 : 1), true;
+	}
 	return n < l && (max_l == 0 || n < max_l) ? ++n, true : false;
 }
 template <typename C, typename T>
@@ -143,7 +147,8 @@ template <typename C, typename T>
 bool parser<C, T>::input::eof() { return cur() == e; }
 template <typename C, typename T>
 C parser<C, T>::input::at(size_t p) {
-	if (isstream()) return s.seekg(p), s.get();
+	if (isstream()) return sb->pubseekpos(p, std::ios_base::in),
+				sb->sbumpc();
 	if (p >= l || (max_l != 0 && p >= max_l)) return e;
 	return d[p];
 }
@@ -199,9 +204,7 @@ parser<C, T>::parser(grammar<C, T>& g, options o) : g(g), o(o), po(o.parse_opts)
 template <typename C, typename T>
 std::basic_string<C> parser<C, T>::get_fresh_tnt() {
 	static std::basic_string<C> prefix = { '_','_','B','_' };
-	std::basic_stringstream<C> ss;
-	ss << prefix << tid++;
-	return ss.str();
+	return prefix + from_str<C>(std::to_string(tid++));
 }
 template <typename C, typename T>
 lit<C, T> parser<C, T>::get_lit(const item& i) const {
@@ -1873,8 +1876,10 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 template <typename C, typename T>
 std::basic_string<C> parser<C, T>::input::get_string() {
 	if (!isstream()) return std::basic_string<C>(d, l);
-	std::basic_stringstream<C> ss;
-	return ss << s.rdbuf(), clear(), ss.str();
+	std::basic_string<C> r;
+	for (int_type c; (c = sb->sbumpc()) != e;)
+		r.push_back(traits_type::to_char_type(c));
+	return clear(), r;
 }
 template <typename C, typename T>
 std::basic_string<T> parser<C, T>::input::get_terminals(
@@ -1896,10 +1901,11 @@ std::basic_string<T> parser<C, T>::input::get_terminals(
 	if constexpr (std::is_same_v<C, T>) {
 		if (!isstream()) return std::basic_string<T>(d + start,
 								end - start);
-		std::basic_stringstream<T> ss;
-		s.seekg(start);
-		while (end > start++) ss << s.get();
-		return clear(), ss.str();
+		std::basic_string<T> r;
+		sb->pubseekpos(start, std::ios_base::in);
+		while (end > start++)
+			r.push_back(traits_type::to_char_type(sb->sbumpc()));
+		return clear(), r;
 	} else {
 		return std::basic_string<T>{};
 	}
