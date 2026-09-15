@@ -239,8 +239,11 @@ void post_order<node>::const_traverse(tref n, auto& visitor,
 			frames.push_back({ current, cursor });
 			current = c;
 			cursor = tree::get(c).left_child();
+			// Seen only once admitted: a node this predicate turns
+			// away here may be admitted elsewhere, and has to stay
+			// reachable there.
+			if constexpr (unique) cache.insert(c);
 		}
-		if constexpr (unique) cache.insert(c);
 	}
 }
 

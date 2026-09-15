@@ -459,8 +459,11 @@ void pre_order<node>::const_traverse(tref n, auto& visitor,
 					TS(++tstats().frames_opened;)
 					upos.push_back(stack.size() - 1);
 				}
+				// Seen only once admitted: a node this predicate
+				// turns away here may be admitted elsewhere, and
+				// has to stay reachable there.
+				if constexpr (unique) cache.insert(c);
 			}
-			if constexpr (unique) cache.insert(c);
 		}
 	}
 }
