@@ -63,9 +63,17 @@ if(TAU_PARSER_BUILD_HEADER_ONLY)
 else()
 	if(TAU_PARSER_BUILD_STATIC_LIBRARY)
 		add_library(tauparser_static STATIC ${TAU_PARSER_SOURCES})
-		set_target_properties(tauparser_static PROPERTIES
-			OUTPUT_NAME "tauparser"
-		)
+		# On Windows the static archive and the import library of the DLL
+		# are both <name>.lib, so the static archive takes its own name.
+		if(WIN32)
+			set_target_properties(tauparser_static PROPERTIES
+				OUTPUT_NAME "tauparser_static"
+			)
+		else()
+			set_target_properties(tauparser_static PROPERTIES
+				OUTPUT_NAME "tauparser"
+			)
+		endif()
 		target_include_directories(tauparser_static PUBLIC
 			$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 			$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
