@@ -24,8 +24,15 @@ RUN apt-get update && apt-get install -y \
 	bash wget git nsis rpm doxygen graphviz \
 	cmake=3.28.3-1build7 \
 	g++=4:13.2.0-7ubuntu1 \
+	ninja-build=1.11.1-2 \
+	clang-19=1:19.1.1-1ubuntu1~24.04.2 \
 	mingw-w64=11.0.1-3build1 \
 	python3-distutils-extra
+
+# The presets name clang and clang++. The versioned package does not provide
+# those names.
+RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100 && \
+	update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100
 
 # Argument BUILD_PRESET=release/debug picks the CMake preset family
 ARG BUILD_PRESET=release
@@ -70,6 +77,15 @@ RUN echo " (BUILD) -- Running tests: $TESTS"
 RUN if [ "$TESTS" = "yes" ]; then \
 	./dev preset ${BUILD_PRESET}-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		|| exit 1; \
+fi
+
+# Argument TEST_GCC_BUILD=no skips the make and gcc check
+ARG TEST_GCC_BUILD=yes
+
+# The default build is ninja and clang. This proves make and gcc still work.
+RUN if [ "$TESTS" = "yes" ] && [ "$TEST_GCC_BUILD" = "yes" ]; then \
+	./dev preset release-make-gcc -DTAU_BUILD_JOBS=${BUILD_JOBS} && \
+	rm -rf build/release-gcc; \
 fi
 
 

@@ -109,6 +109,24 @@
 		},
 
 		{
+			"name": "_build_dir-release-gcc",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/release-gcc"
+		},
+
+		{
+			"name": "_build_dir-debug-gcc",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-gcc"
+		},
+
+		{
+			"name": "_build_dir-relwithdebinfo-gcc",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/relwithdebinfo-gcc"
+		},
+
+		{
 			"name": "_build_dir-release-mingw",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/release-mingw"
@@ -304,7 +322,7 @@
 		{
 			"name": "release-make-gcc",
 			"inherits": [
-				"_build_dir-release",
+				"_build_dir-release-gcc",
 				"_generator-make",
 				"_toolchain-gcc",
 				"_build-type-release"
@@ -314,7 +332,7 @@
 		{
 			"name": "debug-make-gcc",
 			"inherits": [
-				"_build_dir-debug",
+				"_build_dir-debug-gcc",
 				"_generator-make",
 				"_toolchain-gcc",
 				"_build-type-debug"
@@ -324,7 +342,7 @@
 		{
 			"name": "release-ninja-gcc",
 			"inherits": [
-				"_build_dir-release",
+				"_build_dir-release-gcc",
 				"_generator-ninja",
 				"_toolchain-gcc",
 				"_build-type-release"
@@ -334,7 +352,7 @@
 		{
 			"name": "debug-ninja-gcc",
 			"inherits": [
-				"_build_dir-debug",
+				"_build_dir-debug-gcc",
 				"_generator-ninja",
 				"_toolchain-gcc",
 				"_build-type-debug"
@@ -507,7 +525,7 @@
 		{
 			"name": "relwithdebinfo-make-gcc",
 			"inherits": [
-				"_build_dir-relwithdebinfo",
+				"_build_dir-relwithdebinfo-gcc",
 				"_generator-make",
 				"_toolchain-gcc",
 				"_build-type-relwithdebinfo"
@@ -516,32 +534,32 @@
 
 		{
 			"name": "release",
-			"inherits": ["release-make-gcc"]
+			"inherits": ["_build_dir-release", "_generator-ninja", "_toolchain-clang", "_build-type-release"]
 		},
 
 		{
 			"name": "debug",
-			"inherits": ["debug-make-gcc"]
+			"inherits": ["_build_dir-debug", "_generator-ninja", "_toolchain-clang", "_build-type-debug"]
 		},
 
 		{
 			"name": "release-ninja",
-			"inherits": ["release-ninja-gcc"]
+			"inherits": ["release"]
 		},
 
 		{
 			"name": "debug-ninja",
-			"inherits": ["debug-ninja-gcc"]
+			"inherits": ["debug"]
 		},
 
 		{
 			"name": "release-clang",
-			"inherits": ["release-make-clang"]
+			"inherits": ["release"]
 		},
 
 		{
 			"name": "debug-clang",
-			"inherits": ["debug-make-clang"]
+			"inherits": ["debug"]
 		},
 
 		{
@@ -580,7 +598,7 @@
 
 		{
 			"name": "release-ninja-tgf",
-			"inherits": ["release-ninja", "_build-tgf"]
+			"inherits": ["release-tgf"]
 		},
 
 		{
@@ -590,12 +608,12 @@
 
 		{
 			"name": "release-tgf-clang",
-			"inherits": ["release-make-clang", "_build-tgf"]
+			"inherits": ["release-tgf"]
 		},
 
 		{
 			"name": "debug-tgf-clang",
-			"inherits": ["debug-make-clang", "_build-tgf"]
+			"inherits": ["debug-tgf"]
 		},
 
 		{
@@ -624,7 +642,7 @@
 
 		{
 			"name": "relwithdebinfo",
-			"inherits": ["relwithdebinfo-make-gcc"]
+			"inherits": ["_build_dir-relwithdebinfo", "_generator-ninja", "_toolchain-clang", "_build-type-relwithdebinfo"]
 		},
 
 		{
