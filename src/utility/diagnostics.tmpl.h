@@ -474,7 +474,7 @@ inline std::string report::format_message(size_t node_idx) const {
 	return out;
 }
 
-inline void report::print(const sinks& s) const {
+inline void report::print(const sinks& s, const term::colors& tc) const {
 	// An open scope has not yet had its elapsed time written by
 	// scope_guard::close(), so its printed value would be stale.
 	DBG(assert(scope_stack_.empty()
@@ -489,15 +489,15 @@ inline void report::print(const sinks& s) const {
 	info_row_ = 0;
 	for (size_t i = 0; i < nodes_.size(); ++i)
 		if (nodes_[i].parent < 0)
-			print_node(s, children, i, 0, label_w, cols);
+			print_node(s, children, i, 0, label_w, cols, tc);
 }
 
-inline void report::print(std::ostream& os) const {
-	print({ .error = &os, .warning = &os, .info = &os });
+inline void report::print(std::ostream& os, const term::colors& tc) const {
+	print({ .error = &os, .warning = &os, .info = &os }, tc);
 }
 
-inline void report::print(const sink& s) const {
-	print({ s, s, s });
+inline void report::print(const sink& s, const term::colors& tc) const {
+	print({ s, s, s }, tc);
 }
 
 inline void report::print() const {
@@ -678,23 +678,23 @@ inline report::value_columns report::value_column_widths() const {
 }
 
 inline std::string report::color_info_line(const node& n, size_t level,
-	size_t label_w, value_columns cols) const
+	size_t label_w, value_columns cols, const term::colors& tc) const
 {
 	const bool even = (info_row_ & 1) != 0;
 	++info_row_;
 	auto label_fg = [&]() -> std::string {
-		return even ? TC.DIM() : TC.DEFAULT();
+		return even ? tc.DIM() : tc.DEFAULT();
 	};
 	auto metric_fg = [&](code c) -> std::string {
 		if (c == code::info_kb)
-			return even ? TC.CYAN() : TC.LIGHT_CYAN();
+			return even ? tc.CYAN() : tc.LIGHT_CYAN();
 		if (c == code::info_count)
-			return even ? TC.DARK_GRAY() : TC.LIGHT_GRAY();
+			return even ? tc.DARK_GRAY() : tc.LIGHT_GRAY();
 		return label_fg();
 	};
 	std::string line(level, '\t');
 	auto key = str(n.key);
-	line += label_fg() + std::string(key) + ':' + TC.CLEAR();
+	line += label_fg() + std::string(key) + ':' + tc.CLEAR();
 	// A root-level info_micros node with value=0 is the structural
 	// marker pushed by reset(); it has no measured time, so suppress
 	// the value/unit columns (and their label padding) to avoid the
@@ -711,17 +711,17 @@ inline std::string report::color_info_line(const node& n, size_t level,
 		auto val_fg = metric_fg(n.tag);
 		if (p.num.size() < cols.num_w)
 			line.append(cols.num_w - p.num.size(), ' ');
-		line += val_fg + p.num + TC.CLEAR();
+		line += val_fg + p.num + tc.CLEAR();
 		if (!p.unit.empty()) {
 			line += ' ';
 			if (p.unit.size() < cols.unit_w)
 				line.append(cols.unit_w - p.unit.size(), ' ');
-			line += val_fg + p.unit + TC.CLEAR();
+			line += val_fg + p.unit + tc.CLEAR();
 		}
 	}
 	if (n.attr_cnt > 0) {
 		line += ' ';
-		line += TC.DIM();
+		line += tc.DIM();
 		line += '(';
 		for (uint8_t i = 0; i < n.attr_cnt; ++i) {
 			const auto& a = attrs_[n.attr_off + i];
@@ -731,28 +731,29 @@ inline std::string report::color_info_line(const node& n, size_t level,
 			line += format_attr_value(a.key, a.value);
 		}
 		line += ')';
-		line += TC.CLEAR();
+		line += tc.CLEAR();
 	}
 	return line;
 }
 
 inline void report::print_node(const sinks& s,
 	const std::vector<std::vector<size_t>>& children, size_t idx,
-	size_t level, size_t label_w, value_columns cols) const
+	size_t level, size_t label_w, value_columns cols,
+	const term::colors& tc) const
 {
 	const auto& n = nodes_[idx];
 	if (is_error(n.tag)) {
-		s.error(TC.RED() + format_message(idx) + TC.CLEAR());
+		s.error(tc.RED() + format_message(idx) + tc.CLEAR());
 	} else if (is_warning(n.tag)) {
-		s.warning(TC.YELLOW() + format_message(idx) + TC.CLEAR());
+		s.warning(tc.YELLOW() + format_message(idx) + tc.CLEAR());
 	} else if (n.tag == code::info_scope
 		&& children[idx].empty()) {
 		// silent container with nothing to show — skip
 	} else {
-		s.info(color_info_line(n, level, label_w, cols));
+		s.info(color_info_line(n, level, label_w, cols, tc));
 	}
 	for (size_t i : children[idx])
-		print_node(s, children, i, level + 1, label_w, cols);
+		print_node(s, children, i, level + 1, label_w, cols, tc);
 }
 
 inline std::ostream& operator<<(std::ostream& os, const report& r) {

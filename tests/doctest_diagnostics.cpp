@@ -13,6 +13,8 @@
 #include "utility/diagnostics.h"
 
 #include <string>
+#include <vector>
+#include <sstream>
 
 using namespace idni::diagnostics;
 
@@ -500,5 +502,116 @@ TEST_SUITE("diagnostics: chained and_then().transform()") {
 		CHECK(*r2 == 5);
 		CHECK(r2.report().nodes().size() == 1);
 		CHECK(r2.report().str(r2.report().nodes()[0].key) == "doubled");
+	}
+}
+
+// Colour is a parameter of rendering, not a property of the message: the
+// bands are wrapped at print() time, so a caller wanting data (a language
+// binding filling structured fields, a log file) asks for it plain without
+// disturbing anyone else's output.
+TEST_SUITE("diagnostics: print() colouring") {
+
+	// Collect the three bands from one print() call.
+	struct bands {
+		std::vector<std::string> errors, warnings, infos;
+		sinks as_sinks() {
+			return {
+				.error   = [this](std::string_view l) {
+					errors.emplace_back(l); },
+				.warning = [this](std::string_view l) {
+					warnings.emplace_back(l); },
+				.info    = [this](std::string_view l) {
+					infos.emplace_back(l); },
+			};
+		}
+	};
+
+	static bool has_ansi(const std::string& s) {
+		return s.find("\x1b[") != std::string::npos;
+	}
+
+	TEST_CASE("an explicit disabled colour set renders plain") {
+		report r;
+		r.error(code::parse_error, "boom");
+		bands b;
+		r.print(b.as_sinks(), idni::term::colors(false));
+		REQUIRE(b.errors.size() == 1);
+		CHECK(!has_ansi(b.errors[0]));
+		CHECK(b.errors[0].find("boom") != std::string::npos);
+	}
+
+	TEST_CASE("an explicit enabled colour set wraps the message") {
+		report r;
+		r.error(code::parse_error, "boom");
+		bands b;
+		r.print(b.as_sinks(), idni::term::colors(true));
+		REQUIRE(b.errors.size() == 1);
+		CHECK(has_ansi(b.errors[0]));
+		CHECK(b.errors[0].find("boom") != std::string::npos);
+	}
+
+	TEST_CASE("warnings and info scopes honour the colour set too") {
+		report r;
+		r.warning("careful");
+		{ auto g = r.open("work"); }
+		bands plain, coloured;
+		r.print(plain.as_sinks(), idni::term::colors(false));
+		r.print(coloured.as_sinks(), idni::term::colors(true));
+		REQUIRE(plain.warnings.size() == 1);
+		REQUIRE(plain.infos.size() == 1);
+		CHECK(!has_ansi(plain.warnings[0]));
+		CHECK(!has_ansi(plain.infos[0]));
+		CHECK(has_ansi(coloured.warnings[0]));
+		CHECK(has_ansi(coloured.infos[0]));
+	}
+
+	TEST_CASE("the global switch drives print() when no colour set is given") {
+		report r;
+		r.error(code::parse_error, "boom");
+		const bool saved = idni::TC.enabled;
+
+		idni::TC.disable();
+		bands off;
+		r.print(off.as_sinks());
+		REQUIRE(off.errors.size() == 1);
+		CHECK(!has_ansi(off.errors[0]));
+
+		idni::TC.enable();
+		bands on;
+		r.print(on.as_sinks());
+		REQUIRE(on.errors.size() == 1);
+		CHECK(has_ansi(on.errors[0]));
+
+		idni::TC.set(saved);
+	}
+
+	TEST_CASE("operator<< follows the global switch") {
+		report r;
+		r.error(code::parse_error, "boom");
+		const bool saved = idni::TC.enabled;
+
+		idni::TC.disable();
+		std::ostringstream off; off << r;
+		CHECK(!has_ansi(off.str()));
+
+		idni::TC.enable();
+		std::ostringstream on; on << r;
+		CHECK(has_ansi(on.str()));
+
+		idni::TC.set(saved);
+	}
+
+	TEST_CASE("an explicit colour set does not disturb the global one") {
+		report r;
+		r.error(code::parse_error, "boom");
+		const bool saved = idni::TC.enabled;
+		idni::TC.enable();
+
+		bands b;
+		r.print(b.as_sinks(), idni::term::colors(false));
+		CHECK(idni::TC.enabled);          // still on for everyone else
+		CHECK(!has_ansi(b.errors[0]));    // but this render stayed plain
+
+		idni::TC.set(saved);
 	}
 }

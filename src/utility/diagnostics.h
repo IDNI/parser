@@ -16,6 +16,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "term_colors.h"
+
 #include "defs.h"
 #include "measure.h"
 
@@ -275,11 +277,14 @@ struct report {
 	/// info_count, info_kb) emit tab-indented per tree depth. Each
 	/// line goes to the corresponding sink; empty sinks drop their
 	/// lines silently.
-	void print(const sinks&) const;
+	/// Render through @p tc, so a caller wanting plain text (a language
+	/// binding filling structured fields, a log file) passes a disabled
+	/// term::colors rather than mutating the global one.
+	void print(const sinks&, const term::colors& tc = TC) const;
 	/// Route all bands to @p os.
-	void print(std::ostream& os) const;
+	void print(std::ostream& os, const term::colors& tc = TC) const;
 	/// Route all bands to @p s.
-	void print(const sink& s) const;
+	void print(const sink& s, const term::colors& tc = TC) const;
 	/// Default routing: errors/warnings → std::cerr, info → std::cout.
 	void print() const;
 	[[nodiscard]] const std::vector<node>& nodes() const;
@@ -361,10 +366,12 @@ private:
 
 	void print_node(const sinks& s,
 		const std::vector<std::vector<size_t>>& children, size_t idx,
-		size_t level, size_t label_w, value_columns cols) const;
+		size_t level, size_t label_w, value_columns cols,
+		const term::colors& tc) const;
 
 	std::string color_info_line(const node& n, size_t level,
-		size_t label_w, value_columns cols) const;
+		size_t label_w, value_columns cols,
+		const term::colors& tc) const;
 };
 
 std::ostream& operator<<(std::ostream& os, const report& r);
