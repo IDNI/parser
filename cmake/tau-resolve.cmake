@@ -169,11 +169,10 @@ endfunction()
 
 if(CMAKE_SCRIPT_MODE_FILE)
 	# Standalone lookup for scripts/devrc. message() has no "plain stdout,
-	# no prefix" mode (STATUS gets a leading "-- ", everything else -
-	# including plain message() - goes to stderr), so write straight to
-	# /dev/stdout instead of shelling out to a second `cmake -E echo` just
-	# to print one value. /dev/stdout is POSIX-only; this branch is only
-	# ever reached from bash (scripts/devrc), so that's fine here.
+	# no prefix" mode: STATUS adds a leading "-- ", and every other mode
+	# writes to stderr. `cmake -E echo` is the only portable plain-stdout
+	# write. Do not use /dev/stdout here. A buildkit RUN step has no such
+	# device and the open fails.
 	if(CMAKE_ARGC LESS 4)
 		message(FATAL_ERROR
 			"usage: cmake -P tau-resolve.cmake <TAU_BUILD_JOBS|TAU_SHARED_PREFIX> [<requested>]")
@@ -197,7 +196,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
 		message(FATAL_ERROR "tau-resolve: unknown variable '${_tau_resolve_var}'")
 	endif()
 
-	file(WRITE /dev/stdout "${_tau_resolve_result}\n")
+	execute_process(COMMAND "${CMAKE_COMMAND}" -E echo "${_tau_resolve_result}")
 else()
 	# include()d from CMakeLists.txt (directly, or via cmake/use-emscripten.cmake
 	# which needs TAU_SHARED_PREFIX_RESOLVED before project()): declare the
