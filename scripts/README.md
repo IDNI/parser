@@ -179,6 +179,18 @@ composed by the public presets above; see [`CMakePresets.json`](../CMakePresets.
 - `w64-packages` — legacy: Windows NSIS and ZIP via mingw + `packages`
 - Preset alternative: `./dev preset release-packages`, `./dev preset release-mingw-packages`
 
+## Docker
+
+- `docker linux` — build the library and run the suite in the image
+- `docker linux-mingw64-wine` — cross-build for Windows and run the suite under wine
+- `docker packages` — build the release packages
+- `docker nightly` — build the nightly packages
+- `docker tgf` — build the tgf image and run it
+- `docker run`, `docker bash` — run a container, or a shell in one
+
+Any further options go to `docker build`, for example
+`./dev docker linux --build-arg TESTS=no`.
+
 ## Emscripten
 
 - `dep-emsdk` — download and install emsdk into `<TAU_SHARED_PREFIX>/emsdk`,
