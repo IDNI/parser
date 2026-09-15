@@ -43,7 +43,12 @@ function(target_setup target access compile_definitions compile_options link_opt
 			)
 		endif()
 	else()
-		target_compile_options(${target} ${access} /W4)
+		target_compile_options(${target} ${access}
+			/W4 /EHsc /utf-8 /bigobj)
+		target_compile_definitions(${target} ${access}
+			NOMINMAX
+			WIN32_LEAN_AND_MEAN
+			_CRT_DECLARE_NONSTDC_NAMES=0)
 	endif()
 	target_compile_options(${target} ${access} "${compile_options}")
 	target_compile_definitions_if(${target} ${access} "${compile_definitions}")

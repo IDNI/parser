@@ -17,7 +17,9 @@ foreach(X IN LISTS TESTS)
 	set(N "test_${X}")
 	add_executable(${N} "${N}.cpp")
 	tauparser_setup(${N} PRIVATE ${TEST_LIBS})
-	target_compile_options(${N} PUBLIC "-Wno-parentheses")
+	if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+		target_compile_options(${N} PUBLIC "-Wno-parentheses")
+	endif()
 	if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
 		CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 			target_link_libraries(${N} PRIVATE
@@ -36,18 +38,30 @@ endforeach()
 
 set(DOCTEST_HEADER "${PROJECT_SOURCE_DIR}/src/doctest.h" CACHE PATH "Doctest header")
 if (NOT EXISTS "${DOCTEST_HEADER}")
-	message(STATUS "Downloading doctest to '${PROJECT_SOURCE_DIR}'")
-	find_package(Wget REQUIRED)
-	# TODO (MEDIUM) we should use a fixed tag or commit instead of master
-	execute_process(COMMAND "${WGET_EXECUTABLE}" https://raw.githubusercontent.com/doctest/doctest/master/doctest/doctest.h -P ${PROJECT_SOURCE_DIR}/src)
+	set(DOCTEST_VERSION "2.4.11")
+	set(DOCTEST_URL
+		"https://raw.githubusercontent.com/doctest/doctest/v${DOCTEST_VERSION}/doctest/doctest.h")
+	message(STATUS "Downloading doctest ${DOCTEST_VERSION} to '${DOCTEST_HEADER}'")
+	file(DOWNLOAD
+		"${DOCTEST_URL}"
+		"${DOCTEST_HEADER}"
+		STATUS DOCTEST_DOWNLOAD_STATUS
+		TLS_VERIFY ON)
+	list(GET DOCTEST_DOWNLOAD_STATUS 0 DOCTEST_DOWNLOAD_CODE)
+	list(GET DOCTEST_DOWNLOAD_STATUS 1 DOCTEST_DOWNLOAD_MESSAGE)
+	if (NOT DOCTEST_DOWNLOAD_CODE EQUAL 0)
+		message(FATAL_ERROR
+			"Failed to download doctest from '${DOCTEST_URL}': "
+			"${DOCTEST_DOWNLOAD_MESSAGE}")
+	endif()
 endif ()
 
 add_library(doctest INTERFACE)
 target_compile_definitions(doctest INTERFACE TAU_USE_DOCTEST)
 set(DOCTEST_CONFIG_ASSERTION_PARAMETERS_BY_VALUE "true")
 
-if(NOT EMSCRIPTEN)
-add_link_options("-flto")
+if (NOT EMSCRIPTEN AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+	add_link_options("-flto")
 endif()
 
 enable_testing()
@@ -72,7 +86,9 @@ foreach(X IN LISTS DOCTESTS)
 	set(N "doctest_${X}")
 	add_executable(${N} "${N}.cpp")
 	tauparser_setup(${N} PRIVATE "")
-	target_compile_options(${N} PUBLIC "-Wno-parentheses")
+	if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+		target_compile_options(${N} PUBLIC "-Wno-parentheses")
+	endif()
 	if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
 		CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 			target_link_libraries(${N} PRIVATE
@@ -94,7 +110,12 @@ endforeach()
 # Benchmark executable (not a test — run manually)
 add_executable(bench_enhancements bench_enhancements.cpp)
 tauparser_setup(bench_enhancements PRIVATE "")
-target_compile_options(bench_enhancements PUBLIC "-O3" "-Wno-parentheses")
+if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+	target_compile_options(bench_enhancements
+		PUBLIC "-O3" "-Wno-parentheses")
+elseif (MSVC)
+	target_compile_options(bench_enhancements PUBLIC "/O2")
+endif()
 target_link_libraries(bench_enhancements PRIVATE tauparser)
 target_include_directories(bench_enhancements PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>

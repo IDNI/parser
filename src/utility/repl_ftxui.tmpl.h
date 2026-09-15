@@ -11,8 +11,16 @@
 #include <sstream>
 #include <streambuf>
 #include <string>
-#include <unistd.h>
 #include <utility>
+#ifdef _WIN32
+#include <io.h>
+#ifndef STDIN_FILENO
+#define STDIN_FILENO 0
+#endif
+#define isatty _isatty
+#else
+#include <unistd.h>
+#endif
 
 #include <ftxui/component/component.hpp>
 #include <ftxui/component/component_options.hpp>

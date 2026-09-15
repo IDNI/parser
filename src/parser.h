@@ -265,7 +265,7 @@ struct char_class_fns {
 	/// Returns true if a \p nt is an eof character class function.
 	bool is_eof_fn(size_t nt) const;
 	/// id of an eof function.
-	size_t eof_fn = -1;
+	size_t eof_fn = SIZE_MAX;
 };
 
 /**
@@ -769,81 +769,18 @@ public:
 				function e;
 			};
 
-			static inline const extractor<tref> ref{
-				[](const traverser& t) -> tref {
-					return t.value();
-				}};
-			static inline const extractor<traverser> only_child{
-				[](const traverser& t) {
-					if (!t) return traverser();
-					tref r = t.value_tree().only_child();
-					if (!r) return traverser();
-					return traverser(r);
-				}};
-			static inline const extractor<traverser> children{
-				[](const traverser& t) {
-					if (!t) return traverser();
-					return traverser(t.value_tree()
-							.get_children());
-				}};
-			static inline const extractor<tref_range<pnode>>
-							children_range{
-				[](const traverser& t) -> tref_range<pnode> {
-					if (!t) return { nullptr };
-					return t.value_tree().children();
-				}};
-			static inline const extractor<tree_range<tree>>
-							children_trees_range{
-				[](const traverser& t) -> tree_range<tree> {
-					if (!t) return { nullptr };
-					return t.value_tree().children_trees();
-				}};
-			static inline const extractor<traverser> first{
-				[](const traverser& t) {
-					if (!t) return traverser();
-					tref r = t.value_tree().first();
-					if (!r) return traverser();
-					return traverser(r);
-				}};
-			static inline const extractor<traverser> second{
-				[](const traverser& t) {
-					if (!t) return traverser();
-					tref r = t.value_tree().second();
-					if (!r) return traverser();
-					return traverser(r);
-				}};
-			static inline const extractor<traverser> third{
-				[](const traverser& t) {
-					if (!t) return traverser();
-					tref r = t.value_tree().third();
-					if (!r) return traverser();
-					return traverser(r);
-				}};
-			static inline const extractor<std::string> terminals{
-				[](const traverser& t) {
-					if (!t) return std::string();
-					return t.value_tree().get_terminals();
-				}};
-			static inline const extractor<size_t> nonterminal{
-				[](const traverser& t) -> size_t {
-					if (!t) return 0;
-					return t.value_tree().get_nt();
-				}};
-			static inline const extractor<std::optional<size_t>>
-							opt_nonterminal{
-				[](const traverser& t) -> std::optional<size_t> {
-					if (!t) return std::optional<size_t>{};
-					const auto& x = t.value_tree();
-					if (x.value.first.nt())
-						return { x.value.first.n() };
-					return {};
-				}};
-			static inline const extractor<traverser> dump{
-				[](const traverser& t) {
-					if (!t) return t;
-					t.value_tree().dump(std::cout) << "\n";
-					return t;
-				}};
+			static const extractor<tref> ref;
+			static const extractor<traverser> only_child;
+			static const extractor<traverser> children;
+			static const extractor<tref_range<pnode>> children_range;
+			static const extractor<tree_range<tree>> children_trees_range;
+			static const extractor<traverser> first;
+			static const extractor<traverser> second;
+			static const extractor<traverser> third;
+			static const extractor<std::string> terminals;
+			static const extractor<size_t> nonterminal;
+			static const extractor<std::optional<size_t>> opt_nonterminal;
+			static const extractor<traverser> dump;
 
 			traverser operator|(size_t nt) const;
 			traverser operator||(size_t nt) const;

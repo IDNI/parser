@@ -94,8 +94,10 @@ bool test(const char* msg, const basic_string<C>& istr,
 	using input_t = typename parser<C, T>::input;
 	cout << "\"" << to_std_string(istr) << "\" " << msg << endl;
 	basic_istringstream<C> is(istr);
-	auto in = stream ? input_t(is, 0, decoder)
-			: input_t(istr.c_str(), istr.size(), 0, decoder);
+	unique_ptr<input_t> in;
+	if (stream) in = make_unique<input_t>(is, 0, decoder);
+	else in = make_unique<input_t>(
+		istr.c_str(), istr.size(), 0, decoder);
 	size_t counter = 0;
 	auto terminal_out = [&counter](T c) {
 		size_t n = counter++;
@@ -117,7 +119,7 @@ bool test(const char* msg, const basic_string<C>& istr,
 		if constexpr (is_same_v<T, token<C>>)
 			cout << c.to_str();
 	};
-	while (!in.teof()) terminal_out(in.tcur()), in.tnext();
+	while (!in->teof()) terminal_out(in->tcur()), in->tnext();
 	cout << "\n" << endl;
 	return true;
 }

@@ -169,7 +169,7 @@ TEST_SUITE("utf8_to_u32_conv recoder") {
 		const char data[] = "\xC3\xA9";
 		auto r = run_decoder(data, 2);
 		CHECK(r.codepoints.size() == 1);
-		CHECK(r.codepoints[0] == U'é');
+		CHECK(r.codepoints[0] == 0x00E9);
 		CHECK(r.consumed == 2);
 	}
 	TEST_CASE("3-byte UTF-8 -> single codepoint") {
@@ -177,7 +177,7 @@ TEST_SUITE("utf8_to_u32_conv recoder") {
 		const char data[] = "\xE2\x82\xAC";
 		auto r = run_decoder(data, 3);
 		CHECK(r.codepoints.size() == 1);
-		CHECK(r.codepoints[0] == U'€');
+		CHECK(r.codepoints[0] == 0x20AC);
 		CHECK(r.consumed == 3);
 	}
 	TEST_CASE("4-byte UTF-8 -> single codepoint (regression: old bound p!=3 truncated)") {
@@ -233,7 +233,7 @@ TEST_SUITE("utf8_to_u32_conv recoder") {
 		auto r = run_decoder(data, 5);
 		REQUIRE(r.codepoints.size() == 4);
 		CHECK(r.codepoints[0] == U'a');
-		CHECK(r.codepoints[1] == U'é');
+		CHECK(r.codepoints[1] == 0x00E9);
 		CHECK(r.codepoints[2] == 0xFFFD);
 		CHECK(r.codepoints[3] == U'b');
 	}
@@ -249,7 +249,9 @@ TEST_SUITE("UTF-8 ↔ UTF-16 conversions") {
 	TEST_CASE("BMP roundtrip: ©€") {
 		std::string s = "\xC2\xA9\xE2\x82\xAC";   // © €
 		auto u16 = idni::to_u16string(s);
-		CHECK(u16 == u"©€");
+		REQUIRE(u16.size() == 2);
+		CHECK(u16[0] == 0x00A9);
+		CHECK(u16[1] == 0x20AC);
 		CHECK(idni::to_string(u16) == s);
 	}
 	TEST_CASE("non-BMP roundtrip: 😀") {

@@ -149,6 +149,11 @@ Default preset name is `release` if omitted.
 | `release-mingw`, `debug-mingw` | Windows cross-compile | `build/release-mingw`, … |
 | `release-mingw-packages`, `release-mingw-packages-zip` | MinGW + cpack (NSIS or ZIP) | `build/release-mingw` |
 | `emscripten`, `debug-emscripten` | Emscripten (`EMSCRIPTEN_DIR` defaults via `TAU_SHARED_PREFIX`) | `build/emscripten`, … |
+| `release-msvc`, `debug-msvc` | Native MSVC (static lib) | `build/release-msvc`, `build/debug-msvc` |
+| `release-msvc-tgf`, `debug-msvc-tgf` | + TGF (+ FTXUI fetch) | same |
+| `release-msvc-tests`, `debug-msvc-tests` | + tests | same |
+| `release-msvc-all`, `all-msvc` | everything (`TAU_PARSER_BUILD_ALL`) | `build/release-msvc` |
+| `release-msvc-packages`, `release-msvc-packages-zip` | TGF + examples + NSIS/ZIP | `build/release-msvc` |
 
 Hidden building blocks (`_build-tests`, `_build-packages`, `_build-all`, …) are
 composed by the public presets above; see [`CMakePresets.json`](../CMakePresets.json).

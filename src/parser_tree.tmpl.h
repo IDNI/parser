@@ -288,4 +288,119 @@ result_type parser<C, T>::tree::traverser::operator||(
 	return e(*this);
 }
 
+template <typename C, typename T>
+inline const typename parser<C, T>::tree::traverser::template extractor<tref>
+	parser<C, T>::tree::traverser::ref(
+		[](const traverser& t) -> tref {
+			return t.value();
+		});
+
+template <typename C, typename T>
+inline const typename parser<C, T>::tree::traverser::template
+	extractor<typename parser<C, T>::tree::traverser>
+	parser<C, T>::tree::traverser::only_child(
+		[](const traverser& t) -> traverser {
+			if (!t) return traverser();
+			tref r = t.value_tree().only_child();
+			if (!r) return traverser();
+			return traverser(r);
+		});
+
+template <typename C, typename T>
+inline const typename parser<C, T>::tree::traverser::template
+	extractor<typename parser<C, T>::tree::traverser>
+	parser<C, T>::tree::traverser::children(
+		[](const traverser& t) -> traverser {
+			if (!t) return traverser();
+			return traverser(t.value_tree().get_children());
+		});
+
+template <typename C, typename T>
+inline const typename parser<C, T>::tree::traverser::template
+	extractor<tref_range<typename parser<C, T>::pnode>>
+	parser<C, T>::tree::traverser::children_range(
+		[](const traverser& t) -> tref_range<pnode> {
+			if (!t) return { nullptr };
+			return t.value_tree().children();
+		});
+
+template <typename C, typename T>
+inline const typename parser<C, T>::tree::traverser::template
+	extractor<tree_range<typename parser<C, T>::tree>>
+	parser<C, T>::tree::traverser::children_trees_range(
+		[](const traverser& t) -> tree_range<tree> {
+			if (!t) return { nullptr };
+			return t.value_tree().children_trees();
+		});
+
+template <typename C, typename T>
+inline const typename parser<C, T>::tree::traverser::template
+	extractor<typename parser<C, T>::tree::traverser>
+	parser<C, T>::tree::traverser::first(
+		[](const traverser& t) -> traverser {
+			if (!t) return traverser();
+			tref r = t.value_tree().first();
+			if (!r) return traverser();
+			return traverser(r);
+		});
+
+template <typename C, typename T>
+inline const typename parser<C, T>::tree::traverser::template
+	extractor<typename parser<C, T>::tree::traverser>
+	parser<C, T>::tree::traverser::second(
+		[](const traverser& t) -> traverser {
+			if (!t) return traverser();
+			tref r = t.value_tree().second();
+			if (!r) return traverser();
+			return traverser(r);
+		});
+
+template <typename C, typename T>
+inline const typename parser<C, T>::tree::traverser::template
+	extractor<typename parser<C, T>::tree::traverser>
+	parser<C, T>::tree::traverser::third(
+		[](const traverser& t) -> traverser {
+			if (!t) return traverser();
+			tref r = t.value_tree().third();
+			if (!r) return traverser();
+			return traverser(r);
+		});
+
+template <typename C, typename T>
+inline const typename parser<C, T>::tree::traverser::template
+	extractor<std::string> parser<C, T>::tree::traverser::terminals(
+		[](const traverser& t) -> std::string {
+			if (!t) return std::string();
+			return t.value_tree().get_terminals();
+		});
+
+template <typename C, typename T>
+inline const typename parser<C, T>::tree::traverser::template
+	extractor<size_t> parser<C, T>::tree::traverser::nonterminal(
+		[](const traverser& t) -> size_t {
+			if (!t) return 0;
+			return t.value_tree().get_nt();
+		});
+
+template <typename C, typename T>
+inline const typename parser<C, T>::tree::traverser::template
+	extractor<std::optional<size_t>>
+	parser<C, T>::tree::traverser::opt_nonterminal(
+		[](const traverser& t) -> std::optional<size_t> {
+			if (!t) return std::optional<size_t>{};
+			const auto& x = t.value_tree();
+			if (x.value.first.nt()) return { x.value.first.n() };
+			return {};
+		});
+
+template <typename C, typename T>
+inline const typename parser<C, T>::tree::traverser::template
+	extractor<typename parser<C, T>::tree::traverser>
+	parser<C, T>::tree::traverser::dump(
+		[](const traverser& t) -> traverser {
+			if (!t) return t;
+			t.value_tree().dump(std::cout) << "\n";
+			return t;
+		});
+
 } // namespace idni

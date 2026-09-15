@@ -293,6 +293,7 @@ int main(int argc, char **argv) {
 			"type_name has an empty list");
 		check(block.find("unknown_nt") == string::npos,
 			"a name not declared in the grammar has no entry");
+		in.close();
 		fs::remove(out);
 	}
 
