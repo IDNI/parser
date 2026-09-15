@@ -9,6 +9,7 @@ permissions:
   contents: write
   pages: write
   id-token: write
+  actions: read
 
 concurrency:
   group: "pages"
@@ -21,7 +22,7 @@ jobs:
     outputs:
       should_run: ${{ steps.should_run.outputs.should_run }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: print latest_commit
         run: echo ${{ github.sha }}
@@ -40,24 +41,48 @@ jobs:
       - name: print should_run
         run: echo ${{ steps.should_run.outputs.should_run }}
 
-  build_and_deploy_nightly:
+  check_tests:
     needs: check_date
+    if: ${{ needs.check_date.outputs.should_run != 'false' }}
+    runs-on: ubuntu-24.04
+    name: Require a green test run
+    steps:
+      # The nightly packages a commit only after its own Test Release run
+      # passed. A commit with no completed run does not qualify.
+      - name: Read the Test Release result for this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          conclusion=$(gh api \
+            "repos/${{ github.repository }}/actions/workflows/test-release.yml/runs?head_sha=${{ github.sha }}&status=completed" \
+            --jq '.workflow_runs[0].conclusion // "none"')
+          echo "Test Release conclusion for ${{ github.sha }}: ${conclusion}"
+          if [ "${conclusion}" != "success" ]; then
+            echo "::error::Test Release did not pass for this commit (${conclusion})"
+            exit 1
+          fi
+
+  build_and_deploy_nightly:
+    needs: [check_date, check_tests]
     if: ${{ needs.check_date.outputs.should_run != 'false' }}
     runs-on: ubuntu-24.04
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build image with nightly packages
-        run: docker build --build-arg RELEASE="yes" --build-arg NIGHTLY="yes" --build-arg TESTS="no" --build-arg DOCUMENTATION="yes" -t packages .
+        run: >
+          ./dev docker nightly
+          --build-arg TESTS=no
+          --build-arg BUILD_JOBS=4
 
       - name: Copy nightly packages and generated API documentation from container
         run: |
-          CID=$(docker create packages)
-          docker cp $CID:/parser/build-Release/packages ${{ github.workspace }}/
-          docker cp $CID:/parser/build-Release/_site ${{ github.workspace }}/
+          CID=$(docker create parser:nightly)
+          docker cp $CID:/parser/build/release/packages ${{ github.workspace }}/
+          docker cp $CID:/parser/build/release/_site ${{ github.workspace }}/
           docker rm $CID
 
       - name: Read Version
@@ -69,13 +94,13 @@ jobs:
         run: echo "date_iso=$(date --iso)" >> $GITHUB_ENV
 
       - name: Upload nightly packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: "nightly-${{ env.date_iso }}"
           path: ${{ github.workspace }}/packages/
 
       - name: Create Nightly Build Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: "nightly-${{ env.date_iso }}"
           name: "Tau Parser Library ${{ env.version }} Nightly Build ${{ env.date_iso }}"
@@ -87,12 +112,36 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: ${{ github.workspace }}/_site
 
       - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
+
+  macos_package:
+    needs: [check_date, check_tests]
+    if: ${{ needs.check_date.outputs.should_run != 'false' }}
+    runs-on: macos-15
+    env:
+      # macos-15 runners are 3-core arm64
+      TAU_BUILD_JOBS: 3
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Get ISO date
+        run: echo "date_iso=$(date +%F)" >> $GITHUB_ENV
+
+      - name: Build the macOS package
+        run: ./dev preset release-macos-packages -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      # The artifact stays out of the nightly release on purpose. It is for
+      # testing the package before it becomes official.
+      - name: Upload the macOS package
+        uses: actions/upload-artifact@v7
+        with:
+          name: "macos-nightly-${{ env.date_iso }}"
+          path: build/release/packages/

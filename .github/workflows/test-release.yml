@@ -1,0 +1,82 @@
+name: Test Release
+
+on:
+  push:
+    branches: [ "master", "devel", "devel-*", "feature/**", "issue/**" ]
+  pull_request:
+    branches: [ "master", "devel", "devel-*", "feature/**", "issue/**" ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux
+    runs-on: ubuntu-24.04
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build and test
+        run: ./dev docker linux --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }}
+
+  linux-mingw64-wine:
+    name: Windows cross-build (MinGW, wine)
+    runs-on: ubuntu-24.04
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build and test
+        run: ./dev docker linux-mingw64-wine --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }}
+
+  windows-msvc:
+    name: Native Windows (${{ matrix.preset }})
+    runs-on: windows-latest
+    env:
+      # windows-latest runners are 4-core
+      TAU_BUILD_JOBS: 4
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [release-msvc-all, release-clang-cl-all]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v6
+
+      # clang-cl uses the MSVC headers and libraries, so both presets need
+      # this environment.
+      - name: Setup MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      # Git Bash runs ./dev, and the preset carries the compiler choice.
+      - name: Build and test
+        shell: bash
+        run: ./dev preset ${{ matrix.preset }} run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+  macos:
+    name: macOS
+    runs-on: macos-15
+    env:
+      # macos-15 runners are 3-core arm64
+      TAU_BUILD_JOBS: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # `run` on an -all preset makes ./dev call ctest itself.
+      - name: Build and test
+        run: ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}

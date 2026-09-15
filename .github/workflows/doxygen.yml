@@ -20,15 +20,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout sources
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
     - name: Setup Pages
-      uses: actions/configure-pages@v5
+      uses: actions/configure-pages@v6
     - name: Build Doxygen
-      uses: mattnotmitt/doxygen-action@v1.9.5
+      uses: mattnotmitt/doxygen-action@v1.12
       with:
           doxyfile-path: 'Doxyfile'
     - name: Upload artifact
-      uses: actions/upload-pages-artifact@v3
+      uses: actions/upload-pages-artifact@v5
 
   # Deployment job
   deploy:
@@ -40,4 +40,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
