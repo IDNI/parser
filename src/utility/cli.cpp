@@ -97,6 +97,8 @@ inline bool cli::option::is_string() const {
 inline bool cli::option::is_int() const {
 	return holds_alternative<int>(value_); }
 inline void cli::option::set(value v) { value_ = v; }
+inline void cli::option::set(bool v) { value_ = v; }
+inline void cli::option::set(int v) { value_ = v; }
 
 inline int cli::option::set(char* argv) {
 	if (is_bool()) set(is_true_value(argv));

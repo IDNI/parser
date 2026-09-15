@@ -39,6 +39,9 @@ struct cli {
 		bool is_int() const;
 		/// sets the value of the option
 		void set(value v);
+		/// exact matches, so a literal false or 0 never selects set(char*)
+		void set(bool v);
+		void set(int v);
 		int set(char* argv);
 		/// get_value<string / bool / int> returns the value of the option
 		template <typename T> T get() const;
