@@ -471,6 +471,9 @@ struct result {
 	[[nodiscard]] result&& with_error(code c, std::string_view msg,
 		   std::initializer_list<attr> extra);
 
+	/// @ref with_error using @ref code_name(@p c) as the message.
+	[[nodiscard]] result&& with_error(code c);
+
 	/// @ref with_error, plus a DBG assertion of @ref is_well_formed.
 	[[nodiscard]] result&& with_assert_check_error(code c, std::string_view msg, int_t primary = 0,
 		   std::initializer_list<attr> extra = {});
@@ -478,6 +481,10 @@ struct result {
 		   std::initializer_list<attr> extra = {});
 	[[nodiscard]] result&& with_assert_check_error(code c, std::string_view msg,
 		   std::initializer_list<attr> extra);
+
+	/// @ref with_assert_check_error using @ref code_name(@p c) as the message.
+	[[nodiscard]] result&& with_assert_check_error(code c);
+
 	void warning(std::string_view msg, int_t primary = 0,
 		     std::initializer_list<attr> extra = {});
 	void warning(std::string_view msg, size_t primary,

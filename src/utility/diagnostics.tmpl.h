@@ -1005,6 +1005,16 @@ result<T>&& result<T>::with_assert_check_error(code c, std::string_view msg, siz
 }
 
 template <typename T>
+result<T>&& result<T>::with_error(code c) {
+	return with_error(c, code_name(c));
+}
+
+template <typename T>
+result<T>&& result<T>::with_assert_check_error(code c) {
+	return with_assert_check_error(c, code_name(c));
+}
+
+template <typename T>
 void result<T>::warning(std::string_view msg, int_t primary,
 			std::initializer_list<attr> extra) {
 	diag_rep_.warning(msg, primary, extra);
