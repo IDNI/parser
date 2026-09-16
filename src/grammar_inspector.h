@@ -1,13 +1,13 @@
 // To view the license please visit
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
-#ifndef __IDNI__PARSER__TGF__GRAMMAR_INSPECTOR_H__
-#define __IDNI__PARSER__TGF__GRAMMAR_INSPECTOR_H__
+#ifndef __IDNI__PARSER__GRAMMAR_INSPECTOR_H__
+#define __IDNI__PARSER__GRAMMAR_INSPECTOR_H__
 #include "parser.h"
 
 namespace idni {
 
-/// Grammar inspector — friend access to grammar's private members.
+/// Grammar inspector - friend access to grammar's private members.
 /// Used by parser_gen
 template <typename C, typename T>
 struct grammar_inspector {
@@ -24,4 +24,4 @@ struct grammar_inspector {
 
 } // namespace idni
 
-#endif // __IDNI__PARSER__TGF__GRAMMAR_INSPECTOR_H__
+#endif // __IDNI__PARSER__GRAMMAR_INSPECTOR_H__
