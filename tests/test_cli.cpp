@@ -23,6 +23,7 @@ struct test_expected {
 	string cmd_name = "";
 	map<string, cli::option::value> options = {};
 	map<string, cli::option::value> cmd_options = {};
+	vector<string> files = {};
 };
 
 ostream cnull(0);
@@ -106,12 +107,17 @@ bool run_test(const test_options& o, const test_expected& exp) {
 			<< cmd.name() << "\n";
 		goto end;
 	}
+	if (cl.get_files() != exp.files) {
+		os << "expected " << exp.files.size() << " files, got "
+			<< cl.get_files().size() << "\n";
+		goto end;
+	}
 	failed = false;
 
 end:
 	if (!testing::print_only_failed || failed) cout << os.str();
-
-	return true;
+	testing::failed |= failed;
+	return !failed;
 }
 
 int main(int argc, char** argv) {
@@ -137,10 +143,28 @@ int main(int argc, char** argv) {
 		o.args = { "cmd", "--bool", v };
 		run_test(o, { .status = 0, .options = { { "bool", true } }});
 	}
-	for (auto& v : { "0", "f", "off", "no", "false", "any", "2" }) {
+	for (auto& v : { "0", "f", "off", "no", "false" }) {
 		o.args = { "cmd", "--bool", v };
 		run_test(o, { .status = 0, .options = { { "bool", false } }});
 	}
+	o.args = { "cmd", "--bool=true" };
+	run_test(o, { .status = 0, .options = { { "bool", true } }});
+	o.args = { "cmd", "--bool=false" };
+	run_test(o, { .status = 0, .options = { { "bool", false } }});
+
+	TEST("options", "bool does not consume file")
+	o.args = { "cmd", "-b", __FILE__ };
+	run_test(o, { .status = 0, .options = { { "bool", true } },
+		.files = { __FILE__ }});
+	o.args = { "cmd", "--bool", __FILE__ };
+	run_test(o, { .status = 0, .options = { { "bool", true } },
+		.files = { __FILE__ }});
+
+	TEST("options", "bool explicit false")
+	o.opts["bool"] = cli::option("bool", 'b', true);
+	o.args = { "cmd", "--bool", "false" };
+	run_test(o, { .status = 0, .options = { { "bool", false } }});
+	o.opts["bool"] = cli::option("bool", 'b', false);
 
 	TEST("options", "int")
 	o.args = { "cmd" }; // default value
@@ -219,11 +243,11 @@ int main(int argc, char** argv) {
 	o2.args = { "cmd", "gen", "--invalid" };
 	run_test(o2, { .status = 1, .cmd_name = "gen" });
 
-	TEST("command options", "default command with valid option")
-	o2.args = { "cmd", "-N" };
+	TEST("command options", "default command bool does not consume file")
+	o2.args = { "cmd", "-X", __FILE__ };
 	run_test(o2, { .status = 0, .cmd_name = "repl", .cmd_options = {
-		{ "nullable-ambiguity", true }
-	}});
+		{ "legacy-repl", true }
+	}, .files = { __FILE__ }});
 
 	TEST("command options", "default command with invalid option")
 	o2.args = { "cmd", "--invalid" };

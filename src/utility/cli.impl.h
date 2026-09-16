@@ -37,13 +37,24 @@ inline bool opt_prefix(std::string& opt, bool& isshort) {
 	return true;
 }
 
-// checks case insensitively if the std::string represents a true value
-inline bool is_true_value(std::string s) {
-	std::vector<std::string> trues
-		= { "1", "t", "on", "yes", "true" };
+// parses a bool value case insensitively
+inline bool parse_bool_value(std::string s, bool& value) {
 	transform(s.begin(), s.end(), s.begin(),
 		[](unsigned char c) { return tolower(c); });
-	return find(trues.begin(), trues.end(), s) != trues.end();
+	static const std::vector<std::string> trues
+		= { "1", "t", "on", "yes", "true" };
+	static const std::vector<std::string> falses
+		= { "0", "f", "off", "no", "false" };
+	if (find(trues.begin(), trues.end(), s) != trues.end())
+		return value = true, true;
+	if (find(falses.begin(), falses.end(), s) != falses.end())
+		return value = false, true;
+	return false;
+}
+
+inline bool is_true_value(std::string s) {
+	bool value = false;
+	return parse_bool_value(std::move(s), value) && value;
 }
 
 inline std::string long_for(char c, const cli::options& opts) {
@@ -255,6 +266,8 @@ inline int cli::process_arg(int& arg, bool& has_cmd, options& opts) {
 	//DBG(cout << "process_arg: " << arg << " args[arg]: " << args_[arg] << "\n";)
 	cli::option* cur = 0;
 	std::string opt(args_[arg]);
+	std::string option_value;
+	bool has_option_value = false;
 	bool isshort;
 	// if its command return 2 as we are done with CLI options
 	if (cmds_.find(opt) != cmds_.end()) return has_cmd = true, 2;
@@ -263,6 +276,14 @@ inline int cli::process_arg(int& arg, bool& has_cmd, options& opts) {
 			return files_.push_back(opt), ++arg, 0;
 		else return error("Invalid command or file not exists: "
 								+ opt, true);
+	}
+	if (!isshort) {
+		size_t eq = opt.find('=');
+		if (eq != std::string::npos) {
+			option_value = opt.substr(eq + 1);
+			opt = opt.substr(0, eq);
+			has_option_value = true;
+		}
 	}
 	//DBG(cout << "opt: " << opt << " isshort: " << PBOOL(isshort) << endl;)
 	if (isshort) for (size_t o = 0; o != opt.size(); ++o) {
@@ -292,39 +313,32 @@ inline int cli::process_arg(int& arg, bool& has_cmd, options& opts) {
 			return error(ss.str(), true);
 		}
 		cur = &opts[opt];
-		if (cur->is_bool()) cur->set(true);
 	}
 	++arg;
-	// option argument if any
-//#ifdef DEBUG
-//	cout << "arg: " << arg << " argc: " << argc;
-//	if (arg < argc) cout << " args[arg]: " << args_[arg];
-//	cout << "\n";
-//#endif // DEBUG
-	if (arg >= int(args_.size()) || is_opt_prefix(args_[arg])) { // no option argument
-		//DBG(cout << "no option argument?\n";)
-		if (!cur->is_bool()) return error(
-			"Missing argument for option: --"+cur->name());
-		return 0;
-	} else {
-		std::string v = args_[arg];
-		//DBG(cout << "v: " << v << "\n";)
-		if (cur->is_string()) cur->set(v);
-		else if (cur->is_bool())
-			cur->set(is_true_value(v));
-		else if (cur->is_int()) {
-			std::stringstream is(v);
-			int n = 0;
-			if (!(is >> n)) return
-				error("Option --" + cur->name()
-					+ " argument is not a "
-					"number: " + v);
-			cur->set(n);
+	if (cur->is_bool()) {
+		if (has_option_value) cur->set(is_true_value(option_value));
+		else {
+			bool value = true;
+			if (arg < int(args_.size())
+					&& parse_bool_value(args_[arg], value)) ++arg;
+			cur->set(value);
 		}
-		//DBG(if (cur->is_string()) cout
-		//	<< "cur->get_string(): " << cur->get<std::string>() << "\n";)
+		return 0;
 	}
-	++arg;
+	if (!has_option_value) {
+		if (arg >= int(args_.size()) || is_opt_prefix(args_[arg]))
+			return error("Missing argument for option: --"+cur->name());
+		option_value = args_[arg++];
+	}
+	//DBG(cout << "option_value: " << option_value << "\n";)
+	if (cur->is_string()) cur->set(option_value);
+	else if (cur->is_int()) {
+		std::stringstream is(option_value);
+		int n = 0;
+		if (!(is >> n)) return error("Option --" + cur->name()
+			+ " argument is not a number: " + option_value);
+		cur->set(n);
+	}
 	return 0;
 }
 
