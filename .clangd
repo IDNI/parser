@@ -1,3 +1,14 @@
+If:
+  PathExclude: external/.*
+
 CompileFlags:
   Add:
     - -std=c++23
+
+Index:
+  Background: Skip
+
+Diagnostics:
+  UnusedIncludes: None
+  ClangTidy:
+    Remove: '*'

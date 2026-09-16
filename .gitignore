@@ -21,3 +21,8 @@ external/emsdk
 Testing
 tests/data/bench/
 compile_commands.json
+external/emsdk*
+node_modules/
+__pycache__/
+
+.testdata/
