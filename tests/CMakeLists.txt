@@ -1,6 +1,7 @@
 set(TESTS
 	cli
 	input
+	negation_fix
 	parser
 	term_colors
 	tgf
@@ -80,6 +81,9 @@ set(DOCTESTS
 	tree_rewriter
 	enhancements
 	utf8
+	boolean_grammar
+	negation_regression
+	parser
 )
 
 foreach(X IN LISTS DOCTESTS)
