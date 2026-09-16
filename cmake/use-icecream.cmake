@@ -182,6 +182,20 @@ set(_ICECC_WRAPPER
 	"${CMAKE_CURRENT_LIST_DIR}/use-icecream/icecc-terminal-log"
 	"${ICECC_BINARY}")
 
+# -- ccache integration ------------------------------------------------------
+
+option(TAU_USE_CCACHE "Use ccache in front of icecc" OFF)
+if(TAU_USE_CCACHE)
+	find_program(CCACHE_BINARY ccache)
+	if(CCACHE_BINARY)
+		list(APPEND _ICECC_ENV_VARS "CCACHE_PREFIX=${ICECC_BINARY}")
+		set(_ICECC_WRAPPER "${CCACHE_BINARY}")
+		message(STATUS "Using ccache + icecream: ${CCACHE_BINARY}")
+	else()
+		message(WARNING "TAU_USE_CCACHE=ON but ccache not found")
+	endif()
+endif()
+
 icecc_set_launchers("${_ICECC_ENV_VARS}" "${_ICECC_WRAPPER}")
 
 message(STATUS "Using icecream: ${ICECC_BINARY}")
