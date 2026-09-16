@@ -19,13 +19,20 @@ if(TAU_PARSER_HAS_FTXUI_DEP)
 	target_compile_definitions(tgf_cli_core PUBLIC TAU_PARSER_HAS_FTXUI)
 	message(STATUS "tgf: FTXUI REPL enabled (legacy via -X)")
 elseif(NOT TAU_PARSER_DONT_USE_FTXUI)
-	message(WARNING "tgf: FTXUI not available — legacy terminal REPL will be used")
+	message(WARNING "tgf: FTXUI not available - legacy terminal REPL will be used")
 endif()
 
 add_executable(tgf)
 target_sources(tgf PRIVATE
 	"${CMAKE_CURRENT_SOURCE_DIR}/main.cpp")
 tauparser_setup(tgf PRIVATE tgf_cli_core)
+
+# Round-trip self-check first, archive only the binary that passed it
+add_custom_command(TARGET tgf POST_BUILD
+	COMMAND "${CMAKE_SOURCE_DIR}/scripts/tgf-roundtrip-self-check.sh" "$<TARGET_FILE:tgf>"
+	COMMAND "${CMAKE_SOURCE_DIR}/scripts/archive-tgf.sh" "$<TARGET_FILE:tgf>"
+	COMMENT "Round-trip self-check, then archiving the passing binary"
+)
 
 # add_dependencies(tgf ${TAU_PARSER_STATIC_LIB_NAME})
 
