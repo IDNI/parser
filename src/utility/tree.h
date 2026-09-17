@@ -985,6 +985,11 @@ bool is_cached_subtree(tref n, const std::unordered_set<tref>& cache);
 
 /**
  * @brief Struct for tree traversals in post order
+ *
+ * A callback taking two arguments -- f or visit_subtree -- is given the node
+ * and the node whose child list the traversal is walking, null at the root.
+ * One taking a single argument is given the node alone.
+ *
  * @tparam node Tree node type
  */
 template <typename node>
@@ -1000,7 +1005,7 @@ struct post_order {
 	 * f and visit_subtree cannot share information: a subtree the memo already holds is not entered again and f is not called on it, while visit_subtree is called at every occurrence
 	 * @tparam slot Memory slot to use for memorization, disabled by default
 	 * @param f Function to apply on each node. Must not have side effects due to memorization
-	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited. Taking two arguments, it is called with the node and its parent, null at the root
 	 * @return The tree obtained after applying f to root
 	 */
 	template <size_t slot = 0>
@@ -1020,7 +1025,7 @@ struct post_order {
 	 * @brief Call visit in post order on the nodes of root according to visit_subtree.
 	 * If visit returns false on a node, the traversal is terminated
 	 * @param visit Function to call on each node
-	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited. Taking two arguments, it is called with the node and its parent, null at the root
 	 */
 	void search(auto& visit, auto& visit_subtree);
 
@@ -1036,7 +1041,7 @@ struct post_order {
 	 * Equal nodes are not visited twice.
 	 * If visit returns false on a node, the traversal is terminated
 	 * @param visit Function to call on each node
-	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited. Taking two arguments, it is called with the node and its parent, null at the root
 	 */
 	void search_unique(auto& visit, auto& visit_subtree);
 
@@ -1082,6 +1087,11 @@ private:
 
 /**
  * @brief Struct for tree traversals in pre order
+ *
+ * A callback taking two arguments -- f, up or visit_subtree -- is given the
+ * node and the node whose child list the traversal is walking, null at the
+ * root. One taking a single argument is given the node alone.
+ *
  * @tparam node Tree node type
  */
 template<typename node>
@@ -1096,7 +1106,7 @@ struct pre_order {
 	 * If f is applied to a node, the traversal will continue with the children of the transformed node
 	 * @tparam slot Memory slot to use for memorization, disabled by default
 	 * @param f Function to apply on each node. The function can have side effects
-	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited. Taking two arguments, it is called with the node and its parent, null at the root
 	 * @param up Function to apply to processed node in post order
 	 * @return The tree obtained after applying f to root
 	 */
@@ -1118,7 +1128,7 @@ struct pre_order {
 	 * If f is applied to a node resulting in a change, its children are not traversed
 	 * @tparam slot Memory slot to use for memorization, disabled by default
 	 * @param f Function to apply on each node. The function can have side effects
-	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited. Taking two arguments, it is called with the node and its parent, null at the root
 	 * @param up Function to apply to processed node in post order
 	 * @return The tree obtained after applying f to root
 	 */
@@ -1141,7 +1151,7 @@ struct pre_order {
 	 * up is called on every node f was applied to, also on a node whose subtree the memo already holds and is not entered again
 	 * @tparam slot Memory slot to use for memorization, disabled by default
 	 * @param f Function to apply on each node. Its result must depend on the node alone, due to memorization
-	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited. Taking two arguments, it is called with the node and its parent, null at the root
 	 * @param up Function to apply to processed node in post order. Its result must depend on the node alone, due to memorization
 	 * @return The tree obtained after applying f to root
 	 */
@@ -1153,7 +1163,7 @@ struct pre_order {
 	 * If f is applied to a node, the traversal will continue with the children of the transformed node
 	 * @tparam slot Memory slot to use for memorization, disabled by default
 	 * @param f Function to apply on each node. Must not have side effects due to memorization
-	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited. Taking two arguments, it is called with the node and its parent, null at the root
 	 * @return The tree obtained after applying f to root
 	 */
 	template<size_t slot = 0>
@@ -1174,7 +1184,7 @@ struct pre_order {
 	 * A subtree the memo already holds is not entered again and up is not called on it: the memo stores the result of up
 	 * @tparam slot Memory slot to use for memorization, disabled by default
 	 * @param f Function to apply on each node. Must not have side effects due to memorization
-	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited. Taking two arguments, it is called with the node and its parent, null at the root
 	 * @param up Function to apply to processed node in post order. Must not have side effects due to memorization
 	 * @return The tree obtained after applying f to root
 	 */
@@ -1186,7 +1196,7 @@ struct pre_order {
 	 * If f is applied to a node resulting in a change, its children are not traversed
 	 * @tparam slot Memory slot to use for memorization, disabled by default
 	 * @param f Function to apply on each node. Must not have side effects due to memorization
-	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited. Taking two arguments, it is called with the node and its parent, null at the root
 	 * @param up Function to apply to processed node in post order
 	 * @return The tree obtained after applying f to root
 	 */
@@ -1198,7 +1208,7 @@ struct pre_order {
 	 * If f is applied to a node resulting in a change, its children are not traversed
 	 * @tparam slot Memory slot to use for memorization, disabled by default
 	 * @param f Function to apply on each node. Must not have side effects due to memorization
-	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited. Taking two arguments, it is called with the node and its parent, null at the root
 	 * @return The tree obtained after applying f to root
 	 */
 	template<size_t slot = 0>
@@ -1218,7 +1228,7 @@ struct pre_order {
 	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
 	 * If visit returns false on a node, the traversal terminates
 	 * @param visit The function called on nodes
-	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited. Taking two arguments, it is called with the node and its parent, null at the root
 	 * @param up Function called on visited nodes in post order
 	 * @param between Function called between children of a node
 	 */
@@ -1228,7 +1238,7 @@ struct pre_order {
 	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
 	 * If visit returns false on a node, the traversal terminates
 	 * @param visit The function called on nodes
-	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited. Taking two arguments, it is called with the node and its parent, null at the root
 	 * @param up Function called on visited nodes in post order
 	 */
 	void search(auto& visit, auto& visit_subtree, auto& up);
@@ -1245,7 +1255,7 @@ struct pre_order {
 	 * Equal nodes are not visited twice.
 	 * If visit returns false on a node, the traversal terminates
 	 * @param visit The function called on nodes
-	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited. Taking two arguments, it is called with the node and its parent, null at the root
 	 * @param up Function called on visited nodes in post order
 	 */
 	void search_unique(auto& visit, auto& visit_subtree, auto& up);
@@ -1262,7 +1272,7 @@ struct pre_order {
 	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
 	 * If visit returns false on a node, its children are not visited
 	 * @param visit The function called on nodes
-	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited. Taking two arguments, it is called with the node and its parent, null at the root
 	 * @param up Function called on visited nodes in post order
 	 * @param between Function called between children of a node
 	 */
@@ -1272,7 +1282,7 @@ struct pre_order {
 	 * @brief Call visit in pre order on the nodes of root according to visit_subtree.
 	 * If visit returns false on a node, its children are not visited
 	 * @param visit The function called on nodes
-	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited. Taking two arguments, it is called with the node and its parent, null at the root
 	 * @param up Function called on visited nodes in post order
 	 */
 	void visit(auto& visit, auto& visit_subtree, auto& up);
@@ -1289,7 +1299,7 @@ struct pre_order {
 	 * Equal nodes are not visited twice.
 	 * If visit returns false on a node, its children are not visited
 	 * @param visit The function called on nodes
-	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited. Taking two arguments, it is called with the node and its parent, null at the root
 	 * @param up Function called on visited nodes in post order
 	 */
 	void visit_unique(auto& visit, auto& visit_subtree, auto& up);

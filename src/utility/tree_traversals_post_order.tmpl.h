@@ -14,11 +14,7 @@ post_order<node>::post_order(const htref& h) : root(h->get()) {}
 template <typename node>
 template <size_t slot>
 tref post_order<node>::apply_unique(auto& f, auto& visit_subtree) {
-	if (visit_subtree(root)) {
-		tref res = traverse<slot>(root, f, visit_subtree);
-		return res;
-	}
-	else return root;
+	return traverse<slot>(root, f, visit_subtree);
 }
 
 template <typename node>
@@ -30,9 +26,7 @@ tref post_order<node>::apply_unique(auto& f) {
 
 template <typename node>
 void post_order<node>::search(auto& visit, auto& visit_subtree) {
-	if (visit_subtree(root)) {
-		const_traverse<false>(root, visit, visit_subtree);
-	}
+	const_traverse<false>(root, visit, visit_subtree);
 }
 
 template <typename node>
@@ -42,9 +36,7 @@ void post_order<node>::search(auto& visit) {
 
 template <typename node>
 void post_order<node>::search_unique(auto& visit, auto& visit_subtree) {
-	if (visit_subtree(root)) {
-		const_traverse<true>(root, visit, visit_subtree);
-	}
+	const_traverse<true>(root, visit, visit_subtree);
 }
 
 template <typename node>
@@ -56,6 +48,9 @@ template <typename node>
 template <size_t slot>
 tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 	if (n == nullptr) return nullptr;
+	// The root is the one node with no parent, and the one the caller gets
+	// back untouched when the predicate turns it away.
+	if (!enters(visit_subtree, n, nullptr)) return n;
 	// Check cache first
 	if constexpr (slot != 0) {
 		const auto it = m.find(std::make_pair(n, slot));
@@ -107,8 +102,12 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 		}
 	};
 
-	auto call = [](auto& cb, tref n) -> tref {
-		tref nn = cb(n);
+	auto call = [&frames](auto& cb, tref n) -> tref {
+		tref nn;
+		if constexpr (accepts_tref_tref<decltype(cb)>::value)
+			nn = cb(n, frames.empty() ? nullptr
+						: frames.back().node);
+		else nn = cb(n);
 		if (nn == n) return n;
 		if (nn == nullptr) return nullptr;
 		// give the result the sibling `n` had
@@ -125,10 +124,15 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 			const tref finished = fr.node;
 			const tref origin = fr.origin;
 			const size_t start = fr.buffer_start;
+			const bool dirty = fr.dirty;
 			const bool has_children =
 				tree::get(finished).left_child() != nullptr;
+			// `f` runs with the frame popped, so that it sees the
+			// parent
+			frames.pop_back();
+			TD(dec_depth();)
 			tref res = finished;
-			if (fr.dirty) {
+			if (dirty) {
 				// Rebuild from the buffered children
 				TS(++tstats().rebuilds;)
 				res = tree::get(tree::get(finished).value,
@@ -146,8 +150,6 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 					std::make_pair(finished, slot), res);
 				else cache.insert(finished, res);
 			}
-			frames.pop_back();
-			TD(dec_depth();)
 			if (frames.empty()) return res;
 			child_done(origin, res);
 			continue;
@@ -156,7 +158,7 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 		// `frames`, which would leave `fr` dangling
 		TS(++tstats().sibling_steps;)
 		fr.next_child = tree::get(c).right_sibling();
-		if (!visit_subtree(c)) {
+		if (!enters(visit_subtree, c, fr.node)) {
 			child_done(c, c);
 			continue;
 		}
@@ -181,6 +183,8 @@ void post_order<node>::const_traverse(tref n, auto& visitor,
 	auto& visit_subtree)
 {
 	if (n == nullptr) return;
+	// The root is entered only if the predicate admits it; it has no parent
+	if (!enters(visit_subtree, n, nullptr)) return;
 	scratch<node, walk_buffers<subtree_seen<node>>> s;
 	auto& cache = s.buffers->cache;
 	auto& frames = s.buffers->frames;

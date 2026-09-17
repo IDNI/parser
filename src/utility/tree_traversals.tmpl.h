@@ -38,6 +38,17 @@ void print_stack(const std::vector<tref>& stack, tref current) {
 #	define DBGT(x)
 #endif // LOG_TRAVERSALS_ENABLED
 
+// Asks a traversal's predicate whether to enter `x`. A predicate that takes
+// two arguments is given the node whose child list the traversal is walking,
+// null at the root; one that takes a single argument is given the node alone.
+// This is the dispatch `f` and `up` already go through, in the one shape a
+// predicate needs: a bool comes back either way.
+bool enters(auto& cb, tref x, tref parent) {
+	if constexpr (bool_accepts_tref_tref<decltype(cb)>::value)
+		return cb(x, parent);
+	else return cb(x);
+}
+
 // Buffers for one traversal, lent from a pool so that later traversals reuse
 // the capacity earlier ones built up.
 template <typename cache_t, typename position_t>

@@ -14,23 +14,14 @@ pre_order<node>::pre_order(const htref& h) : root(h->get()) {}
 template <typename node>
 template<size_t slot>
 tref pre_order<node>::apply_unique(auto& f, auto& visit_subtree, auto& up) {
-	if (visit_subtree(root)) {
-		tref res = traverse<false, slot, true, false>(root, f, visit_subtree, up);
-		return res;
-	}
-
-	else return root;
+	return traverse<false, slot, true, false>(root, f, visit_subtree, up);
 }
 
 template <typename node>
 template<size_t slot>
 tref pre_order<node>::apply_unique(auto& f, auto& visit_subtree) {
-	if (visit_subtree(root)) {
-		tref res = traverse<false, slot, true, false>(root, f, visit_subtree,
+	return traverse<false, slot, true, false>(root, f, visit_subtree,
 								identity);
-		return res;
-	}
-	else return root;
 }
 
 template <typename node>
@@ -44,21 +35,13 @@ template <typename node>
 template<size_t slot>
 tref pre_order<node>::apply_unique_pure(auto& f, auto& visit_subtree, auto& up)
 {
-	if (visit_subtree(root)) {
-		tref res = traverse<false, slot, true, true>(root, f, visit_subtree, up);
-		return res;
-	}
-	else return root;
+	return traverse<false, slot, true, true>(root, f, visit_subtree, up);
 }
 
 template <typename node>
 template<size_t slot>
 tref pre_order<node>::apply(auto& f, auto& visit_subtree, auto& up) {
-	if (visit_subtree(root)) {
-		tref res = traverse<false, slot, false, false>(root, f, visit_subtree, up);
-		return res;
-	}
-	else return root;
+	return traverse<false, slot, false, false>(root, f, visit_subtree, up);
 }
 
 template <typename node>
@@ -73,22 +56,14 @@ template<size_t slot>
 tref pre_order<node>::apply_unique_until_change(auto& f, auto& visit_subtree,
 	auto& up)
 {
-	if (visit_subtree(root)) {
-		tref res = traverse<true, slot, true, false>(root, f, visit_subtree, up);
-		return res;
-	}
-	else return root;
+	return traverse<true, slot, true, false>(root, f, visit_subtree, up);
 }
 
 template <typename node>
 template<size_t slot>
 tref pre_order<node>::apply_unique_until_change(auto& f, auto& visit_subtree){
-	if (visit_subtree(root)) {
-		tref res = traverse<true, slot, true, false>(
-					root, f, visit_subtree, identity);
-		return res;
-	}
-	else return root;
+	return traverse<true, slot, true, false>(root, f, visit_subtree,
+								identity);
 }
 
 
@@ -104,11 +79,7 @@ template<size_t slot>
 tref pre_order<node>::apply_until_change(auto& f, auto& visit_subtree,
 	auto& up)
 {
-	if (visit_subtree(root)) {
-		tref res = traverse<true, slot, false, false>(root, f, visit_subtree, up);
-		return res;
-	}
-	else return root;
+	return traverse<true, slot, false, false>(root, f, visit_subtree, up);
 }
 
 template <typename node>
@@ -122,18 +93,12 @@ template <typename node>
 void pre_order<node>::visit(auto& visit, auto& visit_subtree, auto& up,
 	auto& between)
 {
-	if (visit_subtree(root)) {
-		const_traverse<false, false>(root,
-					visit, visit_subtree, up, between);
-	}
+	const_traverse<false, false>(root, visit, visit_subtree, up, between);
 }
 
 template <typename node>
 void pre_order<node>::visit(auto& visit, auto& visit_subtree, auto& up) {
-	if (visit_subtree(root)) {
-		const_traverse<false, false>(root,
-					visit, visit_subtree, up, do_nothing);
-	}
+	const_traverse<false, false>(root, visit, visit_subtree, up, do_nothing);
 }
 
 template <typename node>
@@ -145,18 +110,12 @@ template <typename node>
 void pre_order<node>::search(auto& visit, auto& visit_subtree, auto& up,
 	auto& between)
 {
-	if (visit_subtree(root)) {
-		const_traverse<true, false>(root,
-					visit, visit_subtree, up, between);
-	}
+	const_traverse<true, false>(root, visit, visit_subtree, up, between);
 }
 
 template <typename node>
 void pre_order<node>::search(auto& visit, auto& visit_subtree, auto& up) {
-	if (visit_subtree(root)) {
-		const_traverse<true, false>(root,
-					visit, visit_subtree, up, do_nothing);
-	}
+	const_traverse<true, false>(root, visit, visit_subtree, up, do_nothing);
 }
 
 template <typename node>
@@ -167,10 +126,7 @@ void pre_order<node>::search(auto& visit) {
 template <typename node>
 void pre_order<node>::visit_unique(auto& visit, auto& visit_subtree, auto& up)
 {
-	if (visit_subtree(root)) {
-		const_traverse<false, true>(root,
-					visit, visit_subtree, up, do_nothing);
-	}
+	const_traverse<false, true>(root, visit, visit_subtree, up, do_nothing);
 }
 
 template <typename node>
@@ -181,10 +137,7 @@ void pre_order<node>::visit_unique(auto& visit) {
 template <typename node>
 void pre_order<node>::search_unique(auto&visit, auto& visit_subtree, auto& up)
 {
-	if (visit_subtree(root)) {
-		const_traverse<true, true>(root,
-					visit, visit_subtree, up, do_nothing);
-	}
+	const_traverse<true, true>(root, visit, visit_subtree, up, do_nothing);
 }
 
 template <typename node>
@@ -198,6 +151,9 @@ template<bool break_on_change, size_t slot, bool unique, bool pure>
 tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 {
 	if (n == nullptr) return nullptr;
+	// The root is the one node with no parent, and the one the caller gets
+	// back untouched when the predicate turns it away.
+	if (!enters(visit_subtree, n, nullptr)) return n;
 	scratch<node, traversal_buffers<subtree_memo<node>, build_frame>> s;
 	auto& cache = s.buffers->cache;
 	auto& stack = s.buffers->stack;
@@ -263,6 +219,11 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 		DBGT(std::cout << "\tcall returned: " << tree::get(nn).dump_to_str() << "\n";)
 		return nn;
 	};
+	// Whether to enter `x`, which is reached as a child of the node whose
+	// frame is on top; the root's frame is not open yet, so it has none.
+	auto descend = [&get_parent, &visit_subtree](tref x) {
+		return enters(visit_subtree, x, get_parent());
+	};
 	// Opens a frame for `x`, unless the memo already holds its result, in
 	// which case `x` becomes that result. `origin` is the parent's child
 	// it was reached as.
@@ -295,7 +256,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 	}
 	// If the transformed node should not be
 	// visited, do not open a frame for it
-	else if (visit_subtree(r)) descended = open(nullptr, r);
+	else if (descend(r)) descended = open(nullptr, r);
 	else r = call(up, r);
 	if (!descended) return r;
 
@@ -348,7 +309,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 		// get_parent() names the parent.
 		TS(++tstats().sibling_steps;)
 		fr.next_child = tree::get(c).right_sibling();
-		if (!visit_subtree(c)) {
+		if (!descend(c)) {
 			child_done(c, c);
 			continue;
 		}
@@ -363,7 +324,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 		}
 		// If the transformed node should not be
 		// visited, do not open a frame for it
-		else if (visit_subtree(r)) into = open(c, r);
+		else if (descend(r)) into = open(c, r);
 		else r = call(up, r);
 		if (r == nullptr) return nullptr;
 		if (!into) child_done(c, r);

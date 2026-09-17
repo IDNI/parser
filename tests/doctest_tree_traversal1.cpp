@@ -3,6 +3,8 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
+#include <map>
+
 #include "init_test.h"
 
 // ============================================================================
@@ -706,5 +708,108 @@ TEST_SUITE("traversal corner cases") {
 		// pre-order: r, a, b, c, d, e
 		CHECK( visited.size() == 6 );
 		CHECK( chtree::get(visited.front()).value == 'r' );
+	}
+}
+
+// ============================================================================
+// The parent a two-argument callback is given
+// ============================================================================
+
+TEST_SUITE("traversal parents") {
+
+	// Every case below walks a(b(d), c), whose values are all distinct, and
+	// records which parent each value was seen with; '-' stands for the root's
+	// null parent.
+	static tref parent_tree() {
+		return n('a', {n('b', {n('d')}), n('c')});
+	}
+
+	static char mark(tref nd) { return chtree::get(nd).value; }
+
+	static std::map<char, char> expected() {
+		return { {'a', '-'}, {'b', 'a'}, {'c', 'a'}, {'d', 'b'} };
+	}
+
+	TEST_CASE("pre-order rewriting: the predicate is given the parent") {
+		tref root = parent_tree();
+		std::map<char, char> seen;
+		auto note = [&seen](tref nd, tref parent) {
+			seen[mark(nd)] = parent == nullptr ? '-' : mark(parent);
+			return true;
+		};
+		CHECK( pre_order<char>(root).apply_unique(id, note) == root );
+		CHECK( seen == expected() );
+	}
+
+	TEST_CASE("pre-order rewriting: a transformed node is the parent below it") {
+		// 'b' becomes 'z' with the same children, so 'd' is reached as a
+		// child of 'z'
+		tref root = parent_tree();
+		auto b_to_z = [](tref nd) -> tref {
+			auto x = chtree::get(nd);
+			if (x.value == 'b') return bintree<char>::get('z', x.l, x.r);
+			return nd;
+		};
+		std::map<char, char> seen;
+		auto note = [&seen](tref nd, tref parent) {
+			seen[mark(nd)] = parent == nullptr ? '-' : mark(parent);
+			return true;
+		};
+		pre_order<char>(root).apply_unique(b_to_z, note);
+		CHECK( seen['z'] == 'a' );
+		CHECK( seen['d'] == 'z' );
+	}
+
+	TEST_CASE("pre-order rewriting: a turned away root comes back whole") {
+		tref root = parent_tree();
+		auto not_root = [](tref, tref parent) { return parent != nullptr; };
+		CHECK( pre_order<char>(root).apply_unique(tr_a_z, not_root) == root );
+	}
+
+	TEST_CASE("pre-order walk: the predicate is given the parent") {
+		tref root = parent_tree();
+		std::map<char, char> seen;
+		auto note = [&seen](tref nd, tref parent) {
+			seen[mark(nd)] = parent == nullptr ? '-' : mark(parent);
+			return true;
+		};
+		auto collect = [](tref) {};
+		pre_order<char>(root).visit(collect, note, do_nothing);
+		CHECK( seen == expected() );
+	}
+
+	TEST_CASE("post-order rewriting: the predicate and f are given the parent") {
+		tref root = parent_tree();
+		std::map<char, char> at_predicate, at_f;
+		auto note = [&at_predicate](tref nd, tref parent) {
+			at_predicate[mark(nd)] = parent == nullptr ? '-'
+								: mark(parent);
+			return true;
+		};
+		auto keep = [&at_f](tref nd, tref parent) -> tref {
+			at_f[mark(nd)] = parent == nullptr ? '-' : mark(parent);
+			return nd;
+		};
+		CHECK( post_order<char>(root).apply_unique(keep, note) == root );
+		CHECK( at_predicate == expected() );
+		CHECK( at_f == expected() );
+	}
+
+	TEST_CASE("post-order walk: the predicate is given the parent") {
+		tref root = parent_tree();
+		std::map<char, char> seen;
+		auto note = [&seen](tref nd, tref parent) {
+			seen[mark(nd)] = parent == nullptr ? '-' : mark(parent);
+			return true;
+		};
+		auto collect = [](tref) { return true; };
+		post_order<char>(root).search(collect, note);
+		CHECK( seen == expected() );
+	}
+
+	TEST_CASE("post-order rewriting: a turned away root comes back whole") {
+		tref root = parent_tree();
+		auto not_root = [](tref, tref parent) { return parent != nullptr; };
+		CHECK( post_order<char>(root).apply_unique(tr_a_z, not_root) == root );
 	}
 }
