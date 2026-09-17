@@ -4,13 +4,70 @@
 #ifndef __IDNI__PARSER__UTILITY__REPL_FTXUI_H__
 #define __IDNI__PARSER__UTILITY__REPL_FTXUI_H__
 
+#include <atomic>
+#include <functional>
+#include <memory>
+#include <mutex>
+#include <streambuf>
 #include <string>
+#include <thread>
 
 #include "repl_history.h"
 
 namespace ftxui { class ScreenInteractive; }
 
 namespace idni {
+
+class thread_routing_streambuf;
+
+template <typename evaluator_t>
+struct repl_eval_widget {
+	using completion_fn = std::function<void(int, const std::string&, int,
+		bool, bool)>;
+
+	explicit repl_eval_widget(evaluator_t& evaluator);
+
+	bool active() const;
+	auto render() const;
+	void start(ftxui::ScreenInteractive* screen, std::string text,
+		int cursor, bool store, bool allow_incomplete,
+		completion_fn completion);
+	void handle_custom_event();
+	void request_clear();
+	void shutdown();
+
+private:
+	void finish();
+	void drain_output(bool flush_partial);
+	std::mutex& out_mutex() { return out_mutex_; }
+	std::mutex& err_mutex() { return err_mutex_; }
+
+	evaluator_t& evaluator_;
+	ftxui::ScreenInteractive* screen_ = nullptr;
+	completion_fn completion_;
+	std::atomic<bool> active_{false};
+	std::atomic<bool> done_{false};
+	std::atomic<bool> ticker_running_{false};
+	std::atomic<bool> clear_requested_{false};
+	std::thread worker_;
+	std::thread ticker_;
+	int result_ = 0;
+	std::string text_;
+	int cursor_ = 0;
+	bool store_ = false;
+	bool allow_incomplete_ = false;
+	size_t spinner_frame_ = 0;
+	std::chrono::steady_clock::time_point started_{};
+	std::streambuf* saved_cout_buf_ = nullptr;
+	std::streambuf* saved_cerr_buf_ = nullptr;
+	std::string out_buf_;
+	std::string err_buf_;
+	std::mutex out_mutex_;
+	std::mutex err_mutex_;
+	std::unique_ptr<thread_routing_streambuf> out_tsb_;
+	std::unique_ptr<thread_routing_streambuf> err_tsb_;
+	std::unique_lock<std::mutex> stream_lock_;
+};
 
 /// What an evaluator's optional `on_repl_key(key)` hook asks the REPL to do
 /// with a single keypress: pass it to normal editing, swallow it, or submit
@@ -36,8 +93,8 @@ struct repl_key_action {
 ///
 /// Should be in parity with `repl<>`: same key bindings, history
 /// behaviour and file format, multiline continuation and pipe-mode fallback.
-/// `eval()` output is captured into a stringstream, then emitted via
-/// `WithRestoredIO` so it reaches the terminal cleanly after each command.
+/// Interactive evaluation runs on a worker thread so the FTXUI loop can show
+/// progress and live output. Pipe mode remains synchronous.
 template <typename evaluator_t>
 struct repl_ftxui {
 	repl_ftxui(evaluator_t& re, std::string prompt = "> ",
@@ -65,9 +122,14 @@ private:
 	void clear_input();                   ///< empty input, cursor to 0
 
 	void store_history(const std::string& s);
+	std::mutex& prompt_mutex() { return prompt_mutex_; }
+	void apply_eval_result(int result, const std::string& text,
+		int cursor, bool store, bool allow_incomplete);
 
 	evaluator_t& re_;
+	repl_eval_widget<evaluator_t> eval_widget_;
 	std::string  prompt_;
+	mutable std::mutex prompt_mutex_;
 	repl_history history_;
 
 	std::string input_text_;     ///< current edit buffer (may be multiline)

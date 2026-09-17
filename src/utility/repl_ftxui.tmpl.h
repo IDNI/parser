@@ -5,12 +5,16 @@
 #define __IDNI__PARSER__UTILITY__REPL_FTXUI_TMPL_H__
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
+#include <chrono>
 #include <concepts>
 #include <iostream>
+#include <mutex>
 #include <sstream>
 #include <streambuf>
 #include <string>
+#include <thread>
 #include <utility>
 #ifdef _WIN32
 #include <io.h>
@@ -32,7 +36,11 @@
 #include "term.h"
 
 namespace idni {
-namespace repl_ftxui_detail {
+
+inline std::mutex& repl_stream_mutex() {
+	static std::mutex value;
+	return value;
+}
 
 // True when evaluator_t opts into single-key handling (see repl_key_action).
 template <typename E>
@@ -51,17 +59,51 @@ static inline std::string key_token(const ftxui::Event& e) {
 	return {};
 }
 
-struct scoped_stream_redirect {
-	scoped_stream_redirect(std::ostream& os, std::streambuf* next)
-	        : os_(os), previous_(os.rdbuf(next)) {}
-	scoped_stream_redirect(const scoped_stream_redirect&) = delete;
-	scoped_stream_redirect&
-	operator=(const scoped_stream_redirect&) = delete;
-	~scoped_stream_redirect() { os_.rdbuf(previous_); }
+class thread_routing_streambuf : public std::streambuf {
+public:
+	thread_routing_streambuf(std::streambuf* passthrough,
+		std::string& buffer, std::mutex& mutex)
+		: passthrough_(passthrough), buffer_(buffer), mutex_(mutex) {}
+
+	void set_routed_thread(std::thread::id id) {
+		routed_thread_.store(id, std::memory_order_release);
+	}
+
+protected:
+	int_type overflow(int_type c) override {
+		if (traits_type::eq_int_type(c, traits_type::eof())) return c;
+		char ch = traits_type::to_char_type(c);
+		if (is_routed()) {
+			std::lock_guard<std::mutex> lock(mutex_);
+			buffer_.push_back(ch);
+		} else return passthrough_->sputc(ch);
+		return c;
+	}
+
+	std::streamsize xsputn(const char* s, std::streamsize n) override {
+		if (is_routed()) {
+			std::lock_guard<std::mutex> lock(mutex_);
+			buffer_.append(s, static_cast<size_t>(n));
+			return n;
+		}
+		return passthrough_->sputn(s, n);
+	}
+
+	int sync() override {
+		if (is_routed()) return 0;
+		return passthrough_->pubsync();
+	}
 
 private:
-	std::ostream&   os_;
-	std::streambuf* previous_;
+	bool is_routed() const {
+		return std::this_thread::get_id()
+			== routed_thread_.load(std::memory_order_acquire);
+	}
+
+	std::streambuf* passthrough_;
+	std::atomic<std::thread::id> routed_thread_{};
+	std::string& buffer_;
+	std::mutex& mutex_;
 };
 
 // Renders a string carrying ANSI SGR sequences (as produced by term::colors)
@@ -143,14 +185,13 @@ static inline ftxui::Element ansi_to_element(const std::string& s) {
 	return spans.empty() ? text("") : hbox(spans);
 }
 
-} // namespace repl_ftxui_detail
-
 // --- repl_ftxui ------------------------------------------------------------
 
 template <typename evaluator_t>
 repl_ftxui<evaluator_t>::repl_ftxui(evaluator_t& re, std::string prompt,
                                     std::string history_file)
         : re_(re),
+          eval_widget_(re),
           prompt_(std::move(prompt)),
           history_(std::move(history_file)) {
 	re_.r_ftx = this; // link evaluator to this repl
@@ -252,12 +293,20 @@ int repl_ftxui<evaluator_t>::run_interactive() {
 	Component input     = Input(opt);
 
 	// Prompt rendered as a left gutter; continuation lines indent beneath it.
+	// While an evaluation runs, the submitted text stays visible and the
+	// spinner row is drawn below it.
 	Component line = Renderer(input, [this, input] {
+		std::string prompt;
+		{
+			std::lock_guard<std::mutex> lock(prompt_mutex());
+			prompt = prompt_;
+		}
 		Element editor = input_text_.empty()
-		                       ? (text(" ") | focusCursorBarBlinking)
-		                       : input->Render();
-		return hbox({ repl_ftxui_detail::ansi_to_element(prompt_),
-		              editor });
+			? (text(" ") | focusCursorBarBlinking)
+			: input->Render();
+		Element row = hbox({ ansi_to_element(prompt), editor });
+		return eval_widget_.active()
+			? vbox({ row, eval_widget_.render() }) : row;
 	});
 
 	// Is the cursor on the first / last line of the (possibly multiline) buffer?
@@ -270,64 +319,43 @@ int repl_ftxui<evaluator_t>::run_interactive() {
 		return input_text_.find('\n', cp) == std::string::npos;
 	};
 
-	// Runs `text` through eval() with stdout/stderr captured, then emits it
-	// cleanly. Stores history when `store`; exits on ret==1. Returns eval()'s
-	// code so the caller can handle ret==2 (incomplete) as it sees fit.
-	auto run_line = [&](const std::string& text, bool store) -> int {
-		std::ostringstream out_cap, err_cap;
-		int                ret = 0;
-		{
-			repl_ftxui_detail::scoped_stream_redirect
-				out_redirect(std::cout, out_cap.rdbuf());
-			repl_ftxui_detail::scoped_stream_redirect
-				err_redirect(std::cerr, err_cap.rdbuf());
-			ret = re_.eval(text).value_or(0);
-		}
-		if (ret == 2) return ret; // caller decides
-		screen_->WithRestoredIO([&] {
-			std::cout << "\n" << out_cap.str();
-			std::cerr << err_cap.str();
-			std::cout.flush();
-			std::cerr.flush();
-		})();
-		if (store) store_history(text);
-		if (ret == 1) screen_->Exit();
-		return ret;
+	auto start_eval = [this](std::string text, bool store,
+		bool allow_incomplete) {
+		int cursor = cursor_pos_;
+		eval_widget_.start(screen_, std::move(text), cursor, store,
+			allow_incomplete,
+			[this](int result, const std::string& saved_text,
+				int saved_cursor, bool save_history,
+				bool restore_incomplete) {
+				apply_eval_result(result, saved_text, saved_cursor,
+					save_history, restore_incomplete);
+			});
 	};
 
 	Component root = CatchEvent(line, [&](Event e) {
+		if (eval_widget_.active()) {
+			if (e == Event::Custom) eval_widget_.handle_custom_event();
+			return true;
+		}
 		// Single-key hook: let the evaluator claim a keypress (e.g. a
 		// single-key continue/quit prompt) before normal editing sees it.
-		if constexpr (repl_ftxui_detail::has_on_repl_key<evaluator_t>) {
-			if (std::string k = repl_ftxui_detail::key_token(e);
+		if constexpr (has_on_repl_key<evaluator_t>) {
+			if (std::string k = key_token(e);
 				!k.empty())
 			{
 				auto act = re_.on_repl_key(k);
 				if (act.kind == repl_key_action::consume)
 					return true;
 				if (act.kind == repl_key_action::submit) {
-					if (run_line(act.line, false) != 1)
-						clear_input();
+					start_eval(act.line, false, false);
 					return true;
 				}
 			}
 		}
-		// Enter: evaluate. On incomplete input (eval == 2) break the line and
-		// keep editing; otherwise emit output and commit (or exit).
+		// Enter starts evaluation and leaves the UI loop responsive.
 		if (e == Event::Return) {
-			if (input_text_.empty())
-				return true; // ignore empty enter
-			int ret = run_line(input_text_, true);
-			// incomplete: insert newline at cursor, continue
-			if (ret == 2) {
-				size_t cp = std::min((size_t) cursor_pos_,
-							input_text_.size());
-				input_text_.insert(input_text_.begin() + cp,
-							'\n');
-				cursor_pos_ = (int) cp + 1;
-				return true;
-			}
-			if (ret != 1) clear_input();
+			if (input_text_.empty()) return true;
+			start_eval(input_text_, true, true);
 			return true;
 		}
 		// Up/Down: history at the buffer's first/last line, otherwise let the
@@ -398,20 +426,205 @@ int repl_ftxui<evaluator_t>::run_interactive() {
 	});
 
 	screen.Loop(root);
+	eval_widget_.shutdown();
 	screen_ = nullptr;
 	return 0;
 }
 
 template <typename evaluator_t>
+repl_eval_widget<evaluator_t>::repl_eval_widget(evaluator_t& evaluator)
+	: evaluator_(evaluator) {}
+
+template <typename evaluator_t>
+bool repl_eval_widget<evaluator_t>::active() const {
+	return active_.load(std::memory_order_relaxed);
+}
+
+template <typename evaluator_t>
+auto repl_eval_widget<evaluator_t>::render() const {
+	using namespace ftxui;
+	using namespace std::chrono;
+	int64_t micros = duration_cast<microseconds>(
+		steady_clock::now() - started_).count();
+	return hbox({ spinner(15, spinner_frame_), text("  evaluating  "),
+		text(diagnostics::report::format_time(micros)) });
+}
+
+template <typename evaluator_t>
+void repl_eval_widget<evaluator_t>::start(ftxui::ScreenInteractive* screen,
+	std::string text, int cursor, bool store, bool allow_incomplete,
+	completion_fn completion)
+{
+	screen_ = screen;
+	text_ = std::move(text);
+	cursor_ = cursor;
+	store_ = store;
+	allow_incomplete_ = allow_incomplete;
+	completion_ = std::move(completion);
+	result_ = 0;
+	spinner_frame_ = 0;
+	started_ = std::chrono::steady_clock::now();
+	done_.store(false, std::memory_order_relaxed);
+	active_.store(true, std::memory_order_relaxed);
+	{
+		std::lock_guard<std::mutex> lock(out_mutex());
+		out_buf_.clear();
+	}
+	{
+		std::lock_guard<std::mutex> lock(err_mutex());
+		err_buf_.clear();
+	}
+	{
+		std::lock_guard<std::mutex> lock(out_mutex());
+		out_buf_ += text_;
+		out_buf_ += '\n';
+	}
+
+	stream_lock_ = std::unique_lock<std::mutex>(repl_stream_mutex());
+	saved_cout_buf_ = std::cout.rdbuf();
+	saved_cerr_buf_ = std::cerr.rdbuf();
+	out_tsb_ = std::make_unique<thread_routing_streambuf>(
+		saved_cout_buf_, out_buf_, out_mutex());
+	err_tsb_ = std::make_unique<thread_routing_streambuf>(
+		saved_cerr_buf_, err_buf_, err_mutex());
+	std::cout.rdbuf(out_tsb_.get());
+	std::cerr.rdbuf(err_tsb_.get());
+
+	ticker_running_.store(true, std::memory_order_relaxed);
+	ticker_ = std::thread([this] {
+		while (ticker_running_.load(std::memory_order_relaxed)) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+			if (ticker_running_.load(std::memory_order_relaxed) && screen_)
+				screen_->PostEvent(ftxui::Event::Custom);
+		}
+	});
+	worker_ = std::thread([this] {
+		out_tsb_->set_routed_thread(std::this_thread::get_id());
+		err_tsb_->set_routed_thread(std::this_thread::get_id());
+		result_ = evaluator_.eval(text_).value_or(0);
+		done_.store(true, std::memory_order_release);
+		if (screen_) screen_->PostEvent(ftxui::Event::Custom);
+	});
+}
+
+template <typename evaluator_t>
+void repl_eval_widget<evaluator_t>::handle_custom_event() {
+	if (!active()) return;
+	++spinner_frame_;
+	if (clear_requested_.exchange(false))
+		screen_->WithRestoredIO([] { term::clear(); })();
+	if (done_.load(std::memory_order_acquire)) finish();
+}
+
+template <typename evaluator_t>
+void repl_eval_widget<evaluator_t>::finish() {
+	ticker_running_.store(false, std::memory_order_relaxed);
+	if (ticker_.joinable()) ticker_.join();
+	if (worker_.joinable()) worker_.join();
+	drain_output(true);
+	std::cout.rdbuf(saved_cout_buf_);
+	std::cerr.rdbuf(saved_cerr_buf_);
+	saved_cout_buf_ = saved_cerr_buf_ = nullptr;
+	out_tsb_.reset();
+	err_tsb_.reset();
+	stream_lock_.unlock();
+	active_.store(false, std::memory_order_relaxed);
+	if (completion_)
+		completion_(result_, text_, cursor_, store_, allow_incomplete_);
+}
+
+template <typename evaluator_t>
+void repl_eval_widget<evaluator_t>::drain_output(bool flush_partial) {
+	auto cutoff = [&](const std::string& buffer) -> size_t {
+		if (flush_partial) return buffer.size();
+		size_t newline = buffer.rfind('\n');
+		return newline == std::string::npos ? 0 : newline + 1;
+	};
+	std::string out_ready;
+	std::string err_ready;
+	{
+		std::lock_guard<std::mutex> lock(out_mutex());
+		size_t count = cutoff(out_buf_);
+		out_ready = out_buf_.substr(0, count);
+		out_buf_.erase(0, count);
+	}
+	{
+		std::lock_guard<std::mutex> lock(err_mutex());
+		size_t count = cutoff(err_buf_);
+		err_ready = err_buf_.substr(0, count);
+		err_buf_.erase(0, count);
+	}
+	if (out_ready.empty() && err_ready.empty()) return;
+	if (flush_partial && !out_ready.empty() && out_ready.back() != '\n')
+		out_ready += '\n';
+	if (flush_partial && !err_ready.empty() && err_ready.back() != '\n')
+		err_ready += '\n';
+	screen_->WithRestoredIO([&] {
+		term::clear_line();
+		std::cout << out_ready;
+		std::cerr << err_ready;
+		std::cout.flush();
+		std::cerr.flush();
+	})();
+}
+
+template <typename evaluator_t>
+void repl_eval_widget<evaluator_t>::request_clear() {
+	if (!active()) return;
+	clear_requested_.store(true, std::memory_order_relaxed);
+	if (screen_) screen_->PostEvent(ftxui::Event::Custom);
+}
+
+template <typename evaluator_t>
+void repl_eval_widget<evaluator_t>::shutdown() {
+	if (!worker_.joinable() && !ticker_.joinable()) return;
+	ticker_running_.store(false, std::memory_order_relaxed);
+	if (ticker_.joinable()) ticker_.join();
+	if (worker_.joinable()) worker_.join();
+	drain_output(true);
+	if (saved_cout_buf_) std::cout.rdbuf(saved_cout_buf_);
+	if (saved_cerr_buf_) std::cerr.rdbuf(saved_cerr_buf_);
+	out_tsb_.reset();
+	err_tsb_.reset();
+	if (stream_lock_.owns_lock()) stream_lock_.unlock();
+	active_.store(false, std::memory_order_relaxed);
+	screen_ = nullptr;
+}
+
+template <typename evaluator_t>
+void repl_ftxui<evaluator_t>::apply_eval_result(int result,
+	const std::string& text, int cursor, bool store, bool allow_incomplete)
+{
+	if (result == 2 && allow_incomplete) {
+		input_text_ = text;
+		size_t cp = std::min(static_cast<size_t>(cursor), input_text_.size());
+		input_text_.insert(input_text_.begin() + cp, '\n');
+		cursor_pos_ = static_cast<int>(cp) + 1;
+	} else {
+		if (store) store_history(text);
+		clear_input();
+	}
+	if (result == 1) screen_->Exit();
+	else if (screen_) screen_->PostEvent(ftxui::Event::Custom);
+}
+
+template <typename evaluator_t>
 void repl_ftxui<evaluator_t>::set_prompt(const std::string& p) {
-	prompt_ = p;
+	{
+		std::lock_guard<std::mutex> lock(prompt_mutex());
+		prompt_ = p;
+	}
 	if (screen_) screen_->PostEvent(ftxui::Event::Custom); // request redraw
 }
 
 template <typename evaluator_t>
 void repl_ftxui<evaluator_t>::clear() {
 	if (!screen_) return;
-	screen_->WithRestoredIO([]{ term::clear(); })();
+	if (eval_widget_.active()) {
+		eval_widget_.request_clear();
+		return;
+	}
+	screen_->WithRestoredIO([] { term::clear(); })();
 }
 
 } // namespace idni

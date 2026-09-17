@@ -272,6 +272,10 @@ struct report {
 
 	std::string format_message(size_t node_idx) const;
 
+	/// Format a microsecond count with the diagnostics time scale
+	/// (µs / ms / s), matching how timed scopes are printed.
+	static std::string format_time(int64_t micros);
+
 	/// Single pre-order walk over the tree. Errors and warnings emit
 	/// flat at indent 0; info-band nodes (info, info_micros,
 	/// info_count, info_kb) emit tab-indented per tree depth. Each

@@ -111,6 +111,31 @@ foreach(X IN LISTS DOCTESTS)
 	# add_dependencies(${N} ${TAU_PARSER_STATIC_LIB_NAME})
 endforeach()
 
+# Asynchronous FTXUI evaluation integration test.
+if(TARGET tgf AND TAU_PARSER_HAS_FTXUI_DEP AND NOT WIN32)
+	find_package(Threads REQUIRED)
+	add_executable(repl_ftxui_async_fixture repl_ftxui_async_fixture.cpp)
+	tauparser_setup(repl_ftxui_async_fixture PRIVATE tauparser)
+	target_include_directories(repl_ftxui_async_fixture PRIVATE
+		"${PROJECT_SOURCE_DIR}/src")
+	target_link_libraries(repl_ftxui_async_fixture PRIVATE
+		ftxui::screen ftxui::dom ftxui::component Threads::Threads)
+	find_program(PYTHON3_EXECUTABLE python3)
+	if(PYTHON3_EXECUTABLE)
+		execute_process(
+			COMMAND "${PYTHON3_EXECUTABLE}" -c "import pexpect, pyte"
+			RESULT_VARIABLE _py_deps_missing)
+		if(NOT _py_deps_missing)
+			add_test(NAME repl_ftxui_async_test
+				COMMAND "${PYTHON3_EXECUTABLE}"
+					"${CMAKE_CURRENT_SOURCE_DIR}/repl/test_repl_ftxui_async.py"
+					$<TARGET_FILE:repl_ftxui_async_fixture>)
+			set_tests_properties(repl_ftxui_async_test
+				PROPERTIES TIMEOUT 300)
+		endif()
+	endif()
+endif()
+
 # Benchmark executable (not a test — run manually)
 add_executable(bench_enhancements bench_enhancements.cpp)
 tauparser_setup(bench_enhancements PRIVATE "")

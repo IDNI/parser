@@ -14,8 +14,9 @@ endif()
 # otherwise the REPL silently falls back to the legacy terminal REPL.
 include(ftxui)
 if(TAU_PARSER_HAS_FTXUI_DEP)
+	find_package(Threads REQUIRED)
 	target_link_libraries(tgf_cli_core PUBLIC
-		ftxui::screen ftxui::dom ftxui::component)
+		ftxui::screen ftxui::dom ftxui::component Threads::Threads)
 	target_compile_definitions(tgf_cli_core PUBLIC TAU_PARSER_HAS_FTXUI)
 	message(STATUS "tgf: FTXUI REPL enabled (legacy via -X)")
 elseif(NOT TAU_PARSER_DONT_USE_FTXUI)

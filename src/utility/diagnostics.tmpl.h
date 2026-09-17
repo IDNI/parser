@@ -665,6 +665,10 @@ inline std::string report::format_value(int64_t v, code c) {
 	return p.num + ' ' + p.unit;
 }
 
+inline std::string report::format_time(int64_t micros) {
+	return format_value(micros, code::info_micros);
+}
+
 inline report::value_columns report::value_column_widths() const {
 	constexpr size_t min_value_field_width = 6;
 	value_columns cols{ min_value_field_width, 0 };
