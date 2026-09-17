@@ -836,12 +836,11 @@ tref lcrs_tree<T>::remove_child(tref n, int_t pos) {
 
 template <typename T>
 tref lcrs_tree<T>::trim_right_sibling(tref n) {
-	return get(n).trim_right_sibling();
-}
-
-template <typename T>
-tref lcrs_tree<T>::trim_right_sibling() const {
-	return bintree<T>::get(this->value, this->l, nullptr);
+	const lcrs_tree<T>& t = get(n);
+	// A node with no right sibling is already its own trimmed form, and
+	// interning would only find it again under the intern map's lock.
+	if (t.r == nullptr) return n;
+	return bintree<T>::get(t.value, t.l, nullptr);
 }
 
 template <typename T>
