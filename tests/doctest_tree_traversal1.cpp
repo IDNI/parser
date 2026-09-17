@@ -26,6 +26,20 @@ static auto tr_a_z = [](tref nd) -> tref {
 	return nd;
 };
 
+// `up` for the diamond tests: maps 'd' -> 'D' and 'D' -> 'X', counting the
+// 'd' calls, so that a second call on a memoised result shows as 'X'
+static auto d_to_D_counting(int& calls) {
+	return [&calls](tref nd) -> tref {
+		auto x = chtree::get(nd);
+		if (x.value == 'd') {
+			++calls;
+			return bintree<char>::get('D', x.l, x.r);
+		}
+		if (x.value == 'D') return bintree<char>::get('X', x.l, x.r);
+		return nd;
+	};
+}
+
 // ============================================================================
 // post_order — apply_unique
 // ============================================================================
@@ -244,6 +258,37 @@ TEST_SUITE("pre_order::apply_unique") {
 		// 'e' is the leaf child of 'shared'; due to caching, 'e' should be
 		// visited only once even though 'shared' appears under both 'b' and 'c'
 		CHECK( e_calls == 1 );
+	}
+
+	TEST_CASE("diamond DAG: up runs at every occurrence of a shared node") {
+		tref shared = n('d', {n('e')});
+		tref root = n('a', {n('b', {shared}), n('c', {shared})});
+		int d_calls = 0;
+		auto up = d_to_D_counting(d_calls);
+		auto result = pre_order<char>(root).apply_unique(id, all, up);
+		auto& t = chtree::get(result);
+		CHECK( t.first_tree().first_tree().value == 'D' );
+		CHECK( t.second_tree().first_tree().value == 'D' );
+		CHECK( d_calls == 2 );
+	}
+}
+
+// ============================================================================
+// pre_order — apply_unique_pure
+// ============================================================================
+
+TEST_SUITE("pre_order::apply_unique_pure") {
+
+	TEST_CASE("diamond DAG: up runs once for a shared node") {
+		tref shared = n('d', {n('e')});
+		tref root = n('a', {n('b', {shared}), n('c', {shared})});
+		int d_calls = 0;
+		auto up = d_to_D_counting(d_calls);
+		auto result = pre_order<char>(root).apply_unique_pure(id, all, up);
+		auto& t = chtree::get(result);
+		CHECK( t.first_tree().first_tree().value == 'D' );
+		CHECK( t.second_tree().first_tree().value == 'D' );
+		CHECK( d_calls == 1 );
 	}
 }
 

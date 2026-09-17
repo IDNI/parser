@@ -996,7 +996,8 @@ struct post_order {
 
 	/**
 	 * @brief Apply f in post order to root according to visit_subtree.
-	 * If f is applied to a node, its children are already transformed by f
+	 * If f is applied to a node, its children are already transformed by f.
+	 * f and visit_subtree cannot share information: a subtree the memo already holds is not entered again and f is not called on it, while visit_subtree is called at every occurrence
 	 * @tparam slot Memory slot to use for memorization, disabled by default
 	 * @param f Function to apply on each node. Must not have side effects due to memorization
 	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
@@ -1136,11 +1137,12 @@ struct pre_order {
 
 	/**
 	 * @brief Apply f in pre order to root according to visit_subtree.
-	 * If f is applied to a node, the traversal will continue with the children of the transformed node
+	 * If f is applied to a node, the traversal will continue with the children of the transformed node.
+	 * up is called on every node f was applied to, also on a node whose subtree the memo already holds and is not entered again
 	 * @tparam slot Memory slot to use for memorization, disabled by default
-	 * @param f Function to apply on each node. Must not have side effects due to memorization
+	 * @param f Function to apply on each node. Its result must depend on the node alone, due to memorization
 	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
-	 * @param up Function to apply to processed node in post order
+	 * @param up Function to apply to processed node in post order. Its result must depend on the node alone, due to memorization
 	 * @return The tree obtained after applying f to root
 	 */
 	template<size_t slot = 0>
@@ -1166,6 +1168,18 @@ struct pre_order {
 	 */
 	template<size_t slot = 0>
 	tref apply_unique(auto& f);
+
+	/**
+	 * @brief Like apply_unique, for an f and an up that cannot share information.
+	 * A subtree the memo already holds is not entered again and up is not called on it: the memo stores the result of up
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node. Must not have side effects due to memorization
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param up Function to apply to processed node in post order. Must not have side effects due to memorization
+	 * @return The tree obtained after applying f to root
+	 */
+	template<size_t slot = 0>
+	tref apply_unique_pure(auto& f, auto& visit_subtree, auto& up);
 
 	/**
 	 * @brief Apply f in pre order to root according to visit_subtree.
@@ -1299,7 +1313,10 @@ private:
 			size_t>>;
 	inline static cache_t& m = bintree<node>::template create_cache<cache_t>();
 
-	template<bool break_on_change, size_t slot, bool unique>
+	// `pure` says what a unique traversal's memo stores: the result of
+	// `up`, so that a memo hit skips `up`, or the node `up` was given, so
+	// that `up` runs on every hit
+	template<bool break_on_change, size_t slot, bool unique, bool pure>
 	tref traverse(tref n, auto& f, auto& visit_subtree, auto& up);
 
 	template<bool search, bool unique>
