@@ -69,6 +69,13 @@ using id_t = idni::int_t;
 	X(name,               "name") \
 	X(loc,                "loc") \
 	X(value,              "value") \
+	X(exit_code,          "exit code") \
+	X(timeout,            "timeout") \
+	X(limit,              "limit") \
+	X(expected,           "expected") \
+	X(actual,             "actual") \
+	X(time_point,         "time point") \
+	X(width,              "width") \
 	PARSER_DIAG_COUNTERS(X) \
 	X(rss_before,         "rss before") \
 	X(rss_after,          "rss after") \
