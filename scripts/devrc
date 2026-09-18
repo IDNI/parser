@@ -211,6 +211,7 @@ build_run() {
 
 	echo "Configuring with ${GENERATOR} build system"
 	cmake .. -G "${GENERATOR}" -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+		-DTAU_BUILD_JOBS="${TAU_BUILD_JOBS}" \
 		"${DEV_CMAKE[@]}"
 
 	echo "Building with ${GENERATOR}"
