@@ -206,7 +206,7 @@ set(TAU_PARSER_DEFINITIONS
 	TAU_PARSER_MEASURE_COUNTERS)
 # LTO needs the flag on BOTH sides. A link-only -flto finds no IR in the
 # objects and does nothing, which is what this used to do.
-if(EMSCRIPTEN OR NOT TAU_PARSER_LTO)
+if(EMSCRIPTEN OR MINGW OR NOT TAU_PARSER_LTO)
 	set(TAU_PARSER_LINK_OPTIONS "")
 	set(TAU_PARSER_LTO_COMPILE_OPTIONS "")
 elseif(TAU_PARSER_IS_GNU_OR_CLANG)
