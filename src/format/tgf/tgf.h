@@ -225,8 +225,8 @@ private:
 				auto verbosity = po.error_verbosity;
 				res.error(code::parse_error,
 					r.parse_error.to_str(verbosity, line),
-					r.parse_error.loc,
-					{{ label::line, line + r.parse_error.line },
+					{{ label::loc,  r.parse_error.loc },
+					 { label::line, line + r.parse_error.line },
 					 { label::col,  r.parse_error.col }});
 				return 1;
 			}

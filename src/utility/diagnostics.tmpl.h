@@ -462,13 +462,10 @@ inline std::string report::format_message(size_t node_idx) const {
 		append_extra(std::string(str(a.key)) + '='
 			+ format_attr_value(a.key, a.value));
 	}
-	// parse_error nodes always carry a byte offset (loc=0 is the first
-	// byte of input, a common error site). Other errors store whatever
-	// the producer chose in `value`, so render that as a plain value=
-	// only when it is meaningfully non-zero.
-	if (n.tag == code::parse_error && n.key != none)
-		append_extra("loc=" + std::to_string(n.value));
-	else if (n.value != 0)
+	// A producer that knows where the error is attaches label::loc, and
+	// the attr loop above prints it. `value` holds whatever the producer
+	// chose, and zero carries no information.
+	if (n.value != 0)
 		append_extra("value=" + std::to_string(n.value));
 	if (!extras.empty()) out += " (" + extras + ')';
 	return out;

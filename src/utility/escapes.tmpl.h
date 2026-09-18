@@ -131,8 +131,8 @@ inline bool decode_core(std::string_view body, const profile& p, Sink& sink,
 	size_t len = body.size(), i = 0;
 
 	auto fail = [&](size_t pos, std::string_view ps) -> bool {
-		rep.error(code::parse_error, ps, pos,
-			  { { label::offset, static_cast<int_t>(pos) } });
+		rep.error(code::parse_error, ps,
+			  { { label::loc, static_cast<int_t>(pos) } });
 		return false;
 	};
 
