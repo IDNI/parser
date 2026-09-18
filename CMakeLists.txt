@@ -107,13 +107,21 @@ set_property(CACHE TAU_PARSER_LTO                   PROPERTY STRINGS "OFF" "ON")
 
 # build all
 if(TAU_PARSER_BUILD_ALL)
-	set(TAU_PARSER_BUILD_HEADER_ONLY OFF)
-	set(TAU_PARSER_BUILD_STATIC_LIBRARY ON)
-	set(TAU_PARSER_BUILD_SHARED_LIBRARY ON)
-	set(TAU_PARSER_BUILD_TESTS ON)
-	set(TAU_PARSER_BUILD_TGF ON)
-	set(TAU_PARSER_BUILD_EXAMPLES ON)
-	set(TAU_PARSER_BUILD_DOC ON)
+	# write the cache, so it reports what this configure actually built
+	set(TAU_PARSER_BUILD_HEADER_ONLY OFF
+		CACHE BOOL "Build header only library" FORCE)
+	set(TAU_PARSER_BUILD_STATIC_LIBRARY ON
+		CACHE BOOL "Build static library" FORCE)
+	set(TAU_PARSER_BUILD_SHARED_LIBRARY ON
+		CACHE BOOL "Build shared library" FORCE)
+	set(TAU_PARSER_BUILD_TESTS ON
+		CACHE BOOL "Build library tests" FORCE)
+	set(TAU_PARSER_BUILD_TGF ON
+		CACHE BOOL "Build tgf tool" FORCE)
+	set(TAU_PARSER_BUILD_EXAMPLES ON
+		CACHE BOOL "Build examples" FORCE)
+	set(TAU_PARSER_BUILD_DOC ON
+		CACHE BOOL "Build documentation" FORCE)
 endif()
 
 # TGF executable requires performance measures
