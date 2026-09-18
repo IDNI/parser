@@ -307,11 +307,11 @@ Records a memory reading in kilobytes (`code::info_kb`). Negative values trip a 
 ### void info(key msg, int64_t primary = 0, std::initializer_list<attr> extra = {});
 ### void info(std::string_view msg, int64_t primary = 0, std::initializer_list<attr> extra = {});
 
-Push a diagnostic message. For errors, `c` must satisfy `is_error(c)` (top two bits `00`, range `0x0000`–`0x3FFF`). `primary` is a context-dependent integer (a location, a count, etc.); `format_message` renders it as `loc=N` for errors with a non-empty message (including `loc=0`) and as `value=N` otherwise when nonzero. `extra` is an optional list of `attr{key, value}` pairs.
+Push a diagnostic message. For errors, `c` must satisfy `is_error(c)` (top two bits `00`, range `0x0000`–`0x3FFF`). `primary` sets the value field of the node. `format_message` renders that field as `value=N` only when it is nonzero. A producer that knows a location attaches it as a `label::loc` attribute in `extra` instead of passing it as `primary`. That attribute then renders like any other, as `loc=N`, through `format_message`. `extra` is an optional list of `attr{key, value}` pairs.
 
 ```
-r.error(code::parse_error, "unexpected token", offset,
-        {{r.intern("line"), line}, {r.intern("col"), col}});
+r.error(code::parse_error, "unexpected token",
+        {{label::loc, offset}, {label::line, line}, {label::col, col}});
 ```
 
 
@@ -327,7 +327,7 @@ Merges another report into this one under the current scope. Parent links and at
 
 ### std::string format_message(size_t node_idx) const;
 
-Formats a single message node as `"<text> (key=value ...)"` when attributes or `loc`/`value` are present — extras are grouped in parentheses after the message (no severity prefix). Returns empty if the node is not a message.
+Formats a single message node as `"<text> (key=value ...)"` when attributes are present, or when its `value` is nonzero. Extras group in parentheses after the message, with no severity prefix. Returns empty if the node is not a message.
 
 
 ### void print(const sinks& s) const;
@@ -449,6 +449,8 @@ struct attr { int_t key = 0; int64_t value = 0; };
 ```
 
 Key-value attribute carried alongside a message node. `key` is an interned name in the same table as scope/message names. `int_t` is the project-wide signed integer type defined in [`defs.h`](../src/defs.h).
+
+The `LABELS` macro in `parser_strings.h` declares a set of well-known labels for `key`: `loc`, `line`, `col`, `name`, and `value`. Seven more labels exist for common diagnostic shapes: `exit_code`, `timeout`, `limit`, `expected`, `actual`, `time_point`, and `width`. A caller may also intern an arbitrary string as a key.
 
 
 ## parser-specific helpers
