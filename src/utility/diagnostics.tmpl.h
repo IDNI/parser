@@ -809,20 +809,6 @@ result<T>::operator T() const
 }
 
 template <typename T>
-bool result<T>::operator==(std::nullptr_t) const
-	requires std::is_pointer_v<T>
-{
-	return !value_.has_value();
-}
-
-template <typename T>
-bool result<T>::operator!=(std::nullptr_t) const
-	requires std::is_pointer_v<T>
-{
-	return value_.has_value();
-}
-
-template <typename T>
 T& result<T>::value() & {
 	return value_.value();
 }
@@ -841,13 +827,6 @@ template <typename T>
 T& result<T>::emplace(T&& v) {
 	DBG(assert(!diag_rep_.has_error()
 		&& "emplace on errored result silently drops the value");)
-	if constexpr (std::is_pointer_v<T>) {
-		if (v == nullptr) {
-			error(code::invalid_argument, "null pointer value");
-			static T null_value{};
-			return null_value;
-		}
-	}
 	value_.emplace(std::move(v));
 	this->enforce_error_no_value_invariant();
 	return value();
@@ -858,14 +837,6 @@ template <typename... Args>
 T& result<T>::emplace(Args&&... args) {
 	DBG(assert(!diag_rep_.has_error()
 		&& "emplace on errored result silently drops the value");)
-	if constexpr (std::is_pointer_v<T> && sizeof...(Args) == 1) {
-		auto&& only_arg = (args, ...);
-		if (only_arg == nullptr) {
-			error(code::invalid_argument, "null pointer value");
-			static T null_value{};
-			return null_value;
-		}
-	}
 	value_.emplace(std::forward<Args>(args)...);
 	this->enforce_error_no_value_invariant();
 	return value();
@@ -874,12 +845,6 @@ T& result<T>::emplace(Args&&... args) {
 template <typename T>
 template <typename U>
 result<T>& result<T>::operator=(U&& v) {
-	if constexpr (std::is_pointer_v<T>) {
-		if (v == nullptr) {
-			error(code::invalid_argument, "null pointer value");
-			return *this;
-		}
-	}
 	DBG(assert(!diag_rep_.has_error()
 		&& "assigning to an errored result silently drops the value");)
 	value_.emplace(std::forward<U>(v));

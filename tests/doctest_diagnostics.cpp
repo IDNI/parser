@@ -4,9 +4,9 @@
 // Unit tests for the diagnostics facility (namespace idni::diagnostics).
 //
 // Focused on the ergonomics surface: closing a scope_guard early, the
-// measure() sugar, null-pointer rejection on result<T*>, forward_as<T> for
-// a type result<T>(T) cannot construct, take_or_error(), and the
-// expected-style chain: and_then(), transform(), or_else(), value_or().
+// measure() sugar, a null pointer as a legitimate value in result<T*>,
+// forward_as<T> for a type result<T>(T) cannot construct, take_or_error(),
+// and the expected-style chain: and_then(), transform(), or_else(), value_or().
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
@@ -72,20 +72,21 @@ TEST_SUITE("diagnostics: measure()") {
 	}
 }
 
-TEST_SUITE("diagnostics: null pointer rejection") {
+TEST_SUITE("diagnostics: null pointer is a value") {
 
-	TEST_CASE("operator= with a null pointer records an error, not a value") {
+	TEST_CASE("operator= with a null pointer stores it as a value") {
 		result<int*> r;
 		r = static_cast<int*>(nullptr);
-		CHECK_FALSE(r.has_value());
-		CHECK(r.has_error());
+		CHECK(r.has_value());
+		CHECK_FALSE(r.has_error());
+		CHECK(static_cast<int*>(r) == nullptr);
 	}
 
-	TEST_CASE("emplace with a null pointer records an error, not a value") {
+	TEST_CASE("emplace with a null pointer stores it as a value") {
 		result<int*> r;
 		r.emplace(static_cast<int*>(nullptr));
-		CHECK_FALSE(r.has_value());
-		CHECK(r.has_error());
+		CHECK(r.has_value());
+		CHECK_FALSE(r.has_error());
 	}
 
 	TEST_CASE("operator= with a non-null pointer still succeeds") {
@@ -94,6 +95,14 @@ TEST_SUITE("diagnostics: null pointer rejection") {
 		r = &x;
 		CHECK(r.has_value());
 		CHECK_FALSE(r.has_error());
+	}
+
+	TEST_CASE("has_value() is true for a held null pointer, unlike a value-less result") {
+		result<int*> with_null;
+		with_null = static_cast<int*>(nullptr);
+		result<int*> without_value;
+		CHECK(with_null.has_value());
+		CHECK_FALSE(without_value.has_value());
 	}
 }
 

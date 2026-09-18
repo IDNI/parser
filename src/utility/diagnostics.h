@@ -406,12 +406,10 @@ struct result {
 
 	explicit operator bool() const;
 
+	/// The held pointer, or nullptr when there is no value. A null pointer
+	/// is a legitimate value, so this conversion cannot tell "holds null"
+	/// from "has no value" apart; call has_value() when that matters.
 	explicit operator T() const
-		requires std::is_pointer_v<T>;
-
-	bool operator==(std::nullptr_t) const
-		requires std::is_pointer_v<T>;
-	bool operator!=(std::nullptr_t) const
 		requires std::is_pointer_v<T>;
 
 	T&	 value() &;

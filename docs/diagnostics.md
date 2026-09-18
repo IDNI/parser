@@ -89,10 +89,10 @@ scope; `return result<T>(std::move(x))` when the report is empty.
 
 
 ### operator T() const requires std::is_pointer_v\<T\>;
-### bool operator==(std::nullptr_t) const requires std::is_pointer_v\<T\>;
-### bool operator!=(std::nullptr_t) const requires std::is_pointer_v\<T\>;
 
-For pointer-valued results, an implicit conversion to `T` returns the held pointer (or `nullptr` if no value) and `== nullptr` / `!= nullptr` check presence directly. Lets `result<Forest*>` be used wherever `Forest*` is.
+A null pointer is a legitimate value for `result<T>`. The container does not treat a null pointer as an error. A producer that treats null as an error must report that error itself.
+
+For pointer-valued results, an explicit conversion to `T` returns the held pointer, or `nullptr` when the result has no value. This conversion cannot tell a held null pointer from an absent value. Call `has_value()` to check for a value. Compare the value itself to `nullptr` when that comparison matters. A `result<Forest*>` still acts like a `Forest*` wherever code uses a `Forest*`.
 
 
 ### report& report() &;
