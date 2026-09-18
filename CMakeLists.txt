@@ -364,7 +364,7 @@ else()
 	add_subdirectory("src")
 endif()
 
-if(TAU_PARSER_BUILD_TGF)
+if(TAU_PARSER_BUILD_TGF AND NOT TAU_PARSER_BUILD_EMSCRIPTEN)
 	add_subdirectory(src/tgf)
 endif()
 
