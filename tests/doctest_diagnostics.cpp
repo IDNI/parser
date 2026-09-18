@@ -219,13 +219,14 @@ TEST_SUITE("diagnostics: transform") {
 		CHECK(r2.has_error());
 	}
 
-	TEST_CASE("a null pointer result is rejected like emplace rejects one") {
+	TEST_CASE("a null pointer from f is stored as a value, not an error") {
 		result<int> r;
 		r = 5;
 		auto r2 = std::move(r).transform(
 			[](int) -> int* { return nullptr; });
-		CHECK_FALSE(r2.has_value());
-		CHECK(r2.has_error());
+		CHECK(r2.has_value());
+		CHECK_FALSE(r2.has_error());
+		CHECK(static_cast<int*>(r2) == nullptr);
 	}
 }
 
