@@ -228,8 +228,12 @@ inline attr report::resolve(const attr_in& a) {
 	r.key = a.key;
 	// The label decides whether the value is text, not text.data().
 	DBG(assert(bool(a.text.data()) == idni::parser_strings::is_text_label(a.key));)
+	// A release build has no DBG assert, so a wrong call site (a number
+	// under a text label) must still name itself in the rendered output
+	// instead of printing an empty string.
 	r.value = idni::parser_strings::is_text_label(a.key)
-		? intern_dynamic(a.text) : a.num;
+		? intern_dynamic(a.text.data() ? a.text : "<missing text>")
+		: a.num;
 	return r;
 }
 

@@ -140,8 +140,13 @@ struct attr_in {
 	int64_t          num = 0;
 	std::string_view text;
 
+	/// @p k must not be a text label (idni::parser_strings::is_text_label) —
+	/// a text label needs the text.
 	attr_in(int_t k, int_t v) : key(k), num(v) {}
+	/// @p k must not be a text label (idni::parser_strings::is_text_label) —
+	/// a text label needs the text.
 	attr_in(int_t k, size_t v) : key(k), num(saturating_i64(v)) {}
+	/// The report interns @p v when it records the node.
 	attr_in(int_t k, std::string_view v) : key(k), text(v) {}
 	attr_in(const attr& a) : key(a.key), num(a.value) {}
 };

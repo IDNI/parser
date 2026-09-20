@@ -662,13 +662,15 @@ TEST_SUITE("diagnostics: append() remaps a text attribute's value") {
 
 TEST_SUITE("diagnostics: resolve() lets the label decide, not text.data()") {
 
-	TEST_CASE("a number under a text label renders as empty text, "
+	TEST_CASE("a number under a text label renders the missing-text marker, "
 		"not a mismatched label name") {
 		using label = idni::parser_strings::label;
 		report r;
 		r.error(code::io_error, "failed", {{label::path, label::root}});
 
 		CHECK(r.format_message(0).find("root") == std::string::npos);
+		CHECK(r.format_message(0).find("<missing text>")
+			!= std::string::npos);
 	}
 
 	TEST_CASE("a string under a numeric label renders as 0, "
@@ -679,5 +681,15 @@ TEST_SUITE("diagnostics: resolve() lets the label decide, not text.data()") {
 			{{label::exit_code, std::string_view("stray-text")}});
 
 		CHECK(r.format_message(0).find("exit code=0") != std::string::npos);
+	}
+
+	TEST_CASE("a pre-interned key under label::name renders the "
+		"missing-text marker, in a release build with no DBG assert") {
+		using label = idni::parser_strings::label;
+		report r;
+		r.error(code::io_error, "failed", {{label::name, label::root}});
+
+		CHECK(r.format_message(0).find("<missing text>")
+			!= std::string::npos);
 	}
 }
