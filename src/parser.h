@@ -680,6 +680,7 @@ public:
 	using node_type       = std::pair<symbol_type, location_type>;
 	using parser_type     = idni::parser<char_type, terminal_type>;
 	using label           = idni::parser_strings::label;
+	using messages        = idni::parser_strings::messages;
 
 	using pnode = pnode_type<C, T>;
 	struct tree : public lcrs_tree<pnode> {
@@ -964,8 +965,8 @@ public:
 		/// Preprocessing scope
 		bool measure_preprocess = false;
 		/// Enables `if (po.debug)` diagnostic print paths inside the
-		/// build_bintree / init_forest helpers (e.g. "preprocess size: N",
-		/// "sorted sizes : ..."). Independent from the DBG()/DBGP() macros,
+		/// build_bintree / init_forest helpers (e.g. the preprocess info
+		/// node size attribute). Independent from the DBG()/DBGP() macros,
 		/// which are compile-time gated.
 		bool debug = false;
 		/// Verbosity used when recording a parse error into the diagnostics

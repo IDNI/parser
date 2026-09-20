@@ -1465,7 +1465,8 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 
 	// preprocess parser items for faster retrieval
 	int preprocess_count = do_preprocess();
-	if (po.debug) report_.info("preprocess size", preprocess_count);
+	if (po.debug) report_.info(messages::preprocess,
+		{{label::size, preprocess_count}});
 
 	auto check_allowed = [this](const pnode& n) {
 		if (!g.opt.auto_disambiguate) return false;
@@ -1624,9 +1625,9 @@ bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
 	// preprocess parser items for faster retrieval
 	int preprocess_count = do_preprocess();
 	if (po.debug) {
-		report_.info("preprocess size", preprocess_count);
-		report_.info("sorted_citem size", sorted_citem.size());
-		report_.info("rsorted_citem size", rsorted_citem.size());
+		report_.info(messages::preprocess, {{label::size, preprocess_count}});
+		report_.info("sorted_citem", {{label::size, sorted_citem.size()}});
+		report_.info("rsorted_citem", {{label::size, rsorted_citem.size()}});
 	}
 
 	ret = report_.step(po.measure_scopes && po.measure_forest,
