@@ -890,7 +890,7 @@ public:
 		/// end of a stream
 		int_type e = std::char_traits<C>::eof();
 		decoder_type decoder = 0;
-		memory_map mm{};
+		fs::memory_map mm{};
 		/// input position
 		size_t n = 0;
 		/// size of input data (0 for streams)

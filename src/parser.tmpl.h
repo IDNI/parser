@@ -66,32 +66,24 @@ parser<C, T>::input::input(const std::string& filename, size_t max_l,
 	idni::diagnostics::report* diag) : itype(MMAP), e(eof),
 	decoder(decoder),
 #ifdef _WIN32
-	mm(idni::utf8_to_wide(filename), 0, MMAP_READ),
+	mm(fs::to_path(filename), 0, fs::MMAP_READ),
 #else
-	mm(filename, 0, MMAP_READ),
+	mm(filename, 0, fs::MMAP_READ),
 #endif
 	l(mm.size()),
 	max_l(max_l), d(reinterpret_cast<const C*>(mm.data()))
 {
-	if (mm.error) {
-		if (diag) diag->error(idni::diagnostics::code::io_error,
-			mm.error_message);
-		else std::cerr << mm.error_message << std::endl;
-	}
+	if (mm.has_error() && diag) diag->append(mm.report());
 }
 #ifdef _WIN32
 template <typename C, typename T>
 parser<C, T>::input::input(const std::wstring& filename, size_t max_l,
 	decoder_type decoder, int_type eof,
 	idni::diagnostics::report* diag) : itype(MMAP), e(eof),
-	decoder(decoder), mm(filename, 0, MMAP_READ), l(mm.size()),
+	decoder(decoder), mm(filename, 0, fs::MMAP_READ), l(mm.size()),
 	max_l(max_l), d(reinterpret_cast<const C*>(mm.data()))
 {
-	if (mm.error) {
-		if (diag) diag->error(idni::diagnostics::code::io_error,
-			mm.error_message);
-		else std::cerr << mm.error_message << std::endl;
-	}
+	if (mm.has_error() && diag) diag->append(mm.report());
 }
 #else
 template <typename C, typename T>
@@ -117,7 +109,7 @@ parser<C, T>::input::~input() {
 template <typename C, typename T>
 bool parser<C, T>::input::good() const {
 	return    itype == STREAM ? sgood
-		: itype == MMAP   ? !mm.error
+		: itype == MMAP   ? !mm.has_error()
 		:                   true;
 }
 
