@@ -218,7 +218,8 @@ on the way to success:
 
 ```cpp
 result<Forest> build_forest(result<Grammar>&& g) {
-    if (!g) return forward_as<Forest>(std::move(g), Forest{});
+    if (!g.has_value())
+        return forward_as<Forest>(std::move(g), Forest{});
     Forest f = make_forest(g.value());
     return forward_as<Forest>(std::move(g), std::move(f));
 }
