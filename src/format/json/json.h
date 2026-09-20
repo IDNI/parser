@@ -20,6 +20,7 @@
 
 #include "../../utility/escapes.h"
 #include "../../utility/diagnostics.h"
+#include "../../parser_strings.h"
 #include "json_parser.generated.h"
 
 namespace idni::format::json {
@@ -106,6 +107,7 @@ private:
 
 using code   = idni::diagnostics::code;
 using result = idni::diagnostics::result<value>;
+using label  = idni::parser_strings::label;
 
 namespace detail {
 
@@ -149,7 +151,8 @@ inline value build(const trv& t, result& R) {
 		std::string s = v | trv::terminals;
 		double d = 0;
 		if (!parse_number(s, d)) {
-			R.error(code::parse_error, "invalid JSON number: " + s);
+			R.error(code::parse_error, "Invalid JSON number",
+				{{label::value, s}});
 			return {};
 		}
 		return value::number(d);

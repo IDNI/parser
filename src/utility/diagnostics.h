@@ -116,6 +116,7 @@ struct sinks {
 };
 
 int64_t checked_i64(size_t v);
+int64_t saturating_i64(size_t v);
 
 struct attr {
 	int_t   key   = 0;
@@ -123,7 +124,26 @@ struct attr {
 
 	attr() = default;
 	attr(int_t key, int_t value) : key(key), value(value) {}
-	attr(int_t key, size_t value) : key(key), value(checked_i64(value)) {}
+	attr(int_t key, size_t value) : key(key), value(saturating_i64(value)) {}
+};
+
+/// An attribute as written at a call site. The report interns a text
+/// value when it records the node, so a caller never interns one by hand.
+/// resolve() tells text from a number by the label alone
+/// (idni::parser_strings::is_text_label(key)), not by text.data() !=
+/// nullptr, so a default-constructed string_view records the number 0
+/// under a label that is not a text label. A text value therefore
+/// requires a static text label: a runtime-interned label key is
+/// negative and is_text_label answers false for it.
+struct attr_in {
+	int_t            key;
+	int64_t          num = 0;
+	std::string_view text;
+
+	attr_in(int_t k, int_t v) : key(k), num(v) {}
+	attr_in(int_t k, size_t v) : key(k), num(saturating_i64(v)) {}
+	attr_in(int_t k, std::string_view v) : key(k), text(v) {}
+	attr_in(const attr& a) : key(a.key), num(a.value) {}
 };
 
 struct node {
@@ -226,38 +246,38 @@ struct report {
 	void kb(std::string_view name, size_t kilobytes);
 
 	void error(code c, key msg, int_t primary = 0,
-		   std::initializer_list<attr> extra = {});
+		   std::initializer_list<attr_in> extra = {});
 	void error(code c, key msg, size_t primary,
-		   std::initializer_list<attr> extra = {});
+		   std::initializer_list<attr_in> extra = {});
 	void error(code c, std::string_view msg, int_t primary = 0,
-		   std::initializer_list<attr> extra = {});
+		   std::initializer_list<attr_in> extra = {});
 	void error(code c, std::string_view msg, size_t primary,
-		   std::initializer_list<attr> extra = {});
-	void error(code c, key msg, std::initializer_list<attr> extra);
+		   std::initializer_list<attr_in> extra = {});
+	void error(code c, key msg, std::initializer_list<attr_in> extra);
 	void error(code c, std::string_view msg,
-		   std::initializer_list<attr> extra);
+		   std::initializer_list<attr_in> extra);
 
 	void warning(key msg, int_t primary = 0,
-		     std::initializer_list<attr> extra = {});
+		     std::initializer_list<attr_in> extra = {});
 	void warning(key msg, size_t primary,
-		     std::initializer_list<attr> extra = {});
+		     std::initializer_list<attr_in> extra = {});
 	void warning(std::string_view msg, int_t primary = 0,
-		     std::initializer_list<attr> extra = {});
+		     std::initializer_list<attr_in> extra = {});
 	void warning(std::string_view msg, size_t primary,
-		     std::initializer_list<attr> extra = {});
-	void warning(key msg, std::initializer_list<attr> extra);
-	void warning(std::string_view msg, std::initializer_list<attr> extra);
+		     std::initializer_list<attr_in> extra = {});
+	void warning(key msg, std::initializer_list<attr_in> extra);
+	void warning(std::string_view msg, std::initializer_list<attr_in> extra);
 
 	void info(key msg, int_t primary = 0,
-		  std::initializer_list<attr> extra = {});
+		  std::initializer_list<attr_in> extra = {});
 	void info(key msg, size_t primary,
-		  std::initializer_list<attr> extra = {});
+		  std::initializer_list<attr_in> extra = {});
 	void info(std::string_view msg, int_t primary = 0,
-		  std::initializer_list<attr> extra = {});
+		  std::initializer_list<attr_in> extra = {});
 	void info(std::string_view msg, size_t primary,
-		  std::initializer_list<attr> extra = {});
-	void info(key msg, std::initializer_list<attr> extra);
-	void info(std::string_view msg, std::initializer_list<attr> extra);
+		  std::initializer_list<attr_in> extra = {});
+	void info(key msg, std::initializer_list<attr_in> extra);
+	void info(std::string_view msg, std::initializer_list<attr_in> extra);
 
 	void append(const report& other);
 	void append(report&& other);
@@ -321,7 +341,11 @@ private:
 	void pop_scope(int32_t idx);
 
 	int32_t push_tagged(code tag, key name, int64_t v,
-		std::initializer_list<attr> extra = {});
+		std::initializer_list<attr_in> extra = {});
+
+	// Interns a text attribute at the point it is recorded, so a caller
+	// never interns one by hand.
+	attr resolve(const attr_in& a);
 
 	// Shared body for append(const&) and append(&&). The rvalue overload
 	// passes an rvalue reference so this template can move dynamic
@@ -350,9 +374,9 @@ private:
 	// µs/ms/s and memory (stored as KB) to kb/mb/gb/tb.
 	static std::string format_value(int64_t v, code c);
 
-	// Render an attribute's value for display. Most attributes carry a
-	// numeric value; string-valued ones (e.g. `name`) store an interned
-	// key, which is resolved back to its string via str().
+	// Render an attribute's value for display. A negative value is an
+	// interned string key resolved back to text via str(); a non-negative
+	// value prints as a plain number.
 	std::string format_attr_value(key k, int64_t v) const;
 
 	struct value_columns {
@@ -404,14 +428,6 @@ struct result {
 
 	[[nodiscard]] bool has_value() const;
 
-	explicit operator bool() const;
-
-	/// The held pointer, or nullptr when there is no value. A null pointer
-	/// is a legitimate value, so this conversion cannot tell "holds null"
-	/// from "has no value" apart; call has_value() when that matters.
-	explicit operator T() const
-		requires std::is_pointer_v<T>;
-
 	T&	 value() &;
 	const T& value() const&;
 	T&&	 value() &&;
@@ -460,46 +476,46 @@ struct result {
 	/// NOTE: an error on a result that already holds a value will discard
 	/// that value (see @ref enforce_error_no_value_invariant).
 	void error(code c, std::string_view msg, int_t primary = 0,
-		   std::initializer_list<attr> extra = {});
+		   std::initializer_list<attr_in> extra = {});
 	void error(code c, std::string_view msg, size_t primary,
-		   std::initializer_list<attr> extra = {});
+		   std::initializer_list<attr_in> extra = {});
 	void error(code c, std::string_view msg,
-		   std::initializer_list<attr> extra);
+		   std::initializer_list<attr_in> extra);
 
 	/// @ref error, and it returns the result, so a caller returns in one
 	/// statement. It discards a held value the same way, and the rvalue
 	/// return admits no further call.
 	[[nodiscard]] result&& with_error(code c, std::string_view msg, int_t primary = 0,
-		   std::initializer_list<attr> extra = {});
+		   std::initializer_list<attr_in> extra = {});
 	[[nodiscard]] result&& with_error(code c, std::string_view msg, size_t primary,
-		   std::initializer_list<attr> extra = {});
+		   std::initializer_list<attr_in> extra = {});
 	[[nodiscard]] result&& with_error(code c, std::string_view msg,
-		   std::initializer_list<attr> extra);
+		   std::initializer_list<attr_in> extra);
 
 	/// @ref with_error using @ref code_name(@p c) as the message.
 	[[nodiscard]] result&& with_error(code c);
 
 	/// @ref with_error, plus a DBG assertion of @ref is_well_formed.
 	[[nodiscard]] result&& with_assert_check_error(code c, std::string_view msg, int_t primary = 0,
-		   std::initializer_list<attr> extra = {});
+		   std::initializer_list<attr_in> extra = {});
 	[[nodiscard]] result&& with_assert_check_error(code c, std::string_view msg, size_t primary,
-		   std::initializer_list<attr> extra = {});
+		   std::initializer_list<attr_in> extra = {});
 	[[nodiscard]] result&& with_assert_check_error(code c, std::string_view msg,
-		   std::initializer_list<attr> extra);
+		   std::initializer_list<attr_in> extra);
 
 	/// @ref with_assert_check_error using @ref code_name(@p c) as the message.
 	[[nodiscard]] result&& with_assert_check_error(code c);
 
 	void warning(std::string_view msg, int_t primary = 0,
-		     std::initializer_list<attr> extra = {});
+		     std::initializer_list<attr_in> extra = {});
 	void warning(std::string_view msg, size_t primary,
-		     std::initializer_list<attr> extra = {});
-	void warning(std::string_view msg, std::initializer_list<attr> extra);
+		     std::initializer_list<attr_in> extra = {});
+	void warning(std::string_view msg, std::initializer_list<attr_in> extra);
 	void info(std::string_view msg, int_t primary = 0,
-		  std::initializer_list<attr> extra = {});
+		  std::initializer_list<attr_in> extra = {});
 	void info(std::string_view msg, size_t primary,
-		  std::initializer_list<attr> extra = {});
-	void info(std::string_view msg, std::initializer_list<attr> extra);
+		  std::initializer_list<attr_in> extra = {});
+	void info(std::string_view msg, std::initializer_list<attr_in> extra);
 
 	[[nodiscard]] bool has_error() const;
 
@@ -577,6 +593,12 @@ struct result {
 	[[nodiscard]] std::optional<U> take_or_error(result<U>&& child,
 		code c, std::string_view msg);
 
+	/// @ref take_or_error, with @p extra attrs attached to the synthesized
+	/// error.
+	template <typename U>
+	[[nodiscard]] std::optional<U> take_or_error(result<U>&& child,
+		code c, std::string_view msg, std::initializer_list<attr_in> extra);
+
 	/// Chain a fallible step. On value, calls @p f with the moved value and
 	/// returns its @ref result<U>, this result's report merged in before
 	/// the child's so message order stays this-then-child. On error,
@@ -587,7 +609,7 @@ struct result {
 
 	/// Chain an infallible transform. On value, wraps @c f(value) in a
 	/// @ref result<U> together with the moved report; a null pointer @c U
-	/// is rejected the same way @ref emplace rejects one. On error,
+	/// remains a legitimate value. On error,
 	/// @p f is not called; returns a @ref result<U> carrying the moved
 	/// report. F: T -> U.
 	template <typename F>
@@ -627,10 +649,10 @@ template <typename T>
 
 template <typename T>
 [[nodiscard]] result<T> error(code c, std::string_view msg, int_t primary = 0,
-			      std::initializer_list<attr> extra = {});
+			      std::initializer_list<attr_in> extra = {});
 template <typename T>
 [[nodiscard]] result<T> error(code c, std::string_view msg, size_t primary,
-			      std::initializer_list<attr> extra = {});
+			      std::initializer_list<attr_in> extra = {});
 
 /// Forward @p src's diagnostic report into a new @ref result<T> whose value
 /// is @p value on success, absent on failure. The value/error invariant

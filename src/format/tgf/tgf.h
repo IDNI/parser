@@ -79,8 +79,8 @@ struct tgf {
 		if (!ifs) {
 			result R;
 			R.report().reset(label::grammar_load);
-			R.error(code::io_error,
-				std::string(messages::cannot_open_file) + filename);
+			R.error(code::io_error, messages::cannot_open_file,
+				{{label::path, filename}});
 			return R;
 		}
 		return from_string(nts_,
@@ -154,8 +154,8 @@ struct tgf {
 		if (!ifs) {
 			result R;
 			R.report().reset(label::grammar_load);
-			R.error(code::io_error,
-				std::string(messages::cannot_open_file) + filename);
+			R.error(code::io_error, messages::cannot_open_file,
+				{{label::path, filename}});
 			return R;
 		}
 		return from_string_presplit(nts_, std::string(
@@ -210,8 +210,7 @@ private:
 				if (opt.dynamic.count(name)) continue;
 				diag->warning(
 					messages::unproductive_nonterminal,
-					{{ label::name,
-						diag->intern_dynamic(name) }});
+					{{ label::name, name }});
 			}
 		}
 		int parse(const char* s, size_t l, size_t line,
@@ -223,8 +222,8 @@ private:
 			auto r = p.parse(s, l, po);
 			if (!r.found) {
 				auto verbosity = po.error_verbosity;
-				res.error(code::parse_error,
-					r.parse_error.to_str(verbosity, line),
+				auto msg = r.parse_error.to_str(verbosity, line);
+				res.error(code::parse_error, msg,
 					{{ label::loc,  r.parse_error.loc },
 					 { label::line, line + r.parse_error.line },
 					 { label::col,  r.parse_error.col }});

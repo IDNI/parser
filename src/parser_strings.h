@@ -69,6 +69,9 @@ using id_t = idni::int_t;
 	X(name,               "name") \
 	X(loc,                "loc") \
 	X(value,              "value") \
+	X(type_name,          "type name") \
+	X(path,               "path") \
+	X(size,               "size") \
 	X(exit_code,          "exit code") \
 	X(timeout,            "timeout") \
 	X(limit,              "limit") \
@@ -92,6 +95,16 @@ using id_t = idni::int_t;
 	X(inline_paths,       "inline paths") \
 	X(trim_terminals,     "trim terminals") \
 	X(offset,             "offset")
+
+// The labels whose attr value holds interned text, not a number. A
+// separate list, so LABELS keeps its two-argument shape and every
+// existing X-macro user over it keeps compiling unchanged.
+#define TEXT_LABELS(X) \
+	X(name) \
+	X(value) \
+	X(type_name) \
+	X(path) \
+	X(expected)
 
 // Human-readable labels for idni::diagnostics::code values.
 // Sentence form: capital first word, trailing period.
@@ -128,6 +141,18 @@ struct label {
 #undef E
 		count };
 };
+
+// Whether the attr value for label k holds interned text (see
+// report::resolve). Decided by the label, not by the sign of the
+// value.
+constexpr bool is_text_label(id_t k) {
+	switch (k) {
+#define X(nm) case label::nm: return true;
+	TEXT_LABELS(X)
+#undef X
+	default: return false; // a dynamic label (negative key) carries a number
+	}
+}
 
 struct code_label {
 	enum : id_t { none = 0,
@@ -167,10 +192,11 @@ inline id_t label_of(std::string_view sv) {
 
 struct messages {
 	using sv = std::string_view;
-	static constexpr sv cannot_open_file            = "Cannot open file: ";
+	static constexpr sv cannot_open_file            = "Cannot open file";
 	static constexpr sv loading_grammars_unavailable =
 		"Loading grammars is not available in a specialized REPL";
-	static constexpr sv unproductive_nonterminal    = "Unproductive nonterminal: ";
+	static constexpr sv unproductive_nonterminal    = "Unproductive nonterminal";
+	static constexpr sv preprocess                  = "preprocess";
 	// escape decode errors
 	static constexpr sv escape_trailing         = "Trailing escape character.";
 	static constexpr sv escape_lone_delimiter   = "Lone delimiter not doubled.";

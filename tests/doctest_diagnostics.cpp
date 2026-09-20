@@ -79,7 +79,7 @@ TEST_SUITE("diagnostics: null pointer is a value") {
 		r = static_cast<int*>(nullptr);
 		CHECK(r.has_value());
 		CHECK_FALSE(r.has_error());
-		CHECK(static_cast<int*>(r) == nullptr);
+		CHECK(r.value() == nullptr);
 	}
 
 	TEST_CASE("emplace with a null pointer stores it as a value") {
@@ -226,7 +226,7 @@ TEST_SUITE("diagnostics: transform") {
 			[](int) -> int* { return nullptr; });
 		CHECK(r2.has_value());
 		CHECK_FALSE(r2.has_error());
-		CHECK(static_cast<int*>(r2) == nullptr);
+		CHECK(r2.value() == nullptr);
 	}
 }
 
@@ -623,5 +623,61 @@ TEST_SUITE("diagnostics: print() colouring") {
 		CHECK(!has_ansi(b.errors[0]));    // but this render stayed plain
 
 		idni::TC.set(saved);
+	}
+}
+
+TEST_SUITE("diagnostics: append() remaps a text attribute's value") {
+
+	TEST_CASE("a merged attribute keeps its own text, not the destination's") {
+		using label = idni::parser_strings::label;
+		report dst;
+		dst.error(code::internal_error, "boom");
+
+		report src;
+		src.error(code::io_error, "failed",
+			{{label::path, std::string_view("src-path-value")}});
+
+		dst.append(std::move(src));
+
+		REQUIRE(dst.nodes().size() == 2);
+		CHECK(dst.format_message(1).find("src-path-value")
+			!= std::string::npos);
+	}
+
+	TEST_CASE("a merged numeric attribute keeps its negative number") {
+		using label = idni::parser_strings::label;
+		report dst;
+		dst.error(code::internal_error, "boom");
+
+		report src;
+		src.error(code::io_error, "failed", {{label::exit_code, -1}});
+
+		dst.append(std::move(src));
+
+		REQUIRE(dst.nodes().size() == 2);
+		CHECK(dst.format_message(1).find("exit code=-1")
+			!= std::string::npos);
+	}
+}
+
+TEST_SUITE("diagnostics: resolve() lets the label decide, not text.data()") {
+
+	TEST_CASE("a number under a text label renders as empty text, "
+		"not a mismatched label name") {
+		using label = idni::parser_strings::label;
+		report r;
+		r.error(code::io_error, "failed", {{label::path, label::root}});
+
+		CHECK(r.format_message(0).find("root") == std::string::npos);
+	}
+
+	TEST_CASE("a string under a numeric label renders as 0, "
+		"not an interned key") {
+		using label = idni::parser_strings::label;
+		report r;
+		r.error(code::io_error, "failed",
+			{{label::exit_code, std::string_view("stray-text")}});
+
+		CHECK(r.format_message(0).find("exit code=0") != std::string::npos);
 	}
 }
