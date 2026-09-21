@@ -27,6 +27,8 @@ struct parser_gen_options {
 	std::map<std::string, std::vector<std::string>> dynamic = {};
 	// false emits productions() into a companion .cpp instead of the header
 	bool header_only                             = true;
+	// true adds a matcher() member built on idni::treemr::matcher_for
+	bool treemr                                  = false;
 };
 
 template <typename C = char, typename T = C>
@@ -287,6 +289,7 @@ void generate_parser_cpp(const std::string& tgf_filename,
 	if ((opt.decoder.size() && opt.decoder.starts_with("idni::")) ||
 		(opt.encoder.size() && opt.encoder.starts_with("idni::")))
 			os << "#include \"recoders.h\"\n";
+	if (opt.treemr) os << "#include \"format/treemr/treemr.h\"\n";
 	os <<	"\n";
 	if (opt.ns.size()) os << "namespace " << opt.ns << " {\n\n";
 	os << "namespace " << opt.name << "_data {\n\n";
@@ -385,8 +388,12 @@ void generate_parser_cpp(const std::string& tgf_filename,
 		"	}\n"
 		"	symbol_type literal(const nonterminal& nt) {\n"
 		"		return symbol_type(nt, &" << opt.name << "_data::nts);\n"
-		"	}\n"
-		"};\n"
+		"	}\n";
+	if (opt.treemr) os <<
+		"	auto matcher(std::string_view pattern) const {\n"
+		"		return ::idni::treemr::matcher_for(*this, pattern);\n"
+		"	}\n";
+	os <<	"};\n"
 		"\n";
 	if (opt.ns.size()) os << "\n} // " <<opt.ns<< " namespace\n";
 	os <<	"#endif // __" << guard << "_H__\n";

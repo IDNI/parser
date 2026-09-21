@@ -301,6 +301,18 @@ that the `tgf` tool generates satisfies it.
 auto m = matcher_for(my_parser::instance(), "row > cell ',' cell");
 ```
 
+The `tgf` tool has a `--treemr` generator option, and it defaults to
+`false`. With `--treemr true` the generated parser struct gains a
+`matcher(pattern)` member, built on `matcher_for(*this, pattern)`.
+
+```cpp
+auto m = my_parser::instance().matcher("row > cell ',' cell");
+```
+
+Leave the option off for `treemr.tgf` itself. `treemr.h` includes the
+generated parser of that grammar, so a `matcher()` member there needs
+`treemr.h` in turn, and that closes a cycle.
+
 ---
 
 ## match

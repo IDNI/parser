@@ -8,6 +8,9 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 
+#include <filesystem>
+#include <fstream>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -15,6 +18,7 @@
 #include "parser.h"
 #include "format/tgf/tgf.h"
 #include "format/treemr/treemr.h"
+#include "tgf/parser_gen.h"
 
 using namespace std;
 using namespace idni;
@@ -2470,13 +2474,79 @@ TEST_SUITE("treemr - nt_source overloads") {
 }
 
 // ===========================================================================
-// N. lcrs_tree forwarding - match/search/search_all/replace*/trim* reach
+// N. parser_gen treemr option - --treemr toggles the emitted matcher()
+// member on the generated parser
+// ===========================================================================
+
+// A grammar just big enough to drive generate_parser_cpp_from_string.
+const char* TREEMR_OPT_TGF =
+	" start => 'a'. \n";
+
+// generate_parser_cpp_from_string takes the grammar as an in-memory string,
+// so the case needs no .tgf fixture file; the emitted header still lands in
+// a temp file, since parser_gen.h has no in-memory output sink, so this
+// reads it back the way tests/test_tgf.cpp's generator case does.
+string generate_parser_text(const char* tgf_src, parser_gen_options gopt) {
+	namespace fs = std::filesystem;
+	fs::path dir = fs::temp_directory_path();
+	gopt.output_dir = dir.string() + "/";
+	if (gopt.output.empty())
+		gopt.output = "treemr_opt_test.generated.h";
+	if (gopt.name.empty())
+		gopt.name = "treemr_opt_test_parser";
+	fs::path out = dir / gopt.output;
+	auto gr = generate_parser_cpp_from_string<char>(
+		"treemr_opt_test.tgf", string(tgf_src), gopt);
+	REQUIRE(gr.has_value());
+	ifstream in(out);
+	stringstream ss; ss << in.rdbuf();
+	in.close();
+	fs::remove(out);
+	return ss.str();
+}
+
+TEST_SUITE("treemr - parser_gen treemr option") {
+
+	TEST_CASE("N1: treemr = false emits neither the treemr include nor "
+		"the matcher() member")
+	{
+		parser_gen_options gopt;
+		gopt.treemr = false;
+		string text = generate_parser_text(TREEMR_OPT_TGF, gopt);
+		CHECK(text.find("format/treemr/treemr.h") == string::npos);
+		CHECK(text.find("matcher(") == string::npos);
+	}
+
+	TEST_CASE("N2: treemr = true emits both the treemr include and the "
+		"matcher() member")
+	{
+		parser_gen_options gopt;
+		gopt.treemr = true;
+		string text = generate_parser_text(TREEMR_OPT_TGF, gopt);
+		CHECK(text.find("format/treemr/treemr.h") != string::npos);
+		CHECK(text.find("matcher(") != string::npos);
+	}
+
+	TEST_CASE("N3: a freshly constructed parser_gen_options defaults "
+		"treemr to false, so a caller that sets nothing emits no "
+		"matcher() member")
+	{
+		parser_gen_options gopt;
+		CHECK_FALSE(gopt.treemr);
+		string text = generate_parser_text(TREEMR_OPT_TGF, gopt);
+		CHECK(text.find("format/treemr/treemr.h") == string::npos);
+		CHECK(text.find("matcher(") == string::npos);
+	}
+}
+
+// ===========================================================================
+// O. lcrs_tree forwarding - match/search/search_all/replace*/trim* reach
 // the matcher via the tree_matcher-constrained overloads
 // ===========================================================================
 
 TEST_SUITE("treemr - tree forwarding methods") {
 
-	TEST_CASE("N1: t.match/t.search/t.search_all reach the matcher") {
+	TEST_CASE("O1: t.match/t.search/t.search_all reach the matcher") {
 		parsed fx{ CSV_TGF, "12,34" };
 		auto m = matcher_for<char, char>(
 			fx.nts, string_view{ "cell" }).value();
@@ -2487,7 +2557,7 @@ TEST_SUITE("treemr - tree forwarding methods") {
 		CHECK(t.search_all(m).size() == 2);
 	}
 
-	TEST_CASE("N2: t.replace/t.replace_if/t.replace_until reach "
+	TEST_CASE("O2: t.replace/t.replace_if/t.replace_until reach "
 		"the matcher")
 	{
 		parsed fx{ REPLACE_TGF, "1+2" };
@@ -2510,7 +2580,7 @@ TEST_SUITE("treemr - tree forwarding methods") {
 			"sub", fx.nts) == 1);
 	}
 
-	TEST_CASE("N3: t.trim_top(m) resolves to the matcher overload, "
+	TEST_CASE("O3: t.trim_top(m) resolves to the matcher overload, "
 		"not the older predicate overload")
 	{
 		// The unconstrained lcrs_tree::trim_top(const auto& query)

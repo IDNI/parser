@@ -1121,7 +1121,8 @@ static parser_gen_options gen_options_from_cmd(const cli::command& cmd) {
 		.auto_disambiguate   = cmd.get<bool>("auto-disambiguate"),
 		.nodisambig_list     = nodisambig_list,
 		.dynamic             = dynamic,
-		.header_only         = cmd.get<bool>("header-only")
+		.header_only         = cmd.get<bool>("header-only"),
+		.treemr              = cmd.get<bool>("treemr")
 	};
 }
 

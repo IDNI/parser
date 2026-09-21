@@ -149,6 +149,11 @@ inline cli::commands tgf_commands() {
 			"--header-only false emits productions() into a "
 			"companion .cpp so the grammar table is compiled once "
 			"instead of in every translation unit");
+	OPT(cli::option("treemr", '\0',
+		false)),
+		DESC("omit a matcher() member from the generated parser "
+			"struct (default). --treemr true adds the member, "
+			"built on idni::treemr::matcher_for");
 	OPT(cli::option("decoder", 'd',
 		"")),
 		DESC("decoder function");
