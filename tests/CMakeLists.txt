@@ -84,6 +84,7 @@ set(DOCTESTS
 	boolean_grammar
 	negation_regression
 	parser
+	treemr
 )
 
 foreach(X IN LISTS DOCTESTS)
@@ -107,6 +108,15 @@ foreach(X IN LISTS DOCTESTS)
 	target_include_directories(${N} PUBLIC
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
 	)
+	# this test includes a generated header directly, without linking
+	# tgf_cli_core; a header-only build resolves productions() inline instead
+	if(${N} STREQUAL "doctest_treemr" AND NOT EMSCRIPTEN AND NOT TAU_PARSER_BUILD_HEADER_ONLY)
+		target_sources(${N} PRIVATE
+			"${PROJECT_SOURCE_DIR}/src/format/treemr/treemr_parser.generated.cpp")
+		set_source_files_properties(
+			"${PROJECT_SOURCE_DIR}/src/format/treemr/treemr_parser.generated.cpp"
+			PROPERTIES COMPILE_OPTIONS "-O0;-fno-lto")
+	endif()
 	add_test(NAME ${N} COMMAND ${N})
 	# add_dependencies(${N} ${TAU_PARSER_STATIC_LIB_NAME})
 endforeach()

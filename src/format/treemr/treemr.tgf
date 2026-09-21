@@ -1,0 +1,99 @@
+@use char class eof, alpha, alnum, space, printable, xdigit.
+
+@trim __, _.
+@trim all terminals except children of name, unescaped_s, escaped_s,
+	unescaped_c, escaped_c,
+	escape_char, esc_hex, esc_u4, esc_U8.
+@inline char classes.
+@inline pattern, sib_seq, atom, terminal, quantifier, edge.
+
+@highlight keyword : pattern, alt_seq, sib_seq, slot_chain, edge, terminal, quantifier, atom,
+	root_anchor, leaf_anchor, left_anchor, right_anchor.
+@highlight string : unescaped_s, escaped_s, unescaped_c, escaped_c.
+@highlight number : esc_hex, esc_u4, esc_U8.
+
+# Top level: a treemr pattern is a single sibling sequence.
+start         => _ pattern _.
+
+# A pattern may require its match root to be the tree root ('/').
+pattern       => [root_anchor _] sib_seq.
+root_anchor   => '/'.
+
+# A sibling sequence is a slot chain. The chain may end in an edge_slot
+# which slurps the rest of the sequence as its child seq -- siblings
+# are siblings.
+sib_seq       => slot_chain.
+
+# A slot chain is either some simple slots optionally terminated by an
+# edge slot, or a single edge slot on its own.
+slot_chain    => simple_slots [__ edge_slot]
+              | edge_slot.
+
+# One or more simple slots separated by whitespace. An anchor is an
+# ordinary slot: the compiler requires '^' to be the first slot of its
+# sequence and '$' to be the last.
+simple_slots  => simple_slot (__ simple_slot)*.
+simple_slot   => left_anchor
+              | right_anchor
+              | atom [_ leaf_anchor] [_ quantifier].
+left_anchor   => '^'.
+right_anchor  => '$'.
+# An atom marked '!' must match a node with no children.
+leaf_anchor   => '!'.
+
+# Each slot carries an optional regex-style quantifier.
+quantifier    => star | plus | opt.
+star          => '*'.
+plus          => '+'.
+opt           => '?'.
+
+# An edge slot pairs an atom (with optional quantifier) with an edge and
+# its child sib_seq. The trailing sib_seq slurps the remainder of the
+# enclosing sequence, so use parentheses to scope an edge to one atom.
+# '!' parses here too, so the compiler can reject the contradiction with
+# a clear message rather than a parse error.
+edge_slot     => atom [_ leaf_anchor] [_ quantifier] _ edge _ sib_seq.
+
+atom          => name        # nonterminal name (NT_ANY unless edge follows)
+               | wildcard    # % -- any single node
+               | terminal    # 'c' or "str"
+               | capture.    # ( ... ) -- capture group; alternation inside
+
+wildcard      => '%'.
+
+# Every (...) is a capture group. Alternation is allowed inside.
+capture       => '(' _ alt_seq _ ')'.
+alt_seq       => sib_seq (_ '|' _ sib_seq)*.
+
+# Longest-match: list '>>' before '>' so the longer token wins.
+edge          => descendant_edge | direct_edge.
+descendant_edge => '>' '>'.
+direct_edge   => '>'.
+
+# Identifiers (nonterminal names).
+name          => (alpha | '_') (alnum | '_')*.
+
+# Terminal literals.
+terminal      => char_lit | str_lit.
+
+# Single-character terminal literal, e.g. '-' or '\n'.
+char_lit      => '\'' char_lit_char '\''.
+char_lit_char => unescaped_c | escaped_c.
+unescaped_c   => (space | printable) & ~( '\'' | '\\' ).
+escaped_c     => '\\' ('\'' | escape_char).
+
+# String terminal literal, e.g. "abc" or "\"".
+str_lit       => '"' str_lit_char* '"'.
+str_lit_char  => unescaped_s | escaped_s.
+unescaped_s   => (space | printable) & ~( '"' | '\\' ).
+escaped_s     => '\\' ('"' | escape_char).
+escape_char   => 'a' | 'b' | 'f' | 'n' | 'r' | 't' | 'v' | '\\' | '/'
+              | esc_hex | esc_u4 | esc_U8.
+esc_hex       => ('x' | 'X') xdigit xdigit.
+esc_u4        => 'u' xdigit xdigit xdigit xdigit.
+esc_U8        => 'U' xdigit xdigit xdigit xdigit xdigit xdigit xdigit xdigit.
+
+# Whitespace and comments.
+_             => [ __ ].
+__            => (space | comment) _.
+comment       => '#' (printable | '\t')* ('\r' | '\n' | eof).
