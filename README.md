@@ -204,6 +204,7 @@ Click on the type name in the following list to see more detailed documentation 
 - [`traverser`](docs/traverser.md) - struct for traversing and accessing rewriter trees
 - [`rewriting`](docs/rewriting.md) - API for rewriting a resulting parse tree
 - [`measure`](docs/measure.md) - simple struct for measuring time
+- [`idni::fs`](docs/filesystem.md) - portable file layer, with `temp_file` for an RAII temporary file and `memory_map` for a memory-mapped file
 
 ### Classes and structs usable for building command line interfaces
 

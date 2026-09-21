@@ -4,9 +4,9 @@
 // Unit tests for the diagnostics facility (namespace idni::diagnostics).
 //
 // Focused on the ergonomics surface: closing a scope_guard early, the
-// measure() sugar, null-pointer rejection on result<T*>, forward_as<T> for
-// a type result<T>(T) cannot construct, take_or_error(), and the
-// expected-style chain: and_then(), transform(), or_else(), value_or().
+// measure() sugar, a null pointer as a legitimate value in result<T*>,
+// forward_as<T> for a type result<T>(T) cannot construct, take_or_error(),
+// and the expected-style chain: and_then(), transform(), or_else(), value_or().
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
@@ -72,20 +72,21 @@ TEST_SUITE("diagnostics: measure()") {
 	}
 }
 
-TEST_SUITE("diagnostics: null pointer rejection") {
+TEST_SUITE("diagnostics: null pointer is a value") {
 
-	TEST_CASE("operator= with a null pointer records an error, not a value") {
+	TEST_CASE("operator= with a null pointer stores it as a value") {
 		result<int*> r;
 		r = static_cast<int*>(nullptr);
-		CHECK_FALSE(r.has_value());
-		CHECK(r.has_error());
+		CHECK(r.has_value());
+		CHECK_FALSE(r.has_error());
+		CHECK(r.value() == nullptr);
 	}
 
-	TEST_CASE("emplace with a null pointer records an error, not a value") {
+	TEST_CASE("emplace with a null pointer stores it as a value") {
 		result<int*> r;
 		r.emplace(static_cast<int*>(nullptr));
-		CHECK_FALSE(r.has_value());
-		CHECK(r.has_error());
+		CHECK(r.has_value());
+		CHECK_FALSE(r.has_error());
 	}
 
 	TEST_CASE("operator= with a non-null pointer still succeeds") {
@@ -94,6 +95,14 @@ TEST_SUITE("diagnostics: null pointer rejection") {
 		r = &x;
 		CHECK(r.has_value());
 		CHECK_FALSE(r.has_error());
+	}
+
+	TEST_CASE("has_value() is true for a held null pointer, unlike a value-less result") {
+		result<int*> with_null;
+		with_null = static_cast<int*>(nullptr);
+		result<int*> without_value;
+		CHECK(with_null.has_value());
+		CHECK_FALSE(without_value.has_value());
 	}
 }
 
@@ -210,13 +219,14 @@ TEST_SUITE("diagnostics: transform") {
 		CHECK(r2.has_error());
 	}
 
-	TEST_CASE("a null pointer result is rejected like emplace rejects one") {
+	TEST_CASE("a null pointer from f is stored as a value, not an error") {
 		result<int> r;
 		r = 5;
 		auto r2 = std::move(r).transform(
 			[](int) -> int* { return nullptr; });
-		CHECK_FALSE(r2.has_value());
-		CHECK(r2.has_error());
+		CHECK(r2.has_value());
+		CHECK_FALSE(r2.has_error());
+		CHECK(r2.value() == nullptr);
 	}
 }
 
@@ -613,5 +623,73 @@ TEST_SUITE("diagnostics: print() colouring") {
 		CHECK(!has_ansi(b.errors[0]));    // but this render stayed plain
 
 		idni::TC.set(saved);
+	}
+}
+
+TEST_SUITE("diagnostics: append() remaps a text attribute's value") {
+
+	TEST_CASE("a merged attribute keeps its own text, not the destination's") {
+		using label = idni::parser_strings::label;
+		report dst;
+		dst.error(code::internal_error, "boom");
+
+		report src;
+		src.error(code::io_error, "failed",
+			{{label::path, std::string_view("src-path-value")}});
+
+		dst.append(std::move(src));
+
+		REQUIRE(dst.nodes().size() == 2);
+		CHECK(dst.format_message(1).find("src-path-value")
+			!= std::string::npos);
+	}
+
+	TEST_CASE("a merged numeric attribute keeps its negative number") {
+		using label = idni::parser_strings::label;
+		report dst;
+		dst.error(code::internal_error, "boom");
+
+		report src;
+		src.error(code::io_error, "failed", {{label::exit_code, -1}});
+
+		dst.append(std::move(src));
+
+		REQUIRE(dst.nodes().size() == 2);
+		CHECK(dst.format_message(1).find("exit code=-1")
+			!= std::string::npos);
+	}
+}
+
+TEST_SUITE("diagnostics: resolve() lets the label decide, not text.data()") {
+
+	TEST_CASE("a number under a text label renders the missing-text marker, "
+		"not a mismatched label name") {
+		using label = idni::parser_strings::label;
+		report r;
+		r.error(code::io_error, "failed", {{label::path, label::root}});
+
+		CHECK(r.format_message(0).find("root") == std::string::npos);
+		CHECK(r.format_message(0).find("<missing text>")
+			!= std::string::npos);
+	}
+
+	TEST_CASE("a string under a numeric label renders as 0, "
+		"not an interned key") {
+		using label = idni::parser_strings::label;
+		report r;
+		r.error(code::io_error, "failed",
+			{{label::exit_code, std::string_view("stray-text")}});
+
+		CHECK(r.format_message(0).find("exit code=0") != std::string::npos);
+	}
+
+	TEST_CASE("a pre-interned key under label::name renders the "
+		"missing-text marker, in a release build with no DBG assert") {
+		using label = idni::parser_strings::label;
+		report r;
+		r.error(code::io_error, "failed", {{label::name, label::root}});
+
+		CHECK(r.format_message(0).find("<missing text>")
+			!= std::string::npos);
 	}
 }

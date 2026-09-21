@@ -472,10 +472,9 @@ char_class_fns<T> predefined_char_classes(
 		auto it = predef.find(cc);
 		if (it == predef.end()) {
 			if (diag) {
-				auto cc_id = diag->intern_dynamic(cc);
 				diag->error(idni::diagnostics::code::unknown_char_class,
 					"unknown character class",
-					{{ label::name, cc_id }});
+					{{ label::name, cc }});
 			} else
 				std::cerr << "Unknown character class: "
 					<< to_string(cc) << '\n';

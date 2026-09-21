@@ -3,285 +3,281 @@
 
 #ifndef __IDNI__PARSER__UTILITY__MEMORY_MAP_H__
 #define __IDNI__PARSER__UTILITY__MEMORY_MAP_H__
-#include <stdio.h>
-#include <stdlib.h>
-#include <exception>
-#include <sstream>
-#include <iostream>
-#include <memory>
 #include <string>
-#include <filesystem>
-#ifdef _WIN32
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#else
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#endif
+#include <memory>
 
-namespace idni {
+#include "filesystem.h"
 
-#ifdef _WIN32
-using mmap_path_t = std::wstring;
-#else
-using mmap_path_t = std::string;
-#endif
+namespace idni::fs {
 
-#ifdef _WIN32
-static inline mmap_path_t temp_filename() {
-	wchar_t path[MAX_PATH], name[MAX_PATH];
-	DWORD r = ::GetTempPathW(MAX_PATH, path);
-	if (r > MAX_PATH || !r ||
-		!::GetTempFileNameW(path, L"MMAPXXXX", 0, name)) return L"";
-	return std::wstring(name);
-}
-#else
-static inline int temp_fileno() { return fileno(tmpfile()); }
-static inline mmap_path_t filename(int fd) {
-        return std::filesystem::read_symlink(
-                        std::filesystem::path("/proc/self/fd") /
-                                std::to_string(fd));
-}
-#endif
-
-enum mmap_mode { MMAP_NONE, MMAP_READ, MMAP_WRITE };
-
+/**
+ * @brief A file mapped into memory.
+ *
+ * Opening the file and mapping it into memory are separate steps,
+ * moved through by @ref open and @ref map, and undone in turn by
+ * @ref unmap and @ref close. Every such call returns a result<bool>:
+ * true on success, and on failure a report that carries the reason.
+ * This object also keeps that report, so a later caller can inspect
+ * a past failure through @ref has_error and @ref report.
+ *
+ * A redundant close or unmap is not a failure. It records a warning
+ * instead of an error, returns false, and leaves @ref has_error
+ * false.
+ */
 class memory_map {
 public:
-	bool silent = true; // true to disable printing messages to cerr
-	bool error = false;
-	std::string error_message = "";
-	memory_map() : mode_(MMAP_NONE),state_(CLOSED),filename_(),size_(0) {}
-	memory_map(mmap_path_t filename, size_t s=0, mmap_mode m = MMAP_READ,
-		bool do_open=1, bool do_map=1)
-		: mode_(m), state_(CLOSED), filename_(std::move(filename)),
-		  size_(s)
-	{
-		if (mode_ == MMAP_NONE) return;
-		if (do_open || do_map) if (open() == -1) return;
-		if (do_map) map();
-	}
-	~memory_map() { close(); }
-	size_t size() const { return size_; }
-	const mmap_path_t& file_name() const { return filename_; }
-	void clear_error() { error = false, error_message = ""; }
-	void* data() {
-		if (state_ != MAPPED) return 0;
-		return data_;
-	}
-	int open() {
-		if (mode_  == MMAP_NONE) return err("none mmap - cannot");
-		if (state_ != CLOSED)    return err("file is already opened");
-#ifdef _WIN32
-		if (filename_.empty()) create_temp();
-		fh_ = ::CreateFileW(filename_.c_str(),
-			mode_ == MMAP_READ ? GENERIC_READ
-				: GENERIC_READ | GENERIC_WRITE,
-			FILE_SHARE_READ | FILE_SHARE_WRITE,
-			0, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
-		if (fh_ == INVALID_HANDLE_VALUE) return err("cannot open file");
-#else
-		if (mode_ == MMAP_WRITE && (filename_.empty() || !file_exists()))
-			create();
-		else {
-			fd_ = ::open(filename_.c_str(),mode_ == MMAP_READ ?
-				O_RDONLY : O_RDWR, 0600);
-    			if (fd_ == -1) return err(errno, "cannot open file");
-			if (mode_ == MMAP_WRITE)
-				if (truncate() == -1) return -1;
-		}
-#endif
-		state_ = UNMAPPED;
-		if (!size_) { // autodetect map size
-			size_ = file_size();
-		}
-		return 0;
-	}
-	int map() {
-		if (state_ != UNMAPPED)
-			return err("file is not opened or already mapped");
-#ifdef _WIN32
-		mh_ = ::CreateFileMappingW(fh_, 0, mode_ == MMAP_READ ?
-			PAGE_READONLY : PAGE_READWRITE, 0, size_, 0);
-    		if (mh_ == INVALID_HANDLE_VALUE)
-			return data_ = 0, err("mmap err mfd");
-		data_ = ::MapViewOfFile(mh_, mode_ == MMAP_READ ? FILE_MAP_READ
-			: FILE_MAP_WRITE, 0, 0, size_);
-		if (data_ == 0) {
-			::CloseHandle(mh_);
-			return err(GetLastError(), "mmap err");
-		}
-#else
-		data_ = ::mmap(0, size_, mode_ == MMAP_READ ? PROT_READ :
-			PROT_READ|PROT_WRITE, MAP_SHARED, fd_, 0);
-		if (data_==MAP_FAILED) return data_=0,err(errno, "mmap err");
-#endif
-		state_ = MAPPED;
-		return 0;
-	}
-	int sync() {
-		int r = 0;
-#ifdef _WIN32
-		if (::FlushViewOfFile(data_, size_) == 0 ||
-			::FlushFileBuffers(fh_) == 0) r = -1;
-#else
-		r = ::msync(data_, size_, MS_SYNC);
-#endif
-		if (r == -1) return err(errno, "memory_map: sync");
-		return r;
-	}
-	int unmap() {
-		if (state_ != MAPPED)
-			return err("file not mapped, cannot be unmapped\n");
-		if (sync() == -1) return -1;
-		int r = 0;
-#ifdef _WIN32
-		::UnmapViewOfFile(data_);
-		::CloseHandle(mh_);
-#else
-		r = ::munmap(data_, size_);
-#endif
-		data_ = 0, state_ = UNMAPPED;
-		return r;
-	}
-	int unlink() {
-		if (state_ != CLOSED) return err(
-			"file is not closed. it cannot be deleted\n");
-#ifdef _WIN32
-		return ::DeleteFileW(filename_.c_str());
-#else
-		return ::unlink(filename_.c_str());
-#endif
-	}
-	int close() {
-		if (state_ == CLOSED) return -1;
-		else if (state_ == MAPPED && unmap() == -1) return -1;
-#ifdef _WIN32
-		::CloseHandle(fh_);
-#else
-		if (fd_ != -1) ::close(fd_), fd_ = -1;
-#endif
-		state_ = CLOSED;
-		if (temporary_) temporary_ = false, unlink();
-		return 0;
-	}
-	char operator[](const size_t i) noexcept {
-		return (static_cast<char*>(data_))[i];
-	}
+	/// Default-constructs a memory_map with no file and no mapping.
+	memory_map();
+
+	/**
+	 * @brief Constructs a memory_map, and optionally opens and maps
+	 * it.
+	 * @param filename the path to the file. An empty path means a
+	 * temporary file, which close() deletes.
+	 * @param s the size to map, in bytes. Zero, the default, means
+	 * autodetect the size from the file once it is open.
+	 * @param m the access mode. Defaults to MMAP_READ.
+	 * @param do_open true to open the file during construction.
+	 * True is the default.
+	 * @param do_map true to map the file during construction. True
+	 * is the default.
+	 * @post Opens the file when do_open or do_map is true. Maps the
+	 * file when do_map is true and the open succeeds. Does neither
+	 * when m is MMAP_NONE. A failing open or map records into the
+	 * report, readable through @ref report once construction ends.
+	 */
+	memory_map(path filename, size_t s=0, mmap_mode m = MMAP_READ,
+		bool do_open=1, bool do_map=1);
+
+	/**
+	 * @brief Closes the file, unmapping it first if needed.
+	 * @post Same effect as calling close(). A temporary file no
+	 * longer exists on disk.
+	 */
+	~memory_map();
+
+	/**
+	 * @brief The mapped size.
+	 * @return the size in bytes, the value the constructor
+	 * autodetected when the caller passed zero.
+	 */
+	size_t size() const;
+
+	/**
+	 * @brief The path to the mapped file.
+	 * @return the path, in the native path encoding.
+	 */
+	const path& file_name() const;
+
+	/**
+	 * @brief Checks the accumulated report for an error.
+	 * @return true after any past call on this object fails.
+	 */
+	bool has_error() const;
+
+	/**
+	 * @brief The report this object accumulates across every call.
+	 * @return the report, carrying every past error and warning in
+	 * the order the calls made them.
+	 */
+	const diagnostics::report& report() const;
+
+	/**
+	 * @brief The mapped memory.
+	 * @return a pointer to the mapped memory, or null outside the
+	 * MAPPED state.
+	 */
+	void* data();
+
+	/**
+	 * @brief Opens the file, creating a temporary one when the path
+	 * is empty.
+	 * @return on success, true. On failure, an error with
+	 * code::invalid_state for a precondition, or code::io_error for
+	 * a failing system call, with the path in label::path and the
+	 * OS error code in label::exit_code.
+	 * @pre Needs the CLOSED state.
+	 * @post On success, moves to the UNMAPPED state. size() then
+	 * holds the file size, autodetected when the caller passed zero.
+	 * On failure, state_ stays CLOSED, no handle stays open, and no
+	 * temporary file this call created stays on disk.
+	 */
+	result<bool> open();
+
+	/**
+	 * @brief Maps the open file into memory.
+	 * @return on success, true. On failure, an error with
+	 * code::invalid_state for a precondition, or code::io_error for
+	 * a failing system call, with the OS error code in
+	 * label::exit_code.
+	 * @pre Needs the UNMAPPED state.
+	 * @post On success, moves to the MAPPED state, and data()
+	 * returns the mapped memory.
+	 */
+	result<bool> map();
+
+	/**
+	 * @brief Flushes the mapped memory to disk.
+	 * @return on success, true. On failure, an error with
+	 * code::io_error and the OS error code in label::exit_code.
+	 */
+	result<bool> sync();
+
+	/**
+	 * @brief Unmaps the file, syncing it to disk first.
+	 * @return true on success. On a call outside the MAPPED state,
+	 * false, with a warning in the report. On a failing sync or a
+	 * failing system call, an error with code::io_error and the OS
+	 * error code in label::exit_code.
+	 * @post On success, moves to the UNMAPPED state, and data()
+	 * returns null. On the redundant-call case, nothing changes.
+	 */
+	result<bool> unmap();
+
+	/**
+	 * @brief Deletes the file from disk.
+	 * @return on success, true. On failure, an error with
+	 * code::invalid_state for a precondition, or the error fs::unlink
+	 * reports for a failing deletion.
+	 * @pre Needs the CLOSED state.
+	 */
+	result<bool> unlink();
+
+	/**
+	 * @brief Unmaps the file if needed, then closes it.
+	 * @return true on success. On a call on an already CLOSED
+	 * object, false, with a warning in the report. On a failing
+	 * unmap, the error unmap reports.
+	 * @post Moves to the CLOSED state. A temporary file no longer
+	 * exists on disk. A failing delete of a temporary file still
+	 * records into the report, but does not fail this call.
+	 */
+	result<bool> close();
+
+	/**
+	 * @brief Reads one byte of the mapped memory.
+	 * @param i the byte offset.
+	 * @return the byte at offset @p i.
+	 * @pre Needs the MAPPED state.
+	 * @warning This never checks that @p i is within size(). An
+	 * out-of-range i causes undefined behavior.
+	 */
+	char operator[](const size_t i) noexcept;
 private:
 	mmap_mode mode_;
+	/// The three states: CLOSED, UNMAPPED, and MAPPED.
 	enum { CLOSED, UNMAPPED, MAPPED } state_;
-	mmap_path_t filename_;
+	path filename_;
 	size_t size_;
-	void* data_ = 0;
 	bool temporary_ = false;
-#ifdef _WIN32
-	HANDLE fh_;
-	HANDLE mh_;
-	inline void create_temp() {
-		filename_ = temp_filename(), temporary_ = true;
-	}
-#else
-	int fd_;
-	int truncate() {
-		if (state_==MAPPED) return err("cannot truncate mapped file");
-		if (size_ && size_ != (size_t)file_size()) {
-			if (::ftruncate(fd_, size_) == -1)
-				return err(errno, "error truncate failed");
-		}
-		return size_;
-	}
-	inline void seek_beginning() {
-		FILE *file = fdopen(fd_, "w");
-		fseek(file, 0, SEEK_SET);
-	}
-	inline int fill() {
-		int w = ::write(fd_, std::string(size_, 0).c_str(), size_);
-		if (w == -1) err(errno, "memory_map: create (fill)");
-		else seek_beginning();
-		return w;
-	}
-	inline void create_temp() {
-		temporary_ = true,
-		fd_ = temp_fileno(),
-		filename_ = filename(fd_);
-	}
-	void create() {
-		if (filename_.empty()) create_temp();
-		else fd_ = ::open(filename_.c_str(), O_CREAT|O_RDWR, 0600);
-    		if (fd_ == -1) { err(errno, "memory_map: create"); return; }
-		if (fill() == -1) return;
-	}
-	bool file_exists() {
- 		struct stat s;
-    		return filename_.empty()
-			? false : stat(filename_.c_str(),&s) == 0;
-	}
+	diagnostics::report report_;
+	file_handle fh_ = invalid_file_handle;
+	mapping map_;
+#ifndef _WIN32
+	result<bool> truncate();
+	result<bool> seek_beginning();
+	result<bool> fill();
+	result<bool> create();
 #endif
-	size_t file_size() {
-#ifdef _WIN32
-		LARGE_INTEGER file_size;
-		if (::GetFileSizeEx(fh_, &file_size) != 0)
-			return static_cast<size_t>(file_size.QuadPart);
-#else
-		struct stat s;
-		if (::stat(filename_.c_str(), &s) != -1)
-			return s.st_size;
-#endif
-		return err(errno, "cannot get file stats"), 0;
-	}
-	int err(int err_code, std::string message, int return_value = -1) {
-		return err(message, return_value, err_code);
-	}
-	int err(std::string message, int return_value = -1, int err_code = 0) {
-		error = true; std::stringstream ss; ss << "error: ";
-		if (err_code) ss << '[' << err_code << "] ";
-		ss << message << std::endl, error_message = ss.str();
-		if (!silent) std::cerr << error_message;
-		return return_value;
-	}
+	result<bool> create_temp();
+	result<size_t> file_size();
+	/// Closes a handle open() opened, and deletes a temp file it
+	/// created, before a failing open() returns @p r. A cleanup
+	/// failure appends after the original error in @p r, so the
+	/// first failure stays the reason.
+	result<bool> cleanup_failed_open(result<bool> r);
+	/// Records @p message into the report, and returns a failed
+	/// result<bool> carrying the same error.
+	result<bool> err(diagnostics::code c, std::string_view message,
+		std::initializer_list<diagnostics::attr_in> extra = {});
+	/// Records @p message into the report as a warning, and returns
+	/// a result<bool> holding false: the call did nothing.
+	result<bool> warn(std::string_view message,
+		std::initializer_list<diagnostics::attr_in> extra = {});
 };
 
+/**
+ * @brief A std::allocator that backs its memory with a memory_map.
+ * @tparam T the element type to allocate.
+ *
+ * MMAP_NONE falls back to a plain std::allocator<T>, instead of
+ * mapping a file. Any other mode maps a fresh memory_map for every
+ * call to allocate, and closes it on the matching deallocate.
+ */
 template <typename T>
 class memory_map_allocator {
 public:
+	/// The element type this allocator allocates.
 	typedef T value_type;
-	memory_map_allocator() : fn(), m(MMAP_NONE) { }
-	memory_map_allocator(mmap_path_t fn, mmap_mode m = MMAP_WRITE) :
-		fn(std::move(fn)), m(m) { }
-	memory_map_allocator(const memory_map_allocator<T>& a) :
-		fn(a.fn), m(a.m) { }
-	T* allocate(size_t n) {
-		if (m == MMAP_NONE) return (T*) nommap.allocate(n);
-		if (n == 0) return 0;
-		mm = std::make_unique<memory_map>(fn, n*sizeof(T), m);
-		return (T*) mm->data();
-	}
-	void deallocate(T* p, size_t n) {
-		if (m == MMAP_NONE) return (void) nommap.deallocate(p, n);
-		if (!p || !n) return;
-		mm->close();
-	}
-	bool operator==(const memory_map_allocator& t) const {
-		return fn == t.fn && m == t.m && mm == t.mm && nommap==t.nommap;
-	}
-	bool operator!=(const memory_map_allocator& t) const {
-		return fn != t.fn || m != t.m || mm != t.mm || nommap!=t.nommap;
-	}
+
+	/// Default-constructs an allocator in MMAP_NONE mode.
+	memory_map_allocator();
+
+	/**
+	 * @brief Constructs an allocator that maps a file.
+	 * @param fn the path to the file. An empty path means a
+	 * temporary file.
+	 * @param m the access mode. Defaults to MMAP_WRITE.
+	 */
+	memory_map_allocator(path fn, mmap_mode m = MMAP_WRITE);
+
+	/**
+	 * @brief Copies the file path and the access mode.
+	 * @param a the allocator to copy from.
+	 * @note A copy starts unmapped, even when a is already mapped.
+	 */
+	memory_map_allocator(const memory_map_allocator<T>& a);
+
+	/**
+	 * @brief Allocates n elements of type T.
+	 * @param n the element count.
+	 * @return a pointer to n*sizeof(T) bytes. In MMAP_NONE mode,
+	 * this comes from std::allocator<T>. In a mapping mode, this
+	 * comes from a fresh memory_map, or null when n is zero.
+	 * @post In a mapping mode, this object owns the new memory_map,
+	 * replacing any it owned before.
+	 * @warning In a mapping mode, this returns null when the
+	 * mapping fails, the same as memory_map::data() outside the
+	 * MAPPED state. This call reports no error of its own. A caller
+	 * that gets null reads the reason from the held memory_map.
+	 */
+	T* allocate(size_t n);
+
+	/**
+	 * @brief Releases memory obtained from allocate.
+	 * @param p the pointer allocate returned.
+	 * @param n the element count passed to allocate.
+	 * @post In MMAP_NONE mode, this forwards to std::allocator<T>.
+	 * In a mapping mode, a null p, a zero n, or holding no
+	 * memory_map is a no-op, and otherwise this closes the
+	 * memory_map allocate created.
+	 */
+	void deallocate(T* p, size_t n);
+
+	/**
+	 * @brief Compares the file path and the access mode.
+	 * @param t the allocator to compare against.
+	 * @return true when the path and the mode compare equal. This
+	 * ignores the held memory_map, so two allocators still meet the
+	 * Allocator requirements once one of them allocates.
+	 */
+	bool operator==(const memory_map_allocator& t) const;
+
+	/**
+	 * @brief Returns the opposite of operator==.
+	 * @param t the allocator to compare against.
+	 * @return true when any of the compared fields differ.
+	 */
+	bool operator!=(const memory_map_allocator& t) const;
 private:
-	mmap_path_t fn;
+	path fn;
 	mmap_mode m;
 	std::unique_ptr<memory_map> mm;
 	std::allocator<T> nommap;
 };
 
-} // namespace idni
+} // namespace idni::fs
+
+#include "memory_map.tmpl.h"
 
 #endif // __IDNI__PARSER__UTILITY__MEMORY_MAP_H__

@@ -60,12 +60,18 @@ inline void sink::operator()(std::string_view line) const {
 	if (write_) write_(line);
 }
 
-inline int64_t checked_i64(size_t v) {
-	DBG(assert(v <= static_cast<size_t>(
-		std::numeric_limits<int64_t>::max()));)
+// A size_t past int64_t's range saturates. An attr that reports an
+// out-of-range value must be able to carry that value.
+inline int64_t saturating_i64(size_t v) {
 	return v > static_cast<size_t>(std::numeric_limits<int64_t>::max())
 		? std::numeric_limits<int64_t>::max()
 		: static_cast<int64_t>(v);
+}
+
+inline int64_t checked_i64(size_t v) {
+	DBG(assert(v <= static_cast<size_t>(
+		std::numeric_limits<int64_t>::max()));)
+	return saturating_i64(v);
 }
 
 inline report::scope_guard::scope_guard(report& r, key name,
@@ -217,6 +223,20 @@ inline report::key report::intern_dynamic(std::string_view s) {
 	return id;
 }
 
+inline attr report::resolve(const attr_in& a) {
+	attr r;
+	r.key = a.key;
+	// The label decides whether the value is text, not text.data().
+	DBG(assert(bool(a.text.data()) == idni::parser_strings::is_text_label(a.key));)
+	// A release build has no DBG assert, so a wrong call site (a number
+	// under a text label) must still name itself in the rendered output
+	// instead of printing an empty string.
+	r.value = idni::parser_strings::is_text_label(a.key)
+		? intern_dynamic(a.text.data() ? a.text : "<missing text>")
+		: a.num;
+	return r;
+}
+
 inline std::string_view report::str(key id) const {
 	if (id > 0) return idni::parser_strings::str(id);
 	if (id < 0) {
@@ -227,8 +247,7 @@ inline std::string_view report::str(key id) const {
 }
 
 inline std::string report::format_attr_value(key k, int64_t v) const {
-	// `name` stores an interned string key; resolve it back to text.
-	if (k == idni::parser_strings::label::name)
+	if (idni::parser_strings::is_text_label(k))
 		return std::string(str(static_cast<key>(v)));
 	return std::to_string(v);
 }
@@ -267,107 +286,107 @@ inline void report::kb(std::string_view name, size_t kilobytes) {
 }
 
 inline void report::error(code c, key msg, int_t primary,
-	std::initializer_list<attr> extra)
+	std::initializer_list<attr_in> extra)
 {
 	DBG(assert(is_error(c));)
 	push_tagged(c, msg, primary, extra);
 }
 
 inline void report::error(code c, key msg, size_t primary,
-	std::initializer_list<attr> extra)
+	std::initializer_list<attr_in> extra)
 {
 	DBG(assert(is_error(c));)
 	push_tagged(c, msg, checked_i64(primary), extra);
 }
 
 inline void report::error(code c, std::string_view msg, int_t primary,
-	std::initializer_list<attr> extra)
+	std::initializer_list<attr_in> extra)
 {
 	error(c, intern_dynamic(msg), primary, extra);
 }
 
 inline void report::error(code c, std::string_view msg, size_t primary,
-	std::initializer_list<attr> extra)
+	std::initializer_list<attr_in> extra)
 {
 	error(c, intern_dynamic(msg), primary, extra);
 }
 
 inline void report::warning(key msg, int_t primary,
-	std::initializer_list<attr> extra)
+	std::initializer_list<attr_in> extra)
 {
 	push_tagged(code::warning, msg, primary, extra);
 }
 
 inline void report::warning(key msg, size_t primary,
-	std::initializer_list<attr> extra)
+	std::initializer_list<attr_in> extra)
 {
 	push_tagged(code::warning, msg, checked_i64(primary), extra);
 }
 
 inline void report::warning(std::string_view msg, int_t primary,
-	std::initializer_list<attr> extra)
+	std::initializer_list<attr_in> extra)
 {
 	warning(intern_dynamic(msg), primary, extra);
 }
 
 inline void report::warning(std::string_view msg, size_t primary,
-	std::initializer_list<attr> extra)
+	std::initializer_list<attr_in> extra)
 {
 	warning(intern_dynamic(msg), primary, extra);
 }
 
 inline void report::info(key msg, int_t primary,
-	std::initializer_list<attr> extra)
+	std::initializer_list<attr_in> extra)
 {
 	push_tagged(code::info, msg, primary, extra);
 }
 
 inline void report::info(key msg, size_t primary,
-	std::initializer_list<attr> extra)
+	std::initializer_list<attr_in> extra)
 {
 	push_tagged(code::info, msg, checked_i64(primary), extra);
 }
 
 inline void report::info(std::string_view msg, int_t primary,
-	std::initializer_list<attr> extra)
+	std::initializer_list<attr_in> extra)
 {
 	info(intern_dynamic(msg), primary, extra);
 }
 
 inline void report::info(std::string_view msg, size_t primary,
-	std::initializer_list<attr> extra)
+	std::initializer_list<attr_in> extra)
 {
 	info(intern_dynamic(msg), primary, extra);
 }
 
 inline void report::error(code c, key msg,
-	std::initializer_list<attr> extra)
+	std::initializer_list<attr_in> extra)
 {
 	error(c, msg, 0, extra);
 }
 
 inline void report::error(code c, std::string_view msg,
-	std::initializer_list<attr> extra)
+	std::initializer_list<attr_in> extra)
 {
 	error(c, msg, 0, extra);
 }
 
-inline void report::warning(key msg, std::initializer_list<attr> extra) {
+inline void report::warning(key msg, std::initializer_list<attr_in> extra) {
 	warning(msg, 0, extra);
 }
 
 inline void report::warning(std::string_view msg,
-	std::initializer_list<attr> extra)
+	std::initializer_list<attr_in> extra)
 {
 	warning(msg, 0, extra);
 }
 
-inline void report::info(key msg, std::initializer_list<attr> extra) {
+inline void report::info(key msg, std::initializer_list<attr_in> extra) {
 	info(msg, 0, extra);
 }
 
 inline void report::info(std::string_view msg,
-	std::initializer_list<attr> extra)
+	std::initializer_list<attr_in> extra)
 {
 	info(msg, 0, extra);
 }
@@ -403,6 +422,15 @@ void report::append_impl(Other&& other) {
 		if (i >= other.dyn_strings_.size()) return none;
 		return -static_cast<int_t>(dyn_base + i + 1);
 	};
+	// Same remap as remap_key, kept in int64_t throughout so a text
+	// attr value (always in range) never passes through a truncating
+	// cast to int_t.
+	auto remap_value = [&](int64_t v) -> int64_t {
+		if (v >= 0) return v;
+		size_t i = static_cast<size_t>(-v - 1);
+		if (i >= other.dyn_strings_.size()) return none;
+		return -static_cast<int64_t>(dyn_base + i + 1);
+	};
 	// reserve() allocates exactly the requested count, so growing by
 	// other.nodes_.size() each call makes repeated append() quadratic.
 	if (const size_t need = base + other.nodes_.size();
@@ -422,8 +450,11 @@ void report::append_impl(Other&& other) {
 	size_t attr_dst = attrs_.size();
 	attrs_.insert(attrs_.end(),
 		other.attrs_.begin(), other.attrs_.end());
-	for (size_t i = attr_dst; i < attrs_.size(); ++i)
+	for (size_t i = attr_dst; i < attrs_.size(); ++i) {
 		attrs_[i].key = remap_key(attrs_[i].key);
+		if (idni::parser_strings::is_text_label(attrs_[i].key))
+			attrs_[i].value = remap_value(attrs_[i].value);
+	}
 }
 
 inline void report::append(const report& other) {
@@ -462,13 +493,10 @@ inline std::string report::format_message(size_t node_idx) const {
 		append_extra(std::string(str(a.key)) + '='
 			+ format_attr_value(a.key, a.value));
 	}
-	// parse_error nodes always carry a byte offset (loc=0 is the first
-	// byte of input, a common error site). Other errors store whatever
-	// the producer chose in `value`, so render that as a plain value=
-	// only when it is meaningfully non-zero.
-	if (n.tag == code::parse_error && n.key != none)
-		append_extra("loc=" + std::to_string(n.value));
-	else if (n.value != 0)
+	// A producer that knows where the error is attaches label::loc, and
+	// the attr loop above prints it. `value` holds whatever the producer
+	// chose, and zero carries no information.
+	if (n.value != 0)
 		append_extra("value=" + std::to_string(n.value));
 	if (!extras.empty()) out += " (" + extras + ')';
 	return out;
@@ -538,7 +566,7 @@ inline void report::pop_scope(int32_t idx) {
 }
 
 inline int32_t report::push_tagged(code tag, key name, int64_t v,
-	std::initializer_list<attr> extra)
+	std::initializer_list<attr_in> extra)
 {
 	// Catches only the explicitly-unused 0xC000 band; out-of-enum
 	// values inside the valid bands still pass.
@@ -556,7 +584,15 @@ inline int32_t report::push_tagged(code tag, key name, int64_t v,
 			decltype(n.attr_cnt)>::max());)
 		n.attr_off = static_cast<decltype(n.attr_off)>(attrs_.size());
 		n.attr_cnt = static_cast<decltype(n.attr_cnt)>(extra.size());
-		for (const auto& a : extra) attrs_.push_back(a);
+		for (const auto& a : extra) {
+			attr resolved = resolve(a);
+			// Catches a text label whose value is not a genuine
+			// interned string key for this report.
+			DBG(assert(!idni::parser_strings::is_text_label(resolved.key)
+				|| (resolved.value < 0 && static_cast<size_t>(
+					-(resolved.value + 1)) < dyn_strings_.size()));)
+			attrs_.push_back(resolved);
+		}
 	}
 	nodes_.push_back(n);
 	return static_cast<int32_t>(nodes_.size() - 1);
@@ -800,32 +836,6 @@ bool result<T>::has_value() const {
 }
 
 template <typename T>
-result<T>::operator bool() const {
-	return has_value();
-}
-
-template <typename T>
-result<T>::operator T() const
-	requires std::is_pointer_v<T>
-{
-	return value_.has_value() ? value_.value() : nullptr;
-}
-
-template <typename T>
-bool result<T>::operator==(std::nullptr_t) const
-	requires std::is_pointer_v<T>
-{
-	return !value_.has_value();
-}
-
-template <typename T>
-bool result<T>::operator!=(std::nullptr_t) const
-	requires std::is_pointer_v<T>
-{
-	return value_.has_value();
-}
-
-template <typename T>
 T& result<T>::value() & {
 	return value_.value();
 }
@@ -844,13 +854,6 @@ template <typename T>
 T& result<T>::emplace(T&& v) {
 	DBG(assert(!diag_rep_.has_error()
 		&& "emplace on errored result silently drops the value");)
-	if constexpr (std::is_pointer_v<T>) {
-		if (v == nullptr) {
-			error(code::invalid_argument, "null pointer value");
-			static T null_value{};
-			return null_value;
-		}
-	}
 	value_.emplace(std::move(v));
 	this->enforce_error_no_value_invariant();
 	return value();
@@ -861,14 +864,6 @@ template <typename... Args>
 T& result<T>::emplace(Args&&... args) {
 	DBG(assert(!diag_rep_.has_error()
 		&& "emplace on errored result silently drops the value");)
-	if constexpr (std::is_pointer_v<T> && sizeof...(Args) == 1) {
-		auto&& only_arg = (args, ...);
-		if (only_arg == nullptr) {
-			error(code::invalid_argument, "null pointer value");
-			static T null_value{};
-			return null_value;
-		}
-	}
 	value_.emplace(std::forward<Args>(args)...);
 	this->enforce_error_no_value_invariant();
 	return value();
@@ -877,12 +872,6 @@ T& result<T>::emplace(Args&&... args) {
 template <typename T>
 template <typename U>
 result<T>& result<T>::operator=(U&& v) {
-	if constexpr (std::is_pointer_v<T>) {
-		if (v == nullptr) {
-			error(code::invalid_argument, "null pointer value");
-			return *this;
-		}
-	}
 	DBG(assert(!diag_rep_.has_error()
 		&& "assigning to an errored result silently drops the value");)
 	value_.emplace(std::forward<U>(v));
@@ -963,28 +952,28 @@ typename result<T>::diagnostics_report&& result<T>::report() && {
 
 template <typename T>
 void result<T>::error(code c, std::string_view msg, int_t primary,
-		      std::initializer_list<attr> extra) {
+		      std::initializer_list<attr_in> extra) {
 	diag_rep_.error(c, msg, primary, extra);
 	this->enforce_error_no_value_invariant();
 }
 
 template <typename T>
 void result<T>::error(code c, std::string_view msg, size_t primary,
-		      std::initializer_list<attr> extra) {
+		      std::initializer_list<attr_in> extra) {
 	diag_rep_.error(c, msg, primary, extra);
 	this->enforce_error_no_value_invariant();
 }
 
 template <typename T>
 result<T>&& result<T>::with_error(code c, std::string_view msg, int_t primary,
-		      std::initializer_list<attr> extra) {
+		      std::initializer_list<attr_in> extra) {
 	error(c, msg, primary, extra);
 	return std::move(*this);
 }
 
 template <typename T>
 result<T>&& result<T>::with_assert_check_error(code c, std::string_view msg, int_t primary,
-		      std::initializer_list<attr> extra) {
+		      std::initializer_list<attr_in> extra) {
 	error(c, msg, primary, extra);
 	DBG(assert(this->is_well_formed());)
 	return std::move(*this);
@@ -992,14 +981,14 @@ result<T>&& result<T>::with_assert_check_error(code c, std::string_view msg, int
 
 template <typename T>
 result<T>&& result<T>::with_error(code c, std::string_view msg, size_t primary,
-		      std::initializer_list<attr> extra) {
+		      std::initializer_list<attr_in> extra) {
 	error(c, msg, primary, extra);
 	return std::move(*this);
 }
 
 template <typename T>
 result<T>&& result<T>::with_assert_check_error(code c, std::string_view msg, size_t primary,
-		      std::initializer_list<attr> extra) {
+		      std::initializer_list<attr_in> extra) {
 	error(c, msg, primary, extra);
 	DBG(assert(this->is_well_formed());)
 	return std::move(*this);
@@ -1017,44 +1006,44 @@ result<T>&& result<T>::with_assert_check_error(code c) {
 
 template <typename T>
 void result<T>::warning(std::string_view msg, int_t primary,
-			std::initializer_list<attr> extra) {
+			std::initializer_list<attr_in> extra) {
 	diag_rep_.warning(msg, primary, extra);
 }
 
 template <typename T>
 void result<T>::warning(std::string_view msg, size_t primary,
-			std::initializer_list<attr> extra) {
+			std::initializer_list<attr_in> extra) {
 	diag_rep_.warning(msg, primary, extra);
 }
 
 template <typename T>
 void result<T>::info(std::string_view msg, int_t primary,
-		     std::initializer_list<attr> extra) {
+		     std::initializer_list<attr_in> extra) {
 	diag_rep_.info(msg, primary, extra);
 }
 
 template <typename T>
 void result<T>::info(std::string_view msg, size_t primary,
-		     std::initializer_list<attr> extra) {
+		     std::initializer_list<attr_in> extra) {
 	diag_rep_.info(msg, primary, extra);
 }
 
 template <typename T>
 void result<T>::error(code c, std::string_view msg,
-		      std::initializer_list<attr> extra) {
+		      std::initializer_list<attr_in> extra) {
 	error(c, msg, 0, extra);
 }
 
 template <typename T>
 result<T>&& result<T>::with_error(code c, std::string_view msg,
-		      std::initializer_list<attr> extra) {
+		      std::initializer_list<attr_in> extra) {
 	error(c, msg, extra);
 	return std::move(*this);
 }
 
 template <typename T>
 result<T>&& result<T>::with_assert_check_error(code c, std::string_view msg,
-		      std::initializer_list<attr> extra) {
+		      std::initializer_list<attr_in> extra) {
 	error(c, msg, extra);
 	DBG(assert(this->is_well_formed());)
 	return std::move(*this);
@@ -1062,13 +1051,13 @@ result<T>&& result<T>::with_assert_check_error(code c, std::string_view msg,
 
 template <typename T>
 void result<T>::warning(std::string_view msg,
-			std::initializer_list<attr> extra) {
+			std::initializer_list<attr_in> extra) {
 	warning(msg, 0, extra);
 }
 
 template <typename T>
 void result<T>::info(std::string_view msg,
-		     std::initializer_list<attr> extra) {
+		     std::initializer_list<attr_in> extra) {
 	info(msg, 0, extra);
 }
 
@@ -1232,7 +1221,7 @@ template <typename T>
 template <typename U>
 std::optional<U> result<T>::merge_take(result<U>&& child) {
 	std::optional<U> v;
-	if (child.has_value()) v = std::move(child).value();
+	if (child.has_value()) v.emplace(std::move(child).value());
 	merge(std::move(child));
 	return v;
 }
@@ -1254,6 +1243,27 @@ std::optional<U> result<T>::take_or_error(result<U>&& child,
 	// error for the malformed child state: no value and no error.
 	if (!v && !child_well_formed && !has_error())
 		error(c, msg);
+
+	return v;
+}
+
+template <typename T>
+template <typename U>
+std::optional<U> result<T>::take_or_error(result<U>&& child,
+	code c, std::string_view msg, std::initializer_list<attr_in> extra)
+{
+	const bool child_well_formed = child.is_well_formed();
+
+	std::optional<U> v;
+	if (child.has_value())
+		v.emplace(std::move(child).value());
+
+	merge(std::move(child));
+
+	// Child errors already propagated through merge(). Only synthesize an
+	// error for the malformed child state: no value and no error.
+	if (!v && !child_well_formed && !has_error())
+		error(c, msg, extra);
 
 	return v;
 }
@@ -1319,7 +1329,7 @@ result<T> fail(struct report rep) {
 
 template <typename T>
 result<T> error(code c, std::string_view msg, int_t primary,
-		std::initializer_list<attr> extra) {
+		std::initializer_list<attr_in> extra) {
 	report r;
 	r.error(c, msg, primary, extra);
 	return fail<T>(std::move(r));
@@ -1327,7 +1337,7 @@ result<T> error(code c, std::string_view msg, int_t primary,
 
 template <typename T>
 result<T> error(code c, std::string_view msg, size_t primary,
-		std::initializer_list<attr> extra) {
+		std::initializer_list<attr_in> extra) {
 	report r;
 	r.error(c, msg, primary, extra);
 	return fail<T>(std::move(r));

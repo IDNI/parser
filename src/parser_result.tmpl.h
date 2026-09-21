@@ -17,8 +17,9 @@ inline void report_parse_error(idni::diagnostics::report& r,
 	using namespace idni::diagnostics;
 	using namespace idni::parser_strings;
 	auto msg = err.to_str(verbosity);
-	r.error(code::parse_error, msg, err.loc,
-		{{label::line, err.line},
+	r.error(code::parse_error, msg,
+		{{label::loc,  err.loc},
+		 {label::line, err.line},
 		 {label::col,  err.col}});
 }
 

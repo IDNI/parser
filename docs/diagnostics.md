@@ -59,10 +59,9 @@ clash with the `std::string_view` name-constructor). For
 
 
 ### bool has_value() const;
-### explicit operator bool() const;
 ### bool has_error() const;
 
-Status queries. `has_error()` is `true` if the report contains any error node.
+Status queries. `has_error()` is `true` if the report contains any error node. `result<T>` has no conversion to `bool`: call `has_value()` for success and `value()` for a held value of type `bool`, so the two questions never collapse into one spelling.
 
 
 ### T& value() &;
@@ -74,7 +73,9 @@ Status queries. `has_error()` is `true` if the report contains any error node.
 ### T* operator->() requires !std::is_pointer_v\<T\>;
 ### const T* operator->() const requires !std::is_pointer_v\<T\>;
 
-Dereference observers (mirror `std::expected`; omitted for pointer `T` — use `value()` / implicit conversion).
+Dereference observers (mirror `std::expected`; omitted for pointer `T` — call `value()` instead).
+
+A null pointer is a legitimate value for `result<T>`. The container does not treat a null pointer as an error. A producer that treats null as an error must report that error itself. Call `has_value()` first: it tells a held null pointer apart from an absent value, which `value()` alone cannot do.
 
 ### T& emplace(T&& v);
 ### template \<typename... Args\> T& emplace(Args&&... args);
@@ -86,13 +87,6 @@ Set the success payload in place. `emplace` / `operator=` match
 silently dropped (see invariant below). In debug builds (`DBG(...)`), an
 assertion fires so the misuse is loud. Prefer `emplace` at the end of a
 scope; `return result<T>(std::move(x))` when the report is empty.
-
-
-### operator T() const requires std::is_pointer_v\<T\>;
-### bool operator==(std::nullptr_t) const requires std::is_pointer_v\<T\>;
-### bool operator!=(std::nullptr_t) const requires std::is_pointer_v\<T\>;
-
-For pointer-valued results, an implicit conversion to `T` returns the held pointer (or `nullptr` if no value) and `== nullptr` / `!= nullptr` check presence directly. Lets `result<Forest*>` be used wherever `Forest*` is.
 
 
 ### report& report() &;
@@ -110,6 +104,16 @@ Access the embedded diagnostics tree. The `&&` overload moves the report out —
 ### void info(std::string_view msg, std::initializer_list<attr> extra);
 
 Push a message (same names as `report::error` / `warning` / `info`). Each has a primary-form (with `int64_t primary`) and a shorthand that takes only the attribute list. `error` enforces the *errored result carries no value* invariant.
+
+
+### template <typename U = T> result&& with_value(U&& value);
+### result&& with_error(code c, ...);
+### result&& with_error(code c);
+
+These helpers set a value or an error and return the result as an rvalue. Use
+them only in a return statement. The `with_assert_check_value` and
+`with_assert_check_error` variants also check `is_well_formed()` in a debug
+build.
 
 
 ### void print(std::ostream& os) const;
@@ -161,6 +165,27 @@ Append the child's report into this one, drop its value, and enforce the value/e
 Take the child's value (if any), merge its report into this result, return the value. Replaces the manual extract-then-`merge` pattern.
 
 
+### template <typename U> std::optional<U> take_or_error(result<U>&& child, code c, std::string_view msg);
+
+Take and merge a child result. If the child has neither a value nor an error,
+add the supplied error. An existing child error passes through unchanged.
+
+
+### template <typename F> auto and_then(F&& f) &&;
+### template <typename F> auto transform(F&& f) &&;
+### template <typename F> result<T> or_else(F&& f) &&;
+### T value_or(T fallback) &&;
+
+`and_then` calls a fallible next step. `transform` calls an infallible value
+conversion. Both preserve report order and skip the function after an error.
+
+`or_else` runs only after an error. A successful recovery changes the old
+errors to warnings before it merges the alternative report.
+
+`value_or` returns a fallback after failure and intentionally discards the
+report. Use it only where the caller explicitly owns that report loss.
+
+
 ### bool is_well_formed() const;
 
 Sanity check: `has_value() || has_error()`. A well-formed result is either a value or an error — never an empty/clean result with no errors.
@@ -170,7 +195,7 @@ Sanity check: `has_value() || has_error()`. A well-formed result is either a val
 
 | `std::expected<T,E>` | `result<T>` |
 |--------------------|-------------|
-| `has_value()`, `operator bool` | same |
+| `has_value()` | same (no `operator bool`: call `has_value()` explicitly) |
 | `value()`, `operator*` | same (+ `operator->` for non-pointer `T`) |
 | `emplace`, `operator=(U&&)` | same |
 | `error()` → `unexpected<E>` | errors live in `report()` (tree, not single `E`) |
@@ -243,7 +268,7 @@ Drops all nodes, the interned string table, and the open-scope stack.
 ### key intern_dynamic(std::string_view s);
 ### std::string_view str(key id) const;
 
-Interns a string and returns its `key`. `str(id)` resolves a key back to its string view. Empty strings map to `report::none` (key 0). Keys are `int_t`: positive ids are immutable built-in labels from `parser_strings::dict`, while unknown/user labels are report-local dynamic strings with negative ids.
+Interns a string and returns its `key`. `str(id)` resolves a key back to its string view. Empty strings map to `report::none` (key 0). Keys are `int_t`: positive ids resolve through `parser_strings::str`, while unknown or user labels are report-local dynamic strings with negative ids.
 
 <a id="thread-safety"></a>
 Thread-safety: separate `report` objects can be used concurrently because built-in labels are immutable and dynamic labels are report-local. A single `report` object is not internally synchronized; concurrent mutation of the same report still requires external locking.
@@ -307,11 +332,11 @@ Records a memory reading in kilobytes (`code::info_kb`). Negative values trip a 
 ### void info(key msg, int64_t primary = 0, std::initializer_list<attr> extra = {});
 ### void info(std::string_view msg, int64_t primary = 0, std::initializer_list<attr> extra = {});
 
-Push a diagnostic message. For errors, `c` must satisfy `is_error(c)` (top two bits `00`, range `0x0000`–`0x3FFF`). `primary` is a context-dependent integer (a location, a count, etc.); `format_message` renders it as `loc=N` for errors with a non-empty message (including `loc=0`) and as `value=N` otherwise when nonzero. `extra` is an optional list of `attr{key, value}` pairs.
+Push a diagnostic message. For errors, `c` must satisfy `is_error(c)` (top two bits `00`, range `0x0000`–`0x3FFF`). `primary` sets the value field of the node. `format_message` renders that field as `value=N` only when it is nonzero. A producer that knows a location attaches it as a `label::loc` attribute in `extra` instead of passing it as `primary`. That attribute then renders like any other, as `loc=N`, through `format_message`. `extra` is an optional list of `attr{key, value}` pairs.
 
 ```
-r.error(code::parse_error, "unexpected token", offset,
-        {{r.intern("line"), line}, {r.intern("col"), col}});
+r.error(code::parse_error, "unexpected token",
+        {{label::loc, offset}, {label::line, line}, {label::col, col}});
 ```
 
 
@@ -327,7 +352,7 @@ Merges another report into this one under the current scope. Parent links and at
 
 ### std::string format_message(size_t node_idx) const;
 
-Formats a single message node as `"<text> (key=value ...)"` when attributes or `loc`/`value` are present — extras are grouped in parentheses after the message (no severity prefix). Returns empty if the node is not a message.
+Formats a single message node as `"<text> (key=value ...)"` when attributes are present, or when its `value` is nonzero. Extras group in parentheses after the message, with no severity prefix. Returns empty if the node is not a message.
 
 
 ### void print(const sinks& s) const;
@@ -450,19 +475,29 @@ struct attr { int_t key = 0; int64_t value = 0; };
 
 Key-value attribute carried alongside a message node. `key` is an interned name in the same table as scope/message names. `int_t` is the project-wide signed integer type defined in [`defs.h`](../src/defs.h).
 
+The `LABELS` macro in `parser_strings.h` declares a set of well-known labels for `key`: `loc`, `line`, `col`, `name`, and `value`. Ten more labels exist for common diagnostic shapes: `type_name`, `path`, `size`, `exit_code`, `timeout`, `limit`, `expected`, `actual`, `time_point`, and `width`. A caller may also intern an arbitrary string as a key.
+
+Every `extra` list above takes `attr_in`, not `attr`. `attr_in` also accepts a `std::string_view` value and interns it when the report records the node, so a caller never interns a text value by hand.
+
+A fixed subset of labels carries text instead of a number: `name`, `value`, `type_name`, `path`, and `expected`. This subset has a name, `parser_strings::is_text_label`. `report::format_attr_value`, `report::append_impl`, and `report::resolve` all ask it, not the sign of the value, to tell text from a number. The `resolve` function enforces the rule. It interns the value as text when the label is a text label. It keeps the value as a number otherwise. A genuine negative number and an interned string key otherwise look the same. A label outside the subset always carries a number.
+
+A text value therefore needs a static text label. A label a caller interns at run time carries a negative key. The `is_text_label` predicate answers false for a negative key, so the value under it is a number. A debug build asserts when a call site passes text under a numeric label, or a number under a text label. A release build has no assert, so `resolve` renders a text label with no text as `<missing text>`. The rendered attribute therefore names the wrong call site in every build.
+
+`actual` is a numeric label, even though its name pairs with `expected`. Every use of `label::actual` in this project carries a count, next to `label::limit`.
+
 
 ## parser-specific helpers
 
 Parser counters and scope names live in `src/parser_strings.h` under `idni::parser_strings`:
 
 * `names` — `constexpr std::string_view` display labels (`"grammar load"`, `"parse"`, `"build forest"`, …).
-* `messages` — static message prefixes (`cannot open file: `, …).
+* `messages` — static message texts (`cannot open file`, …). The filename travels as a `label::path` attribute, not as concatenated text.
 * `keys` — immutable positive `int_t` ids for built-in labels; `parser<C,T>` privately inherits `keys`.
-* `dict` / `dict_size` / `dict_reset` — read-only lookup for built-in static labels (`dict_reset` is a compatibility no-op).
+* `str(key)` — read-only lookup for a built-in static label.
 * `counters` — plain struct of `size_t` counters (one field per `PARSER_DIAG_COUNTERS` entry); incremented in the parsing hot loop when `TAU_PARSER_MEASURE_COUNTERS` is defined.
 * `flush_counters(report&, const counters&, const keys&)` — pushes every non-zero counter into the report at end of parse.
 
-Report keys are `int_t`: positive ids resolve through the immutable `parser_strings::dict` static-label table, negative ids are report-local dynamic strings (`intern_dynamic`).
+Report keys are `int_t`: positive ids resolve through `parser_strings::str`, and negative ids are report-local dynamic strings (`intern_dynamic`).
 
 
 ## interaction with the parser

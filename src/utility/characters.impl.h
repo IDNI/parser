@@ -93,45 +93,70 @@ inline std::string to_std_string(const char32_t& ch) {
 	return to_std_string(to_utf8string(ch));}
 
 // UTF-16 codec — defined below peek_codepoint / emit_codepoint declarations
-// because the conversion functions use them.
-inline size_t peek_codepoint_u16(const char16_t* s, size_t l, char32_t& ch) {
+// because the conversion functions use them. Templated on the 16-bit code
+// unit type (char16_t, or wchar_t on Windows) since both only ever read/write
+// 16-bit values.
+template <utf16_unit UTF16Unit>
+inline size_t peek_codepoint_u16(const UTF16Unit* s, size_t l, char32_t& ch) {
 	ch = static_cast<char32_t>(-1);
 	if (!l) return 0;
-	char16_t a = s[0];
+	char16_t a = static_cast<char16_t>(s[0]);
 	if (a < 0xD800 || a >= 0xE000) { ch = a; return 1; }
 	if (a >= 0xDC00) return -1;            // unpaired low surrogate
 	if (l < 2) return -1;
-	char16_t b = s[1];
+	char16_t b = static_cast<char16_t>(s[1]);
 	if (b < 0xDC00 || b >= 0xE000) return -1;
 	ch = 0x10000 + ((static_cast<char32_t>(a) - 0xD800) << 10)
 				+ (static_cast<char32_t>(b) - 0xDC00);
 	return 2;
 }
-inline size_t emit_codepoint_u16(char32_t ch, char16_t* out) {
+template <utf16_unit UTF16Unit>
+inline size_t emit_codepoint_u16(char32_t ch, UTF16Unit* out) {
 	if (ch < 0x10000) {
 		if (ch >= 0xD800 && ch < 0xE000) return 0; // surrogate
-		out[0] = static_cast<char16_t>(ch);
+		out[0] = static_cast<UTF16Unit>(ch);
 		return 1;
 	}
 	if (ch >= 0x110000) return 0;
 	ch -= 0x10000;
-	out[0] = static_cast<char16_t>(0xD800 | (ch >> 10));
-	out[1] = static_cast<char16_t>(0xDC00 | (ch & 0x3FF));
+	out[0] = static_cast<UTF16Unit>(0xD800 | (ch >> 10));
+	out[1] = static_cast<UTF16Unit>(0xDC00 | (ch & 0x3FF));
 	return 2;
 }
-inline std::u16string to_u16string(const std::string& s) {
-	std::u16string out; out.reserve(s.size());
+// Shared loop bodies behind to_u16string/to_string and, on Windows,
+// utf8_to_wide/wide_to_utf8 — templated on the UTF-16 unit type so no copy
+// is needed between std::u16string and std::wstring.
+template <utf16_unit UTF16Unit>
+inline std::basic_string<UTF16Unit> to_utf16_(std::string_view s) {
+	std::basic_string<UTF16Unit> out; out.reserve(s.size());
 	auto* p = reinterpret_cast<const utf8char*>(s.data());
 	size_t l = s.size(); char32_t cp;
 	while (l) {
 		size_t n = peek_codepoint(p, l, cp);
 		if (n == 0 || n == static_cast<size_t>(-1)) break;
-		char16_t buf[2];
-		size_t m = emit_codepoint_u16(cp, buf);
+		UTF16Unit buf[2];
+		size_t m = emit_codepoint_u16<UTF16Unit>(cp, buf);
 		out.append(buf, m);
 		p += n; l -= n;
 	}
 	return out;
+}
+template <utf16_unit UTF16Unit>
+inline std::string from_utf16_(std::basic_string_view<UTF16Unit> s) {
+	std::string out; out.reserve(s.size());
+	auto* p = s.data(); size_t l = s.size(); char32_t cp;
+	while (l) {
+		size_t n = peek_codepoint_u16<UTF16Unit>(p, l, cp);
+		if (n == 0 || n == static_cast<size_t>(-1)) break;
+		utf8char buf[4];
+		size_t m = emit_codepoint(cp, buf);
+		out.append(reinterpret_cast<const char*>(buf), m);
+		p += n; l -= n;
+	}
+	return out;
+}
+inline std::u16string to_u16string(const std::string& s) {
+	return to_utf16_<char16_t>(s);
 }
 inline std::u16string to_u16string(const utf8string& s) {
 	return to_u16string(to_string(s));
@@ -146,17 +171,7 @@ inline std::u16string to_u16string(const std::u32string& s) {
 	return out;
 }
 inline std::string to_string(const std::u16string& s) {
-	std::string out; out.reserve(s.size());
-	auto* p = s.data(); size_t l = s.size(); char32_t cp;
-	while (l) {
-		size_t n = peek_codepoint_u16(p, l, cp);
-		if (n == 0 || n == static_cast<size_t>(-1)) break;
-		utf8char buf[4];
-		size_t m = emit_codepoint(cp, buf);
-		out.append(reinterpret_cast<const char*>(buf), m);
-		p += n; l -= n;
-	}
-	return out;
+	return from_utf16_<char16_t>(s);
 }
 inline utf8string to_utf8string(const std::u16string& s) {
 	auto t = to_string(s);
@@ -179,11 +194,10 @@ inline std::string to_std_string(const std::u16string& s) {
 
 #ifdef _WIN32
 inline std::wstring utf8_to_wide(const std::string& s) {
-	auto u16 = to_u16string(s);
-	return std::wstring(u16.begin(), u16.end());
+	return to_utf16_<wchar_t>(s);
 }
 inline std::string wide_to_utf8(const std::wstring& w) {
-	return to_string(std::u16string(w.begin(), w.end()));
+	return from_utf16_<wchar_t>(w);
 }
 #endif
 
@@ -230,6 +244,23 @@ inline size_t peek_codepoint(const utf8char* str, size_t l, char32_t& ch) {
 	else if (ch == 0xf4) { if (s[1] > 0x8f) return -1; }
 	ch = ((ch&7)<<18) | ((s[1]&0x3f)<<12) | ((s[2]&0x3f)<<6) | (s[3]&0x3f);
 	return 4;
+}
+inline bool is_valid_utf8(std::string_view s, diagnostics::report* rep) {
+	using label = idni::parser_strings::label;
+	const auto* p = reinterpret_cast<const utf8char*>(s.data());
+	size_t l = s.size(), i = 0;
+	while (i < l) {
+		char32_t cp;
+		size_t n = peek_codepoint(p + i, l - i, cp);
+		if (n == 0 || n == static_cast<size_t>(-1)) {
+			if (rep) rep->error(diagnostics::code::invalid_argument,
+				"invalid UTF-8 sequence",
+				{{label::offset, static_cast<int_t>(i)}});
+			return false;
+		}
+		i += n;
+	}
+	return true;
 }
 inline size_t codepoint_size(char32_t ch) {
 	return    ch < 0x80     ? 1

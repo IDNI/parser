@@ -5,9 +5,12 @@
 #define __IDNI__PARSER__UTILITY__CHARACTERS_H__
 #include <vector>
 #include <string>
+#include <string_view>
 #include <cstdint>
+#include <concepts>
 
 #include "utf8char_traits.h"
+#include "diagnostics.h"
 
 namespace idni {
 
@@ -54,6 +57,12 @@ template <> struct char_traits_for<utf8char> { using type = utf8char_traits; };
 template <typename CharT>
 using char_traits_for_t = typename char_traits_for<CharT>::type;
 
+// A UTF-16 code unit: char16_t, or wchar_t only where it is that width
+// (excludes Linux, where wchar_t is 32 bits).
+template <typename CharT>
+concept utf16_unit = std::same_as<CharT, char16_t>
+	|| (std::same_as<CharT, wchar_t> && sizeof(wchar_t) == 2);
+
 // from char*/string/char32_t*/u32string to string or u32string
 template <typename CharT>
 std::basic_string<CharT, char_traits_for_t<CharT>> from_cstr(const char *);
@@ -84,19 +93,28 @@ bool is_mb_codepoint(utf8char ch, uint8_t p = 0);
  */
 size_t peek_codepoint(const utf8char* s, size_t l, char32_t& ch);
 /**
- * convert const char16_t* sequence s of 1-2 utf-16 code units into codepoint &ch
+ * Validate that s is well-formed UTF-8 by walking it with peek_codepoint.
+ * @param rep optional sink for the error node
+ * @return true if s is valid UTF-8
+ */
+bool is_valid_utf8(std::string_view s, diagnostics::report* rep = nullptr);
+/**
+ * convert a sequence s of 1-2 UTF-16 code units (char16_t or wchar_t on
+ * Windows) into codepoint &ch
  * @param s string of utf-16 code units
  * @param l size of the s string in code units
  * @param ch reference to a codepoint read from string
  * @return size (0, 1 - 2 code units) or (size_t) -1 if illegal UTF-16
  */
-size_t peek_codepoint_u16(const char16_t* s, size_t l, char32_t& ch);
+template <utf16_unit UTF16Unit>
+size_t peek_codepoint_u16(const UTF16Unit* s, size_t l, char32_t& ch);
 /**
  * Convert codepoint to UTF-16 code units written to out (size 2 sufficient).
  * @return number of code units written (0, 1, or 2). 0 if codepoint is invalid
  *         (surrogate or > U+10FFFF).
  */
-size_t emit_codepoint_u16(char32_t ch, char16_t* out);
+template <utf16_unit UTF16Unit>
+size_t emit_codepoint_u16(char32_t ch, UTF16Unit* out);
 /**
  * Returns size of a unicode codepoint in bytes
  * @return size (0-4)

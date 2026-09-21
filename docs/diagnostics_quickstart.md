@@ -114,12 +114,15 @@ void validate(report& r, const input& in) {
 }
 ```
 
-Attach structured attributes to messages:
+Attach structured attributes to messages. A producer that knows where the
+error sits attaches the offset as a `label::loc` attribute, alongside any
+other context:
 
 ```cpp
-r.error(code::parse_error, "unexpected token", offset,
-    {{r.intern("line"), line_num},
-     {r.intern("col"),  col_num}});
+r.error(code::parse_error, "unexpected token",
+    {{label::loc,  offset},
+     {label::line, line_num},
+     {label::col,  col_num}});
 ```
 
 Grammar-specific codes include `unknown_char_class` (undefined character class name). See the [error `code` table](diagnostics.md#code) in the reference.
@@ -163,11 +166,14 @@ r.report().print({ .error = &cerr, .warning = &cerr, .info = &cout });
 
 ### 6.3 Pointer results
 
-For pointer-valued results, `result<T*>` supports `nullptr` comparison:
+A null pointer is a legitimate value for a pointer-valued result, so
+`result<T*>` no longer compares directly to `nullptr`. Call `has_value()` to
+check for a value, and compare the value itself when a held null pointer
+matters:
 
 ```cpp
 result<Forest*> r = build_forest();
-if (r != nullptr) {
+if (r.has_value()) {
     traverse(r.value());
 }
 ```
@@ -212,7 +218,8 @@ on the way to success:
 
 ```cpp
 result<Forest> build_forest(result<Grammar>&& g) {
-    if (!g) return forward_as<Forest>(std::move(g), Forest{});
+    if (!g.has_value())
+        return forward_as<Forest>(std::move(g), Forest{});
     Forest f = make_forest(g.value());
     return forward_as<Forest>(std::move(g), std::move(f));
 }
@@ -285,8 +292,10 @@ With no scope open, the child attaches under the report root.
 `report::print` is the single primitive. One pre-order tree walk
 emits each node to a per-band sink:
 
-- **errors** → indent 0, formatted as `<text> (attrs… loc=…)` when extras exist (no `error:` prefix)
-- **warnings** → indent 0, formatted as `<text> (attrs… value=…)` when extras exist (no `warning:` prefix)
+- **errors** and **warnings** → indent 0, formatted by the same
+  `format_message` as `<text> (attrs… value=…)` when extras exist (no
+  `error:` / `warning:` prefix). A known location shows there as `loc=…`,
+  among the other attrs.
 - **info band** (`info`, `info_micros`, `info_count`, `info_kb`)
   → tab-indented per tree depth, formatted as `<label>: <value>`
 
