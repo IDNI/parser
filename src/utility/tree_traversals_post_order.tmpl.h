@@ -76,14 +76,29 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 	inc_depth();
 #endif //MEASURE_TRAVERSER_DEPTH
 
-	auto call = [](auto& cb, tref n) -> tref {
-		tref nn = cb(n);
+	auto get_parent = [&upos, &stack]() -> tref {
+		return upos.size() < 2 ? nullptr : stack[upos[upos.size() - 2]];
+	};
+	// Call callback with parent if it is invocable with tref, tref
+	// Otherwise, call it just with tref
+	auto call = [](auto& cb, tref n, tref parent) -> tref {
+		tref nn;
+		if constexpr (accepts_tref_tref<decltype(cb)>::value)
+			nn = cb(n, parent);
+		else nn = cb(n);
 		if (nn == n) return n;
 		if (nn == nullptr) return nullptr;
 		const auto& c_tree = tree::get(nn);
 		return bintree<node>::get(c_tree.value,
 						c_tree.left_child(),
 						tree::get(n).right_sibling());
+	};
+
+	// Call predicate with parent if it is invocable with tref, tref
+	auto call_pred = [](auto& cb, tref x, tref parent) -> bool {
+		if constexpr (accepts_tref_tref<decltype(cb)>::value)
+			return cb(x, parent);
+		else return cb(x);
 	};
 
 	while (true) {
@@ -118,7 +133,7 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 		// Check if node has children
 		if (!tree::get(c_node).has_child()) {
 			// Process node and move to next
-			c_node = call(f, c_node);
+			c_node = call(f, c_node, get_parent());
 			if (c_node == nullptr) return nullptr;
 			upos.pop_back();
 #ifdef MEASURE_TRAVERSER_DEPTH
@@ -138,7 +153,7 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 			if (std::equal(stack.begin() + (upos.back() + 1),
 				stack.end(), ch_range.begin(), ch_range.end()))
 			{
-				tref res = call(f, c_node);
+				tref res = call(f, c_node, get_parent());
 				if (res == nullptr) return nullptr;
 				if constexpr (slot != 0) m.emplace(
 					std::make_pair(c_node, slot), res);
@@ -161,7 +176,7 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 			if (res == nullptr) return nullptr;
 			// Pop children from stacks
 			stack.erase(stack.end() - c_pos, stack.end());
-			res = call(f, res);
+			res = call(f, res, get_parent());
 			if (res == nullptr) return nullptr;
 			if constexpr (slot != 0)
 				m.emplace(std::make_pair(c_node, slot), res);
@@ -172,10 +187,11 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 			dec_depth();
 #endif //MEASURE_TRAVERSER_DEPTH
 		} else {
+			// Read the parent before push_back invalidates c_node
+			tref parent = c_node;
 			// Add next child
 			stack.push_back(c);
-			// c_node can become invalid due to push_back
-			if (visit_subtree(c)) {
+			if (call_pred(visit_subtree, c, parent)) {
 #ifdef MEASURE_TRAVERSER_DEPTH
 				inc_depth();
 #endif //MEASURE_TRAVERSER_DEPTH

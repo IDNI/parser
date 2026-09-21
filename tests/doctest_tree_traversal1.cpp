@@ -95,6 +95,39 @@ TEST_SUITE("post_order::apply_unique") {
 		// Unique mode caches non-leaf nodes: 'd(e)' transformed once
 		CHECK( calls == 1 );
 	}
+
+	TEST_CASE("one-arg callback still compiles and runs unchanged") {
+		tref root = n('a', {n('b'), n('a')});
+		auto result = post_order<char>(root).apply_unique(tr_a_z);
+		auto& t = chtree::get(result);
+		CHECK( t.value == 'z' );
+		CHECK( t.second_tree().value == 'z' );
+	}
+
+	TEST_CASE("two-arg callback receives the original, not yet "
+		"rebuilt, parent") {
+		// root='r' > q='q' > a='a'. q is itself renamed during the
+		// same traversal that renames a, after a's callback runs.
+		tref root = n('r', {n('q', {n('a')})});
+		char seen_parent = 0;
+		auto tr = [&](tref nd, tref parent) -> tref {
+			auto x = chtree::get(nd);
+			if (x.value == 'a') {
+				seen_parent = parent
+					? chtree::get(parent).value : 0;
+				return bintree<char>::get('z', x.l, x.r);
+			}
+			if (x.value == 'q')
+				return bintree<char>::get('Q', x.l, x.r);
+			return nd;
+		};
+		auto result = post_order<char>(root).apply_unique(tr);
+		CHECK( seen_parent == 'q' );
+		auto& t = chtree::get(result);
+		CHECK( t.value == 'r' );
+		CHECK( t.first_tree().value == 'Q' );
+		CHECK( t.first_tree().first_tree().value == 'z' );
+	}
 }
 
 // ============================================================================

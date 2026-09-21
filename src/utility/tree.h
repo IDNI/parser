@@ -995,6 +995,9 @@ bool is_cached_subtree(tref n, const std::unordered_set<tref>& cache);
 /**
  * @brief Struct for tree traversals in post order
  * @tparam node Tree node type
+ *
+ * A callback takes `(tref)` or `(tref, tref parent)`. The parent is the
+ * original node, before the traversal rebuilds it. The root gets `nullptr`.
  */
 template <typename node>
 struct post_order {
