@@ -518,6 +518,8 @@ struct grammar {
 	 */
 	lit<C, T> nt(const std::basic_string<C>& s);
 	const lit<C, T>& get_start() const;
+	/// Returns the nonterminal symbol table this grammar was built with.
+	const nonterminals<C, T>& get_nts() const { return nts; }
 	// Bottom-up derivation fixpoint.
 	// seeds: (nonterminal_literal, position) pairs representing known memberships.
 	// Returns: set of all derivable (literal, span) pairs via unit-rule closure.
