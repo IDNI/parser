@@ -570,6 +570,29 @@ the first alternative's capture.
 
 ---
 
+## `lcrs_tree<T>` forwarding
+
+`lcrs_tree<T>` (`utility/tree.h`) carries the same operations as member
+functions, for any matcher object that satisfies its `tree_matcher`
+concept (a `match(tref)` and a `search(tref)`, each returning something
+bool-like). A `treemr::matcher<T>` satisfies it.
+
+```cpp
+t.match(m);
+t.search(m);
+t.search_all(m);
+t.replace(m, fn);
+t.replace_if(m, fn, query);
+t.replace_until(m, fn, query);
+t.trim(m);
+t.trim_top(m);
+```
+
+`utility/` does not depend on `format/treemr/`, so `tree_matcher` names
+only the shape a matcher needs, never `treemr::matcher<T>` itself.
+
+---
+
 ## Files
 
 | file | purpose |

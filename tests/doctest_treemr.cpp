@@ -2468,3 +2468,74 @@ TEST_SUITE("treemr - nt_source overloads") {
 		CHECK(true);
 	}
 }
+
+// ===========================================================================
+// N. lcrs_tree forwarding - match/search/search_all/replace*/trim* reach
+// the matcher via the tree_matcher-constrained overloads
+// ===========================================================================
+
+TEST_SUITE("treemr - tree forwarding methods") {
+
+	TEST_CASE("N1: t.match/t.search/t.search_all reach the matcher") {
+		parsed fx{ CSV_TGF, "12,34" };
+		auto m = matcher_for<char, char>(
+			fx.nts, string_view{ "cell" }).value();
+		const auto& t = parser<char>::tree::get(fx.root);
+
+		CHECK_FALSE(t.match(m));    // the tree root is "start", not "cell"
+		CHECK(t.search(m));
+		CHECK(t.search_all(m).size() == 2);
+	}
+
+	TEST_CASE("N2: t.replace/t.replace_if/t.replace_until reach "
+		"the matcher")
+	{
+		parsed fx{ REPLACE_TGF, "1+2" };
+		auto m = matcher_for<char, char>(
+			fx.nts, string_view{ "add > (expr) '+' (expr)" }).value();
+		const auto& t = parser<char>::tree::get(fx.root);
+
+		auto fn = [&](const match_result& mt) -> tref {
+			tref minus = make_t_leaf('-');
+			return make_nt_node(fx.nts, "sub",
+				{ mt.captures[1], minus, mt.captures[0] });
+		};
+		query_fn always_descend = [](tref) { return true; };
+		query_fn never_skip     = [](tref) { return false; };
+
+		CHECK(count_nt(t.replace(m, fn), "sub", fx.nts) == 1);
+		CHECK(count_nt(t.replace_if(m, fn, always_descend),
+			"sub", fx.nts) == 1);
+		CHECK(count_nt(t.replace_until(m, fn, never_skip),
+			"sub", fx.nts) == 1);
+	}
+
+	TEST_CASE("N3: t.trim_top(m) resolves to the matcher overload, "
+		"not the older predicate overload")
+	{
+		// The unconstrained lcrs_tree::trim_top(const auto& query)
+		// also exists; a `matcher` argument must resolve to the
+		// tree_matcher-constrained overload instead, since a bare
+		// matcher has no operator() for the predicate form to call.
+		nonterminals<char> nts;
+		auto ad = parse_node_adapter<char, char>(nts);
+		tref inner = make_nt_node(nts, "target", {});
+		tref outer = make_nt_node(nts, "target", { inner });
+		tref root  = make_nt_node(nts, "root", { outer });
+
+		auto pat = treemr::compile("target!");
+		REQUIRE(pat.has_value());
+		matcher<pnode_type<char, char>> m(*pat, ad);
+
+		const auto& t = lcrs_tree<pnode_type<char, char>>::get(root);
+		tref trimmed = t.trim(m);
+		CHECK(lcrs_tree<pnode_type<char, char>>::get(
+			trimmed).first() == nullptr);
+
+		tref trimmed_top = t.trim_top(m);
+		tref remaining = lcrs_tree<pnode_type<char, char>>::get(
+			trimmed_top).first();
+		REQUIRE(remaining != nullptr);
+		CHECK(ad.is_nt(remaining, "target"));
+	}
+}

@@ -444,6 +444,17 @@ using subtree_unordered_map = std::unordered_map<tref, PT,
 template <typename node>
 bool subtree_vec_contains(const trefs& vec, tref val);
 
+// Structural constraint for a matcher usable with the forwarding methods
+// below (match/search/search_all/replace/...). utility/ must not depend
+// on format/treemr/, so this names the shape a matcher needs - `match`
+// and `search` each taking a `tref` and returning something bool-like -
+// rather than naming treemr::matcher<NodeT> itself.
+template <typename M>
+concept tree_matcher = requires(M& m, tref n) {
+	{ m.match(n) } -> std::convertible_to<bool>;
+	{ m.search(n) } -> std::convertible_to<bool>;
+};
+
 /**
  * @brief Left child right sibling tree
  * @tparam T The type of the tree node value
@@ -954,6 +965,53 @@ struct lcrs_tree : public bintree<T> {
 	// apply a substitution to a rule according to a given matcher, this method is
 	// use internaly by apply and apply with skip.
 	tref apply(tref s, const auto& matcher) const;
+
+	// treemr matcher API available directly on the tree. `matcher` is
+	// anything shaped like treemr::matcher<T> (see tree_matcher above);
+	// trailing args forward as-is, so this header never names treemr's
+	// ambig_mode. `trim_top` also exists above, unconstrained: this
+	// overload wins for a `matcher` argument by constrained partial
+	// ordering, verified with a real call in the treemr test suite.
+
+	template <tree_matcher M, typename... Args>
+	auto match(M& matcher, Args&&... args) const {
+		return matcher.match(get(), std::forward<Args>(args)...);
+	}
+
+	template <tree_matcher M, typename... Args>
+	auto search(M& matcher, Args&&... args) const {
+		return matcher.search(get(), std::forward<Args>(args)...);
+	}
+
+	template <tree_matcher M, typename... Args>
+	auto search_all(M& matcher, Args&&... args) const {
+		return matcher.search_all(get(), std::forward<Args>(args)...);
+	}
+
+	template <tree_matcher M, typename... Args>
+	auto replace(M& matcher, Args&&... args) const {
+		return matcher.replace(get(), std::forward<Args>(args)...);
+	}
+
+	template <tree_matcher M, typename... Args>
+	auto replace_if(M& matcher, Args&&... args) const {
+		return matcher.replace_if(get(), std::forward<Args>(args)...);
+	}
+
+	template <tree_matcher M, typename... Args>
+	auto replace_until(M& matcher, Args&&... args) const {
+		return matcher.replace_until(get(), std::forward<Args>(args)...);
+	}
+
+	template <tree_matcher M, typename... Args>
+	auto trim(M& matcher, Args&&... args) const {
+		return matcher.trim(get(), std::forward<Args>(args)...);
+	}
+
+	template <tree_matcher M, typename... Args>
+	auto trim_top(M& matcher, Args&&... args) const {
+		return matcher.trim_top(get(), std::forward<Args>(args)...);
+	}
 };
 
 template <typename node>
