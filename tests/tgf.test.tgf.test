@@ -3,7 +3,7 @@
 # own tree shape, not the treemr grammar.
 #
 # To run:
-#   tgf tgf_test.tgf test tgf_test.tgf.test
+#   tgf tgf.test.tgf test tgf.test.tgf.test
 
 # ===========================================================================
 # comment, whitespace
@@ -239,7 +239,7 @@ negate!           : "~".
 ~__ > comment : " " @raw.
 
 # ===========================================================================
-# rejects -- inputs the tgf_test grammar itself must refuse
+# rejects -- inputs the tgf.test grammar itself must refuse
 # ===========================================================================
 
 # missing terminator: an entry needs '.' or a nested block to close

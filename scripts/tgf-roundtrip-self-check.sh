@@ -11,7 +11,7 @@ ENTRIES=(
 	"src/format/json/json.tgf|src/format/json|json_parser|1"
 	"src/tgf/tgf_repl.tgf|src/tgf|tgf_repl_parser|1"
 	"src/format/treemr/treemr.tgf|src/format/treemr|treemr_parser|1"
-	"src/format/tgf.test/tgf_test.tgf|src/format/tgf.test|tgf_test_parser|1"
+	"src/format/tgf.test/tgf.test.tgf|src/format/tgf.test|tgf_test_parser|1"
 )
 
 TMP="$(mktemp -d)"

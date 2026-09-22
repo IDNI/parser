@@ -1,7 +1,7 @@
 // To view the license please visit
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
-// Runner for tgf_test.tgf-shaped test files: a matcher in a .tgf.test
+// Runner for tgf.test.tgf-shaped test files: a matcher in a .tgf.test
 // entry is treemr DSL text, read verbatim from source and handed to
 // treemr::compile unchanged.
 

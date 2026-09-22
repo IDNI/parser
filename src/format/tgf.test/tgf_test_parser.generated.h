@@ -1,4 +1,4 @@
-// This file is generated from a file src/format/tgf.test/tgf_test.tgf by
+// This file is generated from a file src/format/tgf.test/tgf.test.tgf by
 //       https://github.com/IDNI/parser/src/tgf
 //
 #ifndef __TGF_TEST_PARSER_H__
