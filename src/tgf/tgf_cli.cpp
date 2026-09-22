@@ -1103,12 +1103,19 @@ static tgf_repl_evaluator::options
 
 static parser_gen_options gen_options_from_cmd(const cli::command& cmd) {
 	vector<string> nodisambig_list;
-	for (auto&& s : cmd.get<string>("nodisambig-list")
-		| views::split(',')) nodisambig_list
+	if (cmd.has("nodisambig-list"))
+		for (auto&& s : cmd.get<string>("nodisambig-list")
+			| views::split(',')) nodisambig_list
 				.emplace_back(s.begin(), s.end());
+	auto get_str = [&](const char* n) {
+		return cmd.has(n) ? cmd.get<string>(n) : "";
+	};
+	auto get_bool = [&](const char* n) {
+		return cmd.has(n) && cmd.get<bool>(n);
+	};
 	// several @dynamic nonterminals separated by ';', values by ','
 	map<string, vector<string>> dynamic;
-	for (auto&& e : cmd.get<string>("dynamic") | views::split(';')) {
+	for (auto&& e : get_str("dynamic") | views::split(';')) {
 		string entry(e.begin(), e.end());
 		if (entry.empty()) continue;
 		auto eq = entry.find('=');
@@ -1123,37 +1130,37 @@ static parser_gen_options gen_options_from_cmd(const cli::command& cmd) {
 					.emplace_back(v.begin(), v.end());
 		dynamic[entry.substr(0, eq)] = values;
 	}
-	string char_type     = cmd.get<string>("char-type");
-	string terminal_type = cmd.get<string>("terminal-type");
-	string decoder       = cmd.get<string>("decoder");
-	string encoder       = cmd.get<string>("encoder");
-	if (cmd.get<bool>("utf8")) {
+	string char_type     = get_str("char-type");
+	string terminal_type = get_str("terminal-type");
+	string decoder       = get_str("decoder");
+	string encoder       = get_str("encoder");
+	if (get_bool("utf8")) {
 		char_type     = "char";
 		terminal_type = "char32_t";
 		if (decoder.empty()) decoder = "idni::utf8_to_u32_conv";
 		if (encoder.empty()) encoder = "idni::u32_to_utf8_conv";
 	}
 	return parser_gen_options{
-		.output_dir          = cmd.get<string>("output-dir"),
-		.output              = cmd.get<string>("output"),
-		.name                = cmd.get<string>("name"),
-		.ns                  = cmd.get<string>("namespace"),
+		.output_dir          = get_str("output-dir"),
+		.output              = get_str("output"),
+		.name                = get_str("name"),
+		.ns                  = get_str("namespace"),
 		.char_type           = char_type,
 		.terminal_type       = terminal_type,
 		.decoder             = decoder,
 		.encoder             = encoder,
-		.auto_disambiguate   = cmd.get<bool>("auto-disambiguate"),
+		.auto_disambiguate   = get_bool("auto-disambiguate"),
 		.nodisambig_list     = nodisambig_list,
 		.dynamic             = dynamic,
-		.header_only         = cmd.get<bool>("header-only"),
-		.treemr              = cmd.get<bool>("treemr")
+		.header_only         = get_bool("header-only"),
+		.treemr              = get_bool("treemr")
 	};
 }
 
 static int gen_command(const cli::command& cmd,
 	const tgf_repl_evaluator& re)
 {
-	const bool print_json = cmd.get<bool>("json");
+	const bool print_json = cmd.has("json") && cmd.get<bool>("json");
 	auto gen_opt = gen_options_from_cmd(cmd);
 	auto gr = !re.has_fixed_grammar()
 		? generate_parser_cpp_from_file<char>(re.filename(), gen_opt,
