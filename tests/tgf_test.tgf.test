@@ -1,21 +1,295 @@
-comment            : "# comment", "#", "##".
-__                 : " ", "\n", "# comment", " #", " ## ".
-_                  : " ", "\n", "# comment", " #", " ## ", "".
+# Tests the grammar of .tgf.test files themselves. A matcher in an
+# entry is treemr DSL text, so most rows below exercise this grammar's
+# own tree shape, not the treemr grammar.
+#
+# To run:
+#   tgf tgf_test.tgf test tgf_test.tgf.test
 
-escaped_s          : "\\\"", "\\\\", "\\/", "\\b", "\\f", "\\n", "\\r", "\\t".
-unescaped_s        : " ", ".", "a", "A", "1".
-quoted_string_char : "\\\"", "\\\\", "\\/", "\\b", "\\f", "\\n", "\\r", "\\t",
-                     " ", ".", "a", "A", "1".
-quoted_string      : "\" .aA1\"",
-                     "\"\\\"\\\\\\/\\b\\f\\n\\r\\t\"",
-                     "\"\\\"\\\\\\/\\b\\f\\n\\r\\t .aA1\"".
-test_string        : "simple_symbol_string",
-                     "\"quoted string with \\n escape\"".
+# ===========================================================================
+# comment, whitespace
+# ===========================================================================
 
-symbol             : _symbol, a_symbol1, a1, Z952, _123.
+comment : "# c", "#", "##", "# multi word", "#\ttab".
 
-test               : "symbol : test_string",
-                     "_123   : \"1\\n2\\t3\"".
+# __ and _ are trimmed unconditionally, so their own root is gone after
+# shaping; @raw asks the matcher to run against the tree as parsed.
+@raw __ : " ", "# c\n", "\t".
+@raw _ : "", " ", "\n\n".
+_ : " " @raw, "\n" @raw.
+__ : " " @raw.
 
-start              : "sym1:value.\nsym2:value2.\nsym3 : \"value2\".",
-                     "sym1:value.".
+# ===========================================================================
+# quoted_string / escapes
+# ===========================================================================
+
+escaped_s : "\\\"", "\\\\", "\\/", "\\a", "\\b", "\\f", "\\n", "\\r", "\\t", "\\v".
+escaped_s : "\\x41", "\\X4a", "\\u0041", "\\U00000041".
+unescaped_s : "a", "Z", "0", " ", ".", "!", "@", "#", "$", "%", "&".
+unescaped_s : "*", "(", ")", "-", "+", "=", "[", "]", "{", "}", "|".
+unescaped_s : ";", ":", "'", "<", ">", ",", "?", "/", "_", "~", "`".
+quoted_string_char : "a", " ", ".", "1".
+quoted_string_char : "\\\"", "\\\\", "\\/", "\\b", "\\f", "\\n", "\\r", "\\t".
+quoted_string : "\"\"", "\"a\"", "\"a b c\"", "\"!@#$%\"",
+                "\"mixed \\n text \\t here\"".
+quoted_string : "\"\\n\"", "\"\\t\"", "\"\\\\\"", "\"\\\"\"",
+                "\"all: \\\" \\\\ \\/ \\b \\f \\n \\r \\t\"",
+                "\"line1\\nline2\"".
+quoted_string : "\"\\a\"", "\"\\v\"", "\"\\x41\"", "\"\\X4a\"",
+                "\"\\u0041\"", "\"\\U00000041\"".
+
+# ===========================================================================
+# char_lit / escapes
+# ===========================================================================
+
+escaped_c : "\\'", "\\\\", "\\/", "\\a", "\\b", "\\f", "\\n", "\\r", "\\t", "\\v".
+escaped_c : "\\x41", "\\X4a", "\\u0041", "\\U00000041".
+unescaped_c : "a", "Z", "0", " ", ".", "!", "@", "#", "$", "%", "&".
+unescaped_c : "*", "(", ")", "-", "+", "=", "[", "]", "{", "}", "|".
+unescaped_c : ";", ":", "\"", "<", ">", ",", "?", "/", "_", "~", "`".
+char_lit_char : "a", " ", ".", "1".
+char_lit_char : "\\'", "\\\\", "\\/", "\\a", "\\b", "\\f", "\\n", "\\r", "\\t", "\\v".
+char_lit_char : "\\x41", "\\X4a", "\\u0041", "\\U00000041".
+char_lit : "'a'", "'Z'", "'0'", "' '", "'.'", "'!'", "'*'",
+           "'>'", "':'", "'$'", "'%'", "'&'".
+char_lit : "'('", "')'", "'-'", "'+'", "'='", "'['", "']'",
+           "'{'", "'}'", "'|'", "';'".
+char_lit : "'\"'", "','", "'?'", "'/'", "'_'", "'~'", "'`'".
+char_lit : "'\\''", "'\\\\'", "'\\/'", "'\\a'", "'\\b'", "'\\f'",
+           "'\\n'", "'\\r'", "'\\t'", "'\\v'".
+char_lit : "'\\x41'", "'\\X4a'", "'\\u0041'", "'\\U00000041'".
+
+# ===========================================================================
+# name / input
+# ===========================================================================
+
+name : "a", "Z", "_", "_a", "a1", "a_1", "symbol", "_private", "__dunder__".
+name : "camelCase", "PascalCase", "snake_case", "UPPER_CASE", "a123", "Z952", "_123".
+input : "bare_name", "_underscore", "\"quoted\"", "\"with \\n esc\"", "\"\"", "\"a\"".
+input > name : "a".
+input > quoted_string : "\"a\"".
+
+# ===========================================================================
+# word / words -- @forbid, @unique, @all, @any, @raw
+# ===========================================================================
+
+w_forbid : "forbid".
+w_unique : "unique".
+w_all    : "all".
+w_any    : "any".
+w_raw    : "raw".
+word     : "@forbid", "@unique", "@all", "@any", "@raw".
+words    : "@forbid", "@unique", "@all", "@any", "@raw".
+words    : "@forbid @raw", "@unique @raw", "@all @raw", "@any @raw".
+words > word > w_forbid : "@forbid".
+words > word > w_raw    : "@raw".
+
+# ===========================================================================
+# matcher / m_unit / m_char / m_space -- treemr DSL text, kept verbatim
+# ===========================================================================
+
+m_char : "a", "%", "^", "$", "/", "!", "*", "+", "?", ">".
+m_unit : "a", "\"str\"", "'c'".
+matcher   : "row > ^ cell ',' cell $", "start >> (number | string)",
+            "/start", "value > %!", "a > \"str\"", "a > 'c'",
+            "a>b", "(a|b)", "cell!", "x*", "y+", "z?", ">>",
+            "(',' value)*", "x  >  y", "a\t>\tb".
+matcher > m_unit > m_char : "n".
+matcher > m_unit > quoted_string : "\"str\"".
+matcher > m_unit > char_lit : "'c'".
+matcher > m_space : "a b".
+
+# ===========================================================================
+# negate
+# ===========================================================================
+
+negate : "~", "~ ", "~\n", "~ # comment\n", "~  ".
+
+# ===========================================================================
+# item / item_list -- negate, words, per-item matcher
+# ===========================================================================
+
+item : "bare_input", "\"quoted\"", "~bare_input".
+item : "bare_input @forbid", "bare_input @unique @all".
+item : "bare_input: name", "\"quoted\" @forbid: name".
+item : "~bare_input @unique: name".
+item > input > name : "a".
+item > negate : "~a".
+item > words > word > w_all : "a @all".
+
+item_list : "a", "a , b", "a , b , c".
+item_list : "a @forbid , b @unique , c @all".
+item_list : "~a , ~b , ~c".
+item_list : "a: m1 , b @forbid: m2 , c @unique @raw: m3".
+item_list > item > input > name : "a".
+
+# ===========================================================================
+# entry_terminator, nested_block, entry_tail
+# ===========================================================================
+
+entry_terminator : ".".
+
+nested_block : "{}", "{ a : x. }", "{ a : x, y. }".
+nested_block : "{ a : x. b : y. }", "{ ~a : x. b : y. }".
+nested_block : "{ a : x\n  { b : y. }\n}".
+nested_block : "{ @forbid a: x. }".
+nested_block > entry > matcher > m_unit > m_char : "{ a : x. }".
+
+entry_tail : ": a.", ": a, b, c.", ": a {}", ": a {}.".
+entry_tail : ": a\n{ inner: x. }.".
+entry_tail : " { child: x. }.", " .".
+
+# ===========================================================================
+# entry / start
+# ===========================================================================
+
+entry : "sym : x.", "sym : x, y, z.", "~sym : x.".
+entry : "a > b : x, y.", "a > b > c : \"str\", name.".
+entry : "@forbid sym: x.", "@forbid @raw sym: x.".
+entry : "a > b : x, y\n  { c : z. }.".
+entry : "outer : a\n  { inner : b. }.".
+entry : "sym.", "~sym.", "~sym{}.".
+entry : "a > b : x, y\n  { c : z. d : w. }.".
+entry > matcher > m_unit > m_char : "a : x.".
+
+start : "a : x.", "a : x. b : y.", "~a : x. b : y.".
+start : "a : x.\nb : y.\nc : z.", "a\n  { b : x. }.".
+start : "a : x\n  { b : y. c : z. }.".
+start : "a > b : x, y\n  { c : z. d : w. }.".
+start : "a : x @forbid , y @unique. b : \"q\".".
+start : " # leading\n a : x. \n # trailing".
+start : "a : x. b : y. c : z. d : w. e : v.".
+start : "~a : x. ~b : y.", "root > child : input_name.".
+start : "mix : a @forbid , b @unique , c @all , d: sub.".
+start : "a : x. b . c {}.", " # only comment\n", " \n \n".
+
+# cross-structure: > matches only a direct child, >> matches at any depth below it
+entry >> nested_block > entry > matcher > m_unit > m_char : "a : x\n  { b : y. }.".
+entry >> entry_tail >> nested_block > entry > matcher > m_unit > m_char
+    : "a : x\n  { b : y. }.".
+
+# ===========================================================================
+# exact child sequences -- ^ ... $ pins the full, ordered child list
+# ===========================================================================
+
+entry > ^ negate matcher entry_tail $ : "~a : x.".
+entry > ^ words matcher entry_tail $  : "@forbid a: x.".
+item  > ^ negate input words $        : "~a @all".
+item  > ^ input matcher $             : "a: name".
+item  > ^ input $                     : "a".
+words > ^ word word $                 : "@forbid @raw".
+words > ^ word $                      : "@forbid".
+matcher > ^ m_unit m_space m_unit $   : "a b".
+matcher > ^ m_unit $                  : "a".
+nested_block > ^ entry entry $        : "{ a: x. b: y. }".
+item_list > ^ item item item $        : "a , b , c".
+
+# entry_tail: the colon and braces are trimmed punctuation, so the
+# remaining children are exactly the ones the four alternatives promise
+entry_tail > ^ item_list entry_terminator $         : ": a.".
+entry_tail > ^ item_list entry_terminator $         : ": a, b, c.".
+entry_tail > ^ item_list nested_block $             : ": a { b: y. }".
+entry_tail > ^ item_list nested_block entry_terminator $
+                                                      : ": a { b: y. }.".
+entry_tail > ^ nested_block $                       : " { b: y. }".
+entry_tail > ^ nested_block entry_terminator $      : " { b: y. }.".
+entry_tail > ^ entry_terminator $                   : ".".
+
+# ===========================================================================
+# node text -- string literals asserting a node's exact collected text
+# ===========================================================================
+
+item  > input > "sym"   : "sym".
+input > "sym"            : "sym".
+input > "\"q\""          : "\"q\"".
+m_char > "a"              : "a".
+m_space > " "             : " ".
+
+# ===========================================================================
+# leaf rows -- childless nonterminals whose own terminals are trimmed
+# ===========================================================================
+
+comment!          : "# c".
+entry_terminator! : ".".
+w_forbid!         : "forbid".
+w_raw!            : "raw".
+negate!           : "~".
+
+# ===========================================================================
+# negated shape rows -- a shape that must NOT be present
+# ===========================================================================
+
+~item      > matcher      : "a".
+~item      > negate       : "a".
+~entry     > nested_block : "a: x.".
+~entry_tail > nested_block : ": a, b, c.".
+~words     > w_raw        : "@forbid".
+~matcher   > quoted_string : "a".
+
+# ===========================================================================
+# @raw -- the pre-shaping tree still has the '_', '__' and comment nodes
+# that @trim removes unconditionally from the shaped tree
+# ===========================================================================
+
+@raw __ > comment      : "# c\n".
+@raw _ > __ > comment  : "# c\n".
+@raw _ > __ > space    : " ".
+@raw nested_block > '{'   : "{ a: x. b: y. }".
+@raw nested_block > entry : "{ a: x. b: y. }".
+@raw nested_block > '}'   : "{ a: x. b: y. }".
+~__ > comment : " " @raw.
+
+# ===========================================================================
+# rejects -- inputs the tgf_test grammar itself must refuse
+# ===========================================================================
+
+# missing terminator: an entry needs '.' or a nested block to close
+~start : "a : x".
+
+# an unknown word: only @forbid, @unique, @all, @any, @raw are words
+~word  : "@bogus".
+
+# two colons in one entry_tail
+~entry_tail : ": a :: b.".
+
+# '~' with nothing after it is not a complete entry
+~entry : "~.".
+
+# an unterminated quoted input string
+~input : "\"unterminated".
+
+# a nested block needs a matcher before it; a bare block is not an entry
+~start : "{ a: x. }.".
+
+# ===========================================================================
+# more exact sequences, node text and leaf rows
+# ===========================================================================
+
+entry > ^ matcher entry_tail $        : "a : x.".
+entry > ^ negate matcher entry_tail $ : "~sym.".
+item  > ^ negate input $              : "~a".
+item  > ^ input words $               : "a @all".
+matcher > ^ m_unit $                  : "'c'".
+item_list > ^ item $                  : "a".
+item_list > item item                 : "a , b".
+item_list > ^ item item $             : "a , b".
+words > ^ word word word $            : "@forbid @unique @raw".
+name > ^ "s" "y" "m" $                : "sym".
+
+w_unique! : "unique".
+w_all!    : "all".
+w_any!    : "any".
+
+# ===========================================================================
+# more negated shape rows
+# ===========================================================================
+
+~entry > words              : "a: x.".
+~item_list > item > matcher : "a".
+
+# ===========================================================================
+# more rejects
+# ===========================================================================
+
+# a matcher cannot be empty
+~entry : "sym :.".
+~matcher : "".

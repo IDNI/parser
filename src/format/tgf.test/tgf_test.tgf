@@ -1,0 +1,79 @@
+@use char class eof, alpha, alnum, space, graph, printable, xdigit.
+
+@trim __, _.
+@trim all terminals except children of name, m_char, m_space, quoted_string,
+	char_lit, unescaped_s, escaped_s, unescaped_c, escaped_c,
+	escape_char, esc_hex, esc_u4, esc_U8.
+@inline char classes.
+
+@highlight keyword : word.
+@highlight string : quoted_string, char_lit, unescaped_s, escaped_s, unescaped_c, escaped_c.
+@highlight number : esc_hex, esc_u4, esc_U8.
+
+# Top level: a test file is a sequence of entries.
+start              => _ (entry _)*.
+
+# An entry asserts a tree shape (matcher) against inputs (item_list),
+# optionally nesting entries that extend the matcher with `> <nested>`.
+# It ends at a '.' terminator or its nested block's closing '}'.
+entry              => negate? (words __)? matcher entry_tail.
+entry_tail         => _ ':' _ item_list _ nested_block (_ entry_terminator)?
+                    | _ ':' _ item_list _ entry_terminator
+                    | _ nested_block (_ entry_terminator)?
+                    | _ entry_terminator.
+negate             => '~' _.
+nested_block       => '{' _ (entry _)* '}'.
+entry_terminator   => '.'.
+
+item_list          => item (_ ',' _ item)*.
+item               => negate? input (__ words)? (_ ':' _ matcher)?.
+
+# `~` inverts an item's verdict: it passes iff the input fails to parse
+# or the matcher does not match. It reaches every item and nested entry
+# under the entry it prefixes.
+
+# `words` picks the ambiguity mode for the matcher (FORBID is the
+# default), or requests matching the raw pre-shaping tree via @raw. An
+# item's own words add to its entry's, and a mode word overrides.
+words              => word (__ word)*.
+word               => '@' (w_forbid | w_unique | w_all | w_any | w_raw).
+w_forbid           => "forbid".        # reject any ambiguity in the subtree
+w_unique           => "unique".        # exactly one alternative matches
+w_all              => "all".           # every alternative must match
+w_any              => "any".           # at least one alternative matches
+w_raw              => "raw".           # match the tree before shaping
+
+# An input string is either a quoted string or a bare name.
+input              => quoted_string | name.
+
+# A matcher is treemr DSL text captured verbatim.
+# Internal spaces survive so the source text reaches treemr::compile unchanged.
+matcher            => m_unit (m_space* m_unit)*.
+m_unit             => quoted_string | char_lit | m_char.
+m_char             => graph & ~(':' | '{' | '}' | '.' | ',' | '\'' | '"' | '@' | '#' | '~').
+m_space            => ' ' | '\t'.
+
+# Identifiers used for bare inputs. Treemr names appear inside m_char runs.
+name               => (alpha | '_') (alnum | '_')*.
+
+# Single-character terminal literal in a matcher, e.g. '-' or '\n'.
+char_lit           => '\'' char_lit_char '\''.
+char_lit_char      => unescaped_c | escaped_c.
+unescaped_c        => (space | printable) & ~( '\'' | '\\' ).
+escaped_c          => '\\' ('\'' | escape_char).
+
+# Quoted strings (used as inputs and as matcher string literals).
+quoted_string      => '"' quoted_string_char* '"'.
+quoted_string_char => unescaped_s | escaped_s.
+unescaped_s        => (space | printable) & ~( '"' | '\\' ).
+escaped_s          => '\\' ('"' | escape_char).
+escape_char        => 'a' | 'b' | 'f' | 'n' | 'r' | 't' | 'v' | '\\' | '/'
+                   | esc_hex | esc_u4 | esc_U8.
+esc_hex            => ('x' | 'X') xdigit xdigit.
+esc_u4             => 'u' xdigit xdigit xdigit xdigit.
+esc_U8             => 'U' xdigit xdigit xdigit xdigit xdigit xdigit xdigit xdigit.
+
+# Whitespace and comments.
+_                  => [ __ ].
+__                 => (space | comment) _.
+comment            => '#' (printable | '\t')* ('\r' | '\n' | eof).

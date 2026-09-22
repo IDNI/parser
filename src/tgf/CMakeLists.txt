@@ -7,12 +7,14 @@ target_include_directories(tgf_cli_core PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
 )
 
-# tgf_cli.cpp reaches tgf_repl_parser directly through tgf_cli.h; a
-# header-only build resolves productions() inline instead, so it stays out
-# of that build entirely
+# tgf_cli.cpp reaches tgf_repl_parser (via tgf_cli.h), tgf_test_parser and
+# treemr_parser (via tgf_test.h) directly; a header-only build resolves
+# productions() inline instead, so these stay out of that build entirely
 if(NOT TAU_PARSER_BUILD_HEADER_ONLY)
 	set(TGF_CLI_CORE_GENERATED_SOURCES
 		"${CMAKE_CURRENT_SOURCE_DIR}/tgf_repl_parser.generated.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/../format/treemr/treemr_parser.generated.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/../format/tgf.test/tgf_test_parser.generated.cpp"
 	)
 	target_sources(tgf_cli_core PRIVATE ${TGF_CLI_CORE_GENERATED_SOURCES})
 	# grammar tables are data; optimizing them wastes build time

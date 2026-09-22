@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
-#include <filesystem>
 #include <fstream>
 #include <map>
 #include <optional>
@@ -19,7 +18,7 @@
 #include "recoders.h"
 #include "format/tgf/tgf.h"
 #include "tgf_cli.h"
-#include "tgf_test.h"
+#include "format/tgf.test/tgf_test.h"
 #ifndef DEBUG
 #include "utility/devhelpers.h"
 #endif
@@ -1042,11 +1041,17 @@ static int run_tests(
 	using term_t = tgf_repl_evaluator::terminal_type;
 	tgf_test<char_t, term_t> t;
 	int ret = 0;
+	size_t total_passed = 0, total_failed = 0;
 	for (const auto& file : files) {
 		cout << "running test: " << file << endl;
 		auto r = t.run_from_file(p, file);
-		if (r) ret = r;
+		if (r.ret) ret = r.ret;
+		total_passed += r.passed;
+		total_failed += r.failed;
 	}
+	if (files.size() > 1)
+		cout << "total: " << total_passed << " passed, "
+			<< total_failed << " failed" << endl;
 	return ret;
 }
 
