@@ -1,9 +1,12 @@
 # CSV grammar
 
-# RFC 4180 uses comma and crlf
-# enable production `tab` or `lf` to support other dialects
+# RFC 4180 uses comma, crlf and no_header
+# three guard groups select the dialect:
+#   separator: comma or tab
+#   eol: crlf or lf
+#   header: header or no_header
 
-@enable productions comma, crlf. 
+@enable productions comma, crlf, no_header.
 
 @highlight type : file, header, record.
 @highlight string : escaped, non_escaped, TEXTDATA, EOL.
@@ -12,25 +15,28 @@
 
 @use char class printable.
 
-@inline char classes, TEXTDATA, field.
+@inline char classes, TEXTDATA, field, sep_char.
 @trim DQUOTE, SEP, EOL.
 
-file        => record ( EOL record )* [ EOL ]
-             | header EOL record ( EOL record )* [ EOL ].
-header      => name ( SEP name )*.
-record      => field ( SEP field )*.
-name        => field.
-field       => escaped | non_escaped.
-escaped     => DQUOTE ( TEXTDATA | SEP | CR | LF | DQUOTE DQUOTE )* DQUOTE.
-non_escaped => TEXTDATA*.
+file[no_header] => record ( EOL record )* [ EOL ].
+file[header]    => header EOL record ( EOL record )* [ EOL ].
+header        => name ( SEP name )*.
+record        => field ( SEP field )*.
+name          => field.
+field         => escaped | non_escaped.
+escaped       => DQUOTE ( TEXTDATA | sep_char | CR | LF | escaped_quote )* DQUOTE.
+escaped_quote => DQUOTE '"'.
+non_escaped   => TEXTDATA*.
 
-SEP[comma]  => ','.
-SEP[tab]    => '\t'.
-CR          => '\r'.
-LF          => '\n'.
-EOL[crlf]   => CR LF.
-EOL[lf]     => LF.
-DQUOTE      => '"'.
-TEXTDATA    => printable & ~( DQUOTE | SEP | CR | LF ).
+SEP[comma]      => ','.
+SEP[tab]        => '\t'.
+sep_char[comma] => ','.
+sep_char[tab]   => '\t'.
+CR              => '\r'.
+LF              => '\n'.
+EOL[crlf]       => CR LF.
+EOL[lf]         => LF.
+DQUOTE          => '"'.
+TEXTDATA        => printable & ~( DQUOTE | SEP | CR | LF ).
 
 start       => file.

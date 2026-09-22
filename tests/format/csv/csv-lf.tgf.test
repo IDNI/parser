@@ -4,7 +4,7 @@
 # bare CR are both rejected, tab stays plain data.
 #
 # To run:
-#   tgf csv.tgf test --productions comma,lf csv-lf.tgf.test
+#   tgf csv.tgf test --productions comma,lf,no_header csv-lf.tgf.test
 
 # ===========================================================================
 # 1  COMMA-SEPARATED FIELDS (LF rows)
@@ -44,17 +44,16 @@ start > file > record > escaped! : "\"\"".
 start > file > record > escaped >> LF : "\"a\nline\"".
 start > file > record > "a\nline" : "\"a\nline\"".
 
-# TODO BUG: @trim SEP removes the SEP node wherever it occurs, so a
-# comma used as literal content inside an escaped field is discarded
-# rather than kept as a leaf.
-start > file > record > escaped > ^ 'a' 'b' $ : "\"a,b\"".
-~start > file > record > escaped > ^ 'a' ',' 'b' $ : "\"a,b\"".
+# comma inside quotes survives as a leaf, sep_char folds into it
+start > file > record > escaped > ^ 'a' ',' 'b' $ : "\"a,b\"".
 
-# TODO BUG: @trim DQUOTE also trims the doubled-quote pair inside an
-# escaped field, so a literal quote loses its own node and only its
-# surrounding text fragments remain.
-start > file > record > "she said hi" : "\"she said \"\"hi\"\"\"".
-~start > file > record > escaped >> '"' : "\"she said \"\"hi\"\"\"".
+# a doubled quote survives as its own escaped_quote node
+start > file > record > "she said \"hi\"" : "\"she said \"\"hi\"\"\"".
+start > file > record > escaped >> '"' : "\"she said \"\"hi\"\"\"".
+start > file > record > escaped > escaped_quote > '"' : "\"she said \"\"hi\"\"\"".
+
+# a quoted separator does not change the record's field count
+start > file > record > ^ escaped non_escaped $ : "\"a,b\",c".
 
 # ===========================================================================
 # 5  NEGATION -- CRLF and tab must be rejected

@@ -1,0 +1,35 @@
+# Tests the csv.tgf grammar with the header, comma and crlf productions
+# enabled.
+#
+# What changes from the comma/crlf default: the header guard replaces the
+# no_header guard, so file requires a header line before the first record
+# instead of treating that line as an ordinary record.
+#
+# To run:
+#   tgf csv.tgf test --productions header,comma,crlf csv-header.tgf.test
+
+# ===========================================================================
+# 1  HEADER PLUS RECORD
+# ===========================================================================
+
+start : "a,b\r\n1,2", "\"a\",b\r\n1,2".
+
+start > file > ^ header record $ : "a,b\r\n1,2".
+start >> header > ^ name name $ : "a,b\r\n1,2".
+start >> header > name > non_escaped : "a,b\r\n1,2".
+start >> header > name > escaped : "\"a\",b\r\n1,2".
+
+# ===========================================================================
+# 2  A HEADER LINE WITH NO RECORD IS REJECTED
+# ===========================================================================
+
+# the header production ends at the first EOL, a record must follow it,
+# a lone header line leaves nothing for that mandatory record.
+~start : "a,b".
+
+# ===========================================================================
+# 3  RAW ROWS (pre-shaping tree)
+# ===========================================================================
+
+# EOL sits between header and record before shaping trims it away.
+@raw start > file > header EOL record : "a,b\r\n1,2".

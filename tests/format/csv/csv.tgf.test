@@ -69,15 +69,10 @@ start > file > record > escaped! : "\"\"".
 start > file > record > ^ escaped $ : "\"abc\"".
 start > file > record > "abc" : "\"abc\"".
 
-# 4b  comma inside quotes
-#
-# TODO BUG: @trim SEP also removes a separator written as data inside an
-# escaped field. The row below shows the current shape, the negated row
-# shows the expected one.
+# 4b  comma inside quotes survives as a leaf, sep_char folds into it
 start : "\"a,b\"", "\"one,two,three\"".
 
-start > file > record > escaped > ^ 'a' 'b' $ : "\"a,b\"".
-~start > file > record > escaped > ^ 'a' ',' 'b' $ : "\"a,b\"".
+start > file > record > escaped > ^ 'a' ',' 'b' $ : "\"a,b\"".
 start > file > record > ^ escaped $ : "\"a,b\"".
 
 # 4c  CR and LF inside quotes: both survive as their own nodes,
@@ -89,13 +84,14 @@ start > file > record > escaped > ^ 'a' CR 'b' $ : "\"a\rb\"".
 start > file > record > escaped > ^ 'a' LF 'b' $ : "\"a\nb\"".
 start > file > record > escaped > ^ 'a' CR LF 'b' $ : "\"a\r\nb\"".
 
-# 4d  doubled quote for a literal '"' inside an escaped field.
-#
-# TODO BUG: @trim DQUOTE also trims the doubled-quote pair, so the escaped
-# '""' disappears entirely from the shaped tree instead of surviving as a
-# literal quote node between the two text fragments.
-start > file > record > escaped > ^ 'b' 'c' $ : "\"b\"\"c\"".
-~start > file > record > escaped > ^ 'b' '"' 'c' $ : "\"b\"\"c\"".
+# 4d  doubled quote for a literal '"' inside an escaped field, the pair
+# survives as its own escaped_quote node between the two text fragments.
+start > file > record > escaped > ^ 'b' escaped_quote 'c' $ : "\"b\"\"c\"".
+start > file > record > escaped > escaped_quote > '"' : "\"b\"\"c\"".
+start > file > record > "b\"c" : "\"b\"\"c\"".
+
+# a quoted separator does not change the record's field count
+start > file > record > ^ escaped non_escaped $ : "\"a,b\",c".
 
 start : "\"she said \"\"hi\"\"\"", "\"x\"\"y\"\"z\"".
 
@@ -172,8 +168,8 @@ start > file > record > ^ non_escaped! non_escaped! $ : ",".
 ~start > file > record > escaped : "abc".
 ~start > file > record > non_escaped : "\"abc\"".
 
-# TODO BUG: auto disambiguation always picks the record alternative of
-# file, so a header node never appears in a tree.
+# the no_header guard is active by default, so file[header] is not part
+# of the active grammar and a header node never appears in a tree.
 ~start > file > header : "a,b\r\n1,2".
 
 # ===========================================================================
@@ -188,8 +184,8 @@ start > file > record > ^ non_escaped! non_escaped! $ : ",".
 @raw start > file > record > field > escaped > CR : "\"a\r\nb\"".
 @raw start > file > record > field > escaped > LF : "\"a\r\nb\"".
 
-# header stays absent even before shaping, the choice of alternative is
-# made by the parser's auto disambiguation, not by the shaping pass.
+# header stays absent even before shaping, the no_header guard excludes
+# it from the grammar itself, not only from the shaped tree.
 ~@raw start >> header : "a,b\r\n1,2".
 
 # ===========================================================================

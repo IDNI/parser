@@ -4,7 +4,7 @@
 # data, LF alone and a bare CR are still rejected.
 #
 # To run:
-#   tgf csv.tgf test --productions tab,crlf csv-tab.tgf.test
+#   tgf csv.tgf test --productions tab,crlf,no_header csv-tab.tgf.test
 
 # ===========================================================================
 # 1  TAB-SEPARATED FIELDS
@@ -50,11 +50,11 @@ start > file > record > ^ escaped $ : "\"a,b\"".
 # an escaped field, unlike a comma parsed under the comma dialect.
 start > file > record > escaped > ^ 'a' ',' 'b' $ : "\"a,b\"".
 
-# TODO BUG: @trim SEP also removes a separator written as data inside an
-# escaped field. The row below shows the current shape, the negated row
-# shows the expected one.
-start > file > record > escaped > ^ 'a' 'b' $ : "\"a\tb\"".
-~start > file > record > escaped > ^ 'a' '\t' 'b' $ : "\"a\tb\"".
+# a tab separator inside quotes survives as a leaf, sep_char folds into it
+start > file > record > escaped > ^ 'a' '\t' 'b' $ : "\"a\tb\"".
+
+# a quoted separator does not change the record's field count
+start > file > record > ^ escaped non_escaped $ : "\"a\tb\"\tc".
 
 # ===========================================================================
 # 5  NEGATION -- LF and bare CR must be rejected
