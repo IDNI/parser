@@ -1,0 +1,96 @@
+# Tests the csv.tgf grammar with the tab and crlf productions enabled.
+#
+# What changes from the comma/crlf default: SEP is tab, comma is plain
+# data, LF alone and a bare CR are still rejected.
+#
+# To run:
+#   tgf csv.tgf test --productions tab,crlf csv-tab.tgf.test
+
+# ===========================================================================
+# 1  TAB-SEPARATED FIELDS
+# ===========================================================================
+
+start : "a\tb", "1\t2\t3", "abc\tdef", "a,b", "x\t123".
+
+start > file > record > ^ non_escaped non_escaped $ : "a\tb".
+start > file > record > ^ non_escaped non_escaped non_escaped $ : "1\t2\t3".
+
+# comma is not the enabled separator, it stays inside one field.
+start > file > record > ^ non_escaped $ : "a,b".
+start > file > record > "a,b" : "a,b".
+
+# ===========================================================================
+# 2  MULTIPLE RECORDS -- CRLF
+# ===========================================================================
+
+start : "a\tb\r\nc\td", "1\t2\t3\r\n4\t5\t6".
+
+start > file > ^ record record $ : "a\tb\r\nc\td".
+start > file > ^ record $ : "a\tb\r\n".
+
+# ===========================================================================
+# 3  EMPTY FIELDS (tab)
+# ===========================================================================
+
+start : "a\t\tc", "\t", "\ta", "a\t", "\t\t".
+
+start > file > record > ^ non_escaped! non_escaped! $ : "\t".
+start > file > record > ^ non_escaped non_escaped! non_escaped $ : "a\t\tc".
+
+# ===========================================================================
+# 4  QUOTED (ESCAPED) FIELDS -- still valid, comma inside quotes is data
+# ===========================================================================
+
+start : "\"a\"", "\"hello world\"", "\"a,b\"", "\"a\"\"b\"", "\"\"".
+
+start > file > record > escaped! : "\"\"".
+start > file > record > ^ escaped $ : "\"a,b\"".
+
+# comma is plain TEXTDATA under the tab dialect, so it survives inside
+# an escaped field, unlike a comma parsed under the comma dialect.
+start > file > record > escaped > ^ 'a' ',' 'b' $ : "\"a,b\"".
+
+# TODO BUG: @trim SEP also removes a separator written as data inside an
+# escaped field. The row below shows the current shape, the negated row
+# shows the expected one.
+start > file > record > escaped > ^ 'a' 'b' $ : "\"a\tb\"".
+~start > file > record > escaped > ^ 'a' '\t' 'b' $ : "\"a\tb\"".
+
+# ===========================================================================
+# 5  NEGATION -- LF and bare CR must be rejected
+# ===========================================================================
+
+# LF-only rows: lf guard is disabled, so '\n' alone is not EOL and not
+# TEXTDATA either.
+~start : "a\tb\nc\td".
+
+# bare CR (not part of CRLF): CR is not TEXTDATA, parse fails.
+~start : "a\tb\rc\td".
+
+# tab is the separator, so an unclosed escaped field is still an error.
+~start : "\"abc".
+
+# ===========================================================================
+# 6  STRUCTURAL MATCHERS
+# ===========================================================================
+
+start > file > record > non_escaped : "abc", "123", "a,b".
+start > file > record > escaped     : "\"a\"", "\"line\r\nbreak\"".
+start > file > record > ^ escaped non_escaped $ : "\"a\"\tb".
+
+# ===========================================================================
+# 7  RAW ROWS
+# ===========================================================================
+
+# SEP is the tab node and EOL is the crlf node before shaping trims them.
+@raw start >> SEP : "a\tb".
+@raw start >> EOL : "a\r\nb".
+
+# ===========================================================================
+# 8  REALISTIC
+# ===========================================================================
+
+start : "col1\tcol2\r\nval1\tval2",
+        "one\t\"two\"\tthree".
+
+start > file > ^ record record $ : "col1\tcol2\r\nval1\tval2".

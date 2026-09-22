@@ -1,0 +1,97 @@
+# Tests the csv.tgf grammar with the comma and lf productions enabled.
+#
+# What changes from the comma/crlf default: EOL is a lone LF, CRLF and a
+# bare CR are both rejected, tab stays plain data.
+#
+# To run:
+#   tgf csv.tgf test --productions comma,lf csv-lf.tgf.test
+
+# ===========================================================================
+# 1  COMMA-SEPARATED FIELDS (LF rows)
+# ===========================================================================
+
+start : "a,b", "1,2,3", "abc,def".
+
+start > file > record > ^ non_escaped non_escaped $ : "a,b".
+start > file > record > ^ non_escaped non_escaped non_escaped $ : "1,2,3".
+
+# ===========================================================================
+# 2  MULTIPLE RECORDS -- LF only
+# ===========================================================================
+
+start : "a,b\nc,d", "1,2,3\n4,5,6".
+
+start > file > ^ record record $ : "a,b\nc,d".
+start > file > ^ record $ : "a,b\n".
+
+# ===========================================================================
+# 3  EMPTY FIELDS
+# ===========================================================================
+
+start : "a,,c", ",", ",a", "a,", ",,", "\"\"".
+
+start > file > record > ^ non_escaped! non_escaped! $ : ",".
+start > file > record > ^ non_escaped non_escaped! non_escaped $ : "a,,c".
+
+# ===========================================================================
+# 4  QUOTED (ESCAPED) FIELDS
+# ===========================================================================
+
+start : "\"a\"", "\"a,b\"", "\"a\"\"b\"",
+        "\"line1\nline2\"", "\"she said \"\"hi\"\"\"".
+
+start > file > record > escaped! : "\"\"".
+start > file > record > escaped >> LF : "\"a\nline\"".
+start > file > record > "a\nline" : "\"a\nline\"".
+
+# TODO BUG: @trim SEP removes the SEP node wherever it occurs, so a
+# comma used as literal content inside an escaped field is discarded
+# rather than kept as a leaf.
+start > file > record > escaped > ^ 'a' 'b' $ : "\"a,b\"".
+~start > file > record > escaped > ^ 'a' ',' 'b' $ : "\"a,b\"".
+
+# TODO BUG: @trim DQUOTE also trims the doubled-quote pair inside an
+# escaped field, so a literal quote loses its own node and only its
+# surrounding text fragments remain.
+start > file > record > "she said hi" : "\"she said \"\"hi\"\"\"".
+~start > file > record > escaped >> '"' : "\"she said \"\"hi\"\"\"".
+
+# ===========================================================================
+# 5  NEGATION -- CRLF and tab must be rejected
+# ===========================================================================
+
+# CRLF rows: crlf guard is disabled, a CR before the LF is not TEXTDATA.
+~start : "a,b\r\nc,d".
+
+# tab is not printable, so it is invalid in any dialect.
+~start : "a\tb", "a\tb\nc\td".
+
+# a bare CR is not TEXTDATA and not EOL.
+~start : "a\rb".
+
+# ===========================================================================
+# 6  STRUCTURAL MATCHERS
+# ===========================================================================
+
+start > file > record > non_escaped : "abc", "hello".
+start > file > record > escaped     : "\"a\"", "\"line\nbreak\"".
+start > file > record > ^ non_escaped escaped $ : "a,\"b\"".
+
+# ===========================================================================
+# 7  RAW ROWS
+# ===========================================================================
+
+# SEP is the comma node and EOL is the lf node before shaping trims them.
+@raw start >> SEP : "a,b".
+@raw start >> EOL : "a\nb".
+
+# ===========================================================================
+# 8  REALISTIC
+# ===========================================================================
+
+start : "name,age,city\nAlice,30,New York\nBob,25,London",
+        "a,\"b,c\",d",
+        "1,\"\",3".
+
+start > file > ^ record record record $ :
+	"name,age,city\nAlice,30,New York\nBob,25,London".

@@ -1,0 +1,289 @@
+# Tests the json.tgf grammar.
+#
+# To run:
+#   tgf json.tgf test json.tgf.test
+
+# ===========================================================================
+# 1  CONSTANTS -- true, false, null
+# ===========================================================================
+
+start : true, false, null.
+
+# Each constant value is a distinct nonterminal directly under value.
+start > value > true_sym  : true.
+start > value > false_sym : false.
+start > value > null_sym  : null.
+
+# The @trim children directive makes each constant a leaf node.
+start > value {
+	true_sym!  : true.
+	false_sym! : false.
+	null_sym!  : null.
+}
+
+# A raw parse still shows the literal characters under the constant node.
+@raw start > value > true_sym > 't' 'r' 'u' 'e' : true.
+
+# A constant node never matches the shape of a different constant.
+~start > value > true_sym : false.
+~start > value > null_sym : true.
+
+start > value : true : true_sym, false : false_sym, null : null_sym.
+
+~start : "True", "Null", "nul", "tru", "fals".
+
+# ===========================================================================
+# 2  NUMBERS -- integer, negative, fractional, exponent
+# ===========================================================================
+
+start : "0", "42", "999", "-1", "-42",
+        "3.14", "0.5", "-0.5", "123.456",
+        "1e10", "1E10", "2.5e-3", "2.5E-3", "1e+5", "1E+5",
+        "1.5e10", "-1.5e-10",
+        "10", "200", "1e2", "1.0e2".
+
+# A number's shaped children are terminal digit chars plus an exponent node.
+# integral, fractional, zero and their digit helpers all inline into number.
+start >> number > ^ '0' $           : "0".
+start >> number > ^ '-' '0' $       : "-0".
+start >> number > ^ '4' '2' $       : "42".
+start >> number > ^ '-' '1' $       : "-1".
+start >> number > ^ '1' '.' '5' $   : "1.5".
+start >> number > ^ '1' exponent $  : "1e5", "1E5".
+
+start >> exponent {
+	^ 'e' '5' $     : "1e5".
+	^ 'E' '5' $     : "1E5".
+	^ 'e' '+' '5' $ : "1e+5".
+	^ 'e' '-' '5' $ : "1e-5".
+}
+
+start >> number > ^ '1' '.' '5' exponent $ : "1.5e10".
+
+# @raw exposes the inlined integral and fractional nodes before shaping.
+@raw start >> integral   : "42".
+@raw start >> fractional : "1.5".
+
+# The zero production only feeds the exclusion formula in nonzerodigit,
+# so no parse ever derives an actual zero node.
+~@raw start >> zero : "0".
+
+# A number with an exponent never shapes like one without.
+~start >> exponent : "42".
+~start >> number > ^ '4' '2' $ : "40".
+
+start >> number {
+	^ '1' '0' $     : "10".
+	^ '9' '9' $     : "99".
+	^ '1' '0' '0' $ : "100".
+}
+
+~start : "01", "00", "+1", ".5", "1.",
+         "1e", "1e+", "e10", "-".
+
+# ===========================================================================
+# 3  STRINGS -- empty, unescaped, all escape sequences, unicode
+# ===========================================================================
+
+# 3a  Empty and simple strings
+start : "\"\"", "\"hello\"", "\"hello world\"",
+        "\"!@#$%\"", "\"123\"".
+
+# 3b  Escape sequences in strings
+start : "\"with \\\"quotes\\\"\"",
+        "\"escaped\\nnewline\"",
+        "\"tab\\tbetween\"",
+        "\"backslash\\\\here\"",
+        "\"forwardslash\\/path\"",
+        "\"\\b\\f\\n\\r\\t\"".
+
+# 3c  Unicode escapes
+start : "\"unicode\\u0041\"", "\"\\u0000\"",
+        "\"\\uFFFF\"", "\"A\\u0042C\"".
+
+# The @inline q_str > str directive puts str directly under value.
+start > value > str : "\"hello\"".
+
+# An empty string shapes to a childless str node.
+start >> str! : "\"\"".
+
+# A raw parse still shows the q_str wrapper and the unescaped char class.
+@raw start > value > q_str > str : "\"a\"".
+@raw start >> unescaped : "\"a\"".
+
+# Plain chars stay direct str children, an escape becomes an escaped node.
+start >> str > ^ 'a' 'b' 'c' $     : "\"abc\"".
+start >> str > ^ 'a' escaped 'c' $ : "\"a\\nc\"".
+
+# Every escape kind: quote, backslash, slash, and the five control letters.
+start >> escaped {
+	^ '\\' '"' $  : "\"\\\"\"".
+	^ '\\' '\\' $ : "\"\\\\\"".
+	^ '\\' '/' $  : "\"\\/\"".
+	^ '\\' 'b' $  : "\"\\b\"".
+	^ '\\' 'f' $  : "\"\\f\"".
+	^ '\\' 'n' $  : "\"\\n\"".
+	^ '\\' 'r' $  : "\"\\r\"".
+	^ '\\' 't' $  : "\"\\t\"".
+}
+
+# A \u escape keeps the four hex digits as direct children, uni_cp inlines.
+start >> escaped > ^ '\\' 'u' '0' '0' '4' '1' $ : "\"\\u0041\"".
+@raw start >> uni_cp        : "\"\\u0041\"".
+@raw start >> ascii_xdigit  : "\"\\u0041\"".
+@raw start >> esc           : "\"\\n\"".
+
+# A string with no backslash never shapes with an escaped node.
+~start >> escaped : "\"hello\"".
+
+~start : "\"unclosed", "\"bad \\x escape\"", "\"bad\\u00GG\"",
+         "\"unterminated escape\\", "\"\t\"", "\"\n\"".
+
+# ===========================================================================
+# 4  ARRAYS -- empty, single, multiple, nested, mixed types
+# ===========================================================================
+
+start : "[]", "[1]", "[1, 2, 3]",
+        "[[1, 2], [3, 4]]",
+        "[true, false, null, 42, \"str\"]",
+        "[ ]", "[ 1 , 2 , 3 ]",
+        "[[[[[]]]]]".
+
+start >> arr > ^ '[' ']' $ : "[]".
+start >> arr > ^ '[' values ']' $ : "[1]".
+
+start >> values {
+	^ value $               : "[1]".
+	^ value ',' value $     : "[1,2]".
+	^ value ',' value ',' value $ : "[1,2,3]".
+}
+
+# A three-deep array nests an arr under a value under an arr, twice.
+start >> arr > ^ '[' values ']' $ : "[[[1]]]".
+start >> values > ^ value > arr $ : "[[1]]".
+
+# Each element keeps its own value kind under one values sequence.
+start >> values > ^ value ',' value ',' value ',' value ',' value $ :
+	"[true,false,null,1,\"s\"]".
+
+# A raw parse shows the whitespace node kept between the brackets.
+@raw start >> arr > _ : "[ 1 ]".
+
+# A single-element match never accepts a values list of two.
+~start >> values > ^ value $ : "[1,2]".
+
+start > value : "[]" : arr, "[1]" : arr > values, "[[1]]" : arr > values > value > arr.
+
+~start : "[1,]", "[1 2]", "[] ]", "[}", "[[1]".
+
+# ===========================================================================
+# 5  OBJECTS -- empty, single pair, multiple pairs, nested
+# ===========================================================================
+
+start : "{}", "{\"a\":1}",
+        "{\"a\":1,\"b\":2,\"c\":3}",
+        "{\"nested\":{\"x\":1}}",
+        "{\"bool\":true,\"nothing\":null,\"num\":42}",
+        "{ \"a\" : 1 }", "{\"key\":\"value\"}",
+        "{\"arr\":[1,2,3],\"obj\":{\"a\":1}}".
+
+start >> object > ^ '{' '}' $ : "{}".
+start >> object_pair > ^ str ':' value $ : "{\"a\":1}".
+start >> object > ^ '{' object_pair '}' $ : "{\"a\":1}".
+
+start >> object {
+	^ '{' object_pair ',' object_pair '}' $ : "{\"a\":1,\"b\":2}".
+	^ '{' object_pair ',' object_pair ',' object_pair '}' $ :
+		"{\"a\":1,\"b\":2,\"c\":3}".
+}
+
+start >> object_pair {
+	value > object : "{\"a\":{\"b\":1}}".
+	value > arr    : "{\"a\":[]}".
+}
+
+# A three-deep object nests an object under a value under an object pair,
+# twice, down to a plain number value.
+start >> object > object_pair > value > object > object_pair > value > number :
+	"{\"a\":{\"b\":{\"c\":1}}}".
+
+# A raw parse shows the whitespace node kept around the colon and braces.
+@raw start >> object > _ : "{ \"a\" : 1 }".
+
+# A single-pair match never accepts an object holding two pairs.
+~start >> object > ^ '{' object_pair '}' $ : "{\"a\":1,\"b\":2}".
+
+start > value : "{}" : object, "{\"a\":1}" : object > object_pair.
+
+~start : "{,}", "{key:1}", "{'a':1}", "{\"a\":1,}",
+         "{\"a\":}", "{\"a\":1 \"b\":2}", "{]".
+
+# ===========================================================================
+# 6  WHITESPACE RESILIENCE -- leading/trailing/interior whitespace
+# ===========================================================================
+
+start : "  true", "false  ", "  42  ",
+        " [ 1 , 2 ] ", " { \"a\" : 1 } ",
+        "\ttrue", "true\n", "\n42\n".
+
+# The leading and trailing whitespace around value trims away entirely.
+start > ^ value $ : " 1 ", "\ttrue\n", "  [1]  ".
+
+# A raw parse keeps the whitespace nodes that the shaped tree trims.
+@raw start > _ > __ : " 1".
+@raw start > value _ $ : "1 ".
+
+start >> values > ^ value ',' value $ : "[ 1 , 2 ]".
+start >> object_pair > ^ str ':' value $ : "{ \"a\" : 1 }".
+
+# Whitespace never becomes part of the number or keyword it surrounds.
+~start >> number > ^ '1' $ : " 1 1".
+
+~start : "", " ", "\t", "tr ue", "1 2", "1 . 5".
+
+# ===========================================================================
+# 7  NESTING -- arrays and objects combined, three levels deep
+# ===========================================================================
+
+start : "[[[[1]]]]", "{\"a\":{\"b\":{\"c\":1}}}",
+        "{\"a\":[{\"b\":1}]}", "[{\"a\":[1,2]},{\"b\":3}]",
+        "[[1,2],[3,4]]", "{\"a\":[1,[2,3]]}".
+
+start >> object_pair > value > arr > values > value > object :
+	"{\"a\":[{\"b\":1}]}".
+
+start >> values > ^ value > object $ : "[{\"a\":1}]".
+
+# Swapping the outer container never changes the inner shape it wraps.
+~start >> object_pair > value > arr : "{\"a\":{\"b\":1}}".
+
+~start : "[{]", "{[}", "[[1]", "{{1}}", "[1,2}".
+
+# ===========================================================================
+# 8  REJECTS -- invalid JSON that must be rejected
+# ===========================================================================
+
+~start : "", " ", "abc", "True", "False", "Null",
+         "TRUE", "FALSE", "NULL", "nul", "tru", "fals",
+         "1.2.3", "\"unclosed",
+         "\"bad \\x escape\"",
+         "[1,]", "{,}", "[1 2]", "[] ]",
+         "{key: 1}", "{\"a\":1,}", "{\"a\":}",
+         "\"bad\\u00GG\"",
+         # control chars must be escaped in strings (RFC 8259 sec 7):
+         # a literal tab/newline between the quotes is invalid.
+         "\"\t\"", "\"\n\"",
+         "[}", "{]",
+         "{\"a\":1 \"b\":2}",
+         "\"unterminated escape\\".
+
+~start : "NaN", "Infinity",
+         "'single quotes'",
+         "/* comment */", "// comment",
+         ".5e1", "1.e1".
+
+# A shape assertion on a rejected input never gets the chance to run,
+# because the negated verdict passes as soon as the parse itself fails.
+~start > value > arr : "{}".
+~start > value > object : "[]".
+~start > value > number : "\"1\"".
