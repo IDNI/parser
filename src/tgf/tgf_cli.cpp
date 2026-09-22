@@ -386,6 +386,7 @@ bool tgf_repl_evaluator::reload(const string& new_tgf_file) {
 	}
 	if (!load_file(new_tgf_file)) {
 		cout << "reload failed: " << new_tgf_file << "\n";
+		flush_report();
 		return false;
 	}
 	update_opts_by_grammar_opts();
