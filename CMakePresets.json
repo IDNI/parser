@@ -202,7 +202,8 @@
 			"name": "_build-tests",
 			"hidden": true,
 			"cacheVariables": {
-				"TAU_PARSER_BUILD_TESTS": "ON"
+				"TAU_PARSER_BUILD_TESTS": "ON",
+				"TAU_RUN_GRAMMAR_TESTS": "ON"
 			}
 		},
 
@@ -211,6 +212,14 @@
 			"hidden": true,
 			"cacheVariables": {
 				"TAU_PARSER_BUILD_TGF": "ON"
+			}
+		},
+
+		{
+			"name": "_run-grammar-tests",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_RUN_GRAMMAR_TESTS": "ON"
 			}
 		},
 
@@ -578,6 +587,11 @@
 		},
 
 		{
+			"name": "grammar-tests",
+			"inherits": ["release", "_run-grammar-tests"]
+		},
+
+		{
 			"name": "release-all",
 			"inherits": ["release", "_build-all"]
 		},
@@ -812,6 +826,10 @@
 		{
 			"name": "release-tests",
 			"configurePreset": "release-tests"
+		},
+		{
+			"name": "grammar-tests",
+			"configurePreset": "grammar-tests"
 		},
 		{
 			"name": "debug-all",
@@ -1066,6 +1084,10 @@
 		{
 			"name": "debug-tests-emscripten",
 			"configurePreset": "debug-tests-emscripten"
+		},
+		{
+			"name": "grammar-tests",
+			"configurePreset": "grammar-tests"
 		},
 		{
 			"name": "release-all",

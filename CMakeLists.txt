@@ -55,6 +55,7 @@ option(TAU_PARSER_BUILD_EMSCRIPTEN     "Build for Emscripten"               OFF)
 option(TAU_PARSER_BUILD_TESTS          "Build library tests"                OFF)
 option(TAU_PARSER_BUILD_EXAMPLES       "Build examples"                     OFF)
 option(TAU_PARSER_BUILD_TGF            "Build tgf tool"                     OFF)
+option(TAU_RUN_GRAMMAR_TESTS           "Run the .tgf.test grammar suites"   OFF)
 option(TAU_PARSER_DONT_USE_FTXUI       "Disable FTXUI"                      OFF)
 option(TAU_PARSER_BUILD_PIC            "Build position independent code"    OFF)
 option(TAU_PARSER_WINDOWS_PACKAGE      "Build Windows package"              OFF)
@@ -99,6 +100,7 @@ set_property(CACHE TAU_PARSER_BUILD_EMSCRIPTEN      PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_TESTS           PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_EXAMPLES        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_TGF             PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_RUN_GRAMMAR_TESTS            PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_DONT_USE_FTXUI        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_WINDOWS_PACKAGE       PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_WINDOWS_ZIP_PACKAGE   PROPERTY STRINGS "OFF" "ON")
@@ -122,6 +124,14 @@ if(TAU_PARSER_BUILD_ALL)
 		CACHE BOOL "Build examples" FORCE)
 	set(TAU_PARSER_BUILD_DOC ON
 		CACHE BOOL "Build documentation" FORCE)
+	set(TAU_RUN_GRAMMAR_TESTS ON
+		CACHE BOOL "Run the .tgf.test grammar suites" FORCE)
+endif()
+
+# grammar test suites run through the tgf tool
+if(TAU_RUN_GRAMMAR_TESTS)
+	set(TAU_PARSER_BUILD_TGF ON
+		CACHE BOOL "Build tgf tool" FORCE)
 endif()
 
 # TGF executable requires performance measures
@@ -275,6 +285,7 @@ message(STATUS "TAU_PARSER_BUILD_EMSCRIPTEN:     ${TAU_PARSER_BUILD_EMSCRIPTEN}"
 message(STATUS "TAU_PARSER_BUILD_TESTS:          ${TAU_PARSER_BUILD_TESTS}")
 message(STATUS "TAU_PARSER_BUILD_EXAMPLES:       ${TAU_PARSER_BUILD_EXAMPLES}")
 message(STATUS "TAU_PARSER_BUILD_TGF:            ${TAU_PARSER_BUILD_TGF}")
+message(STATUS "TAU_RUN_GRAMMAR_TESTS:           ${TAU_RUN_GRAMMAR_TESTS}")
 message(STATUS "TAU_PARSER_DONT_USE_FTXUI:       ${TAU_PARSER_DONT_USE_FTXUI}")
 message(STATUS "TAU_PARSER_SPECIALIZE:           ${TAU_PARSER_SPECIALIZE}")
 message(STATUS "TAU_PARSER_BUILD_PIC:            ${TAU_PARSER_BUILD_PIC}")
@@ -366,6 +377,11 @@ endif()
 
 if(TAU_PARSER_BUILD_TGF AND NOT TAU_PARSER_BUILD_EMSCRIPTEN)
 	add_subdirectory(src/tgf)
+endif()
+
+if(TAU_RUN_GRAMMAR_TESTS AND TARGET tgf)
+	enable_testing()
+	include(tests/grammar_tests.cmake)
 endif()
 
 if(TAU_PARSER_SPECIALIZE)
