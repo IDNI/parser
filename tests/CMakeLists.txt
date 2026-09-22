@@ -223,6 +223,21 @@ target_include_directories(bench_enhancements PUBLIC
 )
 endif()
 
+# Parity between the native tgf and the MinGW build run under wine.
+# Registered only when the cross-build and wine are both present.
+if(TARGET tgf AND NOT WIN32)
+	set(MINGW_DIR "${PROJECT_BINARY_DIR}/../release-mingw")
+	find_program(WINE_EXECUTABLE wine)
+	if(WINE_EXECUTABLE AND EXISTS "${MINGW_DIR}/tgf.exe")
+		add_test(NAME tgf_wine_parity
+			COMMAND sh
+				"${CMAKE_CURRENT_SOURCE_DIR}/parity/tgf_wine_parity.sh"
+				$<TARGET_FILE:tgf>
+				"${MINGW_DIR}/tgf.exe"
+				"${PROJECT_SOURCE_DIR}/src/format/json/json.tgf")
+	endif()
+endif()
+
 # Native REPL tests - python3 + pexpect/pyte; skip if modules absent.
 if(TARGET tgf AND NOT WIN32)
 	find_program(PYTHON3_EXECUTABLE python3)

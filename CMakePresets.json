@@ -666,6 +666,14 @@
 		},
 
 		{
+			"name": "release-mingw-tests",
+			"inherits": ["release-mingw", "_build-tests", "_build-tgf"],
+			"cacheVariables": {
+				"CMAKE_CROSSCOMPILING_EMULATOR": "wine"
+			}
+		},
+
+		{
 			"name": "release-mingw-packages",
 			"inherits": [
 				"release-mingw",
@@ -918,6 +926,10 @@
 			"configurePreset": "release-mingw"
 		},
 		{
+			"name": "release-mingw-tests",
+			"configurePreset": "release-mingw-tests"
+		},
+		{
 			"name": "debug-mingw",
 			"configurePreset": "debug-mingw"
 		},
@@ -1042,6 +1054,10 @@
 		{
 			"name": "release-tests",
 			"configurePreset": "release-tests"
+		},
+		{
+			"name": "release-mingw-tests",
+			"configurePreset": "release-mingw-tests"
 		},
 		{
 			"name": "release-tests-emscripten",

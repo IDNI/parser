@@ -108,11 +108,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends wine
 # wine, not wine64: the Ubuntu package runs these 64-bit PE binaries on its
 # own, and needs no i386 multiarch.
 RUN echo " (BUILD) -- Running tests under wine: $TESTS" && \
-	./dev preset release-mingw -DTAU_BUILD_JOBS=${BUILD_JOBS} \
-		-DTAU_PARSER_BUILD_TESTS=ON \
-		-DCMAKE_CROSSCOMPILING_EMULATOR=wine && \
 	if [ "$TESTS" = "yes" ]; then \
-		ctest --test-dir build/release-mingw --output-on-failure; \
+		./dev preset release-mingw-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+	else \
+		./dev preset release-mingw-tests -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+	fi
+
+# The wine parity test lives in the native tree and registers itself once the
+# cross-built tgf.exe is there, so the native suite runs it.
+RUN if [ "$TESTS" = "yes" ]; then \
+		echo " (BUILD) -- Running the native suite with the wine parity test" && \
+		./dev preset release-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 	fi
 
 
