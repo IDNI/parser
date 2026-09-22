@@ -1,88 +1,15 @@
 // This file is generated from a file src/tgf/tgf_repl.tgf by
 //       https://github.com/IDNI/parser/src/tgf
 //
-#ifndef __TGF_REPL_PARSER_H__
-#define __TGF_REPL_PARSER_H__
-
+// productions() lives here so the table is compiled once, not per TU.
+//
 #include "parser.h"
-#include "recoders.h"
+#include "tgf_repl_parser.generated.h"
 
 namespace tgf_repl_parser_data {
 
-using char_type     = char;
-using terminal_type = char32_t;
-
-inline static constexpr size_t nt_bits = 8;
-inline const std::vector<std::string> symbol_names{
-	"", "eof", "alnum", "alpha", "space", "printable", "xdigit", "_", "__", "symbol", 
-	"quoted_string", "unescaped_s", "escaped_s", "parse_input_char_seq", "escape_char", "esc_hex", "esc_u4", "esc_U8", "start", "__E_start_0", 
-	"statement", "__E___E_start_0_1", "__E___E_start_0_2", "grammar_cmd", "igrammar_cmd", "unreachable_cmd", "reload_cmd", "load_cmd", "start_cmd", "help_cmd", 
-	"version_cmd", "license_cmd", "quit_cmd", "clear_cmd", "get_cmd", "set_cmd", "toggle_cmd", "enable_cmd", "disable_cmd", "add_cmd", 
-	"del_cmd", "parse_file_cmd", "parse_cmd", "parse_sym", "__E_parse_cmd_3", "parse_input", "parse_file_sym", "__E_parse_file_cmd_4", "filename", "grammar_sym", 
-	"__E_grammar_cmd_5", "igrammar_sym", "__E_igrammar_cmd_6", "__E_igrammar_cmd_7", "start_sym", "__E_start_cmd_8", "__E_start_cmd_9", "unreachable_sym", "__E_unreachable_cmd_10", "__E_unreachable_cmd_11", 
-	"reload_sym", "__E_reload_cmd_12", "load_sym", "__E_load_cmd_13", "help_sym", "__E_help_cmd_14", "__E_help_cmd_15", "help_arg", "version_sym", "__E_version_cmd_16", 
-	"license_sym", "__E_license_cmd_17", "quit_sym", "__E_quit_cmd_18", "clear_sym", "__E_clear_cmd_19", "get_sym", "__E_get_cmd_20", "option", "add_sym", 
-	"__E_add_cmd_21", "list_option", "symbol_list", "treepaths_option", "treepath_list", "del_sym", "__E_del_cmd_22", "__E_del_cmd_23", "toggle_sym", "__E_toggle_cmd_24", 
-	"bool_option", "enable_sym", "__E_enable_cmd_25", "disable_sym", "__E_disable_cmd_26", "set_sym", "__E_set_cmd_27", "__E___E_set_cmd_27_28", "bool_value", "__E___E_set_cmd_27_29", 
-	"__E___E_set_cmd_27_30", "enum_ev_option", "__E___E_set_cmd_27_31", "error_verbosity", "__E_parse_input_32", "__E_parse_input_33", "error_verbosity_opt", "__E_enum_ev_option_34", "status_opt", "__E_bool_option_35", 
-	"colors_opt", "__E_bool_option_36", "print_ambiguity_opt", "__E_bool_option_37", "print_graphs_opt", "__E_bool_option_38", "print_rules_opt", "__E_bool_option_39", "print_facts_opt", "__E_bool_option_40", 
-	"print_terminals_opt", "__E_bool_option_41", "measure_parsing_opt", "__E_bool_option_42", "measure_each_pos_opt", "__E_bool_option_43", "measure_forest_opt", "__E_bool_option_44", "measure_preprocess_opt", "__E_bool_option_45", 
-	"gc_opt", "__E_bool_option_46", "debug_opt", "__E_bool_option_47", "auto_disambiguate_opt", "__E_bool_option_48", "trim_terminals_opt", "__E_bool_option_49", "inline_cc_opt", "__E_bool_option_50", 
-	"nodisambig_list_opt", "__E_list_option_51", "enabled_prods_opt", "__E_list_option_52", "trim_opt", "trim_children_opt", "__E_list_option_53", "trim_children_terminals_opt", "__E_list_option_54", "inline_opt", 
-	"__E_treepaths_option_55", "true_value", "__E_bool_value_56", "false_value", "__E_bool_value_57", "basic_sym", "__E_error_verbosity_58", "detailed_sym", "__E_error_verbosity_59", "root_cause_sym", 
-	"__E_error_verbosity_60", "__E_symbol_61", "__E_symbol_62", "__E_symbol_63", "__E_symbol_list_64", "__E_symbol_list_65", "treepath", "__E_treepath_66", "__E_treepath_67", "__E_treepath_list_68", 
-	"__E_treepath_list_69", "quoted_string_char", "__E_quoted_string_70", "__E_unescaped_s_71", "__E_unescaped_s_72", "__E_escaped_s_73", "__E_esc_hex_74", "__E_esc_hex_75", "__E___76", "__E____77", 
-	"comment", "__E_comment_78", "__E_comment_79", "__E_comment_80", "__N_0", 
-};
-
-inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
-
-inline std::vector<terminal_type> terminals{
-	U'\0', U'.', U'p', U'a', U'r', U's', U'e', U'f', U' ', 
-	U'i', U'l', U'g', U'm', U'n', U't', U'-', U'u', U'c', U'h', 
-	U'b', U'o', U'd', U'v', U'L', U'q', U'x', U'=', U'\t', U'y', 
-	U'1', U'0', U'_', U',', U'>', U'"', U'\\', U'/', U'X', U'U', 
-	U'\r', U'\n', U'#', 
-};
-
-inline ::idni::char_class_fns<terminal_type> char_classes =
-	::idni::predefined_char_classes<char_type, terminal_type>({
-		"eof",
-		"alnum",
-		"alpha",
-		"space",
-		"printable",
-		"xdigit",
-	}, nts);
-
-inline struct ::idni::grammar<char_type, terminal_type>::options
-	grammar_options
-{
-	.transform_negation = false,
-	.auto_disambiguate = true,
-	.shaping = {
-		.to_trim = {
-			7, 8
-		},
-		.trim_terminals = true,
-		.dont_trim_terminals_of = {
-			9, 10, 11, 12, 13, 14, 15, 16, 17
-		},
-		.inline_char_classes = true
-	}
-};
-
-inline auto make_parser_options() {
-	auto o = ::idni::default_parser_options<char_type, terminal_type>();
-	o.codec.decode = idni::utf8_to_u32_conv;
-	o.codec.encode = idni::u32_to_utf8_conv;
-	return o;
-}
-
-inline ::idni::prods<char_type, terminal_type> start_symbol{ nts(18) };
-
-#ifdef TAU_PARSER_BUILD_HEADER_ONLY
-inline idni::prods<char_type, terminal_type>& productions() {
+#ifndef TAU_PARSER_BUILD_HEADER_ONLY
+idni::prods<char_type, terminal_type>& productions() {
 	static bool loaded = false;
 	static idni::prods<char_type, terminal_type>
 		p, nul(idni::lit<char_type, terminal_type>{});
@@ -813,56 +740,6 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	#undef NT
 	return loaded = true, p;
 }
-#else
-idni::prods<char_type, terminal_type>& productions();
 #endif
 
-inline ::idni::grammar<char_type, terminal_type> grammar(
-	nts, productions(), start_symbol, char_classes, grammar_options);
-
 } // namespace tgf_repl_parser_data
-
-struct tgf_repl_parser_nonterminals {
-	enum nonterminal {
-		nul, eof, alnum, alpha, space, printable, xdigit, _, __, symbol, 
-		quoted_string, unescaped_s, escaped_s, parse_input_char_seq, escape_char, esc_hex, esc_u4, esc_U8, start, __E_start_0, 
-		statement, __E___E_start_0_1, __E___E_start_0_2, grammar_cmd, igrammar_cmd, unreachable_cmd, reload_cmd, load_cmd, start_cmd, help_cmd, 
-		version_cmd, license_cmd, quit_cmd, clear_cmd, get_cmd, set_cmd, toggle_cmd, enable_cmd, disable_cmd, add_cmd, 
-		del_cmd, parse_file_cmd, parse_cmd, parse_sym, __E_parse_cmd_3, parse_input, parse_file_sym, __E_parse_file_cmd_4, filename, grammar_sym, 
-		__E_grammar_cmd_5, igrammar_sym, __E_igrammar_cmd_6, __E_igrammar_cmd_7, start_sym, __E_start_cmd_8, __E_start_cmd_9, unreachable_sym, __E_unreachable_cmd_10, __E_unreachable_cmd_11, 
-		reload_sym, __E_reload_cmd_12, load_sym, __E_load_cmd_13, help_sym, __E_help_cmd_14, __E_help_cmd_15, help_arg, version_sym, __E_version_cmd_16, 
-		license_sym, __E_license_cmd_17, quit_sym, __E_quit_cmd_18, clear_sym, __E_clear_cmd_19, get_sym, __E_get_cmd_20, option, add_sym, 
-		__E_add_cmd_21, list_option, symbol_list, treepaths_option, treepath_list, del_sym, __E_del_cmd_22, __E_del_cmd_23, toggle_sym, __E_toggle_cmd_24, 
-		bool_option, enable_sym, __E_enable_cmd_25, disable_sym, __E_disable_cmd_26, set_sym, __E_set_cmd_27, __E___E_set_cmd_27_28, bool_value, __E___E_set_cmd_27_29, 
-		__E___E_set_cmd_27_30, enum_ev_option, __E___E_set_cmd_27_31, error_verbosity, __E_parse_input_32, __E_parse_input_33, error_verbosity_opt, __E_enum_ev_option_34, status_opt, __E_bool_option_35, 
-		colors_opt, __E_bool_option_36, print_ambiguity_opt, __E_bool_option_37, print_graphs_opt, __E_bool_option_38, print_rules_opt, __E_bool_option_39, print_facts_opt, __E_bool_option_40, 
-		print_terminals_opt, __E_bool_option_41, measure_parsing_opt, __E_bool_option_42, measure_each_pos_opt, __E_bool_option_43, measure_forest_opt, __E_bool_option_44, measure_preprocess_opt, __E_bool_option_45, 
-		gc_opt, __E_bool_option_46, debug_opt, __E_bool_option_47, auto_disambiguate_opt, __E_bool_option_48, trim_terminals_opt, __E_bool_option_49, inline_cc_opt, __E_bool_option_50, 
-		nodisambig_list_opt, __E_list_option_51, enabled_prods_opt, __E_list_option_52, trim_opt, trim_children_opt, __E_list_option_53, trim_children_terminals_opt, __E_list_option_54, inline_opt, 
-		__E_treepaths_option_55, true_value, __E_bool_value_56, false_value, __E_bool_value_57, basic_sym, __E_error_verbosity_58, detailed_sym, __E_error_verbosity_59, root_cause_sym, 
-		__E_error_verbosity_60, __E_symbol_61, __E_symbol_62, __E_symbol_63, __E_symbol_list_64, __E_symbol_list_65, treepath, __E_treepath_66, __E_treepath_67, __E_treepath_list_68, 
-		__E_treepath_list_69, quoted_string_char, __E_quoted_string_70, __E_unescaped_s_71, __E_unescaped_s_72, __E_escaped_s_73, __E_esc_hex_74, __E_esc_hex_75, __E___76, __E____77, 
-		comment, __E_comment_78, __E_comment_79, __E_comment_80, __N_0, 
-	};
-};
-
-struct tgf_repl_parser : public idni::parser<char, char32_t>, public tgf_repl_parser_nonterminals {
-	static tgf_repl_parser& instance() {
-		static tgf_repl_parser inst;
-		return inst;
-	}
-	tgf_repl_parser() : idni::parser<char_type, terminal_type>(
-		tgf_repl_parser_data::grammar,
-		tgf_repl_parser_data::make_parser_options()) {}
-	size_t id(const std::basic_string<char_type>& name) {
-		return tgf_repl_parser_data::nts.get(name);
-	}
-	const std::basic_string<char_type>& name(size_t id) {
-		return tgf_repl_parser_data::nts.get(id);
-	}
-	symbol_type literal(const nonterminal& nt) {
-		return symbol_type(nt, &tgf_repl_parser_data::nts);
-	}
-};
-
-#endif // __TGF_REPL_PARSER_H__

@@ -6,6 +6,20 @@ target_compile_definitions_if(tgf_cli_core PRIVATE
 target_include_directories(tgf_cli_core PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
 )
+
+# tgf_cli.cpp reaches tgf_repl_parser directly through tgf_cli.h; a
+# header-only build resolves productions() inline instead, so it stays out
+# of that build entirely
+if(NOT TAU_PARSER_BUILD_HEADER_ONLY)
+	set(TGF_CLI_CORE_GENERATED_SOURCES
+		"${CMAKE_CURRENT_SOURCE_DIR}/tgf_repl_parser.generated.cpp"
+	)
+	target_sources(tgf_cli_core PRIVATE ${TGF_CLI_CORE_GENERATED_SOURCES})
+	# grammar tables are data; optimizing them wastes build time
+	set_source_files_properties(${TGF_CLI_CORE_GENERATED_SOURCES}
+		PROPERTIES COMPILE_OPTIONS "-O0;-fno-lto")
+endif()
+
 if(NOT WIN32)
 	target_compile_options(tgf_cli_core PRIVATE -fPIC)
 endif()
