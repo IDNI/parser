@@ -5,6 +5,11 @@
 
 @enable productions comma, crlf. 
 
+@highlight type : file, header, record.
+@highlight string : escaped, non_escaped, TEXTDATA, EOL.
+@highlight operator : SEP, DQUOTE.
+@highlight keyword : start.
+
 @use char class printable.
 
 @inline char classes, TEXTDATA, field.

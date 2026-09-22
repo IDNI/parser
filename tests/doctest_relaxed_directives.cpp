@@ -179,3 +179,39 @@ TEST_CASE("directive: @enable") {
 	REQUIRE(g.opt.enabled_guards.count("guard2") == 1);
 }
 
+// ============================================================
+// @highlight
+// ============================================================
+
+TEST_CASE("directive: @highlight populates highlights option") {
+	nonterminals<char> nts;
+	auto g = build_grammar(nts, 
+		"@use char class digit.\n"
+		"@highlight keyword : start;\n"
+		"           comment : comment.\n"
+		"start => digit.\n"
+		"comment => '#' printable | null.\n");
+	REQUIRE(g.opt.highlights.size() == 2);
+	// first entry: keyword -> [start]
+	REQUIRE(g.opt.highlights[0].first == "keyword");
+	REQUIRE(g.opt.highlights[0].second.size() == 1);
+	REQUIRE(g.opt.highlights[0].second[0] == "start");
+	// second entry: comment -> [comment]
+	REQUIRE(g.opt.highlights[1].first == "comment");
+	REQUIRE(g.opt.highlights[1].second.size() == 1);
+	REQUIRE(g.opt.highlights[1].second[0] == "comment");
+}
+
+TEST_CASE("directive: @highlight with multiple nonterminals") {
+	nonterminals<char> nts;
+	auto g = build_grammar(nts, 
+		"@use char class digit.\n"
+		"@highlight number : digit, hex.\n"
+		"start => digit.\n"
+		"hex => 'a' | 'b'.\n");
+	REQUIRE(g.opt.highlights.size() == 1);
+	REQUIRE(g.opt.highlights[0].first == "number");
+	REQUIRE(g.opt.highlights[0].second.size() == 2);
+	REQUIRE(g.opt.highlights[0].second[0] == "digit");
+	REQUIRE(g.opt.highlights[0].second[1] == "hex");
+}

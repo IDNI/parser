@@ -7,6 +7,12 @@
 @trim _, __.
 @trim children true_sym, false_sym, null_sym.
 
+@highlight keyword : true_sym, false_sym, null_sym, start.
+@highlight type : value, arr, object, object_pair, values.
+@highlight string : str, q_str, escaped, unescaped.
+@highlight number : number, digit, integral, fractional, exponent, zero, nonzerodigit, nzintegral, xdigit, ascii_digit, ascii_xdigit.
+@highlight operator : esc.
+
 # start representing JSON text is a value
 start          => _ value _.
 

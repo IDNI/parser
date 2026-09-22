@@ -339,6 +339,7 @@ private:
 		else if (name == "disable")    disable_dir(t);
 		else if (name == "ambiguous")  ambiguous_dir(t);
 		else if (name == "enable")     enable_dir(t);
+		else if (name == "highlight")  highlight_dir(t);
 		else if (name == "dynamic")    dynamic_dir(t);
 		else if (diag) diag->warning(messages::unknown_directive,
 			{{ label::name, name }});
@@ -485,6 +486,35 @@ private:
 			if (a == "disambiguation") {
 				opt.auto_disambiguate = true;
 			} else opt.enabled_guards.insert(a);
+		}
+	}
+
+	void highlight_dir(const trv& t) {
+		for (auto& p : (t || tgf_parser::dir_pair)()) {
+			std::vector<trv> lists;
+			for (auto& lst :
+				(p || tgf_parser::dir_list)())
+				lists.push_back(lst);
+			if (lists.size() < 2) continue;
+			std::string type_name;
+			for (auto& a :
+				(lists[0] || tgf_parser::dir_arg)())
+				type_name = dir_arg_text(
+					a | trv::only_child);
+			if (type_name.empty()) continue;
+			std::vector<std::string> nt_names;
+			for (auto& a :
+				(lists[1] || tgf_parser::dir_arg)()) {
+				auto n = dir_arg_text(
+					a | trv::only_child);
+				if (!n.empty()) {
+					nt_names.push_back(n);
+				}
+			}
+			if (!nt_names.empty())
+				opt.highlights.emplace_back(
+					std::move(type_name),
+					std::move(nt_names));
 		}
 	}
 

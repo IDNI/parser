@@ -6,6 +6,15 @@
 	terminal_hex, hex_bytes.
 @inline char classes, escape_char, esc_hex, esc_u4, esc_U8.
 
+# keyword, operator, string, comment, number, type, variable, delimiter
+@highlight
+	type    : directive_name, directive_token, directive_cmd;
+        operator: alternation, conjunction, optional, repeat, none_or_repeat, neg, tree_path;
+	string  : terminal_string, terminal_char;
+	comment : comment;
+	number  : escaped_s, escaped_c, terminal_hex;
+        keyword : dir_sym.
+
 # start symbol
 start                  => (_ statement)* _.
 

@@ -405,6 +405,10 @@ struct grammar {
 		/// Alternatives supplied by the host for a @dynamic nonterminal.
 		std::map<std::basic_string<C>, std::vector<std::basic_string<C>>>
 			dynamic = {};
+		/// @highlight directive: type_name -> nonterminal names
+		/// Populated by @highlight type : nt1, nt2; type2 : nt3.
+		std::vector<std::pair<std::string, std::vector<std::string>>>
+			highlights = {};
 	} opt;
 	grammar(nonterminals<C, T>& nts, options opt = {});
 	grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
