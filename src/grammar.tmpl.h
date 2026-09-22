@@ -412,9 +412,10 @@ template <typename C, typename T>
 bool prods<C, T>::operator==(const lit<C, T>& l) const { return l == to_lit(); }
 template <typename C, typename T>
 lit<C, T> prods<C, T>::to_lit() const {
-	assert(this->size() && this->back().second.size() &&
+	if (!(this->size() && this->back().second.size() &&
 		this->back().second.begin()->size() &&
-		this->back().second.begin()->begin()->size());
+		this->back().second.begin()->begin()->size()))
+			return lit<C, T>{};
 	return this->back().second.begin()->begin()->back();
 }
 template <typename C, typename T>
