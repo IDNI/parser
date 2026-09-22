@@ -124,6 +124,7 @@ dev_entry() {
 	fi
 	normalize_args "$@"
 	resolve_jobs
+	git_submodules_init
 }
 
 dev_check_no_extra_positionals() {
@@ -165,22 +166,49 @@ make_available() {
 }
 
 # Initializes every submodule `git submodule status` reports as not yet
-# checked out (a leading "-" on its status line), leaving already-initialized
-# ones alone. Reads the status output via a here-string, which keeps the
-# while loop out of a subshell (bash runs a pipeline's last stage in one).
+# checked out (a leading "-" on its status line), and offers to update ones
+# checked out at a commit other than the one HEAD pins (a leading "+"), which
+# otherwise builds against the wrong sources. Reads the status on fd 3, which
+# keeps the while loop out of a subshell (bash runs a pipeline's last stage in
+# one) and leaves stdin free for the prompt. Set TAU_SKIP_SUBMODULE_CHECK=1 to
+# leave "+" submodules alone, as when co-developing one against its parent.
 git_submodules_init() {
-	local status_output line submod
+	local status_output line submod current pinned reply
 	status_output="$(git submodule status)"
-	while IFS= read -r line; do
+	while IFS= read -r line <&3; do
 		[[ -z $line ]] && continue
 		submod="$(awk '{print $2}' <<<"$line")"
-		if [[ $line == -* ]]; then
+		case $line in
+		-*)
 			echo "Initializing submodule ${submod}"
 			git submodule update --init --recursive "${submod}"
-		else
+			;;
+		+*)
+			[[ -n ${TAU_SKIP_SUBMODULE_CHECK:-} ]] && continue
+			current="$(awk '{print $1}' <<<"$line")"
+			pinned="$(git rev-parse --short=8 "HEAD:./${submod}" 2>/dev/null)"
+			echo ""
+			echo "Warning: submodule ${submod} is not at the commit pinned by HEAD"
+			echo "  checked out: ${current:1:8}"
+			echo "  pinned:      ${pinned:-unknown}"
+			reply="n"
+			if [ -t 0 ]; then
+				read -p "Update ${submod} to the pinned commit? [Y/n] " -r reply
+			fi
+			if [[ -z $reply || $reply =~ ^[Yy]([Ee][Ss])?$ ]]; then
+				git submodule update --init --recursive "${submod}"
+			else
+				echo "Leaving ${submod} as is; the build may use stale sources."
+				echo "To update it yourself, run:"
+				echo "  git submodule update --init --recursive ${submod}"
+			fi
+			echo ""
+			;;
+		*)
 			echo "Submodule ${submod} is already initialized"
-		fi
-	done <<<"$status_output"
+			;;
+		esac
+	done 3<<<"$status_output"
 }
 
 build_run() {
