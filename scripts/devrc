@@ -567,3 +567,104 @@ dep_git_source() {
 		cd "$dir"
 	fi
 }
+
+# Downloads a prebuilt package and verifies it before install. Any failure
+# just returns non-zero, so the caller still has a source build to fall
+# back on; this never calls exit.
+dep_prebuilt() {
+	local url="$1" sha256="$2" prefix="$3" marker="$4"
+
+	if [[ -n "$(dep_var TAU_NO_PREBUILT)" || -n "${TAU_NO_PREBUILT:-}" ]]; then
+		echo "TAU_NO_PREBUILT is set, skipping prebuilt download"
+		return 1
+	fi
+	if [[ -z "$url" || -z "$sha256" ]]; then
+		echo "No prebuilt URL or checksum given, skipping prebuilt download"
+		return 1
+	fi
+
+	local downloader=""
+	if which curl > /dev/null 2>&1; then
+		downloader="curl"
+	elif which wget > /dev/null 2>&1; then
+		downloader="wget"
+	else
+		echo "Neither curl nor wget found, skipping prebuilt download"
+		return 1
+	fi
+
+	local sha_tool=""
+	if which sha256sum > /dev/null 2>&1; then
+		sha_tool="sha256sum"
+	elif which shasum > /dev/null 2>&1; then
+		sha_tool="shasum"
+	else
+		echo "Neither sha256sum nor shasum found, skipping prebuilt download"
+		return 1
+	fi
+
+	local tmp_dir
+	tmp_dir="$(mktemp -d)" || { echo "mktemp failed"; return 1; }
+	trap 'rm -rf "$tmp_dir"' RETURN
+
+	local archive="${tmp_dir}/$(basename "$url")"
+	echo "Downloading ${url}"
+	case "$downloader" in
+		curl)
+			curl -fsSL -o "$archive" "$url" || { echo "Download failed"; return 1; }
+			;;
+		wget)
+			wget -qO "$archive" "$url" || { echo "Download failed"; return 1; }
+			;;
+	esac
+
+	echo "Verifying checksum"
+	local actual
+	if [[ "$sha_tool" == sha256sum ]]; then
+		actual="$(sha256sum "$archive" | awk '{print $1}')"
+	else
+		actual="$(shasum -a 256 "$archive" | awk '{print $1}')"
+	fi
+	if [[ "$actual" != "$sha256" ]]; then
+		echo "Checksum mismatch for ${url}"
+		echo "  expected: ${sha256}"
+		echo "  actual:   ${actual}"
+		return 1
+	fi
+
+	local unpack_dir="${tmp_dir}/unpacked"
+	mkdir -p "$unpack_dir"
+	echo "Unpacking $(basename "$archive")"
+	case "$archive" in
+		*.zip)
+			unzip -q "$archive" -d "$unpack_dir" || { echo "Unpack failed"; return 1; }
+			;;
+		*.tar.gz|*.tgz|*.tar.xz|*.tar.zst)
+			tar -xf "$archive" -C "$unpack_dir" || { echo "Unpack failed"; return 1; }
+			;;
+		*)
+			echo "Unsupported archive type: ${archive}"
+			return 1
+			;;
+	esac
+
+	local entries=("$unpack_dir"/*) pkg_root="$unpack_dir"
+	if [[ ${#entries[@]} -eq 1 && -d "${entries[0]}" ]]; then
+		pkg_root="${entries[0]}"
+	fi
+
+	if [[ ! -f "${pkg_root}/${marker}" ]]; then
+		echo "Marker ${marker} not found in prebuilt package"
+		return 1
+	fi
+
+	echo "Installing prebuilt package at ${prefix}"
+	mkdir -p "$(dirname "$prefix")" || return 1
+	rm -rf "$prefix"
+	if ! mv "$pkg_root" "$prefix"; then
+		echo "Failed to install prebuilt package at ${prefix}"
+		rm -rf "$prefix"
+		return 1
+	fi
+	echo "Prebuilt package installed at ${prefix}"
+}
