@@ -110,7 +110,10 @@ Options for `test` command:
 ```
 tgf <tgf file> test [ <options> ]
         --help             -h      detailed information about options
+        --productions      -G      comma-separated list of enabled productions
 ```
+
+See [`TGF test files`](tgf.test.md) for the `.tgf.test` file format that this command runs.
 
 ## REPL commands
 

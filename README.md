@@ -108,6 +108,8 @@ This library comes with a CLI executable `tgf` which features viewing, testing a
 
 More detailed information about this CLI can be found on page [`TGF tool`](docs/tgf_tool.md)
 
+The `test` command runs a `.tgf.test` file. Page [`TGF test files`](docs/tgf.test.md) describes this file format.
+
 TGF is an EBNF-based format to describe grammars. Description of this format can be found on page [`Tau Grammar Format`](docs/tau_grammar_format.md).
 
 ## Tutorials
