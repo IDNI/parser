@@ -42,12 +42,15 @@ target_sources(tgf PRIVATE
 	"${CMAKE_CURRENT_SOURCE_DIR}/main.cpp")
 tauparser_setup(tgf PRIVATE tgf_cli_core)
 
-# Round-trip self-check first, archive only the binary that passed it
-add_custom_command(TARGET tgf POST_BUILD
-	COMMAND "${PROJECT_SOURCE_DIR}/scripts/tgf-roundtrip-self-check.sh" "$<TARGET_FILE:tgf>"
-	COMMAND "${PROJECT_SOURCE_DIR}/scripts/archive-tgf.sh" "$<TARGET_FILE:tgf>"
-	COMMENT "Round-trip self-check, then archiving the passing binary"
-)
+# Round-trip self-check first, archive only the binary that passed it.
+# Both steps run the binary on the host, which a cross build cannot do.
+if(NOT CMAKE_CROSSCOMPILING)
+	add_custom_command(TARGET tgf POST_BUILD
+		COMMAND "${PROJECT_SOURCE_DIR}/scripts/tgf-roundtrip-self-check.sh" "$<TARGET_FILE:tgf>"
+		COMMAND "${PROJECT_SOURCE_DIR}/scripts/archive-tgf.sh" "$<TARGET_FILE:tgf>"
+		COMMENT "Round-trip self-check, then archiving the passing binary"
+	)
+endif()
 
 # add_dependencies(tgf ${TAU_PARSER_STATIC_LIB_NAME})
 
