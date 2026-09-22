@@ -176,7 +176,9 @@ foreach(X IN LISTS DOCTESTS)
 	# add_dependencies(${N} ${TAU_PARSER_STATIC_LIB_NAME})
 endforeach()
 
-# Asynchronous FTXUI evaluation integration test.
+# FTXUI REPL pipe-mode parity (only when the tgf tool is built with FTXUI).
+# Runs `tgf repl` vs `tgf repl -x` over identical scripted input and asserts
+# identical .tgf_history.  See ftxui_repl_parity.sh.
 if(TARGET tgf AND TAU_PARSER_HAS_FTXUI_DEP AND NOT WIN32)
 	find_package(Threads REQUIRED)
 	add_executable(repl_ftxui_async_fixture repl_ftxui_async_fixture.cpp)
@@ -185,20 +187,10 @@ if(TARGET tgf AND TAU_PARSER_HAS_FTXUI_DEP AND NOT WIN32)
 		"${PROJECT_SOURCE_DIR}/src")
 	target_link_libraries(repl_ftxui_async_fixture PRIVATE
 		ftxui::screen ftxui::dom ftxui::component Threads::Threads)
-	find_program(PYTHON3_EXECUTABLE python3)
-	if(PYTHON3_EXECUTABLE)
-		execute_process(
-			COMMAND "${PYTHON3_EXECUTABLE}" -c "import pexpect, pyte"
-			RESULT_VARIABLE _py_deps_missing)
-		if(NOT _py_deps_missing)
-			add_test(NAME repl_ftxui_async_test
-				COMMAND "${PYTHON3_EXECUTABLE}"
-					"${CMAKE_CURRENT_SOURCE_DIR}/repl/test_repl_ftxui_async.py"
-					$<TARGET_FILE:repl_ftxui_async_fixture>)
-			set_tests_properties(repl_ftxui_async_test
-				PROPERTIES TIMEOUT 300)
-		endif()
-	endif()
+	add_test(NAME ftxui_repl_parity
+		COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/parity/ftxui_repl_parity.sh"
+			$<TARGET_FILE:tgf>
+			"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/ambig.tgf")
 endif()
 
 # WASM parity test - compare native tgf output against tgf_node (Node.js)
@@ -229,4 +221,40 @@ target_link_libraries(bench_enhancements PRIVATE tauparser)
 target_include_directories(bench_enhancements PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
 )
+endif()
+
+# Native REPL tests - python3 + pexpect/pyte; skip if modules absent.
+if(TARGET tgf AND NOT WIN32)
+	find_program(PYTHON3_EXECUTABLE python3)
+	if(PYTHON3_EXECUTABLE)
+		execute_process(
+			COMMAND "${PYTHON3_EXECUTABLE}" -c "import pexpect, pyte"
+			RESULT_VARIABLE _py_deps_missing)
+		if(NOT _py_deps_missing)
+			# Legacy (-X) REPL keybindings - no FTXUI required.
+			add_test(NAME repl_keybindings_test
+				COMMAND "${PYTHON3_EXECUTABLE}"
+					"${CMAKE_CURRENT_SOURCE_DIR}/repl/test_repl_keybindings.py"
+					$<TARGET_FILE:tgf>
+					"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tau.tgf")
+			if(TAU_PARSER_HAS_FTXUI_DEP)
+				add_test(NAME repl_ftxui_test
+					COMMAND "${PYTHON3_EXECUTABLE}"
+						"${CMAKE_CURRENT_SOURCE_DIR}/repl/test_repl_ftxui.py"
+						$<TARGET_FILE:tgf>
+						"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tau.tgf")
+				add_test(NAME repl_ftxui_async_test
+					COMMAND "${PYTHON3_EXECUTABLE}"
+						"${CMAKE_CURRENT_SOURCE_DIR}/repl/test_repl_ftxui_async.py"
+						$<TARGET_FILE:repl_ftxui_async_fixture>)
+			endif()
+			# tau.tgf is large; serialize REPL tests and allow generous load time.
+			set_tests_properties(repl_keybindings_test
+				PROPERTIES TIMEOUT 300 RESOURCE_LOCK repl_tau)
+			if(TAU_PARSER_HAS_FTXUI_DEP)
+				set_tests_properties(repl_ftxui_test repl_ftxui_async_test
+					PROPERTIES TIMEOUT 300 RESOURCE_LOCK repl_tau)
+			endif()
+		endif()
+	endif()
 endif()

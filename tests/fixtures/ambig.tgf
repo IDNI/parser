@@ -1,0 +1,6 @@
+# Ambig grammar for FTXUI REPL parity testing.
+# Two ways to parse a number - creates ambiguity.
+@use char classes digit.
+
+start => num.
+num   => digit | digit digit.

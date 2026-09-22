@@ -564,7 +564,7 @@
 
 		{
 			"name": "release-tests",
-			"inherits": ["release", "_build-tests"]
+			"inherits": ["release", "_build-tests", "_build-tgf"]
 		},
 
 		{
@@ -572,6 +572,7 @@
 			"inherits": [
 				"debug",
 				"_build-tests",
+				"_build-tgf",
 				"_build-type-debug"
 			]
 		},
