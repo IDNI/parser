@@ -9,6 +9,30 @@ set(TESTS
 )
 
 set(TEST_LIBS tauparser)
+if(EMSCRIPTEN)
+	# Emscripten produces .js files; run via node
+	find_program(NODE_EXECUTABLE node REQUIRED)
+	set(TEST_RUNNER "${NODE_EXECUTABLE}")
+	set(TEST_SUFFIX ".js")
+	# tauparser is an EXECUTABLE under emscripten, not a library.
+	# Tests are header-only; just need include paths + link flags.
+	set(TEST_LIBS)
+	macro(tauparser_emcc_setup target)
+		target_compile_definitions(${target} PRIVATE TAU_PARSER_BUILD_HEADER_ONLY)
+		target_compile_features(${target} PRIVATE cxx_std_23)
+		target_include_directories(${target} PRIVATE
+			${PROJECT_SOURCE_DIR}/src
+			${PROJECT_SOURCE_DIR}/src/tgf)
+		if(TARGET unordered_dense)
+			target_link_libraries(${target} PRIVATE unordered_dense)
+		endif()
+		target_link_options(${target} PRIVATE
+			"SHELL:-s ALLOW_MEMORY_GROWTH=1")
+	endmacro()
+else()
+	set(TEST_RUNNER "")
+	set(TEST_SUFFIX "")
+endif()
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
     CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 	set(TEST_LIBS ${TEST_LIBS} -static-libgcc -static-libstdc++)
@@ -17,7 +41,18 @@ endif()
 foreach(X IN LISTS TESTS)
 	set(N "test_${X}")
 	add_executable(${N} "${N}.cpp")
-	tauparser_setup(${N} PRIVATE ${TEST_LIBS})
+	if(EMSCRIPTEN)
+		tauparser_emcc_setup(${N})
+		# test_cli passes __FILE__ as a positional, and the CLI checks
+		# the file exists on disk. Preload the source at its absolute
+		# compile-time path so the check passes inside the WASM FS.
+		if(X STREQUAL "cli")
+			target_link_options(${N} PRIVATE
+				"SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/${N}.cpp@${CMAKE_CURRENT_SOURCE_DIR}/${N}.cpp")
+		endif()
+	else()
+		tauparser_setup(${N} PRIVATE ${TEST_LIBS})
+	endif()
 	if (TAU_PARSER_IS_GNU_OR_CLANG)
 		target_compile_options(${N} PUBLIC "-Wno-parentheses")
 	endif()
@@ -34,7 +69,7 @@ foreach(X IN LISTS TESTS)
 	target_include_directories(${N} PUBLIC
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
 	)
-	add_test(NAME ${N} COMMAND ${N})
+	add_test(NAME ${N} COMMAND ${TEST_RUNNER} ${N}${TEST_SUFFIX})
 endforeach()
 
 set(DOCTEST_HEADER "${PROJECT_SOURCE_DIR}/src/doctest.h" CACHE PATH "Doctest header")
@@ -102,20 +137,28 @@ set(DOCTESTS
 foreach(X IN LISTS DOCTESTS)
 	set(N "doctest_${X}")
 	add_executable(${N} "${N}.cpp")
-	tauparser_setup(${N} PRIVATE "")
+	if(EMSCRIPTEN)
+		tauparser_emcc_setup(${N})
+	else()
+		tauparser_setup(${N} PRIVATE "")
+	endif()
 	if (TAU_PARSER_IS_GNU_OR_CLANG)
 		target_compile_options(${N} PUBLIC "-Wno-parentheses")
 	endif()
 	if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
 		CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+		if(NOT EMSCRIPTEN)
 			target_link_libraries(${N} PRIVATE
 				tauparser
 				doctest
 				-static-libgcc
 				-static-libstdc++
 			)
+		endif()
 	else()
-		target_link_libraries(${N} PRIVATE tauparser doctest)
+		if(NOT EMSCRIPTEN)
+			target_link_libraries(${N} PRIVATE tauparser doctest)
+		endif()
 	endif()
 	target_include_directories(${N} PUBLIC
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
@@ -129,7 +172,7 @@ foreach(X IN LISTS DOCTESTS)
 			"${PROJECT_SOURCE_DIR}/src/format/treemr/treemr_parser.generated.cpp"
 			PROPERTIES COMPILE_OPTIONS "-O0;-fno-lto")
 	endif()
-	add_test(NAME ${N} COMMAND ${N})
+	add_test(NAME ${N} COMMAND ${TEST_RUNNER} ${N}${TEST_SUFFIX})
 	# add_dependencies(${N} ${TAU_PARSER_STATIC_LIB_NAME})
 endforeach()
 
@@ -158,7 +201,22 @@ if(TARGET tgf AND TAU_PARSER_HAS_FTXUI_DEP AND NOT WIN32)
 	endif()
 endif()
 
+# WASM parity test - compare native tgf output against tgf_node (Node.js)
+# for a grammar file and REPL commands. Requires the tgf tool, Node.js and
+# a built tgf_node.js (the Emscripten node target).
+if(TARGET tgf AND NOT WIN32)
+	find_program(NODE_EXECUTABLE node)
+	if(NODE_EXECUTABLE AND EXISTS "${PROJECT_SOURCE_DIR}/build/emscripten/tgf_node.js")
+		add_test(NAME tgf_wasm_parity
+			COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/parity/tgf_wasm_parity.sh"
+				$<TARGET_FILE:tgf>
+				"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tau.tgf"
+				"grammar" "p x = 0 || y = 1" "p x = 2" "quit")
+	endif()
+endif()
+
 # Benchmark executable (not a test — run manually)
+if(NOT EMSCRIPTEN)
 add_executable(bench_enhancements bench_enhancements.cpp)
 tauparser_setup(bench_enhancements PRIVATE "")
 if (TAU_PARSER_IS_GNU_OR_CLANG)
@@ -171,3 +229,4 @@ target_link_libraries(bench_enhancements PRIVATE tauparser)
 target_include_directories(bench_enhancements PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
 )
+endif()

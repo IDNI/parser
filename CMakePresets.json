@@ -732,6 +732,21 @@
 		},
 
 		{
+			"name": "release-tests-emscripten",
+			"inherits": ["emscripten", "_build-tests"]
+		},
+
+		{
+			"name": "release-tgf-emscripten",
+			"inherits": ["emscripten", "_build-tgf"]
+		},
+
+		{
+			"name": "release-all-emscripten",
+			"inherits": ["emscripten", "_build-all"]
+		},
+
+		{
 			"name": "debug-emscripten",
 			"inherits": [
 				"_build_dir-debug-emscripten",
@@ -739,6 +754,21 @@
 				"_emscripten",
 				"_build-type-debug"
 			]
+		},
+
+		{
+			"name": "debug-tests-emscripten",
+			"inherits": ["debug-emscripten", "_build-tests"]
+		},
+
+		{
+			"name": "debug-tgf-emscripten",
+			"inherits": ["debug-emscripten", "_build-tgf"]
+		},
+
+		{
+			"name": "debug-all-emscripten",
+			"inherits": ["debug-emscripten", "_build-all"]
 		}
 	],
 	"buildPresets": [
@@ -823,8 +853,32 @@
 			"configurePreset": "emscripten"
 		},
 		{
+			"name": "release-tests-emscripten",
+			"configurePreset": "release-tests-emscripten"
+		},
+		{
+			"name": "release-tgf-emscripten",
+			"configurePreset": "release-tgf-emscripten"
+		},
+		{
+			"name": "release-all-emscripten",
+			"configurePreset": "release-all-emscripten"
+		},
+		{
 			"name": "debug-emscripten",
 			"configurePreset": "debug-emscripten"
+		},
+		{
+			"name": "debug-tests-emscripten",
+			"configurePreset": "debug-tests-emscripten"
+		},
+		{
+			"name": "debug-tgf-emscripten",
+			"configurePreset": "debug-tgf-emscripten"
+		},
+		{
+			"name": "debug-all-emscripten",
+			"configurePreset": "debug-all-emscripten"
 		},
 		{
 			"name": "release-make-gcc",
@@ -989,12 +1043,28 @@
 			"configurePreset": "release-tests"
 		},
 		{
+			"name": "release-tests-emscripten",
+			"configurePreset": "release-tests-emscripten"
+		},
+		{
+			"name": "debug-tests-emscripten",
+			"configurePreset": "debug-tests-emscripten"
+		},
+		{
 			"name": "release-all",
 			"configurePreset": "release-all"
 		},
 		{
+			"name": "release-all-emscripten",
+			"configurePreset": "release-all-emscripten"
+		},
+		{
 			"name": "debug-all",
 			"configurePreset": "debug-all"
+		},
+		{
+			"name": "debug-all-emscripten",
+			"configurePreset": "debug-all-emscripten"
 		},
 		{
 			"name": "all",

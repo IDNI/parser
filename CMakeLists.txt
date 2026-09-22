@@ -383,6 +383,10 @@ endif()
 
 if(TAU_PARSER_BUILD_TESTS)
 	enable_testing()
+	if(TAU_PARSER_BUILD_EMSCRIPTEN AND EMSCRIPTEN)
+		# WASM-only tests (Node.js)
+		include("${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists_emcc.txt")
+	endif()
 	add_subdirectory(tests)
 endif()
 

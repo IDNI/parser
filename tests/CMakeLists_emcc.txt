@@ -1,0 +1,27 @@
+# Emscripten ctest - WASM-only tests that run via Node.js.
+#
+# These tests run after the same configure builds tgf_node.js, so they check
+# for the runner, not for the artifacts that the build itself produces.
+
+find_program(NODE_EXECUTABLE node)
+if(NOT NODE_EXECUTABLE)
+	return()
+endif()
+
+set(WASM_NODE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/emscripten")
+
+# tgf_wasm_parity_emcc - run tgf_node.js against preloaded tau.tgf
+add_test(NAME tgf_wasm_parity_emcc
+	COMMAND ${NODE_EXECUTABLE}
+		"${CMAKE_CURRENT_SOURCE_DIR}/tests/parity/tgf_wasm_parity.js"
+		"${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/tau.tgf"
+		"grammar" "p x = 0 || y = 1" "p x = 2" "quit")
+set_property(TEST tgf_wasm_parity_emcc
+	PROPERTY WORKING_DIRECTORY "${WASM_NODE_DIR}")
+
+# embindings_api_emcc - exercise the tauparser embind class API directly
+add_test(NAME embindings_api_emcc
+	COMMAND ${NODE_EXECUTABLE}
+		"${CMAKE_CURRENT_SOURCE_DIR}/tests/js/test_embindings.js")
+set_property(TEST embindings_api_emcc
+	PROPERTY WORKING_DIRECTORY "${WASM_NODE_DIR}")
