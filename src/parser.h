@@ -390,6 +390,8 @@ struct grammar {
 		 * This can be also disabled by TGF directive @disable disambiguation.
 		 */
 		bool auto_disambiguate = true;
+		/// Whether a grammar directive (@disable/@enable disambiguation) set auto_disambiguate.
+		bool auto_disambiguate_set_by_grammar = false;
 		/**
 		 * If auto_disambiguate is set to true this list contains nonterminal
 		 * ids of symbols we don't want to disambiguate and we want to keep

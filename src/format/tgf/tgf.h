@@ -466,6 +466,7 @@ private:
 		for (auto& a : args) {
 			if (a == "disambiguation") {
 				opt.auto_disambiguate = false;
+				opt.auto_disambiguate_set_by_grammar = true;
 			} else if (diag) diag->warning(
 				messages::unknown_directive_argument,
 				{{ label::name, a }});
@@ -485,6 +486,7 @@ private:
 		for (auto& a : args) {
 			if (a == "disambiguation") {
 				opt.auto_disambiguate = true;
+				opt.auto_disambiguate_set_by_grammar = true;
 			} else opt.enabled_guards.insert(a);
 		}
 	}

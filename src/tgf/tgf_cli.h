@@ -74,6 +74,8 @@ struct tgf_repl_evaluator {
 			parser_type::error::info_lvl::INFO_BASIC;
 		parse_tree_path tree_path = parse_tree_path::bintree_path;
 		bool auto_disambiguate = true;
+		/// True when the user passed --auto-disambiguate on the command line.
+		bool auto_disambiguate_user_set = false;
 		std::set<std::string> nodisambig_list{};
 		std::set<std::string> to_trim{};
 		std::set<std::string> dont_trim_terminals_of{};
@@ -127,6 +129,7 @@ struct tgf_repl_evaluator {
 
 	std::vector<std::string> treepath(const trv& tp) const;
 	void update_opts_by_grammar_opts();
+	void apply_auto_disambiguate();
 
 	parser_type::parse_options get_parse_options();
 	std::ostream& pretty_print(std::ostream& os, tref n,

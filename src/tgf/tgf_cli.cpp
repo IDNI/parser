@@ -260,6 +260,15 @@ void tgf_repl_evaluator::update_opts_by_grammar_opts() {
 		opt.start = g().start_literal().to_std_string();
 }
 
+// TODO (HIGH) replace by generic option origin tracking: every option
+// resolves default < grammar directive < CLI, not one flag per field.
+void tgf_repl_evaluator::apply_auto_disambiguate() {
+	if (opt.auto_disambiguate_user_set)
+		g().opt.auto_disambiguate = opt.auto_disambiguate;
+	else if (!g().opt.auto_disambiguate_set_by_grammar)
+		g().opt.auto_disambiguate = opt.auto_disambiguate;
+}
+
 void tgf_repl_evaluator::set_repl(repl<tgf_repl_evaluator>& r_) {
 	r = &r_;
 	reprompt();
@@ -380,7 +389,7 @@ bool tgf_repl_evaluator::reload(const string& new_tgf_file) {
 		return false;
 	}
 	update_opts_by_grammar_opts();
-	g().opt.auto_disambiguate = opt.auto_disambiguate;
+	apply_auto_disambiguate();
 	cout << "loaded: " << tgf_filename << "\n";
 	return true;
 }
@@ -985,7 +994,7 @@ tgf_repl_evaluator::tgf_repl_evaluator(std::string tgf_file, options opt)
 	TC.set(opt.colors);
 	if (!load_file(tgf_filename)) return;
 	update_opts_by_grammar_opts();
-	g().opt.auto_disambiguate = opt.auto_disambiguate;
+	apply_auto_disambiguate();
 }
 
 tgf_repl_evaluator::tgf_repl_evaluator(
@@ -1010,7 +1019,7 @@ tgf_repl_evaluator::tgf_repl_evaluator(
 {
 	TC.set(opt.colors);
 	update_opts_by_grammar_opts();
-	g().opt.auto_disambiguate = opt.auto_disambiguate;
+	apply_auto_disambiguate();
 }
 
 static tgf_repl_evaluator::parser_type::error::info_lvl
@@ -1040,8 +1049,21 @@ static int run_tests(
 	return ret;
 }
 
+// cli::command::has() reports whether a command's schema declares an
+// option, not whether argv actually carried it (every command declares
+// auto-disambiguate with a default). Scan the raw args for the long
+// flag to tell an explicit user override from that default.
+static bool user_passed_long_flag(const vector<string>& argv,
+	const string& name)
+{
+	string flag = "--" + name;
+	for (auto& a : argv)
+		if (a == flag || a.rfind(flag + "=", 0) == 0) return true;
+	return false;
+}
+
 static tgf_repl_evaluator::options
-	repl_options_from_cmd(const cli::command& cmd)
+	repl_options_from_cmd(const cli::command& cmd, const vector<string>& argv)
 {
 	tgf_repl_evaluator::options tgf_repl_opt;
 	if (cmd.has("status"))                  tgf_repl_opt.status =
@@ -1071,9 +1093,11 @@ static tgf_repl_evaluator::options
 			cmd.get<string>("tree-path") == "forest"
 				? parse_tree_path::forest_path
 				: parse_tree_path::bintree_path;
-	if (cmd.has("auto-disambiguate"))
+	if (user_passed_long_flag(argv, "auto-disambiguate")) {
 		tgf_repl_opt.auto_disambiguate =
 			cmd.get<bool>("auto-disambiguate");
+		tgf_repl_opt.auto_disambiguate_user_set = true;
+	}
 	return tgf_repl_opt;
 }
 
@@ -1271,7 +1295,7 @@ int tgf_specialized_run(int argc, char** argv,
 	if (auto code = cli_universal(cl, cmd)) return *code;
 
 	tgf_repl_evaluator re(parser, tgf_label, grammar_source,
-		repl_options_from_cmd(cmd));
+		repl_options_from_cmd(cmd, args));
 	if (!re.good()) return re.flush_report(), 1;
 
 	return run_command(cl, cmd, re);
@@ -1306,7 +1330,7 @@ int tgf_run(int argc, char** argv) {
 	if (!provided) return cl.error("no TGF file specified", true);
 	if (!exists) return cl.error("TGF file does not exist ", true);
 
-	tgf_repl_evaluator re(tgf_file, repl_options_from_cmd(cmd));
+	tgf_repl_evaluator re(tgf_file, repl_options_from_cmd(cmd, args));
 	if (!re.good()) return re.flush_report(), 1;
 
 	return run_command(cl, cmd, re);
