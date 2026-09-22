@@ -81,6 +81,7 @@ set(DOCTESTS
 	tree_rewriter
 	enhancements
 	utf8
+	relaxed_directives
 	boolean_grammar
 	negation_regression
 	parser

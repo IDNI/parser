@@ -64,7 +64,7 @@ struct tgf {
 				// on has_error() — this is the canonical pattern;
 				// see the comment on predefined_char_classes in
 				// src/grammar.tmpl.h.
-				b.build(trv(n), &R.report());
+				b.build(trv(n), &R.report(), s.c_str());
 				if (!R.report().has_error()) R.emplace(b.g());
 			}
 		}
@@ -177,13 +177,16 @@ private:
 		grammar<C, T>::options opt{};
 		char_class_fns<T> cc;
 		idni::diagnostics::report* diag = nullptr;
+		const char* source_ = nullptr;
 		grammar_builder(nonterminals<C, T>& nts) : nts(nts) {}
 		grammar_builder(nonterminals<C, T>& nts, const trv& t,
 			idni::diagnostics::report* diag = nullptr)
 			: nts(nts) { build(t, diag); }
 		void build(const trv& t,
-			idni::diagnostics::report* diag = nullptr) {
+			idni::diagnostics::report* diag = nullptr,
+			const char* source = nullptr) {
 			this->diag = diag;
+			source_ = source;
 			auto statements  = t || tgf_parser::statement;
 			auto directives  = statements || tgf_parser::directive;
 			for (const auto& d : directives()) collect_cc_names(d);
@@ -229,7 +232,7 @@ private:
 					 { label::col,  r.parse_error.col }});
 				return 1;
 			}
-			build(trv(r.get_shaped_tree2()), &res.report());
+			build(trv(r.get_shaped_tree2()), &res.report(), s);
 			return 0;
 		}
 		grammar<C, T> g() {
@@ -250,95 +253,360 @@ private:
 	private:
 		size_t id = 0;
 		size_t node2nt(const trv& t) {
-			return nts.get(t | trv::terminals);
+			return nts.get(dir_arg_text(t));
 		}
-		void collect_cc_names(const trv& t) {
-			auto d = t | tgf_parser::directive_body | trv::only_child;
-			if ((d | trv::nonterminal) != tgf_parser::use_dir) return;
-			for (auto& cc : (d
-				|| tgf_parser::use_param
-				|| tgf_parser::cc_name)())
-				cc_names.push_back(cc | trv::terminals);
+	// ---- directive helpers (relaxed grammar) ----
+
+	// Get the directive name from a directive node.
+	std::string dir_name(const trv& t) {
+		auto tok = t | tgf_parser::directive_token;
+		auto nm = tok | tgf_parser::directive_name;
+		if (nm.has_value())
+			return dir_arg_text(nm | trv::only_child);
+		for (auto& d :
+			(tok || tgf_parser::directive_name)())
+			return dir_arg_text(d | trv::only_child);
+		return {};
+	}
+
+	// Extract terminal text from a traverser. Falls back to
+	// span-based extraction for leaf nodes (dir_sym, escape_char,
+	// etc.) that have no terminal children.
+	std::string dir_arg_text(const trv& t) {
+		if (!t.has_value()) return {};
+		auto txt = t | trv::terminals;
+		if (!txt.empty()) return txt;
+		if (source_) {
+			auto& sp = t.value_tree().value.second;
+			if (sp[0] < sp[1])
+				return std::string(source_ + sp[0],
+					sp[1] - sp[0]);
 		}
-		void inline_dir(const trv& t) {
-			for (auto& n : (t || tgf_parser::inline_arg)())
-			if ((n | trv::only_child
-				| trv::nonterminal) == tgf_parser::cc_sym)
-					opt.shaping.inline_char_classes = true;
+		return {};
+	}
+
+	// Collect all sym args from cmd blocks and dir_pairs.
+	std::vector<std::string> dir_sym_args(const trv& t) {
+		std::vector<std::string> v;
+		// from directive_cmd blocks
+		for (auto& cmd : (t || tgf_parser::directive_cmd)())
+		for (auto& s : (cmd || tgf_parser::sym)())
+			v.push_back(dir_arg_text(s));
+		// from dir_pair blocks
+		for (auto& p : (t || tgf_parser::dir_pair)())
+		for (auto& lst : (p || tgf_parser::dir_list)())
+		for (auto& c : (lst | trv::children)())
+		{
+			auto txt = c | trv::terminals;
+			if (txt == "," || txt == ";") continue;
+			if ((c | trv::nonterminal)
+				!= tgf_parser::dir_arg) continue;
+			txt = dir_arg_text(c | trv::only_child);
+			if (!txt.empty()) v.push_back(txt);
+		}
+		return v;
+	}
+
+
+	// ---- directive processing ----
+
+	void collect_cc_names(const trv& t) {
+		std::string name = dir_name(t);
+		if (name.empty() || name != "use") return;
+		auto args = dir_sym_args(t);
+		// find "char class" or "char classes" and collect everything after
+		for (size_t i = 0; i + 1 < args.size(); ++i)
+			if (args[i] == "char"
+				&& (args[i+1] == "class"
+					|| args[i+1] == "classes"))
+			{
+				for (size_t j = i + 2;
+					j < args.size(); ++j)
+					if (!args[j].empty())
+					    cc_names.push_back(args[j]);
+				return;
+			}
+	}
+
+	void directive(const trv& t) {
+		std::string name = dir_name(t);
+		if (name.empty() || name.size() <= 1) return;
+
+		if      (name == "use")        use_dir(t);
+		else if (name == "start")      start_dir(t);
+		else if (name == "trim")       trim_dir(t);
+		else if (name == "inline")     inline_dir(t);
+		else if (name == "disable")    disable_dir(t);
+		else if (name == "ambiguous")  ambiguous_dir(t);
+		else if (name == "enable")     enable_dir(t);
+		else if (name == "dynamic")    dynamic_dir(t);
+		else if (diag) diag->warning(messages::unknown_directive,
+			{{ label::name, name }});
+	}
+
+	// ---- per-directive handlers ----
+
+	void use_dir(const trv& /*t*/) {
+		// cc_names already collected by collect_cc_names pre-pass
+	}
+
+	void start_dir(const trv& t) {
+		auto a = t | tgf_parser::dir_pair | tgf_parser::dir_list
+			   | tgf_parser::dir_arg;
+		if (!a.has_value()) return;
+		auto s = dir_arg_text(a | trv::only_child);
+		if (s.empty()) return;
+		start = prods_t(nts(s));
+	}
+
+	void trim_dir(const trv& t) {
+		auto args = dir_sym_args(t);
+		if (args.size() >= 2 && args[0] == "all"
+			&& args[1] == "terminals")
+			trim_all_terminals(t);
+		else if (args.size() >= 1 && args[0] == "children")
+			trim_children(t);
+		else
+			trim_simple(t);
+	}
+
+	void trim_simple(const trv& t) {
+		auto args = dir_sym_args(t);
+		for (auto& a : args)
+			opt.shaping.to_trim.insert(nts.get(a));
+	}
+
+	void trim_all_terminals(const trv& t) {
+		opt.shaping.trim_terminals = true;
+		auto args = dir_sym_args(t);
+		// check for optional "except children of" keywords
+		bool has_except = false;
+		for (size_t i = 0; i + 2 < args.size(); ++i)
+			if (args[i] == "except"
+				&& args[i+1] == "children"
+				&& args[i+2] == "of")
+				has_except = true;
+		if (has_except)
+			for (auto& p :
+				(t || tgf_parser::dir_pair)())
+			for (auto& lst :
+				(p || tgf_parser::dir_list)())
+			for (auto& a :
+				(lst || tgf_parser::dir_arg)())
+			opt.shaping
+			 .dont_trim_terminals_of
+			 .insert(nts.get(
+				dir_arg_text(a | trv::only_child)));
+	}
+
+	void trim_children(const trv& t) {
+		auto args = dir_sym_args(t);
+		bool terminals = (args.size() >= 2
+			&& args[1] == "terminals");
+		auto& target = terminals
+			? opt.shaping.to_trim_children_terminals
+			: opt.shaping.to_trim_children;
+		for (auto& p :
+			(t || tgf_parser::dir_pair)())
+		for (auto& lst :
+			(p || tgf_parser::dir_list)())
+		for (auto& a :
+			(lst || tgf_parser::dir_arg)())
+			target.insert(nts.get(
+				dir_arg_text(a | trv::only_child)));
+	}
+
+	void inline_dir(const trv& t) {
+		auto args = dir_sym_args(t);
+		for (size_t i = 0; i + 1 < args.size(); ++i)
+			if (args[i] == "char"
+				&& (args[i+1] == "class"
+					|| args[i+1] == "classes"))
+			{
+				opt.shaping.inline_char_classes
+					= true;
+			}
+		for (auto& p :
+			(t || tgf_parser::dir_pair)())
+		for (auto& lst :
+			(p || tgf_parser::dir_list)())
+		for (auto& a :
+			(lst || tgf_parser::dir_arg)())
+		{
+			auto child =
+				a | trv::only_child;
+			if ((child
+				| trv::nonterminal)
+				== tgf_parser::tree_path)
+			{
+				std::vector<size_t> path;
+				for (auto& s :
+				 (child
+				  || tgf_parser::dir_sym)())
+				path.push_back(
+				  nts.get(dir_arg_text(s)));
+				if (!path.empty())
+					opt.shaping.to_inline
+					   .insert(
+					    std::move(path));
+			}
 			else {
-				std::vector<size_t> tree_path{};
-				for (auto& s : (n | tgf_parser::tree_path
-					|| tgf_parser::sym)())
-						tree_path.push_back(node2nt(s));
-				opt.shaping.to_inline.insert(tree_path);
+				auto txt = dir_arg_text(child);
+				if (txt != "char" && txt != "class"
+					&& txt != "classes")
+				opt.shaping.to_inline
+					.insert({ nts.get(txt) });
 			}
 		}
-		void dynamic_decl(const trv& t) {
-			auto& kept = opt.dynamic[from_str<C>(std::string(
-				t | tgf_parser::dynamic_name
-				  | tgf_parser::sym | trv::terminals))];
+	}
+
+	void disable_dir(const trv& t) {
+		auto args = dir_sym_args(t);
+		for (auto& a : args) {
+			if (a == "disambiguation") {
+				opt.auto_disambiguate = false;
+			} else if (diag) diag->warning(
+				messages::unknown_directive_argument,
+				{{ label::name, a }});
+		}
+	}
+
+	void ambiguous_dir(const trv& t) {
+		auto args = dir_sym_args(t);
+		for (auto& a : args) {
+			auto id = nts.get(a);
+			opt.nodisambig_list.insert(id);
+		}
+	}
+
+	void enable_dir(const trv& t) {
+		auto args = dir_sym_args(t);
+		for (auto& a : args) {
+			if (a == "disambiguation") {
+				opt.auto_disambiguate = true;
+			} else opt.enabled_guards.insert(a);
+		}
+	}
+
+	// value of one dir_arg: a plain sym, or a (possibly escaped) string
+	std::basic_string<C> dynamic_value(const trv& t) {
+		auto c = t | trv::only_child;
+		auto nt = c | trv::nonterminal;
+		if (nt == tgf_parser::dir_sym)
+			return from_str<C>(dir_arg_text(c));
+		if (nt != tgf_parser::terminal_string) return {};
+		std::basic_string<C> r{};
+		for (auto& ch : (c | trv::children)()) {
+			if ((ch | trv::nonterminal) == tgf_parser::unescaped_s)
+				r += from_str<C>(dir_arg_text(ch));
+			else {
+				auto txt = (ch | tgf_parser::escaped_s)
+					| trv::terminals;
+				// escaped_s children may be span-only
+				if ((txt.empty() || txt.size() == 1)
+					&& source_)
+				{
+					auto& sp = ch.value_tree()
+						.value.second;
+					if (sp[0] < sp[1])
+						txt.assign(
+							source_ + sp[0],
+							sp[1] - sp[0]);
+				}
+				r += unescape(txt, idni::escapes::tgf_string);
+			}
+		}
+		return r;
+	}
+
+	// rejoin command syms the sep/'_' ambiguity split apart.
+	std::vector<std::string> dynamic_cmd_words(const trv& t) {
+		std::vector<std::string> words;
+		size_t prev_end = 0;
+		bool have_prev = false;
+		for (auto& cmd : (t || tgf_parser::directive_cmd)())
+		for (auto& s : (cmd || tgf_parser::sym)()) {
+			auto txt = dir_arg_text(s);
+			auto& sp = s.value_tree().value.second;
+			if (have_prev && source_ && sp[0] == prev_end + 1
+				&& (source_[prev_end] == '_'
+					|| source_[prev_end] == '-'))
+			{
+				words.back() += source_[prev_end];
+				words.back() += txt;
+			} else words.push_back(txt);
+			prev_end = sp[1];
+			have_prev = true;
+		}
+		return words;
+	}
+
+	void dynamic_dir(const trv& t) {
+		std::vector<std::string> words = dynamic_cmd_words(t);
+
+		std::vector<std::vector<trv>> pairs;
+		for (auto& p : (t || tgf_parser::dir_pair)()) {
+			std::vector<trv> args;
+			for (auto& lst : (p || tgf_parser::dir_list)())
+			for (auto& c : (lst | trv::children)()) {
+				if ((c | trv::nonterminal)
+					!= tgf_parser::dir_arg) continue;
+				args.push_back(c);
+			}
+			pairs.push_back(std::move(args));
+		}
+
+		auto declare = [&](const std::basic_string<C>& name) {
+			if (!name.empty()) opt.dynamic[name];
+		};
+		auto add_values = [&](const std::basic_string<C>& name,
+			const std::vector<trv>& args)
+		{
+			if (name.empty()) return;
+			auto& kept = opt.dynamic[name];
 			std::set<std::basic_string<C>> seen(
 				kept.begin(), kept.end());
-			for (auto& v : (t || tgf_parser::dynamic_value)())
-				if (auto s = dynamic_value(v);
-					seen.insert(s).second)
-						kept.push_back(s);
-		}
-		void directive(const trv& t) {
-			//print_node(std::cout << "directive: ", t.value()) << "\n";
-			auto d = t | tgf_parser::directive_body | trv::only_child;
-			auto nt = d | trv::nonterminal;
-			//print_node(std::cout << "nt: " << nt << " directive_body: ", d.value()) << "\n";
-			switch (nt) {
-			case tgf_parser::use_dir: break;
-			case tgf_parser::start_dir:
-				start = prods_t(nts(d
-					| tgf_parser::sym | trv::terminals));
-				break;
-			case tgf_parser::trim_all_terminals_dir:
-				opt.shaping.trim_terminals = true;
-				for (auto& n : (d || tgf_parser::sym)())
-					opt.shaping.dont_trim_terminals_of
-						.insert(node2nt(n));
-				break;
-			case tgf_parser::trim_dir:
-				for (auto& n : (d || tgf_parser::sym)())
-					opt.shaping.to_trim.insert(node2nt(n));
-				break;
-			case tgf_parser::trim_children_dir:
-				for (auto& n : (d || tgf_parser::sym)())
-					opt.shaping.to_trim_children
-						.insert(node2nt(n));
-				break;
-			case tgf_parser::trim_children_terminals_dir:
-				for (auto& n : (d || tgf_parser::sym)())
-					opt.shaping.to_trim_children_terminals
-						.insert(node2nt(n));
-				break;
-			case tgf_parser::inline_dir: inline_dir(d); break;
-			case tgf_parser::disable_ad_dir:
-				opt.auto_disambiguate = false; break;
-			case tgf_parser::ambiguous_dir:
-				for (auto& n : (d || tgf_parser::sym)())
-					opt.nodisambig_list.insert(node2nt(n));
-				break;
-			case tgf_parser::enable_prods_dir:
-				for (auto& n : (d || tgf_parser::sym)())
-					opt.enabled_guards
-						.insert(n | trv::terminals);
-				break;
-			case tgf_parser::dynamic_dir:
-				for (auto& dd : (d || tgf_parser::dynamic_decl)())
-					dynamic_decl(dd);
-				break;
-			default: return;
+			for (auto& a : args)
+				if (auto v = dynamic_value(a);
+					seen.insert(v).second)
+						kept.push_back(v);
+		};
+		auto pair_name = [&](const std::vector<trv>& args) {
+			if (args.empty()) return std::basic_string<C>{};
+			return from_str<C>(
+				dir_arg_text(args.front() | trv::only_child));
+		};
+		// a bare declaration pair names exactly one nonterminal;
+		// use ';' to separate names, not ','
+		auto declare_pair = [&](const std::vector<trv>& args) {
+			if (args.size() > 1) {
+				if (diag) diag->error(code::invalid_argument,
+					messages::dynamic_names_need_semicolon);
+				return;
 			}
+			declare(pair_name(args));
+		};
+
+		size_t pi = 0;
+		if (!words.empty() && words.back() == "defaults"
+			&& words.size() >= 2)
+		{
+			auto name = from_str<C>(words[words.size() - 2]);
+			if (pi < pairs.size()) add_values(name, pairs[pi++]);
+			else declare(name);
+			for (; pi < pairs.size(); ++pi)
+				declare_pair(pairs[pi]);
+		} else {
+			for (auto& w : words) declare(from_str<C>(w));
+			for (auto& args : pairs) declare_pair(args);
 		}
+	}
 		void production(const trv& t) {
 			//print_node(std::cout, t.value()) << "\n";
-			prods_t sym(nts(t | tgf_parser::sym | trv::terminals));
-			std::string guard(t | tgf_parser::production_guard
-				| tgf_parser::sym | trv::terminals);
+			prods_t sym(nts(dir_arg_text(t | tgf_parser::sym)));
+			std::string guard(dir_arg_text(
+				t | tgf_parser::production_guard
+					| tgf_parser::sym));
 			if (guard.size()) {
 				sym.back().guard = guard;
 				// DBG(std::cout << "sym: (" << sym << ") guard: " << guard << "\n";)
@@ -385,9 +653,12 @@ private:
 			alternation(nr.to_lit(), t | tgf_parser::alternation);
 			return ps(nn, nr | (nn + nr)), nn;
 		}
-		std::basic_string<C> unescape(const std::string& s) {
-			auto dec = idni::escapes::decode(
-				s, idni::escapes::tgf_string);
+		std::basic_string<C> unescape(
+			const std::string& s,
+			const idni::escapes::profile& p
+				= idni::escapes::tgf_string)
+		{
+			auto dec = idni::escapes::decode(s, p);
 			if (!dec.has_value()) {
 				if (diag) diag->append(std::move(dec.report()));
 				return {};
@@ -395,43 +666,72 @@ private:
 			return from_str<C>(std::move(dec).value());
 		}
 		prods_t terminal_char(const trv& t) {
-			//print_node(std::cout << "terminal_char: ", t.value()) << "\n";
 			auto c = t | tgf_parser::unescaped_c;
 			if (c.has_value()) {
-				//std::cout << "unescaped_c: `" << (c | trv::terminals) << "`\n";
-				return prods_t(c | trv::terminals);
+				auto txt = c | trv::terminals;
+				// escape_char/unescaped_c may be span-only
+				// leaves; extract from source position
+				if (txt.empty() && source_) {
+					auto& sp = c.value_tree().value.second;
+					if (sp[0] < sp[1])
+						txt.assign(source_ + sp[0],
+							sp[1] - sp[0]);
+				}
+				return prods_t(txt);
 			}
 			c = t | tgf_parser::escaped_c;
-			return prods_t(unescape(c | trv::terminals));
+			auto txt = c | trv::terminals;
+			// escaped_c children (escape_char etc.) may be
+			// span-only; extract full escape sequence from
+			// the escaped_c span
+			if ((txt.empty() || txt.size() == 1) && source_) {
+				auto& sp = c.value_tree().value.second;
+				if (sp[0] < sp[1])
+					txt.assign(source_ + sp[0],
+						sp[1] - sp[0]);
+			}
+			return prods_t(unescape(txt,
+				idni::escapes::tgf_char));
 		}
 		prods_t terminal_string(const trv& t) {
 			prods_t r{};
 			for (auto& ch : (t | trv::children)()) {
-				if ((ch | trv::nonterminal) == tgf_parser::unescaped_s)
-					r = r + prods_t(ch | trv::terminals);
-				else
-					r = r + prods_t(unescape(ch | trv::terminals));
-			}
-			return r;
-		}
-		std::basic_string<C> dynamic_value(const trv& t) {
-			auto c = t | trv::only_child;
-			if ((c | trv::nonterminal) == tgf_parser::sym)
-				return from_str<C>(std::string(
-					c | trv::terminals));
-			// a quoted value carries escapes, decode them
-			std::basic_string<C> r{};
-			for (auto& ch : (c | trv::children)()) {
-				if ((ch | trv::nonterminal) == tgf_parser::unescaped_s)
-					r += from_str<C>(std::string(
-						ch | trv::terminals));
-				else
-					r += unescape(ch | trv::terminals);
+				if ((ch | trv::nonterminal) == tgf_parser::unescaped_s) {
+					auto txt = ch | trv::terminals;
+					// unescaped_s may be a span-only leaf
+					if (txt.empty() && source_) {
+						auto& sp = ch.value_tree()
+							.value.second;
+						if (sp[0] < sp[1])
+							txt.assign(
+								source_ + sp[0],
+								sp[1] - sp[0]);
+					}
+					r = r + prods_t(txt);
+				}
+				else {
+					auto txt = (ch | tgf_parser::escaped_s)
+						| trv::terminals;
+					// escaped_s children may be span-only;
+					// extract from escaped_s span
+					if ((txt.empty() || txt.size() == 1)
+						&& source_)
+					{
+						auto& sp = ch.value_tree()
+							.value.second;
+						if (sp[0] < sp[1])
+							txt.assign(
+								source_ + sp[0],
+								sp[1] - sp[0]);
+					}
+					r = r + prods_t(unescape(txt,
+						idni::escapes::tgf_string));
+				}
 			}
 			return r;
 		}
 		prods_t terminal_hex(const trv& t) {
-			auto digits = (t | tgf_parser::hex_bytes) | trv::terminals;
+			auto digits = dir_arg_text(t | tgf_parser::hex_bytes);
 			std::string bytes;
 			if (digits.size() == 1) {
 				bytes.push_back(
@@ -462,7 +762,7 @@ private:
 			//std::cout << "term: " << (x | trv::nonterminal) << std::endl;
 			switch (x | trv::nonterminal) {
 			case tgf_parser::sym: {
-				auto s = x | trv::terminals;
+				auto s = dir_arg_text(x);
 				if (s == "null") return nul;
 				return prods_t(nts(s));
 			}
@@ -477,7 +777,7 @@ private:
 		prods_t shorthand_rule(const prods_t& sym, const trv& t) {
 			//print_node(std::cout << "shorthand_rule: ", t.value()) << "\n";
 			auto f = t | tgf_parser::factor;
-			auto s = t | tgf_parser::sym | trv::terminals;
+			auto s = dir_arg_text(t | tgf_parser::sym);
 			auto nt = nts(s);
 			ps(nt, factor(sym, f));
 			return nt;

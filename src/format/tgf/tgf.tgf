@@ -2,9 +2,9 @@
 
 @trim __, _, sep.
 @trim all terminals except children of
-	sym, cc_name, escaped_s, unescaped_s, escaped_c, unescaped_c,
+	sym, dir_sym, cc_name, escaped_s, unescaped_s, escaped_c, unescaped_c,
 	terminal_hex, hex_bytes.
-@inline char classes, syms, dynamic_decls, dynamic_values, escape_char, esc_hex, esc_u4, esc_U8.
+@inline char classes, escape_char, esc_hex, esc_u4, esc_U8.
 
 # start symbol
 start                  => (_ statement)* _.
@@ -47,40 +47,17 @@ esc_u4                 => 'u' xdigit xdigit xdigit xdigit.
 esc_U8                 => 'U' xdigit xdigit xdigit xdigit xdigit xdigit xdigit xdigit.
 
 # directives
-directive              => '@' _ directive_body _ '.'.
-directive_body         =>
-	  ("start" __ sym)                                  :start_dir
-	| ("inline" __ inline_arg (_ ',' _ inline_arg)*)    :inline_dir
-	| ("trim" sep "children" __ syms)                   :trim_children_dir
-	| ("trim" sep "children" sep "terminals" __ syms)
-	                			:trim_children_terminals_dir
-	| ("trim" sep "all" sep "terminals"
-		[sep "except" [sep "children" sep "of"] __ syms])
-						:trim_all_terminals_dir
-	| ("trim" __ syms)                                  :trim_dir
-	| ("use" __ cc_sym:use_from __ use_param (_ ',' _ use_param)*)
-	                                                    :use_dir
-	| ("disable" __ ["auto" sep] "disambig" "uation"?)  :disable_ad_dir
-	| ("enable" __ "productions" __ syms)               :enable_prods_dir
-	| ("ambiguous" __ syms)                             :ambiguous_dir
-	| ("dynamic" __ dynamic_decls)                      :dynamic_dir
-	.
-
-syms                   => sym (_ ',' _ sym)*.
-dynamic_decls          => dynamic_decl (_ ';' _ dynamic_decl)*.
-dynamic_decl           => sym:dynamic_name [__ "defaults" __ dynamic_values].
-dynamic_values         => dynamic_value (_ ',' _ dynamic_value)*.
-dynamic_value          => sym | terminal_string.
-inline_arg             => tree_path | ("char" sep "class" "es"?):cc_sym.
-tree_path              => sym (_ '>' _ sym)*.
-use_param              => ("eof" | "any" | "ascii" | "alnum" | "alpha" | "blank"
-                        | "cntrl" | "digit" | "graph" | "lower" | "printable"
-                        | "punct" | "space" | "upper" | "xdigit"):cc_name.
+directive              => ('@' _ sym:directive_name _):directive_token
+                           ( (sep sym (sep sym)*):directive_cmd )*
+                           [ __ dir_pair (_ ';' _ dir_pair)* ] _ '.'.
+sep                    => '-' | '_' | __.
+dir_pair               => dir_list [ _ ':' _ dir_list ].
+dir_list               => dir_arg (_ ',' _ dir_arg)*.
+dir_arg                => tree_path | dir_sym | terminal_string.
+tree_path              => dir_sym _ '>' _ dir_sym (_ '>' _ dir_sym)*.
+dir_sym                => (alpha | '_' | '*') (alnum | '_' | '*')*.
 
 # common productions
-sep                    => [sep_required].
-sep_required           => '-' | '_' | __.
-
 _                      => __ | null.                      # optional whitespace
 __                     => space | comment | __ space | __ comment. # whitespace
 comment                => '#' (printable | '\t')* ('\r' | '\n' | eof).

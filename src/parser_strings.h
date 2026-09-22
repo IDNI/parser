@@ -195,8 +195,13 @@ struct messages {
 	static constexpr sv cannot_open_file            = "Cannot open file";
 	static constexpr sv loading_grammars_unavailable =
 		"Loading grammars is not available in a specialized REPL";
-	static constexpr sv unproductive_nonterminal    = "Unproductive nonterminal";
-	static constexpr sv preprocess                  = "preprocess";
+	static constexpr sv unproductive_nonterminal = "Unproductive nonterminal";
+	static constexpr sv preprocess               = "preprocess";
+	static constexpr sv unknown_directive        = "Unknown directive";
+	static constexpr sv unknown_directive_argument =
+		"Unknown directive argument";
+	static constexpr sv dynamic_names_need_semicolon =
+		"Dynamic directive names must be separated by ';', not ','.";
 	// escape decode errors
 	static constexpr sv escape_trailing         = "Trailing escape character.";
 	static constexpr sv escape_lone_delimiter   = "Lone delimiter not doubled.";
