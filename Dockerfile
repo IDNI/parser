@@ -27,7 +27,8 @@ RUN apt-get update && apt-get install -y \
 	ninja-build=1.11.1-2 \
 	clang-19=1:19.1.1-1ubuntu1~24.04.2 \
 	mingw-w64=11.0.1-3build1 \
-	python3-distutils-extra
+	python3-distutils-extra \
+	python3-pexpect python3-pyte
 
 # The presets name clang and clang++. The versioned package does not provide
 # those names.
