@@ -30,8 +30,8 @@ tauparser_setup(tgf PRIVATE tgf_cli_core)
 
 # Round-trip self-check first, archive only the binary that passed it
 add_custom_command(TARGET tgf POST_BUILD
-	COMMAND "${CMAKE_SOURCE_DIR}/scripts/tgf-roundtrip-self-check.sh" "$<TARGET_FILE:tgf>"
-	COMMAND "${CMAKE_SOURCE_DIR}/scripts/archive-tgf.sh" "$<TARGET_FILE:tgf>"
+	COMMAND "${PROJECT_SOURCE_DIR}/scripts/tgf-roundtrip-self-check.sh" "$<TARGET_FILE:tgf>"
+	COMMAND "${PROJECT_SOURCE_DIR}/scripts/archive-tgf.sh" "$<TARGET_FILE:tgf>"
 	COMMENT "Round-trip self-check, then archiving the passing binary"
 )
 
