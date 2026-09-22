@@ -32,11 +32,12 @@ case "$(echo "${BUILD_TYPE_ARG}" | tr '[:upper:]' '[:lower:]')" in
 esac
 dev_entry "${BUILD_TYPE_ARG}" "$@"
 BUILD_TYPE="${BUILD_TYPE,,}"
+TAU_BRANCH="${TAU_BRANCH:-main}"
 
 # clone tau
 if [ ! -d "$TAUDIR" ]; then
-	echo "Cloning tau-lang"
-	git clone https://github.com/IDNI/tau-lang $TAUDIR
+	echo "Cloning tau-lang (${TAU_BRANCH})"
+	git clone --branch "${TAU_BRANCH}" https://github.com/IDNI/tau-lang "$TAUDIR"
 else
 	echo "tau-lang already cloned"
 fi
@@ -54,10 +55,5 @@ rm -rf external/parser/*
 cp -r ../cmake ../scripts ../src ../CMakeLists.txt ../VERSION ../LICENSE.md ../README.md \
 	external/parser
 
-# resolve TAU_BUILD_JOBS using shared devrc logic
-DEV_CMAKE=()
-resolve_jobs
-
-# build tau with tests and run them
-echo "Building $BUILD_TYPE (TAU_BUILD_JOBS=$TAU_BUILD_JOBS)"
-./dev $BUILD_TYPE -DTAU_BUILD_TESTS=ON -DTAU_BUILD_JOBS=$TAU_BUILD_JOBS && ./dev test-$BUILD_TYPE
+echo "Building with preset ${BUILD_TYPE} (TAU_BUILD_JOBS=$TAU_BUILD_JOBS)"
+./dev preset "${BUILD_TYPE}-tests" run -DTAU_BUILD_JOBS=$TAU_BUILD_JOBS
