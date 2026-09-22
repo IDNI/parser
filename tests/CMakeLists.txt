@@ -284,4 +284,16 @@ if(TARGET tgf AND NOT WIN32)
 			endif()
 		endif()
 	endif()
+
+# tgf.test grammar test files, run through the tgf CLI.
+if(TARGET tgf AND NOT WIN32)
+	add_test(NAME tgf_test_tgf_test COMMAND $<TARGET_FILE:tgf>
+		"${PROJECT_SOURCE_DIR}/src/format/tgf.test/tgf_test.tgf" test
+		"${PROJECT_SOURCE_DIR}/tests/tgf_test.tgf.test")
+	add_test(NAME treemr_tgf_test COMMAND $<TARGET_FILE:tgf>
+		"${PROJECT_SOURCE_DIR}/src/format/treemr/treemr.tgf" test
+		"${PROJECT_SOURCE_DIR}/src/format/treemr/treemr.tgf.test")
+	add_test(NAME ambig_bc_tgf_test COMMAND $<TARGET_FILE:tgf>
+		"${PROJECT_SOURCE_DIR}/tests/fixtures/ambig_bc.tgf" test
+		"${PROJECT_SOURCE_DIR}/tests/ambig_bc.tgf.test")
 endif()

@@ -1,0 +1,508 @@
+# Tests the treemr (Tree Match/Replace) DSL grammar.
+#
+# Every nonterminal is exercised via parse-success entries. A `>` chain
+# matches only among direct children, so structural assertions focus on
+# the nonterminals where the target is a direct child.
+#
+# To run:
+#   tgf treemr.tgf test treemr.tgf.test
+
+# ===========================================================================
+# 1  NAME -- bare nonterminal identifiers
+# ===========================================================================
+
+name                : "digit", "digit123", "_underscore", "_1", "a_2",
+                      "A", "Z", "z".
+
+# ===========================================================================
+# 2  WILDCARD -- '%'
+# ===========================================================================
+
+wildcard            : "%".
+
+# ===========================================================================
+# 3  TERMINAL -- char_lit | str_lit
+# ===========================================================================
+
+# 3a  Simple char literals
+char_lit            : "'a'", "'1'", "' '".
+
+# 3b  Escape sequences in char literals (\n \t \\ \')
+char_lit            : "'\\n'", "'\\t'", "'\\\\'", "'\\''".
+
+# 3c  Simple string literals
+str_lit             : "\"abc\"", "\"a1b\"", "\" \"", "\"\"".
+
+# 3d  Escape sequences in string literals
+str_lit             : "\"\\n\"", "\"\\t\\r\"",
+                      "\"\\\\\\\"\"", "\"a\\tb\"".
+
+# ===========================================================================
+# 4  QUANTIFIERS -- star '*', plus '+', opt '?'
+# ===========================================================================
+
+star                : "*".
+plus                : "+".
+opt                 : "?".
+quantifier          : "*", "+", "?".
+
+# ===========================================================================
+# 5  simple_slot -- atom with optional quantifier
+# ===========================================================================
+
+simple_slot         : "digit", "%", "'c'", "\"str\"",
+                      "digit*", "digit+", "digit?",
+                      "%*", "%+", "'c'?",
+                      "\"str\"*", "\"str\"+", "\"str\"?".
+
+# ===========================================================================
+# 6  simple_slots -- one or more simple_slot separated by whitespace
+# ===========================================================================
+
+simple_slots        : "digit", "digit %", "digit % 'x'",
+                      "digit* alpha+ beta?",
+                      "digit % '\"' '\\'' \"str\"".
+
+# ===========================================================================
+# 7  EDGES -- direct '>', descendant '>>'
+# ===========================================================================
+
+direct_edge         : ">".
+descendant_edge     : ">>".
+edge                : ">", ">>".
+
+# ===========================================================================
+# 8  edge_slot -- atom [quantifier] edge sib_seq
+# ===========================================================================
+
+# 8a  Direct edge (>)
+edge_slot           : "digit > alpha", "% > 'x'",
+                      "digit* > %", "digit? > \"test\"".
+
+# 8b  Descendant edge (>>)
+edge_slot           : "digit >> alpha", "% >> 'x'",
+                      "digit+ >> term", "digit? >> %".
+
+# ===========================================================================
+# 9  slot_chain -- simple_slots [__ edge_slot] | edge_slot
+# ===========================================================================
+
+# 9a  Pure simple_slots
+slot_chain          : "digit", "digit %", "alpha beta %".
+
+# 9b  Edge slot only
+slot_chain          : "digit > alpha", "% >> term", "digit* > %".
+
+# 9c  simple_slots followed by edge slot
+slot_chain          : "digit % > alpha", "digit* alpha+ >> term",
+                      "row > cell ',' cell", "% name* >> leaf".
+
+# ===========================================================================
+# 10  ANCHORS -- '^' (left), '$' (right)
+# ===========================================================================
+
+left_anchor         : "^".
+right_anchor        : "$".
+
+# ===========================================================================
+# 11  sib_seq -- the core sibling-sequence nonterminal
+# ===========================================================================
+
+# 11a  Unanchored
+sib_seq             : "digit", "%", "'c'", "\"str\"", "(digit)".
+
+# 11b  Left anchor only
+sib_seq             : "^ digit", "^ % > alpha", "^ (digit | alpha)+ term?".
+
+# 11c  Right anchor only
+sib_seq             : "digit $", "%* $", "(digit)+ $".
+
+# 11d  Both anchors
+sib_seq             : "^ digit $", "^ digit* $",
+                      "^ %+ > leaf $",
+                      "^ row > (^ cell ',' cell $) $".
+
+# 11e  Tree shape: left_anchor is a slot inside sib_seq's slot_chain,
+#       not a direct child (it sits under simple_slots > simple_slot)
+sib_seq >> left_anchor     : "^ digit", "^ row > cell".
+
+# 11f  Tree shape: `rule > a $` puts the `$` under the INNER slot_chain
+#       (the one slurped by the edge), not the outer one
+sib_seq > slot_chain > edge_slot > slot_chain >> right_anchor : "rule > a $".
+
+# ===========================================================================
+# 12  CAPTURE -- '(' _ alt_seq _ ')'
+# ===========================================================================
+
+# 12a  Single sib_seq inside (capture, not union)
+capture             : "(digit)", "(%)", "('c')", "(\"str\")",
+                      "(digit* alpha+ term?)",
+                      "(digit > %)",
+
+                      # Nested capture
+                      "((digit))".
+
+# ===========================================================================
+# 13  alt_seq -- sib_seq (_ '|' _ sib_seq)*  -->  UNION in compiled pattern
+# ===========================================================================
+
+# 13a  Bare alternation (inside sib_seq context via alt_seq)
+alt_seq             : "digit | alpha", "digit* | alpha+",
+                      "% | 'c'", "\"yes\" | \"no\"".
+
+# 13b  Capture groups with alternation (UNION)
+capture             : "(digit | alpha)", "(digit | alpha | %)",
+                      "('0' | '1' | '2' | '3')",
+                      "(digit* | alpha+ | term?)",
+
+                      # Nested alternation
+                      "(digit | (alpha | %))",
+
+                      # Quantified capture (single sib_seq; must parse
+                      # from sib_seq or simple_slot, not capture itself)
+
+                      # Edge inside alternation
+                      "(row > cell | row > expr)",
+
+                      # Many alternatives
+                      "(x | y | z | w)".
+
+# ===========================================================================
+# 14  EDGE-SLURP -- edge's child sib_seq consumes the rest of the tail
+# ===========================================================================
+
+slot_chain          : "row > cell ',' cell",
+                      "expr >> term '+' term",
+                      "fn > (arg ',' arg*) ')'",
+                      "start > _ sib_seq _".
+
+# Tree shape: edge_slot is first child of slot_chain (in edge-only form)
+slot_chain > edge_slot   : "row > cell ',' cell",
+                           "expr >> term '+' factor".
+
+# ===========================================================================
+# 15  COMPLEX PATTERNS -- realistic treemr DSL examples
+# ===========================================================================
+
+sib_seq             :
+    "digit",
+    "% > 'x'",
+    "row > cell",
+    "expr >> digit",
+    "cell > digit+",
+    "row > cell %* term",
+    "^ digit+ $",
+    "row > (^ cell ',' cell $)",
+    "(digit | alpha)",
+    "(digit)+",
+    "(^ digit $)*",
+    "row >> ^ cell",
+    "cell ',' cell* ',' cell+",
+    "digit* > '0'",
+    "'1'",
+    "\"abc\"",
+    "(digit | \"str\" | % | 'x')",
+    "(row > (cell ',' cell*))",
+    "row > cell ',' cell $",
+    "^ expr >> ^ term ('+' term)* $".
+
+# ===========================================================================
+# 16  WHITESPACE RESILIENCE
+# ===========================================================================
+
+sib_seq             :
+    "digit *",
+    "digit  >  alpha",
+    "( digit  |  alpha  |  % )",
+    "^  digit  $".
+
+# ===========================================================================
+# 17  COMMENT RESILIENCE -- '#' comments consumed as whitespace
+# ===========================================================================
+
+sib_seq             :
+    "(digit # first alt\n | alpha # second alt\n)",
+    "^ digit # anchored at start\n $".
+
+# ===========================================================================
+# 18  EMPTY INPUT ENSURE-ANCHOR -- shortest valid inputs
+# ===========================================================================
+
+sib_seq             : "digit", "%", "'x'", "\"x\"".
+
+# ===========================================================================
+# 19  EDGE CASES AND REGRESSION LOCKS
+# ===========================================================================
+
+# 19a  Quantifier on capture group (use sib_seq start symbol;
+#       capture nonterminal itself stops at the closing ')').
+sib_seq             : "(digit)+", "(digit)?", "(%)*".
+
+# 19b  Wildcard as atom (tree shape: wildcard is first child of simple_slot)
+atom > wildcard   : "%".
+
+# 19c  Terminal as atom
+atom > char_lit   : "'x'", "'\\n'".
+atom > str_lit    : "\"abc\"", "\"\\\"\"".
+
+# 19d  Name as atom
+atom > name        : "digit", "alpha_123", "_private".
+
+# 19e  Descendant edge with complex sub
+sib_seq             :
+    "start >> (rule | token)",
+    "program >> function > name",
+    "% >> %*".
+
+# ===========================================================================
+# 20  UNESCAPED AND ESCAPED CHARACTERS -- full coverage
+# ===========================================================================
+
+# 20a  Unescaped characters in char literals
+char_lit            : "'a'", "'Z'", "'0'", "' '", "'!'", "'@'",
+                      "'['", "'}'", "'|'".
+
+# 20b  All recognized escape sequences in char literals
+char_lit            : "'\\''", "'\\\\'", "'\\/'",
+                      "'\\b'", "'\\f'", "'\\n'", "'\\r'", "'\\t'".
+
+# 20c  Unescaped characters in string literals
+str_lit             : "\"hello world\"", "\"123\"", "\"!@#$%\"",
+                      "\"space separated words\"".
+
+# 20d  All recognized escape sequences in string literals
+str_lit             : "\"\\\"\"", "\"\\\\\"", "\"\\/\"",
+                      "\"\\b\"", "\"\\f\"", "\"\\n\"", "\"\\r\"", "\"\\t\"",
+                      "\"line1\\nline2\"", "\"tab\\tbetween\"",
+                      "\"backslash\\\\here\"", "\"quote\\\"inside\"".
+
+# ===========================================================================
+# 21  ROOT ANCHOR -- '/' prefixes a pattern
+# ===========================================================================
+
+root_anchor         : "/".
+
+# 21a  Prefix on a single atom
+pattern             : "/ digit".
+
+# 21b  Prefix on a following sequence
+pattern             : "/ row > cell ',' cell", "/ digit* alpha+ >> term".
+
+# 21c  Tree shape: root_anchor is the first child of pattern, before the
+#       slot_chain it prefixes
+pattern > root_anchor : "/ digit", "/ row > cell ',' cell".
+
+# 21d  A pattern still parses with no root anchor
+pattern             : "digit", "row > cell".
+
+# ===========================================================================
+# 22  LEAF ANCHOR -- '!' marks an atom as childless
+# ===========================================================================
+
+leaf_anchor         : "!".
+
+# 22a  On a name, a wildcard and both terminal forms
+simple_slot         : "digit!", "%!", "'c'!", "\"str\"!".
+
+# 22b  On a capture group
+simple_slot         : "(digit)!", "(digit | alpha)!".
+
+# 22c  Combined with a quantifier
+simple_slot         : "digit!*", "digit!+", "digit!?".
+
+# 22d  Inside one alternative of a capture group only
+capture             : "(digit! | alpha)", "(digit | alpha!)".
+
+# 22e  Tree shape: leaf_anchor sits beside the atom's own children, not
+#       first (the atom always comes first)
+simple_slot >> leaf_anchor : "digit!", "(digit)!".
+
+# 22f  edge_slot accepts '!' grammatically too; the compiler, not the
+#       grammar, rejects the atom-with-edge contradiction
+edge_slot           : "digit! > alpha".
+edge_slot >> leaf_anchor : "digit! > alpha".
+
+# ---- Descendant-edge matchers: >> reaches non-first-child descendants ----
+# right_anchor is not a child of sib_seq at all; it is a simple_slot
+# nested under slot_chain > simple_slots
+sib_seq >> right_anchor : "digit $", "(digit)+ $".
+
+# star/plus/opt is not first child of simple_slot (the atom's
+# alternative comes first)
+simple_slot >> star : "digit*".
+simple_slot >> plus : "digit+".
+simple_slot >> opt  : "digit?".
+
+# direct_edge is not first child of edge_slot (the atom's alternative
+# comes first)
+edge_slot >> direct_edge : "digit > alpha".
+
+# Capture inside edge-slurp: slot_chain inside edge_slot is deep
+edge_slot >> slot_chain : "row > cell ',' cell".
+
+# ===========================================================================
+# 23  EXACT CHILD SEQUENCES -- ^ ... $ pins the full, ordered child list
+# ===========================================================================
+
+# 23a  capture, char_lit, str_lit: quotes are trimmed punctuation, so the
+#       captured content is the sole child
+capture              > ^ alt_seq $                     : "(digit)".
+char_lit             > ^ char_lit_char $                : "'a'".
+str_lit              > ^ str_lit_char $                 : "\"a\"".
+str_lit              > ^ str_lit_char str_lit_char str_lit_char $
+                                                          : "\"abc\"".
+
+# 23b  edge_slot: atom, optional leaf_anchor, optional quantifier,
+#       the edge kind, then the slurped slot_chain, in that order
+edge_slot            > ^ name direct_edge slot_chain $  : "digit > alpha".
+edge_slot            > ^ name descendant_edge slot_chain $
+                                                          : "digit >> alpha".
+edge_slot            > ^ wildcard direct_edge slot_chain $
+                                                          : "% > alpha".
+edge_slot            > ^ capture direct_edge slot_chain $
+                                                          : "(digit) > alpha".
+edge_slot            > ^ name star direct_edge slot_chain $
+                                                          : "digit* > alpha".
+edge_slot            > ^ name star descendant_edge slot_chain $
+                                                          : "digit* >> alpha".
+edge_slot            > ^ name opt direct_edge slot_chain $
+                                                          : "digit? > alpha".
+edge_slot            > ^ name leaf_anchor direct_edge slot_chain $
+                                                          : "digit! > alpha".
+
+# 23c  simple_slot: atom then its own optional leaf_anchor and quantifier
+simple_slot          > ^ name star $                    : "digit*".
+simple_slot          > ^ name leaf_anchor $              : "digit!".
+simple_slot          > ^ name leaf_anchor star $         : "digit!*".
+simple_slot          > ^ wildcard star $                 : "%*".
+simple_slot          > ^ char_lit plus $                 : "'c'+".
+simple_slot          > ^ str_lit opt $                   : "\"s\"?".
+simple_slot          > ^ capture leaf_anchor $            : "(digit)!".
+simple_slot          > ^ capture opt $                   : "(digit)?".
+simple_slot          > ^ capture star $                  : "(digit)*".
+simple_slot          > ^ capture plus $                  : "(digit)+".
+
+# 23d  slot_chain: pure simple_slots, edge-only, or both in sequence
+slot_chain           > ^ simple_slots $                  : "digit alpha".
+slot_chain           > ^ edge_slot $                     : "digit > alpha".
+slot_chain           > ^ simple_slots edge_slot $        : "digit % > alpha".
+
+# 23e  simple_slots: an anchor is one simple_slot among the others,
+#       not a bare child, so a 3-slot sequence has 3 simple_slot children
+simple_slots         > ^ simple_slot simple_slot simple_slot $
+                                                          : "^ digit $".
+simple_slots         > simple_slot > ^ left_anchor $     : "^ digit $".
+
+# 23f  pattern: root_anchor then the (inlined) sib_seq content
+pattern              > ^ root_anchor slot_chain $        : "/ digit".
+
+# 23g  alt_seq: one slot_chain per alternative, '|' itself is trimmed
+alt_seq              > ^ slot_chain slot_chain $         : "digit | alpha".
+alt_seq              > ^ slot_chain slot_chain slot_chain slot_chain $
+                                                          : "x | y | z | w".
+alt_seq              > ^ slot_chain slot_chain $         : "row > cell | row > expr".
+
+# ===========================================================================
+# 24  NODE TEXT -- string literals asserting the exact collected text of
+#      name and escape nodes, whose terminal children survive @trim
+# ===========================================================================
+
+name                 > ^ "d" "i" "g" "i" "t" $           : "digit".
+name                 > ^ "A" $                           : "A".
+name                 > ^ "_" "1" $                        : "_1".
+name                 > ^ "s" "y" "m" "b" "o" "l" $        : "symbol".
+char_lit_char        > unescaped_c > "a"                 : "a".
+str_lit_char         > unescaped_s > "a"                  : "a".
+char_lit_char        > escaped_c > escape_char > "n"      : "\\n".
+str_lit_char         > escaped_s > "n"                    : "\\n".
+escaped_c            > escape_char > "\\"                 : "\\\\".
+escaped_s            > escape_char > "\\"                 : "\\\\".
+escaped_c            > "\\"                                : "\\'".
+escape_char          > esc_hex > ^ "x" "4" "1" $          : "x41".
+char_lit             > char_lit_char > escaped_c > escape_char > esc_hex > ^ "x" "4" "1" $ : "'\\x41'".
+
+# ===========================================================================
+# 25  LEAF ROWS -- '!' asserts a childless node; these leaves always are
+# ===========================================================================
+
+left_anchor!         : "^".
+right_anchor!        : "$".
+wildcard!            : "%".
+star!                : "*".
+plus!                : "+".
+opt!                 : "?".
+root_anchor!         : "/".
+direct_edge!         : ">".
+descendant_edge!     : ">>".
+str_lit!             : "\"\"".
+
+# ===========================================================================
+# 26  NEGATED SHAPE ROWS -- a shape that must NOT be present
+# ===========================================================================
+
+~slot_chain > edge_slot                : "digit alpha".
+~simple_slot > capture                 : "digit".
+~simple_slot > leaf_anchor             : "digit".
+~simple_slot > star                    : "digit".
+~edge_slot > direct_edge               : "digit >> alpha".
+~edge_slot > wildcard                  : "digit > alpha".
+~str_lit > str_lit_char                : "\"\"".
+~capture > alt_seq > slot_chain > edge_slot : "(digit)".
+
+# ===========================================================================
+# 27  ESCAPE KINDS -- \xHH \uHHHH \UHHHHHHHH under both char_lit and str_lit
+# ===========================================================================
+
+char_lit_char        > escaped_c > escape_char > esc_hex : "\\x41".
+char_lit_char        > escaped_c > escape_char > esc_u4  : "\\u0041".
+char_lit_char        > escaped_c > escape_char > esc_U8  : "\\U00000041".
+str_lit_char         > escaped_s > escape_char > esc_hex : "\\X4a".
+str_lit_char         > escaped_s > escape_char > esc_u4  : "\\u0041".
+str_lit_char         > escaped_s > escape_char > esc_U8  : "\\U00000041".
+escape_char          > esc_u4 > ^ "u" "0" "0" "4" "1" $  : "u0041".
+escape_char          > esc_U8 > ^ "U" "0" "0" "0" "0" "0" "0" "4" "1" $
+                                                          : "U00000041".
+str_lit_char         > escaped_s > escape_char > esc_u4 > ^ "u" "0" "0" "4" "1" $ : "\\u0041".
+str_lit_char         > escaped_s > escape_char > esc_U8 > ^ "U" "0" "0" "0" "0" "0" "0" "4" "1" $ : "\\U00000041".
+char_lit_char        > escaped_c > escape_char > esc_u4 > ^ "u" "0" "0" "4" "1" $ : "\\u0041".
+char_lit_char        > escaped_c > escape_char > esc_U8 > ^ "U" "0" "0" "0" "0" "0" "0" "4" "1" $ : "\\U00000041".
+str_lit_char         > escaped_s > escape_char > esc_hex > ^ "X" "4" "a" $ : "\\X4a".
+
+# ===========================================================================
+# 28  @RAW -- the pre-shaping tree still has the inlined nonterminals
+#      (pattern, sib_seq, atom, terminal, quantifier, edge)
+# ===========================================================================
+
+@raw pattern > root_anchor              : "/ digit".
+@raw pattern > sib_seq                  : "digit".
+@raw sib_seq > slot_chain               : "digit".
+@raw atom > name                        : "digit".
+@raw atom > wildcard                    : "%".
+@raw atom > capture                     : "(digit)".
+@raw atom > terminal > str_lit          : "\"a\"".
+@raw terminal > char_lit                : "'a'".
+@raw terminal > str_lit                 : "\"a\"".
+@raw simple_slot > quantifier > star    : "digit*".
+@raw simple_slot > quantifier > plus    : "digit+".
+@raw simple_slot > quantifier > opt     : "digit?".
+@raw edge_slot > edge > direct_edge     : "digit > alpha".
+@raw edge_slot > edge > descendant_edge : "digit >> alpha".
+
+# ===========================================================================
+# 29  REJECTS -- inputs the treemr grammar itself must refuse
+# ===========================================================================
+
+# 29a  Empty pattern: a sibling sequence needs at least one slot
+~pattern             : "".
+
+# 29b  '>' with no right-hand sib_seq to slurp
+~slot_chain          : "digit >".
+
+# 29c  Unclosed capture group
+~capture             : "(digit".
+
+# 29d  Two quantifiers on one atom: a simple_slot has room for only one
+~simple_slot         : "digit**".
+
+# 29e  The grammar accepts a non-leading '^'. Only the compiler rejects it.
+simple_slots         : "digit ^".

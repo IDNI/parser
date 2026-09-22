@@ -1,0 +1,26 @@
+# Tests the ANY / UNIQUE / ALL / FORBID ambig_mode table against a
+# genuinely ambiguous grammar: A => B | C, both alternatives deriving
+# "x". A `~` prefix marks a row expected to fail its matcher, so every
+# row reports OK.
+#
+# To run:
+#   tgf ambig_bc.tgf test ambig_bc.tgf.test
+
+A > B : "x" @any.
+A > C : "x" @any.
+A > B : ~"x".
+A > B : ~"x" @all.
+A > C : ~"x" @all.
+A > B : ~"x" @forbid.
+
+# ALL mode over a capture: every alternative holds a child, so the
+# match succeeds. ALL merges the captures, so a capture that differs
+# across alternatives becomes an __AMB__ node over the distinct values.
+A > (%) : "x" @all.
+
+# UNIQUE mode: exactly one alternative satisfies the matcher. "A > B"
+# and "A > C" each satisfy only their own alternative, so both match.
+# "A > (%)" satisfies both alternatives, so it is not unique.
+A > B : "x" @unique.
+A > C : "x" @unique.
+A > (%) : ~"x" @unique.

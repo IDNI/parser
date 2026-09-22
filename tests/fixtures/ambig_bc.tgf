@@ -1,0 +1,8 @@
+# Ambiguous grammar for treemr ambig_mode tests: A derives 'x' via
+# B or via C, and the grammar directive keeps both alternatives.
+@disable disambiguation.
+
+start => A.
+A     => B | C.
+B     => 'x'.
+C     => 'x'.
