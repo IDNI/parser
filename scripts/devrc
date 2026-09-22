@@ -322,7 +322,13 @@ preset_binary_dir() {
 # if cpack fails.
 run_cpack() {
 	local build_dir="$1"
-	( cd "${build_dir}" && cpack -C Release )
+	if [[ -z "$build_dir" ]]; then
+		echo "run_cpack: build_dir not set"
+		return 1
+	fi
+	( cd "${build_dir}" && cpack -C Release ) || return
+	# cpack stages into the package directory; only packages stay
+	rm -rf "${build_dir}/packages/_CPack_Packages"
 }
 
 preset_entry() {

@@ -97,7 +97,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: "nightly-${{ env.date_iso }}"
-          path: ${{ github.workspace }}/packages/
+          path: |
+            ${{ github.workspace }}/packages/*.deb
+            ${{ github.workspace }}/packages/*.rpm
 
       - name: Create Nightly Build Release
         uses: softprops/action-gh-release@v3
@@ -144,4 +146,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: "macos-nightly-${{ env.date_iso }}"
-          path: build/release/packages/
+          path: |
+            build/release/packages/*.dmg
+            build/release/packages/*.zip

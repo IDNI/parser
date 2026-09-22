@@ -43,6 +43,9 @@ elseif (TAU_PARSER_MACOS_PACKAGE)
 		list(APPEND CPACK_GENERATOR "DragNDrop")
 		set(CPACK_DMG_VOLUME_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}")
 		set(CPACK_DMG_FORMAT "UDZO")
+		# a library image needs no drop target, and the symlink makes
+		# directory walks of the staging tree escape into /Applications
+		set(CPACK_DMG_DISABLE_APPLICATIONS_SYMLINK ON)
 	endif()
 else()
 	set(CPACK_GENERATOR "DEB;RPM")
