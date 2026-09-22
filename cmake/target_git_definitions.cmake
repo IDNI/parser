@@ -2,6 +2,9 @@
 # and creates TAU_PARSER_GIT_DEFINITIONS list
 # provides target_git_definitions($target) function to add definitions to a target
 
+# A submodule checkout gives .git as a file, not a directory, and EXISTS accepts both.
+# A container build without .git supplies the same three values as env vars.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
 execute_process(
 	COMMAND git describe --tags --always
 	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -20,6 +23,11 @@ execute_process(
 	OUTPUT_VARIABLE TAU_PARSER_GIT_COMMIT_HASH
 	OUTPUT_STRIP_TRAILING_WHITESPACE
 )
+else()
+	set(TAU_PARSER_GIT_DESCRIBED "$ENV{TAU_PARSER_GIT_DESCRIBED}")
+	set(TAU_PARSER_GIT_BRANCH "$ENV{TAU_PARSER_GIT_BRANCH}")
+	set(TAU_PARSER_GIT_COMMIT_HASH "$ENV{TAU_PARSER_GIT_COMMIT_HASH}")
+endif()
 
 set(TAU_PARSER_GIT_DEFINITIONS
 	"TAU_PARSER_GIT_DESCRIBED=\"${TAU_PARSER_GIT_DESCRIBED}\""

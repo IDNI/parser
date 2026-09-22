@@ -25,11 +25,16 @@ set(TAU_PARSER_HEADERS
 	utility/cli.impl.h
 	utility/diagnostics.h
 	utility/diagnostics.tmpl.h
+	utility/filesystem.h
+	utility/filesystem.tmpl.h
 	utility/measure.h
 	utility/memory_map.h
+	utility/memory_map.tmpl.h
 	utility/repl.h
 	utility/repl_ftxui.h
 	utility/repl_ftxui.tmpl.h
+	utility/temp_file.h
+	utility/temp_file.tmpl.h
 	utility/term.h
 	utility/term.impl.h
 	utility/term_colors.h
