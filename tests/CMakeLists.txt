@@ -8,7 +8,7 @@ set(TESTS
 	tree
 )
 
-set(TEST_LIBS tauparser ${TEST_FRAMEWORK})
+set(TEST_LIBS tauparser)
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
     CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 	set(TEST_LIBS ${TEST_LIBS} -static-libgcc -static-libstdc++)
@@ -59,7 +59,18 @@ endif ()
 
 add_library(doctest INTERFACE)
 target_compile_definitions(doctest INTERFACE TAU_USE_DOCTEST)
-set(DOCTEST_CONFIG_ASSERTION_PARAMETERS_BY_VALUE "true")
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+	# clang accepts an unknown -Wno-* silently, so probe the positive form
+	include(CheckCXXCompilerFlag)
+	set(CMAKE_REQUIRED_FLAGS "-Werror")
+	check_cxx_compiler_flag("-Wc2y-extensions" TAU_HAVE_WC2Y_EXTENSIONS)
+	unset(CMAKE_REQUIRED_FLAGS)
+	if(TAU_HAVE_WC2Y_EXTENSIONS)
+		target_compile_options(doctest INTERFACE -Wno-c2y-extensions)
+	endif()
+	target_compile_options(doctest INTERFACE "-Wno-#warnings")
+endif()
+add_compile_definitions(DOCTEST_CONFIG_ASSERTION_PARAMETERS_BY_VALUE)
 
 if (NOT EMSCRIPTEN AND TAU_PARSER_IS_GNU_OR_CLANG)
 	add_link_options("-flto")
@@ -99,7 +110,7 @@ foreach(X IN LISTS DOCTESTS)
 		CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 			target_link_libraries(${N} PRIVATE
 				tauparser
-				${TEST_FRAMEWORK}
+				doctest
 				-static-libgcc
 				-static-libstdc++
 			)
