@@ -30,7 +30,7 @@ RUN apt-get update && apt-get install -y \
 	clang-19=1:19.1.1-1ubuntu1~24.04.2 \
 	mingw-w64=11.0.1-3build1 \
 	python3-distutils-extra \
-	python3-pexpect python3-pyte
+	python3-pexpect python3-pyte ccache
 
 # The presets name clang and clang++. The versioned package does not provide
 # those names.
@@ -71,6 +71,11 @@ RUN echo "(BUILD) -- Building version: $(head -n 1 VERSION)"
 
 FROM source AS linux
 
+# ccache keeps compiled objects in a cache mount, so a source change only
+# recompiles what it touches. CI carries the mount across runs.
+ENV CMAKE_C_COMPILER_LAUNCHER=ccache CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+	CCACHE_DIR=/root/.ccache CCACHE_MAXSIZE=1G
+
 # Argument BUILD_PRESET=release/debug picks the CMake preset family
 ARG BUILD_PRESET=release
 
@@ -83,7 +88,8 @@ ARG BUILD_JOBS=1
 # Build tests and run them if TESTS is set to yes. Stop the build if they fail
 RUN echo " (BUILD) -- Running tests: $TESTS"
 # `run` on a -tests preset makes ./dev call ctest itself
-RUN if [ "$TESTS" = "yes" ]; then \
+RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	if [ "$TESTS" = "yes" ]; then \
 	./dev preset ${BUILD_PRESET}-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		|| exit 1; \
 fi
@@ -92,7 +98,8 @@ fi
 ARG TEST_GCC_BUILD=yes
 
 # The default build is ninja and clang. This proves make and gcc still work.
-RUN if [ "$TESTS" = "yes" ] && [ "$TEST_GCC_BUILD" = "yes" ]; then \
+RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	if [ "$TESTS" = "yes" ] && [ "$TEST_GCC_BUILD" = "yes" ]; then \
 	./dev preset release-make-gcc -DTAU_BUILD_JOBS=${BUILD_JOBS} && \
 	rm -rf build/release-gcc; \
 fi
@@ -125,12 +132,18 @@ ARG TESTS=yes
 # Argument BUILD_JOBS=N raises the parallelism. One job is the safe default.
 ARG BUILD_JOBS=1
 
+# ccache keeps compiled objects in a cache mount, so a source change only
+# recompiles what it touches. CI carries the mount across runs.
+ENV CMAKE_C_COMPILER_LAUNCHER=ccache CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+	CCACHE_DIR=/root/.ccache CCACHE_MAXSIZE=1G
+
 COPY --from=source /parser /parser
 WORKDIR /parser
 
 # wine, not wine64: the Ubuntu package runs these 64-bit PE binaries on its
 # own, and needs no i386 multiarch.
-RUN echo " (BUILD) -- Running tests under wine: $TESTS" && \
+RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	echo " (BUILD) -- Running tests under wine: $TESTS" && \
 	if [ "$TESTS" = "yes" ]; then \
 		./dev preset release-mingw-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 	else \
@@ -139,7 +152,8 @@ RUN echo " (BUILD) -- Running tests under wine: $TESTS" && \
 
 # The wine parity test lives in the native tree and registers itself once the
 # cross-built tgf.exe is there, so the native suite runs it.
-RUN if [ "$TESTS" = "yes" ]; then \
+RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	if [ "$TESTS" = "yes" ]; then \
 		echo " (BUILD) -- Running the native suite with the wine parity test" && \
 		./dev preset release-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 	fi
