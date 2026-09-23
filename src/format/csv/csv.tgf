@@ -8,10 +8,8 @@
 
 @enable productions comma, crlf, no_header.
 
-@highlight type : file, header, record.
-@highlight string : escaped, non_escaped, TEXTDATA, EOL.
+@highlight string : escaped, non_escaped.
 @highlight operator : SEP, DQUOTE.
-@highlight keyword : start.
 
 @use char class printable.
 

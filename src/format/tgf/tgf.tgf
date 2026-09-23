@@ -13,7 +13,9 @@
 	string  : terminal_string, terminal_char;
 	comment : comment;
 	number  : escaped_s, escaped_c, terminal_hex;
-        keyword : dir_sym.
+        keyword : dir_sym;
+	variable: sym;
+	delimiter: production, directive.
 
 # start symbol
 start                  => (_ statement)* _.

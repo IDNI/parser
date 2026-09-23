@@ -8,7 +8,8 @@
 
 @highlight keyword : word.
 @highlight string : quoted_string, char_lit, unescaped_s, escaped_s, unescaped_c, escaped_c.
-@highlight number : esc_hex, esc_u4, esc_U8.
+@highlight comment : comment.
+@highlight delimiter : entry_terminator.
 
 # Top level: a test file is a sequence of entries.
 start              => _ (entry _)*.

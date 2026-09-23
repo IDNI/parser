@@ -9,7 +9,6 @@
 
 @highlight keyword : *_cmd, *_sym, *_opt, statement, option, help_arg, bool_value.
 @highlight string : quoted_string, unescaped_s, escaped_s, filename.
-@highlight number : esc_hex, esc_u4, esc_U8.
 
 # TGF grammar
 start                  => _ [ statement (_ '.' _ statement)* _ ].
