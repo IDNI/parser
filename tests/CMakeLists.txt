@@ -253,6 +253,14 @@ target_include_directories(bench_enhancements PUBLIC
 )
 endif()
 
+# The committed generated parsers must match their grammars, so a grammar
+# change without a regenerated parser fails here.
+if(TARGET tgf AND NOT WIN32)
+	add_test(NAME tgf_roundtrip_self_check
+		COMMAND bash "${PROJECT_SOURCE_DIR}/scripts/tgf-roundtrip-self-check.sh"
+			$<TARGET_FILE:tgf>)
+endif()
+
 # Parity between the native tgf and the MinGW build run under wine.
 # Registered only when the cross-build and wine are both present.
 if(TARGET tgf AND NOT WIN32)
