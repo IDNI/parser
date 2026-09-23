@@ -37,6 +37,17 @@ RUN apt-get update && apt-get install -y \
 RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100 && \
 	update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100
 
+ARG BUILD_JOBS=1
+
+# A system FTXUI lets every native build find it with find_package, so no
+# build fetches and compiles it again. Keep the tag equal to the fetched one.
+RUN git clone --depth 1 --branch v6.1.9 https://github.com/ArthurSonzogni/FTXUI.git /tmp/ftxui && \
+	cmake -S /tmp/ftxui -B /tmp/ftxui/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+		-DFTXUI_BUILD_EXAMPLES=OFF -DFTXUI_BUILD_DOCS=OFF -DFTXUI_BUILD_TESTS=OFF && \
+	cmake --build /tmp/ftxui/build -j ${BUILD_JOBS} && \
+	cmake --install /tmp/ftxui/build && \
+	rm -rf /tmp/ftxui
+
 
 # ------------------------------------------------------------
 # Source tree for every stage that builds the parser
