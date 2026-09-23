@@ -9,13 +9,14 @@
 # keyword, operator, string, comment, number, type, variable, delimiter
 @highlight
 	type    : directive_name, directive_token, directive_cmd;
-        operator: alternation, conjunction, optional, repeat, none_or_repeat, neg, tree_path;
+        operator: alternation, conjunction, optional, repeat, none_or_repeat, neg, tree_path,
+                  production > ("=>");
 	string  : terminal_string, terminal_char;
 	comment : comment;
 	number  : escaped_s, escaped_c, terminal_hex;
         keyword : dir_sym;
 	variable: sym;
-	delimiter: production, directive.
+	delimiter: production > ('.'), directive > ('.').
 
 # start symbol
 start                  => (_ statement)* _.

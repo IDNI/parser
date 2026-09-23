@@ -207,7 +207,7 @@ TEST_CASE("tgf.tgf highlights a rule's symbols and its production delimiters") {
 	CHECK(tokens[0].text == "start");
 	CHECK(tokens[0].type == "variable");
 	CHECK(tokens[1].text == "=>");
-	CHECK(tokens[1].type == "delimiter");
+	CHECK(tokens[1].type == "operator");
 	CHECK(tokens[2].text == "expr");
 	CHECK(tokens[2].type == "variable");
 	CHECK(tokens[3].text == ".");
@@ -233,7 +233,7 @@ TEST_CASE("tgf.tgf: quote chars in char and string literals are string") {
 	CHECK(found_ts);
 
 	// Each quoted literal merges into one string token; x is a plain sym, colored variable.
-	// production is @highlight'ed as delimiter, so => and the terminator . carry that type.
+	// production > ("=>") types the arrow operator; production > ('.') types the terminator.
 	string input = "x => 'a' | \"bc\".";
 	auto data = hl.get_tokens(input);
 	auto tokens = decode(data, input);
@@ -241,7 +241,7 @@ TEST_CASE("tgf.tgf: quote chars in char and string literals are string") {
 	CHECK(tokens[0].text == "x");
 	CHECK(tokens[0].type == "variable");
 	CHECK(tokens[1].text == "=>");
-	CHECK(tokens[1].type == "delimiter");
+	CHECK(tokens[1].type == "operator");
 	CHECK(tokens[2].text == "'a'");
 	CHECK(tokens[2].type == "string");
 	CHECK(tokens[3].text == "|");
@@ -259,7 +259,7 @@ TEST_CASE("tgf.tgf self-highlighting: quotes in tgf.tgf source are string") {
 	REQUIRE(hl.good());
 
 	// Each quoted literal merges into one string token; ch is a plain sym, colored variable.
-	// production is @highlight'ed as delimiter, so => and the terminator . carry that type.
+	// production > ("=>") types the arrow operator; production > ('.') types the terminator.
 	string input = "ch => \"'\" | '\\''.";
 	auto data = hl.get_tokens(input);
 	auto tokens = decode(data, input);
@@ -267,7 +267,7 @@ TEST_CASE("tgf.tgf self-highlighting: quotes in tgf.tgf source are string") {
 	CHECK(tokens[0].text == "ch");
 	CHECK(tokens[0].type == "variable");
 	CHECK(tokens[1].text == "=>");
-	CHECK(tokens[1].type == "delimiter");
+	CHECK(tokens[1].type == "operator");
 	CHECK(tokens[2].type == "string");
 	CHECK(tokens[3].text == "|");
 	CHECK(tokens[3].type == "operator");

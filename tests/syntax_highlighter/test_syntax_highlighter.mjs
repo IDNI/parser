@@ -122,8 +122,6 @@ if (compiled['tgf']) {
 		['terminal_hex', 'number'],
 		['alternation', 'operator'],
 		['directive_token', 'type'],
-		['production', 'delimiter'],
-		['directive', 'delimiter'],
 	];
 	for (const [name, expect] of checks) {
 		let id = -1;
