@@ -1,0 +1,8 @@
+{
+	"tgf":          { "path": "src/format/tgf/tgf.tgf" },
+	"tgf-test":     { "path": "src/format/tgf.test/tgf.test.tgf" },
+	"tgf-csv":      { "path": "src/format/csv/csv.tgf", "also": ["csv"] },
+	"tgf-json":     { "path": "src/format/json/json.tgf", "also": ["json"] },
+	"tgf-treemr":   { "path": "src/format/treemr/treemr.tgf" },
+	"tgf-tgf_repl": { "path": "src/tgf/tgf_repl.tgf" }
+}

@@ -24,5 +24,8 @@ compile_commands.json
 external/emsdk*
 node_modules/
 __pycache__/
+editors/vscode/out/
+editors/vscode/wasm/
+editors/vscode/grammars/
 
 .testdata/

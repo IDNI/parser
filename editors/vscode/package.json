@@ -1,0 +1,93 @@
+{
+  "name": "tgf-syntax",
+  "displayName": "TGF Grammars' Syntax Highlighter",
+  "description": "Syntax highlighting for any language defined by a .tgf grammar",
+  "version": "0.1.0",
+  "publisher": "idni",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": ["Programming Languages"],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "tgf-syntax.showTokens",
+        "title": "TGF: Show All Tokens"
+      },
+      {
+        "command": "tgf-syntax.inspectTokens",
+        "title": "TGF: Inspect Tokens at Cursor"
+      },
+      {
+        "command": "tgf-syntax.showMap",
+        "title": "TGF: Show Classification Map"
+      }
+    ],
+    "languages": [
+      {
+        "id": "tgf",
+        "extensions": [".tgf"],
+        "aliases": ["TGF", "tgf"],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "tgf-test",
+        "extensions": [".tgf.test"],
+        "aliases": ["TGF Test", "tgf-test"],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "tgf-csv",
+        "aliases": ["TGF:CSV"]
+      },
+      {
+        "id": "tgf-json",
+        "aliases": ["TGF:JSON"]
+      },
+      {
+        "id": "tgf-treemr",
+        "aliases": ["TGF:TREE_MATCHER"]
+      },
+      {
+        "id": "tgf-tgf_repl",
+        "aliases": ["TGF:TGF_REPL"]
+      }
+    ],
+    "configurationDefaults": {
+      "[tgf]": { "editor.semanticHighlighting.enabled": true },
+      "[tgf-test]": { "editor.semanticHighlighting.enabled": true },
+      "[tgf-csv]": { "editor.semanticHighlighting.enabled": true },
+      "[tgf-json]": { "editor.semanticHighlighting.enabled": true },
+      "[tgf-treemr]": { "editor.semanticHighlighting.enabled": true },
+      "[tgf-tgf_repl]": { "editor.semanticHighlighting.enabled": true }
+    },
+    "semanticTokenScopes": [
+      {
+        "scopes": {
+          "keyword":   ["keyword.control", "keyword"],
+          "operator":  ["keyword.operator", "operator"],
+          "string":    ["string"],
+          "comment":   ["comment"],
+          "number":    ["constant.numeric"],
+          "type":      ["entity.name.type", "support.type"],
+          "variable":  ["variable.other", "variable"],
+          "delimiter": ["punctuation.separator", "punctuation"]
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -watch -p ."
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.2",
+    "@types/vscode": "^1.120.0",
+    "typescript": "^5.0.0"
+  }
+}
