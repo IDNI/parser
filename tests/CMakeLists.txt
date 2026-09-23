@@ -130,6 +130,7 @@ set(DOCTESTS
 	tree_rewriter
 	enhancements
 	utf8
+	highlight
 	relaxed_directives
 	boolean_grammar
 	negation_regression
@@ -140,6 +141,11 @@ set(DOCTESTS
 )
 
 foreach(X IN LISTS DOCTESTS)
+	# The highlight test reads host grammar files through PROJECT_SOURCE_DIR
+	# and is not WASM-runnable.
+	if(EMSCRIPTEN AND X STREQUAL "highlight")
+		continue()
+	endif()
 	set(N "doctest_${X}")
 	add_executable(${N} "${N}.cpp")
 	if(EMSCRIPTEN)
@@ -168,6 +174,10 @@ foreach(X IN LISTS DOCTESTS)
 	target_include_directories(${N} PUBLIC
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
 	)
+	if(${N} STREQUAL "doctest_highlight" AND NOT EMSCRIPTEN)
+		target_compile_definitions(${N} PRIVATE
+			PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+	endif()
 	# these tests include a generated header directly, without linking
 	# tgf_cli_core; a header-only build resolves productions() inline instead
 	if(${N} STREQUAL "doctest_treemr" AND NOT EMSCRIPTEN AND NOT TAU_PARSER_BUILD_HEADER_ONLY)
