@@ -17,6 +17,9 @@ if(TAU_PARSER_DONT_USE_FTXUI)
 else()
 	find_package(ftxui QUIET)
 	if(ftxui_FOUND)
+		# imported targets are directory scoped, and tests/ links them too
+		set_target_properties(ftxui::screen ftxui::dom ftxui::component
+			PROPERTIES IMPORTED_GLOBAL TRUE)
 		set(TAU_PARSER_HAS_FTXUI_DEP ON)
 		message(STATUS "FTXUI: using system package")
 	else()
