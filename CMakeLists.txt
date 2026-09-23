@@ -419,6 +419,11 @@ if(TAU_PARSER_BUILD_TESTS)
 	add_subdirectory(tests)
 endif()
 
+if(TAU_PARSER_BUILD_TESTS OR (TAU_RUN_GRAMMAR_TESTS AND TARGET tgf))
+	include(ctest-build-tree)
+	tau_require_build_tree()
+endif()
+
 # Documentation
 if(TAU_PARSER_INSTALL)
 	message(STATUS "Installing license and static docs to ${TAU_PARSER_DOC_DESTINATION}")

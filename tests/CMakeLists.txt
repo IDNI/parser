@@ -317,3 +317,6 @@ if(TARGET tgf AND NOT WIN32)
 		endif()
 	endif()
 endif()
+
+include(ctest-build-tree)
+tau_require_build_tree()
