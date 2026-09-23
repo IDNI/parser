@@ -106,6 +106,10 @@ ENV WINEPREFIX=/root/.wine-parser WINEDEBUG=-all
 
 RUN apt-get update && apt-get install -y --no-install-recommends wine
 
+# Create the wine prefix once. A parallel test run against a missing prefix
+# makes every wine process race to create the wineserver socket.
+RUN wineboot --init && wineserver -w
+
 # wine, not wine64: the Ubuntu package runs these 64-bit PE binaries on its
 # own, and needs no i386 multiarch.
 RUN echo " (BUILD) -- Running tests under wine: $TESTS" && \
