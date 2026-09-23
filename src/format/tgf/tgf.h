@@ -173,6 +173,8 @@ private:
 		prods_t start = nul;
 		/// char class names coming from @use char class ...
 		std::vector<std::string> cc_names{};
+		/// plain (non-glob) @highlight pattern names seen so far.
+		std::set<std::string> highlight_plain_names{};
 		/// grammar options
 		grammar<C, T>::options opt{};
 		char_class_fns<T> cc;
@@ -211,6 +213,16 @@ private:
 					&& name[1] == '_') continue;
 				// a @dynamic nonterminal has no alternatives yet
 				if (opt.dynamic.count(name)) continue;
+				diag->warning(
+					messages::unproductive_nonterminal,
+					{{ label::name, name }});
+			}
+			std::set<std::string> defined_names;
+			for (auto nt : defined) defined_names.insert(nts.get(nt));
+			for (auto& name : highlight_plain_names) {
+				if (defined_names.count(name)) continue;
+				if (std::find(cc_names.begin(), cc_names.end(),
+					name) != cc_names.end()) continue;
 				diag->warning(
 					messages::unproductive_nonterminal,
 					{{ label::name, name }});
@@ -254,6 +266,12 @@ private:
 		size_t id = 0;
 		size_t node2nt(const trv& t) {
 			return nts.get(dir_arg_text(t));
+		}
+		/// True when name is a token type of the @highlight legend.
+		static bool is_highlight_token_type(const std::string& name) {
+			for (auto& t : highlight_token_types)
+				if (t == name) return true;
+			return false;
 		}
 	// ---- directive helpers (relaxed grammar) ----
 
@@ -497,26 +515,48 @@ private:
 			for (auto& lst :
 				(p || tgf_parser::dir_list)())
 				lists.push_back(lst);
-			if (lists.size() < 2) continue;
+			if (lists.size() == 1) {
+				std::vector<std::string> args;
+				for (auto& a :
+					(lists[0] || tgf_parser::dir_arg)())
+					args.push_back(dir_arg_text(
+						a | trv::only_child));
+				if (args.size() == 1 && args[0] == "auto") {
+					opt.highlight_heuristics = true;
+					continue;
+				}
+				if (diag) for (auto& a : args)
+					diag->warning(
+						messages::unknown_directive_argument,
+						{{ label::name, a }});
+				continue;
+			}
 			std::string type_name;
 			for (auto& a :
 				(lists[0] || tgf_parser::dir_arg)())
 				type_name = dir_arg_text(
 					a | trv::only_child);
 			if (type_name.empty()) continue;
-			std::vector<std::string> nt_names;
+			if (!is_highlight_token_type(type_name)) {
+				if (diag) diag->warning(
+					messages::unknown_highlight_type,
+					{{ label::type_name, type_name }});
+				continue;
+			}
+			std::vector<std::string> patterns;
 			for (auto& a :
 				(lists[1] || tgf_parser::dir_arg)()) {
 				auto n = dir_arg_text(
 					a | trv::only_child);
-				if (!n.empty()) {
-					nt_names.push_back(n);
-				}
+				if (n.empty()) continue;
+				patterns.push_back(n);
+				if (n.find('*') == std::string::npos)
+					highlight_plain_names.insert(n);
 			}
-			if (!nt_names.empty())
+			if (!patterns.empty())
 				opt.highlights.emplace_back(
 					std::move(type_name),
-					std::move(nt_names));
+					std::move(patterns));
 		}
 	}
 

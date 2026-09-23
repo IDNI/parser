@@ -359,6 +359,13 @@ struct dynamic_context {
 
 template <typename C, typename T> struct grammar_inspector;
 template <typename C, typename T> class parser;
+
+/// @highlight token type legend, in index order.
+constexpr std::array<std::string_view, 8> highlight_token_types = {
+	"keyword", "operator", "string", "comment",
+	"number", "type", "variable", "delimiter",
+};
+
 /**
  * @brief Grammar struct required by parser.
  *
@@ -411,6 +418,8 @@ struct grammar {
 		/// Populated by @highlight type : nt1, nt2; type2 : nt3.
 		std::vector<std::pair<std::string, std::vector<std::string>>>
 			highlights = {};
+		/// @highlight auto: enable name and content heuristics.
+		bool highlight_heuristics = false;
 	} opt;
 	grammar(nonterminals<C, T>& nts, options opt = {});
 	grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,

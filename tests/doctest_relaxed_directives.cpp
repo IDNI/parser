@@ -4,6 +4,7 @@
 #include "format/tgf/tgf.h"
 
 using namespace idni;
+using messages = idni::parser_strings::messages;
 
 // Helper: build a grammar from a TGF string. The caller must keep
 // the nonterminals alive as long as the grammar is in use (grammar
@@ -204,7 +205,7 @@ TEST_CASE("directive: @highlight populates highlights option") {
 
 TEST_CASE("directive: @highlight with multiple nonterminals") {
 	nonterminals<char> nts;
-	auto g = build_grammar(nts, 
+	auto g = build_grammar(nts,
 		"@use char class digit.\n"
 		"@highlight number : digit, hex.\n"
 		"start => digit.\n"
@@ -214,4 +215,87 @@ TEST_CASE("directive: @highlight with multiple nonterminals") {
 	REQUIRE(g.opt.highlights[0].second.size() == 2);
 	REQUIRE(g.opt.highlights[0].second[0] == "digit");
 	REQUIRE(g.opt.highlights[0].second[1] == "hex");
+}
+
+TEST_CASE("directive: @highlight auto sets the heuristics flag") {
+	nonterminals<char> nts;
+	auto g = build_grammar(nts,
+		"@use char class digit.\n"
+		"@highlight auto.\n"
+		"start => digit.\n");
+	REQUIRE(g.opt.highlight_heuristics == true);
+}
+
+TEST_CASE("directive: no @highlight leaves heuristics off") {
+	nonterminals<char> nts;
+	auto g = build_grammar(nts,
+		"@use char class digit.\n"
+		"start => digit.\n");
+	REQUIRE(g.opt.highlight_heuristics == false);
+}
+
+// True if the report holds a warning whose message text is msg.
+static bool has_warning(const idni::diagnostics::report& r,
+	std::string_view msg)
+{
+	for (auto& n : r.nodes())
+		if (idni::diagnostics::is_warning(n.tag) && r.str(n.key) == msg)
+			return true;
+	return false;
+}
+
+TEST_CASE("directive: @highlight with an unknown type warns and is skipped") {
+	nonterminals<char> nts;
+	auto res = tgf<char>::from_string(nts,
+		"@use char class digit.\n"
+		"@highlight keywrod : start.\n"
+		"start => digit.\n");
+	REQUIRE(res.has_value());
+	auto& rep = res.report();
+	CHECK(has_warning(rep, messages::unknown_highlight_type));
+	auto g = std::move(res).value();
+	REQUIRE(g.opt.highlights.empty());
+}
+
+TEST_CASE("directive: @highlight of an undefined name warns unproductive") {
+	nonterminals<char> nts;
+	auto res = tgf<char>::from_string(nts,
+		"@use char class digit.\n"
+		"@highlight keyword : nosuch.\n"
+		"start => digit.\n");
+	REQUIRE(res.has_value());
+	auto& rep = res.report();
+	CHECK(has_warning(rep, messages::unproductive_nonterminal));
+	auto g = std::move(res).value();
+	REQUIRE(g.opt.highlights.size() == 1);
+}
+
+TEST_CASE("directive: @highlight glob pattern does not warn unproductive") {
+	nonterminals<char> nts;
+	auto res = tgf<char>::from_string(nts,
+		"@use char class digit.\n"
+		"@highlight keyword : nosuch*.\n"
+		"start => digit.\n");
+	REQUIRE(res.has_value());
+	auto& rep = res.report();
+	CHECK_FALSE(has_warning(rep, messages::unproductive_nonterminal));
+	auto g = std::move(res).value();
+	REQUIRE(g.opt.highlights.size() == 1);
+}
+
+TEST_CASE("directive: @highlight multi-pair directive stores both pairs "
+	"in order")
+{
+	nonterminals<char> nts;
+	auto g = build_grammar(nts,
+		"@use char class digit.\n"
+		"@highlight keyword : a; comment : b.\n"
+		"start => digit.\n"
+		"a => digit.\n"
+		"b => digit.\n");
+	REQUIRE(g.opt.highlights.size() == 2);
+	REQUIRE(g.opt.highlights[0].first == "keyword");
+	REQUIRE(g.opt.highlights[0].second == std::vector<std::string>{"a"});
+	REQUIRE(g.opt.highlights[1].first == "comment");
+	REQUIRE(g.opt.highlights[1].second == std::vector<std::string>{"b"});
 }

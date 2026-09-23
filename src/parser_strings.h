@@ -200,6 +200,8 @@ struct messages {
 	static constexpr sv unknown_directive        = "Unknown directive";
 	static constexpr sv unknown_directive_argument =
 		"Unknown directive argument";
+	static constexpr sv unknown_highlight_type =
+		"Unknown highlight type";
 	static constexpr sv dynamic_names_need_semicolon =
 		"Dynamic directive names must be separated by ';', not ','.";
 	// escape decode errors
