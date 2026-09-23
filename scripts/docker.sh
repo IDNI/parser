@@ -25,6 +25,7 @@ case "${CMD}" in
 		echo "  linux-mingw64-wine - cross-build for Windows, run the suite under wine"
 		echo "  wasm-deps          - build the wasm-deps image (emsdk + node)"
 		echo "  wasm-node          - build the wasm-node image and run the node suite"
+		echo "  wasm-browser       - build the wasm-browser image and run the browser suite"
 		echo "  packages           - build the release packages"
 		echo "  nightly            - build the nightly packages"
 		echo "  tgf                - build the tgf image and run it"
@@ -45,6 +46,9 @@ case "${CMD}" in
 		;;
 	"wasm-node")
 		build --target wasm-node -t parser:wasm-node "${@:2}"
+		;;
+	"wasm-browser")
+		build --target wasm-browser -t parser:wasm-browser "${@:2}"
 		;;
 	"packages")
 		build --target packages --build-arg RELEASE=yes -t parser:packages "${@:2}"

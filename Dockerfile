@@ -223,3 +223,41 @@ COPY --from=source /parser /parser
 
 RUN echo "(BUILD) -- Building and running the wasm node tests" && \
 	./dev preset release-tests-emscripten run -DTAU_BUILD_JOBS=${BUILD_JOBS}
+
+
+# ------------------------------------------------------------
+# WebAssembly browser gate: native tgf as the parity reference, the
+# browser REPL, and the puppeteer/Chrome test layer.
+
+FROM wasm-deps AS wasm-browser
+
+ARG BUILD_JOBS=1
+
+# Chrome's shared-library dependencies, needed only by the browser layer.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+	libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+	libdbus-1-3 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
+	libxrandr2 libgbm1 libasound2t64 libpango-1.0-0 libcairo2 libx11-6 \
+	libx11-xcb1 libxcb1 libxext6 libxshmfence1 libglib2.0-0 fonts-liberation
+
+COPY --from=source /parser /parser
+
+# Native tgf is the parity reference for the browser parity tests.
+RUN echo "(BUILD) -- Building native tgf" && \
+	./dev preset release-tgf -DTAU_BUILD_JOBS=${BUILD_JOBS}
+
+# Chrome for Testing, pinned separately from puppeteer-core's own version.
+RUN echo "(BUILD) -- Installing Chrome for Testing" && \
+	./dev dep-chrome.sh
+
+RUN echo "(BUILD) -- Installing puppeteer-core" && \
+	npm ci --prefix tests/repl --no-audit --no-fund
+
+# xterm.js vendor files for the browser REPL page.
+RUN echo "(BUILD) -- Installing js/tau-wasm-terminal dependencies" && \
+	npm ci --prefix js/tau-wasm-terminal --no-audit --no-fund
+
+# Browser tests launch Chrome as root, which needs --no-sandbox; the test
+# scripts already pass it.
+RUN echo "(BUILD) -- Building and running the wasm browser tests" && \
+	./dev preset release-tests-emscripten-browser run -DTAU_BUILD_JOBS=${BUILD_JOBS}
