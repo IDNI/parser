@@ -65,9 +65,11 @@ directive              => ('@' _ sym:directive_name _):directive_token
 sep                    => '-' | '_' | __.
 dir_pair               => dir_list [ _ ':' _ dir_list ].
 dir_list               => dir_arg (_ ',' _ dir_arg)*.
-# the negation keeps a bare word run out of dir_arg, so it stays directive_cmd
+# the negation keeps a run of words and strings out of dir_arg, so the words
+# stay directive_cmd and a string stays a separate argument
 dir_arg                => tree_path | dir_sym | terminal_string
-                        | treemr_pattern & ~(dir_sym (pat_space+ dir_sym)+).
+                        | treemr_pattern & ~(pat_word (pat_space+ pat_word)+).
+pat_word               => dir_sym | terminal_string.
 tree_path              => dir_sym _ '>' _ dir_sym (_ '>' _ dir_sym)*.
 dir_sym                => (alpha | '_' | '*') (alnum | '_' | '*')*.
 treemr_pattern         => pat_unit (pat_space* pat_unit)*.
