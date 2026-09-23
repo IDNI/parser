@@ -19,6 +19,12 @@ set(JSLIB_SOURCES
         embindings.cpp
 )
 
+# tgf_cli.cpp reaches tgf_test_parser via tgf_test.h; a header-only build
+# resolves productions() inline instead, so this stays out of that build
+if(NOT TAU_PARSER_BUILD_HEADER_ONLY)
+	list(APPEND JSLIB_SOURCES ../src/format/tgf.test/tgf_test_parser.generated.cpp)
+endif()
+
 set(JSLIB_COMPILE_OPTIONS
 	"$<$<CONFIG:DEBUG>:-O0;-DDEBUG;-gsource-map;-fno-exceptions>"
 	"$<$<CONFIG:RELEASE>:-O3;-DNDEBUG;-g0;-fno-exceptions>"
@@ -67,6 +73,11 @@ endif()
 set_target_properties(tauparser PROPERTIES LINK_FLAGS ${JSLIB_LINK_OPTIONS})
 target_compile_definitions(tauparser PRIVATE
         "-DNODEFSMOUNT")
+# header-only mode makes tgf_test.h resolve productions() inline instead
+# of needing the out-of-line definition linked in
+if(TAU_PARSER_BUILD_HEADER_ONLY)
+	target_compile_definitions(tauparser PRIVATE TAU_PARSER_BUILD_HEADER_ONLY)
+endif()
 
 # tauparser.node.js does require('./tauparser.js'), so the harnesses go in the
 # target's own output directory rather than this list file's binary dir
@@ -88,6 +99,9 @@ set(TGF_NODE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/embindings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/parser.cpp
 )
+if(NOT TAU_PARSER_BUILD_HEADER_ONLY)
+    list(APPEND TGF_NODE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../src/format/tgf.test/tgf_test_parser.generated.cpp)
+endif()
 set(TGF_NODE_LINK_OPTIONS
     -lnodefs.js
     -s MODULARIZE=1
@@ -116,6 +130,11 @@ target_compile_definitions(tgf_node PRIVATE
     TAU_PARSER_MEASURE_SCOPES
     TAU_PARSER_MEASURE_COUNTERS
     "-DNODEFSMOUNT")
+# header-only mode makes tgf_test.h resolve productions() inline instead
+# of needing the out-of-line definition linked in
+if(TAU_PARSER_BUILD_HEADER_ONLY)
+    target_compile_definitions(tgf_node PRIVATE TAU_PARSER_BUILD_HEADER_ONLY)
+endif()
 # Suppress C++23 extension warnings from parser headers (static lambdas)
 target_compile_options(tgf_node PRIVATE -Wno-c++23-extensions -fsigned-char)
 target_link_libraries(tgf_node PRIVATE embind)
