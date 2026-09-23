@@ -71,8 +71,7 @@ jobs:
       - name: Build and test
         run: |
           ./dev docker linux --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --cache-from type=gha,scope=parser-base \
-            --cache-to   type=gha,scope=parser-linux,mode=max
+            --cache-from type=gha,scope=parser-base
 
   # One job builds emsdk and the browser test dependencies, so the wasm gates
   # import them instead of each gate building them. Change the scope to force
@@ -117,8 +116,7 @@ jobs:
       - name: Build and test
         run: |
           ./dev docker wasm-node --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --cache-from type=gha,scope=parser-wasm-deps \
-            --cache-to   type=gha,scope=parser-wasm-node,mode=max
+            --cache-from type=gha,scope=parser-wasm-deps
 
   wasm-browser:
     name: WebAssembly (browser)
@@ -138,8 +136,7 @@ jobs:
       - name: Build and test
         run: |
           ./dev docker wasm-browser --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --cache-from type=gha,scope=parser-wasm-deps \
-            --cache-to   type=gha,scope=parser-wasm-browser,mode=max
+            --cache-from type=gha,scope=parser-wasm-deps
 
   linux-mingw64-wine:
     name: Windows cross-build (MinGW, wine)
@@ -175,8 +172,7 @@ jobs:
       - name: Build and test
         run: |
           ./dev docker linux-mingw64-wine --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --cache-from type=gha,scope=parser-base \
-            --cache-to   type=gha,scope=parser-mingw64-wine,mode=max
+            --cache-from type=gha,scope=parser-base
 
   windows-msvc:
     name: Native Windows (${{ matrix.preset }})
