@@ -182,3 +182,44 @@ fi
 WORKDIR /parser/build/${BUILD_PRESET}
 ENTRYPOINT [ "./tgf" ]
 CMD []
+
+# ------------------------------------------------------------
+# WebAssembly dependencies image: emsdk and its bundled Node.js
+
+FROM base AS wasm-deps
+
+ARG BUILD_JOBS=1
+
+# dep-emsdk.sh needs curl, unzip and xz; the base image does not carry them.
+RUN apt-get update && apt-get install -y --no-install-recommends curl unzip xz-utils
+
+# Only the files dep-emsdk.sh runs, so a source change keeps the emsdk layer.
+COPY ./dev /parser/
+COPY ./scripts/devrc ./scripts/dep-emsdk.sh /parser/scripts/
+COPY ./cmake/tau-resolve.cmake /parser/cmake/
+WORKDIR /parser
+
+RUN echo "(BUILD) -- Building wasm dependencies: emsdk" && \
+	./dev dep-emsdk.sh -DTAU_BUILD_JOBS=${BUILD_JOBS}
+
+# emsdk ships the only node/npm/npx in the image, under a version directory
+# whose name is not fixed. The Emscripten tests and the browser test deps
+# need them on the path.
+RUN EMSDK_NODE_BIN="$(ls -d /root/.tau/emsdk/node/*/bin | head -n1)" && \
+	ln -s "$EMSDK_NODE_BIN/node" /usr/local/bin/node && \
+	ln -s "$EMSDK_NODE_BIN/npm"  /usr/local/bin/npm && \
+	ln -s "$EMSDK_NODE_BIN/npx"  /usr/local/bin/npx
+
+
+# ------------------------------------------------------------
+# WebAssembly Node.js gate: build the Emscripten tests and run them
+# under emsdk's Node.js. No Chrome or puppeteer here.
+
+FROM wasm-deps AS wasm-node
+
+ARG BUILD_JOBS=1
+
+COPY --from=source /parser /parser
+
+RUN echo "(BUILD) -- Building and running the wasm node tests" && \
+	./dev preset release-tests-emscripten run -DTAU_BUILD_JOBS=${BUILD_JOBS}
