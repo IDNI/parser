@@ -560,11 +560,18 @@ void repl_eval_widget<evaluator_t>::drain_output(bool flush_partial) {
 	if (flush_partial && !err_ready.empty() && err_ready.back() != '\n')
 		err_ready += '\n';
 	screen_->WithRestoredIO([&] {
-		term::clear_line();
+		// Clears rows the previous frame drew below the cursor, not just the current line.
+		std::cout << "\r\033[J";
 		std::cout << out_ready;
 		std::cerr << err_ready;
 		std::cout.flush();
 		std::cerr.flush();
+		// Scrolls past the next frame's stale reset-cursor move so it lands below this text, not on it.
+		int dy = screen_->dimy() - 1;
+		if (dy > 0) {
+			std::cout << std::string(dy, '\n') << "\033[" << dy << "A";
+			std::cout.flush();
+		}
 	})();
 }
 

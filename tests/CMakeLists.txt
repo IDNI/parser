@@ -219,7 +219,7 @@ if(TARGET tgf AND NOT WIN32)
 	endif()
 endif()
 
-# Benchmark executable (not a test — run manually)
+# Benchmark executable (not a test - run manually)
 if(NOT EMSCRIPTEN)
 add_executable(bench_enhancements bench_enhancements.cpp)
 tauparser_setup(bench_enhancements PRIVATE "")
@@ -274,12 +274,18 @@ if(TARGET tgf AND NOT WIN32)
 					COMMAND "${PYTHON3_EXECUTABLE}"
 						"${CMAKE_CURRENT_SOURCE_DIR}/repl/test_repl_ftxui_async.py"
 						$<TARGET_FILE:repl_ftxui_async_fixture>)
+				add_test(NAME repl_ftxui_drain_test
+					COMMAND "${PYTHON3_EXECUTABLE}"
+						"${CMAKE_CURRENT_SOURCE_DIR}/repl/test_repl_ftxui_drain.py"
+						$<TARGET_FILE:tgf>
+						"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tau.tgf")
 			endif()
 			# tau.tgf is large; serialize REPL tests and allow generous load time.
 			set_tests_properties(repl_keybindings_test
 				PROPERTIES TIMEOUT 300 RESOURCE_LOCK repl_tau)
 			if(TAU_PARSER_HAS_FTXUI_DEP)
 				set_tests_properties(repl_ftxui_test repl_ftxui_async_test
+						repl_ftxui_drain_test
 					PROPERTIES TIMEOUT 300 RESOURCE_LOCK repl_tau)
 			endif()
 		endif()
