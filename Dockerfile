@@ -102,7 +102,8 @@ ARG BUILD_JOBS=1
 
 # WINEPREFIX keeps the wine configuration out of the home directory.
 # WINEDEBUG drops wine's own noise, and not the output of a test.
-ENV WINEPREFIX=/root/.wine-parser WINEDEBUG=-all
+# WINEARCH keeps the prefix 64-bit only, so wineboot skips the 32-bit setup.
+ENV WINEPREFIX=/root/.wine-parser WINEDEBUG=-all WINEARCH=win64
 
 RUN apt-get update && apt-get install -y --no-install-recommends wine
 
