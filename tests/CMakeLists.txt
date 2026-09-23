@@ -178,6 +178,14 @@ foreach(X IN LISTS DOCTESTS)
 		target_compile_definitions(${N} PRIVATE
 			PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 	endif()
+	# the highlighter compiles treemr patterns, so it needs the DSL parser
+	if(${N} STREQUAL "doctest_highlight" AND NOT EMSCRIPTEN AND NOT TAU_PARSER_BUILD_HEADER_ONLY)
+		target_sources(${N} PRIVATE
+			"${PROJECT_SOURCE_DIR}/src/format/treemr/treemr_parser.generated.cpp")
+		set_source_files_properties(
+			"${PROJECT_SOURCE_DIR}/src/format/treemr/treemr_parser.generated.cpp"
+			PROPERTIES COMPILE_OPTIONS "-O0;-fno-lto")
+	endif()
 	# these tests include a generated header directly, without linking
 	# tgf_cli_core; a header-only build resolves productions() inline instead
 	if(${N} STREQUAL "doctest_treemr" AND NOT EMSCRIPTEN AND NOT TAU_PARSER_BUILD_HEADER_ONLY)

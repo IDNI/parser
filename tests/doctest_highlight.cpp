@@ -494,6 +494,80 @@ TEST_CASE("a typed ancestor colors a terminal through an untyped intermediate no
 	CHECK(tokens[0].type == "keyword");
 }
 
+// --- treemr patterns in @highlight ---
+
+TEST_CASE("treemr pattern with a capture types only the captured nodes") {
+	syntax_highlighter hl(
+		"@use char class alpha.\n"
+		"@highlight variable : sym.\n"
+		"@highlight operator : production > (\"=>\").\n"
+		"start => production.\n"
+		"production => sym \"=>\" sym.\n"
+		"sym => alpha+.\n");
+	REQUIRE(hl.good());
+
+	string input = "a=>b";
+	auto tokens = decode(hl.get_tokens(input), input);
+	REQUIRE(tokens.size() == 3);
+	CHECK(tokens[0].text == "a");
+	CHECK(tokens[0].type == "variable");
+	CHECK(tokens[1].text == "=>");
+	CHECK(tokens[1].type == "operator");
+	CHECK(tokens[2].text == "b");
+	CHECK(tokens[2].type == "variable");
+}
+
+TEST_CASE("treemr pattern without captures types the whole match root span") {
+	syntax_highlighter hl(
+		"@use char class alpha.\n"
+		"@highlight operator : production > \"=>\".\n"
+		"start => production.\n"
+		"production => sym \"=>\" sym.\n"
+		"sym => alpha+.\n");
+	REQUIRE(hl.good());
+
+	string input = "a=>b";
+	auto tokens = decode(hl.get_tokens(input), input);
+	REQUIRE(tokens.size() == 1);
+	CHECK(tokens[0].text == "a=>b");
+	CHECK(tokens[0].type == "operator");
+}
+
+TEST_CASE("a bad treemr pattern is diagnosed and other entries still work") {
+	syntax_highlighter hl(
+		"@use char class alpha.\n"
+		"@highlight keyword : sym.\n"
+		"@highlight operator : (bad.\n"
+		"start => sym.\n"
+		"sym => alpha+.\n");
+	REQUIRE(hl.good());
+	CHECK(hl.diagnostics().find("invalid treemr pattern")
+		!= string::npos);
+
+	string input = "abc";
+	auto tokens = decode(hl.get_tokens(input), input);
+	REQUIRE(tokens.size() == 1);
+	CHECK(tokens[0].text == "abc");
+	CHECK(tokens[0].type == "keyword");
+}
+
+TEST_CASE("a later treemr pattern wins on the same node") {
+	syntax_highlighter hl(
+		"@use char class alpha.\n"
+		"@highlight keyword : production > (\"=>\").\n"
+		"@highlight operator : production > (\"=>\").\n"
+		"start => production.\n"
+		"production => sym \"=>\" sym.\n"
+		"sym => alpha+.\n");
+	REQUIRE(hl.good());
+
+	string input = "a=>b";
+	auto tokens = decode(hl.get_tokens(input), input);
+	REQUIRE(tokens.size() == 1);
+	CHECK(tokens[0].text == "=>");
+	CHECK(tokens[0].type == "operator");
+}
+
 // --- glob_match ---
 
 TEST_CASE("glob_match: exact and star patterns") {

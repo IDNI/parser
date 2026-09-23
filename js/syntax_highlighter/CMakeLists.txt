@@ -10,6 +10,7 @@ set(TOP_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 set(SYNTAX_HIGHLIGHTER_SOURCES
 	${TOP_SRC}/src/parser.cpp
 	${TOP_SRC}/src/format/tgf/tgf_parser.generated.cpp
+	${TOP_SRC}/src/format/treemr/treemr_parser.generated.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/../syntax_highlighter_bindings.cpp
 )
 

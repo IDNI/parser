@@ -336,12 +336,14 @@ inline uint32_t token_classifier::classify_by_name(
 }
 
 inline void token_classifier::init(const grammar<char, char>& g,
-	const nonterminals<char, char>& nts, bool heuristics)
+	const nonterminals<char, char>& nts, bool heuristics,
+	std::string& diagnostics)
 {
 	nt_to_type_.clear();
 	char_class_nts_.clear();
 	digit_class_nts_.clear();
 	transparent_nts_.clear();
+	patterns_.clear();
 
 	static const std::set<std::string> cc_names = {
 		"alnum", "alpha", "blank", "cntrl", "digit", "graph",
@@ -381,15 +383,58 @@ inline void token_classifier::init(const grammar<char, char>& g,
 	}
 
 	// Pass 3, @highlight, always, last: author intent beats heuristics.
+	auto is_name_glob = [](const std::string& s) {
+		if (s.empty()) return false;
+		if (!(std::isalpha((unsigned char)s[0])
+			|| s[0] == '_' || s[0] == '*'))
+			return false;
+		for (char c : s)
+			if (!(std::isalnum((unsigned char)c)
+				|| c == '_' || c == '*'))
+				return false;
+		return true;
+	};
 	for (auto& hl : g.opt.highlights) {
 		uint32_t ti = type_index(hl.first);
 		if (ti == no_type) continue;
-		for (auto& pat : hl.second)
-			for (size_t i = 0; i < nts.size(); ++i) {
-				std::string nm = nts.get(i);
-				if (nm.empty()) continue;
-				if (glob_match(pat, nm)) nt_to_type_[i] = ti;
+		for (auto& pat : hl.second) {
+			if (is_name_glob(pat)) {
+				for (size_t i = 0; i < nts.size(); ++i) {
+					std::string nm = nts.get(i);
+					if (nm.empty()) continue;
+					if (glob_match(pat, nm))
+						nt_to_type_[i] = ti;
+				}
+				continue;
 			}
+			auto m = treemr::matcher_for<char, char>(nts, pat);
+			if (!m.has_value()) {
+				diagnostics += "invalid treemr pattern: "
+					+ pat + "\n";
+				continue;
+			}
+			patterns_.emplace_back(
+				std::move(m).value(), ti);
+		}
+	}
+}
+
+inline void token_classifier::apply_patterns(tref root,
+	std::unordered_map<tref, uint32_t>& overrides) const
+{
+	if (!root) return;
+	for (auto& pm : patterns_) {
+		auto matches = pm.first.search_all(root);
+		for (auto& m : matches) {
+			if (m.captures.empty()) {
+				overrides[m.root] = pm.second;
+				continue;
+			}
+			for (size_t i = 1; i <= m.captures.size(); ++i)
+				for (tref n : m.capture_nodes<
+					pnode_type<char, char>>(i))
+					overrides[n] = pm.second;
+		}
 	}
 }
 
@@ -411,7 +456,7 @@ inline syntax_highlighter::syntax_highlighter(const std::string& grammar_src,
 
 	heuristics_ = heuristics.has_value()
 		? *heuristics : g_->opt.highlight_heuristics;
-	classifier_.init(*g_, *nts_, heuristics_);
+	classifier_.init(*g_, *nts_, heuristics_, diagnostics_);
 
 	// Highlighting shaping disables all trimming and all user inlining.
 	highlight_shaping_ = g_->opt.shaping;
@@ -520,7 +565,8 @@ inline void syntax_highlighter::flush_run(uint32_t type,
 
 inline void syntax_highlighter::extract_tokens(tref root,
 	const std::string& src,
-	std::vector<extracted_token>& out) const
+	std::vector<extracted_token>& out,
+	const std::unordered_map<tref, uint32_t>& overrides) const
 {
 	using tree = parser<char, char>::tree;
 
@@ -529,8 +575,9 @@ inline void syntax_highlighter::extract_tokens(tref root,
 	std::vector<size_t> line_offsets;
 	build_line_offsets(src, line_offsets);
 
-	// Stack of non-skipped ancestors; the top classifies the next terminal leaf.
-	std::vector<tref> ctx;
+	// Non-skipped ancestors with their type; the top types the next leaf.
+	struct ctx_entry { tref node; uint32_t type; };
+	std::vector<ctx_entry> ctx;
 	static constexpr size_t no_parent = static_cast<size_t>(-1);
 
 	// Run-merging state: adjacent same-type terminals under the same parent join.
@@ -541,11 +588,15 @@ inline void syntax_highlighter::extract_tokens(tref root,
 	const uint32_t string_idx  = token_classifier::type_index("string");
 	const uint32_t comment_idx = token_classifier::type_index("comment");
 	int opaque_string = 0, opaque_comment = 0;
-	auto eff_type = [&](size_t pnt) -> uint32_t {
+	auto eff_type = [&]() -> uint32_t {
 		if (opaque_string  > 0) return string_idx;
 		if (opaque_comment > 0) return comment_idx;
-		if (pnt == no_parent) return token_classifier::no_type;
-		return classifier_.classify(pnt);
+		if (ctx.empty()) return token_classifier::no_type;
+		return ctx.back().type;
+	};
+	auto parent_nt = [&]() -> size_t {
+		return ctx.empty() ? no_parent
+			: tree::get(ctx.back().node).value.first.n();
 	};
 
 	auto flush = [&]() {
@@ -582,13 +633,18 @@ inline void syntax_highlighter::extract_tokens(tref root,
 	auto enter = [&](tref node, tref /*parent*/) -> bool {
 		const auto& n = tree::get(node);
 		if (n.is_nt()) {
-			// A skipped parent (transparent, or with no type) never enters the stack.
 			size_t nt = n.value.first.n();
-			if (!classifier_.is_skipped_parent(nt)) {
-				ctx.push_back(node);
-				uint32_t pty = classifier_.classify(nt);
-				if (pty == string_idx)  ++opaque_string;
-				else if (pty == comment_idx) ++opaque_comment;
+			auto oit = overrides.find(node);
+			bool overridden = oit != overrides.end();
+			uint32_t ty = overridden ? oit->second
+				: classifier_.classify(nt);
+			// An override must reach the leaves, even under a transparent node.
+			bool skipped = !overridden
+				&& classifier_.is_skipped_parent(nt);
+			if (!skipped) {
+				ctx.push_back({node, ty});
+				if (ty == string_idx)  ++opaque_string;
+				else if (ty == comment_idx) ++opaque_comment;
 			}
 			// A childless nonterminal (e.g. a char class match)
 			// emits a token for its own span.
@@ -596,14 +652,12 @@ inline void syntax_highlighter::extract_tokens(tref root,
 				size_t s = n.value.second[0];
 				size_t e = n.value.second[1];
 				if (s < e) {
-					size_t pnt = ctx.empty() ? no_parent
-						: tree::get(ctx.back())
-						.value.first.n();
-					uint32_t ty = eff_type(pnt);
-					if (ty == token_classifier::no_type
+					size_t pnt = parent_nt();
+					uint32_t t = eff_type();
+					if (t == token_classifier::no_type
 						&& heuristics_)
-						ty = infer_from_char(src[s]);
-					merge_or_start(ty, s, e, pnt);
+						t = infer_from_char(src[s]);
+					merge_or_start(t, s, e, pnt);
 				}
 			}
 			return true;
@@ -623,9 +677,11 @@ inline void syntax_highlighter::extract_tokens(tref root,
 				return true;
 		}
 
-		size_t pnt = ctx.empty() ? no_parent
-			: tree::get(ctx.back()).value.first.n();
-		uint32_t ty = eff_type(pnt);
+		size_t pnt = parent_nt();
+		uint32_t ty = token_classifier::no_type;
+		auto oit = overrides.find(node);
+		if (oit != overrides.end()) ty = oit->second;
+		else ty = eff_type();
 
 		// With heuristics on and no ancestor type, infer from the character itself.
 		if (ty == token_classifier::no_type && heuristics_)
@@ -640,13 +696,18 @@ inline void syntax_highlighter::extract_tokens(tref root,
 		const auto& n = tree::get(node);
 		if (n.is_nt()) {
 			size_t nt = n.value.first.n();
+			auto oit = overrides.find(node);
+			bool overridden = oit != overrides.end();
+			uint32_t ty = overridden ? oit->second
+				: classifier_.classify(nt);
+			bool skipped = !overridden
+				&& classifier_.is_skipped_parent(nt);
 			// Adjacent same-type siblings still merge across this boundary in enter().
-			if (!classifier_.is_skipped_parent(nt)) {
+			if (!skipped) {
 				if (!ctx.empty()) ctx.pop_back();
-				uint32_t pty = classifier_.classify(nt);
-				if (pty == string_idx && opaque_string > 0)
+				if (ty == string_idx && opaque_string > 0)
 					--opaque_string;
-				else if (pty == comment_idx
+				else if (ty == comment_idx
 					&& opaque_comment > 0)
 					--opaque_comment;
 			}
@@ -768,7 +829,9 @@ inline std::vector<uint32_t> syntax_highlighter::get_tokens(
 			if (prefix_result.found) {
 				tref tree = prefix_result.get_shaped_tree2(
 					highlight_shaping_);
-				extract_tokens(tree, src, tokens);
+				std::unordered_map<tref, uint32_t> overrides;
+				classifier_.apply_patterns(tree, overrides);
+				extract_tokens(tree, src, tokens, overrides);
 				suffix_start = static_cast<size_t>(err_loc);
 			}
 		}
@@ -779,7 +842,9 @@ inline std::vector<uint32_t> syntax_highlighter::get_tokens(
 			line_offsets, tokens);
 	} else {
 		tref tree = result.get_shaped_tree2(highlight_shaping_);
-		extract_tokens(tree, src, tokens);
+		std::unordered_map<tref, uint32_t> overrides;
+		classifier_.apply_patterns(tree, overrides);
+		extract_tokens(tree, src, tokens, overrides);
 	}
 
 	// Post-extraction: merge adjacent same-type tokens.

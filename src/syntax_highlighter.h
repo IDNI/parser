@@ -11,8 +11,11 @@
 #include <set>
 #include <memory>
 #include <optional>
+#include <utility>
+#include <unordered_map>
 
 #include "parser.h"
+#include "format/treemr/treemr.h"
 
 namespace idni {
 
@@ -31,10 +34,15 @@ struct token_classifier
 {
 	// Build the classifier from a compiled grammar and its nonterminals.
 	void init(const grammar<char, char>& g,
-		const nonterminals<char, char>& nts, bool heuristics);
+		const nonterminals<char, char>& nts, bool heuristics,
+		std::string& diagnostics);
 
 	// Return the token type index for a nonterminal id, or no_type.
 	uint32_t classify(size_t nt_id) const;
+
+	// A later pattern overwrites an earlier one on the same node.
+	void apply_patterns(tref root,
+		std::unordered_map<tref, uint32_t>& overrides) const;
 
 	// Return true if the nonterminal is a character class function.
 	bool is_char_class_nt(size_t nt_id) const;
@@ -67,6 +75,10 @@ private:
 	std::set<size_t> char_class_nts_;
 	std::set<size_t> digit_class_nts_;
 	std::set<size_t> transparent_nts_;
+
+	// Compiled treemr patterns in declaration order, each with its type.
+	std::vector<std::pair<treemr::matcher<pnode_type<char, char>>,
+		uint32_t>> patterns_;
 
 	// Classify by nonterminal name (suffix/prefix/exact patterns), or no_type.
 	uint32_t classify_by_name(const std::string& name) const;
@@ -138,9 +150,10 @@ private:
 		const std::vector<size_t>& line_offsets,
 		std::vector<extracted_token>& out) const;
 
-	// Walk the shaped parse tree and extract tokens.
+	// Walk the shaped parse tree and extract tokens, honoring overrides.
 	void extract_tokens(tref root, const std::string& src,
-		std::vector<extracted_token>& out) const;
+		std::vector<extracted_token>& out,
+		const std::unordered_map<tref, uint32_t>& overrides) const;
 
 	// Character-class-based tokenization for an unparsed suffix.
 	void fallback_tokens(const std::string& src, size_t offset,
