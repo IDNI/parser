@@ -185,6 +185,25 @@ static inline ftxui::Element ansi_to_element(const std::string& s) {
 	return spans.empty() ? text("") : hbox(spans);
 }
 
+// Prints newlines so real rows exist below the cursor, then moves back up.
+static inline void pad_scroll_rows(int newlines, int moveup) {
+	if (newlines > 0) std::cout << std::string(newlines, '\n');
+	if (moveup > 0) std::cout << "\033[" << moveup << "A";
+}
+
+// Character count of s with ANSI SGR sequences (as ansi_to_element parses) excluded.
+static inline size_t visible_width(const std::string& s) {
+	size_t n = 0;
+	for (size_t i = 0; i < s.size();) {
+		if (s[i] == '\033' && i + 1 < s.size() && s[i + 1] == '[') {
+			i += 2;
+			while (i < s.size() && s[i] != 'm') ++i;
+			if (i < s.size()) ++i;
+		} else ++n, ++i;
+	}
+	return n;
+}
+
 // --- repl_ftxui ------------------------------------------------------------
 
 template <typename evaluator_t>
@@ -293,9 +312,9 @@ int repl_ftxui<evaluator_t>::run_interactive() {
 	Component input     = Input(opt);
 
 	// Prompt rendered as a left gutter; continuation lines indent beneath it.
-	// While an evaluation runs, the submitted text stays visible and the
-	// spinner row is drawn below it.
+	// While an evaluation runs, the spinner row replaces the prompt row.
 	Component line = Renderer(input, [this, input] {
+		if (eval_widget_.active()) return eval_widget_.render();
 		std::string prompt;
 		{
 			std::lock_guard<std::mutex> lock(prompt_mutex());
@@ -304,9 +323,7 @@ int repl_ftxui<evaluator_t>::run_interactive() {
 		Element editor = input_text_.empty()
 			? (text(" ") | focusCursorBarBlinking)
 			: input->Render();
-		Element row = hbox({ ansi_to_element(prompt), editor });
-		return eval_widget_.active()
-			? vbox({ row, eval_widget_.render() }) : row;
+		return hbox({ ansi_to_element(prompt), editor });
 	});
 
 	// Is the cursor on the first / last line of the (possibly multiline) buffer?
@@ -317,6 +334,38 @@ int repl_ftxui<evaluator_t>::run_interactive() {
 	auto on_last_line = [this] {
 		size_t cp = std::min((size_t) cursor_pos_, input_text_.size());
 		return input_text_.find('\n', cp) == std::string::npos;
+	};
+
+	// Prints the prompt and submitted line into terminal history before the
+	// spinner frame covers them. Keys and Enter in one batch get no draw in
+	// between, so the current line is reprinted from the buffer.
+	auto commit_input_rows = [this] {
+		screen_->WithRestoredIO([this] {
+			size_t cp = std::min((size_t)cursor_pos_, input_text_.size());
+			int cy = (int)std::count(input_text_.begin(),
+				input_text_.begin() + cp, '\n');
+			int h = (int)std::count(input_text_.begin(),
+				input_text_.end(), '\n') + 1;
+			size_t line_start = cy == 0 ? 0
+				: input_text_.rfind('\n', cp > 0 ? cp - 1 : 0) + 1;
+			size_t line_end = input_text_.find('\n', cp);
+			if (line_end == std::string::npos) line_end = input_text_.size();
+			std::string prompt;
+			{
+				std::lock_guard<std::mutex> lock(prompt_mutex());
+				prompt = prompt_;
+			}
+			std::cout << "\r\033[K";
+			std::cout << (cy == 0
+				? prompt : std::string(visible_width(prompt), ' '));
+			std::cout << input_text_.substr(line_start,
+				line_end - line_start);
+			int down = h - 1 - cy;
+			if (down > 0) std::cout << "\033[" << down << "B";
+			std::cout << '\n';
+			pad_scroll_rows(h - 1, down);
+			std::cout.flush();
+		})();
 	};
 
 	auto start_eval = [this](std::string text, bool store,
@@ -347,6 +396,7 @@ int repl_ftxui<evaluator_t>::run_interactive() {
 				if (act.kind == repl_key_action::consume)
 					return true;
 				if (act.kind == repl_key_action::submit) {
+					commit_input_rows();
 					start_eval(act.line, false, false);
 					return true;
 				}
@@ -355,6 +405,7 @@ int repl_ftxui<evaluator_t>::run_interactive() {
 		// Enter starts evaluation and leaves the UI loop responsive.
 		if (e == Event::Return) {
 			if (input_text_.empty()) return true;
+			commit_input_rows();
 			start_eval(input_text_, true, true);
 			return true;
 		}
@@ -474,11 +525,6 @@ void repl_eval_widget<evaluator_t>::start(ftxui::ScreenInteractive* screen,
 		std::lock_guard<std::mutex> lock(err_mutex());
 		err_buf_.clear();
 	}
-	{
-		std::lock_guard<std::mutex> lock(out_mutex());
-		out_buf_ += text_;
-		out_buf_ += '\n';
-	}
 
 	stream_lock_ = std::unique_lock<std::mutex>(repl_stream_mutex());
 	saved_cout_buf_ = std::cout.rdbuf();
@@ -568,10 +614,8 @@ void repl_eval_widget<evaluator_t>::drain_output(bool flush_partial) {
 		std::cerr.flush();
 		// Scrolls past the next frame's stale reset-cursor move so it lands below this text, not on it.
 		int dy = screen_->dimy() - 1;
-		if (dy > 0) {
-			std::cout << std::string(dy, '\n') << "\033[" << dy << "A";
-			std::cout.flush();
-		}
+		pad_scroll_rows(dy, dy);
+		std::cout.flush();
 	})();
 }
 
