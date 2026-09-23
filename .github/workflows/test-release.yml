@@ -58,10 +58,11 @@ jobs:
             --cache-from type=gha,scope=parser-base \
             --cache-to   type=gha,scope=parser-linux,mode=max
 
-  # One job builds emsdk, so the wasm gates import the layer instead of
-  # each gate building it. Change the scope to force a rebuild.
+  # One job builds emsdk and the browser test dependencies, so the wasm gates
+  # import them instead of each gate building them. Change the scope to force
+  # a rebuild.
   wasm-deps:
-    name: Build wasm deps image (emsdk)
+    name: Build wasm deps images (emsdk, Chrome)
     needs: base
     runs-on: ubuntu-24.04
     env:
@@ -75,9 +76,9 @@ jobs:
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
-      - name: Build wasm deps stage
+      - name: Build wasm-deps and wasm-browser-deps stages
         run: |
-          ./dev docker wasm-deps --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+          ./dev docker wasm-browser-deps --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --cache-from type=gha,scope=parser-base \
             --cache-from type=gha,scope=parser-wasm-deps \
             --cache-to   type=gha,scope=parser-wasm-deps,mode=max
