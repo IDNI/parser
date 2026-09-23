@@ -22,6 +22,7 @@ case "${CMD}" in
 		echo "Available actions:"
 		echo "  base               - build the base image (system packages)"
 		echo "  linux              - build and run the suite on Linux"
+		echo "  w64-deps           - build the w64-deps image (wine)"
 		echo "  linux-mingw64-wine - cross-build for Windows, run the suite under wine"
 		echo "  wasm-deps          - build the wasm-deps image (emsdk + node)"
 		echo "  wasm-node          - build the wasm-node image and run the node suite"
@@ -37,6 +38,9 @@ case "${CMD}" in
 		;;
 	"linux")
 		build --target linux -t parser:linux "${@:2}"
+		;;
+	"w64-deps")
+		build --target w64-deps -t parser:w64-deps "${@:2}"
 		;;
 	"linux-mingw64-wine")
 		build --target linux-mingw64-wine -t parser:mingw64-wine "${@:2}"

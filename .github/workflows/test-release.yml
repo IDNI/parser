@@ -12,10 +12,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # One job builds the system base image, so the image builds import the
-  # layer instead of each one building it. Change the scope to force a rebuild.
+  # One job builds the system base and the wine layers, so the image builds
+  # import them instead of each one building them. Change the scope to force
+  # a rebuild.
   base:
-    name: Build base image
+    name: Build base images (system, wine)
     runs-on: ubuntu-24.04
     env:
       # ubuntu-24.04 runners are 4-core
@@ -30,9 +31,9 @@ jobs:
       # does not expose to run: steps
       - uses: crazy-max/ghaction-github-runtime@v4
 
-      - name: Build base stage
+      - name: Build base and w64-deps stages
         run: |
-          ./dev docker base --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+          ./dev docker w64-deps --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --cache-from type=gha,scope=parser-base \
             --cache-to   type=gha,scope=parser-base,mode=max
 

@@ -99,14 +99,9 @@ fi
 
 
 # ------------------------------------------------------------
-# Windows cross build, with the suite run under wine
+# Windows cross build dependencies: wine and its prefix
 
-FROM source AS linux-mingw64-wine
-
-ARG TESTS=yes
-
-# Argument BUILD_JOBS=N raises the parallelism. One job is the safe default.
-ARG BUILD_JOBS=1
+FROM base AS w64-deps
 
 # WINEPREFIX keeps the wine configuration out of the home directory.
 # WINEDEBUG drops wine's own noise, and not the output of a test.
@@ -118,6 +113,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends wine
 # Create the wine prefix once. A parallel test run against a missing prefix
 # makes every wine process race to create the wineserver socket.
 RUN wineboot --init && wineserver -w
+
+
+# ------------------------------------------------------------
+# Windows cross build, with the suite run under wine
+
+FROM w64-deps AS linux-mingw64-wine
+
+ARG TESTS=yes
+
+# Argument BUILD_JOBS=N raises the parallelism. One job is the safe default.
+ARG BUILD_JOBS=1
+
+COPY --from=source /parser /parser
+WORKDIR /parser
 
 # wine, not wine64: the Ubuntu package runs these 64-bit PE binaries on its
 # own, and needs no i386 multiarch.
