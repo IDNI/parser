@@ -35,6 +35,12 @@ RUN apt-get update && apt-get install -y \
 RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100 && \
 	update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100
 
+
+# ------------------------------------------------------------
+# Source tree for every stage that builds the parser
+
+FROM base AS source
+
 # Argument BUILD_PRESET=release/debug picks the CMake preset family
 ARG BUILD_PRESET=release
 
@@ -61,7 +67,7 @@ RUN echo "(BUILD) -- Building version: $(head -n 1 VERSION)"
 # ------------------------------------------------------------
 # Linux build and its test suite
 
-FROM base AS linux
+FROM source AS linux
 
 # Argument BUILD_PRESET=release/debug picks the CMake preset family
 ARG BUILD_PRESET=release
@@ -93,7 +99,7 @@ fi
 # ------------------------------------------------------------
 # Windows cross build, with the suite run under wine
 
-FROM base AS linux-mingw64-wine
+FROM source AS linux-mingw64-wine
 
 ARG TESTS=yes
 

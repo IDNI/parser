@@ -20,6 +20,7 @@ case "${CMD}" in
 		echo "Usage: ./dev docker <ACTION> [DOCKER OPTIONS]"
 		echo "Every action runs docker build. Extra options are appended."
 		echo "Available actions:"
+		echo "  base               - build the base image (system packages)"
 		echo "  linux              - build and run the suite on Linux"
 		echo "  linux-mingw64-wine - cross-build for Windows, run the suite under wine"
 		echo "  packages           - build the release packages"
@@ -27,6 +28,9 @@ case "${CMD}" in
 		echo "  tgf                - build the tgf image and run it"
 		echo "  run                - run a container"
 		echo "  bash               - run bash in a container"
+		;;
+	"base")
+		build --target base -t parser:base "${@:2}"
 		;;
 	"linux")
 		build --target linux -t parser:linux "${@:2}"
