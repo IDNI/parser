@@ -1,0 +1,11 @@
+{
+    "private": true,
+    "name": "tau-wasm-terminal",
+    "version": "0.1.0",
+    "description": "xterm.js glue for hosting an Emscripten terminal program in a browser page.",
+    "dependencies": {
+        "@xterm/xterm": "6.0.0",
+        "@xterm/addon-fit": "0.11.0",
+        "@xterm/addon-webgl": "0.19.0"
+    }
+}
