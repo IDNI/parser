@@ -64,9 +64,15 @@ directive              => ('@' _ sym:directive_name _):directive_token
 sep                    => '-' | '_' | __.
 dir_pair               => dir_list [ _ ':' _ dir_list ].
 dir_list               => dir_arg (_ ',' _ dir_arg)*.
-dir_arg                => tree_path | dir_sym | terminal_string.
+# the negation keeps a bare word run out of dir_arg, so it stays directive_cmd
+dir_arg                => tree_path | dir_sym | terminal_string
+                        | treemr_pattern & ~(dir_sym (pat_space+ dir_sym)+).
 tree_path              => dir_sym _ '>' _ dir_sym (_ '>' _ dir_sym)*.
 dir_sym                => (alpha | '_' | '*') (alnum | '_' | '*')*.
+treemr_pattern         => pat_unit (pat_space* pat_unit)*.
+pat_unit               => terminal_string | terminal_char | pat_char.
+pat_char               => printable & ~(space | ',' | '.' | ':' | ';' | '#' | '"' | '\'').
+pat_space              => ' ' | '\t'.
 
 # common productions
 _                      => __ | null.                      # optional whitespace

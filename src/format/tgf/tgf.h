@@ -303,6 +303,15 @@ private:
 		return {};
 	}
 
+	// Raw source text under a node's span for subtrees whose terminals are trimmed.
+	std::string span_text(const trv& t) {
+		if (!t.has_value() || !source_) return {};
+		auto& sp = t.value_tree().value.second;
+		return sp[0] < sp[1]
+			? std::string(source_ + sp[0], sp[1] - sp[0])
+			: std::string{};
+	}
+
 	// Collect all sym args from cmd blocks and dir_pairs.
 	std::vector<std::string> dir_sym_args(const trv& t) {
 		std::vector<std::string> v;
@@ -546,11 +555,20 @@ private:
 			std::vector<std::string> patterns;
 			for (auto& a :
 				(lists[1] || tgf_parser::dir_arg)()) {
-				auto n = dir_arg_text(
-					a | trv::only_child);
+				auto child = a | trv::only_child;
+				auto nt = child | trv::nonterminal;
+				std::string n;
+				if (nt == tgf_parser::tree_path
+					|| nt == tgf_parser::treemr_pattern)
+					n = span_text(child);
+				else if (nt == tgf_parser::terminal_string)
+					n = '"' + idni::to_std_string(
+						dynamic_value(a)) + '"';
+				else n = dir_arg_text(child);
 				if (n.empty()) continue;
 				patterns.push_back(n);
-				if (n.find('*') == std::string::npos)
+				if (nt == tgf_parser::dir_sym
+					&& n.find('*') == std::string::npos)
 					highlight_plain_names.insert(n);
 			}
 			if (!patterns.empty())

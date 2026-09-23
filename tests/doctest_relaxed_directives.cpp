@@ -137,6 +137,18 @@ TEST_CASE("directive: @inline nonterminals") {
 	REQUIRE(g.opt.shaping.to_inline.size() >= 2);
 }
 
+TEST_CASE("directive: @inline tree path a > b stores the full path") {
+	nonterminals<char> nts;
+	auto g = build_grammar(nts,
+		"@use char class digit.\n"
+		"@inline a > b.\n"
+		"start => digit.\n"
+		"a => b.\n"
+		"b => 'x'.\n");
+	std::vector<size_t> path{ g.nt("a").n(), g.nt("b").n() };
+	CHECK(g.opt.shaping.to_inline.count(path) == 1);
+}
+
 // ============================================================
 // @disable
 // ============================================================
@@ -201,6 +213,75 @@ TEST_CASE("directive: @highlight populates highlights option") {
 	REQUIRE(g.opt.highlights[1].first == "comment");
 	REQUIRE(g.opt.highlights[1].second.size() == 1);
 	REQUIRE(g.opt.highlights[1].second[0] == "comment");
+}
+
+TEST_CASE("directive: @highlight treemr pattern with an edge and a "
+	"quoted literal stores the raw text verbatim")
+{
+	nonterminals<char> nts;
+	auto g = build_grammar(nts,
+		"@use char class digit.\n"
+		"@highlight operator : production > \"=>\".\n"
+		"start => digit.\n");
+	REQUIRE(g.opt.highlights.size() == 1);
+	REQUIRE(g.opt.highlights[0].first == "operator");
+	REQUIRE(g.opt.highlights[0].second.size() == 1);
+	CHECK(g.opt.highlights[0].second[0] == "production > \"=>\"");
+}
+
+TEST_CASE("directive: @highlight pattern with a quoted comma or period "
+	"stays in the pattern text")
+{
+	nonterminals<char> nts;
+	auto g = build_grammar(nts,
+		"@use char class digit.\n"
+		"@highlight delimiter : production > \",\", production > \".\".\n"
+		"start => digit.\n");
+	REQUIRE(g.opt.highlights.size() == 1);
+	REQUIRE(g.opt.highlights[0].first == "delimiter");
+	REQUIRE(g.opt.highlights[0].second.size() == 2);
+	CHECK(g.opt.highlights[0].second[0] == "production > \",\"");
+	CHECK(g.opt.highlights[0].second[1] == "production > \".\"");
+}
+
+TEST_CASE("directive: @highlight stores two treemr patterns, a "
+	"capture group and an edge into a parenthesized literal")
+{
+	nonterminals<char> nts;
+	auto g = build_grammar(nts,
+		"@use char class digit.\n"
+		"@highlight delimiter : (sym), directive > ('.').\n"
+		"start => digit.\n");
+	REQUIRE(g.opt.highlights.size() == 1);
+	REQUIRE(g.opt.highlights[0].second.size() == 2);
+	CHECK(g.opt.highlights[0].second[0] == "(sym)");
+	CHECK(g.opt.highlights[0].second[1] == "directive > ('.')");
+}
+
+TEST_CASE("directive: @highlight keeps a plain name and a glob "
+	"unchanged alongside a treemr pattern")
+{
+	nonterminals<char> nts;
+	auto g = build_grammar(nts,
+		"@use char class digit.\n"
+		"@highlight keyword : dir_sym, *_cmd, sym > (%).\n"
+		"start => digit.\n");
+	REQUIRE(g.opt.highlights.size() == 1);
+	REQUIRE(g.opt.highlights[0].second.size() == 3);
+	CHECK(g.opt.highlights[0].second[0] == "dir_sym");
+	CHECK(g.opt.highlights[0].second[1] == "*_cmd");
+	CHECK(g.opt.highlights[0].second[2] == "sym > (%)");
+}
+
+TEST_CASE("directive: @highlight string pattern keeps its quotes") {
+	nonterminals<char> nts;
+	auto g = build_grammar(nts,
+		"@use char class digit.\n"
+		"@highlight string : \"=>\".\n"
+		"start => digit.\n");
+	REQUIRE(g.opt.highlights.size() == 1);
+	REQUIRE(g.opt.highlights[0].second.size() == 1);
+	CHECK(g.opt.highlights[0].second[0] == "\"=>\"");
 }
 
 TEST_CASE("directive: @highlight with multiple nonterminals") {
