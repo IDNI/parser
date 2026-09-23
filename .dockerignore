@@ -1,0 +1,7 @@
+# Keep build artifacts and machine-local checkouts out of the build context.
+build/
+build-*/
+tau-lang/
+.local/
+.claude/
+**/node_modules/
