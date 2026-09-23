@@ -123,9 +123,11 @@ int main(int argc, char **argv) {
 
 	// run_test_tgf() builds its grammar internally and never hands it back,
 	// so a test calling add_dynamic() has to build the grammar itself.
+	// returns cond, so a failed load stops before .value() on an empty result
 	auto check = [](bool cond, const char* name) {
 		if (cond) cout << "\n\t# OK " << name;
 		else cout << "\n\t# FAILED " << name, testing::failed = true;
+		return cond;
 	};
 	auto parse_ok = [](parser<char>& p, const string& in) {
 		return p.parse(in.c_str(), in.size()).found;
@@ -158,7 +160,7 @@ int main(int argc, char **argv) {
 		auto gr = tgf<char>::from_string(nts,
 			"@dynamic type_name.\n"
 			"start => type_name.\n");
-		check(gr.print_and_ok(cerr), "grammar loads");
+		if (!check(gr.print_and_ok(cerr), "grammar loads")) return 1;
 		grammar<char> g = std::move(gr).value();
 		parser<char> p(g);
 		g.add_dynamic("type_name", { "u8", "u16" });
@@ -203,7 +205,7 @@ int main(int argc, char **argv) {
 		auto gr = tgf<char>::from_string(nts,
 			"@dynamic type_name defaults u8, u16.\n"
 			"start => type_name.\n");
-		check(gr.print_and_ok(cerr), "grammar loads");
+		if (!check(gr.print_and_ok(cerr), "grammar loads")) return 1;
 		grammar<char> g = std::move(gr).value();
 		parser<char> p(g);
 		check(parse_ok(p, "u8"),  "u8 from defaults parses");
@@ -217,7 +219,7 @@ int main(int argc, char **argv) {
 		auto gr = tgf<char>::from_string(nts,
 			"@dynamic type_name defaults u8, u16.\n"
 			"start => type_name.\n");
-		check(gr.print_and_ok(cerr), "grammar loads");
+		if (!check(gr.print_and_ok(cerr), "grammar loads")) return 1;
 		grammar<char> g = std::move(gr).value();
 		parser<char> p(g);
 		g.add_dynamic("type_name", { "i32" });
@@ -232,7 +234,7 @@ int main(int argc, char **argv) {
 		auto gr = tgf<char>::from_string(nts,
 			"@dynamic type_name defaults \"a b\", u8.\n"
 			"start => type_name.\n");
-		check(gr.print_and_ok(cerr), "grammar loads");
+		if (!check(gr.print_and_ok(cerr), "grammar loads")) return 1;
 		grammar<char> g = std::move(gr).value();
 		parser<char> p(g);
 		check(parse_ok(p, "a b"), "quoted default with a space parses");
@@ -245,7 +247,7 @@ int main(int argc, char **argv) {
 		auto gr = tgf<char>::from_string(nts,
 			"@dynamic a; b.\n"
 			"start => a | b.\n");
-		check(gr.print_and_ok(cerr), "grammar loads");
+		if (!check(gr.print_and_ok(cerr), "grammar loads")) return 1;
 		grammar<char> g = std::move(gr).value();
 		parser<char> p(g);
 		check(!parse_ok(p, "x"), "separate decls declare no values");
@@ -303,7 +305,7 @@ int main(int argc, char **argv) {
 		auto gr = tgf<char>::from_string(nts,
 			"@dynamic ba_type defaults tau, sbf; a.\n"
 			"start => ba_type | a.\n");
-		check(gr.print_and_ok(cerr), "grammar loads");
+		if (!check(gr.print_and_ok(cerr), "grammar loads")) return 1;
 		grammar<char> g = std::move(gr).value();
 		parser<char> p(g);
 		check(parse_ok(p, "tau"), "tau from defaults parses");
@@ -328,7 +330,7 @@ int main(int argc, char **argv) {
 		nonterminals<char> nts;
 		auto gr = tgf<char>::from_string(nts,
 			"start => \"a\\/b\".\n");
-		check(gr.print_and_ok(cerr), "grammar loads");
+		if (!check(gr.print_and_ok(cerr), "grammar loads")) return 1;
 		grammar<char> g = std::move(gr).value();
 		parser<char> p(g);
 		check(parse_ok(p, "a/b"), "escaped slash in a production parses");
@@ -340,7 +342,7 @@ int main(int argc, char **argv) {
 		auto gr = tgf<char>::from_string(nts,
 			"@dynamic t defaults \"a\\/b\".\n"
 			"start => t.\n");
-		check(gr.print_and_ok(cerr), "grammar loads");
+		if (!check(gr.print_and_ok(cerr), "grammar loads")) return 1;
 		grammar<char> g = std::move(gr).value();
 		parser<char> p(g);
 		check(parse_ok(p, "a/b"), "escaped slash in a default value parses");
