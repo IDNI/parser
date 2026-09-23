@@ -152,6 +152,7 @@ Default preset name is `release` if omitted.
 | `emscripten`, `debug-emscripten` | Emscripten (`EMSCRIPTEN_DIR` defaults via `TAU_SHARED_PREFIX`) | `build/emscripten`, … |
 | `release-tests-emscripten` | Emscripten + tests, run under Node.js | `build/emscripten` |
 | `release-tgf-emscripten`, `debug-tgf-emscripten` | Emscripten + the tgf FTXUI REPL, run by `./dev tgf-node` | `build/emscripten`, … |
+| `release-tests-emscripten-browser` | Emscripten tests + tgf and the browser REPL page | `build/emscripten` |
 | `release-msvc`, `debug-msvc` | Native MSVC (static lib) | `build/release-msvc`, `build/debug-msvc` |
 | `release-msvc-tgf`, `debug-msvc-tgf` | + TGF (+ FTXUI fetch) | same |
 | `release-msvc-tests`, `debug-msvc-tests` | + tests | same |
@@ -207,8 +208,12 @@ Any further options go to `docker build`, for example
   `<TAU_SHARED_PREFIX>/emsdk/upstream/emscripten` (same resolution as
   `dep-emsdk`: `-DTAU_SHARED_PREFIX=`, else `$TAU_SHARED_PREFIX`, else
   `~/.tau`). Override with `-DEMSCRIPTEN_DIR=<dir>`.
+- `tgf-wasm [serve]` — build the browser REPL page with the
+  `release-tests-emscripten-browser` preset. `serve` then starts the page server.
 - `tgf-node [grammar.tgf]` — run the WebAssembly tgf REPL in the terminal
   through Node.js. Builds it with `release-tgf-emscripten` when it is missing.
+- `tgf-serve [PORT]` — serve the built page from `build/emscripten/js/tgf`
+  with the COOP and COEP headers. Default port 8088.
 
 ## TGF
 

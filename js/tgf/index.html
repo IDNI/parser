@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>TGF - Tau Grammar Format (browser)</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📐</text></svg>">
+    <link rel="stylesheet" href="vendor/xterm.css">
+    <link rel="stylesheet" href="shell.css">
+    <!-- Vendored xterm.js + addons (no CDN) -- loaded after body for DOM access -->
+  </head>
+  <body>
+    <div class="header">
+      <h1>TGF REPL</h1>
+      <a href="https://github.com/IDNI/parser">github.com/IDNI/parser</a>
+      <input type="file" id="upload" accept=".tgf">
+      <label for="upload" class="upload-label">📂 Open grammar</label>
+      <span id="status"></span>
+    </div>
+
+    <div id="terminalContainer">
+      <div class="fakeMenu">
+        <div class="fakeButtons fakeClose"></div>
+        <div class="fakeButtons fakeMinimize"></div>
+        <div class="fakeButtons fakeZoom"></div>
+        <span>tgf repl</span>
+      </div>
+      <div id="terminal"></div>
+    </div>
+
+    <script src="vendor/xterm.js"></script>
+    <script src="vendor/xterm-addon-fit.js"></script>
+    <script src="vendor/xterm-addon-webgl.js"></script>
+    <script src="terminal.js"></script>
+    <script src="index.mjs"></script>
+  </body>
+</html>

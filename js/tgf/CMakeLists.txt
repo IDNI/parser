@@ -1,6 +1,6 @@
-# TGF FTXUI REPL for WebAssembly.
+# TGF FTXUI REPL for WebAssembly, run by Node.js or by the browser page.
 # Requires Emscripten and FTXUI (pthreads).
-# Built when TAU_PARSER_BUILD_TGF=ON.
+# Built when TAU_PARSER_BUILD_TGF=ON, the page when TAU_PARSER_BUILD_BROWSER_TESTS=ON.
 
 cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 project(tgf_wasm)
@@ -63,3 +63,21 @@ target_compile_options(tgf_standalone PRIVATE -fno-exceptions -pthread)
 set_target_properties(tgf_standalone PROPERTIES
     SUFFIX ".js"
     LINK_FLAGS "-pthread -Wno-pthreads-mem-growth -s ASYNCIFY -s PROXY_TO_PTHREAD -s STACK_SIZE=16777216 -s ALLOW_MEMORY_GROWTH=1 -s INITIAL_MEMORY=64MB -s MAXIMUM_MEMORY=1GB -s EXIT_RUNTIME=1 -lnodefs.js --preload-file ${TOP_SRC}/tests/fixtures/tau.tgf@/tau.tgf")
+
+if(TAU_PARSER_BUILD_BROWSER_TESTS)
+    # Browser page files, copied next to the program output
+    configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/index.html
+        ${CMAKE_CURRENT_BINARY_DIR}/index.html
+        COPYONLY
+    )
+    configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/index.mjs
+        ${CMAKE_CURRENT_BINARY_DIR}/index.mjs
+        COPYONLY
+    )
+    # Generic terminal page glue (shell.css, terminal.js, sw.js) and the
+    # vendored xterm.js files, shared with any other Emscripten terminal page.
+    include(${TOP_SRC}/js/tau-wasm-terminal/tau-wasm-terminal.cmake)
+    tau_wasm_terminal_page(${CMAKE_CURRENT_BINARY_DIR})
+endif()

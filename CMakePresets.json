@@ -208,6 +208,14 @@
 		},
 
 		{
+			"name": "_build-browser-tests",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_PARSER_BUILD_BROWSER_TESTS": "ON"
+			}
+		},
+
+		{
 			"name": "_build-tgf",
 			"hidden": true,
 			"cacheVariables": {
@@ -760,6 +768,11 @@
 		},
 
 		{
+			"name": "release-tests-emscripten-browser",
+			"inherits": ["emscripten", "_build-tests", "_build-browser-tests"]
+		},
+
+		{
 			"name": "release-tgf-emscripten",
 			"inherits": ["emscripten", "_build-tgf"]
 		},
@@ -882,6 +895,10 @@
 		{
 			"name": "release-tests-emscripten",
 			"configurePreset": "release-tests-emscripten"
+		},
+		{
+			"name": "release-tests-emscripten-browser",
+			"configurePreset": "release-tests-emscripten-browser"
 		},
 		{
 			"name": "release-tgf-emscripten",
@@ -1080,6 +1097,10 @@
 		{
 			"name": "release-tests-emscripten",
 			"configurePreset": "release-tests-emscripten"
+		},
+		{
+			"name": "release-tests-emscripten-browser",
+			"configurePreset": "release-tests-emscripten-browser"
 		},
 		{
 			"name": "debug-tests-emscripten",
