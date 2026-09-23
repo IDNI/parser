@@ -152,7 +152,7 @@ Default preset name is `release` if omitted.
 | `emscripten`, `debug-emscripten` | Emscripten (`EMSCRIPTEN_DIR` defaults via `TAU_SHARED_PREFIX`) | `build/emscripten`, … |
 | `release-tests-emscripten` | Emscripten + tests, run under Node.js | `build/emscripten` |
 | `release-tgf-emscripten`, `debug-tgf-emscripten` | Emscripten + the tgf FTXUI REPL, run by `./dev tgf-node` | `build/emscripten`, … |
-| `release-tests-emscripten-browser` | Emscripten tests + tgf and the browser REPL page | `build/emscripten` |
+| `release-tests-emscripten-browser` | Emscripten tests + tgf, the browser REPL page and the headless Chrome tests | `build/emscripten` |
 | `release-msvc`, `debug-msvc` | Native MSVC (static lib) | `build/release-msvc`, `build/debug-msvc` |
 | `release-msvc-tgf`, `debug-msvc-tgf` | + TGF (+ FTXUI fetch) | same |
 | `release-msvc-tests`, `debug-msvc-tests` | + tests | same |
@@ -201,6 +201,9 @@ Any further options go to `docker build`, for example
   i.e. `~/.tau/emsdk` by default; relocate with `-DTAU_SHARED_PREFIX=<prefix>`
   or the `TAU_SHARED_PREFIX` environment variable. Requires `unzip`. Skips the
   download when `<dir>/upstream/emscripten/emcc` already exists.
+- `dep-chrome` — install Chrome for Testing into `<TAU_SHARED_PREFIX>/chrome`
+  through `@puppeteer/browsers`. The browser tests need it. Skips the install
+  when the pinned `CHROME_TAG` build already exists.
 - Presets: `./dev preset emscripten` (Release, `build/emscripten`) and
   `./dev preset debug-emscripten` (`build/debug-emscripten`). Each places
   `tauparser.html` / `tauparser.node.js` beside the built `tauparser.js`.

@@ -1,14 +1,17 @@
 # Emscripten ctest - WASM-only tests that run via Node.js.
 #
-# These tests run after the same configure builds tgf_node.js, so they check
-# for the runner, not for the artifacts that the build itself produces.
+# These tests run after the same configure builds the WASM artifacts
+# (tgf_node.js, tgf_standalone.js), so they check for the runner and for
+# dependencies installed before configure (puppeteer), not for the artifacts
+# that the build itself produces.
 
 find_program(NODE_EXECUTABLE node)
 if(NOT NODE_EXECUTABLE)
 	return()
 endif()
 
-set(WASM_NODE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/emscripten")
+set(WASM_NODE_DIR    "${CMAKE_CURRENT_SOURCE_DIR}/build/emscripten")
+set(WASM_BROWSER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/emscripten/js/tgf")
 
 # tgf_wasm_parity_emcc - run tgf_node.js against preloaded tau.tgf
 add_test(NAME tgf_wasm_parity_emcc
@@ -25,3 +28,72 @@ add_test(NAME embindings_api_emcc
 		"${CMAKE_CURRENT_SOURCE_DIR}/tests/js/test_embindings.js")
 set_property(TEST embindings_api_emcc
 	PROPERTY WORKING_DIRECTORY "${WASM_NODE_DIR}")
+
+# Browser tests need Chrome and puppeteer-core, installed before configure.
+# The browser REPL itself is built by this same configure.
+if(TAU_PARSER_BUILD_BROWSER_TESTS)
+	# emsdk bundles its own node/npm/npx; putting its bin/ first on PATH
+	# means the dep scripts below need no system node install.
+	file(GLOB _tau_emsdk_node_bin "${TAU_SHARED_PREFIX_RESOLVED}/emsdk/node/*/bin")
+	list(LENGTH _tau_emsdk_node_bin _tau_emsdk_node_bin_count)
+	if(_tau_emsdk_node_bin_count EQUAL 0)
+		message(FATAL_ERROR
+			"TAU_PARSER_BUILD_BROWSER_TESTS=ON needs emsdk's bundled node, not "
+			"found under ${TAU_SHARED_PREFIX_RESOLVED}/emsdk/node. Run "
+			"'./dev dep-emsdk.sh' first (the Emscripten toolchain itself "
+			"already requires it).")
+	endif()
+	list(GET _tau_emsdk_node_bin 0 _tau_emsdk_node_bin)
+
+	# Single definition of the pinned Chrome build: reused below to compute
+	# TAU_CHROME_BIN and handed to dep-chrome.sh so both agree on the path.
+	set(TAU_CHROME_TAG "150.0.7871.24" CACHE STRING
+		"Chrome for Testing build the browser tests are pinned to")
+
+	execute_process(
+		COMMAND ${CMAKE_COMMAND} -E env "PATH=${_tau_emsdk_node_bin}:$ENV{PATH}"
+			bash ./dev dep-chrome.sh "-DCHROME_TAG=${TAU_CHROME_TAG}"
+		WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+		COMMAND_ERROR_IS_FATAL ANY)
+	execute_process(
+		COMMAND ${CMAKE_COMMAND} -E env "PATH=${_tau_emsdk_node_bin}:$ENV{PATH}"
+			npm ci --prefix "${CMAKE_CURRENT_SOURCE_DIR}/tests/repl" --no-audit --no-fund
+		WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+		COMMAND_ERROR_IS_FATAL ANY)
+
+	execute_process(
+		COMMAND "${NODE_EXECUTABLE}" --input-type=module
+			-e "await import('puppeteer-core')"
+		WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/tests/repl"
+		RESULT_VARIABLE _puppeteer_missing
+		OUTPUT_QUIET ERROR_QUIET)
+	if(NOT _puppeteer_missing)
+		set(TAU_CHROME_BIN
+			"${TAU_SHARED_PREFIX_RESOLVED}/chrome/chrome/linux-${TAU_CHROME_TAG}/chrome-linux64/chrome")
+
+		# tgf_browser_keybindings - keystroke editing via puppeteer-core
+		add_test(NAME tgf_browser_keybindings_emcc
+			COMMAND ${NODE_EXECUTABLE}
+				"${CMAKE_CURRENT_SOURCE_DIR}/tests/repl/test_browser_keybindings.js"
+				"${WASM_BROWSER_DIR}")
+		set_property(TEST tgf_browser_keybindings_emcc
+			PROPERTY RESOURCE_LOCK emcc_browser)
+		set_property(TEST tgf_browser_keybindings_emcc
+			PROPERTY ENVIRONMENT "TAU_CHROME_BIN=${TAU_CHROME_BIN}")
+
+		# tgf_browser_parity - compare native tgf vs browser WASM
+		if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/build/release/tgf")
+			add_test(NAME tgf_browser_parity_emcc
+				COMMAND ${NODE_EXECUTABLE}
+					"${CMAKE_CURRENT_SOURCE_DIR}/tests/repl/test_repl_browser.js"
+					"${CMAKE_CURRENT_SOURCE_DIR}/build/release/tgf"
+					"${WASM_BROWSER_DIR}"
+					"${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/tau.tgf"
+					"grammar" "p x = 0 || y = 1" "p x = 2" "quit")
+			set_property(TEST tgf_browser_parity_emcc
+				PROPERTY RESOURCE_LOCK emcc_browser)
+			set_property(TEST tgf_browser_parity_emcc
+				PROPERTY ENVIRONMENT "TAU_CHROME_BIN=${TAU_CHROME_BIN}")
+		endif()
+	endif()
+endif()

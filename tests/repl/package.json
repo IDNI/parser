@@ -1,0 +1,9 @@
+{
+	"name": "tauparser-repl-tests",
+	"private": true,
+	"version": "0.0.0",
+	"description": "Dev-only tooling for the browser WASM REPL tests (puppeteer-core).",
+	"devDependencies": {
+		"puppeteer-core": "25.7.0"
+	}
+}
