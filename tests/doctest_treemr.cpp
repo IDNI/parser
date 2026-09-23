@@ -712,6 +712,91 @@ TEST_SUITE("treemr - matching") {
 		REQUIRE(mt.captures.size() == 1);
 		CHECK(mt.captures[0] == a_opt_node);
 	}
+
+	// ---- E1. a string literal also matches a run of terminal siblings -
+
+	const char* ARROW_TGF =
+		" start => arrow.   \n"
+		" arrow => '=' '>'. \n";
+
+	const char* ARROW_EQEQ_TGF =
+		" start => arrow.   \n"
+		" arrow => '=' '='. \n";
+
+	const char* ARROW_EQ_TGF =
+		" start => arrow. \n"
+		" arrow => '='.   \n";
+
+	TEST_CASE("E1: arrow > \"=>\" - a run of two terminal siblings "
+		"'=' '>' spells the string")
+	{
+		parsed fx{ ARROW_TGF, "=>" };
+		auto m = build(fx, "arrow > \"=>\"");
+		CHECK(m.search(fx.root));
+	}
+
+	TEST_CASE("E1: arrow > \"=>\" - a run of '=' '=' does not spell "
+		"the string")
+	{
+		parsed fx{ ARROW_EQEQ_TGF, "==" };
+		auto m = build(fx, "arrow > \"=>\"");
+		CHECK_FALSE(m.search(fx.root));
+	}
+
+	TEST_CASE("E1: arrow > \"=>\" - a lone '=' cannot form a run") {
+		parsed fx{ ARROW_EQ_TGF, "=" };
+		auto m = build(fx, "arrow > \"=>\"");
+		CHECK_FALSE(m.search(fx.root));
+	}
+
+	TEST_CASE("E1: \"12\" - a single node whose collected text is the "
+		"string still matches (regression)")
+	{
+		parsed fx{ CSV_TGF, "12,34" };
+		auto m = build(fx, "\"12\"");
+		CHECK(m.search(fx.root));
+	}
+
+	// ---- E2. a capture records its exclusive end alongside its start --
+
+	TEST_CASE("E2: (cell ',' cell) - capture_nodes(1) returns the full "
+		"three-node range")
+	{
+		parsed fx{ CSV_TGF, "1,2" };
+		auto m = build(fx, "(cell ',' cell)");
+		auto sel = m.search_all(fx.root);
+		REQUIRE(sel.size() == 1);
+		const auto& mt = sel[0];
+		REQUIRE(mt.captures.size() == 1);
+		auto nodes = mt.capture_nodes<pnode_type<char, char>>(1);
+		REQUIRE(nodes.size() == 3);
+		CHECK(nodes[0] == mt.captures[0]);
+	}
+
+	TEST_CASE("E2: seq > (a_opt)? 'b' - an unmatched capture gives an "
+		"empty capture_nodes")
+	{
+		parsed fx{ OPT2_TGF, "b" };
+		auto m = build(fx, "seq > (a_opt)? 'b'");
+		auto sel = m.search_all(fx.root);
+		REQUIRE(sel.size() == 1);
+		const auto& mt = sel[0];
+		REQUIRE(mt.captures.size() == 1);
+		CHECK(mt.captures[0] == nullptr);
+		CHECK(mt.capture_nodes<pnode_type<char, char>>(1).empty());
+	}
+
+	TEST_CASE("E1+E2: arrow > (\"=>\") - a string run inside a capture "
+		"gives a two-node capture_nodes")
+	{
+		parsed fx{ ARROW_TGF, "=>" };
+		auto m = build(fx, "arrow > (\"=>\")");
+		auto sel = m.search_all(fx.root);
+		REQUIRE(sel.size() == 1);
+		const auto& mt = sel[0];
+		REQUIRE(mt.captures.size() == 1);
+		CHECK(mt.capture_nodes<pnode_type<char, char>>(1).size() == 2);
+	}
 }
 
 // ===========================================================================
@@ -1136,6 +1221,30 @@ TEST_SUITE("treemr - ambig_mode") {
 		bool c1_is_b = ad.is_nt(c1, "B"), c1_is_c = ad.is_nt(c1, "C");
 		bool c2_is_b = ad.is_nt(c2, "B"), c2_is_c = ad.is_nt(c2, "C");
 		CHECK(((c1_is_b && c2_is_c) || (c1_is_c && c2_is_b)));
+	}
+
+	TEST_CASE("E2: A > (%) under ALL - capture_nodes on a synthesized "
+		"__AMB__ capture returns exactly that one node")
+	{
+		ambig_parsed fx{ AMBIG_TGF, "x" };
+		auto ad = parse_node_adapter<char, char>(fx.nts);
+		tref amb = lcrs_tree<pnode_type<char, char>>::get(
+			fx.root).first();
+		REQUIRE(amb != nullptr);
+
+		auto m = matcher_for<char, char>(
+			fx.nts, string_view{ "A > (%)" });
+		REQUIRE(m.has_value());
+		match_result mt;
+		(*m).match(amb, mt, ambig_mode::ALL);
+		REQUIRE((bool)mt);
+		REQUIRE(mt.captures.size() == 1);
+		REQUIRE(mt.captures[0] != nullptr);
+		CHECK(ad.is_nt(mt.captures[0], "__AMB__"));
+
+		auto nodes = mt.capture_nodes<pnode_type<char, char>>(1);
+		REQUIRE(nodes.size() == 1);
+		CHECK(nodes[0] == mt.captures[0]);
 	}
 
 	TEST_CASE("M25: A > % > (%) under ALL keeps a capture that is the "

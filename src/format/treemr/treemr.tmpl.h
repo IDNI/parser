@@ -372,6 +372,12 @@ inline bool node_adapter::is_terminal(tref n, std::string_view s) const {
 	return is_terminal_fn ? is_terminal_fn(n, s) : false;
 }
 
+inline std::optional<std::string> node_adapter::terminal_leaf_text(
+	tref n) const
+{
+	return terminal_leaf_text_fn ? terminal_leaf_text_fn(n) : std::nullopt;
+}
+
 //------------------------------------------------------------------------------
 // parse_node_adapter<C,T>
 //------------------------------------------------------------------------------
@@ -405,6 +411,13 @@ node_adapter parse_node_adapter(const nonterminals<C, T>& nts) {
 		if (got.size() != text.size()) return false;
 		return std::equal(got.begin(), got.end(), text.begin());
 	};
+	a.terminal_leaf_text_fn = [](tref n) -> std::optional<std::string> {
+		if (!n) return std::nullopt;
+		using tree_t = typename ::idni::parser<C, T>::tree;
+		const auto& tr = tree_t::get(n);
+		if (tr.is_nt() || tr.has_child()) return std::nullopt;
+		return tr.get_terminals();
+	};
 	a.make_node_fn = [&nts](std::string_view name, const trefs& children)
 		-> tref
 	{
@@ -428,19 +441,24 @@ node_adapter parse_node_adapter(const nonterminals<C, T>& nts) {
 // writes with rollback(), so a failed branch costs O(writes-undone) rather than
 // copying the whole capture vector at every step.
 struct capture_state {
-	std::vector<tref>                 v;      // current capture slots
-	std::vector<std::pair<int, tref>> trail;  // (index, previous value)
+	std::vector<tref>                 v;         // current capture slots
+	std::vector<tref>                 ends;      // exclusive end, parallel to v
+	std::vector<std::pair<int, tref>> trail;      // (index, previous v)
+	std::vector<std::pair<int, tref>> end_trail;  // (index, previous end)
 
 	explicit capture_state(int n)
-		: v(static_cast<size_t>(n < 0 ? 0 : n), nullptr) {}
+		: v(static_cast<size_t>(n < 0 ? 0 : n), nullptr)
+		, ends(static_cast<size_t>(n < 0 ? 0 : n), nullptr) {}
 
 	// Checkpoint: the trail length to roll back to.
 	size_t mark() const { return trail.size(); }
 
-	// Record-then-write a capture slot so it can be undone.
-	void set(int idx, tref n) {
+	// Record-then-write a capture slot and its end so both can be undone.
+	void set(int idx, tref n, tref end) {
 		trail.emplace_back(idx, v[idx]);
+		end_trail.emplace_back(idx, ends[idx]);
 		v[idx] = n;
+		ends[idx] = end;
 	}
 
 	// Undo all capture writes recorded since checkpoint `m`.
@@ -449,12 +467,18 @@ struct capture_state {
 			v[trail.back().first] = trail.back().second;
 			trail.pop_back();
 		}
+		while (end_trail.size() > m) {
+			ends[end_trail.back().first] = end_trail.back().second;
+			end_trail.pop_back();
+		}
 	}
 
 	// Reuse across candidates: clear writes and the trail.
 	void reset() {
 		for (auto& slot : v) slot = nullptr;
+		for (auto& slot : ends) slot = nullptr;
 		trail.clear();
+		end_trail.clear();
 	}
 };
 
@@ -511,26 +535,30 @@ bool matcher<NodeT>::match_amb_alts(tref n, capture_state& caps,
 	}
 	if (mode == ambig_mode::UNIQUE) {
 		int count = 0;
-		trefs winner;
+		trefs winner, winner_ends;
 		for (; alt; alt = lcrs_tree<NodeT>::get(alt).right_sibling()) {
 			if (pred(alt)) {
-				if (++count == 1) winner = caps.v;
+				if (++count == 1) {
+					winner = caps.v;
+					winner_ends = caps.ends;
+				}
 				caps.rollback(entry);
 				if (count > 1) return false;
 			} else caps.rollback(entry);
 		}
 		if (count != 1) return false;
 		for (size_t idx = 0; idx < caps.v.size(); ++idx)
-			caps.set((int)idx, winner[idx]);
+			caps.set((int)idx, winner[idx], winner_ends[idx]);
 		return true;
 	}
 	// ALL - every alternative must match. Each alternative's captures
 	// are recorded, then rolled back so the next alternative starts
 	// from the same baseline; a single failure rolls back to entry.
-	std::vector<trefs> per_alt;
+	std::vector<trefs> per_alt, per_alt_ends;
 	for (; alt; alt = lcrs_tree<NodeT>::get(alt).right_sibling()) {
 		if (!pred(alt)) { caps.rollback(entry); return false; }
 		per_alt.push_back(caps.v);
+		per_alt_ends.push_back(caps.ends);
 		caps.rollback(entry);
 	}
 	// Merge: a capture that is the same node (or nullptr) in every
@@ -539,19 +567,30 @@ bool matcher<NodeT>::match_amb_alts(tref n, capture_state& caps,
 	// Written via caps.set() so the merge survives a later rollback.
 	for (size_t idx = 0; idx < caps.v.size(); ++idx) {
 		if (!adapter_.make_node_fn) {
-			caps.set((int)idx, per_alt.front()[idx]);
+			caps.set((int)idx, per_alt.front()[idx],
+				per_alt_ends.front()[idx]);
 			continue;
 		}
 		trefs distinct;
-		for (const auto& snap : per_alt) {
-			tref v = snap[idx];
+		tref distinct_end = nullptr;
+		for (size_t a = 0; a < per_alt.size(); ++a) {
+			tref v = per_alt[a][idx];
 			if (v && std::find(distinct.begin(), distinct.end(), v)
-				== distinct.end())
+				== distinct.end()) {
 				distinct.push_back(v);
+				if (distinct.size() == 1)
+					distinct_end = per_alt_ends[a][idx];
+			}
 		}
-		caps.set((int)idx, distinct.empty() ? nullptr
-			: distinct.size() == 1 ? distinct.front()
-			: adapter_.make_node_fn("__AMB__", distinct));
+		if (distinct.size() <= 1) {
+			caps.set((int)idx, distinct.empty() ? nullptr
+				: distinct.front(), distinct_end);
+			continue;
+		}
+		// Pin the end to the node's own right sibling, immune to hash-consing reuse.
+		tref synth = adapter_.make_node_fn("__AMB__", distinct);
+		caps.set((int)idx, synth,
+			synth ? lcrs_tree<NodeT>::get(synth).right_sibling() : nullptr);
 	}
 	return true;
 }
@@ -588,9 +627,29 @@ bool matcher<NodeT>::match_node(tref n,
 	case pattern_node::kind::NT:
 		atom_ok = adapter_.is_nt(n, p.text);
 		break;
-	case pattern_node::kind::TERMINAL:
+	case pattern_node::kind::TERMINAL: {
 		atom_ok = adapter_.is_terminal(n, p.text);
+		// A run of childless terminal siblings can also spell the text.
+		if (!atom_ok) {
+			std::string acc;
+			size_t run_len = 0;
+			tref cur = n;
+			while (cur) {
+				auto txt = adapter_.terminal_leaf_text(cur);
+				if (!txt || acc.size() + txt->size() > p.text.size())
+					break;
+				acc += *txt;
+				++run_len;
+				cur = lcrs_tree<NodeT>::get(cur).right_sibling();
+				if (acc.size() >= p.text.size()) break;
+			}
+			if (run_len >= 2 && acc == p.text) {
+				atom_ok = true;
+				matched_next = cur;
+			}
+		}
 		break;
+	}
 	case pattern_node::kind::CAPTURE: {
 		// A capture is transparent. Its alternative can consume more
 		// than one sibling, so preserve the position after its body.
@@ -616,7 +675,8 @@ bool matcher<NodeT>::match_node(tref n,
 		// nullptr instead of the group's anchor position.
 		if (atom_ok && p.capture_idx >= 0
 			&& (int)caps.v.size() > p.capture_idx)
-			caps.set(p.capture_idx, zero_width ? nullptr : n);
+			caps.set(p.capture_idx, zero_width ? nullptr : n,
+				zero_width ? nullptr : matched_next);
 		break;
 	}
 	}
@@ -780,6 +840,7 @@ bool matcher<NodeT>::match(tref root, match_result& m, ambig_mode mode) const
 			&& subtree_has_amb(root, amb_seen))) {
 		m.root = root;
 		m.captures = std::move(caps.v);
+		m.capture_ends = std::move(caps.ends);
 		return true;
 	}
 	return false;
@@ -811,6 +872,7 @@ bool matcher<NodeT>::search(tref root, match_result& m, ambig_mode mode) const
 				&& subtree_has_amb(candidate, amb_seen))) {
 			m.root = candidate;
 			m.captures = std::move(caps.v);
+			m.capture_ends = std::move(caps.ends);
 			return false;
 		}
 		return true;
@@ -848,6 +910,7 @@ auto matcher<NodeT>::search_all(tref root,
 				match_result m;
 				m.root = candidate;
 				m.captures = std::move(caps.v);
+				m.capture_ends = std::move(caps.ends);
 				matches.push_back(std::move(m));
 			}
 		}
@@ -913,6 +976,7 @@ tref matcher<NodeT>::replace_walk(tref n, tref parent, bool at_root,
 			match_result mt;
 			mt.root = rebuilt;
 			mt.captures = std::move(caps.v);
+			mt.capture_ends = std::move(caps.ends);
 			tref r = fn(mt);
 			if (!r) { deleted = true; result = nullptr; }
 			else result = r;

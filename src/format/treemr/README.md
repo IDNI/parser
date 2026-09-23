@@ -74,6 +74,14 @@ A name follows `(alpha|_)(alnum|_)*`. Both literal kinds accept
 `\a \b \f \n \r \t \v \\ \/`, `\xHH`, `\uHHHH`, and `\UHHHHHHHH`. A char
 literal also accepts `\'`. A string literal also accepts `\"`.
 
+A string literal also matches a run of consecutive childless terminal
+siblings whose concatenated text equals the string.
+
+```
+"=>"                # matches one node whose text is "=>", or two
+                     # sibling leaves '=' and '>' in a row
+```
+
 ### Quantifiers
 
 A trailing quantifier makes a slot repeat, greedy and regex-style.
@@ -233,8 +241,11 @@ capture a node. It would only shift the numbering of later captures.
 ### Captures
 
 Every `( … )` is a **capture group**. The first node it matches is
-recorded, then returned by `match` and the search operations. A
-multi-slot capture records only its first node, not a range. Groups are
+recorded, then returned by `match` and the search operations. A capture
+also records its exclusive end: the sibling right after the last node its
+body consumed, or `nullptr` when the body ran to the last sibling.
+`match_result::capture_nodes(i)` returns the range as a `trefs`, from
+`captures[i-1]` up to but excluding `capture_ends[i-1]`. Groups are
 numbered by their opening parenthesis, left-to-right starting at **1**,
 outer before inner, as in regexes (`0` is reserved for the match root).
 Alternation `|` is allowed inside a group. The first alternative that
@@ -351,11 +362,14 @@ m.search(root, mt);                 // same test, and fills in mt on success
 
 ```cpp
 struct match_result {
-    tref  root;          // the matched node
-    trefs captures;      // capture 1..N (nullptr for an unmatched optional group)
+    tref  root;              // the matched node
+    trefs captures;          // capture 1..N (nullptr for an unmatched optional group)
+    trefs capture_ends;      // exclusive end per capture, parallel to captures
     tref  operator[](size_t i) const;  // [0] is root, [i] is captures[i - 1]
     size_t size() const;               // 0 if no match, else 1 + captures.size()
     explicit operator bool() const;    // true when root is not nullptr
+    template <typename NodeT>
+    trefs capture_nodes(size_t i) const; // captures[i-1] .. capture_ends[i-1], exclusive
 };
 ```
 

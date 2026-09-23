@@ -7,6 +7,7 @@
 #include <concepts>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -87,12 +88,29 @@ enum class ambig_mode : uint8_t { FORBID, ANY, UNIQUE, ALL };
 struct match_result {
 	tref  root = nullptr;
 	trefs captures;
+	trefs capture_ends;  // exclusive end per capture, parallel to captures
 
 	tref operator[](size_t i) const {
 		return i == 0 ? root : captures.at(i - 1);
 	}
 	size_t size() const { return root ? 1 + captures.size() : 0; }
 	explicit operator bool() const { return root != nullptr; }
+
+	// Consecutive siblings from captures[i-1] up to (excluding)
+	// capture_ends[i-1]; empty for an unmatched capture.
+	template <typename NodeT>
+	trefs capture_nodes(size_t i) const {
+		trefs out;
+		if (i == 0 || i > captures.size()) return out;
+		tref start = captures[i - 1];
+		if (!start) return out;
+		if (i > capture_ends.size()) { out.push_back(start); return out; }
+		tref end = capture_ends[i - 1];
+		for (tref c = start; c != end;
+			c = lcrs_tree<NodeT>::get(c).right_sibling())
+			out.push_back(c);
+		return out;
+	}
 };
 
 //------------------------------------------------------------------------------
@@ -136,9 +154,12 @@ struct node_adapter {
 	// Builds a node named `nt` with the given children, for an ALL-mode ambiguity capture.
 	// `parse_node_adapter` always sets it. A hand-built adapter may leave it empty.
 	std::function<tref(std::string_view nt, const trefs& children)> make_node_fn;
+	// Terminal text of a childless terminal node, or nullopt when n is not one.
+	std::function<std::optional<std::string>(tref)> terminal_leaf_text_fn;
 
 	bool is_nt(tref n, std::string_view s) const;
 	bool is_terminal(tref n, std::string_view s) const;
+	std::optional<std::string> terminal_leaf_text(tref n) const;
 };
 
 // Build a node_adapter for an idni::parser<C,T> parse tree
