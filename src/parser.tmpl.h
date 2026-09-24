@@ -598,6 +598,19 @@ void parser<C, T>::predict(const item& i, container_t& t, T ch) {
 			has_inherited = true;
 		}
 	}
+	// The parent link is per predicting item and is kept for every item.
+	// The production loop below is idempotent per (nonterminal, position):
+	// the lookahead is fixed per position, so every item of a position that
+	// waits on the same nonterminal, and every revisit of such an item,
+	// would attempt the same productions again. It runs once per
+	// (nonterminal, position); with gc (reference counts per predicting
+	// item) and for an item that forwards dynamic child spans it runs on
+	// every call.
+	if (parl.nt()) cache[{parl.n(), i.set}].insert(i);
+	if (!po.enable_gc && !has_inherited) {
+		if (predicted_.size() <= i.set) predicted_.resize(i.set + 1);
+		if (!predicted_[i.set].insert(parl.n()).second) return;
+	}
 	for (size_t p : g.prod_ids_of_literal(get_lit(i))) {
 		// predicting item should have ref count increased
 		// since predicting item, for its advancement over
@@ -610,8 +623,6 @@ void parser<C, T>::predict(const item& i, container_t& t, T ch) {
 		// item, just use one
 		// Should we use S[n] to see if new item is insertable
 		for (size_t c = 0; c != g.n_conjs(p); ++c) {
-			//just once
-			if (c==0 && parl.nt()) cache[{parl.n(), i.set}].insert(i);
 			// One-character lookahead: a conjunct that starts with a
 			// terminal or a character class the current character
 			// cannot satisfy would only be scanned and dropped at
@@ -876,6 +887,7 @@ parser<C, T>::result parser<C, T>::_parse() {
 	// fromS is only read by GC drain and conjunctive cascade machinery.
 	// Skip every write for non-conjunctive grammars with GC off.
 	need_fromS = po.enable_gc || any_conj;
+	predicted_.clear();
 	S.clear(), U.clear(), snapshot_.clear(), fromS.clear(),
 		bin_tnt.clear(), refi.clear(),
 		cache.clear(), gcready.clear(), sorted_citem.clear(),
