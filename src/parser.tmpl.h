@@ -306,6 +306,7 @@ bool parser<C, T>::nt_still_completed(size_t nt_id, size_t from, size_t set)
 
 template <typename C, typename T>
 void parser<C, T>::retract_item(const item& x, container_t& c) {
+	++reprocess_epoch_;
 	if (U.size() < S.size()) U.resize(S.size());
 	c.erase(x);
 	if (x.set >= S.size()) return;
@@ -513,7 +514,10 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 			c.insert(j);
 			if (any_conj) {
 				completion_deps[ckey].push_back(j);
-				forward_deps[*it].push_back(j);
+				// a predictor from an earlier set is never
+				// retracted (see the end of the position loop)
+				if (it->set == i.set)
+					forward_deps[*it].push_back(j);
 				MC(maks(cnt.completion_deps_size_peak,
 					completion_deps[ckey].size());)
 			}
@@ -524,7 +528,10 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 		if (add(t, j).second) {
 			if (any_conj) {
 				completion_deps[ckey].push_back(j);
-				forward_deps[*it].push_back(j);
+				// a predictor from an earlier set is never
+				// retracted (see the end of the position loop)
+				if (it->set == i.set)
+					forward_deps[*it].push_back(j);
 				MC(maks(cnt.completion_deps_size_peak,
 					completion_deps[ckey].size());)
 			}
@@ -916,6 +923,8 @@ parser<C, T>::result parser<C, T>::_parse() {
 		}
 
 		MC(size_t pos_iters = 0;)
+		size_t done = 0, epoch = reprocess_epoch_;
+		revisit_.clear();
 		do {
 			MC(count(cnt.inner_loop_iterations);)
 			MC(count(pos_iters);)
@@ -930,7 +939,31 @@ parser<C, T>::result parser<C, T>::_parse() {
 				}
 			}
 			t.clear();
-			snapshot_.assign(S[n].begin(), S[n].end());
+			// A round processes the items added to S[n] since the
+			// previous round plus revisit_; revisiting any other item
+			// is a no-op. revisit_ holds the completed items whose
+			// revisit still matters: an empty-span item, which
+			// predictions made at n since may wait on, and a conjunct,
+			// which must be parked in c every round so that
+			// resolve_conjunctions() sees its whole group. Retraction,
+			// GC erase, dynamic grammar growth and span merges bump
+			// reprocess_epoch_ and force a full pass. GC forces it
+			// always: its reference counts rely on predict() running
+			// on every revisit.
+			const auto& cur = S[n].values();
+			if (po.enable_gc || reprocess_epoch_ != epoch
+				|| done > cur.size())
+				epoch = reprocess_epoch_, done = 0,
+				revisit_.clear();
+			snapshot_.clear();
+			for (size_t k : revisit_) snapshot_.push_back(cur[k]);
+			for (size_t k = done; k < cur.size(); ++k) {
+				snapshot_.push_back(cur[k]);
+				if (completed(cur[k]) && (cur[k].from == n
+					|| g.conjunctive(cur[k].prod)))
+					revisit_.push_back(k);
+			}
+			done = cur.size();
 			//DBGP(print(std::cout << "\nto process:\n", snapshot_);)
 			for (const item& x : snapshot_) {
 				DBGP(print(std::cout << "----------------------"
@@ -958,6 +991,19 @@ parser<C, T>::result parser<C, T>::_parse() {
 			//DBGP(if (!t.empty()) print(std::cout << "t not empty:\n", t) << "\n";)
 			} while (!t.empty());
 			MC(maks(cnt.inner_loop_iterations_max, pos_iters);)
+			// Retraction starts from items completed at this position
+			// and only reaches items derived from them, so from here on
+			// nothing at a set <= n is ever retracted and complete() is
+			// never again called on an item of set n. The dependency
+			// and completion bookkeeping keyed on those items is dead.
+			if (!complete_memo.empty()) complete_memo.clear();
+			if (any_conj) {
+				if (!forward_deps.empty()) forward_deps.clear();
+				if (!completion_deps.empty()) completion_deps.clear();
+				if (!completion_count.empty()) completion_count.clear();
+				if (!counted_completions.empty())
+					counted_completions.clear();
+			}
 			MC(maks(cnt.s_max_per_pos, S[n].size());)
 
 		if (po.measure_each_pos && new_pos) {
@@ -992,6 +1038,7 @@ parser<C, T>::result parser<C, T>::_parse() {
 					if (!can_remove) { ++it; continue; }
 					auto its = S[rm.set].find(rm);
 					if ( its != S[rm.set].end() ){
+						++reprocess_epoch_;
 						S[rm.set].erase(its);
 						if (!completed(rm) && get_lit(rm).nt()) {
 							auto cit = cache.find(

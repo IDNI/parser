@@ -1347,6 +1347,12 @@ private:
 	std::vector<container_t> U; /// uncompleted
 	/// reused across fixpoint iterations so the item snapshot allocates once
 	std::vector<item> snapshot_ = {};
+	/// indices into S[n] of the completed items the position loop in
+	/// _parse revisits every round (empty-span items and conjuncts)
+	std::vector<size_t> revisit_ = {};
+	/// Bumped whenever an Earley set loses an item or the grammar or a
+	/// dynamic span annotation changes; see the position loop in _parse.
+	size_t reprocess_epoch_ = 0;
 		///mapping from to position of end in S for items
 	ankerl::unordered_dense::map<size_t,
 		ankerl::unordered_dense::set<size_t>> fromS;
@@ -1413,6 +1419,7 @@ private:
 	void merge_dyn_child_span(const item& j,
 		const std::vector<dyn_child_entry>& incoming)
 	{
+		++reprocess_epoch_;
 		auto it = dyn_child_span.find(j);
 		std::vector<dyn_child_entry> merged = it != dyn_child_span.end()
 			? it->second : std::vector<dyn_child_entry>{};
@@ -1439,6 +1446,7 @@ private:
 		size_t to)
 	{
 		if (!o.on_dynamic_grow) return;
+		++reprocess_epoch_;
 		auto prev = g.active_grow_;
 		g.active_grow_ = { parent_nt, child_nt };
 		o.on_dynamic_grow(*in_, child_nt, from, to);

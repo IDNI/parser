@@ -398,6 +398,30 @@ int main(int argc, char **argv)
 	run_test<char>(ps, nt, start, "3*2+1", cc);
 	ps.clear();
 
+	// A conjunct ending in a terminal is scanned straight into the
+	// Earley set while a conjunct ending in a nonterminal only gets
+	// there once resolve_conjunctions() accepts it. Every later
+	// resolution at that position must still see both conjuncts.
+	TEST("boolean", "scanned_and_completed_conjuncts")
+	ps(start, (X + b) & (X + X));
+	ps(X,     b);
+	o = {}, o.ambiguity_fails = false;
+	run_test<char>(ps, nt, start, "bb", {}, o);
+	o = {};
+	ps.clear();
+
+	// A conjunct re-checked at a later resolution of the same position
+	// must not leave behind a completed item without a derivation:
+	// "ab" is not in the language of start even without the negation.
+	TEST("boolean", "late_conjunction_recheck")
+	ps(start, B + b);
+	ps(A,     a & ~B);
+	ps(B,     (A + B + b) | (A + A) | nll);
+	o.error_expected = "Unexpected";
+	run_test<char>(ps, nt, start, "ab", {}, o);
+	o = {};
+	ps.clear();
+
 	// all cycles
 	// TODO this should be ambiguous but not in start
 	// conjunction w/o negation cannot make multiple trees
