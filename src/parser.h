@@ -1358,8 +1358,11 @@ private:
 		ankerl::unordered_dense::set<size_t>> fromS;
 	/// true iff fromS writes are needed this parse (enable_gc || any_conj)
 	bool need_fromS = false;
+	/// items that wait for a nonterminal at a position
 	ankerl::unordered_dense::map<std::pair<size_t /*nt_id*/, size_t>,
-		container_t> cache;
+		std::vector<item>> cache;
+	void cache_insert(size_t nt, size_t pos, const item& i);
+	void cache_erase(size_t nt, size_t pos, const item& i);
 
 	/// refcounter for the earley item
 	/// default value is 0, which means it can be garbaged

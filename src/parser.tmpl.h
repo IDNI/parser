@@ -304,6 +304,22 @@ bool parser<C, T>::nt_still_completed(size_t nt_id, size_t from, size_t set)
 	return it != completion_count.end() && it->second > 0;
 }
 
+// waiting items of one (nt, position) key; a swap-remove keeps erase O(1)
+template <typename C, typename T>
+void parser<C, T>::cache_insert(size_t nt, size_t pos, const item& i) {
+	auto& v = cache[{ nt, pos }];
+	if (std::find(v.begin(), v.end(), i) == v.end()) v.push_back(i);
+}
+template <typename C, typename T>
+void parser<C, T>::cache_erase(size_t nt, size_t pos, const item& i) {
+	auto cit = cache.find({ nt, pos });
+	if (cit == cache.end()) return;
+	auto& v = cit->second;
+	auto it = std::find(v.begin(), v.end(), i);
+	if (it == v.end()) return;
+	*it = v.back(), v.pop_back();
+}
+
 template <typename C, typename T>
 void parser<C, T>::retract_item(const item& x, container_t& c) {
 	++reprocess_epoch_;
@@ -314,10 +330,8 @@ void parser<C, T>::retract_item(const item& x, container_t& c) {
 	U[x.set].insert(x);
 	if (sit == S[x.set].end()) return;
 	S[x.set].erase(sit);
-	if (!completed(x) && get_lit(x).nt()) {
-		auto cit = cache.find({ get_lit(x).n(), x.set });
-		if (cit != cache.end()) cit->second.erase(x);
-	}
+	if (!completed(x) && get_lit(x).nt())
+		cache_erase(get_lit(x).n(), x.set, x);
 	if (auto fit = fromS.find(x.from); fit != fromS.end()) {
 		MC(count(cnt.fromS_reads);)
 		fit->second.erase(x.set);
@@ -453,7 +467,7 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 	const size_t cur_size = rng.size();
 	size_t& last_idx = complete_memo[i];
 	if (last_idx >= cur_size) return;
-	const auto& vec = rng.values();
+	const auto& vec = rng;
 	const size_t start_idx = last_idx;
 	last_idx = cur_size;
 	// i's own head (smbl) is what just completed. Whether a given
@@ -611,7 +625,7 @@ void parser<C, T>::predict(const item& i, container_t& t, T ch) {
 		// Should we use S[n] to see if new item is insertable
 		for (size_t c = 0; c != g.n_conjs(p); ++c) {
 			//just once
-			if (c==0 && parl.nt()) cache[{parl.n(), i.set}].insert(i);
+			if (c==0 && parl.nt()) cache_insert(parl.n(), i.set, i);
 			// One-character lookahead: a conjunct that starts with a
 			// terminal or a character class the current character
 			// cannot satisfy would only be scanned and dropped at
@@ -732,7 +746,7 @@ void parser<C, T>::scan_cc_function(const item& i, size_t n, T ch,
 		if (p == static_cast<size_t>(-1)) return;
 	}
 	if (!eof) n++;
-	if( l.nt()) cache[{l.n(), i.set}].insert(i);
+	if( l.nt()) cache_insert(l.n(), i.set, i);
 	item k(n, p, 0, n - (eof ? 0 : 1), 1); // complete char functions's char
 	DBGP(print(std::cout << " +  adding from cc scan into S[" << k.set <<
 		"] \t", k) << "\n";)
@@ -1040,12 +1054,9 @@ parser<C, T>::result parser<C, T>::_parse() {
 					if ( its != S[rm.set].end() ){
 						++reprocess_epoch_;
 						S[rm.set].erase(its);
-						if (!completed(rm) && get_lit(rm).nt()) {
-							auto cit = cache.find(
-								{get_lit(rm).n(), rm.set});
-							if (cit != cache.end())
-								cit->second.erase(rm);
-						}
+						if (!completed(rm) && get_lit(rm).nt())
+							cache_erase(get_lit(rm).n(),
+								rm.set, rm);
 
 						// also clean from fromS
 						if (auto fit = fromS.find(rm.from);
