@@ -1374,8 +1374,8 @@ private:
 	using completion_key = std::tuple<size_t, size_t, size_t>;
 	std::unordered_map<completion_key, std::vector<item>>
 		completion_deps;
-	/// completed items keyed by (nt_id, from, set)
-	std::unordered_map<completion_key, std::vector<item>> span_citem;
+	/// child scans read the item indexes instead of S
+	bool use_citem_index = false;
 	/// O(1) "is anything still completed?" predicate.
 	ankerl::unordered_dense::map<completion_key, size_t> completion_count;
 	/// completed items currently counted in completion_count (one count per live item)

@@ -879,8 +879,7 @@ parser<C, T>::result parser<C, T>::_parse() {
 	S.clear(), U.clear(), snapshot_.clear(), fromS.clear(),
 		bin_tnt.clear(), refi.clear(),
 		cache.clear(), gcready.clear(), sorted_citem.clear(),
-		rsorted_citem.clear(), span_citem.clear(),
-		completion_deps.clear(),
+		rsorted_citem.clear(), completion_deps.clear(),
 		completion_count.clear(), complete_memo.clear(),
 		forward_deps.clear(), counted_completions.clear(),
 		dyn_child_span.clear();
@@ -1475,8 +1474,7 @@ void parser<C, T>::pre_process(const item& i) {
 	//sorted_citem[G[i.prod][0].n()][i.from].emplace_back(i);
 	if (completed(i))
 		sorted_citem[{ g(i.prod).n(), i.from }].emplace_back(i),
-		rsorted_citem[{ g(i.prod).n(), i.set }].emplace_back(i),
-		span_citem[{ g(i.prod).n(), i.from, i.set }].emplace_back(i);
+		rsorted_citem[{ g(i.prod).n(), i.set }].emplace_back(i);
 	else if (o.binarize) {
 		// Precreating temporaries to help in binarisation later
 		// each temporary represents a partial rhs production with
@@ -1509,14 +1507,17 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 	bin_tnt.clear();
 	sorted_citem.clear();
 	rsorted_citem.clear();
-	span_citem.clear();
 	tid = 0;
 	pnode root(start_lit, { 0, in_->tpos() });
 
-	// preprocess parser items for faster retrieval
-	int preprocess_count = do_preprocess();
-	if (po.debug) report_.info(messages::preprocess,
-		{{label::size, preprocess_count}});
+	// The child scan reads S directly. Binarization needs the temporaries
+	// that pre_process() adds to the indexes.
+	use_citem_index = o.binarize;
+	if (use_citem_index) {
+		int preprocess_count = do_preprocess();
+		if (po.debug) report_.info(messages::preprocess,
+			{{label::size, preprocess_count}});
+	}
 
 	auto check_allowed = [this](const pnode& n) {
 		if (!g.opt.auto_disambiguate) return false;
@@ -1565,14 +1566,20 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 	auto collect_packs = [&](const pnode& node, bool& ad_allowed)
 		-> pnodes_set
 	{
-		auto& items = span_citem[{ node.first.n(),
-					node.second[0], node.second[1] }];
 		pnodes_set packs;
 		ad_allowed = check_allowed(node);
+		const size_t nt = node.first.n(), from = node.second[0],
+			set = node.second[1];
+		if (set >= S.size()) return packs;
+		auto matches = [&](const item& cur) {
+			return cur.from == from && completed(cur)
+				&& g(cur.prod).n() == nt;
+		};
 
 		if (ad_allowed) {
 			size_t best_prod = SIZE_MAX;
-			for (auto& cur : items) {
+			for (auto& cur : S[set]) {
+				if (!matches(cur)) continue;
 				if (cur.prod >= best_prod) continue;
 				pnodes nxtlits;
 				pnodes_set cur_packs;
@@ -1587,7 +1594,8 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 				}
 			}
 		} else {
-			for (auto& cur : items) {
+			for (auto& cur : S[set]) {
+				if (!matches(cur)) continue;
 				pnodes nxtlits;
 				pnodes_set cur_packs;
 				if (o.binarize)
@@ -1698,12 +1706,12 @@ bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
 	bin_tnt.clear();
 	sorted_citem.clear();
 	rsorted_citem.clear();
-	span_citem.clear();
 	tid = 0;
 	// set the start root node
 	pnode root(start_lit, { 0, in_->tpos() });
 	f.root(root);
 
+	use_citem_index = true;
 	// preprocess parser items for faster retrieval
 	int preprocess_count = do_preprocess();
 	if (po.debug) {
@@ -1745,13 +1753,20 @@ void parser<C, T>::sbl_chd_forest(const item& eitem,
 		sbl_chd_forest(eitem, curchd, from, ambset);
 		curchd.erase(curchd.begin() + lastpos, curchd.end());
 	} else {
-		auto& nxtl_sets = rsorted_citem[{ nxtlit.n(), xto }];
-		for (auto& v : nxtl_sets) {
-			if (v.from < eitem.from) continue;
+		auto try_item = [&](const item& v) {
+			if (v.from < eitem.from) return;
 			size_t lastpos = curchd.size();
 			curchd.push_back(pnode(nxtlit, { v.from, xto })),
 			sbl_chd_forest(eitem, curchd, v.from, ambset);
 			curchd.erase(curchd.begin() + lastpos, curchd.end());
+		};
+		if (use_citem_index) {
+			for (auto& v : rsorted_citem[{ nxtlit.n(), xto }])
+				try_item(v);
+		} else if (xto < S.size()) {
+			for (auto& v : S[xto])
+				if (completed(v) && g(v.prod).n() == nxtlit.n())
+					try_item(v);
 		}
 	}
 }
