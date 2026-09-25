@@ -1360,6 +1360,12 @@ private:
 	bool need_fromS = false;
 	ankerl::unordered_dense::map<std::pair<size_t /*nt_id*/, size_t>,
 		container_t> cache;
+	/// Nonterminals already predicted at a position. Predicting the same
+	/// nonterminal at the same position again adds no item: the lookahead
+	/// character is fixed per position, so the production loop is skipped
+	/// after its first run there. Not used with gc (refi is kept per
+	/// predicting item) or with dynamic child spans (forwarded per item).
+	std::vector<ankerl::unordered_dense::set<size_t>> predicted_;
 
 	/// refcounter for the earley item
 	/// default value is 0, which means it can be garbaged

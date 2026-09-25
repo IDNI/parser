@@ -740,6 +740,39 @@ int main(int argc, char **argv)
 			cout << "benchmark test finished" << endl;
 	}
 
+#ifdef TAU_PARSER_MEASURE_COUNTERS
+	{
+		// Prediction runs once per nonterminal and position: the items of
+		// a position that wait on the same nonterminal must not attempt
+		// its productions again. On this grammar and input the memoized
+		// parse attempts 50 inserts; the bound of 100 sits below the count
+		// of a parse that attempts the productions per item (168 on the
+		// tree the test was written on, master @ cdcc0f7).
+		TEST("measure", "predict inserts bounded")
+		prods<> ps2, expr(nt("expr")), term(nt("term")), num(nt("num")),
+			plus('+'), times('*');
+		ps2(start, expr);
+		ps2(expr, term | (expr + plus + term));
+		ps2(term, num | (term + times + num));
+		ps2(num, digit | (digit + num));
+		grammar<> g2(nt, ps2, start, cc);
+		parser<> p2(g2);
+		parser<>::parse_options po2;
+		po2.measure_counters = true;
+		const std::string in2 = "1+2*3+4*5+6*7+8*9+10*11+12*13";
+		auto res2 = p2.parse(in2.c_str(), in2.size(), po2);
+		int64_t inserts = -1;
+		for (const auto& n : res2.report().nodes())
+			if (n.tag == diagnostics::code::info_count
+				&& n.key == parser_strings::label::predict_inserts)
+				inserts = n.value;
+		const int64_t bound = 100;
+		const bool ok = res2.found && inserts >= 0 && inserts <= bound;
+		if (!ok) testing::failed = true;
+		cout << (ok ? "OK" : "FAILED") << " predict inserts: " << inserts
+			<< " (bound " << bound << ")\n";
+	}
+#endif
 	cout << endl;
 	if (testing::failed) cout << "FAILED\n";
 	return testing::failed ? 1 : 0;
