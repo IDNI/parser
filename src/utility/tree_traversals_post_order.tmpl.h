@@ -69,8 +69,11 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 	}
 	subtree_unordered_map<node, tref> cache;
 	std::vector<tref> stack;
+	// original right sibling of each stack entry
+	std::vector<tref> nxt;
 	std::vector<size_t> upos;
 	stack.push_back(n);
+	nxt.push_back(nullptr);
 	upos.push_back(0);
 #ifdef MEASURE_TRAVERSER_DEPTH
 	inc_depth();
@@ -143,7 +146,8 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 		}
 		// Get next child position
 		size_t c_pos = (stack.size() - 1) - upos.back();
-		tref c = tree::get(c_node).child(c_pos);
+		tref c = c_pos == 0 ? tree::get(c_node).left_child()
+				: nxt.back();
 		DBGT(std::cout << "\tmove to a child: " << c << " \t"
 			<< (stack.back() == c_node ? "LC" : "RS") << "\n";)
 		// Are all children visited?
@@ -161,6 +165,7 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 				c_node = res;
 				// Pop children from stacks
 				stack.erase(stack.end() - c_pos, stack.end());
+				nxt.erase(nxt.end() - c_pos, nxt.end());
 				upos.pop_back();
 #ifdef MEASURE_TRAVERSER_DEPTH
 				dec_depth();
@@ -176,6 +181,7 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 			if (res == nullptr) return nullptr;
 			// Pop children from stacks
 			stack.erase(stack.end() - c_pos, stack.end());
+			nxt.erase(nxt.end() - c_pos, nxt.end());
 			res = call(f, res, get_parent());
 			if (res == nullptr) return nullptr;
 			if constexpr (slot != 0)
@@ -191,6 +197,7 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 			tref parent = c_node;
 			// Add next child
 			stack.push_back(c);
+			nxt.push_back(tree::get(c).right_sibling());
 			if (call_pred(visit_subtree, c, parent)) {
 #ifdef MEASURE_TRAVERSER_DEPTH
 				inc_depth();

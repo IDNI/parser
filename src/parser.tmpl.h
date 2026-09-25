@@ -879,7 +879,8 @@ parser<C, T>::result parser<C, T>::_parse() {
 	S.clear(), U.clear(), snapshot_.clear(), fromS.clear(),
 		bin_tnt.clear(), refi.clear(),
 		cache.clear(), gcready.clear(), sorted_citem.clear(),
-		rsorted_citem.clear(), completion_deps.clear(),
+		rsorted_citem.clear(), span_citem.clear(),
+		completion_deps.clear(),
 		completion_count.clear(), complete_memo.clear(),
 		forward_deps.clear(), counted_completions.clear(),
 		dyn_child_span.clear();
@@ -1474,7 +1475,8 @@ void parser<C, T>::pre_process(const item& i) {
 	//sorted_citem[G[i.prod][0].n()][i.from].emplace_back(i);
 	if (completed(i))
 		sorted_citem[{ g(i.prod).n(), i.from }].emplace_back(i),
-		rsorted_citem[{ g(i.prod).n(), i.set }].emplace_back(i);
+		rsorted_citem[{ g(i.prod).n(), i.set }].emplace_back(i),
+		span_citem[{ g(i.prod).n(), i.from, i.set }].emplace_back(i);
 	else if (o.binarize) {
 		// Precreating temporaries to help in binarisation later
 		// each temporary represents a partial rhs production with
@@ -1507,6 +1509,7 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 	bin_tnt.clear();
 	sorted_citem.clear();
 	rsorted_citem.clear();
+	span_citem.clear();
 	tid = 0;
 	pnode root(start_lit, { 0, in_->tpos() });
 
@@ -1556,26 +1559,80 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 		return s.size() >= 4 && s.substr(0, 4) == "__E_";
 	};
 
-	auto is_amb = [](tref n) {
-		if (!n) return false;
-		auto& l = tree::get(n).value.first;
-		return l.nt() && l.to_std_string() == "__AMB__";
-	};
-
 	std::set<pnode> visiting;
 	std::function<tref(const pnode&)> build;
+	std::function<void(const pnodes&, trefs&)> build_children;
 	std::function<tref(const pnode&, const pnodes&)> build_pack;
 
-	auto build_children = [&](const pnodes& pack, trefs& out) {
+	// collects the child packs of a node; sets ad_allowed for the node
+	auto collect_packs = [&](const pnode& node, bool& ad_allowed)
+		-> pnodes_set
+	{
+		auto& items = span_citem[{ node.first.n(),
+					node.second[0], node.second[1] }];
+		pnodes_set packs;
+		ad_allowed = check_allowed(node);
+
+		if (ad_allowed) {
+			size_t best_prod = SIZE_MAX;
+			for (auto& cur : items) {
+				if (cur.prod >= best_prod) continue;
+				pnodes nxtlits;
+				pnodes_set cur_packs;
+				if (o.binarize)
+					binarize_comb(cur, cur_packs);
+				else
+					sbl_chd_forest(cur, nxtlits,
+						cur.set, cur_packs);
+				if (!cur_packs.empty()) {
+					best_prod = cur.prod;
+					packs = std::move(cur_packs);
+				}
+			}
+		} else {
+			for (auto& cur : items) {
+				pnodes nxtlits;
+				pnodes_set cur_packs;
+				if (o.binarize)
+					binarize_comb(cur, cur_packs);
+				else
+					sbl_chd_forest(cur, nxtlits,
+						cur.set, cur_packs);
+				for (auto& p : cur_packs)
+					packs.insert(std::move(p));
+			}
+		}
+		return packs;
+	};
+
+	auto build_amb = [&](const pnode& node, pnodes_set& packs) {
+		auto amb = g.nt(from_str<C>(std::string("__AMB__")));
+		trefs alts;
+		for (auto& pack : packs)
+			if (auto alt = build_pack(node, pack); alt)
+				alts.push_back(alt);
+		return tree::get(pnode(amb, node.second), alts);
+	};
+
+	// An EBNF helper node is not materialized. Its children go straight
+	// into the parent's child list, so a long repetition costs O(n) nodes.
+	build_children = [&](const pnodes& pack, trefs& out) {
 		for (auto& nxt : pack) {
-			if (is_ebnf(nxt)) {
-				auto ch = build(nxt);
-				if (ch && is_amb(ch)) out.push_back(ch);
-				else if (ch) for (auto c
-					: tree::get(ch).children())
-					out.push_back(c);
-			} else if (auto ch = build(nxt); ch)
-				out.push_back(ch);
+			if (!is_ebnf(nxt)) {
+				if (auto ch = build(nxt); ch) out.push_back(ch);
+				continue;
+			}
+			if (visiting.count(nxt)) continue;
+			visiting.insert(nxt);
+			bool ad_allowed = false;
+			auto packs = collect_packs(nxt, ad_allowed);
+			if (packs.size() == 1)
+				build_children(*packs.begin(), out);
+			else if (packs.size() > 1 && ad_allowed)
+				build_children(pick_best(packs), out);
+			else if (packs.size() > 1)
+				out.push_back(build_amb(nxt, packs));
+			visiting.erase(nxt);
 		}
 	};
 
@@ -1590,42 +1647,8 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 		if (visiting.count(node)) return tree::get(node);
 		visiting.insert(node);
 
-		auto& items = sorted_citem[{ node.first.n(),
-						node.second[0] }];
-		pnodes_set packs;
-		bool ad_allowed = check_allowed(node);
-
-		if (ad_allowed) {
-			size_t best_prod = SIZE_MAX;
-			for (auto& cur : items) {
-				if (cur.set != node.second[1]) continue;
-				if (cur.prod >= best_prod) continue;
-				pnodes nxtlits;
-				pnodes_set cur_packs;
-				if (o.binarize)
-					binarize_comb(cur, cur_packs);
-				else
-					sbl_chd_forest(cur, nxtlits,
-						cur.from, cur_packs);
-				if (!cur_packs.empty()) {
-					best_prod = cur.prod;
-					packs = std::move(cur_packs);
-				}
-			}
-		} else {
-			for (auto& cur : items) {
-				if (cur.set != node.second[1]) continue;
-				pnodes nxtlits;
-				pnodes_set cur_packs;
-				if (o.binarize)
-					binarize_comb(cur, cur_packs);
-				else
-					sbl_chd_forest(cur, nxtlits,
-						cur.from, cur_packs);
-				for (auto& p : cur_packs)
-					packs.insert(std::move(p));
-			}
-		}
+		bool ad_allowed = false;
+		auto packs = collect_packs(node, ad_allowed);
 
 		tref r;
 		if (packs.empty()) {
@@ -1635,14 +1658,7 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 		} else if (ad_allowed) {
 			r = build_pack(node, pick_best(packs));
 		} else {
-			auto amb = g.nt(from_str<C>(
-				std::string("__AMB__")));
-			trefs alts;
-			for (auto& pack : packs)
-				if (auto alt = build_pack(node,
-						pack); alt)
-					alts.push_back(alt);
-			r = tree::get(pnode(amb, node.second), alts);
+			r = build_amb(node, packs);
 		}
 
 		visiting.erase(node);
@@ -1664,6 +1680,7 @@ bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
 	bin_tnt.clear();
 	sorted_citem.clear();
 	rsorted_citem.clear();
+	span_citem.clear();
 	tid = 0;
 	// set the start root node
 	pnode root(start_lit, { 0, in_->tpos() });
@@ -1687,47 +1704,35 @@ bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
 // span of the item and stores them in the set ambset.
 template <typename C, typename T>
 void parser<C, T>::sbl_chd_forest(const item& eitem,
-	pnodes& curchd, size_t xfrom,
+	pnodes& curchd, size_t xto,
 	pnodes_set& ambset)
 {
-	//check if we have reached the end of the rhs of prod
-	if (g.len(eitem.prod, eitem.con) <= curchd.size())  {
-		// match the end of the span we are searching in.
-		if (curchd.back()->second[1] == eitem.set) ambset.insert(curchd);
+	// walks the rhs from its last symbol, which must end at eitem.set
+	size_t len = g.len(eitem.prod, eitem.con);
+	if (len <= curchd.size()) {
+		if (xto == eitem.from)
+			ambset.insert(pnodes(curchd.rbegin(), curchd.rend()));
 		return;
 	}
-	// curchd.size() refers to index of cur literal to process in the rhs of production
-	const lit<C, T>& nxtlit = g[eitem.prod][eitem.con][curchd.size()];
-	// set the span start/end of the terminal symbol
+	const lit<C, T>& nxtlit =
+		g[eitem.prod][eitem.con][len - 1 - curchd.size()];
 	if (!nxtlit.nt()) {
-		size_t from = xfrom, to;
-		// for empty, use same span edge as from
-		if (nxtlit.is_null()) to = xfrom;
-		// ensure well-formed combination (matching input) early
-		else if (xfrom < in_->tpos()
-			 && in_->tat(xfrom) == nxtlit.t())
-				to = ++xfrom;
-		else // if not building the correction variation, prune this path quickly
-			return;
-		// build from the next in the line
+		size_t from, to = xto;
+		if (nxtlit.is_null()) from = xto;
+		else if (xto > eitem.from
+			&& in_->tat(xto - 1) == nxtlit.t()) from = xto - 1;
+		else return;
 		size_t lastpos = curchd.size();
 		curchd.push_back(pnode(nxtlit, { from, to })),
-		sbl_chd_forest(eitem, curchd, xfrom, ambset);
+		sbl_chd_forest(eitem, curchd, from, ambset);
 		curchd.erase(curchd.begin() + lastpos, curchd.end());
 	} else {
-		// get the from/to span of all non-terminals in the rhs of production.
-		size_t from = xfrom;
-
-		//auto& nxtl_froms = sorted_citem[nxtl.n()][xfrom];
-		auto& nxtl_froms = sorted_citem[{ nxtlit.n(), xfrom }];
-		for (auto& v : nxtl_froms) {
-			// ignore beyond the span
-			if (v.set > eitem.set) continue;
-			// store current and recursively build for next nt
+		auto& nxtl_sets = rsorted_citem[{ nxtlit.n(), xto }];
+		for (auto& v : nxtl_sets) {
+			if (v.from < eitem.from) continue;
 			size_t lastpos = curchd.size();
-			curchd.push_back(pnode(nxtlit, { from, v.set })),
-			xfrom = v.set,
-			sbl_chd_forest(eitem, curchd, xfrom, ambset);
+			curchd.push_back(pnode(nxtlit, { v.from, xto })),
+			sbl_chd_forest(eitem, curchd, v.from, ambset);
 			curchd.erase(curchd.begin() + lastpos, curchd.end());
 		}
 	}
@@ -1835,7 +1840,7 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 		else {
 			pnodes nxtlits;
 			//std::cout << "\n" << cur.prod << " " << last_p << " " << ambset.size();
-			sbl_chd_forest(cur, nxtlits, cur.from,
+			sbl_chd_forest(cur, nxtlits, cur.set,
 						allowed_disambg ? cambset : ambset);
 		}
 

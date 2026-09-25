@@ -209,6 +209,8 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 	if (n == nullptr) return nullptr;
 	subtree_unordered_map<node, tref> cache;
 	trefs stack;
+	// original right sibling of each stack entry
+	trefs nxt;
 	std::vector<size_t> upos;
 	auto get_parent = [&upos, &stack]() -> tref {
 		return upos.empty() ? nullptr : stack[upos.back()];
@@ -252,6 +254,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 		if (r == nullptr) return nullptr;
 	}
 	stack.emplace_back(r);
+	nxt.push_back(nullptr);
 	while (true) {
 		// If no unprocessed position exists, we are done
 		if (upos.empty()) return stack[0];
@@ -299,7 +302,8 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 		}
 		// Get next child position
 		size_t c_pos = (stack.size() - 1) - upos.back();
-		tref c = tree::get(c_node).child(c_pos);
+		tref c = c_pos == 0 ? tree::get(c_node).left_child()
+				: nxt.back();
 		DBGT(std::cout << "\tmove to a child: " << c << " \t"
 			<< (stack.back() == c_node ? "LC" : "RS") << "\n";)
 		// Are all children visited?
@@ -322,6 +326,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				c_node = res;
 				// Pop children from stacks
 				stack.erase(stack.end() - c_pos, stack.end());
+				nxt.erase(nxt.end() - c_pos, nxt.end());
 #ifdef MEASURE_TRAVERSER_DEPTH
 				dec_depth();
 #endif //MEASURE_TRAVERSER_DEPTH
@@ -335,6 +340,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 			DBGT(std::cout << "\tnew node: " << tree::get(res).dump_to_str() << "\n";)
 			// Pop children from stacks
 			stack.erase(stack.end() - c_pos, stack.end());
+			nxt.erase(nxt.end() - c_pos, nxt.end());
 			if (res == nullptr) return nullptr;
 			// Call up
 			upos.pop_back();
@@ -380,6 +386,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				stack.emplace_back(r);
 			}
 			else stack.push_back(c);
+			nxt.push_back(tree::get(c).right_sibling());
 		}
 	}
 }

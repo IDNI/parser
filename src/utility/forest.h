@@ -3,6 +3,7 @@
 
 #ifndef __IDNI__PARSER__FOREST_H__
 #define __IDNI__PARSER__FOREST_H__
+#include <algorithm>
 #include <array>
 #include <set>
 #include <map>

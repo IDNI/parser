@@ -485,40 +485,46 @@ bool forest<NodeT>::replace_nodes(graph& g, nodes& s) {
 	MC(size_t total_replacements = 0;)
 	std::set<node> cleanup;
 
-	// Traverse the graph and replace nodes in RHSs
-	for (auto& [lhs, rhs_set] : g) {
-		std::set<nodes> updated_rhs_set;
-
-		for (const auto& rhs : rhs_set) {
-			nodes newrhs = rhs;
-			// bool changed = false;
-
-			for (size_t i = 0; i < newrhs.size(); ) {
-				auto it = replmap.find(newrhs[i]);
-				if (it != replmap.end()) {
-					const node torepl = it->first;
-					const nodes& repl = it->second;
-
-					// DBG(std::cout << "Replacing " << NodeT(torepl) << " with ";
-					// 	for (auto& r : repl) std::cout << NodeT(r) << " " << newrhs.size() << " ";
-					// 	std::cout << "\n";)
-
-					// Do replacement
-					newrhs.erase(newrhs.begin() + i);
-					newrhs.insert(newrhs.begin() + i, repl.begin(), repl.end());
-
-					i += repl.size()? 0: 1;
-					// changed = true;
-					MC(total_replacements++);
-					cleanup.insert(torepl);
-				} else {
-					++i;
-				}
+	// Writes rhs into out with every replaceable node expanded, nested
+	// ones included. A node already open on the stack stays as it is.
+	struct frame { const nodes* vec; size_t i; };
+	std::vector<frame> stack;
+	nodes open;
+	auto expand = [&](const nodes& rhs, nodes& out) {
+		stack.clear(), open.clear();
+		stack.push_back({ &rhs, 0 });
+		while (!stack.empty()) {
+			frame& fr = stack.back();
+			if (fr.i >= fr.vec->size()) {
+				stack.pop_back();
+				if (!open.empty()) open.pop_back();
+				continue;
 			}
+			const node& cur = (*fr.vec)[fr.i++];
+			auto it = replmap.find(cur);
+			if (it == replmap.end() || std::find(open.begin(),
+				open.end(), cur) != open.end())
+			{
+				out.push_back(cur);
+				continue;
+			}
+			MC(total_replacements++);
+			cleanup.insert(cur);
+			open.push_back(cur);
+			stack.push_back({ &it->second, 0 });
+		}
+	};
 
+	// A replaced node leaves the graph, so its own rhs is not expanded.
+	for (auto& [lhs, rhs_set] : g) {
+		if (!(lhs == g.root) && replmap.find(lhs) != replmap.end())
+			continue;
+		std::set<nodes> updated_rhs_set;
+		for (const auto& rhs : rhs_set) {
+			nodes newrhs;
+			expand(rhs, newrhs);
 			updated_rhs_set.insert(std::move(newrhs));
 		}
-
 		if (!updated_rhs_set.empty()) {
 			rhs_set = std::move(updated_rhs_set);
 			gchange = true;
