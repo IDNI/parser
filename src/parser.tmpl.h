@@ -1560,9 +1560,6 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 	};
 
 	std::set<pnode> visiting;
-	std::function<tref(const pnode&)> build;
-	std::function<void(const pnodes&, trefs&)> build_children;
-	std::function<tref(const pnode&, const pnodes&)> build_pack;
 
 	// collects the child packs of a node; sets ad_allowed for the node
 	auto collect_packs = [&](const pnode& node, bool& ad_allowed)
@@ -1605,64 +1602,85 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 		return packs;
 	};
 
-	auto build_amb = [&](const pnode& node, pnodes_set& packs) {
-		auto amb = g.nt(from_str<C>(std::string("__AMB__")));
-		trefs alts;
-		for (auto& pack : packs)
-			if (auto alt = build_pack(node, pack); alt)
-				alts.push_back(alt);
-		return tree::get(pnode(amb, node.second), alts);
+	// One frame per node under construction. A flattened EBNF helper
+	// delivers its children to the nearest ancestor that builds a node,
+	// so a long repetition costs stack frames on the heap, not the C stack.
+	struct frame {
+		pnode node;
+		size_t sink;             // frame index that takes the output
+		bool flatten = false;    // EBNF helper: no node of its own
+		bool amb = false;        // one alternative node per pack
+		std::vector<pnodes> packs;
+		size_t pi = 0, ei = 0;
+		trefs children, alts;
 	};
-
-	// An EBNF helper node is not materialized. Its children go straight
-	// into the parent's child list, so a long repetition costs O(n) nodes.
-	build_children = [&](const pnodes& pack, trefs& out) {
-		for (auto& nxt : pack) {
-			if (!is_ebnf(nxt)) {
-				if (auto ch = build(nxt); ch) out.push_back(ch);
+	std::vector<frame> stack;
+	trefs result;
+	auto sink_of = [&](size_t fi) -> trefs& {
+		return fi == SIZE_MAX ? result : stack[fi].children;
+	};
+	auto push_frame = [&](const pnode& n, size_t from, bool flatten,
+		bool amb_node, std::vector<pnodes>&& packs)
+	{
+		size_t sink = from == SIZE_MAX ? SIZE_MAX
+			: stack[from].flatten ? stack[from].sink : from;
+		visiting.insert(n);
+		stack.push_back(frame{ n, sink, flatten, amb_node,
+			std::move(packs), 0, 0, {}, {} });
+	};
+	auto open_node = [&](const pnode& n, size_t from) {
+		bool ad_allowed = false;
+		pnodes_set packs = collect_packs(n, ad_allowed);
+		bool ebnf = is_ebnf(n);
+		trefs& out = sink_of(from == SIZE_MAX ? SIZE_MAX
+			: stack[from].flatten ? stack[from].sink : from);
+		if (packs.empty()) {
+			if (!ebnf) out.push_back(tree::get(n));
+			return;
+		}
+		if (packs.size() == 1)
+			push_frame(n, from, ebnf, false, { *packs.begin() });
+		else if (ad_allowed)
+			push_frame(n, from, ebnf, false, { pick_best(packs) });
+		else push_frame(n, from, false, true,
+			std::vector<pnodes>(packs.begin(), packs.end()));
+	};
+	auto build = [&](const pnode& root) -> tref {
+		if (!root.first.nt()) return tree::get(root);
+		open_node(root, SIZE_MAX);
+		while (!stack.empty()) {
+			size_t fi = stack.size() - 1;
+			frame& f = stack[fi];
+			if (f.pi < f.packs.size()) {
+				const pnodes& pack = f.packs[f.pi];
+				if (f.ei < pack.size()) {
+					pnode nxt = pack[f.ei++];
+					trefs& out = sink_of(f.flatten ? f.sink : fi);
+					if (!nxt.first.nt())
+						out.push_back(tree::get(nxt));
+					else if (visiting.count(nxt)) {
+						if (!is_ebnf(nxt))
+							out.push_back(tree::get(nxt));
+					} else open_node(nxt, fi);
+					continue;
+				}
+				if (f.amb) {
+					if (auto alt = tree::get(f.node, f.children); alt)
+						f.alts.push_back(alt);
+					f.children.clear();
+				}
+				f.pi++, f.ei = 0;
 				continue;
 			}
-			if (visiting.count(nxt)) continue;
-			visiting.insert(nxt);
-			bool ad_allowed = false;
-			auto packs = collect_packs(nxt, ad_allowed);
-			if (packs.size() == 1)
-				build_children(*packs.begin(), out);
-			else if (packs.size() > 1 && ad_allowed)
-				build_children(pick_best(packs), out);
-			else if (packs.size() > 1)
-				out.push_back(build_amb(nxt, packs));
-			visiting.erase(nxt);
+			tref r = nullptr;
+			if (f.amb) r = tree::get(pnode(g.nt(from_str<C>(
+				std::string("__AMB__"))), f.node.second), f.alts);
+			else if (!f.flatten) r = tree::get(f.node, f.children);
+			if (r) sink_of(f.sink).push_back(r);
+			visiting.erase(f.node);
+			stack.pop_back();
 		}
-	};
-
-	build_pack = [&](const pnode& node, const pnodes& pack) {
-		trefs children;
-		build_children(pack, children);
-		return tree::get(node, children);
-	};
-
-	build = [&](const pnode& node) -> tref {
-		if (!node.first.nt()) return tree::get(node);
-		if (visiting.count(node)) return tree::get(node);
-		visiting.insert(node);
-
-		bool ad_allowed = false;
-		auto packs = collect_packs(node, ad_allowed);
-
-		tref r;
-		if (packs.empty()) {
-			r = tree::get(node);
-		} else if (packs.size() == 1) {
-			r = build_pack(node, *packs.begin());
-		} else if (ad_allowed) {
-			r = build_pack(node, pick_best(packs));
-		} else {
-			r = build_amb(node, packs);
-		}
-
-		visiting.erase(node);
-		return r;
+		return result.empty() ? nullptr : result[0];
 	};
 
 	tref ret = report_.step(po.measure_scopes && po.measure_forest,
