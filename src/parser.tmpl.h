@@ -1168,6 +1168,7 @@ parser<C, T>::result parser<C, T>::_parse() {
 	}
 
 	parse_scope.reset();
+	release_chart();
 	if (po.tree_path == parse_tree_path::bintree_path) {
 		result r(*this, std::move(in_), fr, fnd, err);
 		po = o.parse_opts;
@@ -1176,6 +1177,17 @@ parser<C, T>::result parser<C, T>::_parse() {
 	result r(*this, std::move(in_), std::move(f), fnd, err);
 	po = o.parse_opts;
 	return r;
+}
+// The tree and the error report are built. The chart of this parse goes
+// back to the allocator instead of staying in the parser until the next parse.
+template <typename C, typename T>
+void parser<C, T>::release_chart() {
+	auto drop = [](auto& c) { std::decay_t<decltype(c)> e; std::swap(c, e); };
+	drop(S), drop(U), drop(snapshot_), drop(revisit_), drop(fromS),
+	drop(cache), drop(refi), drop(gcready), drop(bin_tnt),
+	drop(sorted_citem), drop(rsorted_citem), drop(completion_deps),
+	drop(completion_count), drop(counted_completions), drop(forward_deps),
+	drop(complete_memo), drop(dyn_child_span);
 }
 template <typename C, typename T>
 bool parser<C, T>::found(size_t start) {
