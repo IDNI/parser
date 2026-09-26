@@ -43,7 +43,7 @@ struct Result {
     std::string name;
     double ms;
     size_t ops;
-    double ops_per_sec() const { return ops / (ms / 1000.0); }
+    double ops_per_sec() const { return static_cast<double>(ops) / (ms / 1000.0); }
 };
 
 void print(const Result& r) {

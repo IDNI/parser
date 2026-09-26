@@ -4,6 +4,8 @@
 #ifndef __IDNI__PARSER__UTILITY__TERM_H__
 #define __IDNI__PARSER__UTILITY__TERM_H__
 
+#include <cstddef>
+
 // #define TERM_DEBUG 1
 #ifdef TERM_DEBUG
 #	define TDBG(x) x
@@ -18,15 +20,16 @@ void close();
 void enable_getline_mode();
 void disable_getline_mode();
 void clear();
-int in(char& c);
-int in(char* s, size_t l);
+/// Byte count read, or -1 on error: read(2) returns a signed count.
+std::ptrdiff_t in(char& c);
+std::ptrdiff_t in(char* s, size_t l);
 void out(const char* data, size_t size);
 void out(const std::string& str);
 void clear_line();
-void cursor_up(int n = 1);
-void cursor_down(int n = 1);
-void cursor_right(int n = 1);
-void cursor_left(int n = 1);
+void cursor_up(size_t n = 1);
+void cursor_down(size_t n = 1);
+void cursor_right(size_t n = 1);
+void cursor_left(size_t n = 1);
 std::pair<unsigned short, unsigned short> get_termsize();
 bool is_tty();
 

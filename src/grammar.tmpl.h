@@ -518,13 +518,14 @@ grammar<C, T>::grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
 		if (c.size() > 1) conjunctives.insert(G.size()-1);
 		if (p.guard) {
 			//DBG(std::cout << "\tguard: " << p.guard.value() << "\n";)
-			size_t gid;
-			auto it = std::find(guards.begin(), guards.end(),
-							p.guard.value());
-			if (it != guards.end())
-				gid = std::distance(guards.begin(), it);
-			else    guards.push_back(p.guard.value()),
-				gid = guards.size() - 1;
+			size_t gid = guards.size();
+			for (size_t i = 0; i < guards.size(); ++i)
+				if (guards[i] == p.guard.value()) {
+					gid = i;
+					break;
+				}
+			if (gid == guards.size())
+				guards.push_back(p.guard.value());
 			grdm[G.size()-1] = gid;
 		}
 	}
@@ -915,7 +916,7 @@ std::ostream& grammar<C, T>::print_production(std::ostream& os,
 	const size_t p, bool print_ids, const term::colors& TC) const
 {
 	const int ID_SIZE   = 6;
-	const int HEAD_SIZE = 20;
+	const size_t HEAD_SIZE = 20;
 	auto nt_begin = [this, &TC](const lit<C, T>& l) {
 		if (!l.nt()) return std::string{};
 		return is_cc_fn(l.n()) ? TC_CC : TC_NT;
@@ -930,8 +931,9 @@ std::ostream& grammar<C, T>::print_production(std::ostream& os,
 	std::string head_id = ss.str();
 	os << nt_begin(G[p].first) << head << TC_DEFAULT
 		<< TC_NT_ID << head_id << TC_DEFAULT;
-	int len = HEAD_SIZE-head.size()-head_id.size();
-	for (int i = 0; i < len; ++i) os <<" ";
+	size_t len = head.size() + head_id.size() < HEAD_SIZE
+			? HEAD_SIZE - head.size() - head_id.size() : 0;
+	for (size_t i = 0; i < len; ++i) os <<" ";
 	os << " =>";
 	size_t j = 0;
 	for (const auto& c : G[p].second) {

@@ -748,11 +748,11 @@ public:
 		bool is_t() const;
 		std::string get_terminals() const;
 		size_t get_nt() const;
-		char get_t() const;
+		T get_t() const;
 
 		// provide also same api as literal
 		bool nt() const { return this->value.first.nt(); }
-		char t() const { return this->value.first.t(); }
+		T t() const { return this->value.first.t(); }
 		size_t n() const { return this->value.first.n(); }
 		bool is_null() const { return this->value.first.is_null(); }
 
@@ -934,8 +934,8 @@ public:
 			INFO_DETAILED,
 			INFO_ROOT_CAUSE
 		};
-		/// Location of error.
-		int_t loc;
+		/// Location of error, SIZE_MAX when unset.
+		size_t loc;
 		/// Line of error.
 		size_t line = 0;
 		/// Column of error.
@@ -954,7 +954,7 @@ public:
 
 		/// List of expected token and respective productions
 		std::vector<exp_prod_t> expv;
-		error() : loc(-1) {}
+		error() : loc(SIZE_MAX) {}
 		bool at_eof() const;
 		/// Produces a string containing human readable information about the error.
 		std::string to_str(info_lvl lv = INFO_DETAILED,

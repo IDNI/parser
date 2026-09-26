@@ -293,7 +293,7 @@ void generate_parser_cpp(const std::string& tgf_filename,
 	os <<	"\n";
 	if (opt.ns.size()) os << "namespace " << opt.ns << " {\n\n";
 	os << "namespace " << opt.name << "_data {\n\n";
-	size_t nt_bits = std::ceil(std::log2(gi.nts().size()));
+	size_t nt_bits = static_cast<size_t>(std::ceil(std::log2(gi.nts().size())));
 	os <<
 		"using char_type     = " << opt.char_type << ";\n"
 		"using terminal_type = " << opt.terminal_type << ";\n"

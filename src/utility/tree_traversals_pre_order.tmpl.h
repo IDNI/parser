@@ -306,8 +306,9 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 		if (c == nullptr) {
 			// Check if children actually changed
 			auto ch_range = tree::get(c_node).children();
-			if (std::equal(stack.begin() + (upos.back() + 1),
-				stack.end(), ch_range.begin(), ch_range.end()))
+			if (std::equal(stack.data() + (upos.back() + 1),
+				stack.data() + stack.size(),
+				ch_range.begin(), ch_range.end()))
 			{
 				// Call up
 				upos.pop_back();
@@ -321,7 +322,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				}
 				c_node = res;
 				// Pop children from stacks
-				stack.erase(stack.end() - c_pos, stack.end());
+				stack.resize(stack.size() - c_pos);
 #ifdef MEASURE_TRAVERSER_DEPTH
 				dec_depth();
 #endif //MEASURE_TRAVERSER_DEPTH
@@ -334,7 +335,7 @@ tref pre_order<node>::traverse(tref n, auto& f, auto& visit_subtree, auto& up)
 				tree::get(c_node).right_sibling());
 			DBGT(std::cout << "\tnew node: " << tree::get(res).dump_to_str() << "\n";)
 			// Pop children from stacks
-			stack.erase(stack.end() - c_pos, stack.end());
+			stack.resize(stack.size() - c_pos);
 			if (res == nullptr) return nullptr;
 			// Call up
 			upos.pop_back();
@@ -468,7 +469,7 @@ void pre_order<node>::const_traverse(tref n, auto& visitor,
 			call(up, c_node, get_parent(), "up2");
 
 			// Pop children from stacks
-			stack.erase(stack.end() - c_pos, stack.end());
+			stack.resize(stack.size() - c_pos);
 			// Node is finished. Call between if has right sibling
 			if (c_tree.has_right_sibling())
 				call(between, c_node, get_parent(), "between");

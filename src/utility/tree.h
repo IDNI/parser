@@ -1472,7 +1472,7 @@ struct std::hash<const idni::bintree<T>> {
 template <typename T>
 struct std::hash<idni::bintree<T>> {
 	size_t operator()(const idni::bintree<T>& b) const noexcept {
-		return b.hash;
+		return static_cast<size_t>(b.hash);
 	}
 };
 

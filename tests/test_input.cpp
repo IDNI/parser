@@ -16,7 +16,7 @@ auto u8conv = [](parser<char, char32_t>::input& in) {
 	utf8char s[4] = {0,0,0,0};
 	char32_t ch;
 	for (uint8_t p = 0; p != 3; ++p) {
-		s[p] = in.cur();
+		s[p] = static_cast<utf8char>(in.cur());
 		//cout << "\n\ns["<<(unsigned int)p<<"]:("<<(unsigned int)s[p]<<")\n";
 		if (!is_mb_codepoint(s[p], p))
 			return peek_codepoint(s, p+1, ch), in.next(), r = {ch};

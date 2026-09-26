@@ -20,7 +20,7 @@ inline std::vector<char32_t> utf8_to_u32_conv(
 	std::vector<char32_t> r;
 	if (in.eof()) return r;
 	idni::utf8char s[4] = { 0, 0, 0, 0 };
-	s[0] = in.cur();
+	s[0] = static_cast<utf8char>(in.cur());
 	// Expected sequence length from the lead byte. Anything not in
 	// the 0xC2..0xF4 range is treated as a 1-byte (mostly invalid)
 	// run; ASCII falls through here too with len = 1.
@@ -39,7 +39,7 @@ inline std::vector<char32_t> utf8_to_u32_conv(
 	// so the next decode() call sees them.
 	for (size_t i = 1; i < len; ++i) {
 		if (in.eof()) break;
-		s[i] = in.cur();
+		s[i] = static_cast<utf8char>(in.cur());
 		if ((s[i] & 0xC0) != 0x80) break;
 		in.next();
 		got = i + 1;

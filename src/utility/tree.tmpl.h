@@ -503,14 +503,15 @@ void bintree<T>::hash_group_stats(size_t& distinct_hashes,
 
 template <typename T>
 size_t hash_tref<T>::operator()(tref r) const {
-	return bintree<T>::get(r).hash;
+	return static_cast<size_t>(bintree<T>::get(r).hash);
 }
 
 template<typename T>
 size_t hash_lcrs_tref<T>::operator()(tref r) const {
 	const lcrs_tree<T>& n = lcrs_tree<T>::get(r);
 	std::uint64_t seed = 0;
-	const size_t hash_l = n.l == nullptr ? 0 : lcrs_tree<T>::get(n.l).hash;
+	const size_t hash_l = n.l == nullptr
+		? 0 : static_cast<size_t>(lcrs_tree<T>::get(n.l).hash);
 	if constexpr (requires { n.value.hash; })
 		hash_combine(seed, n.value.hash, hash_l);
 	else    hash_combine(seed, n.value, hash_l);
@@ -1235,5 +1236,5 @@ tref merge_trees(tref a, tref b, JoinFn&& join_fn, MismatchFn&& mismatch_fn) {
 template<typename T>
 size_t std::hash<const idni::bintree<T>>::operator()(
 	const idni::bintree<T>& b) const noexcept {
-	return b.hash;
+	return static_cast<size_t>(b.hash);
 }

@@ -648,9 +648,10 @@ int main(int argc, char **argv)
 		auto gen_npnmn = [](size_t n){
 			string s="n";
 			string ch = "pme";
+			const auto nch = ch.end() - ch.begin();
 			for (size_t i = 0; i < n - 2; i++){
 				if (i&1) s += 'n';
-				else s += ch[rand() % 3];
+				else s += *(ch.begin() + std::rand() % nch);
 			}
 			if (~s.size()&1) s += 'n';
 			return s;

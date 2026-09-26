@@ -18,6 +18,10 @@ function(target_setup target access compile_definitions compile_options link_opt
 			-Wstrict-aliasing=2
 			-Wfloat-equal
 			-Wwrite-strings
+			# Value-losing and sign conversions are errors in the -Werror
+			# configurations. -Wsign-conversion is named explicitly because
+			# GCC's -Wconversion does not report sign changes.
+			-Wconversion -Wsign-conversion
 			$<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:-Werror>
 			# -Wfatal-errors
 		)
@@ -49,6 +53,15 @@ function(target_setup target access compile_definitions compile_options link_opt
 			NOMINMAX
 			WIN32_LEAN_AND_MEAN
 			_CRT_DECLARE_NONSTDC_NAMES=0)
+	endif()
+	if(EMSCRIPTEN)
+		target_compile_options(${target} ${access}
+			# wasm32 is the only 32-bit target here. A 64-bit value narrowed
+			# to size_t truncates silently there instead of trapping, so this
+			# one stays fatal in every build type, not just the -Werror ones
+			# above.
+			-Werror=shorten-64-to-32
+		)
 	endif()
 	target_compile_options(${target} ${access} "${compile_options}")
 	target_compile_definitions_if(${target} ${access} "${compile_definitions}")

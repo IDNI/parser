@@ -185,9 +185,18 @@ static inline ftxui::Element ansi_to_element(const std::string& s) {
 	return spans.empty() ? text("") : hbox(spans);
 }
 
+// A line count feeds size_t positions, and std::count returns a signed
+// difference, so count newlines in size_t directly.
+static inline size_t count_newlines(const char* s, size_t n) {
+	size_t c = 0;
+	for (size_t i = 0; i != n; ++i) if (s[i] == '\n') ++c;
+	return c;
+}
+
 // Prints newlines so real rows exist below the cursor, then moves back up.
-static inline void pad_scroll_rows(int newlines, int moveup) {
-	if (newlines > 0) std::cout << std::string(newlines, '\n');
+static inline void pad_scroll_rows(size_t newlines, size_t moveup) {
+	if (newlines > 0)
+		std::cout << std::string(newlines, '\n');
 	if (moveup > 0) std::cout << "\033[" << moveup << "A";
 }
 
@@ -341,11 +350,11 @@ int repl_ftxui<evaluator_t>::run_interactive() {
 	// between, so the current line is reprinted from the buffer.
 	auto commit_input_rows = [this] {
 		screen_->WithRestoredIO([this] {
-			size_t cp = std::min((size_t)cursor_pos_, input_text_.size());
-			int cy = (int)std::count(input_text_.begin(),
-				input_text_.begin() + cp, '\n');
-			int h = (int)std::count(input_text_.begin(),
-				input_text_.end(), '\n') + 1;
+			size_t cp = std::min(static_cast<size_t>(cursor_pos_),
+				input_text_.size());
+			size_t cy = count_newlines(input_text_.data(), cp);
+			size_t h = count_newlines(input_text_.data(),
+				input_text_.size()) + 1;
 			size_t line_start = cy == 0 ? 0
 				: input_text_.rfind('\n', cp > 0 ? cp - 1 : 0) + 1;
 			size_t line_end = input_text_.find('\n', cp);
@@ -360,7 +369,7 @@ int repl_ftxui<evaluator_t>::run_interactive() {
 				? prompt : std::string(visible_width(prompt), ' '));
 			std::cout << input_text_.substr(line_start,
 				line_end - line_start);
-			int down = h - 1 - cy;
+			size_t down = h - 1 - cy;
 			if (down > 0) std::cout << "\033[" << down << "B";
 			std::cout << '\n';
 			pad_scroll_rows(h - 1, down);
@@ -449,10 +458,10 @@ int repl_ftxui<evaluator_t>::run_interactive() {
 		}
 		// Ctrl+W: delete word backward (alphanumeric word boundaries).
 		if (e == Event::CtrlW) {
-			int cp = std::min(cursor_pos_,
-			                  (int)input_text_.size());
+			size_t cp = std::min(static_cast<size_t>(cursor_pos_),
+			                  input_text_.size());
 			if (cp == 0) return true;
-			int end = cp;
+			size_t end = cp;
 			// skip trailing non-alnum
 			while (cp > 0 && !std::isalnum(
 			        (unsigned char)input_text_[cp - 1]))
@@ -462,7 +471,7 @@ int repl_ftxui<evaluator_t>::run_interactive() {
 			        (unsigned char)input_text_[cp - 1]))
 				--cp;
 			input_text_.erase(cp, end - cp);
-			cursor_pos_ = cp;
+			cursor_pos_ = static_cast<int>(cp);
 			return true;
 		}
 		// Ctrl+C: cancel a non-empty buffer in place (FTXUI redraws a clean
@@ -613,7 +622,8 @@ void repl_eval_widget<evaluator_t>::drain_output(bool flush_partial) {
 		std::cout.flush();
 		std::cerr.flush();
 		// Scrolls past the next frame's stale reset-cursor move so it lands below this text, not on it.
-		int dy = screen_->dimy() - 1;
+		const int dimy = screen_->dimy();
+		const size_t dy = dimy > 0 ? static_cast<size_t>(dimy - 1) : 0;
 		pad_scroll_rows(dy, dy);
 		std::cout.flush();
 	})();
@@ -649,7 +659,7 @@ void repl_ftxui<evaluator_t>::apply_eval_result(int result,
 	if (result == 2 && allow_incomplete) {
 		input_text_ = text;
 		size_t cp = std::min(static_cast<size_t>(cursor), input_text_.size());
-		input_text_.insert(input_text_.begin() + cp, '\n');
+		input_text_.insert(cp, 1, '\n');
 		cursor_pos_ = static_cast<int>(cp) + 1;
 	} else {
 		if (store) store_history(text);

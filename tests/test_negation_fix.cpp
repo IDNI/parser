@@ -8,8 +8,8 @@
 // exercising the exact code path the fix addresses.
 //
 // Build:
-//   g++ -std=c++23 -O1 -DTAU_PARSER_BUILD_HEADER_ONLY \
-//       -I../src -I../build/release/_deps/unordered_dense-src/include \
+//   g++ -std=c++23 -O1 -DTAU_PARSER_BUILD_HEADER_ONLY
+//       -I../src -I../build/release/_deps/unordered_dense-src/include
 //       -o test_negation_fix test_negation_fix.cpp && ./test_negation_fix
 
 #include "parser.h"

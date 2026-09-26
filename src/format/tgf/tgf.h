@@ -828,8 +828,8 @@ private:
 					(char)idni::escapes::hex_val(digits[0]));
 			} else {
 				for (size_t i = 0; i + 1 < digits.size(); i += 2) {
-					int hi = idni::escapes::hex_val(digits[i]);
-					int lo = idni::escapes::hex_val(digits[i+1]);
+					auto hi = idni::escapes::hex_val(digits[i]);
+					auto lo = idni::escapes::hex_val(digits[i+1]);
 					bytes.push_back(
 						(char)((hi << 4) | lo));
 				}

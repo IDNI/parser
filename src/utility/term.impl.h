@@ -45,8 +45,8 @@ inline bool open() {
 #ifndef _WIN32
 	tcgetattr(STDIN_FILENO, &orig_attrs);
 	raw_attrs = orig_attrs;
-	raw_attrs.c_lflag &= ~(ECHO | ICANON | ISIG);
-	raw_attrs.c_iflag &= ~(IXON);
+	raw_attrs.c_lflag &= ~static_cast<tcflag_t>(ECHO | ICANON | ISIG);
+	raw_attrs.c_iflag &= ~static_cast<tcflag_t>(IXON);
 	raw_attrs.c_cc[VMIN] = 0;
 	raw_attrs.c_cc[VTIME] = 1;
 	tcsetattr(STDIN_FILENO, TCSANOW, &raw_attrs);
@@ -157,9 +157,11 @@ inline std::vector<char> translate_virtual_key(WORD vk, DWORD controlState) {
 }
 #endif
 
-inline int in(char& c) {
+inline std::ptrdiff_t in(char& c) {
 #ifndef _WIN32
-	return read(STDIN_FILENO, &c, 1);
+	const std::ptrdiff_t n = read(STDIN_FILENO, &c, 1);
+	if (n == -1) return -1;
+	return n;
 #else
 	if (!input_buffer.empty()) {
 		c = input_buffer.front();
@@ -201,9 +203,11 @@ inline int in(char& c) {
 #endif
 }
 
-inline int in(char* s, size_t l) {
+inline std::ptrdiff_t in(char* s, size_t l) {
 #ifndef _WIN32
-	return read(STDIN_FILENO, &s, l);
+	const std::ptrdiff_t n = read(STDIN_FILENO, s, l);
+	if (n == -1) return -1;
+	return n;
 #else
 	size_t count = 0;
 	while (count < l) {
@@ -219,8 +223,8 @@ inline void out(const char* data, size_t size) {
 	// TODO (HIGH) handle write errors
 	if (size == 0) return;
 #ifndef _WIN32
-	size_t written = write(STDOUT_FILENO, data, size);
-	if (written != size)
+	const ssize_t written = write(STDOUT_FILENO, data, size);
+	if (written < 0 || static_cast<size_t>(written) != size)
 #else
 	DWORD written;
 	if (!init()) return;
@@ -239,29 +243,28 @@ inline void clear_line() {
 	out("\r\033[K", 4);
 }
 
-inline void cursor_up(int n) {
+// Direction moves one axis: A/B up/down, C/D right/left. The count is a
+// magnitude, so the caller names the direction instead of the sign.
+inline void cursor_move(size_t n, char dir) {
+	if (n == 0) return;
+	std::stringstream ss;
+	ss << "\033[" << n << dir;
+	out(ss.str().c_str(), ss.str().size());
+}
+
+inline void cursor_up(size_t n) {
 	TDBG(std::cerr << " <UP: " << n << ">";)
-	if (n == 0) return;
-	bool down = n < 0;
-	n = abs(n);
-	std::stringstream ss;
-	ss << "\033[" << (n ? n : 1) << (down ? "B" : "A");
-	out(ss.str().c_str(), ss.str().size());
+	cursor_move(n, 'A');
 }
 
-inline void cursor_down(int n) { cursor_up(-n); }
+inline void cursor_down(size_t n) { cursor_move(n, 'B'); }
 
-inline void cursor_right(int n) {
+inline void cursor_right(size_t n) {
 	TDBG(std::cerr << " <RIGHT: " << n << ">";)
-	if (n == 0) return;
-	bool left = n < 0;
-	n = abs(n);
-	std::stringstream ss;
-	ss << "\033[" << (n ? n : 1) << (left ? "D" : "C");
-	out(ss.str().c_str(), ss.str().size());
+	cursor_move(n, 'C');
 }
 
-inline void cursor_left(int n) { cursor_right(-n); }
+inline void cursor_left(size_t n) { cursor_move(n, 'D'); }
 
 inline std::pair<unsigned short, unsigned short> get_termsize() {
 #ifndef _WIN32

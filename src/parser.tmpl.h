@@ -92,11 +92,15 @@ parser<C, T>::input::input(int fd, size_t max_l, decoder_type decoder,
 	l(0), max_l(max_l), d(0)
 {
 	if (fd != -1) {
-		l = lseek(fd, 0, SEEK_END);
-		if (l == 0 || (max_l > 0 && l > max_l)) l = max_l;
-		void* r = mmap(nullptr, l, PROT_READ, MAP_PRIVATE, fd, 0);
-		if (r == MAP_FAILED) d = 0, l = 0, max_l = 0;
-		else d = reinterpret_cast<const C*>(r);
+		const off_t fsize = lseek(fd, 0, SEEK_END);
+		if (fsize == -1) d = 0, l = 0, max_l = 0;
+		else {
+			l = static_cast<size_t>(fsize);
+			if (l == 0 || (max_l > 0 && l > max_l)) l = max_l;
+			void* r = mmap(nullptr, l, PROT_READ, MAP_PRIVATE, fd, 0);
+			if (r == MAP_FAILED) d = 0, l = 0, max_l = 0;
+			else d = reinterpret_cast<const C*>(r);
+		}
 		close(fd);
 	}
 }
@@ -119,14 +123,16 @@ template <typename C, typename T>
 void parser<C, T>::input::clear() { if (isstream()) sgood = sb != nullptr; }
 template <typename C, typename T>
 C parser<C, T>::input::cur() {
-	if (isstream()) return sgood ? sb->sgetc() : e;
-	return n < l && (max_l == 0 || n < max_l) ? d[n] : e;
+	if (isstream()) return static_cast<C>(sgood ? sb->sgetc() : e);
+	return static_cast<C>(n < l && (max_l == 0 || n < max_l) ? d[n] : e);
 }
 template <typename C, typename T>
 bool parser<C, T>::input::next() {
 	if (isstream()) {
 		if (!sgood) return false;
-		n = sb->pubseekoff(0, std::ios_base::cur, std::ios_base::in);
+		const std::streamoff o = sb->pubseekoff(0, std::ios_base::cur,
+							std::ios_base::in);
+		n = o == -1 ? 0 : static_cast<size_t>(o);
 		int_type c = sb->sbumpc();
 		if (c == e) sgood = false;
 		return l = n + (c == e ? 0 : 1), true;
@@ -139,9 +145,10 @@ template <typename C, typename T>
 bool parser<C, T>::input::eof() { return cur() == e; }
 template <typename C, typename T>
 C parser<C, T>::input::at(size_t p) {
-	if (isstream()) return sb->pubseekpos(p, std::ios_base::in),
-				sb->sbumpc();
-	if (p >= l || (max_l != 0 && p >= max_l)) return e;
+	if (isstream()) return static_cast<C>(
+				sb->pubseekpos(static_cast<std::streamoff>(p),
+					std::ios_base::in), sb->sbumpc());
+	if (p >= l || (max_l != 0 && p >= max_l)) return static_cast<C>(e);
 	return d[p];
 }
 template <typename C, typename T>
@@ -162,7 +169,7 @@ template <typename C, typename T>
 size_t parser<C, T>::input::tpos() { return tp; }
 template <typename C, typename T>
 T parser<C, T>::input::tat(size_t p) {
-	if (!decoder) return at(p);
+	if (!decoder) return static_cast<T>(at(p));
 	if (p >= ts.size()) return T();
 	return ts[p];
 }
@@ -252,7 +259,7 @@ std::pair<typename parser<C, T>::container_iter, bool>
 		return { sit, false };
 	auto [it, inserted] = t.insert(i);
 	if (!inserted) return { it, false };
-	const size_t pos = static_cast<size_t>(std::distance(t.begin(), it));
+	const auto pos = std::distance(t.begin(), it);
 	if (nullable(*it)) {
 		item j(it->set, it->prod, it->con, it->from, it->dot + 1);
 		// j shares i's set: the dot only skips a nullable literal, so
@@ -897,7 +904,7 @@ parser<C, T>::result parser<C, T>::_parse() {
 	size_t r = 1, cb = 0; // row and cel beginning
 	size_t proc = 0;
 	T ch = 0;
-	size_t cn = -1;
+	size_t cn = SIZE_MAX;
 	bool new_pos = true;
 	DBGP(print(std::cout << "\ninitial t:\n", t);)
 	do {
@@ -1298,11 +1305,11 @@ template <typename C, typename T>
 typename parser<C, T>::error parser<C, T>::get_error() {
 	error err;
 	auto& in = *in_;
-	auto near_ctxt = [&in](int_t from, int_t pos) {
+	auto near_ctxt = [&in](size_t from, size_t pos) {
 		std::vector<T> errctxt;
 		// using from as delimiter..
-		while (pos >= from)
-			errctxt.push_back(in.tat(pos--));
+		for (size_t p = pos + 1; p > from; )
+			errctxt.push_back(in.tat(--p));
 		return errctxt;
 	};
 	std::stringstream es;
@@ -1324,7 +1331,7 @@ typename parser<C, T>::error parser<C, T>::get_error() {
 	in.clear();
 	//DBGP(std::cout << "tpos: " << in.tpos() << "\n";)
 	//DBGP(print_S(std::cout << "S:\n") << "\n";)
-	for (int_t i = (int_t) in.tpos(); i >= 0; i--) if (S[i].size()) {
+	for (size_t i = in.tpos() + 1; i-- > 0; ) if (S[i].size()) {
 		//DBG(std::cout << "get_error i pos = " << i << "\n";)
 		// predict() skipped every production whose first literal
 		// could not match the character here; the report must
@@ -1387,16 +1394,20 @@ typename parser<C, T>::error parser<C, T>::get_error() {
 			}
 		}
 		if (!unexp_neg)
-			err.unexp = lits<C, T>{ { in.tat(i) } }, err.loc = i;
+			err.unexp = lits<C, T>{ { in.tat(i) } },
+				err.loc = i;
 
 		break;
 	}
 	err.line = 1;
-	size_t line_loc = 0;
-	for (int_t j = 0; err.loc > -1 && j != err.loc; ++j)
-		if (in.tat(j) == (T)'\n') err.line++, line_loc = j;
-	err.col = err.loc - line_loc + 1;
-	err.ctxt = near_ctxt(line_loc, err.loc + 1);
+	if (err.loc != SIZE_MAX) {
+		size_t line_loc = 0;
+		for (size_t j = 0; j != err.loc; ++j)
+			if (in.tat(j) == (T)'\n') err.line++, line_loc = j;
+		err.col = err.loc - line_loc + 1;
+		err.ctxt = near_ctxt(line_loc, err.loc + 1);
+	} else
+		err.ctxt = near_ctxt(0, 0);
 	return err;
 }
 template <typename C, typename T>
@@ -1433,8 +1444,8 @@ void parser<C, T>::pre_process(const item& i) {
 		// each temporary represents a partial rhs production with
 		// atleast 3 symbols
 		if (i.dot >= 2) {
-			std::vector<lit<C, T>> v(g[i.prod][i.con].begin(),
-					g[i.prod][i.con].begin() + i.dot);
+			std::vector<lit<C, T>> v(g[i.prod][i.con].data(),
+					g[i.prod][i.con].data() + i.dot);
 			lit<C, T> l;
 			if (bin_tnt.find(v) == bin_tnt.end()) {
 				l = g.nt(from_str<C>(get_fresh_tnt()));
@@ -1478,30 +1489,32 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 	auto pick_best = [](pnodes_set& packs) -> pnodes {
 		if (packs.size() <= 1)
 			return packs.empty() ? pnodes{} : *packs.begin();
-		int maxk = INT_MAX;
-		for (auto& p : packs)
-			if ((int)p.size() < maxk) maxk = (int)p.size();
-		std::vector<int> idxs;
-		for (size_t i = 0; i < packs.size(); i++)
-			idxs.push_back((int)i);
-		int k = 0;
-		while (k < maxk && idxs.size() > 1) {
-			int gspan = INT_MAX;
-			std::vector<int> gi;
-			for (auto idx : idxs) {
-				auto& pk = *std::next(packs.begin(), idx);
-				int span = (int)(pk[k]->second[1]
-						- pk[k]->second[0]);
+		// iterator views of the set: the pack index is a container
+		// subscript for [k] and a signed difference for std::next, so
+		// only an iterator keeps both free of a sign conversion
+		std::vector<typename pnodes_set::const_iterator> cand;
+		for (auto it = packs.begin(); it != packs.end(); ++it)
+			cand.push_back(it);
+		size_t maxk = cand.front()->size();
+		for (auto it : cand)
+			if (it->size() < maxk) maxk = it->size();
+		size_t k = 0;
+		while (k < maxk && cand.size() > 1) {
+			size_t gspan = SIZE_MAX;
+			std::vector<typename pnodes_set::const_iterator> gi;
+			for (auto it : cand) {
+				const pnode& n = (*it)[k];
+				size_t span = n.second[1] - n.second[0];
 				if (span < gspan) {
 					gspan = span; gi.clear();
-					gi.push_back(idx);
+					gi.push_back(it);
 				} else if (span == gspan)
-					gi.push_back(idx);
+					gi.push_back(it);
 			}
-			idxs = std::move(gi);
+			cand = std::move(gi);
 			k++;
 		}
-		return *std::next(packs.begin(), idxs[0]);
+		return *cand.front();
 	};
 
 	auto is_ebnf = [](const pnode& n) -> bool {
@@ -1666,7 +1679,7 @@ void parser<C, T>::sbl_chd_forest(const item& eitem,
 		size_t lastpos = curchd.size();
 		curchd.push_back(pnode(nxtlit, { from, to })),
 		sbl_chd_forest(eitem, curchd, xfrom, ambset);
-		curchd.erase(curchd.begin() + lastpos, curchd.end());
+		curchd.resize(lastpos);
 	} else {
 		// get the from/to span of all non-terminals in the rhs of production.
 		size_t from = xfrom;
@@ -1681,7 +1694,7 @@ void parser<C, T>::sbl_chd_forest(const item& eitem,
 			curchd.push_back(pnode(nxtlit, { from, v.set })),
 			xfrom = v.set,
 			sbl_chd_forest(eitem, curchd, xfrom, ambset);
-			curchd.erase(curchd.begin() + lastpos, curchd.end());
+			curchd.resize(lastpos);
 		}
 	}
 }
@@ -1711,8 +1724,8 @@ bool parser<C, T>::binarize_comb(const item& eitem,
 	// many literals in rhs
 	if (eitem.dot > 2) {
 		//DBG(print(std::cout, eitem);)
-		std::vector<lit<C, T>> v(g[eitem.prod][eitem.con].begin(),
-			g[eitem.prod][eitem.con].begin() + eitem.dot - 1);
+		std::vector<lit<C, T>> v(g[eitem.prod][eitem.con].data(),
+			g[eitem.prod][eitem.con].data() + eitem.dot - 1);
 		//DBG(assert(bin_tnt.find(v) != bin_tnt.end());)
 		const lit<C, T>& leftlit = bin_tnt[v];
 		//DBG(std::cout << "\n" << d->get(bin_tnt[v].n()) << std::endl);
@@ -1816,31 +1829,33 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 
 		// resolve ambiguity if WITHIN production, where same production with same symbols
 		// of different individual span
-		std::vector<int> gi;
-		int k = 0;
-		std::vector<int> idxs;
-		for(size_t i = 0; i < ambset.size(); i++) idxs.push_back(i);
+		// iterator views of the set: the pack index is a container
+		// subscript for [k] and a signed difference for std::next, so
+		// only an iterator keeps both free of a sign conversion
+		std::vector<typename pnodes_set::const_iterator> cand;
+		for (auto it = ambset.begin(); it != ambset.end(); ++it)
+			cand.push_back(it);
 		// smallest node count in ambset
-		int maxk = INT_MAX;
-		for(auto& pack : ambset)
-			if ((int)pack.size() < maxk) maxk = pack.size();
+		size_t maxk = cand.empty() ? 0 : cand.front()->size();
+		for (auto it : cand)
+			if (it->size() < maxk) maxk = it->size();
 
 
 		//choose the one with the first smallest span from upto size of
 		// smallest set in ambset
+		size_t k = 0;
+		std::vector<typename pnodes_set::const_iterator> gi;
 		do {
 			gi.clear();
-			int gspan = INT_MAX;
-			for (auto packidx : idxs) {
-				auto apack = *next(ambset.begin(), packidx);
-				pnode lt = apack[k];
-				int span = lt.second[1] - lt.second[0];
-				if (gspan == span) gi.push_back(packidx);
+			size_t gspan = SIZE_MAX;
+			for (auto it : cand) {
+				const pnode& n = (*it)[k];
+				size_t span = n.second[1] - n.second[0];
+				if (gspan == span) gi.push_back(it);
 				if (gspan > span) gspan = span,
-						gi.clear(), gi.push_back(packidx);
+						gi.clear(), gi.push_back(it);
 			}
-			idxs.clear();
-			idxs.insert(idxs.begin(),gi.begin(),gi.end());
+			cand = gi;
 		}
 		while(++k < maxk && gi.size() > 1);
 
@@ -1848,7 +1863,7 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 		if (ambset.size())
 			cambset.insert(
 				gi.size()
-					? *next(ambset.begin(), gi[0])
+					? *gi[0]
 					: *ambset.begin());
 
 	//std::cout <<" camb "<< cambset.size() << std::endl;
@@ -1887,15 +1902,16 @@ std::basic_string<T> parser<C, T>::input::get_terminals(
 	if (decoder) {
 		if (start > ts.size()) start = ts.size();
 		if (end > ts.size()) end = ts.size();
-		return std::basic_string<T>(ts.begin() + start,
-			ts.begin() + end);
+		return std::basic_string<T>(ts.data() + start,
+			ts.data() + end);
 	}
 	// No decoder: Only valid when the parser's char_type and terminal_type match
 	if constexpr (std::is_same_v<C, T>) {
 		if (!isstream()) return std::basic_string<T>(d + start,
 								end - start);
 		std::basic_string<T> r;
-		sb->pubseekpos(start, std::ios_base::in);
+		sb->pubseekpos(static_cast<std::streamoff>(start),
+				std::ios_base::in);
 		while (end > start++)
 			r.push_back(traits_type::to_char_type(sb->sbumpc()));
 		return clear(), r;

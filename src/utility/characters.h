@@ -45,6 +45,7 @@ std::string to_std_string(const utf8string& s);
 std::string to_std_string(const std::u32string& s);
 std::string to_std_string(const std::u16string& s);
 std::string to_std_string(const char32_t& ch);
+std::string to_std_string(char ch);
 #ifdef _WIN32
 std::wstring utf8_to_wide(const std::string& s);
 std::string  wide_to_utf8(const std::wstring& w);

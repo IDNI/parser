@@ -150,7 +150,7 @@ private:
 	std::ostream* out_ = &std::cout;
 	std::ostream* err_ = &std::cerr;
 
-	int process_arg(int& arg, bool& has_cmd, options& opts);
+	int process_arg(size_t& arg, bool& has_cmd, options& opts);
 };
 
 template <typename T> T cli::option::get() const {

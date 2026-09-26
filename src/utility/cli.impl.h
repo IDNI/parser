@@ -65,7 +65,7 @@ inline std::string long_for(char c, const cli::options& opts) {
 
 inline std::ostream& info_new_line(std::ostream& os, size_t indent) {
 	os << "#";
-	for (int i = indent; i--; ) os << "\t";
+	for (size_t i = indent; i--; ) os << "\t";
 	os << " ";
 	return os;
 };
@@ -262,7 +262,7 @@ inline std::ostream& cli::help(std::ostream& os, command cmd) const {
 // if it is a command, returns 2
 // if it is invalid option and we dont have a command returns 3
 // if it is invalid option and we have a command returns 1
-inline int cli::process_arg(int& arg, bool& has_cmd, options& opts) {
+inline int cli::process_arg(size_t& arg, bool& has_cmd, options& opts) {
 	//DBG(cout << "process_arg: " << arg << " args[arg]: " << args_[arg] << "\n";)
 	cli::option* cur = 0;
 	std::string opt(args_[arg]);
@@ -319,14 +319,14 @@ inline int cli::process_arg(int& arg, bool& has_cmd, options& opts) {
 		if (has_option_value) cur->set(is_true_value(option_value));
 		else {
 			bool value = true;
-			if (arg < int(args_.size())
+			if (arg < args_.size()
 					&& parse_bool_value(args_[arg], value)) ++arg;
 			cur->set(value);
 		}
 		return 0;
 	}
 	if (!has_option_value) {
-		if (arg >= int(args_.size()) || is_opt_prefix(args_[arg]))
+		if (arg >= args_.size() || is_opt_prefix(args_[arg]))
 			return error("Missing argument for option: --"+cur->name());
 		option_value = args_[arg++];
 	}
@@ -344,7 +344,7 @@ inline int cli::process_arg(int& arg, bool& has_cmd, options& opts) {
 
 // processes CLI args provided and populates cmd_ and options_ with values
 inline int cli::process_args() {
-	int argc(args_.size());
+	size_t argc(args_.size());
 
 //#ifdef DEBUG
 //	cout << "== DEBUG ========================================"
@@ -360,7 +360,7 @@ inline int cli::process_args() {
 	bool has_cmd = false;
 	status_ = 0;
 	// get CLI options
-	int arg = 1;
+	size_t arg = 1;
 	for ( ; arg < argc; )
 		if ((status_ = process_arg(arg, has_cmd, opts_)) != 0) break;
 	//DBG(cout << "status: " << status_ << endl;)
