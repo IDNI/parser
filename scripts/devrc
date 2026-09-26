@@ -448,111 +448,18 @@ resolve_script() {
 # --- dep-*.sh helpers --------------------------------------------------
 #
 # The dep-*.sh scripts here and in tau-lang (e.g. dep-emsdk.sh in this repo)
-# each pull a handful of -D options, a --w64/--darwin/--emscripten platform
-# switch, an idempotency guard, and a clone-once git checkout. dep_entry
+# each pull a handful of -D options, a -DTAU_DEP_TARGET platform value,
+# an idempotency guard, and a clone-once git checkout. dep_entry
 # parses those options generically.
 
-# -D values are kept in plain DEP_VAR_<key> variables; bash 3.2 has no
-# associative arrays. Reset at load time so dep_var works without dep_entry.
-
-# Keys come from the command line, so fold non-identifier characters.
-dep_var_key() {
-	local k="${1//[^A-Za-z0-9_]/_}"
-	printf 'DEP_VAR_%s' "$k"
-}
-
-# what to unset on the next reset
-DEP_VAR_KEYS=""
-dep_vars_reset() {
-	local k
-	for k in $DEP_VAR_KEYS; do unset "$k"; done
-	DEP_VAR_KEYS=""
-}
+# The build configuration and invocation live in the narrow module the
+# producers hash. This driver keeps the publish side and the dist helpers,
+# and is provenance, not an id input.
+source "${__devrc_dir}/dep-build"
 
 dep_vars_reset
 DEP_POSITIONAL=()
 DEP_TARGET="native"
-
-dep_entry() {
-	dep_vars_reset
-	DEP_POSITIONAL=()
-	DEP_TARGET="native"
-	local arg name value key
-	for arg in "$@"; do
-		case "$arg" in
-			--w64)
-				DEP_TARGET="w64"
-				;;
-			--darwin)
-				DEP_TARGET="darwin"
-				;;
-			--emscripten)
-				DEP_TARGET="emscripten"
-				;;
-			-D*=*)
-				name="${arg#-D}"
-				name="${name%%=*}"
-				value="${arg#-D"${name}"=}"
-				key="$(dep_var_key "$name")"
-				printf -v "$key" '%s' "$value"
-				DEP_VAR_KEYS="$DEP_VAR_KEYS $key"
-				;;
-			*)
-				DEP_POSITIONAL+=("$arg")
-				;;
-		esac
-	done
-}
-
-# An empty value falls back to the default: `-DTAU_BUILD_JOBS=` reaches here
-# whenever a caller interpolates an unset variable into a -D flag, and an
-# empty jobs count would otherwise expand to a bare `make -j`, i.e.
-# unbounded parallelism.
-dep_var() {
-	local name="$1" default="${2:-}" key value
-	key="$(dep_var_key "$name")"
-	# unset and empty both fall back to the default
-	value="${!key-}"
-	if [[ -n "$value" ]]; then
-		echo "$value"
-	else
-		echo "$default"
-	fi
-}
-
-# cmake -P warns and ignores a trailing empty-string command-line argument,
-# so only pass "requested" through when dep_var actually found a -D; a
-# missing arg is exactly what tau-resolve.cmake treats as "none given"
-# anyway.
-_tau_resolve() {
-	local var="$1" requested="$2"
-	if [[ -n "$requested" ]]; then
-		cmake -P "${__devrc_dir}/../cmake/tau-resolve.cmake" "$var" "$requested"
-	else
-		cmake -P "${__devrc_dir}/../cmake/tau-resolve.cmake" "$var"
-	fi
-}
-
-# -D beats the environment beats ~/.tau. cmake/tau-resolve.cmake is the
-# single definition of the rule; this asks it (via `cmake -P`) rather than
-# restating the rule in bash, so the shell and CMake sides cannot disagree
-# about where a dependency landed. Only the explicit -D value (if any) is
-# passed through as "requested" -- tau-resolve.cmake itself checks the
-# TAU_SHARED_PREFIX environment variable and falls back to ~/.tau.
-dep_shared_prefix() {
-	_tau_resolve TAU_SHARED_PREFIX "$(dep_var TAU_SHARED_PREFIX "")"
-}
-
-# -D beats the environment beats half the logical core count (rounded up,
-# minimum 1). cmake/tau-resolve.cmake is the single definition of the rule;
-# this asks it (via `cmake -P`) rather than restating the rule in bash, so
-# the shell and CMake sides cannot disagree about how many jobs to use. Only
-# the explicit -D value (if any) is passed through as "requested" --
-# tau-resolve.cmake itself checks the TAU_BUILD_JOBS environment variable
-# and falls back to auto-detection.
-dep_jobs() {
-	_tau_resolve TAU_BUILD_JOBS "$(dep_var TAU_BUILD_JOBS "")"
-}
 
 dep_done_if_exists() {
 	local path="$1" label="$2"
@@ -673,4 +580,293 @@ dep_prebuilt() {
 		return 1
 	fi
 	echo "Prebuilt package installed at ${prefix}"
+}
+
+# Validate a shell variable name that dep_ensure may write to.
+_tau_dep_ensure_valid_name() {
+	case "$1" in
+		"") return 1 ;;
+		_tau_dep_ensure_*) return 1 ;;
+		*[!A-Za-z0-9_]*) return 1 ;;
+		[0-9]*) return 1 ;;
+		*) return 0 ;;
+	esac
+}
+
+# Remove the claim, staging, and field block owned by the current invocation.
+_tau_dep_ensure_cleanup() {
+	if [ -n "${_tau_dep_ensure_staging:-}" ]; then
+		rm -rf "$_tau_dep_ensure_staging"
+	fi
+	if [ -n "${_tau_dep_ensure_claim:-}" ]; then
+		rm -f "${_tau_dep_ensure_claim}/owner"
+		rmdir "$_tau_dep_ensure_claim" 2>/dev/null
+	fi
+	if [ -n "${_tau_dep_ensure_block_file:-}" ]; then
+		rm -f "$_tau_dep_ensure_block_file"
+	fi
+	_tau_dep_ensure_staging=""
+	_tau_dep_ensure_claim=""
+	_tau_dep_ensure_block_file=""
+}
+
+# EXIT trap for the producer subshell. It fires for a callback that calls
+# exit or otherwise terminates the shell, while the caller's frame is still
+# live, so the owned paths are visible. It preserves the exit status.
+_tau_dep_ensure_exit_trap() {
+	local _tau_dep_ensure_exit_rc=$?
+	_tau_dep_ensure_cleanup
+	trap - EXIT INT TERM
+	exit "$_tau_dep_ensure_exit_rc"
+}
+
+# Clean up and print the verified prefix, then return from the caller.
+_tau_dep_ensure_finish() {
+	_tau_dep_ensure_cleanup
+	trap - EXIT INT TERM
+	printf '%s\n' "$1"
+}
+
+# Producer side of dep_ensure. Runs in a command-substitution subshell so its
+# signal traps never touch the caller's traps. Prints the store prefix on
+# stdout; everything else goes to stderr.
+_tau_dep_ensure_run() {
+	local _tau_dep_ensure_mode="$1" _tau_dep_ensure_dep="$2"
+	local _tau_dep_ensure_block="$3" _tau_dep_ensure_producer="$4"
+	shift 4
+	local _tau_dep_ensure_manifest_cmake="${__devrc_dir}/../cmake/tau-manifest.cmake"
+	local _tau_dep_ensure_store_cmake="${__devrc_dir}/../cmake/tau-store.cmake"
+	local _tau_dep_ensure_prefix _tau_dep_ensure_claim_dir _tau_dep_ensure_block_file
+	local _tau_dep_ensure_id _tau_dep_ensure_lookup _tau_dep_ensure_status
+	local _tau_dep_ensure_prefix_out _tau_dep_ensure_claim _tau_dep_ensure_staging
+	local _tau_dep_ensure_published _tau_dep_ensure_timeout _tau_dep_ensure_poll
+	local _tau_dep_ensure_now _tau_dep_ensure_deadline
+	local _tau_dep_ensure_host _tau_dep_ensure_owner_file
+	local _tau_dep_ensure_owner_host _tau_dep_ensure_owner_pid
+	_tau_dep_ensure_claim=""
+	_tau_dep_ensure_staging=""
+	_tau_dep_ensure_block_file=""
+	trap 'exit 130' INT TERM
+	trap '_tau_dep_ensure_exit_trap' EXIT
+	if ! _tau_dep_ensure_prefix="$(dep_shared_prefix)"; then
+		echo "dep_ensure: cannot resolve TAU_SHARED_PREFIX" >&2
+		_tau_dep_ensure_cleanup
+		return 1
+	fi
+	if [ -z "$_tau_dep_ensure_prefix" ]; then
+		echo "dep_ensure: TAU_SHARED_PREFIX resolved to an empty value" >&2
+		_tau_dep_ensure_cleanup
+		return 1
+	fi
+	_tau_dep_ensure_claim_dir="${_tau_dep_ensure_prefix}/store/${_tau_dep_ensure_dep}"
+	_tau_dep_ensure_host="$(uname -n)"
+	_tau_dep_ensure_block_file="$(mktemp "${TMPDIR:-/tmp}/tau-dep-block.XXXXXX")" || {
+		echo "dep_ensure: cannot create a temporary field block" >&2
+		_tau_dep_ensure_cleanup
+		return 1
+	}
+	printf '%s\n' "$_tau_dep_ensure_block" > "$_tau_dep_ensure_block_file" || {
+		echo "dep_ensure: cannot write the temporary field block" >&2
+		_tau_dep_ensure_cleanup
+		return 1
+	}
+	if ! _tau_dep_ensure_id="$(cmake -P "$_tau_dep_ensure_manifest_cmake" \
+			input-id-file "$_tau_dep_ensure_block_file")"; then
+		echo "dep_ensure: cannot compute an input id for ${_tau_dep_ensure_dep}" >&2
+		_tau_dep_ensure_cleanup
+		return 1
+	fi
+	if ! _tau_dep_ensure_lookup="$(cmake -P "$_tau_dep_ensure_store_cmake" lookup \
+			"$_tau_dep_ensure_prefix" "$_tau_dep_ensure_dep" "$_tau_dep_ensure_id")"; then
+		echo "dep_ensure: integrity failure for ${_tau_dep_ensure_dep} ${_tau_dep_ensure_id}" >&2
+		_tau_dep_ensure_cleanup
+		return 1
+	fi
+	_tau_dep_ensure_status="$(printf '%s\n' "$_tau_dep_ensure_lookup" | sed -n '1p')"
+	if [ "$_tau_dep_ensure_status" = "hit" ]; then
+		_tau_dep_ensure_prefix_out="$(printf '%s\n' "$_tau_dep_ensure_lookup" | sed -n '2p')"
+		_tau_dep_ensure_finish "$_tau_dep_ensure_prefix_out"
+		return 0
+	fi
+	if [ "$_tau_dep_ensure_status" != "miss" ]; then
+		echo "dep_ensure: unexpected lookup result for ${_tau_dep_ensure_dep} ${_tau_dep_ensure_id}" >&2
+		_tau_dep_ensure_cleanup
+		return 1
+	fi
+	# Read on a miss, before building: a producer first tries the remote store,
+	# then builds. An absent or failed remote is not an error, so configure
+	# falls through to the build. Consumer mode reads only the local store.
+	if [ "$_tau_dep_ensure_mode" = "producer" ] && [ -n "${TAU_STORE_REMOTE:-}" ]; then
+		if "${__devrc_dir}/store-remote.sh" pull "$_tau_dep_ensure_prefix" \
+				"${_tau_dep_ensure_dep}/${_tau_dep_ensure_id}" >&2; then
+			if ! _tau_dep_ensure_lookup="$(cmake -P "$_tau_dep_ensure_store_cmake" lookup \
+					"$_tau_dep_ensure_prefix" "$_tau_dep_ensure_dep" "$_tau_dep_ensure_id")"; then
+				echo "dep_ensure: integrity failure for ${_tau_dep_ensure_dep} ${_tau_dep_ensure_id}" >&2
+				_tau_dep_ensure_cleanup
+				return 1
+			fi
+			_tau_dep_ensure_status="$(printf '%s\n' "$_tau_dep_ensure_lookup" | sed -n '1p')"
+			if [ "$_tau_dep_ensure_status" = "hit" ]; then
+				_tau_dep_ensure_prefix_out="$(printf '%s\n' "$_tau_dep_ensure_lookup" | sed -n '2p')"
+				_tau_dep_ensure_finish "$_tau_dep_ensure_prefix_out"
+				return 0
+			fi
+		else
+			echo "dep_ensure: ${_tau_dep_ensure_dep} ${_tau_dep_ensure_id} is not on ${TAU_STORE_REMOTE}; building it" >&2
+		fi
+	fi
+	if [ "$_tau_dep_ensure_mode" = "consumer" ]; then
+		echo "dep_ensure: ${_tau_dep_ensure_dep} ${_tau_dep_ensure_id} is not in the LOCAL store (consumer mode)" >&2
+		_tau_dep_ensure_cleanup
+		return 1
+	fi
+	mkdir -p "$_tau_dep_ensure_claim_dir" || {
+		echo "dep_ensure: cannot create ${_tau_dep_ensure_claim_dir}" >&2
+		_tau_dep_ensure_cleanup
+		return 1
+	}
+	_tau_dep_ensure_timeout="${TAU_DEP_CLAIM_TIMEOUT:-300}"
+	_tau_dep_ensure_poll="${TAU_DEP_CLAIM_POLL:-1}"
+	case "$_tau_dep_ensure_timeout" in ''|*[!0-9]*) _tau_dep_ensure_timeout=300 ;; esac
+	case "$_tau_dep_ensure_poll" in ''|*[!0-9]*) _tau_dep_ensure_poll=1 ;; esac
+	[ "$_tau_dep_ensure_poll" -lt 1 ] && _tau_dep_ensure_poll=1
+	_tau_dep_ensure_now="$(date +%s)"
+	_tau_dep_ensure_deadline=$((_tau_dep_ensure_now + _tau_dep_ensure_timeout))
+	while :; do
+		if mkdir "${_tau_dep_ensure_claim_dir}/${_tau_dep_ensure_id}.claim" 2>/dev/null; then
+			_tau_dep_ensure_claim="${_tau_dep_ensure_claim_dir}/${_tau_dep_ensure_id}.claim"
+			if ! printf '%s %s\n' "$_tau_dep_ensure_host" "${BASHPID:-$(sh -c 'echo $PPID')}" \
+					> "${_tau_dep_ensure_claim}/owner"; then
+				echo "dep_ensure: cannot write the claim owner file for ${_tau_dep_ensure_claim}" >&2
+				_tau_dep_ensure_cleanup
+				return 1
+			fi
+			break
+		fi
+		# A claim from another host, or one with no owner file yet, is live.
+		_tau_dep_ensure_owner_file="${_tau_dep_ensure_claim_dir}/${_tau_dep_ensure_id}.claim/owner"
+		if [ -f "$_tau_dep_ensure_owner_file" ]; then
+			read -r _tau_dep_ensure_owner_host _tau_dep_ensure_owner_pid \
+				< "$_tau_dep_ensure_owner_file"
+			if [ "$_tau_dep_ensure_owner_host" = "$_tau_dep_ensure_host" ] \
+					&& [ -n "$_tau_dep_ensure_owner_pid" ] \
+					&& ! kill -0 "$_tau_dep_ensure_owner_pid" 2>/dev/null; then
+				rm -f "$_tau_dep_ensure_owner_file"
+				rmdir "${_tau_dep_ensure_claim_dir}/${_tau_dep_ensure_id}.claim" 2>/dev/null
+				continue
+			fi
+		fi
+		if ! _tau_dep_ensure_lookup="$(cmake -P "$_tau_dep_ensure_store_cmake" lookup \
+				"$_tau_dep_ensure_prefix" "$_tau_dep_ensure_dep" "$_tau_dep_ensure_id")"; then
+			echo "dep_ensure: integrity failure for ${_tau_dep_ensure_dep} ${_tau_dep_ensure_id}" >&2
+			_tau_dep_ensure_cleanup
+			return 1
+		fi
+		_tau_dep_ensure_status="$(printf '%s\n' "$_tau_dep_ensure_lookup" | sed -n '1p')"
+		if [ "$_tau_dep_ensure_status" = "hit" ]; then
+			_tau_dep_ensure_prefix_out="$(printf '%s\n' "$_tau_dep_ensure_lookup" | sed -n '2p')"
+			_tau_dep_ensure_finish "$_tau_dep_ensure_prefix_out"
+			return 0
+		fi
+		_tau_dep_ensure_now="$(date +%s)"
+		if [ "$_tau_dep_ensure_now" -ge "$_tau_dep_ensure_deadline" ]; then
+			echo "dep_ensure: timed out after ${_tau_dep_ensure_timeout}s waiting for the producer claim ${_tau_dep_ensure_claim_dir}/${_tau_dep_ensure_id}.claim; if that claim is stale, remove it with: rm -r ${_tau_dep_ensure_claim_dir}/${_tau_dep_ensure_id}.claim" >&2
+			_tau_dep_ensure_cleanup
+			return 1
+		fi
+		sleep "$_tau_dep_ensure_poll"
+	done
+	# The claim is ours. Recheck in case another producer published meanwhile.
+	if ! _tau_dep_ensure_lookup="$(cmake -P "$_tau_dep_ensure_store_cmake" lookup \
+			"$_tau_dep_ensure_prefix" "$_tau_dep_ensure_dep" "$_tau_dep_ensure_id")"; then
+		echo "dep_ensure: integrity failure for ${_tau_dep_ensure_dep} ${_tau_dep_ensure_id}" >&2
+		_tau_dep_ensure_cleanup
+		return 1
+	fi
+	_tau_dep_ensure_status="$(printf '%s\n' "$_tau_dep_ensure_lookup" | sed -n '1p')"
+	if [ "$_tau_dep_ensure_status" = "hit" ]; then
+		_tau_dep_ensure_prefix_out="$(printf '%s\n' "$_tau_dep_ensure_lookup" | sed -n '2p')"
+		_tau_dep_ensure_finish "$_tau_dep_ensure_prefix_out"
+		return 0
+	fi
+	if ! _tau_dep_ensure_staging="$(dep_build_staging \
+			"$_tau_dep_ensure_prefix" "$_tau_dep_ensure_dep" "$_tau_dep_ensure_id")"; then
+		echo "dep_ensure: cannot create a staging entry for ${_tau_dep_ensure_dep} ${_tau_dep_ensure_id}" >&2
+		_tau_dep_ensure_cleanup
+		return 1
+	fi
+	if ! dep_build_producer "$_tau_dep_ensure_staging" "$_tau_dep_ensure_producer" "$@" 1>&2; then
+		echo "dep_ensure: producer failed for ${_tau_dep_ensure_dep} ${_tau_dep_ensure_id}" >&2
+		_tau_dep_ensure_cleanup
+		return 1
+	fi
+	# Fail closed: a package carrying a build, staging, store, or home path is not
+	# publishable, so no consumer ever resolves one.
+	if ! "${__devrc_dir}/audit-store-paths.sh" \
+			"$_tau_dep_ensure_staging/prefix" >&2; then
+		echo "dep_ensure: producer left an absolute build, staging, store, or home path in ${_tau_dep_ensure_dep} ${_tau_dep_ensure_id}" >&2
+		_tau_dep_ensure_cleanup
+		return 1
+	fi
+	if ! cmake -P "$_tau_dep_ensure_manifest_cmake" manifest \
+			"$_tau_dep_ensure_staging/manifest.json" "$_tau_dep_ensure_id" \
+			"$_tau_dep_ensure_block_file" "$_tau_dep_ensure_staging/prefix" >/dev/null; then
+		echo "dep_ensure: cannot write the manifest for ${_tau_dep_ensure_dep} ${_tau_dep_ensure_id}" >&2
+		_tau_dep_ensure_cleanup
+		return 1
+	fi
+	if ! _tau_dep_ensure_published="$(cmake -P "$_tau_dep_ensure_store_cmake" publish \
+			"$_tau_dep_ensure_prefix" "$_tau_dep_ensure_dep" "$_tau_dep_ensure_id" \
+			"$_tau_dep_ensure_staging")"; then
+		echo "dep_ensure: cannot publish ${_tau_dep_ensure_dep} ${_tau_dep_ensure_id}" >&2
+		_tau_dep_ensure_cleanup
+		return 1
+	fi
+	_tau_dep_ensure_finish "$_tau_dep_ensure_published"
+	return 0
+}
+
+# Ensure a dependency package is in the LOCAL store and set <out-var> to its
+# prefix. MODE is "producer" or "consumer".
+#
+#   dep_ensure <out-var> <mode> <dep> <field-block> <producer> [args...]
+#
+# <field-block> is a newline-separated list of key=value fields. <producer> is a
+# shell function called as <producer> <staging-prefix> [args...]; it must
+# populate <staging-prefix>. A verified hit sets the out variable and never
+# calls the producer. A clean miss in consumer mode is an error. A clean miss in
+# producer mode builds into a unique sibling staging entry, writes the
+# complete-tree manifest, publishes atomically, and sets the out variable. A
+# partial, corrupt, or digest-invalid entry is an error and is never rebuilt.
+#
+# A producer claim under the dependency directory serializes cold starts: the
+# winner writes "<hostname> <subshell pid>" to <claim>/owner, and a waiter
+# removes the claim only when that pid is dead on its own host, else it polls.
+dep_ensure() {
+	if [ "$#" -lt 5 ]; then
+		echo "dep_ensure: usage: dep_ensure <out-var> <producer|consumer> <dep> <field-block> <producer> [args...]" >&2
+		return 2
+	fi
+	local _tau_dep_ensure_out="$1" _tau_dep_ensure_mode="$2" _tau_dep_ensure_dep="$3"
+	local _tau_dep_ensure_block="$4" _tau_dep_ensure_producer="$5"
+	shift 5
+	if ! _tau_dep_ensure_valid_name "$_tau_dep_ensure_out"; then
+		echo "dep_ensure: output variable is not a safe name: '${_tau_dep_ensure_out}'" >&2
+		return 2
+	fi
+	case "$_tau_dep_ensure_mode" in
+		producer|consumer) ;;
+		*)
+			echo "dep_ensure: mode must be producer or consumer: '${_tau_dep_ensure_mode}'" >&2
+			return 2
+			;;
+	esac
+	local _tau_dep_ensure_result
+	if ! _tau_dep_ensure_result="$(_tau_dep_ensure_run \
+			"$_tau_dep_ensure_mode" "$_tau_dep_ensure_dep" "$_tau_dep_ensure_block" \
+			"$_tau_dep_ensure_producer" "$@")"; then
+		return 1
+	fi
+	printf -v "$_tau_dep_ensure_out" '%s' "$_tau_dep_ensure_result"
+	return 0
 }

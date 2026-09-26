@@ -337,12 +337,22 @@ add_test(NAME tau_store_local
 		"${PROJECT_SOURCE_DIR}/cmake/tau-store.cmake"
 		"${CMAKE_CURRENT_BINARY_DIR}")
 
+# dep_ensure shell bridge: hermetic, fake producer, build-local scratch prefix.
+# Skipped only when bash is unavailable.
 find_program(TAU_TEST_BASH bash NO_CACHE)
 if(TAU_TEST_BASH)
+	add_test(NAME tau_dep_ensure
+		COMMAND "${TAU_TEST_BASH}"
+			"${CMAKE_CURRENT_SOURCE_DIR}/tau-dep-ensure-self-check.sh")
 	# Transport round-trip and its failure paths: export, import, verify, a
 	# forced mode loss, a truncated archive, a content corruption, and a missing
 	# expected entry.
 	add_test(NAME tau_store_transport
 		COMMAND "${TAU_TEST_BASH}"
 			"${CMAKE_CURRENT_SOURCE_DIR}/store-transport-self-check.sh")
+	# Remote store bridge: the <dep>-<id> tag naming and the "remote miss
+	# builds" rule, with a fake oras on PATH.
+	add_test(NAME tau_store_remote
+		COMMAND "${TAU_TEST_BASH}"
+			"${CMAKE_CURRENT_SOURCE_DIR}/store-remote-self-check.sh")
 endif()

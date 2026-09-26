@@ -1,0 +1,268 @@
+#!/bin/bash
+# The narrow build module. It contains exactly the code that configures and
+# invokes a dependency build: option parsing, shared-prefix and job-count
+# resolution, staging-path derivation, and the producer callback invocation.
+# Producers hash this file into the input id, so its content is an id input.
+#
+# Everything that only decides whether a finished tree is accepted, recorded,
+# placed, or pointed at lives in devrc (the publish-side driver) and is
+# provenance, not an id input.
+#
+# Sourced by scripts/devrc. It also runs correctly when sourced directly, so a
+# producer can hash it without loading the driver.
+#
+# shellcheck shell=bash
+
+__devrc_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+dep_var_key() {
+	local k="${1//[^A-Za-z0-9_]/_}"
+	printf 'DEP_VAR_%s' "$k"
+}
+
+# what to unset on the next reset
+DEP_VAR_KEYS=""
+dep_vars_reset() {
+	local k
+	for k in $DEP_VAR_KEYS; do unset "$k"; done
+	DEP_VAR_KEYS=""
+}
+
+dep_entry() {
+	dep_vars_reset
+	DEP_POSITIONAL=()
+	DEP_TARGET="native"
+	local arg name value key
+	for arg in "$@"; do
+		case "$arg" in
+			-D*=*)
+				name="${arg#-D}"
+				name="${name%%=*}"
+				value="${arg#-D"${name}"=}"
+				key="$(dep_var_key "$name")"
+				printf -v "$key" '%s' "$value"
+				DEP_VAR_KEYS="$DEP_VAR_KEYS $key"
+				;;
+			*)
+				DEP_POSITIONAL+=("$arg")
+				;;
+		esac
+	done
+	# An unknown -DTAU_DEP_TARGET value reaches the producer's own guard.
+	local _opt_target
+	_opt_target="$(dep_var TAU_DEP_TARGET "")"
+	if [ -n "$_opt_target" ]; then
+		DEP_TARGET="$_opt_target"
+	fi
+}
+
+# An empty value falls back to the default: `-DTAU_BUILD_JOBS=` reaches here
+# whenever a caller interpolates an unset variable into a -D flag, and an
+# empty jobs count would otherwise expand to a bare `make -j`, i.e.
+# unbounded parallelism.
+dep_var() {
+	local name="$1" default="${2:-}" key value
+	key="$(dep_var_key "$name")"
+	# unset and empty both fall back to the default
+	value="${!key-}"
+	if [[ -n "$value" ]]; then
+		echo "$value"
+	else
+		echo "$default"
+	fi
+}
+
+# cmake -P warns and ignores a trailing empty-string command-line argument,
+# so only pass "requested" through when dep_var actually found a -D; a
+# missing arg is exactly what tau-resolve.cmake treats as "none given"
+# anyway.
+_tau_resolve() {
+	local var="$1" requested="$2"
+	if [[ -n "$requested" ]]; then
+		cmake -P "${__devrc_dir}/../cmake/tau-resolve.cmake" "$var" "$requested"
+	else
+		cmake -P "${__devrc_dir}/../cmake/tau-resolve.cmake" "$var"
+	fi
+}
+
+# -D beats the environment beats ~/.tau. cmake/tau-resolve.cmake is the
+# single definition of the rule; this asks it (via `cmake -P`) rather than
+# restating the rule in bash, so the shell and CMake sides cannot disagree
+# about where a dependency landed. Only the explicit -D value (if any) is
+# passed through as "requested" -- tau-resolve.cmake itself checks the
+# TAU_SHARED_PREFIX environment variable and falls back to ~/.tau.
+dep_shared_prefix() {
+	_tau_resolve TAU_SHARED_PREFIX "$(dep_var TAU_SHARED_PREFIX "")"
+}
+
+# -D beats the environment beats half the logical core count (rounded up,
+# minimum 1). cmake/tau-resolve.cmake is the single definition of the rule;
+# this asks it (via `cmake -P`) rather than restating the rule in bash, so
+# the shell and CMake sides cannot disagree about how many jobs to use. Only
+# the explicit -D value (if any) is passed through as "requested" --
+# tau-resolve.cmake itself checks the TAU_BUILD_JOBS environment variable
+# and falls back to auto-detection.
+dep_jobs() {
+	_tau_resolve TAU_BUILD_JOBS "$(dep_var TAU_BUILD_JOBS "")"
+}
+
+# ── target and toolchain helpers ─────────────────────────────────────────
+# A target names the platform the package runs on AND the host that produces
+# it, so a macOS or MSVC package is never built by the wrong machine.
+
+dep_target_host() {
+	case "$1" in
+		native|w64|wasm) echo linux ;;
+		darwin-arm64|darwin-x86_64) echo darwin ;;
+		win-msvc-x64) echo windows ;;
+		*) echo unknown ;;
+	esac
+}
+
+dep_host_os() {
+	case "$(uname -s)" in
+		Linux) echo linux ;;
+		Darwin) echo darwin ;;
+		MINGW*|MSYS*|CYGWIN*) echo windows ;;
+		*) echo unknown ;;
+	esac
+}
+
+# Fail closed when a target cannot be produced on this host. The target's own
+# allowed set stays in the producer; this guard only covers the host.
+dep_require_target_host() {
+	local dep="$1" target="$2" host want
+	host="$(dep_host_os)"
+	want="$(dep_target_host "$target")"
+	if [ "$want" = "unknown" ]; then
+		echo "${dep}: unsupported target '${target}'" >&2
+		exit 2
+	fi
+	if [ "$host" != "$want" ]; then
+		echo "${dep}: target '${target}' needs a ${want} host, running on $(uname -s)" >&2
+		exit 2
+	fi
+}
+
+# Only a cross toolchain target takes a CMake toolchain file. macOS and MSVC
+# build with the host compiler the preset selected, so they pass none.
+dep_target_needs_toolchain() {
+	case "$1" in
+		w64|wasm) return 0 ;;
+		*) return 1 ;;
+	esac
+}
+
+# ── portable identity helpers ────────────────────────────────────────────
+
+dep_sha256() {
+	if command -v sha256sum > /dev/null 2>&1; then
+		sha256sum "$1" | awk '{print $1}'
+	else
+		shasum -a 256 "$1" | awk '{print $1}'
+	fi
+}
+
+dep_sha256_stdin() {
+	if command -v sha256sum > /dev/null 2>&1; then
+		sha256sum | awk '{print $1}'
+	else
+		shasum -a 256 | awk '{print $1}'
+	fi
+}
+
+# Compiler identity, portable across GNU, Clang, AppleClang and MSVC. cl.exe
+# has no --version, so its banner is what running it without input prints.
+dep_compiler_id() {
+	local cxx="$1" first
+	first="$("$cxx" --version 2>&1 | head -n 1)"
+	case "$first" in
+		*"Apple clang"*) echo AppleClang; return 0 ;;
+		*GCC*|*g++*) echo GNU; return 0 ;;
+		*[Cc]lang*) echo Clang; return 0 ;;
+	esac
+	case "$(basename "$cxx")" in
+		cl|cl.exe) echo MSVC; return 0 ;;
+	esac
+	echo unknown
+}
+
+dep_compiler_version() {
+	local cxx="$1"
+	if [ "$(dep_compiler_id "$cxx")" = "MSVC" ]; then
+		"$cxx" 2>&1 | head -n 1
+	else
+		"$cxx" --version 2>&1 | head -n 1
+	fi
+}
+
+# cl.exe has no -dumpmachine. The only MSVC preset is x64, so the triple is
+# derivable from the compiler alone.
+dep_compiler_triple() {
+	local cxx="$1" target="${2:-native}"
+	if [ "$(dep_compiler_id "$cxx")" = "MSVC" ]; then
+		echo "x86_64-pc-windows-msvc"
+		return 0
+	fi
+	"$cxx" -dumpmachine 2>/dev/null || echo "unknown-${target}"
+}
+
+# /etc/os-release exists on Linux only; macOS reports its product version.
+dep_os_release_hash() {
+	if [ -f /etc/os-release ]; then
+		dep_sha256 /etc/os-release
+		return 0
+	fi
+	if [ "$(dep_host_os)" = darwin ]; then
+		printf '%s' "$(sw_vers -productVersion 2>/dev/null || echo unknown)" \
+			| dep_sha256_stdin
+		return 0
+	fi
+	printf 'none'
+}
+
+dep_libc_version() {
+	local v
+	v="$(getconf GNU_LIBC_VERSION 2>/dev/null)" || true
+	if [ -n "$v" ]; then printf '%s' "$v"; return 0; fi
+	if [ "$(dep_host_os)" = darwin ]; then
+		printf 'libc=%s' "$(sw_vers -productVersion 2>/dev/null || echo unknown)"
+		return 0
+	fi
+	v="$(ldd --version 2>/dev/null | head -n 1)" || true
+	printf '%s' "${v:-none}"
+}
+
+# BSD sed has no bare `-i`, so in-place edits go through a temporary file
+# instead of a GNU-only flag spelling.
+dep_sed_inplace() {
+	local file="$1" tmp
+	shift
+	tmp="$(mktemp "${file}.XXXXXX")" || return 1
+	if ! sed "$@" "$file" > "$tmp"; then
+		rm -f "$tmp"
+		return 1
+	fi
+	# Rewrite in place so the target keeps its mode and inode.
+	if ! cat "$tmp" > "$file"; then
+		rm -f "$tmp"
+		return 1
+	fi
+	rm -f "$tmp"
+	return 0
+}
+
+# Derive a unique sibling staging entry path for a dependency and input id.
+dep_build_staging() {
+	local prefix="$1" dep="$2" id="$3"
+	cmake -P "${__devrc_dir}/../cmake/tau-store.cmake" staging "$prefix" "$dep" "$id"
+}
+
+# Invoke a producer callback into a staging prefix. The producer clears the
+# build-affecting environment itself and records the ambient values it read, so
+# its identity does not change when it is invoked through the store.
+dep_build_producer() {
+	local staging="$1" producer="$2"
+	shift 2
+	"$producer" "${staging}/prefix" "$@"
+}
