@@ -10,6 +10,7 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
+#include "debug_skip.h"
 #include "utility/diagnostics.h"
 
 #include <string>
@@ -663,7 +664,8 @@ TEST_SUITE("diagnostics: append() remaps a text attribute's value") {
 TEST_SUITE("diagnostics: resolve() lets the label decide, not text.data()") {
 
 	TEST_CASE("a number under a text label renders the missing-text marker, "
-		"not a mismatched label name") {
+		"not a mismatched label name" * doctest::skip(
+			idni::testing::skip_under_debug_assert)) {
 		using label = idni::parser_strings::label;
 		report r;
 		r.error(code::io_error, "failed", {{label::path, label::root}});
@@ -674,7 +676,8 @@ TEST_SUITE("diagnostics: resolve() lets the label decide, not text.data()") {
 	}
 
 	TEST_CASE("a string under a numeric label renders as 0, "
-		"not an interned key") {
+		"not an interned key" * doctest::skip(
+			idni::testing::skip_under_debug_assert)) {
 		using label = idni::parser_strings::label;
 		report r;
 		r.error(code::io_error, "failed",
@@ -684,7 +687,8 @@ TEST_SUITE("diagnostics: resolve() lets the label decide, not text.data()") {
 	}
 
 	TEST_CASE("a pre-interned key under label::name renders the "
-		"missing-text marker, in a release build with no DBG assert") {
+		"missing-text marker, in a release build with no DBG assert" *
+		doctest::skip(idni::testing::skip_under_debug_assert)) {
 		using label = idni::parser_strings::label;
 		report r;
 		r.error(code::io_error, "failed", {{label::name, label::root}});

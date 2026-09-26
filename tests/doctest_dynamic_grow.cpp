@@ -20,6 +20,7 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
+#include "debug_skip.h"
 #include "parser.h"
 
 using namespace std;
@@ -597,7 +598,8 @@ TEST_SUITE("dynamic grow: multiple pairs") {
 TEST_SUITE("dynamic grow: parent equals child is rejected") {
 
 	TEST_CASE("a pair whose parent equals its child is dropped, not "
-		"thrown")
+		"thrown" * doctest::skip(
+			idni::testing::skip_under_debug_assert))
 	{
 		nonterminals<char> nts;
 		prods<char> ps, start(nts("start"));
