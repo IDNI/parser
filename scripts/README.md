@@ -129,7 +129,8 @@ optionally test or run `tgf` via
 ./dev preset release-wasm
 ```
 
-Default preset name is `release` if omitted.
+Default preset name is `release` if omitted. Every build-type preset has
+`release-`, `devel-` and `debug-` twins; package presets are release only.
 
 #### Preset reference
 
@@ -140,6 +141,7 @@ Default preset name is `release` if omitted.
 | `release-tgf`, `debug-tgf` | + TGF | same |
 | `release-tgf-clang`, `debug-tgf-clang` | + TGF (clang) | `build/release-clang`, `build/debug-clang` |
 | `release-clang`, `debug-clang` (+ `-make-`, `-ninja-`) | header-only (default) | `build/release-clang`, `build/debug-clang` |
+| `release-make-gcc`, `release-ninja-gcc` (+ `debug-`, `devel-`) | header-only (gcc) | `build/release-gcc`, … |
 | `release-examples`, `debug-examples` | + examples | same |
 | `release-packages` | TGF + examples (Linux cpack) | `build/release` |
 | `release-all`, `debug-all`, `all` | everything (`TAU_PARSER_BUILD_ALL`) | `build/release` / `build/debug` (`all` → `build/release`) |
@@ -147,10 +149,10 @@ Default preset name is `release` if omitted.
 | `release-measure`, `debug-measure` | + instrumentation | same |
 | `debug-asan` | + address sanitizer | `build/debug` |
 | `relwithdebinfo` (+ `-tests`, `-tgf`, …) | RelWithDebInfo variants | `build/relwithdebinfo` |
-| `release-w64`, `debug-w64` | Windows cross-compile | `build/release-mingw`, … |
+| `release-w64`, `debug-w64` (+ `devel-w64`) | Windows cross-compile | `build/release-mingw`, … |
 | `release-w64-packages`, `release-w64-packages-zip` | MinGW + cpack (NSIS or ZIP) | `build/release-mingw` |
-| `release-wasm`, `debug-wasm` | Emscripten (`EMSCRIPTEN_DIR` defaults via `TAU_SHARED_PREFIX`) | `build/emscripten`, … |
-| `release-wasm-tests` | Emscripten + tests, run under Node.js | `build/emscripten` |
+| `release-wasm`, `debug-wasm` (+ `devel-wasm`) | Emscripten (`EMSCRIPTEN_DIR` defaults via `TAU_SHARED_PREFIX`) | `build/emscripten`, … |
+| `release-wasm-tests` (+ `debug-`, `devel-`) | Emscripten + tests, run under Node.js | `build/emscripten` |
 | `release-wasm-tgf`, `debug-wasm-tgf` | Emscripten + the tgf FTXUI REPL, run by `./dev tgf-node` | `build/emscripten`, … |
 | `release-wasm-tests-browser` | Emscripten tests + tgf, the browser REPL page and the headless Chrome tests | `build/emscripten` |
 | `release-msvc`, `debug-msvc` | Native MSVC (static lib) | `build/release-msvc`, `build/debug-msvc` |
@@ -158,6 +160,7 @@ Default preset name is `release` if omitted.
 | `release-msvc-tests`, `debug-msvc-tests` | + tests | same |
 | `release-msvc-all`, `msvc-all` | everything (`TAU_PARSER_BUILD_ALL`) | `build/release-msvc` |
 | `release-msvc-packages`, `release-msvc-packages-zip` | TGF + examples + NSIS/ZIP | `build/release-msvc` |
+| `release-msvc-all-clang-cl` (+ `debug-`, `devel-`) | everything, clang-cl / Ninja / x64 | `build/release-clang-cl` |
 
 Hidden building blocks (`_build-tests`, `_build-packages`, `_build-all`, …) are
 composed by the public presets above; see [`CMakePresets.json`](../CMakePresets.json).

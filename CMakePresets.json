@@ -6,13 +6,11 @@
 			"hidden": true,
 			"generator": "Unix Makefiles"
 		},
-
 		{
 			"name": "_generator-ninja",
 			"hidden": true,
 			"generator": "Ninja"
 		},
-
 		{
 			"name": "_toolchain-gcc",
 			"hidden": true,
@@ -29,13 +27,11 @@
 				"CMAKE_CXX_COMPILER": "clang++"
 			}
 		},
-
 		{
 			"name": "_toolchain-mingw",
 			"hidden": true,
 			"toolchainFile": "cmake/mingw-w64-x86_64.cmake"
 		},
-
 		{
 			"name": "_condition-windows",
 			"hidden": true,
@@ -45,7 +41,6 @@
 				"rhs": "Windows"
 			}
 		},
-
 		{
 			"name": "_toolchain-msvc",
 			"hidden": true,
@@ -64,7 +59,6 @@
 				}
 			}
 		},
-
 		{
 			"name": "_toolchain-clang-cl",
 			"hidden": true,
@@ -83,97 +77,116 @@
 				}
 			}
 		},
-
 		{
 			"name": "_build_dir-release",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/release"
 		},
-
 		{
 			"name": "_build_dir-debug",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/debug"
 		},
-
 		{
 			"name": "_build_dir-release-clang",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/release-clang"
 		},
-
 		{
 			"name": "_build_dir-debug-clang",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/debug-clang"
 		},
-
+		{
+			"name": "_build_dir-devel",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/devel"
+		},
 		{
 			"name": "_build_dir-release-gcc",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/release-gcc"
 		},
-
 		{
 			"name": "_build_dir-debug-gcc",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/debug-gcc"
 		},
-
 		{
-			"name": "_build_dir-relwithdebinfo-gcc",
+			"name": "_build_dir-devel-gcc",
 			"hidden": true,
-			"binaryDir": "${sourceDir}/build/relwithdebinfo-gcc"
+			"binaryDir": "${sourceDir}/build/devel-gcc"
 		},
-
 		{
 			"name": "_build_dir-release-w64",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/release-mingw"
 		},
-
 		{
 			"name": "_build_dir-debug-w64",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/debug-mingw"
 		},
-
+		{
+			"name": "_build_dir-devel-w64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/devel-w64"
+		},
 		{
 			"name": "_build_dir-release-msvc",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/release-msvc"
 		},
-
-		{
-			"name": "_build_dir-release-msvc-clang-cl",
-			"hidden": true,
-			"binaryDir": "${sourceDir}/build/release-clang-cl"
-		},
-
 		{
 			"name": "_build_dir-debug-msvc",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/debug-msvc"
 		},
-
+		{
+			"name": "_build_dir-devel-msvc",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/devel-msvc"
+		},
+		{
+			"name": "_build_dir-release-msvc-clang-cl",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/release-clang-cl"
+		},
+		{
+			"name": "_build_dir-debug-msvc-clang-cl",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-msvc-clang-cl"
+		},
+		{
+			"name": "_build_dir-devel-msvc-clang-cl",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/devel-msvc-clang-cl"
+		},
 		{
 			"name": "_build_dir-relwithdebinfo",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/relwithdebinfo"
 		},
-
+		{
+			"name": "_build_dir-relwithdebinfo-gcc",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/relwithdebinfo-gcc"
+		},
 		{
 			"name": "_build_dir-release-wasm",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/emscripten"
 		},
-
 		{
 			"name": "_build_dir-debug-wasm",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/debug-emscripten"
 		},
-
+		{
+			"name": "_build_dir-devel-wasm",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/devel-wasm"
+		},
 		{
 			"name": "_build-type-debug",
 			"hidden": true,
@@ -181,7 +194,6 @@
 				"CMAKE_BUILD_TYPE": "Debug"
 			}
 		},
-
 		{
 			"name": "_build-type-release",
 			"hidden": true,
@@ -189,7 +201,13 @@
 				"CMAKE_BUILD_TYPE": "Release"
 			}
 		},
-
+		{
+			"name": "_build-type-devel",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Devel"
+			}
+		},
 		{
 			"name": "_build-type-relwithdebinfo",
 			"hidden": true,
@@ -197,7 +215,6 @@
 				"CMAKE_BUILD_TYPE": "RelWithDebInfo"
 			}
 		},
-
 		{
 			"name": "_build-tests",
 			"hidden": true,
@@ -206,7 +223,6 @@
 				"TAU_RUN_GRAMMAR_TESTS": "ON"
 			}
 		},
-
 		{
 			"name": "_build-browser-tests",
 			"hidden": true,
@@ -214,7 +230,6 @@
 				"TAU_PARSER_BUILD_BROWSER_TESTS": "ON"
 			}
 		},
-
 		{
 			"name": "_build-tgf",
 			"hidden": true,
@@ -222,7 +237,6 @@
 				"TAU_PARSER_BUILD_TGF": "ON"
 			}
 		},
-
 		{
 			"name": "_run-grammar-tests",
 			"hidden": true,
@@ -230,7 +244,6 @@
 				"TAU_RUN_GRAMMAR_TESTS": "ON"
 			}
 		},
-
 		{
 			"name": "_build-examples",
 			"hidden": true,
@@ -238,7 +251,6 @@
 				"TAU_PARSER_BUILD_EXAMPLES": "ON"
 			}
 		},
-
 		{
 			"name": "_build-packages",
 			"hidden": true,
@@ -247,7 +259,6 @@
 				"TAU_PARSER_BUILD_EXAMPLES": "ON"
 			}
 		},
-
 		{
 			"name": "_build-measure",
 			"hidden": true,
@@ -255,7 +266,6 @@
 				"TAU_PARSER_MEASURE": "ON"
 			}
 		},
-
 		{
 			"name": "_build-all",
 			"hidden": true,
@@ -263,7 +273,6 @@
 				"TAU_PARSER_BUILD_ALL": "ON"
 			}
 		},
-
 		{
 			"name": "_build-static",
 			"hidden": true,
@@ -271,7 +280,6 @@
 				"TAU_PARSER_BUILD_STATIC_LIBRARY": "ON"
 			}
 		},
-
 		{
 			"name": "_build-shared",
 			"hidden": true,
@@ -279,7 +287,6 @@
 				"TAU_PARSER_BUILD_SHARED_LIBRARY": "ON"
 			}
 		},
-
 		{
 			"name": "_build-pic",
 			"hidden": true,
@@ -287,7 +294,6 @@
 				"TAU_PARSER_BUILD_PIC": "ON"
 			}
 		},
-
 		{
 			"name": "_sanitize-address",
 			"hidden": true,
@@ -295,7 +301,6 @@
 				"TAU_PARSER_ADDRESS_SANITIZER": "ON"
 			}
 		},
-
 		{
 			"name": "_install",
 			"hidden": true,
@@ -303,7 +308,6 @@
 				"TAU_PARSER_INSTALL": "ON"
 			}
 		},
-
 		{
 			"name": "_windows-package",
 			"hidden": true,
@@ -311,7 +315,6 @@
 				"TAU_PARSER_WINDOWS_PACKAGE": "ON"
 			}
 		},
-
 		{
 			"name": "_windows-zip-package",
 			"hidden": true,
@@ -319,7 +322,6 @@
 				"TAU_PARSER_WINDOWS_ZIP_PACKAGE": "ON"
 			}
 		},
-
 		{
 			"name": "_macos-package",
 			"hidden": true,
@@ -327,7 +329,6 @@
 				"TAU_PARSER_MACOS_PACKAGE": "ON"
 			}
 		},
-
 		{
 			"name": "_toolchain-wasm",
 			"hidden": true,
@@ -335,7 +336,6 @@
 				"TAU_PARSER_BUILD_EMSCRIPTEN": "ON"
 			}
 		},
-
 		{
 			"name": "release-make-gcc",
 			"inherits": [
@@ -345,7 +345,6 @@
 				"_build-type-release"
 			]
 		},
-
 		{
 			"name": "debug-make-gcc",
 			"inherits": [
@@ -355,7 +354,15 @@
 				"_build-type-debug"
 			]
 		},
-
+		{
+			"name": "devel-make-gcc",
+			"inherits": [
+				"_build_dir-devel-gcc",
+				"_generator-make",
+				"_toolchain-gcc",
+				"_build-type-devel"
+			]
+		},
 		{
 			"name": "release-ninja-gcc",
 			"inherits": [
@@ -365,7 +372,6 @@
 				"_build-type-release"
 			]
 		},
-
 		{
 			"name": "debug-ninja-gcc",
 			"inherits": [
@@ -375,7 +381,15 @@
 				"_build-type-debug"
 			]
 		},
-
+		{
+			"name": "devel-ninja-gcc",
+			"inherits": [
+				"_build_dir-devel-gcc",
+				"_generator-ninja",
+				"_toolchain-gcc",
+				"_build-type-devel"
+			]
+		},
 		{
 			"name": "release-make-clang",
 			"inherits": [
@@ -385,7 +399,6 @@
 				"_build-type-release"
 			]
 		},
-
 		{
 			"name": "debug-make-clang",
 			"inherits": [
@@ -395,7 +408,15 @@
 				"_build-type-debug"
 			]
 		},
-
+		{
+			"name": "devel-make-clang",
+			"inherits": [
+				"_build_dir-devel",
+				"_generator-make",
+				"_toolchain-clang",
+				"_build-type-devel"
+			]
+		},
 		{
 			"name": "release-ninja-clang",
 			"inherits": [
@@ -405,7 +426,6 @@
 				"_build-type-release"
 			]
 		},
-
 		{
 			"name": "debug-ninja-clang",
 			"inherits": [
@@ -415,7 +435,15 @@
 				"_build-type-debug"
 			]
 		},
-
+		{
+			"name": "devel-ninja-clang",
+			"inherits": [
+				"_build_dir-devel",
+				"_generator-ninja",
+				"_toolchain-clang",
+				"_build-type-devel"
+			]
+		},
 		{
 			"name": "release-w64",
 			"inherits": [
@@ -425,7 +453,6 @@
 				"_build-type-release"
 			]
 		},
-
 		{
 			"name": "debug-w64",
 			"inherits": [
@@ -435,7 +462,64 @@
 				"_build-type-debug"
 			]
 		},
-
+		{
+			"name": "devel-w64",
+			"inherits": [
+				"_build_dir-devel-w64",
+				"_generator-make",
+				"_toolchain-mingw",
+				"_build-type-devel"
+			]
+		},
+		{
+			"name": "release-w64-tests",
+			"inherits": [
+				"release-w64",
+				"_build-tests",
+				"_build-tgf"
+			],
+			"cacheVariables": {
+				"CMAKE_CROSSCOMPILING_EMULATOR": "wine"
+			}
+		},
+		{
+			"name": "debug-w64-tests",
+			"inherits": [
+				"debug-w64",
+				"_build-tests",
+				"_build-tgf"
+			],
+			"cacheVariables": {
+				"CMAKE_CROSSCOMPILING_EMULATOR": "wine"
+			}
+		},
+		{
+			"name": "devel-w64-tests",
+			"inherits": [
+				"devel-w64",
+				"_build-tests",
+				"_build-tgf"
+			],
+			"cacheVariables": {
+				"CMAKE_CROSSCOMPILING_EMULATOR": "wine"
+			}
+		},
+		{
+			"name": "release-w64-packages",
+			"inherits": [
+				"release-w64",
+				"_build-packages",
+				"_windows-package"
+			]
+		},
+		{
+			"name": "release-w64-packages-zip",
+			"inherits": [
+				"release-w64",
+				"_build-packages",
+				"_windows-zip-package"
+			]
+		},
 		{
 			"name": "release-msvc",
 			"displayName": "Release (MSVC / Ninja / x64)",
@@ -448,7 +532,6 @@
 				"_build-static"
 			]
 		},
-
 		{
 			"name": "debug-msvc",
 			"displayName": "Debug (MSVC / Ninja / x64)",
@@ -460,43 +543,108 @@
 				"_build-static"
 			]
 		},
-
+		{
+			"name": "devel-msvc",
+			"displayName": "Devel (MSVC / Ninja / x64)",
+			"inherits": [
+				"_condition-windows",
+				"_build_dir-devel-msvc",
+				"_toolchain-msvc",
+				"_build-type-devel",
+				"_build-static"
+			]
+		},
 		{
 			"name": "release-msvc-tgf",
-			"inherits": ["release-msvc", "_build-tgf"]
+			"inherits": [
+				"release-msvc",
+				"_build-tgf"
+			]
 		},
-
 		{
 			"name": "debug-msvc-tgf",
-			"inherits": ["debug-msvc", "_build-tgf"]
+			"inherits": [
+				"debug-msvc",
+				"_build-tgf"
+			]
 		},
-
+		{
+			"name": "devel-msvc-tgf",
+			"inherits": [
+				"devel-msvc",
+				"_build-tgf"
+			]
+		},
 		{
 			"name": "release-msvc-tests",
-			"inherits": ["release-msvc", "_build-tests"]
+			"inherits": [
+				"release-msvc",
+				"_build-tests"
+			]
 		},
-
 		{
 			"name": "debug-msvc-tests",
-			"inherits": ["debug-msvc", "_build-tests"]
+			"inherits": [
+				"debug-msvc",
+				"_build-tests"
+			]
 		},
-
+		{
+			"name": "devel-msvc-tests",
+			"inherits": [
+				"devel-msvc",
+				"_build-tests"
+			]
+		},
 		{
 			"name": "release-msvc-examples",
-			"inherits": ["release-msvc", "_build-examples"]
+			"inherits": [
+				"release-msvc",
+				"_build-examples"
+			]
 		},
-
 		{
 			"name": "debug-msvc-examples",
-			"inherits": ["debug-msvc", "_build-examples"]
+			"inherits": [
+				"debug-msvc",
+				"_build-examples"
+			]
 		},
-
+		{
+			"name": "devel-msvc-examples",
+			"inherits": [
+				"devel-msvc",
+				"_build-examples"
+			]
+		},
 		{
 			"name": "release-msvc-all",
 			"displayName": "Release all targets (MSVC)",
-			"inherits": ["release-msvc", "_build-all"]
+			"inherits": [
+				"release-msvc",
+				"_build-all"
+			]
 		},
-
+		{
+			"name": "debug-msvc-all",
+			"inherits": [
+				"debug-msvc",
+				"_build-all"
+			]
+		},
+		{
+			"name": "devel-msvc-all",
+			"inherits": [
+				"devel-msvc",
+				"_build-all"
+			]
+		},
+		{
+			"name": "msvc-all",
+			"inherits": [
+				"release-msvc-all"
+			]
+		},
 		{
 			"name": "release-msvc-all-clang-cl",
 			"displayName": "Release all targets (clang-cl / Ninja / x64)",
@@ -510,17 +658,28 @@
 				"_build-all"
 			]
 		},
-
 		{
-			"name": "debug-msvc-all",
-			"inherits": ["debug-msvc", "_build-all"]
+			"name": "debug-msvc-all-clang-cl",
+			"inherits": [
+				"_condition-windows",
+				"_build_dir-debug-msvc-clang-cl",
+				"_toolchain-clang-cl",
+				"_build-type-debug",
+				"_build-static",
+				"_build-all"
+			]
 		},
-
 		{
-			"name": "msvc-all",
-			"inherits": ["release-msvc-all"]
+			"name": "devel-msvc-all-clang-cl",
+			"inherits": [
+				"_condition-windows",
+				"_build_dir-devel-msvc-clang-cl",
+				"_toolchain-clang-cl",
+				"_build-type-devel",
+				"_build-static",
+				"_build-all"
+			]
 		},
-
 		{
 			"name": "release-msvc-packages",
 			"inherits": [
@@ -529,7 +688,6 @@
 				"_windows-package"
 			]
 		},
-
 		{
 			"name": "release-msvc-packages-zip",
 			"inherits": [
@@ -538,7 +696,6 @@
 				"_windows-zip-package"
 			]
 		},
-
 		{
 			"name": "relwithdebinfo-make-gcc",
 			"inherits": [
@@ -548,42 +705,77 @@
 				"_build-type-relwithdebinfo"
 			]
 		},
-
 		{
 			"name": "release",
-			"inherits": ["_build_dir-release", "_generator-ninja", "_toolchain-clang", "_build-type-release"]
+			"inherits": [
+				"_build_dir-release",
+				"_generator-ninja",
+				"_toolchain-clang",
+				"_build-type-release"
+			]
 		},
-
 		{
 			"name": "debug",
-			"inherits": ["_build_dir-debug", "_generator-ninja", "_toolchain-clang", "_build-type-debug"]
+			"inherits": [
+				"_build_dir-debug",
+				"_generator-ninja",
+				"_toolchain-clang",
+				"_build-type-debug"
+			]
 		},
-
+		{
+			"name": "devel",
+			"inherits": [
+				"_build_dir-devel",
+				"_generator-ninja",
+				"_toolchain-clang",
+				"_build-type-devel"
+			]
+		},
 		{
 			"name": "release-ninja",
-			"inherits": ["release"]
+			"inherits": [
+				"release"
+			]
 		},
-
 		{
 			"name": "debug-ninja",
-			"inherits": ["debug"]
+			"inherits": [
+				"debug"
+			]
 		},
-
+		{
+			"name": "devel-ninja",
+			"inherits": [
+				"devel"
+			]
+		},
 		{
 			"name": "release-clang",
-			"inherits": ["release"]
+			"inherits": [
+				"release"
+			]
 		},
-
 		{
 			"name": "debug-clang",
-			"inherits": ["debug"]
+			"inherits": [
+				"debug"
+			]
 		},
-
+		{
+			"name": "devel-clang",
+			"inherits": [
+				"devel"
+			]
+		},
 		{
 			"name": "release-tests",
-			"inherits": ["release", "_build-tests", "_build-tgf"]
+			"inherits": [
+				"release",
+				"_build-tests",
+				"_build-tgf"
+			]
 		},
-
 		{
 			"name": "debug-tests",
 			"inherits": [
@@ -593,52 +785,115 @@
 				"_build-type-debug"
 			]
 		},
-
+		{
+			"name": "devel-tests",
+			"inherits": [
+				"devel",
+				"_build-tests",
+				"_build-tgf"
+			]
+		},
 		{
 			"name": "grammar-tests",
-			"inherits": ["release", "_run-grammar-tests"]
+			"inherits": [
+				"release",
+				"_run-grammar-tests"
+			]
 		},
-
 		{
 			"name": "release-all",
-			"inherits": ["release", "_build-all"]
+			"inherits": [
+				"release",
+				"_build-all"
+			]
 		},
-
 		{
 			"name": "debug-all",
-			"inherits": ["debug", "_build-all", "_build-type-debug"]
+			"inherits": [
+				"debug",
+				"_build-all",
+				"_build-type-debug"
+			]
 		},
-
+		{
+			"name": "devel-all",
+			"inherits": [
+				"devel",
+				"_build-all"
+			]
+		},
 		{
 			"name": "all",
-			"inherits": ["release-all"]
+			"inherits": [
+				"release-all"
+			]
 		},
-
 		{
 			"name": "release-tgf",
-			"inherits": ["release", "_build-tgf"]
+			"inherits": [
+				"release",
+				"_build-tgf"
+			]
 		},
-
-		{
-			"name": "release-ninja-tgf",
-			"inherits": ["release-tgf"]
-		},
-
 		{
 			"name": "debug-tgf",
-			"inherits": ["debug", "_build-tgf", "_build-type-debug"]
+			"inherits": [
+				"debug",
+				"_build-tgf",
+				"_build-type-debug"
+			]
 		},
-
+		{
+			"name": "devel-tgf",
+			"inherits": [
+				"devel",
+				"_build-tgf"
+			]
+		},
+		{
+			"name": "release-ninja-tgf",
+			"inherits": [
+				"release-tgf"
+			]
+		},
+		{
+			"name": "debug-ninja-tgf",
+			"inherits": [
+				"debug-tgf"
+			]
+		},
+		{
+			"name": "devel-ninja-tgf",
+			"inherits": [
+				"devel-tgf"
+			]
+		},
 		{
 			"name": "release-tgf-clang",
-			"inherits": ["release-tgf"]
+			"inherits": [
+				"release-tgf"
+			]
 		},
-
 		{
 			"name": "debug-tgf-clang",
-			"inherits": ["debug-tgf"]
+			"inherits": [
+				"debug-tgf"
+			]
 		},
-
+		{
+			"name": "devel-tgf-clang",
+			"inherits": [
+				"devel-tgf"
+			]
+		},
+		{
+			"name": "release-asan",
+			"inherits": [
+				"release",
+				"_sanitize-address",
+				"_build-type-release"
+			]
+		},
 		{
 			"name": "debug-asan",
 			"inherits": [
@@ -647,12 +902,39 @@
 				"_build-type-debug"
 			]
 		},
-
+		{
+			"name": "devel-asan",
+			"inherits": [
+				"devel",
+				"_sanitize-address",
+				"_build-type-devel"
+			]
+		},
 		{
 			"name": "release-static",
-			"inherits": ["release", "_build-static", "_install"]
+			"inherits": [
+				"release",
+				"_build-static",
+				"_install"
+			]
 		},
-
+		{
+			"name": "debug-static",
+			"inherits": [
+				"debug",
+				"_build-static",
+				"_install",
+				"_build-type-debug"
+			]
+		},
+		{
+			"name": "devel-static",
+			"inherits": [
+				"devel",
+				"_build-static",
+				"_install"
+			]
+		},
 		{
 			"name": "release-shared",
 			"inherits": [
@@ -662,17 +944,32 @@
 				"_install"
 			]
 		},
-
 		{
-			"name": "relwithdebinfo",
-			"inherits": ["_build_dir-relwithdebinfo", "_generator-ninja", "_toolchain-clang", "_build-type-relwithdebinfo"]
+			"name": "debug-shared",
+			"inherits": [
+				"debug",
+				"_build-shared",
+				"_build-pic",
+				"_install",
+				"_build-type-debug"
+			]
 		},
-
+		{
+			"name": "devel-shared",
+			"inherits": [
+				"devel",
+				"_build-shared",
+				"_build-pic",
+				"_install"
+			]
+		},
 		{
 			"name": "release-examples",
-			"inherits": ["release", "_build-examples"]
+			"inherits": [
+				"release",
+				"_build-examples"
+			]
 		},
-
 		{
 			"name": "debug-examples",
 			"inherits": [
@@ -681,68 +978,72 @@
 				"_build-type-debug"
 			]
 		},
-
+		{
+			"name": "devel-examples",
+			"inherits": [
+				"devel",
+				"_build-examples"
+			]
+		},
 		{
 			"name": "release-packages",
-			"inherits": ["release", "_build-packages"]
-		},
-
-		{
-			"name": "release-w64-tests",
-			"inherits": ["release-w64", "_build-tests", "_build-tgf"],
-			"cacheVariables": {
-				"CMAKE_CROSSCOMPILING_EMULATOR": "wine"
-			}
-		},
-
-		{
-			"name": "release-w64-packages",
 			"inherits": [
-				"release-w64",
-				"_build-packages",
-				"_windows-package"
+				"release",
+				"_build-packages"
 			]
 		},
-
-		{
-			"name": "release-w64-packages-zip",
-			"inherits": [
-				"release-w64",
-				"_build-packages",
-				"_windows-zip-package"
-			]
-		},
-
 		{
 			"name": "release-macos-packages",
-			"inherits": ["release", "_build-packages", "_macos-package"]
+			"inherits": [
+				"release",
+				"_build-packages",
+				"_macos-package"
+			]
 		},
-
+		{
+			"name": "relwithdebinfo",
+			"inherits": [
+				"_build_dir-relwithdebinfo",
+				"_generator-ninja",
+				"_toolchain-clang",
+				"_build-type-relwithdebinfo"
+			]
+		},
 		{
 			"name": "relwithdebinfo-tests",
-			"inherits": ["relwithdebinfo", "_build-tests"]
+			"inherits": [
+				"relwithdebinfo",
+				"_build-tests"
+			]
 		},
-
 		{
 			"name": "relwithdebinfo-tgf",
-			"inherits": ["relwithdebinfo", "_build-tgf"]
+			"inherits": [
+				"relwithdebinfo",
+				"_build-tgf"
+			]
 		},
-
 		{
 			"name": "relwithdebinfo-examples",
-			"inherits": ["relwithdebinfo", "_build-examples"]
+			"inherits": [
+				"relwithdebinfo",
+				"_build-examples"
+			]
 		},
-
 		{
 			"name": "relwithdebinfo-all",
-			"inherits": ["relwithdebinfo", "_build-all"]
+			"inherits": [
+				"relwithdebinfo",
+				"_build-all"
+			]
 		},
-
 		{
 			"name": "release-measure",
-			"inherits": ["release", "_build-measure"]
+			"inherits": [
+				"release",
+				"_build-measure"
+			]
 		},
-
 		{
 			"name": "debug-measure",
 			"inherits": [
@@ -751,7 +1052,13 @@
 				"_build-type-debug"
 			]
 		},
-
+		{
+			"name": "devel-measure",
+			"inherits": [
+				"devel",
+				"_build-measure"
+			]
+		},
 		{
 			"name": "release-wasm",
 			"inherits": [
@@ -761,27 +1068,6 @@
 				"_build-type-release"
 			]
 		},
-
-		{
-			"name": "release-wasm-tests",
-			"inherits": ["release-wasm", "_build-tests"]
-		},
-
-		{
-			"name": "release-wasm-tests-browser",
-			"inherits": ["release-wasm", "_build-tests", "_build-browser-tests"]
-		},
-
-		{
-			"name": "release-wasm-tgf",
-			"inherits": ["release-wasm", "_build-tgf"]
-		},
-
-		{
-			"name": "release-wasm-all",
-			"inherits": ["release-wasm", "_build-all"]
-		},
-
 		{
 			"name": "debug-wasm",
 			"inherits": [
@@ -791,139 +1077,104 @@
 				"_build-type-debug"
 			]
 		},
-
 		{
-			"name": "debug-wasm-tests",
-			"inherits": ["debug-wasm", "_build-tests"]
-		},
-
-		{
-			"name": "debug-wasm-tgf",
-			"inherits": ["debug-wasm", "_build-tgf"]
-		},
-
-		{
-			"name": "debug-wasm-all",
-			"inherits": ["debug-wasm", "_build-all"]
-		}
-	],
-	"buildPresets": [
-		{
-			"name": "debug",
-			"configurePreset": "debug"
-		},
-		{
-			"name": "release",
-			"configurePreset": "release"
-		},
-		{
-			"name": "release-ninja",
-			"configurePreset": "release-ninja"
-		},
-		{
-			"name": "debug-ninja",
-			"configurePreset": "debug-ninja"
-		},
-		{
-			"name": "release-clang",
-			"configurePreset": "release-clang"
-		},
-		{
-			"name": "debug-clang",
-			"configurePreset": "debug-clang"
-		},
-		{
-			"name": "debug-tests",
-			"configurePreset": "debug-tests"
-		},
-		{
-			"name": "release-tests",
-			"configurePreset": "release-tests"
-		},
-		{
-			"name": "grammar-tests",
-			"configurePreset": "grammar-tests"
-		},
-		{
-			"name": "debug-all",
-			"configurePreset": "debug-all"
-		},
-		{
-			"name": "release-all",
-			"configurePreset": "release-all"
-		},
-		{
-			"name": "all",
-			"configurePreset": "all"
-		},
-		{
-			"name": "debug-tgf",
-			"configurePreset": "debug-tgf"
-		},
-		{
-			"name": "release-tgf",
-			"configurePreset": "release-tgf"
-		},
-		{
-			"name": "release-ninja-tgf",
-			"configurePreset": "release-ninja-tgf"
-		},
-		{
-			"name": "release-tgf-clang",
-			"configurePreset": "release-tgf-clang"
-		},
-		{
-			"name": "debug-tgf-clang",
-			"configurePreset": "debug-tgf-clang"
-		},
-		{
-			"name": "debug-asan",
-			"configurePreset": "debug-asan"
-		},
-		{
-			"name": "release-static",
-			"configurePreset": "release-static"
-		},
-		{
-			"name": "release-shared",
-			"configurePreset": "release-shared"
-		},
-		{
-			"name": "release-wasm",
-			"configurePreset": "release-wasm"
+			"name": "devel-wasm",
+			"inherits": [
+				"_build_dir-devel-wasm",
+				"_generator-make",
+				"_toolchain-wasm",
+				"_build-type-devel"
+			]
 		},
 		{
 			"name": "release-wasm-tests",
-			"configurePreset": "release-wasm-tests"
-		},
-		{
-			"name": "release-wasm-tests-browser",
-			"configurePreset": "release-wasm-tests-browser"
-		},
-		{
-			"name": "release-wasm-tgf",
-			"configurePreset": "release-wasm-tgf"
-		},
-		{
-			"name": "release-wasm-all",
-			"configurePreset": "release-wasm-all"
-		},
-		{
-			"name": "debug-wasm",
-			"configurePreset": "debug-wasm"
+			"inherits": [
+				"release-wasm",
+				"_build-tests"
+			]
 		},
 		{
 			"name": "debug-wasm-tests",
-			"configurePreset": "debug-wasm-tests"
+			"inherits": [
+				"debug-wasm",
+				"_build-tests"
+			]
+		},
+		{
+			"name": "devel-wasm-tests",
+			"inherits": [
+				"devel-wasm",
+				"_build-tests"
+			]
+		},
+		{
+			"name": "release-wasm-tests-browser",
+			"inherits": [
+				"release-wasm",
+				"_build-tests",
+				"_build-browser-tests"
+			]
+		},
+		{
+			"name": "debug-wasm-tests-browser",
+			"inherits": [
+				"debug-wasm",
+				"_build-tests",
+				"_build-browser-tests"
+			]
+		},
+		{
+			"name": "devel-wasm-tests-browser",
+			"inherits": [
+				"devel-wasm",
+				"_build-tests",
+				"_build-browser-tests"
+			]
+		},
+		{
+			"name": "release-wasm-tgf",
+			"inherits": [
+				"release-wasm",
+				"_build-tgf"
+			]
 		},
 		{
 			"name": "debug-wasm-tgf",
-			"configurePreset": "debug-wasm-tgf"
+			"inherits": [
+				"debug-wasm",
+				"_build-tgf"
+			]
+		},
+		{
+			"name": "devel-wasm-tgf",
+			"inherits": [
+				"devel-wasm",
+				"_build-tgf"
+			]
+		},
+		{
+			"name": "release-wasm-all",
+			"inherits": [
+				"release-wasm",
+				"_build-all"
+			]
 		},
 		{
 			"name": "debug-wasm-all",
-			"configurePreset": "debug-wasm-all"
+			"inherits": [
+				"debug-wasm",
+				"_build-all"
+			]
 		},
+		{
+			"name": "devel-wasm-all",
+			"inherits": [
+				"devel-wasm",
+				"_build-all"
+			]
+		}
+	],
+	"buildPresets": [
 		{
 			"name": "release-make-gcc",
 			"configurePreset": "release-make-gcc"
@@ -931,6 +1182,10 @@
 		{
 			"name": "debug-make-gcc",
 			"configurePreset": "debug-make-gcc"
+		},
+		{
+			"name": "devel-make-gcc",
+			"configurePreset": "devel-make-gcc"
 		},
 		{
 			"name": "release-ninja-gcc",
@@ -941,12 +1196,20 @@
 			"configurePreset": "debug-ninja-gcc"
 		},
 		{
+			"name": "devel-ninja-gcc",
+			"configurePreset": "devel-ninja-gcc"
+		},
+		{
 			"name": "release-make-clang",
 			"configurePreset": "release-make-clang"
 		},
 		{
 			"name": "debug-make-clang",
 			"configurePreset": "debug-make-clang"
+		},
+		{
+			"name": "devel-make-clang",
+			"configurePreset": "devel-make-clang"
 		},
 		{
 			"name": "release-ninja-clang",
@@ -957,92 +1220,32 @@
 			"configurePreset": "debug-ninja-clang"
 		},
 		{
-			"name": "release-w64",
-			"configurePreset": "release-w64"
+			"name": "devel-ninja-clang",
+			"configurePreset": "devel-ninja-clang"
 		},
 		{
-			"name": "release-w64-tests",
-			"configurePreset": "release-w64-tests"
+			"name": "release-w64",
+			"configurePreset": "release-w64"
 		},
 		{
 			"name": "debug-w64",
 			"configurePreset": "debug-w64"
 		},
 		{
-			"name": "release-msvc",
-			"configurePreset": "release-msvc"
+			"name": "devel-w64",
+			"configurePreset": "devel-w64"
 		},
 		{
-			"name": "debug-msvc",
-			"configurePreset": "debug-msvc"
+			"name": "release-w64-tests",
+			"configurePreset": "release-w64-tests"
 		},
 		{
-			"name": "release-msvc-tgf",
-			"configurePreset": "release-msvc-tgf"
+			"name": "debug-w64-tests",
+			"configurePreset": "debug-w64-tests"
 		},
 		{
-			"name": "debug-msvc-tgf",
-			"configurePreset": "debug-msvc-tgf"
-		},
-		{
-			"name": "release-msvc-tests",
-			"configurePreset": "release-msvc-tests"
-		},
-		{
-			"name": "debug-msvc-tests",
-			"configurePreset": "debug-msvc-tests"
-		},
-		{
-			"name": "release-msvc-examples",
-			"configurePreset": "release-msvc-examples"
-		},
-		{
-			"name": "debug-msvc-examples",
-			"configurePreset": "debug-msvc-examples"
-		},
-		{
-			"name": "release-msvc-all",
-			"configurePreset": "release-msvc-all"
-		},
-		{
-			"name": "release-msvc-all-clang-cl",
-			"configurePreset": "release-msvc-all-clang-cl"
-		},
-		{
-			"name": "debug-msvc-all",
-			"configurePreset": "debug-msvc-all"
-		},
-		{
-			"name": "msvc-all",
-			"configurePreset": "msvc-all"
-		},
-		{
-			"name": "release-msvc-packages",
-			"configurePreset": "release-msvc-packages"
-		},
-		{
-			"name": "release-msvc-packages-zip",
-			"configurePreset": "release-msvc-packages-zip"
-		},
-		{
-			"name": "relwithdebinfo",
-			"configurePreset": "relwithdebinfo"
-		},
-		{
-			"name": "relwithdebinfo-make-gcc",
-			"configurePreset": "relwithdebinfo-make-gcc"
-		},
-		{
-			"name": "release-examples",
-			"configurePreset": "release-examples"
-		},
-		{
-			"name": "debug-examples",
-			"configurePreset": "debug-examples"
-		},
-		{
-			"name": "release-packages",
-			"configurePreset": "release-packages"
+			"name": "devel-w64-tests",
+			"configurePreset": "devel-w64-tests"
 		},
 		{
 			"name": "release-w64-packages",
@@ -1053,8 +1256,256 @@
 			"configurePreset": "release-w64-packages-zip"
 		},
 		{
+			"name": "release-msvc",
+			"configurePreset": "release-msvc"
+		},
+		{
+			"name": "debug-msvc",
+			"configurePreset": "debug-msvc"
+		},
+		{
+			"name": "devel-msvc",
+			"configurePreset": "devel-msvc"
+		},
+		{
+			"name": "release-msvc-tgf",
+			"configurePreset": "release-msvc-tgf"
+		},
+		{
+			"name": "debug-msvc-tgf",
+			"configurePreset": "debug-msvc-tgf"
+		},
+		{
+			"name": "devel-msvc-tgf",
+			"configurePreset": "devel-msvc-tgf"
+		},
+		{
+			"name": "release-msvc-tests",
+			"configurePreset": "release-msvc-tests"
+		},
+		{
+			"name": "debug-msvc-tests",
+			"configurePreset": "debug-msvc-tests"
+		},
+		{
+			"name": "devel-msvc-tests",
+			"configurePreset": "devel-msvc-tests"
+		},
+		{
+			"name": "release-msvc-examples",
+			"configurePreset": "release-msvc-examples"
+		},
+		{
+			"name": "debug-msvc-examples",
+			"configurePreset": "debug-msvc-examples"
+		},
+		{
+			"name": "devel-msvc-examples",
+			"configurePreset": "devel-msvc-examples"
+		},
+		{
+			"name": "release-msvc-all",
+			"configurePreset": "release-msvc-all"
+		},
+		{
+			"name": "debug-msvc-all",
+			"configurePreset": "debug-msvc-all"
+		},
+		{
+			"name": "devel-msvc-all",
+			"configurePreset": "devel-msvc-all"
+		},
+		{
+			"name": "msvc-all",
+			"configurePreset": "msvc-all"
+		},
+		{
+			"name": "release-msvc-all-clang-cl",
+			"configurePreset": "release-msvc-all-clang-cl"
+		},
+		{
+			"name": "debug-msvc-all-clang-cl",
+			"configurePreset": "debug-msvc-all-clang-cl"
+		},
+		{
+			"name": "devel-msvc-all-clang-cl",
+			"configurePreset": "devel-msvc-all-clang-cl"
+		},
+		{
+			"name": "release-msvc-packages",
+			"configurePreset": "release-msvc-packages"
+		},
+		{
+			"name": "release-msvc-packages-zip",
+			"configurePreset": "release-msvc-packages-zip"
+		},
+		{
+			"name": "relwithdebinfo-make-gcc",
+			"configurePreset": "relwithdebinfo-make-gcc"
+		},
+		{
+			"name": "release",
+			"configurePreset": "release"
+		},
+		{
+			"name": "debug",
+			"configurePreset": "debug"
+		},
+		{
+			"name": "devel",
+			"configurePreset": "devel"
+		},
+		{
+			"name": "release-ninja",
+			"configurePreset": "release-ninja"
+		},
+		{
+			"name": "debug-ninja",
+			"configurePreset": "debug-ninja"
+		},
+		{
+			"name": "devel-ninja",
+			"configurePreset": "devel-ninja"
+		},
+		{
+			"name": "release-clang",
+			"configurePreset": "release-clang"
+		},
+		{
+			"name": "debug-clang",
+			"configurePreset": "debug-clang"
+		},
+		{
+			"name": "devel-clang",
+			"configurePreset": "devel-clang"
+		},
+		{
+			"name": "release-tests",
+			"configurePreset": "release-tests"
+		},
+		{
+			"name": "debug-tests",
+			"configurePreset": "debug-tests"
+		},
+		{
+			"name": "devel-tests",
+			"configurePreset": "devel-tests"
+		},
+		{
+			"name": "grammar-tests",
+			"configurePreset": "grammar-tests"
+		},
+		{
+			"name": "release-all",
+			"configurePreset": "release-all"
+		},
+		{
+			"name": "debug-all",
+			"configurePreset": "debug-all"
+		},
+		{
+			"name": "devel-all",
+			"configurePreset": "devel-all"
+		},
+		{
+			"name": "all",
+			"configurePreset": "all"
+		},
+		{
+			"name": "release-tgf",
+			"configurePreset": "release-tgf"
+		},
+		{
+			"name": "debug-tgf",
+			"configurePreset": "debug-tgf"
+		},
+		{
+			"name": "devel-tgf",
+			"configurePreset": "devel-tgf"
+		},
+		{
+			"name": "release-ninja-tgf",
+			"configurePreset": "release-ninja-tgf"
+		},
+		{
+			"name": "debug-ninja-tgf",
+			"configurePreset": "debug-ninja-tgf"
+		},
+		{
+			"name": "devel-ninja-tgf",
+			"configurePreset": "devel-ninja-tgf"
+		},
+		{
+			"name": "release-tgf-clang",
+			"configurePreset": "release-tgf-clang"
+		},
+		{
+			"name": "debug-tgf-clang",
+			"configurePreset": "debug-tgf-clang"
+		},
+		{
+			"name": "devel-tgf-clang",
+			"configurePreset": "devel-tgf-clang"
+		},
+		{
+			"name": "release-asan",
+			"configurePreset": "release-asan"
+		},
+		{
+			"name": "debug-asan",
+			"configurePreset": "debug-asan"
+		},
+		{
+			"name": "devel-asan",
+			"configurePreset": "devel-asan"
+		},
+		{
+			"name": "release-static",
+			"configurePreset": "release-static"
+		},
+		{
+			"name": "debug-static",
+			"configurePreset": "debug-static"
+		},
+		{
+			"name": "devel-static",
+			"configurePreset": "devel-static"
+		},
+		{
+			"name": "release-shared",
+			"configurePreset": "release-shared"
+		},
+		{
+			"name": "debug-shared",
+			"configurePreset": "debug-shared"
+		},
+		{
+			"name": "devel-shared",
+			"configurePreset": "devel-shared"
+		},
+		{
+			"name": "release-examples",
+			"configurePreset": "release-examples"
+		},
+		{
+			"name": "debug-examples",
+			"configurePreset": "debug-examples"
+		},
+		{
+			"name": "devel-examples",
+			"configurePreset": "devel-examples"
+		},
+		{
+			"name": "release-packages",
+			"configurePreset": "release-packages"
+		},
+		{
 			"name": "release-macos-packages",
 			"configurePreset": "release-macos-packages"
+		},
+		{
+			"name": "relwithdebinfo",
+			"configurePreset": "relwithdebinfo"
 		},
 		{
 			"name": "relwithdebinfo-tests",
@@ -1079,6 +1530,70 @@
 		{
 			"name": "debug-measure",
 			"configurePreset": "debug-measure"
+		},
+		{
+			"name": "devel-measure",
+			"configurePreset": "devel-measure"
+		},
+		{
+			"name": "release-wasm",
+			"configurePreset": "release-wasm"
+		},
+		{
+			"name": "debug-wasm",
+			"configurePreset": "debug-wasm"
+		},
+		{
+			"name": "devel-wasm",
+			"configurePreset": "devel-wasm"
+		},
+		{
+			"name": "release-wasm-tests",
+			"configurePreset": "release-wasm-tests"
+		},
+		{
+			"name": "debug-wasm-tests",
+			"configurePreset": "debug-wasm-tests"
+		},
+		{
+			"name": "devel-wasm-tests",
+			"configurePreset": "devel-wasm-tests"
+		},
+		{
+			"name": "release-wasm-tests-browser",
+			"configurePreset": "release-wasm-tests-browser"
+		},
+		{
+			"name": "debug-wasm-tests-browser",
+			"configurePreset": "debug-wasm-tests-browser"
+		},
+		{
+			"name": "devel-wasm-tests-browser",
+			"configurePreset": "devel-wasm-tests-browser"
+		},
+		{
+			"name": "release-wasm-tgf",
+			"configurePreset": "release-wasm-tgf"
+		},
+		{
+			"name": "debug-wasm-tgf",
+			"configurePreset": "debug-wasm-tgf"
+		},
+		{
+			"name": "devel-wasm-tgf",
+			"configurePreset": "devel-wasm-tgf"
+		},
+		{
+			"name": "release-wasm-all",
+			"configurePreset": "release-wasm-all"
+		},
+		{
+			"name": "debug-wasm-all",
+			"configurePreset": "debug-wasm-all"
+		},
+		{
+			"name": "devel-wasm-all",
+			"configurePreset": "devel-wasm-all"
 		}
 	],
 	"testPresets": [
@@ -1091,20 +1606,20 @@
 			"configurePreset": "release-tests"
 		},
 		{
+			"name": "devel-tests",
+			"configurePreset": "devel-tests"
+		},
+		{
 			"name": "release-w64-tests",
 			"configurePreset": "release-w64-tests"
 		},
 		{
-			"name": "release-wasm-tests",
-			"configurePreset": "release-wasm-tests"
+			"name": "debug-w64-tests",
+			"configurePreset": "debug-w64-tests"
 		},
 		{
-			"name": "release-wasm-tests-browser",
-			"configurePreset": "release-wasm-tests-browser"
-		},
-		{
-			"name": "debug-wasm-tests",
-			"configurePreset": "debug-wasm-tests"
+			"name": "devel-w64-tests",
+			"configurePreset": "devel-w64-tests"
 		},
 		{
 			"name": "grammar-tests",
@@ -1115,16 +1630,12 @@
 			"configurePreset": "release-all"
 		},
 		{
-			"name": "release-wasm-all",
-			"configurePreset": "release-wasm-all"
-		},
-		{
 			"name": "debug-all",
 			"configurePreset": "debug-all"
 		},
 		{
-			"name": "debug-wasm-all",
-			"configurePreset": "debug-wasm-all"
+			"name": "devel-all",
+			"configurePreset": "devel-all"
 		},
 		{
 			"name": "all",
@@ -1147,20 +1658,72 @@
 			"configurePreset": "debug-msvc-tests"
 		},
 		{
-			"name": "release-msvc-all",
-			"configurePreset": "release-msvc-all"
+			"name": "devel-msvc-tests",
+			"configurePreset": "devel-msvc-tests"
 		},
 		{
-			"name": "release-msvc-all-clang-cl",
-			"configurePreset": "release-msvc-all-clang-cl"
+			"name": "release-msvc-all",
+			"configurePreset": "release-msvc-all"
 		},
 		{
 			"name": "debug-msvc-all",
 			"configurePreset": "debug-msvc-all"
 		},
 		{
+			"name": "devel-msvc-all",
+			"configurePreset": "devel-msvc-all"
+		},
+		{
 			"name": "msvc-all",
 			"configurePreset": "msvc-all"
+		},
+		{
+			"name": "release-msvc-all-clang-cl",
+			"configurePreset": "release-msvc-all-clang-cl"
+		},
+		{
+			"name": "debug-msvc-all-clang-cl",
+			"configurePreset": "debug-msvc-all-clang-cl"
+		},
+		{
+			"name": "devel-msvc-all-clang-cl",
+			"configurePreset": "devel-msvc-all-clang-cl"
+		},
+		{
+			"name": "release-wasm-tests",
+			"configurePreset": "release-wasm-tests"
+		},
+		{
+			"name": "debug-wasm-tests",
+			"configurePreset": "debug-wasm-tests"
+		},
+		{
+			"name": "devel-wasm-tests",
+			"configurePreset": "devel-wasm-tests"
+		},
+		{
+			"name": "release-wasm-all",
+			"configurePreset": "release-wasm-all"
+		},
+		{
+			"name": "debug-wasm-all",
+			"configurePreset": "debug-wasm-all"
+		},
+		{
+			"name": "devel-wasm-all",
+			"configurePreset": "devel-wasm-all"
+		},
+		{
+			"name": "release-wasm-tests-browser",
+			"configurePreset": "release-wasm-tests-browser"
+		},
+		{
+			"name": "debug-wasm-tests-browser",
+			"configurePreset": "debug-wasm-tests-browser"
+		},
+		{
+			"name": "devel-wasm-tests-browser",
+			"configurePreset": "devel-wasm-tests-browser"
 		}
 	]
 }
