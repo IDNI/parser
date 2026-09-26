@@ -203,6 +203,8 @@ foreach(X IN LISTS DOCTESTS)
 		if(TARGET tgf_cli_core)
 			# the core library owns the generated parsers
 			target_link_libraries(${N} PRIVATE tgf_cli_core)
+			# tgf_run() is defined by the core library only
+			target_compile_definitions(${N} PRIVATE TAU_TEST_HAS_TGF_CLI)
 		else()
 			target_sources(${N} PRIVATE
 				"${PROJECT_SOURCE_DIR}/src/tgf/tgf_repl_parser.generated.cpp")

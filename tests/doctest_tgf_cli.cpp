@@ -223,6 +223,8 @@ TEST_SUITE("tgf cli: global options") {
 // TEST SUITE: derived character class report and switch
 // ---------------------------------------------------------------------------
 
+#if defined(TAU_TEST_HAS_TGF_CLI) && defined(PROJECT_SOURCE_DIR)
+
 // Runs the TGF CLI with args and returns what it wrote to stdout and
 // stderr. The parse error report writes errors to stderr, so a test that
 // reads only stdout would see an empty string for a rejected input.
@@ -276,3 +278,5 @@ TEST_SUITE("tgf cli: derived character classes") {
 		CHECK(on != off);
 	}
 }
+
+#endif // TAU_TEST_HAS_TGF_CLI && PROJECT_SOURCE_DIR

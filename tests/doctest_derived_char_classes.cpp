@@ -29,6 +29,8 @@
 using namespace std;
 using namespace idni;
 
+#ifdef PROJECT_SOURCE_DIR
+
 // ---------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------
@@ -890,3 +892,5 @@ TEST_CASE("a grammar built from copied cc_fns has no derived classes") {
 	CHECK(parses<char>(p2, "a"));
 	CHECK_FALSE(parses<char>(p2, "b"));
 }
+
+#endif // PROJECT_SOURCE_DIR

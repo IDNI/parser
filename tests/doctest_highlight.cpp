@@ -15,6 +15,8 @@
 using namespace std;
 using namespace idni;
 
+#ifdef PROJECT_SOURCE_DIR
+
 // Read a file from the source tree relative to the project root.
 string read_grammar(const string& rel_path) {
 	string full = string(PROJECT_SOURCE_DIR) + "/" + rel_path;
@@ -914,3 +916,5 @@ TEST_CASE("with heuristics on, a rule named ws still lets a keyword color and em
 	CHECK(tokens[1].text == "let");
 	CHECK(tokens[1].type == "keyword");
 }
+
+#endif // PROJECT_SOURCE_DIR
