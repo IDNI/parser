@@ -283,6 +283,12 @@ preset_binary_dir() {
 		debug-mingw*)
 			echo "build/debug-mingw"
 			;;
+		release-msvc*|*-msvc-packages*)
+			echo "build/release-msvc"
+			;;
+		debug-msvc*)
+			echo "build/debug-msvc"
+			;;
 		relwithdebinfo*)
 			echo "build/relwithdebinfo"
 			;;

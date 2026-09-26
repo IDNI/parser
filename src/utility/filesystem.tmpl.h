@@ -138,8 +138,15 @@ inline result<path> temp_dir() {
 	result<path> r;
 	std::error_code ec;
 	auto d = std::filesystem::temp_directory_path(ec);
-	if (!ec && !d.empty()) return r.with_value(d.native());
 #ifdef _WIN32
+	auto is_dir = [](const path& p) {
+		DWORD attr = ::GetFileAttributesW(p.c_str());
+		return attr != INVALID_FILE_ATTRIBUTES
+			&& (attr & FILE_ATTRIBUTE_DIRECTORY);
+	};
+	if (!ec && !d.empty() && is_dir(d.native()))
+		return r.with_value(d.native());
+
 	using label = idni::parser_strings::label;
 	wchar_t dir[MAX_PATH];
 	DWORD dr = ::GetTempPathW(MAX_PATH, dir);
@@ -148,11 +155,25 @@ inline result<path> temp_dir() {
 			"the temporary directory path is too long",
 			{{label::size, static_cast<size_t>(dr)},
 				{label::limit, static_cast<size_t>(MAX_PATH)}});
-	if (dr == 0)
+	if (dr > 0 && is_dir(path(dir)))
+		return r.with_value(path(dir));
+
+	// Git bash scripts that name a tempfile shell var TMP/TEMP export that
+	// path into Win32 children; GetTempPathW prefers TMP and then points at
+	// a file. Fall back to LOCALAPPDATA\Temp when the result is not a dir.
+	wchar_t la[MAX_PATH];
+	DWORD n = ::GetEnvironmentVariableW(L"LOCALAPPDATA", la, MAX_PATH);
+	if (!n || n >= MAX_PATH)
 		return r.with_error(diagnostics::code::io_error,
 			"failed to determine the temporary directory path");
-	return r.with_value(path(dir));
+	path fallback(la);
+	fallback += L"\\Temp";
+	if (!is_dir(fallback))
+		return r.with_error(diagnostics::code::io_error,
+			"failed to determine the temporary directory path");
+	return r.with_value(fallback);
 #else
+	if (!ec && !d.empty()) return r.with_value(d.native());
 	return r.with_value(path("/tmp"));
 #endif
 }
