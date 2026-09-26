@@ -1,4 +1,6 @@
 // terminal.js - xterm.js glue for hosting an Emscripten terminal program.
+// Entry point: tau_wasm_terminal.start(options) returns { term, send,
+// write_file }, or null while the COOP/COEP service worker reloads the page.
 var tau_wasm_terminal = (function() {
 'use strict';
 
@@ -101,3 +103,7 @@ function start(options) {
 return { start: start };
 
 })();
+
+// A classic page script already exposes this as a global; assign it
+// explicitly so the boundary does not depend on script-vs-module loading.
+if (typeof window !== 'undefined') window.tau_wasm_terminal = tau_wasm_terminal;

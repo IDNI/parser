@@ -34,10 +34,13 @@ else()
 		message(STATUS "FTXUI: using installed package at ${ftxui_DIR}")
 	else()
 		include(FetchContent)
+		# The Emscripten listener in v6.1.9 never checks the read result
+		# and spins forever once stdin reaches EOF.
 		FetchContent_Declare(ftxui
 			GIT_REPOSITORY https://github.com/ArthurSonzogni/FTXUI.git
 			GIT_TAG        v6.1.9   # verified tag (commit 5cfed50)
-			GIT_SHALLOW    TRUE)
+			GIT_SHALLOW    TRUE
+			PATCH_COMMAND ${CMAKE_COMMAND} -DPATCH=${CMAKE_CURRENT_LIST_DIR}/ftxui-emscripten-listener-eof.patch -P ${CMAKE_CURRENT_LIST_DIR}/ftxui-apply-patch.cmake)
 		set(FTXUI_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 		set(FTXUI_BUILD_DOCS     OFF CACHE BOOL "" FORCE)
 		set(FTXUI_BUILD_TESTS    OFF CACHE BOOL "" FORCE)

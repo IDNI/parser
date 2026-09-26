@@ -94,6 +94,16 @@ if(TAU_PARSER_BUILD_BROWSER_TESTS)
 				PROPERTY RESOURCE_LOCK emcc_browser)
 			set_property(TEST tgf_browser_parity_emcc
 				PROPERTY ENVIRONMENT "TAU_CHROME_BIN=${TAU_CHROME_BIN}")
+		else()
+			message(STATUS
+				"tgf_browser_parity_emcc not registered: "
+				"${CMAKE_CURRENT_SOURCE_DIR}/build/release/tgf is not built")
 		endif()
+	else()
+		message(WARNING
+			"Browser REPL tests skipped: puppeteer-core is not importable from "
+			"${CMAKE_CURRENT_SOURCE_DIR}/tests/repl. Run "
+			"'npm ci --prefix tests/repl' to register tgf_browser_keybindings_emcc "
+			"and tgf_browser_parity_emcc.")
 	endif()
 endif()
