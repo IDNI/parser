@@ -328,3 +328,11 @@ add_test(NAME tau_manifest_input_id
 		"${CMAKE_CURRENT_SOURCE_DIR}/tau-manifest-self-check.cmake"
 		"${PROJECT_SOURCE_DIR}/cmake/tau-manifest.cmake"
 		"${CMAKE_CURRENT_BINARY_DIR}")
+
+# LOCAL store primitive: another pure, hermetic self-check with the same
+# build-local temp dir.
+add_test(NAME tau_store_local
+	COMMAND ${CMAKE_COMMAND} -P
+		"${CMAKE_CURRENT_SOURCE_DIR}/tau-store-self-check.cmake"
+		"${PROJECT_SOURCE_DIR}/cmake/tau-store.cmake"
+		"${CMAKE_CURRENT_BINARY_DIR}")
