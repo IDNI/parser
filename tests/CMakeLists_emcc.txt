@@ -10,8 +10,8 @@ if(NOT NODE_EXECUTABLE)
 	return()
 endif()
 
-set(WASM_NODE_DIR    "${CMAKE_CURRENT_SOURCE_DIR}/build/emscripten")
-set(WASM_BROWSER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/emscripten/js/tgf")
+set(WASM_NODE_DIR    "${CMAKE_CURRENT_SOURCE_DIR}/build/release-wasm")
+set(WASM_BROWSER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/release-wasm/js/tgf")
 
 # tgf_wasm_parity_emcc - run tgf_node.js against preloaded tau.tgf
 add_test(NAME tgf_wasm_parity_emcc

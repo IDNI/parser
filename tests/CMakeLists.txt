@@ -228,7 +228,7 @@ endif()
 # a built tgf_node.js (the Emscripten node target).
 if(TARGET tgf AND NOT WIN32)
 	find_program(NODE_EXECUTABLE node)
-	if(NODE_EXECUTABLE AND EXISTS "${PROJECT_SOURCE_DIR}/build/emscripten/tgf_node.js")
+	if(NODE_EXECUTABLE AND EXISTS "${PROJECT_SOURCE_DIR}/build/release-wasm/tgf_node.js")
 		add_test(NAME tgf_wasm_parity
 			COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/parity/tgf_wasm_parity.sh"
 				$<TARGET_FILE:tgf>
@@ -264,7 +264,7 @@ endif()
 # Parity between the native tgf and the MinGW build run under wine.
 # Registered only when the cross-build and wine are both present.
 if(TARGET tgf AND NOT WIN32)
-	set(MINGW_DIR "${PROJECT_BINARY_DIR}/../release-mingw")
+	set(MINGW_DIR "${PROJECT_BINARY_DIR}/../release-w64")
 	find_program(WINE_EXECUTABLE wine)
 	if(WINE_EXECUTABLE AND EXISTS "${MINGW_DIR}/tgf.exe")
 		add_test(NAME tgf_wine_parity

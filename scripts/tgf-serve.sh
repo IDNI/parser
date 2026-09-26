@@ -9,7 +9,7 @@
 set -euo pipefail
 
 TOP="$(cd "$(dirname "$0")/.." && pwd)"
-WASM_DIR="$TOP/build/emscripten/js/tgf"
+WASM_DIR="$TOP/build/release-wasm/js/tgf"
 PORT="${1:-8088}"
 
 if [ ! -f "$WASM_DIR/index.html" ]; then

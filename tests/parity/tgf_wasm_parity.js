@@ -24,7 +24,7 @@ async function main() {
 
 	const absGrammar = path.resolve(grammarFile);
 
-	const buildDir = path.resolve(__dirname, '..', '..', 'build', 'emscripten');
+	const buildDir = path.resolve(__dirname, '..', '..', 'build', 'release-wasm');
 	process.chdir(buildDir);
 	const tgfNodePath = path.join(buildDir, 'tgf_node.js');
 	const createTGF = require(tgfNodePath);

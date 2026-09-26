@@ -276,47 +276,45 @@ test_entry() {
 }
 
 preset_binary_dir() {
+	local type="${1%%-*}"
 	case "$1" in
-		release-mingw*|*-mingw-packages*)
-			echo "build/release-mingw"
+		# A preset gets its build type's folder; a non-default toolchain or a
+		# platform adds a suffix, and the generator never splits a folder.
+		*-wasm-nothreads*)
+			echo "build/${type}-wasm-nothreads"
 			;;
-		debug-mingw*)
-			echo "build/debug-mingw"
+		*-wasm-repl-browser|*-wasm-repl-tests-browser)
+			echo "build/${type}-wasm-repl-browser"
 			;;
-		release-msvc*|*-msvc-packages*)
+		*-wasm*)
+			echo "build/${type}-wasm"
+			;;
+		*-w64*)
+			echo "build/${type}-w64"
+			;;
+		*-clang-cl)
+			echo "build/${type}-msvc-clang-cl"
+			;;
+		*-msvc*)
+			echo "build/${type}-msvc"
+			;;
+		msvc-all)
 			echo "build/release-msvc"
 			;;
-		debug-msvc*)
-			echo "build/debug-msvc"
+		*-gcc)
+			echo "build/${type}-gcc"
+			;;
+		coverage*)
+			echo "build/coverage-gcc"
 			;;
 		relwithdebinfo*)
 			echo "build/relwithdebinfo"
 			;;
-		*emscripten*)
-			echo "build/$1"
-			;;
-		release-clang|release-*-clang|release-make-clang \
-			|release-ninja-clang)
-			echo "build/release-clang"
-			;;
-		debug-clang|debug-*-clang|debug-make-clang \
-			|debug-ninja-clang)
-			echo "build/debug-clang"
-			;;
-		coverage*)
-			echo "build/coverage"
-			;;
-		devel*)
-			echo "build/devel"
-			;;
-		debug*)
-			echo "build/debug"
-			;;
-		release*)
+		all|grammar-tests)
 			echo "build/release"
 			;;
-		all)
-			echo "build/release"
+		release*|debug*|devel*)
+			echo "build/${type}"
 			;;
 		*)
 			echo "build"

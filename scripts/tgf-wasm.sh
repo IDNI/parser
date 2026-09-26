@@ -12,7 +12,7 @@ set -euo pipefail
 TOP="$(cd "$(dirname "$0")/.." && pwd)"
 source "$TOP/scripts/devrc"
 
-BUILD_DIR="$TOP/build/emscripten"
+BUILD_DIR="$TOP/build/release-wasm"
 
 # --- activate emsdk --------------------------------------------------------
 EMSDK_DIR="$(dep_shared_prefix)/emsdk"

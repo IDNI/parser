@@ -88,16 +88,6 @@
 			"binaryDir": "${sourceDir}/build/debug"
 		},
 		{
-			"name": "_build_dir-release-clang",
-			"hidden": true,
-			"binaryDir": "${sourceDir}/build/release-clang"
-		},
-		{
-			"name": "_build_dir-debug-clang",
-			"hidden": true,
-			"binaryDir": "${sourceDir}/build/debug-clang"
-		},
-		{
 			"name": "_build_dir-devel",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/devel"
@@ -120,12 +110,12 @@
 		{
 			"name": "_build_dir-release-w64",
 			"hidden": true,
-			"binaryDir": "${sourceDir}/build/release-mingw"
+			"binaryDir": "${sourceDir}/build/release-w64"
 		},
 		{
 			"name": "_build_dir-debug-w64",
 			"hidden": true,
-			"binaryDir": "${sourceDir}/build/debug-mingw"
+			"binaryDir": "${sourceDir}/build/debug-w64"
 		},
 		{
 			"name": "_build_dir-devel-w64",
@@ -150,7 +140,7 @@
 		{
 			"name": "_build_dir-release-msvc-clang-cl",
 			"hidden": true,
-			"binaryDir": "${sourceDir}/build/release-clang-cl"
+			"binaryDir": "${sourceDir}/build/release-msvc-clang-cl"
 		},
 		{
 			"name": "_build_dir-debug-msvc-clang-cl",
@@ -175,12 +165,12 @@
 		{
 			"name": "_build_dir-release-wasm",
 			"hidden": true,
-			"binaryDir": "${sourceDir}/build/emscripten"
+			"binaryDir": "${sourceDir}/build/release-wasm"
 		},
 		{
 			"name": "_build_dir-debug-wasm",
 			"hidden": true,
-			"binaryDir": "${sourceDir}/build/debug-emscripten"
+			"binaryDir": "${sourceDir}/build/debug-wasm"
 		},
 		{
 			"name": "_build_dir-devel-wasm",
@@ -393,7 +383,7 @@
 		{
 			"name": "release-make-clang",
 			"inherits": [
-				"_build_dir-release-clang",
+				"_build_dir-release",
 				"_generator-make",
 				"_toolchain-clang",
 				"_build-type-release"
@@ -402,7 +392,7 @@
 		{
 			"name": "debug-make-clang",
 			"inherits": [
-				"_build_dir-debug-clang",
+				"_build_dir-debug",
 				"_generator-make",
 				"_toolchain-clang",
 				"_build-type-debug"
@@ -420,7 +410,7 @@
 		{
 			"name": "release-ninja-clang",
 			"inherits": [
-				"_build_dir-release-clang",
+				"_build_dir-release",
 				"_generator-ninja",
 				"_toolchain-clang",
 				"_build-type-release"
@@ -429,7 +419,7 @@
 		{
 			"name": "debug-ninja-clang",
 			"inherits": [
-				"_build_dir-debug-clang",
+				"_build_dir-debug",
 				"_generator-ninja",
 				"_toolchain-clang",
 				"_build-type-debug"

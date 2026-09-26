@@ -16,7 +16,7 @@ const {
 	focusTerminal,
 } = require('./browser_helpers');
 
-const WASM_DIR = path.resolve(process.argv[2] || 'build/emscripten/js/tgf');
+const WASM_DIR = path.resolve(process.argv[2] || 'build/release-wasm/js/tgf');
 
 const TAU_CHROME_BIN = process.env.TAU_CHROME_BIN;
 if (!TAU_CHROME_BIN) {
