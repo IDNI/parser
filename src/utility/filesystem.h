@@ -191,9 +191,8 @@ result<file_handle> open(const path& p, mmap_mode m);
  * with code::io_error, the path in label::path, and the OS error
  * code in label::exit_code.
  * @post The caller closes the returned handle, through @ref close.
- * @note On Windows, this behaves exactly like open, since the
- * OPEN_ALWAYS flag of CreateFileW already creates a missing file.
- * create and open differ only on POSIX.
+ * @note On Windows, this opens the file with write access, because only
+ * a write-open creates a missing file.
  */
 result<file_handle> create(const path& p, mmap_mode m);
 

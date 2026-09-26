@@ -7,6 +7,9 @@
 #include "doctest.h"
 #include "parser.h"
 
+#include <filesystem>
+#include <fstream>
+
 using namespace std;
 using namespace idni;
 
@@ -364,5 +367,71 @@ TEST_SUITE("input: tokenize32 (char32_t -> token<char32_t>)") {
 		CHECK(r[4].value == U"World");
 		CHECK(r[5].ttype == token<char32_t>::PUNCT);
 		CHECK(r[5].value == U"!");
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TEST SUITE: file input through a memory map
+// ---------------------------------------------------------------------------
+
+// True when the report holds an io_error node.
+static bool report_has_io_error(const diagnostics::report& r) {
+	for (const auto& n : r.nodes())
+		if (n.tag == diagnostics::code::io_error) return true;
+	return false;
+}
+
+// The single rule grammar start => 'a'.
+static prods<char> file_input_prods(nonterminals<char>& nts) {
+	auto start = nts("start");
+	prods<char> ps, a('a');
+	ps(start, a);
+	return ps;
+}
+
+// Owns the symbol table, the grammar and the parser, because the grammar
+// and the parser hold references to the objects before them.
+struct file_input_parser {
+	nonterminals<char> nts;
+	grammar<char> g;
+	parser<char> p;
+	file_input_parser()
+		: nts(), g(nts, file_input_prods(nts), nts("start"), {}, {}),
+		  p(g) {}
+};
+
+TEST_SUITE("input: file map") {
+
+	TEST_CASE("a file with content parses through the map") {
+		auto path = filesystem::temp_directory_path()
+			/ "tau_input_content.txt";
+		{ ofstream os(path, ios::binary); os << "a"; }
+		file_input_parser f;
+		auto r = f.p.parse(path.string());
+		CHECK(r.found);
+		CHECK(!report_has_io_error(r.report()));
+		filesystem::remove(path);
+	}
+
+	TEST_CASE("a missing file keeps its io error in the report") {
+		auto path = filesystem::temp_directory_path()
+			/ "tau_input_missing.txt";
+		filesystem::remove(path);
+		file_input_parser f;
+		auto r = f.p.parse(path.string());
+		CHECK(!r.found);
+		CHECK(report_has_io_error(r.report()));
+	}
+
+	TEST_CASE("an empty file is an empty input, not an io error") {
+		auto path = filesystem::temp_directory_path()
+			/ "tau_input_empty.txt";
+		{ ofstream os(path, ios::binary); }
+		file_input_parser f;
+		auto r = f.p.parse(path.string());
+		CHECK(!r.found);
+		CHECK(r.report().has_error());
+		CHECK(!report_has_io_error(r.report()));
+		filesystem::remove(path);
 	}
 }

@@ -110,6 +110,11 @@ inline result<bool> memory_map::map() {
 	if (state_ != UNMAPPED)
 		return err(diagnostics::code::invalid_state,
 			"file is not opened or already mapped");
+	// An empty file has no bytes to map, so it is not an io error.
+	if (!size_) {
+		result<bool> rr;
+		return rr.with_value(true);
+	}
 	auto r = fs::map(fh_, size_, mode_);
 	if (!r.has_value()) {
 		report_.append(r.report());

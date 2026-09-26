@@ -112,7 +112,8 @@ public:
 	 * label::exit_code.
 	 * @pre Needs the UNMAPPED state.
 	 * @post On success, moves to the MAPPED state, and data()
-	 * returns the mapped memory.
+	 * returns the mapped memory. A zero-size file has no bytes to
+	 * map, so it stays UNMAPPED, with a null data(), and no error.
 	 */
 	result<bool> map();
 

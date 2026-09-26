@@ -798,6 +798,7 @@ parser<C, T>::result parser<C, T>::parse(const C* data, size_t size,
 }
 template <typename C, typename T>
 parser<C, T>::result parser<C, T>::parse(const C* data, size_t size) {
+	report_.clear();
 	in_ = std::make_unique<input>(data, size,
 		po.max_length, o.codec.decode, po.eof);
 	return _parse();
@@ -811,6 +812,7 @@ parser<C, T>::result parser<C, T>::parse(std::basic_istream<C>& is,
 }
 template <typename C, typename T>
 parser<C, T>::result parser<C, T>::parse(std::basic_istream<C>& is) {
+	report_.clear();
 	in_ = std::make_unique<input>(is,
 		po.max_length, o.codec.decode, po.eof);
 	return _parse();
@@ -824,6 +826,7 @@ parser<C, T>::result  parser<C, T>::parse(const std::string& fn,
 }
 template <typename C, typename T>
 parser<C, T>::result  parser<C, T>::parse(const std::string& fn) {
+	report_.clear();
 	in_ = std::make_unique<input>(fn,
 		po.max_length, o.codec.decode, po.eof, &report_);
 	return _parse();
@@ -838,6 +841,7 @@ parser<C, T>::result parser<C, T>::parse(const std::wstring& fn,
 }
 template <typename C, typename T>
 parser<C, T>::result parser<C, T>::parse(const std::wstring& fn) {
+	report_.clear();
 	in_ = std::make_unique<input>(fn,
 		po.max_length, o.codec.decode, po.eof, &report_);
 	return _parse();
@@ -850,6 +854,7 @@ parser<C, T>::result parser<C, T>::parse(int fd, parse_options popts) {
 }
 template <typename C, typename T>
 parser<C, T>::result parser<C, T>::parse(int fd) {
+	report_.clear();
 	in_ = std::make_unique<input>(fd,
 		po.max_length, o.codec.decode, po.eof);
 	return _parse();
@@ -857,8 +862,7 @@ parser<C, T>::result parser<C, T>::parse(int fd) {
 #endif
 template <typename C, typename T>
 parser<C, T>::result parser<C, T>::_parse() {
-	// Fresh report per parse.
-	report_.clear();
+	// Entry points clear the report first, so an input error survives here.
 	// A chart position and span field is 32-bit, so a longer input cannot
 	// be represented and is stopped before the first item is built.
 	const size_t max_item_pos = static_cast<size_t>(UINT32_MAX) - 1;
@@ -878,9 +882,11 @@ parser<C, T>::result parser<C, T>::_parse() {
 		return r;
 	}
 	std::optional<idni::diagnostics::report::scope_guard> parse_scope;
+	// The nodes of an input error stay, so a failing file open survives
+	// into the report of the parse it failed.
 	if (po.measure_scopes)
 		parse_scope.emplace(report_.open(label::parse));
-	else
+	else if (!report_.has_error())
 		report_.reset(label::parse);
 #ifdef TAU_PARSER_MEASURE_COUNTERS
 	cnt = idni::parser_strings::counters{};

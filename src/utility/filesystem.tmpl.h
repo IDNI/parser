@@ -221,10 +221,12 @@ inline result<path> temp_filename(const std::string& prefix) {
 inline result<file_handle> open(const path& p, mmap_mode m) {
 	using label = idni::parser_strings::label;
 	result<file_handle> r;
+	// A read of a missing file must fail instead of creating an empty file.
 	file_handle f = ::CreateFileW(p.c_str(),
 		m == MMAP_READ ? GENERIC_READ : GENERIC_READ | GENERIC_WRITE,
 		FILE_SHARE_READ | FILE_SHARE_WRITE,
-		0, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+		0, m == MMAP_READ ? OPEN_EXISTING : OPEN_ALWAYS,
+		FILE_ATTRIBUTE_NORMAL, 0);
 	if (f == invalid_file_handle)
 		return r.with_error(diagnostics::code::io_error,
 			"failed to open file",
@@ -233,8 +235,8 @@ inline result<file_handle> open(const path& p, mmap_mode m) {
 	return r.with_value(f);
 }
 inline result<file_handle> create(const path& p, mmap_mode m) {
-	// OPEN_ALWAYS already creates a missing file, so create is open.
-	return open(p, m);
+	// Only a write mode creates a missing file, so a read mode maps to it.
+	return open(p, m == MMAP_READ ? MMAP_WRITE : m);
 }
 inline result<bool> close(file_handle f) {
 	using label = idni::parser_strings::label;
