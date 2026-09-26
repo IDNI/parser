@@ -190,6 +190,10 @@ parser<C, T>::parser(grammar<C, T>& g, options o) : g(g), o(o), po(o.parse_opts)
 			DBG(assert(it->first != it->second);)
 			it = this->o.dynamic_grow_nts.erase(it);
 		} else ++it;
+	std::set<size_t> grow_children;
+	for (const auto& [p, c] : this->o.dynamic_grow_nts)
+		grow_children.insert(c);
+	if (!grow_children.empty()) g.exclude_from_char_classes(grow_children);
 	for (size_t p = 0; p < g.size(); p++)
 		if (g.conjunctive(p)) { any_conj = true; break; }
 }
@@ -1414,6 +1418,21 @@ typename parser<C, T>::error parser<C, T>::get_error() {
 					err.unexp.emplace_back(in.tat(k));
 				err.loc = t.from, unexp_neg = true;
 			}
+		// The negation of a derived class runs inside the class, so the
+		// chart has no __N_* item for it. Look at the class waiters of
+		// the previous position instead.
+		if (!unexp_neg && i > 0) {
+			T prev = in.tat(i - 1);
+			for (const item& t : S[i - 1]) {
+				if (completed(t) || !get_lit(t).nt()) continue;
+				size_t n = get_lit(t).n();
+				if (!g.cc_fns.is_derived(n)) continue;
+				if (!g.cc_rejects_by_negation(n, prev)) continue;
+				err.unexp = lits<C, T>{ { prev } };
+				err.loc = i - 1, unexp_neg = true;
+				break;
+			}
+		}
 		// smallest length item that may be used as delimiter
 		for (const item& t : S[i]) {
 			//DBG(print(std::cout << "t0 = ", t) << "\n";)
@@ -1593,6 +1612,10 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 		ad_allowed = check_allowed(node);
 		const size_t nt = node.first.n(), from = node.second[0],
 			set = node.second[1];
+		if (set == from + 1 && g.uses_derived_recipe(nt)) {
+			derived_class_packs(nt, from, ad_allowed, packs);
+			return packs;
+		}
 		if (set >= S.size()) return packs;
 		auto matches = [&](const item& cur) {
 			return cur.from == from && completed(cur)
@@ -1630,6 +1653,12 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 					packs.insert(std::move(p));
 			}
 		}
+		// A predefined class that a derived class replaced is not in the
+		// chart, so its child is the character itself.
+		if (packs.empty() && set == from + 1 && g.is_cc_fn(nt)
+			&& !g.cc_fns.is_derived(nt) && !g.is_eof_fn(nt))
+				packs.insert({ pnode(lit<C, T>{ in_->tat(from) },
+					{ from, set }) });
 		return packs;
 	};
 
@@ -1863,6 +1892,22 @@ bool parser<C, T>::binarize_comb(const item& eitem,
 	}
 	return true;
 }
+// Builds the packs of a derived class or inner rule from its enabled source
+// productions and the character at pos, so the tree keeps its original shape.
+template <typename C, typename T>
+void parser<C, T>::derived_class_packs(size_t nt, size_t pos, bool ad_allowed,
+	pnodes_set& packs) const
+{
+	T ch = in_->tat(pos);
+	for (size_t p : g.enabled_source_prods(nt)) {
+		if (!g.rule_prod_accepts(p, ch)) continue;
+		for (const lits<C, T>& cj : g[p]) {
+			if (cj.neg) continue;
+			packs.insert({ pnode(cj[0], { pos, pos + 1 }) });
+			if (ad_allowed) return;
+		}
+	}
+}
 // default-mode build_forest — builds a pforest from a root pnode
 template <typename C, typename T>
 bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
@@ -1870,8 +1915,6 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 	if (f.contains(root)) return false;
 	// std::cout << "build_forest for node: `" << root << "`" << std::endl;
 	//auto& nxtset = sorted_citem[root.n()][root.second[0]];
-	auto &nxtset = sorted_citem[{ root.first.n(), root.second[0] }];
-
 	pnodes_set ambset, cambset;
 	std::set<pnode> snodes;
 	size_t last_p = SIZE_MAX;
@@ -1883,41 +1926,70 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
 		return true;
 	};
 
-	for (auto& cur : nxtset) {
-		// print(std::cout << "cur: ", cur) << std::endl;
-		if (cur.set != root.second[1]) continue;
-		pnode cnode(completed(cur) /*&& !negative(cur)*/
-			? g(cur.prod) : g.nt(root.first.n()),
-			{ cur.from, cur.set });
-		cambset.clear();
-		bool allowed_disambg = check_allowed(cnode);
-		if (o.binarize) binarize_comb(cur,
-						allowed_disambg ? cambset : ambset);
-		else {
-			pnodes nxtlits;
-			//std::cout << "\n" << cur.prod << " " << last_p << " " << ambset.size();
-			sbl_chd_forest(cur, nxtlits, cur.set,
-						allowed_disambg ? cambset : ambset);
-		}
+	bool recipe = root.second[1] == root.second[0] + 1
+		&& g.uses_derived_recipe(root.first.n());
+	bool cc_free = root.second[1] == root.second[0] + 1
+		&& g.is_cc_fn(root.first.n())
+		&& !g.cc_fns.is_derived(root.first.n())
+		&& !g.is_eof_fn(root.first.n());
+	bool fallback = false;
+	if (!recipe && cc_free) {
+		auto &ccset = sorted_citem[{ root.first.n(), root.second[0] }];
+		bool has = false;
+		for (auto& cur : ccset)
+			if (cur.set == root.second[1]) { has = true; break; }
+		fallback = !has;
+	}
+	if (recipe) {
+		derived_class_packs(root.first.n(), root.second[0],
+			check_allowed(root), ambset);
+		snodes.insert(root);
+		f[root] = ambset;
+	} else if (fallback) {
+		// A predefined class that a derived class replaced.
+		ambset.insert({ pnode(lit<C, T>{ in_->tat(root.second[0]) },
+			{ root.second[0], root.second[1] } ) });
+		snodes.insert(root);
+		f[root] = ambset;
+	} else {
+		auto &nxtset = sorted_citem[{ root.first.n(), root.second[0] }];
 
-		// resolve ambiguity across productions, due to different earley items
-		// with different prod id
-		if (allowed_disambg) {
-			if (cambset.size()) { // any new sub forest
-				if (ambset.size() == 0) // first time if
-					last_p = cur.prod, ambset = cambset;
-				else {
-					// get the smallest one
-					if (last_p > cur.prod) ambset.clear(),
-						last_p = cur.prod,
-						ambset = cambset;
-				}
+		for (auto& cur : nxtset) {
+			// print(std::cout << "cur: ", cur) << std::endl;
+			if (cur.set != root.second[1]) continue;
+			pnode cnode(completed(cur) /*&& !negative(cur)*/
+				? g(cur.prod) : g.nt(root.first.n()),
+				{ cur.from, cur.set });
+			cambset.clear();
+			bool allowed_disambg = check_allowed(cnode);
+			if (o.binarize) binarize_comb(cur,
+							allowed_disambg ? cambset : ambset);
+			else {
+				pnodes nxtlits;
+				//std::cout << "\n" << cur.prod << " " << last_p << " " << ambset.size();
+				sbl_chd_forest(cur, nxtlits, cur.set,
+							allowed_disambg ? cambset : ambset);
 			}
 
-			snodes.insert(cnode);
+			// resolve ambiguity across productions, due to different earley items
+			// with different prod id
+			if (allowed_disambg) {
+				if (cambset.size()) { // any new sub forest
+					if (ambset.size() == 0) // first time if
+						last_p = cur.prod, ambset = cambset;
+					else {
+						// get the smallest one
+						if (last_p > cur.prod) ambset.clear(),
+							last_p = cur.prod,
+							ambset = cambset;
+					}
+				}
+
+				snodes.insert(cnode);
+			}
+			f[cnode] = ambset;
+			//std::cout << "\n A " << cur.prod << " " << last_p << " " << ambset.size();
 		}
-		f[cnode] = ambset;
-		//std::cout << "\n A " << cur.prod << " " << last_p << " " << ambset.size();
 	}
 
 	if (snodes.size() && check_allowed(*snodes.begin())) {

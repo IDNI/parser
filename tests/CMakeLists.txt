@@ -138,12 +138,14 @@ set(DOCTESTS
 	treemr
 	tgf
 	tgf_cli
+	derived_char_classes
 )
 
 foreach(X IN LISTS DOCTESTS)
-	# The highlight test reads host grammar files through PROJECT_SOURCE_DIR
-	# and is not WASM-runnable.
-	if(EMSCRIPTEN AND X STREQUAL "highlight")
+	# The highlight and derived-char-class tests read host grammar files
+	# through PROJECT_SOURCE_DIR and are not WASM-runnable.
+	if(EMSCRIPTEN AND (X STREQUAL "highlight"
+			OR X STREQUAL "derived_char_classes"))
 		continue()
 	endif()
 	set(N "doctest_${X}")
@@ -174,7 +176,9 @@ foreach(X IN LISTS DOCTESTS)
 	target_include_directories(${N} PUBLIC
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
 	)
-	if(${N} STREQUAL "doctest_highlight" AND NOT EMSCRIPTEN)
+	if((N STREQUAL "doctest_highlight"
+			OR N STREQUAL "doctest_derived_char_classes"
+			OR N STREQUAL "doctest_tgf_cli") AND NOT EMSCRIPTEN)
 		target_compile_definitions(${N} PRIVATE
 			PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 	endif()
@@ -196,11 +200,16 @@ foreach(X IN LISTS DOCTESTS)
 			PROPERTIES COMPILE_OPTIONS "-O0;-fno-lto")
 	endif()
 	if(${N} STREQUAL "doctest_tgf_cli" AND NOT EMSCRIPTEN AND NOT TAU_PARSER_BUILD_HEADER_ONLY)
-		target_sources(${N} PRIVATE
-			"${PROJECT_SOURCE_DIR}/src/tgf/tgf_repl_parser.generated.cpp")
-		set_source_files_properties(
-			"${PROJECT_SOURCE_DIR}/src/tgf/tgf_repl_parser.generated.cpp"
-			PROPERTIES COMPILE_OPTIONS "-O0;-fno-lto")
+		if(TARGET tgf_cli_core)
+			# the core library owns the generated parsers
+			target_link_libraries(${N} PRIVATE tgf_cli_core)
+		else()
+			target_sources(${N} PRIVATE
+				"${PROJECT_SOURCE_DIR}/src/tgf/tgf_repl_parser.generated.cpp")
+			set_source_files_properties(
+				"${PROJECT_SOURCE_DIR}/src/tgf/tgf_repl_parser.generated.cpp"
+				PROPERTIES COMPILE_OPTIONS "-O0;-fno-lto")
+		endif()
 	endif()
 	add_test(NAME ${N} COMMAND ${TEST_RUNNER} ${N}${TEST_SUFFIX})
 	# add_dependencies(${N} ${TAU_PARSER_STATIC_LIB_NAME})

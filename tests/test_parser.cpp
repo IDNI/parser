@@ -316,7 +316,7 @@ int main(int argc, char **argv)
 	run_test<char>(ps,nt,start, "\"abc\"");                      // 2
 	run_test<char>(ps,nt,start, "\"\\\"a\\\"c\\\"\"");           // 3
 	run_test<char>(ps,nt,start, "\"\\\"a\\\"a\\\"a\\\"a\\\"\""); // 4
-	o.error_expected = "Unexpected '\"' at 1:2 (2)";
+	o.error_expected = "Unexpected 'c' at 1:3 (3)";
 	run_test<char>(ps,nt,start, "\"\"c\"", {}, o);               // 5
 	ps.clear();
 

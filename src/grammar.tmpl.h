@@ -438,6 +438,10 @@ bool char_class_fns<T>::is_fn(size_t nt) const {
 	return fns.find(nt) != fns.end();
 }
 template <typename T>
+bool char_class_fns<T>::is_derived(size_t nt) const {
+	return derived.find(nt) != derived.end();
+}
+template <typename T>
 bool char_class_fns<T>::is_eof_fn(size_t nt) const {
 	return nt == eof_fn;
 }
@@ -498,6 +502,10 @@ grammar<C, T>::grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
 	typename grammar<C, T>::options opt)
 	: opt(opt), nts(nts), start(start.to_lit()), cc_fns(cc_fns)
 {
+	// a caller may pass a container another grammar already used
+	for (size_t nt : this->cc_fns.derived)
+		this->cc_fns.fns.erase(nt);
+	this->cc_fns.derived.clear(), this->cc_fns.ps.clear();
 	size_t neg_id = 0;
 	// load prods
 	// every disjunction has its own prod rule
@@ -528,11 +536,12 @@ grammar<C, T>::grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
 			grdm[G.size()-1] = gid;
 		}
 	}
+	source_productions_ = G.size();
 	for (const auto& [name, values] : opt.dynamic)
 		host_dynamic_values(nt(name), values);
+	compute_nullables();
 	// set guards to create ntsm: nt -> prod rule map
 	set_enabled_productions(opt.enabled_guards);
-	compute_nullables();
 	//DBG(print_data(std::cout << "\n", "\t") << "\n\n";)
 }
 template <typename C, typename T>
@@ -545,11 +554,80 @@ void grammar<C, T>::set_enabled_productions(const std::set<std::string>& grds) {
 	ntsm.clear(), ntsm_by_nt.assign(nts.size(), {});
 	for (size_t n = 0; n != G.size(); ++n) {
 		if (is_retired(n)) continue;
+		if (cc_char_prod_ids_.count(n)) continue;
 		auto it = grdm.find(n); // if not guarded or guard is enabled
 		if (it == grdm.end() || gids.count(it->second))
 			ntsm[G[n].first].insert(n);
 	}
 	for (const auto& [l, ps] : ntsm) if (l.nt()) ntsm_by_nt[l.n()] = ps;
+	apply_derived_char_classes();
+}
+template <typename C, typename T>
+void grammar<C, T>::derive_char_classes(bool on) {
+	opt.derive_char_classes = on;
+	set_enabled_productions(opt.enabled_guards);
+}
+template <typename C, typename T>
+void grammar<C, T>::exclude_from_char_classes(
+	const std::set<size_t>& nts)
+{
+	cc_excluded_nts_ = nts;
+	set_enabled_productions(opt.enabled_guards);
+}
+template <typename C, typename T>
+void grammar<C, T>::apply_derived_char_classes() {
+	// Save the active accept cache of every derived class under the guard
+	// state it belongs to.
+	for (size_t nt : cc_fns.derived)
+		cc_ps_states_[nt][cc_active_guards_[nt]] = cc_fns.ps[nt];
+	cc_prod_exprs_.clear(), cc_inner_nts_.clear();
+	// cache the enabled source productions of every rule once
+	cc_source_prods_.clear();
+	for (size_t p = 0; p < source_productions_; ++p) {
+		if (!G[p].first.nt()) continue;
+		if (auto it = grdm.find(p); it != grdm.end()
+			&& !opt.enabled_guards.count(guards[it->second]))
+				continue;
+		cc_source_prods_[G[p].first.n()].push_back(p);
+	}
+	if (!opt.derive_char_classes) {
+		for (size_t nt : cc_fns.derived) cc_fns.fns.erase(nt);
+		cc_fns.derived.clear(), cc_active_guards_.clear();
+		return;
+	}
+	cc_walk w;
+	for (size_t p = 0; p < source_productions_; ++p)
+		if (G[p].first.nt())
+			single_char_rule(G[p].first.n(), w);
+	std::set<size_t> now_derived;
+	for (const cc_rule_info<T>& e : classify_cc_walk(w)) {
+		if (e.st == cc_rule_info<T>::state::rejected) continue;
+		// an unused rule stays an ordinary rule, not a class
+		if (e.st == cc_rule_info<T>::state::unused) continue;
+		// a derived or inner rule keeps one predicate per production
+		for (size_t p : enabled_source_prods(e.nt))
+			if (auto it = w.prod_expr.find(p);
+				it != w.prod_expr.end())
+					cc_prod_exprs_[p] = it->second;
+		if (e.st == cc_rule_info<T>::state::inner) {
+			cc_inner_nts_.insert(e.nt);
+			continue;
+		}
+		// never overwrite or remove a predefined class
+		if (cc_fns.is_fn(e.nt) && !cc_fns.is_derived(e.nt)) continue;
+		now_derived.insert(e.nt);
+		cc_fns.fns[e.nt] = e.fn;
+		cc_active_guards_[e.nt] = e.guards;
+		cc_fns.ps[e.nt] = cc_ps_states_[e.nt][e.guards];
+	}
+	for (size_t nt : cc_fns.derived)
+		if (!now_derived.count(nt)) cc_fns.fns.erase(nt);
+	cc_fns.derived = std::move(now_derived);
+	for (auto it = cc_active_guards_.begin();
+		it != cc_active_guards_.end();)
+			if (!cc_fns.derived.count(it->first))
+				it = cc_active_guards_.erase(it);
+			else ++it;
 }
 template <typename C, typename T>
 void grammar<C, T>::productions_enable(const std::string& guard) {
@@ -577,8 +655,8 @@ void grammar<C, T>::add_dynamic(const std::basic_string<C>& nt_name,
 		if (!already && seen.insert(v).second) kept.push_back(v);
 	}
 	host_dynamic_values(l, values);
-	set_enabled_productions(opt.enabled_guards);
 	compute_nullables();
+	set_enabled_productions(opt.enabled_guards);
 }
 template <typename C, typename T>
 void grammar<C, T>::host_dynamic_values(const lit<C, T>& l,
@@ -646,6 +724,17 @@ bool grammar<C, T>::char_class_check(lit<C, T> l, T ch) const
 }
 template <typename C, typename T>
 size_t grammar<C, T>::add_char_class_production(lit<C, T> l, T ch) {
+	// A derived class shares one production per character across guard
+	// states and never links it into the enabled-production index.
+	if (cc_fns.is_derived(l.n())) {
+		auto& by_ch = cc_char_prods_[l.n()];
+		if (auto it = by_ch.find(ch); it != by_ch.end())
+			return cc_fns.ps[l.n()][ch] = it->second;
+		G.push_back(production{ l, { { { { lit<C, T>{ ch } } } } } });
+		size_t idx = G.size() - 1;
+		by_ch[ch] = idx, cc_char_prod_ids_.insert(idx);
+		return cc_fns.ps[l.n()][ch] = idx;
+	}
 	G.push_back(production{ l, { { { { lit<C, T>{ ch } } } } } });
 	ntsm[G.back().first].insert(G.size() - 1);
 	if (l.nt()) {
@@ -653,6 +742,249 @@ size_t grammar<C, T>::add_char_class_production(lit<C, T> l, T ch) {
 		ntsm_by_nt[l.n()].insert(G.size() - 1);
 	}
 	return cc_fns.ps[l.n()][ch] = G.size() - 1;
+}
+template <typename T>
+bool cc_expr<T>::operator()(T c) const {
+	switch (k) {
+	case kind::eq:  return c == ch;
+	case kind::fn:  return fn(c);
+	case kind::neg: return !sub[0](c);
+	case kind::any_of:
+		for (const auto& s : sub) if (s(c)) return true;
+		return false;
+	case kind::all_of:
+		for (const auto& s : sub) if (!s(c)) return false;
+		return true;
+	}
+	return false;
+}
+template <typename T>
+size_t cc_expr_node_count(const cc_expr<T>& e) {
+	size_t n = 1;
+	for (const cc_expr<T>& s : e.sub) n += cc_expr_node_count(s);
+	return n;
+}
+template <typename T>
+size_t cc_expr_depth(const cc_expr<T>& e) {
+	size_t d = 0;
+	for (const cc_expr<T>& s : e.sub) {
+		size_t sd = cc_expr_depth(s);
+		if (sd > d) d = sd;
+	}
+	return d + 1;
+}
+template <typename C, typename T>
+std::optional<cc_expr<T>> grammar<C, T>::cc_reject(size_t nt, cc_walk& w,
+	const char* reason) const
+{
+	// Keep the first reason. A cycle is detected on the open rule, and the
+	// frames that unwind through it must not replace that reason.
+	auto it = w.mark.find(nt);
+	if (it == w.mark.end() || it->second != cc_mark::fail) {
+		w.mark[nt] = cc_mark::fail;
+		w.reason[nt] = reason;
+	}
+	return std::nullopt;
+}
+template <typename C, typename T>
+std::optional<cc_expr<T>> grammar<C, T>::single_char_rule(size_t nt,
+	cc_walk& w) const
+{
+	if (auto it = w.mark.find(nt); it != w.mark.end()) {
+		if (it->second == cc_mark::open)
+			return cc_reject(nt, w, "cycle");
+		if (it->second == cc_mark::fail) return std::nullopt;
+		return w.expr.at(nt);
+	}
+	if (cc_excluded_nts_.count(nt)) return cc_reject(nt, w, "dynamic");
+	if (cc_fns.is_fn(nt) && !cc_fns.is_derived(nt)) { // base classes are leaves
+		if (cc_fns.is_eof_fn(nt)) return cc_reject(nt, w, "eof class");
+		cc_expr<T> e;
+		e.k = cc_expr<T>::kind::fn;
+		e.fn = cc_fns.fns.at(nt);
+		return e;
+	}
+	w.mark[nt] = cc_mark::open;
+	if (start.nt() && start.n() == nt)
+		return cc_reject(nt, w, "start");
+	// A guard-hidden nullable rule is rejected too: a false rejection only.
+	if (nullables.find(nt) != nullables.end())
+		return cc_reject(nt, w, "nullable");
+	if (opt.dynamic.find(nts.get(nt)) != opt.dynamic.end())
+		return cc_reject(nt, w, "dynamic");
+	for (const auto& [dl, m] : dynamic_idx_)
+		if (dl.nt() && dl.n() == nt)
+			return cc_reject(nt, w, "dynamic");
+	std::vector<size_t> ps = enabled_source_prods(nt);
+	std::set<std::string> gset;
+	for (size_t p : ps)
+		if (auto git = grdm.find(p); git != grdm.end())
+			gset.insert(guards[git->second]);
+	if (ps.empty()) return cc_reject(nt, w, "no production");
+	static constexpr size_t max_nodes = 256, max_depth = 64;
+	cc_expr<T> alts;
+	alts.k = cc_expr<T>::kind::any_of;
+	for (size_t p : ps) {
+		cc_expr<T> all;
+		all.k = cc_expr<T>::kind::all_of;
+		bool positive = false;
+		for (const lits<C, T>& cj : G[p].second) {
+			if (cj.size() != 1)
+				return cc_reject(nt, w, "sequence");
+			const lit<C, T>& l = cj[0];
+			cc_expr<T> e;
+			if (!l.nt()) {
+				if (l.is_null())
+					return cc_reject(nt, w, "null literal");
+				if (l.t() == T(0))
+					return cc_reject(nt, w, "zero literal");
+				if (l.t() == T(-1))
+					return cc_reject(nt, w, "eof literal");
+				e.k = cc_expr<T>::kind::eq;
+				e.ch = l.t();
+			} else {
+				auto ce = single_char_rule(l.n(), w);
+				if (!ce) return cc_reject(nt, w, "inner rule");
+				if (auto git = w.guards.find(l.n());
+					git != w.guards.end())
+						gset.insert(git->second.begin(),
+							git->second.end());
+				e = std::move(*ce);
+			}
+			if (cj.neg) {
+				cc_expr<T> n;
+				n.k = cc_expr<T>::kind::neg;
+				n.sub.push_back(std::move(e));
+				all.sub.push_back(std::move(n));
+			} else {
+				all.sub.push_back(std::move(e));
+				positive = true;
+			}
+		}
+		if (!positive)
+			return cc_reject(nt, w, "no positive conjunct");
+		w.prod_expr[p] = all;
+		alts.sub.push_back(std::move(all));
+		if (cc_expr_node_count(alts) > max_nodes
+				|| cc_expr_depth(alts) > max_depth)
+			return cc_reject(nt, w, "too large");
+	}
+	w.mark[nt] = cc_mark::ok;
+	w.expr[nt] = std::move(alts);
+	w.guards[nt] = std::move(gset);
+	return w.expr.at(nt);
+}
+template <typename C, typename T>
+std::vector<cc_rule_info<T>> grammar<C, T>::derive_char_classes_report() const
+{
+	cc_walk w;
+	// walk every rule that owns a source production
+	for (size_t p = 0; p < source_productions_; ++p)
+		if (G[p].first.nt())
+			single_char_rule(G[p].first.n(), w);
+	return classify_cc_walk(w);
+}
+template <typename C, typename T>
+std::vector<cc_rule_info<T>> grammar<C, T>::classify_cc_walk(
+	const cc_walk& w) const
+{
+	// which source rule heads use each nonterminal
+	std::map<size_t, std::set<size_t>> used_by;
+	for (size_t p = 0; p < source_productions_; ++p) {
+		if (!G[p].first.nt()) continue;
+		if (auto git = grdm.find(p); git != grdm.end()
+			&& !opt.enabled_guards.count(guards[git->second]))
+				continue;
+		size_t head = G[p].first.n();
+		for (const lits<C, T>& cj : G[p].second)
+			for (const lit<C, T>& l : cj)
+				if (l.nt()) used_by[l.n()].insert(head);
+	}
+	std::vector<cc_rule_info<T>> out;
+	out.reserve(w.mark.size());
+	for (auto& [nt, m] : w.mark) {
+		cc_rule_info<T> info;
+		info.nt = nt;
+		if (m == cc_mark::fail) {
+			info.st = cc_rule_info<T>::state::rejected;
+			auto rit = w.reason.find(nt);
+			if (rit != w.reason.end()) info.reason = rit->second;
+		} else {
+			cc_expr<T> e = w.expr.at(nt);
+			info.fn = [e](T c) { return e(c); };
+			if (auto git = w.guards.find(nt); git != w.guards.end())
+				info.guards = git->second;
+			bool any_user = false, rejected_user = false;
+			if (auto uit = used_by.find(nt); uit != used_by.end())
+				for (size_t u : uit->second) {
+					any_user = true;
+					auto mit = w.mark.find(u);
+					if (mit != w.mark.end()
+						&& mit->second == cc_mark::fail)
+							rejected_user = true;
+				}
+			if (rejected_user)
+				info.st = cc_rule_info<T>::state::derived;
+			else if (any_user)
+				info.st = cc_rule_info<T>::state::inner;
+			else
+				info.st = cc_rule_info<T>::state::unused;
+		}
+		out.push_back(std::move(info));
+	}
+	std::sort(out.begin(), out.end(),
+		[](const cc_rule_info<T>& a, const cc_rule_info<T>& b) {
+			return a.nt < b.nt;
+		});
+	return out;
+}
+template <typename C, typename T>
+bool grammar<C, T>::rule_prod_accepts(size_t p, T ch) const {
+	auto it = cc_prod_exprs_.find(p);
+	return it != cc_prod_exprs_.end() && it->second(ch);
+}
+template <typename C, typename T>
+std::vector<size_t> grammar<C, T>::enabled_source_prods(size_t nt) const {
+	if (auto it = cc_source_prods_.find(nt); it != cc_source_prods_.end())
+		return it->second;
+	return {};
+}
+template <typename C, typename T>
+bool grammar<C, T>::uses_derived_recipe(size_t nt) const {
+	return opt.derive_char_classes
+		&& (cc_fns.is_derived(nt) || cc_inner_nts_.count(nt));
+}
+template <typename C, typename T>
+bool grammar<C, T>::cc_lit_accepts(const lit<C, T>& l, T ch) const {
+	if (!l.nt()) return !l.is_null() && l.t() == ch;
+	size_t n = l.n();
+	if (cc_fns.is_fn(n) && !cc_fns.is_derived(n))
+		return !cc_fns.is_eof_fn(n) && cc_fns.fns.at(n)(ch);
+	for (size_t p : enabled_source_prods(n))
+		if (rule_prod_accepts(p, ch)) return true;
+	return false;
+}
+template <typename C, typename T>
+bool grammar<C, T>::cc_rejects_by_negation(size_t nt, T ch) const {
+	if (!opt.derive_char_classes) return false;
+	if (!cc_fns.is_derived(nt) && !cc_inner_nts_.count(nt)) return false;
+	for (size_t p : enabled_source_prods(nt)) {
+		bool pos_ok = true, neg_accepts = false, pos_inner_neg = false;
+		for (const lits<C, T>& cj : G[p].second) {
+			if (cj.size() != 1) { pos_ok = false; break; }
+			const lit<C, T>& l = cj[0];
+			if (cj.neg) {
+				if (cc_lit_accepts(l, ch)) neg_accepts = true;
+			} else if (cc_lit_accepts(l, ch)) {
+				continue;
+			} else if (l.nt() && cc_inner_nts_.count(l.n())
+				&& cc_rejects_by_negation(l.n(), ch)) {
+					pos_inner_neg = true;
+			} else pos_ok = false;
+		}
+		if (pos_ok && (neg_accepts || pos_inner_neg)) return true;
+	}
+	return false;
 }
 template <typename C, typename T>
 std::optional<size_t> grammar<C, T>::add_dynamic_production_from(

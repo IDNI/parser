@@ -20,6 +20,9 @@ struct grammar_inspector {
 	const char_class_fns<T>& cc_fns() const { return g.cc_fns; }
 	const std::map<size_t, size_t>& grdm() const { return g.grdm; }
 	const std::vector<std::string>& guards() const { return g.guards; }
+	/// Production indices of the derived class `A => ch` productions.
+	const std::set<size_t>& cc_char_prod_ids() const
+		{ return g.cc_char_prod_ids_; }
 };
 
 } // namespace idni
