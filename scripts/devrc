@@ -310,6 +310,15 @@ preset_binary_dir() {
 		relwithdebinfo*)
 			echo "build/relwithdebinfo"
 			;;
+		# The bv-only and no-bv packs take a folder of their own: they configure
+		# the same sources with a different pack, and each has to exist beside
+		# the default pack's build.
+		*-bvonly)
+			echo "build/${type}-bvonly"
+			;;
+		*-nobv)
+			echo "build/${type}-nobv"
+			;;
 		all|grammar-tests)
 			echo "build/release"
 			;;
