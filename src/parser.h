@@ -1622,6 +1622,7 @@ private:
 	// pre_process(), wrapped in a measured scope. Returns the
 	// number of items visited (for the caller's debug printing).
 	int do_preprocess();
+	void release_recognition();
 	void release_chart();
 
 #ifdef TAU_PARSER_MEASURE_COUNTERS

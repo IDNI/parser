@@ -1151,6 +1151,21 @@ parser<C, T>::result parser<C, T>::_parse() {
 		count(cnt.refi_size_final, refi.size());
 	})
 
+	if (debug) debug = false;
+
+	bool fnd = found(po.start);
+	error err = fnd ? error{} : get_error();
+	// progress past a child is strong evidence, not proof the parent
+	// completes, so a confirmed grow only survives a successful parse;
+	// this runs regardless of dynamic_grow_nts, so a hook added outside
+	// its firing is decided too, by the end of the very next parse
+	if (fnd) g.commit_dynamic(*dyn_ctx);
+	else g.rollback_dynamic();
+
+	// The tree builders read S, the sorted indexes and the binarization
+	// temporaries; every other recognition container is dead here.
+	release_recognition();
+
 	tref fr = 0;
 	if (po.tree_path == parse_tree_path::bintree_path) {
 		// bintree is always built post-parse; incr_gen_forest is ignored.
@@ -1180,17 +1195,6 @@ parser<C, T>::result parser<C, T>::_parse() {
 			report_.count(label::bintree_nodes,
 				cnt.bintree_nodes);
 	})
-
-	if (debug) debug = false;
-
-	bool fnd = found(po.start);
-	error err = fnd ? error{} : get_error();
-	// progress past a child is strong evidence, not proof the parent
-	// completes, so a confirmed grow only survives a successful parse;
-	// this runs regardless of dynamic_grow_nts, so a hook added outside
-	// its firing is decided too, by the end of the very next parse
-	if (fnd) g.commit_dynamic(*dyn_ctx);
-	else g.rollback_dynamic();
 
 	if (f) {
 		DBGP(
@@ -1228,16 +1232,24 @@ parser<C, T>::result parser<C, T>::_parse() {
 	po = o.parse_opts;
 	return r;
 }
-// The tree and the error report are built. The chart of this parse goes
-// back to the allocator instead of staying in the parser until the next parse.
+// Recognition is over and the result is decided. Every container the tree
+// builders do not read is freed here, before the tree build, so it does not
+// fragment the heap under the tree allocations.
+template <typename C, typename T>
+void parser<C, T>::release_recognition() {
+	auto drop = [](auto& c) { std::decay_t<decltype(c)> e; std::swap(c, e); };
+	drop(U), drop(snapshot_), drop(revisit_), drop(fromS), drop(cache),
+	drop(refi), drop(gcready), drop(completion_deps),
+	drop(completion_count), drop(counted_completions), drop(forward_deps),
+	drop(complete_memo), drop(dyn_child_span);
+}
+// The tree and the error report are built. The chart and the binarization
+// temporaries the tree builders read go back to the allocator instead of
+// staying in the parser until the next parse.
 template <typename C, typename T>
 void parser<C, T>::release_chart() {
 	auto drop = [](auto& c) { std::decay_t<decltype(c)> e; std::swap(c, e); };
-	drop(S), drop(U), drop(snapshot_), drop(revisit_), drop(fromS),
-	drop(cache), drop(refi), drop(gcready), drop(bin_tnt),
-	drop(sorted_citem), drop(rsorted_citem), drop(completion_deps),
-	drop(completion_count), drop(counted_completions), drop(forward_deps),
-	drop(complete_memo), drop(dyn_child_span);
+	drop(S), drop(bin_tnt), drop(sorted_citem), drop(rsorted_citem);
 }
 template <typename C, typename T>
 bool parser<C, T>::found(size_t start) {
