@@ -8,6 +8,8 @@
 #include "doctest.h"
 #include "../src/tgf/tgf_cli.h"
 
+#include <sstream>
+
 using namespace std;
 using namespace idni;
 
@@ -214,5 +216,63 @@ TEST_SUITE("tgf cli: global options") {
 	TEST_CASE("invalid global option") {
 		o.args = { "tgf", "--invalid" };
 		expect_cli(o, { .status = 1 });
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TEST SUITE: derived character class report and switch
+// ---------------------------------------------------------------------------
+
+// Runs the TGF CLI with args and returns what it wrote to stdout and
+// stderr. The parse error report writes errors to stderr, so a test that
+// reads only stdout would see an empty string for a rejected input.
+static string capture_tgf_run(const vector<string>& args) {
+	vector<string> a = args;
+	vector<char*> argv;
+	for (auto& s : a) argv.push_back(s.data());
+	ostringstream os;
+	streambuf* old_out = cout.rdbuf(os.rdbuf());
+	streambuf* old_err = cerr.rdbuf(os.rdbuf());
+	tgf_run((int)argv.size(), argv.data());
+	cout.rdbuf(old_out);
+	cerr.rdbuf(old_err);
+	return os.str();
+}
+
+TEST_SUITE("tgf cli: derived character classes") {
+
+	TEST_CASE("grammar --char-class-report lists unescaped as derived") {
+		string json = string(PROJECT_SOURCE_DIR)
+			+ "/src/format/json/json.tgf";
+		string out = capture_tgf_run({ "tgf", json, "grammar",
+			"--char-class-report" });
+		CHECK(out.find("derived:") != string::npos);
+		CHECK(out.find("unescaped") != string::npos);
+		CHECK(out.find("rejected:") != string::npos);
+	}
+
+	TEST_CASE("parse --derive-char-classes false matches the default") {
+		string json = string(PROJECT_SOURCE_DIR)
+			+ "/src/format/json/json.tgf";
+		string on = capture_tgf_run({ "tgf", json, "parse",
+			"-e", "\"a\"", "-c", "false" });
+		string off = capture_tgf_run({ "tgf", json, "parse",
+			"-e", "\"a\"", "-c", "false",
+			"--derive-char-classes", "false" });
+		CHECK(!on.empty());
+		CHECK(on == off);
+	}
+
+	TEST_CASE("parse --derive-char-classes false turns the classes off") {
+		string json = string(PROJECT_SOURCE_DIR)
+			+ "/src/format/json/json.tgf";
+		string on = capture_tgf_run({ "tgf", json, "parse",
+			"-e", "\"a", "-v", "detailed" });
+		string off = capture_tgf_run({ "tgf", json, "parse",
+			"-e", "\"a", "-v", "detailed",
+			"--derive-char-classes", "false" });
+		CHECK(on.find("expecting unescaped") != string::npos);
+		CHECK(off.find("expecting unescaped") == string::npos);
+		CHECK(on != off);
 	}
 }

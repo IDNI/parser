@@ -1177,6 +1177,36 @@ static int gen_command(const cli::command& cmd,
 	return gr.has_value() ? 0 : 1;
 }
 
+// Print the derived character class report of the loaded grammar, one line
+// per rule, grouped by state.
+static void print_char_class_report(tgf_repl_evaluator& re) {
+	using state = cc_rule_info<
+		tgf_repl_evaluator::terminal_type>::state;
+	auto& g = re.g();
+	auto& nts = g.get_nts();
+	auto report = g.derive_char_classes_report();
+	auto print_group = [&](const char* title, state st) {
+		cout << title << ":\n";
+		for (const auto& e : report) {
+			if (e.st != st) continue;
+			cout << "\t" << nts.get(e.nt);
+			if (st == state::rejected) cout << " " << e.reason;
+			else {
+				cout << " guards=";
+				bool first = true;
+				for (const auto& gd : e.guards)
+					cout << (first ? "" : ",") << gd,
+						first = false;
+			}
+			cout << "\n";
+		}
+	};
+	print_group("derived", state::derived);
+	print_group("inner", state::inner);
+	print_group("unused", state::unused);
+	print_group("rejected", state::rejected);
+}
+
 static int show_command(const cli::command& cmd,
 	tgf_repl_evaluator& re)
 {
@@ -1186,6 +1216,9 @@ static int show_command(const cli::command& cmd,
 		cout, start, {}, true);
 	if (cmd.get<bool>("nullable"))
 		re.g().check_nullable_recursive_production(cout);
+	if (cmd.has("char-class-report")
+		&& cmd.get<bool>("char-class-report"))
+			print_char_class_report(re);
 	re.flush_report();
 	return 0;
 }
@@ -1250,6 +1283,10 @@ static int run_command(cli& cl, const cli::command& cmd,
 	}
 
 	if (cmd.name() == "parse") {
+		// the classes are on by default; the option can turn them off
+		if (cmd.has("derive-char-classes")
+			&& !cmd.get<bool>("derive-char-classes"))
+				re.g().derive_char_classes(false);
 		string infile = cmd.get<string>("input");
 		string inexp  = cmd.get<string>("input-expression");
 		if (infile.size() && inexp.size())
