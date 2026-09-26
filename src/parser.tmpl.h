@@ -326,20 +326,21 @@ bool parser<C, T>::nt_still_completed(size_t nt_id, size_t from, size_t set)
 	return it != completion_count.end() && it->second > 0;
 }
 
-// waiting items of one (nt, position) key; a swap-remove keeps erase O(1)
+// waiting items of one position; the nt id groups them by symbol
 template <typename C, typename T>
 void parser<C, T>::cache_insert(size_t nt, size_t pos, const item& i) {
-	auto& v = cache[{ nt, pos }];
-	if (std::find(v.begin(), v.end(), i) == v.end()) v.push_back(i);
+	if (cache.size() <= pos) cache.resize(pos + 1);
+	auto& v = cache[pos];
+	for (const wait_entry& e : v)
+		if (e.nt == nt && e.it == i) return;
+	v.push_back(wait_entry{ static_cast<uint32_t>(nt), i });
 }
+// Erasing tombstones the entry: moving it would break complete_memo.
 template <typename C, typename T>
 void parser<C, T>::cache_erase(size_t nt, size_t pos, const item& i) {
-	auto cit = cache.find({ nt, pos });
-	if (cit == cache.end()) return;
-	auto& v = cit->second;
-	auto it = std::find(v.begin(), v.end(), i);
-	if (it == v.end()) return;
-	*it = v.back(), v.pop_back();
+	if (pos >= cache.size()) return;
+	for (wait_entry& e : cache[pos])
+		if (e.nt == nt && e.it == i) { e.nt = dead_wait; return; }
 }
 
 template <typename C, typename T>
@@ -481,15 +482,16 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 	if (!negative(i)) confirm_dynamic_parent(i);
 	//const container_t& cont = S[i.from];
 	auto smbl = get_nt(i);
-	auto &rng = cache[{smbl.n(), i.from}];
+	static const std::vector<wait_entry> no_waiters;
+	const std::vector<wait_entry>& vec = i.from < cache.size()
+		? cache[i.from] : no_waiters;
 	completion_key ckey{ smbl.n(), i.from, i.set };
 	if (any_conj && counted_completions.insert(i).second)
 		++completion_count[ckey];
-	// per-item memoization: only iterate cache entries new since last call.
-	const size_t cur_size = rng.size();
+	// per-item memoization: only iterate wait entries new since last call
+	const size_t cur_size = vec.size();
 	size_t& last_idx = complete_memo[i];
 	if (last_idx >= cur_size) return;
-	const auto& vec = rng;
 	const size_t start_idx = last_idx;
 	last_idx = cur_size;
 	// i's own head (smbl) is what just completed. Whether a given
@@ -500,10 +502,10 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 	bool smbl_is_dyn_child = !o.dynamic_grow_nts.empty() && smbl.nt() &&
 		dyn_child_ids.count(smbl.n());
 	for (size_t k = start_idx; k < cur_size; k++) {
-		const auto& eit = vec[k];
-		const auto* it = &eit;
-		if (n_literals(*it) <= it->dot ||
-			get_lit(*it) != get_nt(i)) continue;
+		const wait_entry& we = vec[k];
+		if (we.nt == dead_wait || we.nt != smbl.n()) continue;
+		const auto* it = &we.it;
+		if (n_literals(*it) <= it->dot) continue;
 		// Predictor may have been evicted from S; it can still drive
 		// completion only if conjunction-cascade machinery kept it in U.
 		bool in_S = S[it->set].find(*it) != S[it->set].end();

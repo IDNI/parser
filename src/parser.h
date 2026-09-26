@@ -1498,9 +1498,18 @@ private:
 		ankerl::unordered_dense::set<size_t>> fromS;
 	/// true iff fromS writes are needed this parse (enable_gc || any_conj)
 	bool need_fromS = false;
-	/// items that wait for a nonterminal at a position
-	ankerl::unordered_dense::map<std::pair<size_t /*nt_id*/, size_t>,
-		std::vector<item>> cache;
+	/// One item waiting for a nonterminal at a position. The nonterminal
+	/// id sits beside the item so one position vector holds every symbol.
+	struct wait_entry {
+		uint32_t nt;
+		item it;
+	};
+	static_assert(sizeof(wait_entry) == 20, "wait_entry must stay 20 bytes");
+	/// Sentinel nonterminal id of a tombstoned entry. Erasing marks the
+	/// entry dead instead of moving it, so complete_memo stays valid.
+	static constexpr uint32_t dead_wait = static_cast<uint32_t>(-1);
+	/// items that wait for a nonterminal, grouped by position
+	std::vector<std::vector<wait_entry>> cache;
 	void cache_insert(size_t nt, size_t pos, const item& i);
 	void cache_erase(size_t nt, size_t pos, const item& i);
 
@@ -1510,8 +1519,14 @@ private:
 	std::map<item, int_t> refi;
 	/// items ready for collection
 	container_t gcready;
-	ankerl::unordered_dense::map<std::pair<size_t, size_t>,
-		std::vector<item>> sorted_citem, rsorted_citem;
+	/// The tree builders scan these indexes by (nt, position) in their hot
+	/// loops; a cache-line start fixes their offset as other members change.
+	using cc_index_t = ankerl::unordered_dense::map<
+		std::pair<size_t, size_t>, std::vector<item>>;
+	struct cc_index_align_probe { alignas(64) cc_index_t v; };
+	static_assert(alignof(cc_index_align_probe) == 64,
+		"the chart index must start on a cache line");
+	alignas(64) cc_index_t sorted_citem, rsorted_citem;
 
 	/// completion key (nt_id, from, set) for dependency tracking
 	using completion_key = std::tuple<size_t, size_t, size_t>;
@@ -1529,11 +1544,10 @@ private:
 	/// True iff any production in `g` is conjunctive. Cascade machinery
 	/// is dead code when this is false, so its bookkeeping is skipped.
 	bool any_conj = false;
-	/// Per-item memoization for complete(): index into the underlying
-	/// cache vector at the last call. complete() only re-processes cache
-	/// entries [last, current_size) instead of the whole cache. The cache
-	/// only grows during a parse, so indices into its underlying vector
-	/// are stable.
+	/// Per-item memoization for complete(): index into the position wait
+	/// vector at the last call. complete() only re-processes entries
+	/// [last, current_size) instead of the whole vector. Tombstones keep
+	/// the vector from shrinking, so the index stays valid.
 	ankerl::unordered_dense::map<item, size_t, item_hash> complete_memo;
 	/// One registered child's span, consumed on the way to some item's
 	/// own parent in o.dynamic_grow_nts. fired marks that on_dynamic_grow
