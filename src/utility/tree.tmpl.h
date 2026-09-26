@@ -429,7 +429,7 @@ void bintree<T>::hash_group_stats(size_t& distinct_hashes,
 	size_t& distinct_values,
 	size_t& distinct_child_pairs,
 	size_t& leaf_count,
-	std::vector<std::string>& sample_values,
+	std::vector<hash_group_sample>& samples,
 	size_t& stale_hash_count,
 	std::uint64_t& largest_group_hash,
 	size_t& largest_group_stale_count)
@@ -447,7 +447,7 @@ void bintree<T>::hash_group_stats(size_t& distinct_hashes,
 	distinct_values = 0;
 	distinct_child_pairs = 0;
 	leaf_count = 0;
-	sample_values.clear();
+	samples.clear();
 	stale_hash_count = 0;
 	largest_group_hash = by_size.empty() ? 0 : by_size.begin()->second;
 	largest_group_stale_count = 0;
@@ -482,19 +482,14 @@ void bintree<T>::hash_group_stats(size_t& distinct_hashes,
 			}
 			distinct_values = values.size();
 			distinct_child_pairs = child_pairs.size();
-			for (size_t k = 0; k < nodes.size() && k < 3; ++k) {
-				std::stringstream ss;
-				ss << nodes[k]->value
-					<< " (l=" << (nodes[k]->l == nullptr
-						? "null" : "set")
-					<< ", r=" << (nodes[k]->r == nullptr
-						? "null" : "set")
-					<< ") stored hash=" << nodes[k]->hash
-					<< " recomputed hash="
-					<< nodes[k]->hashit(nodes[k]->value,
-						nodes[k]->l, nodes[k]->r);
-				sample_values.push_back(ss.str());
-			}
+			for (size_t k = 0; k < nodes.size() && k < 3; ++k)
+				samples.push_back(hash_group_sample{
+					nodes[k]->value,
+					nodes[k]->l,
+					nodes[k]->r,
+					nodes[k]->hash,
+					nodes[k]->hashit(nodes[k]->value,
+						nodes[k]->l, nodes[k]->r)});
 		}
 	}
 }

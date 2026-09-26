@@ -155,7 +155,6 @@ size_t forest<NodeT>::count_trees(const node& root) const {
 				if (sym->first.nt() && ndc[sym] != 0) {
 					size_t x = pkc * ndc[sym];
 					if (pkc != 0 && x / pkc != ndc[sym]) {
-						MC(std::cout<<"Overflow\n");
 						ndc[croot]=SIZE_MAX;
 						return;
 					}
@@ -460,7 +459,7 @@ bool forest<NodeT>::_traverse(const node_graph& g, const node& root,
 template <typename NodeT>
 bool forest<NodeT>::replace_nodes(graph& g, nodes& s) {
 
-	MC(std::cout << "replace_nodes: " << s.size() << "\n";)
+	MC(last_replace_nodes = s.size();)
 
 	std::unordered_map<node, nodes, node> replmap;
 	replmap.reserve(s.size());
@@ -479,7 +478,7 @@ bool forest<NodeT>::replace_nodes(graph& g, nodes& s) {
 			replmap[n] = repl;
 		}
 	}
-	MC(std::cout << "replacing nodes: " << replmap.size() << "\n";)
+	MC(last_replacing_nodes = replmap.size();)
 
 	bool gchange = false;
 	MC(size_t total_replacements = 0;)
@@ -536,7 +535,7 @@ bool forest<NodeT>::replace_nodes(graph& g, nodes& s) {
 		g.erase(n);
 	}
 
-	MC(std::cout << "Total replaced count: " << total_replacements << "\n";)
+	MC(last_total_replacements = total_replacements;)
 	// g was mutated in place; predecessors()/traverse_backward() would
 	// otherwise walk a stale index.
 	if (gchange) invalidate_reverse_index();

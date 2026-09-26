@@ -323,6 +323,16 @@ struct bintree {
 		double& load_factor, size_t& max_chain, double& mean_chain,
 		std::array<size_t, 8>* chain_len_histogram = nullptr);
 
+	/// One sample node of the largest hash group: its value and children,
+	/// and its stored and recomputed hashes.
+	struct hash_group_sample {
+		T value;
+		tref left = nullptr;
+		tref right = nullptr;
+		std::uint64_t stored_hash = 0;
+		std::uint64_t recomputed_hash = 0;
+	};
+
 	/// groups M() entries by stored hash, to tell whether the largest
 	/// chain is real hash_combine collisions or a missing hash input.
 	/// The last 4 params detail the largest group only, by real equality.
@@ -336,7 +346,7 @@ struct bintree {
 		size_t& distinct_values,
 		size_t& distinct_child_pairs,
 		size_t& leaf_count,
-		std::vector<std::string>& sample_values,
+		std::vector<hash_group_sample>& samples,
 		size_t& stale_hash_count,
 		std::uint64_t& largest_group_hash,
 		size_t& largest_group_stale_count);

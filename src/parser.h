@@ -587,8 +587,14 @@ struct grammar {
 	bool is_eof_fn(const size_t& p) const;
 	std::set<size_t> reachable_productions(const lit<C, T>& l) const;
 	std::set<size_t> unreachable_productions(const lit<C, T>& l) const;
+	/// Returns one entry for each nullable recursive production: the head
+	/// symbol and the index of the production that recurses.
+	std::vector<std::pair<lit<C, T>, size_t>>
+		nullable_recursive_productions() const;
 	std::ostream& check_nullable_recursive_production(
 		std::ostream& os) const;
+	/// Guard name of production @p p, or nullptr when it is not guarded.
+	const std::string* production_guard(size_t p) const;
 	/// Prints a production rule with index p into ostream os.
 	std::ostream& print_production(std::ostream& os,
 		size_t p, bool print_ids = false,
@@ -1350,6 +1356,9 @@ public:
 		bool has_single_parse_tree() const;
 		/// Returns ambiguous nodes
 		std::set<std::pair<pnode, pnodes_set>> ambiguous_nodes() const;
+		/// Number of distinct parse trees, the count the text prints as
+		/// "# n trees:". One when the parse is unambiguous.
+		size_t count_trees() const;
 		/// Prints ambiguous nodes.
 		std::ostream& print_ambiguous_nodes(std::ostream& os) const;
 

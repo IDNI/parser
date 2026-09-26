@@ -1240,10 +1240,10 @@ template <typename C, typename T>
 const lit<C, T>& grammar<C, T>::get_start() const { return start; }
 
 template <typename C, typename T>
-std::ostream& grammar<C, T>::check_nullable_recursive_production(
-	std::ostream& os) const
+std::vector<std::pair<lit<C, T>, size_t>>
+grammar<C, T>::nullable_recursive_productions() const
 {
-	bool warned = false;
+	std::vector<std::pair<lit<C, T>, size_t>> r;
 	for (size_t p = 0; p != G.size(); ++p) {
 		const lit<C, T>& head = G[p].first;
 		if (!head.nt()) continue;
@@ -1259,18 +1259,37 @@ std::ostream& grammar<C, T>::check_nullable_recursive_production(
 						break;
 					}
 				}
-				if (!zero_progress) continue;
-				os << "Warning: nullable recursive production: "
-					<< head << " can recurse without consuming input"
-					<< " in production: ";
-				print_production(os, p);
-				os << "\n";
-				warned = true;
+				if (zero_progress) r.emplace_back(head, p);
 			}
 		}
 	}
-	if (!warned) os << "No nullable recursive productions found\n";
+	return r;
+}
+
+template <typename C, typename T>
+std::ostream& grammar<C, T>::check_nullable_recursive_production(
+	std::ostream& os) const
+{
+	auto prods = nullable_recursive_productions();
+	if (prods.empty()) {
+		os << "No nullable recursive productions found\n";
+		return os;
+	}
+	for (const auto& [head, p] : prods) {
+		os << "Warning: nullable recursive production: "
+			<< head << " can recurse without consuming input"
+			<< " in production: ";
+		print_production(os, p);
+		os << "\n";
+	}
 	return os;
+}
+
+/// Guard name of production @p p, or nullptr when it is not guarded.
+template <typename C, typename T>
+const std::string* grammar<C, T>::production_guard(size_t p) const {
+	auto it = grdm.find(p);
+	return it == grdm.end() ? nullptr : &guards[it->second];
 }
 
 #include "parser_term_color_macros.h" // load color macros

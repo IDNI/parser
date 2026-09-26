@@ -756,6 +756,12 @@ std::set<std::pair<typename parser<C, T>::pnode,
 }
 
 template <typename C, typename T>
+size_t parser<C, T>::result::count_trees() const {
+	if (froot != 0) return count_bintree_parses(froot->get(), amb_node);
+	return f ? f->count_trees() : 0;
+}
+
+template <typename C, typename T>
 std::ostream& parser<C, T>::result::print_ambiguous_nodes(std::ostream& os)
 	const
 {
@@ -883,7 +889,15 @@ bool parser<C, T>::result::inline_nodes(pgraph& g,
 			// std::cout << "inserted node " << l.to_std_string() << std::endl;
 		}
 	}
-	return f->replace_nodes(g, s);
+	bool changed = f->replace_nodes(g, s);
+	MC(if (measure_counters) {
+		report().count(label::replace_nodes, f->last_replace_nodes);
+		report().count(label::replacing_nodes,
+			f->last_replacing_nodes);
+		report().count(label::total_replacements,
+			f->last_total_replacements);
+	})
+	return changed;
 }
 
 } // idni namespace

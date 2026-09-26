@@ -48,7 +48,10 @@ using id_t = idni::int_t;
 	X(bintree_get_hits,           "bintree get() hits") \
 	X(bintree_get_misses,         "bintree get() misses") \
 	X(bintree_geth_calls,         "bintree geth() calls") \
-	X(bintree_nodes,              "bintree nodes, global across all parsers")
+	X(bintree_nodes,              "bintree nodes, global across all parsers") \
+	X(replace_nodes,              "replace_nodes") \
+	X(replacing_nodes,            "replacing nodes") \
+	X(total_replacements,         "Total replaced count")
 
 // Well-known diagnostic label strings. Positive ids are O(1) lookups via
 // str(label). Unknown/dynamic labels are stored per-report with negative ids.

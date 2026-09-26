@@ -274,6 +274,12 @@ public:
 	/// return true if any one of the nodes' replacement
 	/// succeeds
 	bool replace_nodes(graph& g, nodes& s);
+	/// Counts of the last replace_nodes() call, for the parser's report
+	/// counters: the nodes offered, the nodes with a replacement, and
+	/// the replacements performed. Set only in a measure-counters build.
+	size_t last_replace_nodes = 0;
+	size_t last_replacing_nodes = 0;
+	size_t last_total_replacements = 0;
 	/// Replaces node 'torep' in one pass with the given nodes
 	/// 'replacement' everywhere in the forest and returns true
 	/// if changed. Does not care if its recursive or cyclic, its
