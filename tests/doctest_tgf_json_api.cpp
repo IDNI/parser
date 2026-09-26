@@ -56,12 +56,10 @@ struct repl_run {
 	std::string raw;
 };
 
-// Drive one evaluator on @p grammar with @p lines and collect the
-// response values.
-static repl_run run_repl_on(const std::string& grammar,
+// Drive @p re with @p lines and collect the response values.
+static repl_run run_repl_re(tgf_repl_evaluator& re,
 	const std::vector<std::string>& lines)
 {
-	tgf_repl_evaluator re(grammar, json_options());
 	std::string input;
 	for (const auto& l : lines) input += l + "\n";
 	std::istringstream in(input);
@@ -77,6 +75,23 @@ static repl_run run_repl_on(const std::string& grammar,
 		r.responses.push_back(parse_line(l));
 	}
 	return r;
+}
+
+// Drive one evaluator on @p grammar with @p lines and collect the
+// response values.
+static repl_run run_repl_on(const std::string& grammar,
+	const std::vector<std::string>& lines)
+{
+	tgf_repl_evaluator re(grammar, json_options());
+	return run_repl_re(re, lines);
+}
+
+// Drive one evaluator with no grammar.
+static repl_run run_repl_no_grammar(
+	const std::vector<std::string>& lines)
+{
+	tgf_repl_evaluator re(json_options());
+	return run_repl_re(re, lines);
 }
 
 // Drive one evaluator with @p lines and collect the response values.
@@ -1007,6 +1022,104 @@ TEST_SUITE("tgf json api: cmd echo") {
 	}
 }
 
+TEST_SUITE("tgf json api: no grammar") {
+	static json::value hello_value(const repl_run& r) {
+		std::istringstream ls(r.raw);
+		std::string line;
+		REQUIRE(static_cast<bool>(std::getline(ls, line)));
+		return parse_line(line);
+	}
+
+	static bool node_has_key(const json::value& node,
+		const std::string& key)
+	{
+		const json::value* k = node.find("key");
+		if (k && k->as_string() == key) return true;
+		const json::value* ch = node.find("children");
+		if (!ch) return false;
+		for (const auto& c : *ch)
+			if (node_has_key(c, key)) return true;
+		return false;
+	}
+
+	static bool report_has_key(const json::value& resp,
+		const std::string& key)
+	{
+		const json::value* rep = resp.find("report");
+		if (!rep) return false;
+		const json::value* nodes = rep->find("nodes");
+		if (!nodes) return false;
+		for (const auto& n : *nodes)
+			if (node_has_key(n, key)) return true;
+		return false;
+	}
+
+	TEST_CASE("hello and state carry a null grammar") {
+		auto r = run_repl_no_grammar({});
+		json::value p = hello_value(r);
+		auto h = p.find("hello");
+		REQUIRE(h != nullptr);
+		REQUIRE(h->find("grammar") != nullptr);
+		CHECK(h->find("grammar")->is_null());
+		REQUIRE(h->find("fixed_grammar") != nullptr);
+		CHECK(!h->find("fixed_grammar")->as_bool());
+		auto s = p.find("state");
+		REQUIRE(s != nullptr);
+		REQUIRE(s->find("grammar") != nullptr);
+		CHECK(s->find("grammar")->is_null());
+	}
+
+	TEST_CASE("commands that need a grammar report the error") {
+		auto r = run_repl_no_grammar({
+			R"({"id":1,"cmd":"parse","input":"1"})",
+			R"({"id":2,"cmd":"internal-grammar"})",
+			R"({"id":3,"cmd":"unreachable"})",
+			R"({"id":4,"cmd":"grammar"})",
+			R"({"id":5,"cmd":"reload"})" });
+		REQUIRE(r.responses.size() == 5);
+		for (const auto& resp : r.responses) {
+			CHECK(resp.find("status")->as_string() == "error");
+			CHECK(report_has_key(resp,
+				"no grammar loaded, use load"));
+		}
+	}
+
+	TEST_CASE("options and simple commands work with no grammar") {
+		auto r = run_repl_no_grammar({
+			R"({"id":1,"cmd":"get","option":"status"})",
+			R"({"id":2,"cmd":"set","option":"trim","value":["a"]})",
+			R"({"id":3,"cmd":"toggle","option":"print-ambiguity"})",
+			R"({"id":4,"cmd":"help","command":"load"})",
+			R"({"id":5,"cmd":"version"})",
+			R"({"id":6,"cmd":"license"})",
+			R"({"id":7,"cmd":"clear"})" });
+		REQUIRE(r.responses.size() == 7);
+		for (const auto& resp : r.responses)
+			CHECK(resp.find("status")->as_string() == "ok");
+	}
+
+	TEST_CASE("start before load is kept and load then parses") {
+		auto r = run_repl_no_grammar({
+			R"({"id":1,"cmd":"start","symbol":"num"})",
+			file_request(2, "load", grammar_path()),
+			R"({"id":3,"cmd":"start"})",
+			R"({"id":4,"cmd":"parse","input":"123"})" });
+		REQUIRE(r.responses.size() == 4);
+		CHECK(r.responses[0].find("status")->as_string() == "ok");
+		REQUIRE(r.responses[0].find("result")->find("changed")
+			!= nullptr);
+		CHECK(r.responses[0].find("result")->find("changed")
+			->as_bool());
+		CHECK(r.responses[1].find("result")->find("loaded")
+			->as_bool());
+		CHECK(r.responses[2].find("result")->find("start")
+			->as_string() == "num");
+		CHECK(r.responses[3].find("status")->as_string() == "ok");
+		CHECK(r.responses[3].find("result")->find("tree")
+			!= nullptr);
+	}
+}
+
 TEST_SUITE("tgf json api: one-shot CLI") {
 	static std::string capture_run(const std::vector<std::string>& args,
 		int& code)
@@ -1205,5 +1318,57 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 		}
 		CHECK(lines == 1);
 		CHECK(code == 0);
+	}
+
+	TEST_CASE("one-shot JSON commands with no grammar report the error") {
+		int code = -1;
+		auto text = capture_run({ "tgf", "parse", "--json", "-e",
+			"1" }, code);
+		auto vs = lines_of(text);
+		REQUIRE(vs.size() == 1);
+		CHECK(vs[0].find("status")->as_string() == "error");
+		CHECK(vs[0].find("cmd")->as_string() == "parse");
+		REQUIRE(vs[0].find("report") != nullptr);
+		const json::value* nodes = vs[0].find("report")->find("nodes");
+		REQUIRE(nodes != nullptr);
+		REQUIRE(nodes->size() >= 1);
+		REQUIRE((*nodes)[0].find("key") != nullptr);
+		CHECK((*nodes)[0].find("key")->as_string()
+			== "no grammar loaded, use load");
+		CHECK(code == 1);
+
+		int gcode = -1;
+		auto gtext = capture_run({ "tgf", "grammar", "--json" },
+			gcode);
+		auto gvs = lines_of(gtext);
+		REQUIRE(gvs.size() == 1);
+		CHECK(gvs[0].find("status")->as_string() == "error");
+		CHECK(gvs[0].find("cmd")->as_string() == "grammar");
+		CHECK(gcode == 1);
+
+		auto dir = std::filesystem::temp_directory_path()
+			/ "tgf_json_api_nogen";
+		std::filesystem::create_directories(dir);
+		int ncode = -1;
+		auto ntext = capture_run({ "tgf", "gen", "--json", "--name",
+			"nogen", "--header-only", "false", "--output-dir",
+			dir.string() }, ncode);
+		auto nvs = lines_of(ntext);
+		REQUIRE(nvs.size() == 1);
+		CHECK(nvs[0].find("status")->as_string() == "error");
+		CHECK(nvs[0].find("cmd")->as_string() == "gen");
+		CHECK(ncode == 1);
+		std::filesystem::remove_all(dir);
+	}
+
+	TEST_CASE("one-shot text commands with no grammar exit 1") {
+		int code = -1;
+		auto text = capture_run({ "tgf", "parse", "-e", "1" }, code);
+		CHECK(code == 1);
+		CHECK(text.empty());   // the error goes to stderr, no help text
+		int gcode = -1;
+		auto gtext = capture_run({ "tgf", "grammar" }, gcode);
+		CHECK(gcode == 1);
+		CHECK(gtext.empty());
 	}
 }

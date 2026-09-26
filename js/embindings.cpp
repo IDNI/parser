@@ -496,6 +496,17 @@ struct tgf_repl_wrap {
 		std::cerr.rdbuf(old_err);
 		load_diag = cap.str();
 	}
+	tgf_repl_wrap() {
+		std::ostringstream cap;
+		auto* old_out = std::cout.rdbuf(cap.rdbuf());
+		auto* old_err = std::cerr.rdbuf(cap.rdbuf());
+		re = new idni::tgf_repl_evaluator(
+			idni::tgf_repl_evaluator::options{});
+		re->flush_report();
+		std::cout.rdbuf(old_out);
+		std::cerr.rdbuf(old_err);
+		load_diag = cap.str();
+	}
 	~tgf_repl_wrap() { delete re; }
 
 	bool good() const { return re && re->good(); }
@@ -683,6 +694,7 @@ EMSCRIPTEN_BINDINGS(tauparser) {
 
 	emscripten::class_<tgf_repl_wrap>("tgf_repl")
 		.constructor<const std::string&>()
+		.constructor<>()
 		.function("good",         &tgf_repl_wrap::good)
 		.function("diagnostics",  &tgf_repl_wrap::diagnostics)
 		.function("eval",         &tgf_repl_wrap::eval)

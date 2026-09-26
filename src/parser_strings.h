@@ -130,6 +130,7 @@ using id_t = idni::int_t;
 	X(parse_error,              "Parse error.") \
 	X(runtime_error,            "Runtime error.") \
 	X(unknown_char_class,       "Unknown character class.") \
+	X(no_grammar,               "No grammar.") \
 	X(warning,                  "Warning.") \
 	X(info,                     "Info.") \
 	X(info_micros,              "Time.") \
@@ -222,6 +223,8 @@ struct messages {
 	static constexpr sv invalid_error_verbosity =
 		"Invalid error verbosity value";
 	static constexpr sv unknown_command        = "Unknown command";
+	static constexpr sv no_grammar_loaded      =
+		"no grammar loaded, use load";
 	// load and reload command results
 	static constexpr sv reload_succeeded       = "Grammar reloaded";
 	static constexpr sv reload_failed          = "Grammar reload failed";

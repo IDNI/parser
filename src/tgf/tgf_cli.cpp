@@ -474,6 +474,13 @@ bool tgf_repl_evaluator::has_fixed_grammar() const noexcept {
 	return fixed_grammar;
 }
 
+bool tgf_repl_evaluator::require_grammar() {
+	if (grammar_loaded) return true;
+	report.error(diagnostics::code::no_grammar,
+		parser_strings::messages::no_grammar_loaded);
+	return false;
+}
+
 diagnostics::report tgf_repl_evaluator::take_report() {
 	diagnostics::report r = std::move(report);
 	report.clear();
@@ -510,12 +517,18 @@ void tgf_repl_evaluator::print_source(ostream& os) const {
 
 void tgf_repl_evaluator::reprompt() {
 	stringstream ss;
-	if (opt.status)
-		ss << TC_STATUS << "[ "
-		<< TC_STATUS_FILE  << "\"" << tgf_filename << "\"" << TC.CLEAR()
-		<< TC_STATUS << " "
-		<< TC_STATUS_START << opt.start << TC.CLEAR()
-		<< TC_STATUS << " ]" << TC.CLEAR() << " ";
+	if (opt.status) {
+		ss << TC_STATUS << "[ ";
+		if (has_grammar())
+			ss << TC_STATUS_FILE << "\"" << tgf_filename
+				<< "\"" << TC.CLEAR() << TC_STATUS << " ";
+		if (has_grammar() || !opt.start.empty())
+			ss << TC_STATUS_START << opt.start
+				<< TC.CLEAR() << TC_STATUS << " ]"
+				<< TC.CLEAR() << " ";
+		else
+			ss << "]" << TC.CLEAR() << " ";
+	}
 	ss << TC_PROMPT << "tgf>" << TC.CLEAR() << " ";
 	if (r) r->set_prompt(ss.str());
 #ifdef TAU_PARSER_HAS_FTXUI
@@ -568,6 +581,7 @@ bool tgf_repl_evaluator::load_file(const std::string& filename) {
 	p_            = owned_p.get();
 	tgf_filename = filename;
 	grammar_source.clear();
+	grammar_loaded = true;
 	return true;
 }
 
@@ -733,6 +747,7 @@ tgf_repl_evaluator::parser_type::parse_options
 format::json::value tgf_repl_evaluator::parse(const char* input, size_t size,
 	std::string& text)
 {
+	if (!require_grammar()) return format::json::value::object();
 	if (!good()) return format::json::value::object();
 	auto po = get_parse_options();
 	auto r = p().parse(input, size, po);
@@ -742,6 +757,7 @@ format::json::value tgf_repl_evaluator::parse(const char* input, size_t size,
 format::json::value tgf_repl_evaluator::parse(istream& instream,
 	std::string& text)
 {
+	if (!require_grammar()) return format::json::value::object();
 	if (!good()) return format::json::value::object();
 	auto po = get_parse_options();
 	auto r = p().parse(instream, po);
@@ -751,6 +767,7 @@ format::json::value tgf_repl_evaluator::parse(istream& instream,
 format::json::value tgf_repl_evaluator::parse(const string& infile,
 	std::string& text)
 {
+	if (!require_grammar()) return format::json::value::object();
 	if (!good()) return format::json::value::object();
 	auto po = get_parse_options();
 	auto r = p().parse(infile, po);
@@ -1427,6 +1444,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 					loading_grammars_unavailable);
 				break;
 			}
+			if (!require_grammar()) break;
 			res.data = reload_data(tgf_filename);
 			break;
 		case p::load_cmd: {
@@ -1457,6 +1475,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			break;
 		}
 		case p::igrammar_cmd: {
+			if (!require_grammar()) break;
 			auto n = s | p::symbol;
 			string start = n.has_value()
 				? n | tt::terminals : opt.start;
@@ -1482,6 +1501,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			break;
 		}
 		case p::grammar_cmd: {
+			if (!require_grammar()) break;
 			auto v = value::object();
 			v.set("file", value::string(tgf_filename));
 			string src = grammar_source;
@@ -1496,6 +1516,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			break;
 		}
 		case p::unreachable_cmd: {
+			if (!require_grammar()) break;
 			auto n = s | p::symbol;
 			string start = n.has_value()
 				? n | tt::terminals : opt.start;
@@ -1689,6 +1710,17 @@ tgf_repl_evaluator::tgf_repl_evaluator(std::string tgf_file, options opt)
 	apply_auto_disambiguate();
 }
 
+tgf_repl_evaluator::tgf_repl_evaluator(options opt)
+	: opt(opt)
+{
+	TC.set(opt.json_api ? false : opt.colors);
+	owned_nts = make_unique<nonterminals_type>();
+	owned_g = make_unique<grammar_type>(*owned_nts);
+	owned_p = make_unique<parser_type>(*owned_g,
+		default_parser_options<char_type, terminal_type>());
+	p_ = owned_p.get();
+}
+
 tgf_repl_evaluator::tgf_repl_evaluator(
 	parser_type& parser,
 	std::string display_name,
@@ -1705,6 +1737,7 @@ tgf_repl_evaluator::tgf_repl_evaluator(
 	options opt)
 	: opt(opt),
 	  fixed_grammar(true),
+	  grammar_loaded(true),
 	  tgf_filename(std::move(display_name)),
 	  grammar_source(std::move(grammar_source)),
 	  p_(&parser)
@@ -1858,10 +1891,20 @@ static parser_gen_options gen_options_from_cmd(const cli::command& cmd) {
 }
 
 static int gen_command(const cli::command& cmd,
-	const tgf_repl_evaluator& re)
+	tgf_repl_evaluator& re)
 {
 	using format::json::value;
 	const bool print_json = cmd.has("json") && cmd.get<bool>("json");
+	if (!re.require_grammar()) {
+		if (print_json) {
+			json_write_line(cout, json_result_response(
+				cmd_status::error, "gen", value::object(),
+				state_value(re), re.take_report()));
+			return 1;
+		}
+		re.flush_report();
+		return 1;
+	}
 	auto gen_opt = gen_options_from_cmd(cmd);
 	auto gr = !re.has_fixed_grammar()
 		? generate_parser_cpp_from_file<char>(re.filename(), gen_opt,
@@ -1920,6 +1963,16 @@ static int show_command(const cli::command& cmd,
 {
 	using format::json::value;
 	const bool json = cmd.has("json") && cmd.get<bool>("json");
+	if (!re.require_grammar()) {
+		if (json) {
+			json_write_line(cout, json_result_response(
+				cmd_status::error, "grammar", value::object(),
+				state_value(re), re.take_report()));
+			return 1;
+		}
+		re.flush_report();
+		return 1;
+	}
 	string start = cmd.get<string>("start");
 	if (start.empty()) start = re.g().start_literal().to_std_string();
 	if (json) {
@@ -2098,6 +2151,7 @@ static int run_command(cli& cl, const cli::command& cmd,
 		cout << text;
 		re.flush_report();
 		if (cmd.get<bool>("measure")) print_bintree_process_totals();
+		return re.has_grammar() ? 0 : 1;
 	}
 	return 0;
 }
@@ -2173,7 +2227,11 @@ int tgf_run(int argc, char** argv) {
 	cli::command cmd;
 	if (auto code = cli_universal(cl, cmd)) return *code;
 
-	if (!provided) return cl.error("no TGF file specified", true);
+	if (!provided) {
+		tgf_repl_evaluator re(repl_options_from_cmd(cmd, args));
+		if (!re.good()) return re.flush_report(), 1;
+		return run_command(cl, cmd, re);
+	}
 	if (!exists) return cl.error("TGF file does not exist ", true);
 
 	tgf_repl_evaluator re(tgf_file, repl_options_from_cmd(cmd, args));

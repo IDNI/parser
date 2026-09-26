@@ -273,7 +273,8 @@ static value report_value(const diagnostics::report& r) {
 format::json::value state_value(const tgf_repl_evaluator& re) {
 	using value = format::json::value;
 	value v = value::object();
-	v.set("grammar", value::string(re.filename()));
+	v.set("grammar", re.has_grammar()
+		? value::string(re.filename()) : value::null());
 	v.set("start", value::string(re.start_symbol()));
 	return v;
 }
@@ -362,7 +363,8 @@ static value hello(tgf_repl_evaluator& re) {
 	value h = value::object();
 	h.set("protocol", value::number(1));
 	h.set("version", value::string(tauparser::full_version));
-	h.set("grammar", value::string(re.filename()));
+	h.set("grammar", re.has_grammar()
+		? value::string(re.filename()) : value::null());
 	h.set("fixed_grammar", value::boolean(re.has_fixed_grammar()));
 	h.set("start", value::string(re.start_symbol()));
 	h.set("options", re.option_values());

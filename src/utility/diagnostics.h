@@ -57,6 +57,7 @@ enum class code : uint16_t {
 	parse_error              = 15,
 	runtime_error            = 16,
 	unknown_char_class       = 17,
+	no_grammar               = 18,
 
 	// 01 band — warnings
 	warning                  = 0x4000,

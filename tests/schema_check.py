@@ -105,7 +105,11 @@ def run_oneshot(tgf, validator, args, label):
 
 
 def run_repl(tgf, fixture, validator, requests):
-    proc = subprocess.Popen([tgf, fixture, "repl", "--json"],
+    cmd = [tgf]
+    if fixture is not None:
+        cmd.append(fixture)
+    cmd += ["repl", "--json"]
+    proc = subprocess.Popen(cmd,
         stdin=subprocess.PIPE, stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL, text=True, bufsize=1)
     ok = True
@@ -207,6 +211,22 @@ def run_api(tgf, fixture, api_path, report_path, ast_path):
                       "not quit")
                 quit_ok = False
         ok &= quit_ok
+
+        # a run with no grammar: hello.grammar is null, and a command
+        # that needs productions reports the no-grammar error
+        no_grammar_requests = [
+            ("no grammar get", {"id": 1, "cmd": "get",
+                "option": "status"}, True),
+            ("no grammar parse", {"id": 2, "cmd": "parse",
+                "input": "1"}, True),
+            ("no grammar load", {"id": 3, "cmd": "load",
+                "file": fixture}, True),
+            ("no grammar parse ok", {"id": 4, "cmd": "parse",
+                "input": "12"}, True),
+            ("no grammar quit", {"id": 5, "cmd": "quit"}, True),
+        ]
+        ng_ok, _ = run_repl(tgf, None, validator, no_grammar_requests)
+        ok &= ng_ok
 
         ok &= run_oneshot(tgf, validator,
             [fixture, "parse", "--json", "-e", "12"], "parse")

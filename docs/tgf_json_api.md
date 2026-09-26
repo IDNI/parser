@@ -227,6 +227,23 @@ A null node is skipped. The schema is
 
 The exit code is `1` when the status is `error`, else `0`.
 
+## No grammar
+
+`tgf`, `tgf repl` and `tgf repl --json` start with an empty grammar
+when no file is given. `hello.grammar` and `state.grammar` are `null`;
+the other hello fields stay.
+
+Commands that need productions report the error
+`no grammar loaded, use load`: `parse`, `parse file`,
+`internal-grammar`, `unreachable`, `grammar` and `reload`. `load`
+installs a grammar. `get`, `set`, `toggle`, `enable`, `disable`, `add`,
+`delete`, `help`, `version`, `license`, `quit` and `clear` work as
+usual. `set start foo` is stored, and the later `load` uses it.
+
+The one-shot `tgf parse`, `tgf grammar` and `tgf gen` with no grammar
+report the same error and exit 1. With `--json` they print one error
+response.
+
 ## Example
 
     $ tgf tests/fixtures/tiny.tgf repl --json

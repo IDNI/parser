@@ -126,6 +126,9 @@ struct tgf_repl_evaluator {
 
 	explicit tgf_repl_evaluator(std::string tgf_file);
 	tgf_repl_evaluator(std::string tgf_file, options opt);
+	/// Construct an evaluator with no grammar loaded. A later load
+	/// installs one.
+	explicit tgf_repl_evaluator(options opt);
 	tgf_repl_evaluator(parser_type& parser,
 		std::string grammar_filename,
 		std::string grammar_source);
@@ -135,6 +138,12 @@ struct tgf_repl_evaluator {
 		options opt);
 
 	[[nodiscard]] bool good() const noexcept { return p_ != nullptr; }
+	/// True when a grammar is loaded.
+	[[nodiscard]] bool has_grammar() const noexcept
+		{ return grammar_loaded; }
+	/// Report "no grammar loaded" and return false when no grammar is
+	/// loaded. Commands that need productions call this first.
+	bool require_grammar();
 
 	parser_type& p() { return *p_; }
 	const parser_type& p() const { return *p_; }
@@ -214,6 +223,7 @@ struct tgf_repl_evaluator {
 private:
 	options opt;
 	bool fixed_grammar = false;
+	bool grammar_loaded = false;
 	std::string tgf_filename;
 	std::string grammar_source;
 
