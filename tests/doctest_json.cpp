@@ -4,6 +4,8 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 #include "format/json/json.h"
+#include "format/ast.json/ast_json.h"
+#include "parser.h"
 
 #include <sstream>
 #include <string>
@@ -250,5 +252,69 @@ TEST_SUITE("json: report to nested value") {
 		print(r, os, true);
 		CHECK(os.str().find('\n') == std::string::npos);
 		CHECK(os.str().find("\"nodes\"") != std::string::npos);
+	}
+}
+
+TEST_SUITE("ast_json: parser tree to AST JSON") {
+	using p_t = idni::parser<char, char32_t>;
+	using lit_t = idni::lit<char, char32_t>;
+	using tree_t = p_t::tree;
+	using pnode_t = p_t::pnode;
+
+	static idni::nonterminals<char, char32_t> nts({"", "start", "digit"});
+
+	static tref term_node(char32_t c, size_t b, size_t e) {
+		return tree_t::get(pnode_t(lit_t(c), {b, e}));
+	}
+
+	TEST_CASE("symbol, range, terminal text, null skipped") {
+		tref term = term_node(char32_t('1'), 0, 1);
+		tref nul = tree_t::get(pnode_t(lit_t(), {1, 1}));
+		tref dig = tree_t::get(pnode_t(nts("digit"), {0, 1}),
+			trefs{term, nul});
+		tref root = tree_t::get(pnode_t(nts("start"), {0, 1}),
+			trefs{dig});
+
+		auto v = idni::format::ast_json::to_value<tree_t>(
+			root, "start", "1");
+		CHECK(v.find("format")->as_string() == "ast");
+		CHECK(v.find("start")->as_string() == "start");
+		CHECK(v.find("input")->as_string() == "1");
+		auto ast = v.find("ast");
+		REQUIRE(ast != nullptr);
+		CHECK(ast->find("symbol")->as_string() == "start");
+		REQUIRE(ast->find("id") != nullptr);
+		CHECK(ast->find("id")->as_number()
+			== static_cast<double>(nts("start").n()));
+		CHECK(ast->find("text") == nullptr);
+		auto kids = ast->find("children");
+		REQUIRE(kids != nullptr);
+		REQUIRE(kids->size() == 1);
+		const auto& digit = (*kids)[0];
+		CHECK(digit.find("symbol")->as_string() == "digit");
+		REQUIRE(digit.find("id") != nullptr);
+		CHECK(digit.find("id")->as_number()
+			== static_cast<double>(nts("digit").n()));
+		CHECK(digit.find("text") == nullptr);
+		auto dk = digit.find("children");
+		REQUIRE(dk != nullptr);
+		REQUIRE(dk->size() == 1);
+		const auto& leaf = (*dk)[0];
+		CHECK(leaf.find("symbol")->as_string() == "");
+		CHECK(leaf.find("id") == nullptr);
+		CHECK(leaf.find("text")->as_string() == "1");
+		CHECK(leaf.find("children") == nullptr);
+	}
+
+	TEST_CASE("range holds the code point offsets") {
+		tref term = term_node(char32_t('x'), 2, 3);
+		tref root = tree_t::get(pnode_t(nts("start"), {2, 3}),
+			trefs{term});
+		auto v = idni::format::ast_json::node_to_value<tree_t>(root);
+		auto range = v.find("range");
+		REQUIRE(range != nullptr);
+		REQUIRE(range->size() == 2);
+		CHECK((*range)[0].as_number() == 2);
+		CHECK((*range)[1].as_number() == 3);
 	}
 }

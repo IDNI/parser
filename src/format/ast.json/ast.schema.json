@@ -1,0 +1,141 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://github.com/IDNI/parser/blob/main/src/format/ast.json/ast.schema.json",
+	"title": "AST JSON",
+	"description": "Parse tree in the AST JSON format shared by the tgf and tau tools.",
+	"type": "object",
+	"properties": {
+		"format": {
+			"type": "string"
+		},
+		"version": {
+			"type": "string"
+		},
+		"commit": {
+			"type": "string"
+		},
+		"start": {
+			"type": "string"
+		},
+		"input": {
+			"type": "string"
+		},
+		"pools": {
+			"type": "object",
+			"properties": {
+				"dict": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"constants": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"properties": {
+							"constant": {
+								"type": "string"
+							},
+							"type": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"constant",
+							"type"
+						],
+						"additionalProperties": false
+					}
+				}
+			},
+			"additionalProperties": false
+		},
+		"ast": {
+			"$ref": "#/$defs/node"
+		}
+	},
+	"anyOf": [
+		{
+			"required": ["ast"]
+		},
+		{
+			"required": ["input"]
+		}
+	],
+	"additionalProperties": true,
+	"$defs": {
+		"node": {
+			"type": "object",
+			"properties": {
+				"symbol": {
+					"type": "string"
+				},
+				"id": {
+					"type": "integer"
+				},
+				"range": {
+					"type": "array",
+					"items": {
+						"type": "integer"
+					},
+					"minItems": 2,
+					"maxItems": 2
+				},
+				"children": {
+					"type": "array",
+					"items": {
+						"$ref": "#/$defs/node"
+					}
+				},
+				"data": {
+					"type": "integer"
+				},
+				"data_type": {
+					"type": "string",
+					"enum": ["dict", "constants", "integer"]
+				},
+				"text": {
+					"type": "string"
+				}
+			},
+			"required": ["symbol"],
+			"allOf": [
+				{
+					"if": {
+						"required": ["data"]
+					},
+					"then": {
+						"required": ["data_type"]
+					}
+				},
+				{
+					"if": {
+						"required": ["data_type"]
+					},
+					"then": {
+						"required": ["data"]
+					}
+				},
+				{
+					"not": {
+						"required": ["data", "text"]
+					}
+				},
+				{
+					"if": {
+						"required": ["id"]
+					},
+					"then": {
+						"properties": {
+							"symbol": {
+								"minLength": 1
+							}
+						}
+					}
+				}
+			],
+			"additionalProperties": false
+		}
+	}
+}
