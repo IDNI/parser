@@ -259,6 +259,25 @@ if(TARGET tgf AND NOT WIN32)
 				$<TARGET_FILE:tgf>
 				"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tau.tgf"
 				"grammar" "p x = 0 || y = 1" "p x = 2" "quit")
+		add_test(NAME tgf_wasm_reload
+			COMMAND ${NODE_EXECUTABLE}
+				"${CMAKE_CURRENT_SOURCE_DIR}/parity/tgf_wasm_reload.js"
+				"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tiny.tgf"
+				"${PROJECT_SOURCE_DIR}/src/format/json/json.tgf")
+	endif()
+endif()
+
+# The JSON API must end every message with one LF on the real stdout. An
+# in-process capture cannot see the line-ending translation that a
+# text-mode stdout does, so this runs the program and reads its bytes.
+if(TARGET tgf)
+	find_program(PYTHON3_JSON_STDOUT_EXECUTABLE python3)
+	if(PYTHON3_JSON_STDOUT_EXECUTABLE)
+		add_test(NAME json_stdout_bytes
+			COMMAND "${PYTHON3_JSON_STDOUT_EXECUTABLE}"
+				"${CMAKE_CURRENT_SOURCE_DIR}/parity/json_stdout_bytes.py"
+				"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tiny.tgf"
+				$<TARGET_FILE:tgf>)
 	endif()
 endif()
 
@@ -298,6 +317,13 @@ if(TARGET tgf AND NOT WIN32)
 				$<TARGET_FILE:tgf>
 				"${MINGW_DIR}/tgf.exe"
 				"${PROJECT_SOURCE_DIR}/src/format/json/json.tgf")
+		if(PYTHON3_JSON_STDOUT_EXECUTABLE)
+			add_test(NAME json_stdout_bytes_wine
+				COMMAND "${PYTHON3_JSON_STDOUT_EXECUTABLE}"
+					"${CMAKE_CURRENT_SOURCE_DIR}/parity/json_stdout_bytes.py"
+					"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tiny.tgf"
+					"${WINE_EXECUTABLE}" "${MINGW_DIR}/tgf.exe")
+		endif()
 	endif()
 endif()
 

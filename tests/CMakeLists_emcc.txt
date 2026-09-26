@@ -22,6 +22,15 @@ add_test(NAME tgf_wasm_parity_emcc
 set_property(TEST tgf_wasm_parity_emcc
 	PROPERTY WORKING_DIRECTORY "${WASM_NODE_DIR}")
 
+# tgf_wasm_reload_emcc - exercise tgf_repl.reload(file) in tgf_node.js
+add_test(NAME tgf_wasm_reload_emcc
+	COMMAND ${NODE_EXECUTABLE}
+		"${CMAKE_CURRENT_SOURCE_DIR}/tests/parity/tgf_wasm_reload.js"
+		"${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/tiny.tgf"
+		"${CMAKE_CURRENT_SOURCE_DIR}/src/format/json/json.tgf")
+set_property(TEST tgf_wasm_reload_emcc
+	PROPERTY WORKING_DIRECTORY "${WASM_NODE_DIR}")
+
 # embindings_api_emcc - exercise the tauparser embind class API directly
 add_test(NAME embindings_api_emcc
 	COMMAND ${NODE_EXECUTABLE}
