@@ -423,7 +423,10 @@
 				"_generator-make",
 				"_toolchain-mingw",
 				"_build-type-release"
-			]
+			],
+			"cacheVariables": {
+				"TAU_PARSER_BUILD_TGF": "ON"
+			}
 		},
 
 		{

@@ -57,7 +57,7 @@ struct eval_result {
 };
 
 /// One row for each REPL option, used by get_cmd() and render_text().
-enum class option_kind { boolean, string_value, list, treepaths };
+enum class option_kind { boolean, string_value, symbol_value, list, treepaths };
 
 struct option_desc {
 	size_t nt;          // tgf_repl_parser nonterminal

@@ -132,6 +132,10 @@ static const map<size_t, option_desc> option_table = {
 	tgf_repl_parser::inline_opt,
 	"inline", "inline:                 ",
 	option_kind::treepaths } },
+{ tgf_repl_parser::start_opt, {
+	tgf_repl_parser::start_opt,
+	"start", "start:                  ",
+	option_kind::symbol_value } },
 };
 
 static const option_desc* find_option(size_t nt) {
@@ -432,7 +436,8 @@ static pair<tgf_repl_parser::nonterminal, tt> get_opt(const tt& t) {
 		{ p::bool_option,      p::bool_value },
 		{ p::list_option,      p::symbol_list },
 		{ p::treepaths_option, p::treepath_list },
-		{ p::enum_ev_option,   p::error_verbosity }
+		{ p::enum_ev_option,   p::error_verbosity },
+		{ p::symbol_option,    p::symbol }
 	};
 	for (auto it = ov.begin(); it != ov.end(); ++it)
 		if (auto x = t | it->first; x.has_value())
@@ -952,6 +957,9 @@ format::json::value tgf_repl_evaluator::option_value(size_t o) const {
 		return treepaths_value(opt.to_inline);
 	case tgf_repl_parser::error_verbosity_opt:
 		return value::string(verbosity_name(opt.error_verbosity));
+	case tgf_repl_parser::start_opt:
+		return opt.start.empty() ? value::null()
+			: value::string(opt.start);
 	default: return value::null();
 	}
 }
@@ -1040,6 +1048,9 @@ format::json::value tgf_repl_evaluator::set_cmd(const tt& n) {
 		g().opt.auto_disambiguate = get_bool_value(v); break;
 	case p::derive_char_classes_opt:
 		g().derive_char_classes(get_bool_value(v)); break;
+	case p::start_opt:
+		opt.start = v | tt::terminals;
+		break;
 	case p::nodisambig_list_opt:
 		g().opt.nodisambig_list.clear();
 		for (const auto& s : (v || p::symbol)())
@@ -1226,9 +1237,11 @@ static std::string help_text(size_t nt, bool show_load_reload) {
 		"  inline                 list of tree paths to inline       symbol1 > ch1 > ch2, symbol2...\n";
 	static const string enum_ev_option =
 		"  error-verbosity        parse errors verbosity             basic/detailed/root-cause\n";
+	static const string symbol_options =
+		"  start                  get or set the start symbol        symbol\n";
 	static const string all_available_options = string{} +
 		"Available options:\n" + bool_options + list_options
-			+ treepaths_options + enum_ev_option;
+			+ treepaths_options + symbol_options + enum_ev_option;
 	static const string bool_available_options = string{} +
 		"Available options:\n" + bool_options;
 	static const string list_and_treepaths_available_options =
@@ -1469,7 +1482,8 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 				changed = true;
 			}
 			auto v = value::object();
-			v.set("start", value::string(opt.start))
+			v.set("start", opt.start.empty() ? value::null()
+				: value::string(opt.start))
 			 .set("changed", value::boolean(changed));
 			res.data = std::move(v);
 			break;

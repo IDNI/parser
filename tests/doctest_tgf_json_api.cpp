@@ -1063,10 +1063,59 @@ TEST_SUITE("tgf json api: no grammar") {
 		CHECK(h->find("grammar")->is_null());
 		REQUIRE(h->find("fixed_grammar") != nullptr);
 		CHECK(!h->find("fixed_grammar")->as_bool());
+		REQUIRE(h->find("start") != nullptr);
+		CHECK(h->find("start")->is_null());
 		auto s = p.find("state");
 		REQUIRE(s != nullptr);
 		REQUIRE(s->find("grammar") != nullptr);
 		CHECK(s->find("grammar")->is_null());
+		REQUIRE(s->find("start") != nullptr);
+		CHECK(s->find("start")->is_null());
+	}
+
+	TEST_CASE("set start and get start in eval and structured form") {
+		auto r = run_repl_no_grammar({
+			eval_request(1, "set start foo"),
+			R"({"id":2,"cmd":"get","option":"start"})",
+			eval_request(3, "get start"),
+			R"({"id":4,"cmd":"set","option":"start","value":"bar"})",
+			R"({"id":5,"cmd":"get","option":"start"})" });
+		REQUIRE(r.responses.size() == 5);
+		auto res1 = r.responses[0].find("results");
+		REQUIRE(res1 != nullptr);
+		REQUIRE(res1->size() == 1);
+		CHECK((*res1)[0].find("result")->find("option")
+			->as_string() == "start");
+		CHECK((*res1)[0].find("result")->find("value")
+			->as_string() == "foo");
+		CHECK(r.responses[0].find("state")->find("start")
+			->as_string() == "foo");
+		CHECK(result_of(r.responses[1])->find("value")
+			->as_string() == "foo");
+		CHECK(r.responses[1].find("state")->find("start")
+			->as_string() == "foo");
+		auto res3 = r.responses[2].find("results");
+		REQUIRE(res3 != nullptr);
+		REQUIRE(res3->size() == 1);
+		CHECK((*res3)[0].find("result")->find("value")
+			->as_string() == "foo");
+		CHECK(result_of(r.responses[3])->find("value")
+			->as_string() == "bar");
+		CHECK(result_of(r.responses[4])->find("value")
+			->as_string() == "bar");
+	}
+
+	TEST_CASE("the start command gives null with no start symbol") {
+		auto r = run_repl_no_grammar({
+			R"({"id":1,"cmd":"start"})",
+			eval_request(2, "start") });
+		REQUIRE(r.responses.size() == 2);
+		CHECK(result_of(r.responses[0])->find("start")->is_null());
+		CHECK(!result_of(r.responses[0])->find("changed")->as_bool());
+		auto res2 = r.responses[1].find("results");
+		REQUIRE(res2 != nullptr);
+		REQUIRE(res2->size() == 1);
+		CHECK((*res2)[0].find("result")->find("start")->is_null());
 	}
 
 	TEST_CASE("commands that need a grammar report the error") {
@@ -1370,5 +1419,14 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 		auto gtext = capture_run({ "tgf", "grammar" }, gcode);
 		CHECK(gcode == 1);
 		CHECK(gtext.empty());
+	}
+
+	TEST_CASE("text repl set start and get start") {
+		int code = -1;
+		auto text = capture_run({ "tgf", grammar_path(), "repl",
+			"--evaluate", "set start num . get start" }, code);
+		CHECK(code == 0);
+		CHECK(text.find("start:") != std::string::npos);
+		CHECK(text.find("num") != std::string::npos);
 	}
 }

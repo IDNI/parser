@@ -49,7 +49,8 @@ set_cmd        => "set"                          :set_sym __ (
                                       | [ __ symbol_list ] )
                         | treepaths_option ( _ '=' _ [ treepath_list ]
                                       | [ __ treepath_list ] )
-                        | enum_ev_option (__ | _ '=' _) error_verbosity).
+                        | enum_ev_option (__ | _ '=' _) error_verbosity
+                        | symbol_option (__ | _ '=' _) symbol).
 
 parse_input            => quoted_string
                         | (printable | '\t')+:parse_input_char_seq.
@@ -63,8 +64,9 @@ help_arg               => grammar_sym | igrammar_sym | unreachable_sym
 
 # options
 option                 => bool_option | enum_ev_option
-                        | list_option | treepaths_option.
+                        | list_option | treepaths_option | symbol_option.
 enum_ev_option         => ("e" | "error-verbosity"):error_verbosity_opt.
+symbol_option          => "start":start_opt.
 bool_option            => ("s" | "status"):status_opt
                         | ("c" | "color" | "colors"):colors_opt
                         | ("a" | "ambiguity" | "print-ambiguity")

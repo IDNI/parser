@@ -271,12 +271,13 @@ endif()
 # in-process capture cannot see the line-ending translation that a
 # text-mode stdout does, so this runs the program and reads its bytes.
 if(TARGET tgf)
-	find_program(PYTHON3_JSON_STDOUT_EXECUTABLE python3)
+	find_program(PYTHON3_JSON_STDOUT_EXECUTABLE NAMES python3 python)
 	if(PYTHON3_JSON_STDOUT_EXECUTABLE)
 		add_test(NAME json_stdout_bytes
 			COMMAND "${PYTHON3_JSON_STDOUT_EXECUTABLE}"
 				"${CMAKE_CURRENT_SOURCE_DIR}/parity/json_stdout_bytes.py"
 				"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tiny.tgf"
+				${CMAKE_CROSSCOMPILING_EMULATOR}
 				$<TARGET_FILE:tgf>)
 	endif()
 endif()

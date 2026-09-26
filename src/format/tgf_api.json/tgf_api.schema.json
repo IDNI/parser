@@ -29,7 +29,7 @@
 					"type": ["string", "null"]
 				},
 				"start": {
-					"type": "string"
+					"type": ["string", "null"]
 				}
 			},
 			"required": [
@@ -61,6 +61,9 @@
 						"detailed",
 						"root-cause"
 					]
+				},
+				{
+					"$ref": "#/$defs/symbol"
 				},
 				{
 					"type": "array",
@@ -104,6 +107,7 @@
 				"trim",
 				"trim-children",
 				"trim-children-terminals",
+				"start",
 				"inline"
 			]
 		},
@@ -223,6 +227,9 @@
 				"derive-char-classes": {
 					"type": "boolean"
 				},
+				"start": {
+					"type": ["string", "null"]
+				},
 				"nodisambig-list": {
 					"$ref": "#/$defs/symbol_list"
 				},
@@ -261,6 +268,7 @@
 				"trim-terminals",
 				"inline-char-classes",
 				"derive-char-classes",
+				"start",
 				"nodisambig-list",
 				"enabled-productions",
 				"trim",
@@ -665,7 +673,7 @@
 			"type": "object",
 			"properties": {
 				"start": {
-					"type": "string"
+					"type": ["string", "null"]
 				},
 				"changed": {
 					"type": "boolean"
@@ -862,6 +870,25 @@
 							}
 						}
 					}
+				},
+				{
+					"if": {
+						"properties": {
+							"option": {
+								"const": "start"
+							}
+						},
+						"required": [
+							"option"
+						]
+					},
+					"then": {
+						"properties": {
+							"value": {
+								"type": ["string", "null"]
+							}
+						}
+					}
 				}
 			]
 		},
@@ -1001,7 +1028,7 @@
 					"type": "boolean"
 				},
 				"start": {
-					"type": "string"
+					"type": ["string", "null"]
 				},
 				"options": {
 					"$ref": "#/$defs/options"

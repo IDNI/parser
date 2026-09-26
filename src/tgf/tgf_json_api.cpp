@@ -107,6 +107,14 @@ static diagnostics::result<std::string> value_to_src(
 				parser_strings::messages::invalid_error_verbosity);
 		return ok_result(s);
 	}
+	case option_kind::symbol_value: {
+		if (!v.is_string()) return type_error();
+		if (!is_symbol(v.as_string()))
+			return diagnostics::error<std::string>(
+				code::invalid_argument,
+				parser_strings::messages::invalid_symbol);
+		return ok_result(std::string(v.as_string()));
+	}
 	case option_kind::list: {
 		if (!v.is_array()) return type_error();
 		std::string out;
@@ -275,7 +283,8 @@ format::json::value state_value(const tgf_repl_evaluator& re) {
 	value v = value::object();
 	v.set("grammar", re.has_grammar()
 		? value::string(re.filename()) : value::null());
-	v.set("start", value::string(re.start_symbol()));
+	v.set("start", re.start_symbol().empty() ? value::null()
+		: value::string(re.start_symbol()));
 	return v;
 }
 
@@ -366,7 +375,8 @@ static value hello(tgf_repl_evaluator& re) {
 	h.set("grammar", re.has_grammar()
 		? value::string(re.filename()) : value::null());
 	h.set("fixed_grammar", value::boolean(re.has_fixed_grammar()));
-	h.set("start", value::string(re.start_symbol()));
+	h.set("start", re.start_symbol().empty() ? value::null()
+		: value::string(re.start_symbol()));
 	h.set("options", re.option_values());
 	h.set("report", report_value(re.take_report()));
 	value v = value::object();

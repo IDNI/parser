@@ -119,7 +119,7 @@ number. `message` is the code name and is present in API output.
 | `parse`, `parse file` | `{"input"?,"ambiguous"?,"terminals"?,"tml_rules"?,"tml_facts"?,"tree"?}` |
 | `grammar` | `{"file":"...","source":"..."}` |
 | `internal-grammar` | `{"start":"...","productions":["..."],"production_ids":[{...}]}` |
-| `start` | `{"start":"...","changed":true}` |
+| `start` | `{"start":"..." or null,"changed":true}` |
 | `unreachable` | `{"symbol":"...","productions":["..."],"production_ids":[{...}]}` |
 | `load`, `reload` | `{"grammar":"...","loaded":true}` |
 | `help` | `{"command":"...","text":"..."}` |
@@ -131,9 +131,12 @@ number. `message` is the code name and is present in API output.
 | `set`, `toggle`, `enable`, `disable`, `add`, `delete` | same as `get` for that option |
 
 Option values are a bool, an array of strings, an array of string arrays
-(tree paths), or a string for `error-verbosity`. Option names are the
-long names from `tgf_repl.tgf`. `derive-char-classes` (`dcc`) is a bool
-option: true scans one-character rules as character classes.
+(tree paths), a string for `error-verbosity`, or a symbol for `start`.
+Option names are the long names from `tgf_repl.tgf`.
+`derive-char-classes` (`dcc`) is a bool option: true scans one-character
+rules as character classes. `start` is the start symbol; `set start foo`
+does the same as the `start foo` command. `start` is `null` when no
+start symbol is set.
 
 `input` is present when `print-input` is on. `terminals` is present
 when `print-terminals` is on. `tml_rules` and `tml_facts` carry text when
@@ -230,15 +233,18 @@ The exit code is `1` when the status is `error`, else `0`.
 ## No grammar
 
 `tgf`, `tgf repl` and `tgf repl --json` start with an empty grammar
-when no file is given. `hello.grammar` and `state.grammar` are `null`;
-the other hello fields stay.
+when no file is given. `hello.grammar`, `state.grammar`, `hello.start`
+and `state.start` are `null`; the other hello fields stay. Once a start
+symbol is set, `hello.start`, `state.start`, the `start` option and the
+`start` command give it, also with no grammar.
 
 Commands that need productions report the error
 `no grammar loaded, use load`: `parse`, `parse file`,
 `internal-grammar`, `unreachable`, `grammar` and `reload`. `load`
 installs a grammar. `get`, `set`, `toggle`, `enable`, `disable`, `add`,
 `delete`, `help`, `version`, `license`, `quit` and `clear` work as
-usual. `set start foo` is stored, and the later `load` uses it.
+usual. `set start foo` stores the start symbol, and the later `load`
+uses it.
 
 The one-shot `tgf parse`, `tgf grammar` and `tgf gen` with no grammar
 report the same error and exit 1. With `--json` they print one error
