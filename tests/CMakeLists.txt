@@ -320,3 +320,11 @@ endif()
 
 include(ctest-build-tree)
 tau_require_build_tree()
+
+# Registered after tau_require_build_tree(): the self-checks run no built
+# binary, so they need no build_tree fixture.
+add_test(NAME tau_manifest_input_id
+	COMMAND ${CMAKE_COMMAND} -P
+		"${CMAKE_CURRENT_SOURCE_DIR}/tau-manifest-self-check.cmake"
+		"${PROJECT_SOURCE_DIR}/cmake/tau-manifest.cmake"
+		"${CMAKE_CURRENT_BINARY_DIR}")
