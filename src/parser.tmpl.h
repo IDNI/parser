@@ -1910,140 +1910,151 @@ void parser<C, T>::derived_class_packs(size_t nt, size_t pos, bool ad_allowed,
 }
 // default-mode build_forest — builds a pforest from a root pnode
 template <typename C, typename T>
-bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
-	if (!root.first.nt()) return false;
-	if (f.contains(root)) return false;
-	// std::cout << "build_forest for node: `" << root << "`" << std::endl;
-	//auto& nxtset = sorted_citem[root.n()][root.second[0]];
-	pnodes_set ambset, cambset;
-	std::set<pnode> snodes;
-	size_t last_p = SIZE_MAX;
-	auto check_allowed = [this](const pnode &cnode) {
-		if (g.opt.auto_disambiguate == false) return false;
-		for (auto &nt : g.opt.nodisambig_list)
-			if (cnode.first.nt() && cnode.first.n() == nt)
-				return false;
-		return true;
-	};
+bool parser<C, T>::build_forest(pforest& f, const pnode& root0) {
+	// One explicit stack replaces one C frame per child, so a long
+	// repetition does not overflow the C stack.
+	std::vector<pnode> stack{ root0 };
+	bool built = false;
+	while (!stack.empty()) {
+		pnode root = stack.back();
+		stack.pop_back();
+		if (!root.first.nt()) continue;
+		if (f.contains(root)) continue;
+		// std::cout << "build_forest for node: `" << root << "`" << std::endl;
+		//auto& nxtset = sorted_citem[root.n()][root.second[0]];
+		pnodes_set ambset, cambset;
+		std::set<pnode> snodes;
+		size_t last_p = SIZE_MAX;
+		auto check_allowed = [this](const pnode &cnode) {
+			if (g.opt.auto_disambiguate == false) return false;
+			for (auto &nt : g.opt.nodisambig_list)
+				if (cnode.first.nt() && cnode.first.n() == nt)
+					return false;
+			return true;
+		};
 
-	bool recipe = root.second[1] == root.second[0] + 1
-		&& g.uses_derived_recipe(root.first.n());
-	bool cc_free = root.second[1] == root.second[0] + 1
-		&& g.is_cc_fn(root.first.n())
-		&& !g.cc_fns.is_derived(root.first.n())
-		&& !g.is_eof_fn(root.first.n());
-	bool fallback = false;
-	if (!recipe && cc_free) {
-		auto &ccset = sorted_citem[{ root.first.n(), root.second[0] }];
-		bool has = false;
-		for (auto& cur : ccset)
-			if (cur.set == root.second[1]) { has = true; break; }
-		fallback = !has;
-	}
-	if (recipe) {
-		derived_class_packs(root.first.n(), root.second[0],
-			check_allowed(root), ambset);
-		snodes.insert(root);
-		f[root] = ambset;
-	} else if (fallback) {
-		// A predefined class that a derived class replaced.
-		ambset.insert({ pnode(lit<C, T>{ in_->tat(root.second[0]) },
-			{ root.second[0], root.second[1] } ) });
-		snodes.insert(root);
-		f[root] = ambset;
-	} else {
-		auto &nxtset = sorted_citem[{ root.first.n(), root.second[0] }];
+		bool recipe = root.second[1] == root.second[0] + 1
+			&& g.uses_derived_recipe(root.first.n());
+		bool cc_free = root.second[1] == root.second[0] + 1
+			&& g.is_cc_fn(root.first.n())
+			&& !g.cc_fns.is_derived(root.first.n())
+			&& !g.is_eof_fn(root.first.n());
+		bool fallback = false;
+		if (!recipe && cc_free) {
+			auto &ccset = sorted_citem[{ root.first.n(), root.second[0] }];
+			bool has = false;
+			for (auto& cur : ccset)
+				if (cur.set == root.second[1]) { has = true; break; }
+			fallback = !has;
+		}
+		if (recipe) {
+			derived_class_packs(root.first.n(), root.second[0],
+				check_allowed(root), ambset);
+			snodes.insert(root);
+			f[root] = ambset;
+		} else if (fallback) {
+			// A predefined class that a derived class replaced.
+			ambset.insert({ pnode(lit<C, T>{ in_->tat(root.second[0]) },
+				{ root.second[0], root.second[1] } ) });
+			snodes.insert(root);
+			f[root] = ambset;
+		} else {
+			auto &nxtset = sorted_citem[{ root.first.n(), root.second[0] }];
 
-		for (auto& cur : nxtset) {
-			// print(std::cout << "cur: ", cur) << std::endl;
-			if (cur.set != root.second[1]) continue;
-			pnode cnode(completed(cur) /*&& !negative(cur)*/
-				? g(cur.prod) : g.nt(root.first.n()),
-				{ cur.from, cur.set });
-			cambset.clear();
-			bool allowed_disambg = check_allowed(cnode);
-			if (o.binarize) binarize_comb(cur,
-							allowed_disambg ? cambset : ambset);
-			else {
-				pnodes nxtlits;
-				//std::cout << "\n" << cur.prod << " " << last_p << " " << ambset.size();
-				sbl_chd_forest(cur, nxtlits, cur.set,
-							allowed_disambg ? cambset : ambset);
-			}
-
-			// resolve ambiguity across productions, due to different earley items
-			// with different prod id
-			if (allowed_disambg) {
-				if (cambset.size()) { // any new sub forest
-					if (ambset.size() == 0) // first time if
-						last_p = cur.prod, ambset = cambset;
-					else {
-						// get the smallest one
-						if (last_p > cur.prod) ambset.clear(),
-							last_p = cur.prod,
-							ambset = cambset;
-					}
+			for (auto& cur : nxtset) {
+				// print(std::cout << "cur: ", cur) << std::endl;
+				if (cur.set != root.second[1]) continue;
+				pnode cnode(completed(cur) /*&& !negative(cur)*/
+					? g(cur.prod) : g.nt(root.first.n()),
+					{ cur.from, cur.set });
+				cambset.clear();
+				bool allowed_disambg = check_allowed(cnode);
+				if (o.binarize) binarize_comb(cur,
+								allowed_disambg ? cambset : ambset);
+				else {
+					pnodes nxtlits;
+					//std::cout << "\n" << cur.prod << " " << last_p << " " << ambset.size();
+					sbl_chd_forest(cur, nxtlits, cur.set,
+								allowed_disambg ? cambset : ambset);
 				}
 
-				snodes.insert(cnode);
+				// resolve ambiguity across productions, due to different earley items
+				// with different prod id
+				if (allowed_disambg) {
+					if (cambset.size()) { // any new sub forest
+						if (ambset.size() == 0) // first time if
+							last_p = cur.prod, ambset = cambset;
+						else {
+							// get the smallest one
+							if (last_p > cur.prod) ambset.clear(),
+								last_p = cur.prod,
+								ambset = cambset;
+						}
+					}
+
+					snodes.insert(cnode);
+				}
+				f[cnode] = ambset;
+				//std::cout << "\n A " << cur.prod << " " << last_p << " " << ambset.size();
 			}
-			f[cnode] = ambset;
-			//std::cout << "\n A " << cur.prod << " " << last_p << " " << ambset.size();
 		}
-	}
 
-	if (snodes.size() && check_allowed(*snodes.begin())) {
+		if (snodes.size() && check_allowed(*snodes.begin())) {
 
-		// resolve ambiguity if WITHIN production, where same production with same symbols
-		// of different individual span
-		std::vector<int> gi;
-		int k = 0;
-		std::vector<int> idxs;
-		for(size_t i = 0; i < ambset.size(); i++) idxs.push_back(i);
-		// smallest node count in ambset
-		int maxk = INT_MAX;
-		for(auto& pack : ambset)
-			if ((int)pack.size() < maxk) maxk = pack.size();
+			// resolve ambiguity if WITHIN production, where same production with same symbols
+			// of different individual span
+			std::vector<int> gi;
+			int k = 0;
+			std::vector<int> idxs;
+			for(size_t i = 0; i < ambset.size(); i++) idxs.push_back(i);
+			// smallest node count in ambset
+			int maxk = INT_MAX;
+			for(auto& pack : ambset)
+				if ((int)pack.size() < maxk) maxk = pack.size();
 
 
-		//choose the one with the first smallest span from upto size of
-		// smallest set in ambset
-		do {
-			gi.clear();
-			int gspan = INT_MAX;
-			for (auto packidx : idxs) {
-				auto apack = *next(ambset.begin(), packidx);
-				pnode lt = apack[k];
-				int span = lt.second[1] - lt.second[0];
-				if (gspan == span) gi.push_back(packidx);
-				if (gspan > span) gspan = span,
-						gi.clear(), gi.push_back(packidx);
+			//choose the one with the first smallest span from upto size of
+			// smallest set in ambset
+			do {
+				gi.clear();
+				int gspan = INT_MAX;
+				for (auto packidx : idxs) {
+					auto apack = *next(ambset.begin(), packidx);
+					pnode lt = apack[k];
+					int span = lt.second[1] - lt.second[0];
+					if (gspan == span) gi.push_back(packidx);
+					if (gspan > span) gspan = span,
+							gi.clear(), gi.push_back(packidx);
+				}
+				idxs.clear();
+				idxs.insert(idxs.begin(),gi.begin(),gi.end());
 			}
-			idxs.clear();
-			idxs.insert(idxs.begin(),gi.begin(),gi.end());
-		}
-		while(++k < maxk && gi.size() > 1);
+			while(++k < maxk && gi.size() > 1);
 
-		cambset.clear();
-		if (ambset.size())
-			cambset.insert(
-				gi.size()
-					? *next(ambset.begin(), gi[0])
-					: *ambset.begin());
+			cambset.clear();
+			if (ambset.size())
+				cambset.insert(
+					gi.size()
+						? *next(ambset.begin(), gi[0])
+						: *ambset.begin());
 
-	//std::cout <<" camb "<< cambset.size() << std::endl;
-		if (snodes.size()) {
-			DBG(assert(snodes.size() == 1));
-			f[*snodes.begin()] = cambset;
+		//std::cout <<" camb "<< cambset.size() << std::endl;
+			if (snodes.size()) {
+				DBG(assert(snodes.size() == 1));
+				f[*snodes.begin()] = cambset;
+			}
+		//std::cout << gi.size() << std::endl;
 		}
-	//std::cout << gi.size() << std::endl;
+
+		const pnodes_set& chosen =
+			(snodes.size() && check_allowed(*snodes.begin()))
+			? cambset : ambset;
+		for (auto pit = chosen.rbegin(); pit != chosen.rend(); ++pit)
+			for (auto nit = pit->rbegin(); nit != pit->rend(); ++nit)
+				stack.push_back(*nit);
+		built = true;
 	}
-
-	for (auto& aset : (snodes.size() && check_allowed(*snodes.begin()))
-			? cambset : ambset)
-		for (const auto &nxt : aset) build_forest(f, nxt);
-
-	return true;
+	return built;
 }
 
 template <typename C, typename T>

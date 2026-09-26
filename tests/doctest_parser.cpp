@@ -7,6 +7,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 #include "parser.h"
+#include "format/json/json.h"
 
 #include <sstream>
 
@@ -1540,4 +1541,43 @@ TEST_SUITE("auto-disambiguation") {
 		CHECK(amb.size() >= 1);
 	}
 
+}
+
+// ---------------------------------------------------------------------------
+// Regression: forest_path on a long input must not overflow the C stack.
+// ---------------------------------------------------------------------------
+TEST_SUITE("forest_path: long input") {
+
+	using jp_t = parser<char, char32_t>;
+
+	// Iterative terminal walk: a recursive one overflows on a long string.
+	static size_t terminal_count(tref n) {
+		size_t count = 0;
+		std::vector<tref> stack{ n };
+		while (!stack.empty()) {
+			tref cur = stack.back();
+			stack.pop_back();
+			if (!cur) continue;
+			const auto& t = jp_t::tree::get(cur);
+			if (!t.value.first.nt() && t.value.first.t()) ++count;
+			for (tref c : t.children()) stack.push_back(c);
+		}
+		return count;
+	}
+
+	TEST_CASE("a 64000 character JSON string builds a forest tree") {
+		string in = "\"";
+		in.append(64000, 'a');
+		in.push_back('\"');
+		auto& g = json_parser_data::grammar;
+		jp_t p(g, json_parser_data::make_parser_options());
+		auto r = p.parse(in.data(), in.size(),
+			{ .tree_path = parse_tree_path::forest_path,
+			  .enable_gc = false, .gc_lag = 1 });
+		REQUIRE(r.found);
+		tref t = r.get_shaped_tree2();
+		REQUIRE(t != nullptr);
+		// the shaped tree keeps the 64000 content characters
+		CHECK(terminal_count(t) == 64000);
+	}
 }
