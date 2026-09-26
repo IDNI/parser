@@ -45,8 +45,10 @@ enable_cmd     => ("en"  __ | "enable"  __)      :enable_sym  bool_option.
 disable_cmd    => ("dis" __ | "disable" __)      :disable_sym bool_option.
 set_cmd        => "set"                          :set_sym __ (
                           bool_option (__ | _ '=' _) bool_value
-                        | list_option (__ | _ '=' _) symbol_list
-                        | treepaths_option (__ | _ '=' _) treepath_list
+                        | list_option ( _ '=' _ [ symbol_list ]
+                                      | [ __ symbol_list ] )
+                        | treepaths_option ( _ '=' _ [ treepath_list ]
+                                      | [ __ treepath_list ] )
                         | enum_ev_option (__ | _ '=' _) error_verbosity).
 
 parse_input            => quoted_string

@@ -6,6 +6,7 @@
 
 #include <functional>
 #include <memory>
+#include <ostream>
 #include <set>
 #include <string>
 #include <vector>
@@ -17,6 +18,7 @@
 #ifdef TAU_PARSER_HAS_FTXUI
 #include "../utility/repl_ftxui.h"
 #endif
+#include "format/json/json.h"
 #include "tgf_repl_parser.generated.h"
 #include "tgf_cli_options.h"
 
@@ -30,6 +32,42 @@ cli::options tgf_options();
 
 /// TGF commands, their options and descriptions
 cli::commands tgf_commands();
+
+/// Status of one command, or of one request text as a whole.
+enum class cmd_status { ok, error, incomplete, quit };
+
+/// Symbolic name of @p s: "ok", "error", "incomplete" or "quit".
+const char* cmd_status_name(cmd_status s);
+
+/// Result of one statement.
+struct cmd_result {
+	std::string cmd;                        // long name: "set", "parse file"
+	cmd_status status = cmd_status::ok;
+	format::json::value data = format::json::value::object();
+	std::string text;   // text mode only: colored output of parse,
+			    // internal-grammar and unreachable
+	diagnostics::report report;
+};
+
+/// Result of one request text (one or more statements).
+struct eval_result {
+	cmd_status status = cmd_status::ok;
+	std::vector<cmd_result> results;
+	diagnostics::report report;   // errors in the command text itself
+};
+
+/// One row for each REPL option, used by get_cmd() and render_text().
+enum class option_kind { boolean, string_value, list, treepaths };
+
+struct option_desc {
+	size_t nt;          // tgf_repl_parser nonterminal
+	const char* name;   // long name and JSON key: "print-graphs"
+	const char* label;  // text label get prints: "print-graphs:  "
+	option_kind kind;   // value shape of this option
+};
+
+/// The option row for @p name, or nullptr when no option has that name.
+const option_desc* option_desc_by_name(std::string_view name);
 
 struct tgf_repl_evaluator {
 	friend struct repl<tgf_repl_evaluator>;
@@ -60,6 +98,9 @@ struct tgf_repl_evaluator {
 		bool tml_rules          = false;
 		bool tml_facts          = false;
 		bool print_json         = false;
+		/// True when the evaluator is driven as a JSON API: no colors,
+		/// no output on cout or cerr.
+		bool json_api           = false;
 		bool measure            = false;
 		bool measure_each_pos   = false;
 #ifdef TAU_PARSER_MEASURE_SCOPES
@@ -76,7 +117,6 @@ struct tgf_repl_evaluator {
 		bool auto_disambiguate = true;
 		/// True when the user passed --auto-disambiguate on the command line.
 		bool auto_disambiguate_user_set = false;
-		std::set<std::string> nodisambig_list{};
 		std::set<std::string> to_trim{};
 		std::set<std::string> dont_trim_terminals_of{};
 		std::set<std::string> to_trim_children{};
@@ -103,31 +143,56 @@ struct tgf_repl_evaluator {
 
 	[[nodiscard]] const std::string& filename() const noexcept;
 	[[nodiscard]] const std::string& source() const noexcept;
+	[[nodiscard]] const std::string& start_symbol() const noexcept;
 	[[nodiscard]] bool has_fixed_grammar() const noexcept;
 
-	bool reload();
+	/// Move the pending report out and clear it. The JSON front end uses
+	/// it for the hello line, which carries the grammar-load report.
+	diagnostics::report take_report();
+
 	bool reload(const std::string& new_tgf_file);
 
 	void flush_report();
 	void set_repl(repl<tgf_repl_evaluator>& r_);
 	void reprompt();
 
-	idni::diagnostics::result<int> eval(const trv& n);
+	/// Run one statement and return its data. Writes nothing to cout or
+	/// cerr; errors and warnings go into the returned report.
+	cmd_result run(const trv& n);
+	/// Run one request text. @p each runs after each statement, so the
+	/// text REPL prints and flushes in the current order.
+	eval_result run(const std::string& src,
+		const std::function<void(cmd_result&)>& each = {});
+
+	/// Render @p r as text. Success output is byte-identical to REPL text.
+	void render_text(const cmd_result& r, std::ostream& os) const;
+
 	idni::diagnostics::result<int> eval(const std::string& src);
 
-	void parse(const char* input, size_t size);
-	void parse(std::istream& instream);
-	void parse(const std::string& infile);
-	void parsed(parser_type::result& r);
+	/// Option value as JSON, by option nonterminal.
+	format::json::value option_value(size_t o) const;
+	/// All 23 REPL options as one object, in the order get prints them.
+	format::json::value option_values() const;
 
-	void get_cmd(const trv& n);
-	void set_cmd(const trv& n);
-	void add_cmd(const trv& n);
-	void del_cmd(const trv& n);
-	void update_bool_opt_cmd(const trv& n,
+	format::json::value parsed(parser_type::result& r, std::string& text);
+	format::json::value parse(const char* input, size_t size,
+		std::string& text);
+	format::json::value parse(std::istream& instream, std::string& text);
+	format::json::value parse(const std::string& infile,
+		std::string& text);
+
+	format::json::value get_cmd(const trv& n);
+	format::json::value set_cmd(const trv& n);
+	format::json::value add_cmd(const trv& n);
+	format::json::value del_cmd(const trv& n);
+	format::json::value update_bool_opt_cmd(const trv& n,
 		const std::function<bool(bool&)>& update_fn);
 
 	std::vector<std::string> treepath(const trv& tp) const;
+	/// Shaping options from the REPL lists in opt. update_opts_by_grammar_opts()
+	/// fills them from the grammar lists.
+	shaping_options shaping();
+
 	void update_opts_by_grammar_opts();
 	void apply_auto_disambiguate();
 
@@ -137,6 +202,14 @@ struct tgf_repl_evaluator {
 
 	size_t nt_id(const std::string& s);
 	std::string nt_name(size_t id) const;
+
+	/// One string for the production at index @p p, with no colors and
+	/// no node ids, for example "expr => expr '+' term.".
+	std::string production_string(size_t p) const;
+	/// One entry of the production_ids array that parallels a
+	/// productions array: index, head id, conjunct literal ids, guard
+	/// and conjunctive.
+	format::json::value production_id_entry(size_t p) const;
 
 private:
 	options opt;
@@ -157,7 +230,12 @@ private:
 	parser_type* p_ = nullptr;
 
 	bool load_file(const std::string& filename);
-	void print_source() const;
+	/// Load a grammar file and adopt it, without printing. @p new_tgf_file
+	/// is the file to load; on success tgf_filename names it.
+	bool load_grammar(const std::string& new_tgf_file);
+	/// Data of the load and reload commands: {"grammar", "loaded"}.
+	format::json::value reload_data(const std::string& new_tgf_file);
+	void print_source(std::ostream& os) const;
 };
 
 /// Specialized parser entry point (compiled-in grammar; no load/reload)
@@ -165,6 +243,29 @@ int tgf_specialized_run(int argc, char** argv,
 	tgf_repl_evaluator::parser_type& parser,
 	const char* display_name,
 	const char* grammar_source);
+
+/// Run the JSON request loop on @p in until end of input or a quit
+/// request. Writes one response line per request and flushes each.
+int tgf_json_loop(tgf_repl_evaluator& re, std::istream& in,
+	std::ostream& out);
+
+/// Write @p v as one JSON line and flush.
+void json_write_line(std::ostream& os, const format::json::value& v);
+
+/// The {"grammar","start"} state object that every response carries.
+format::json::value state_value(const tgf_repl_evaluator& re);
+
+/// Response of one eval request: {"id","status","results":[...],
+/// "state":{...},"report"}.
+format::json::value json_eval_response(const format::json::value& id,
+	const eval_result& er, const format::json::value& state);
+
+/// Response of one one-shot CLI command: {"status","result",
+/// "state":{...},"report"}.
+format::json::value json_result_response(cmd_status status,
+	const format::json::value& result,
+	const format::json::value& state,
+	const diagnostics::report& report);
 
 } // namespace idni
 

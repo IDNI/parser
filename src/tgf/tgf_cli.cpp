@@ -24,12 +24,253 @@
 #endif
 #include "defs.h"
 #include "format/json/json.h"
+#include "format/ast.json/ast_json.h"
 
 namespace idni {
 
 using namespace std;
 
 using tt = tgf_repl_parser::tree::traverser;
+
+// The REPL option table, keyed by option nonterminal so iteration runs in
+// the ascending nonterminal order that get prints. The label is the text
+// that get prints before each value.
+static const map<size_t, option_desc> option_table = {
+{ tgf_repl_parser::error_verbosity_opt, {
+	tgf_repl_parser::error_verbosity_opt,
+	"error-verbosity", "error-verbosity:        ",
+	option_kind::string_value } },
+{ tgf_repl_parser::status_opt, {
+	tgf_repl_parser::status_opt,
+	"status", "show status:            ",
+	option_kind::boolean } },
+{ tgf_repl_parser::colors_opt, {
+	tgf_repl_parser::colors_opt,
+	"colors", "colors:                 ",
+	option_kind::boolean } },
+{ tgf_repl_parser::print_ambiguity_opt, {
+	tgf_repl_parser::print_ambiguity_opt,
+	"print-ambiguity", "print-ambiguity:        ",
+	option_kind::boolean } },
+{ tgf_repl_parser::print_graphs_opt, {
+	tgf_repl_parser::print_graphs_opt,
+	"print-graphs", "print-graphs:           ",
+	option_kind::boolean } },
+{ tgf_repl_parser::print_rules_opt, {
+	tgf_repl_parser::print_rules_opt,
+	"print-rules", "print-rules:            ",
+	option_kind::boolean } },
+{ tgf_repl_parser::print_facts_opt, {
+	tgf_repl_parser::print_facts_opt,
+	"print-facts", "print-facts:            ",
+	option_kind::boolean } },
+{ tgf_repl_parser::print_terminals_opt, {
+	tgf_repl_parser::print_terminals_opt,
+	"print-terminals", "print-terminals:        ",
+	option_kind::boolean } },
+{ tgf_repl_parser::measure_parsing_opt, {
+	tgf_repl_parser::measure_parsing_opt,
+	"measure-parsing", "measure-parsing:        ",
+	option_kind::boolean } },
+{ tgf_repl_parser::measure_each_pos_opt, {
+	tgf_repl_parser::measure_each_pos_opt,
+	"measure-each-pos", "measure-each:           ",
+	option_kind::boolean } },
+{ tgf_repl_parser::measure_forest_opt, {
+	tgf_repl_parser::measure_forest_opt,
+	"measure-forest", "measure-forest:         ",
+	option_kind::boolean } },
+{ tgf_repl_parser::measure_preprocess_opt, {
+	tgf_repl_parser::measure_preprocess_opt,
+	"measure-preprocess", "measure-preprocess:     ",
+	option_kind::boolean } },
+{ tgf_repl_parser::gc_opt, {
+	tgf_repl_parser::gc_opt,
+	"gc", "gc:                     ",
+	option_kind::boolean } },
+{ tgf_repl_parser::debug_opt, {
+	tgf_repl_parser::debug_opt,
+	"debug", "show debug:             ",
+	option_kind::boolean } },
+{ tgf_repl_parser::auto_disambiguate_opt, {
+	tgf_repl_parser::auto_disambiguate_opt,
+	"auto-disambiguate", "auto-disambiguate:      ",
+	option_kind::boolean } },
+{ tgf_repl_parser::trim_terminals_opt, {
+	tgf_repl_parser::trim_terminals_opt,
+	"trim-terminals", "trim-terminals:         ",
+	option_kind::boolean } },
+{ tgf_repl_parser::inline_cc_opt, {
+	tgf_repl_parser::inline_cc_opt,
+	"inline-char-classes", "inline-char-classes:    ",
+	option_kind::boolean } },
+{ tgf_repl_parser::derive_char_classes_opt, {
+	tgf_repl_parser::derive_char_classes_opt,
+	"derive-char-classes", "derive-char-classes:    ",
+	option_kind::boolean } },
+{ tgf_repl_parser::nodisambig_list_opt, {
+	tgf_repl_parser::nodisambig_list_opt,
+	"nodisambig-list", "nodisambig-list:        ",
+	option_kind::list } },
+{ tgf_repl_parser::enabled_prods_opt, {
+	tgf_repl_parser::enabled_prods_opt,
+	"enabled-productions", "enabled_productions:    ",
+	option_kind::list } },
+{ tgf_repl_parser::trim_opt, {
+	tgf_repl_parser::trim_opt,
+	"trim", "trim:                   ",
+	option_kind::list } },
+{ tgf_repl_parser::trim_children_opt, {
+	tgf_repl_parser::trim_children_opt,
+	"trim-children", "trim-children:          ",
+	option_kind::list } },
+{ tgf_repl_parser::trim_children_terminals_opt, {
+	tgf_repl_parser::trim_children_terminals_opt,
+	"trim-children-terminals", "trim-children-terminals:",
+	option_kind::list } },
+{ tgf_repl_parser::inline_opt, {
+	tgf_repl_parser::inline_opt,
+	"inline", "inline:                 ",
+	option_kind::treepaths } },
+};
+
+static const option_desc* find_option(size_t nt) {
+	auto it = option_table.find(nt);
+	return it == option_table.end() ? nullptr : &it->second;
+}
+
+const option_desc* option_desc_by_name(std::string_view name) {
+	for (const auto& [_, d] : option_table)
+		if (name == d.name) return &d;
+	return nullptr;
+}
+
+static format::json::value range_value(const std::array<size_t, 2>& range) {
+	using value = format::json::value;
+	value v = value::array();
+	v.push_back(value::number(static_cast<double>(range[0])));
+	v.push_back(value::number(static_cast<double>(range[1])));
+	return v;
+}
+
+// Text form of an option value: on/off, a list joined with ", ", tree
+// paths joined with " > ", or the error-verbosity name.
+static std::string option_text(const format::json::value& v) {
+	if (v.is_bool()) return v.as_bool() ? "on" : "off";
+	if (v.is_string()) return v.as_string();
+	if (!v.is_array()) return {};
+	if (v.size() == 0) return "(empty)";
+	std::stringstream ss;
+	bool first = true;
+	for (const auto& e : v) {
+		ss << (first ? first = false, "" : ", ");
+		if (e.is_array()) {
+			bool first_s = true;
+			for (const auto& s : e)
+				ss << (first_s ? first_s = false, "" : " > ")
+					<< s.as_string();
+		} else ss << e.as_string();
+	}
+	return ss.str();
+}
+
+static format::json::value strings_value(const std::set<std::string>& l) {
+	using value = format::json::value;
+	value v = value::array();
+	for (const auto& s : l) v.push_back(value::string(s));
+	return v;
+}
+
+static format::json::value treepaths_value(
+	const std::set<std::vector<std::string>>& l)
+{
+	using value = format::json::value;
+	value v = value::array();
+	for (const auto& tp : l) {
+		value p = value::array();
+		for (const auto& s : tp) p.push_back(value::string(s));
+		v.push_back(std::move(p));
+	}
+	return v;
+}
+
+static const char* verbosity_name(
+	tgf_repl_evaluator::parser_type::error::info_lvl v)
+{
+	using lvl = tgf_repl_evaluator::parser_type::error::info_lvl;
+	switch (v) {
+	case lvl::INFO_BASIC:      return "basic";
+	case lvl::INFO_DETAILED:   return "detailed";
+	case lvl::INFO_ROOT_CAUSE: return "root-cause";
+	default:                   return "unknown";
+	}
+}
+
+// Long command name for a command nonterminal.
+static const char* command_name(size_t nt) {
+	using p = tgf_repl_parser;
+	switch (nt) {
+	case p::parse_cmd:       return "parse";
+	case p::parse_file_cmd:  return "parse file";
+	case p::grammar_cmd:     return "grammar";
+	case p::igrammar_cmd:    return "internal-grammar";
+	case p::start_cmd:       return "start";
+	case p::unreachable_cmd: return "unreachable";
+	case p::reload_cmd:      return "reload";
+	case p::load_cmd:        return "load";
+	case p::help_cmd:        return "help";
+	case p::version_cmd:     return "version";
+	case p::license_cmd:     return "license";
+	case p::quit_cmd:        return "quit";
+	case p::clear_cmd:       return "clear";
+	case p::get_cmd:         return "get";
+	case p::set_cmd:         return "set";
+	case p::toggle_cmd:      return "toggle";
+	case p::enable_cmd:      return "enable";
+	case p::disable_cmd:     return "disable";
+	case p::add_cmd:         return "add";
+	case p::del_cmd:         return "delete";
+	default:                 return "";
+	}
+}
+
+// Long command name for a help argument nonterminal.
+static const char* help_arg_name(size_t nt) {
+	using p = tgf_repl_parser;
+	switch (nt) {
+	case p::grammar_sym:     return "grammar";
+	case p::igrammar_sym:    return "internal-grammar";
+	case p::unreachable_sym: return "unreachable";
+	case p::start_sym:       return "start";
+	case p::parse_sym:       return "parse";
+	case p::parse_file_sym:  return "parse file";
+	case p::load_sym:        return "load";
+	case p::reload_sym:      return "reload";
+	case p::clear_sym:       return "clear";
+	case p::help_sym:        return "help";
+	case p::quit_sym:        return "quit";
+	case p::version_sym:     return "version";
+	case p::license_sym:     return "license";
+	case p::get_sym:         return "get";
+	case p::set_sym:         return "set";
+	case p::add_sym:         return "add";
+	case p::del_sym:         return "delete";
+	case p::toggle_sym:      return "toggle";
+	case p::enable_sym:      return "enable";
+	case p::disable_sym:     return "disable";
+	default:                 return "help";
+	}
+}
+
+const char* cmd_status_name(cmd_status s) {
+	switch (s) {
+	case cmd_status::ok:         return "ok";
+	case cmd_status::error:      return "error";
+	case cmd_status::incomplete: return "incomplete";
+	case cmd_status::quit:       return "quit";
+	}
+	return "ok";
+}
 
 static void print_diagnostics_report(
 	const idni::diagnostics::report& report,
@@ -69,12 +310,12 @@ static void print_bintree_process_totals() {
 	size_t distinct_hashes = 0, largest_group_size = 0;
 	std::array<size_t, 5> top_group_sizes{}, top_group_triples{};
 	size_t distinct_values = 0, distinct_child_pairs = 0, leaf_count = 0;
-	std::vector<std::string> sample_values;
+	std::vector<tree_t::hash_group_sample> samples;
 	size_t stale_hash_count = 0, largest_group_stale_count = 0;
 	std::uint64_t largest_group_hash = 0;
 	tree_t::hash_group_stats(distinct_hashes, largest_group_size,
 		top_group_sizes, top_group_triples, distinct_values,
-		distinct_child_pairs, leaf_count, sample_values,
+		distinct_child_pairs, leaf_count, samples,
 		stale_hash_count, largest_group_hash,
 		largest_group_stale_count);
 	cout << "bintree M() hash groups: distinct hashes: " << distinct_hashes
@@ -89,12 +330,92 @@ static void print_bintree_process_totals() {
 		<< distinct_child_pairs << ", leaf count: " << leaf_count
 		<< "\n";
 	cout << "bintree M() largest hash group sample values:";
-	for (auto& s : sample_values) cout << " [" << s << "]";
+	for (const auto& s : samples)
+		cout << " [" << s.value
+			<< " (l=" << (s.left == nullptr ? "null" : "set")
+			<< ", r=" << (s.right == nullptr ? "null" : "set")
+			<< ") stored hash=" << s.stored_hash
+			<< " recomputed hash=" << s.recomputed_hash << "]";
 	cout << "\n";
 	cout << "bintree M() stale hash check: stale_hash_count (whole map): "
 		<< stale_hash_count << ", largest_group_hash: "
 		<< largest_group_hash << ", largest_group_stale_count: "
 		<< largest_group_stale_count << "\n";
+}
+
+// The same bintree counters as print_bintree_process_totals(), as JSON
+// numbers for the --json data under bintree_totals.
+static format::json::value bintree_process_totals_value() {
+	using tree_t = tgf_repl_evaluator::parser_type::tree;
+	using value = format::json::value;
+	size_t buckets = 0, entries = 0, max_chain = 0;
+	double load_factor = 0.0, mean_chain = 0.0;
+	std::array<size_t, 8> chain_len_histogram{};
+	tree_t::bucket_stats(buckets, entries, load_factor, max_chain,
+		mean_chain, &chain_len_histogram);
+	size_t distinct_hashes = 0, largest_group_size = 0;
+	std::array<size_t, 5> top_group_sizes{}, top_group_triples{};
+	size_t distinct_values = 0, distinct_child_pairs = 0, leaf_count = 0;
+	std::vector<tree_t::hash_group_sample> samples;
+	size_t stale_hash_count = 0, largest_group_stale_count = 0;
+	std::uint64_t largest_group_hash = 0;
+	tree_t::hash_group_stats(distinct_hashes, largest_group_size,
+		top_group_sizes, top_group_triples, distinct_values,
+		distinct_child_pairs, leaf_count, samples,
+		stale_hash_count, largest_group_hash,
+		largest_group_stale_count);
+	auto n = [](size_t x) { return value::number(
+		static_cast<double>(x)); };
+	// A 64-bit hash exceeds the exact JSON number range, so it is text.
+	auto h = [](std::uint64_t x) {
+		return value::string(std::to_string(x)); };
+	static constexpr const char* bin_names[8] = {
+		"0", "1", "2", "3", "4-7", "8-15", "16-63", "64+" };
+	auto histogram = value::object();
+	for (size_t i = 0; i != 8; ++i)
+		histogram.set(bin_names[i], n(chain_len_histogram[i]));
+	auto top_groups = value::array();
+	for (size_t i = 0; i != 5; ++i)
+		top_groups.push_back(value::object()
+			.set("size", n(top_group_sizes[i]))
+			.set("triples", n(top_group_triples[i])));
+	auto sample_arr = value::array();
+	for (const auto& s : samples) {
+		auto e = value::object();
+		e.set("value", value::string(s.value.first.to_std_string()));
+		auto range = value::array();
+		range.push_back(n(s.value.second[0]));
+		range.push_back(n(s.value.second[1]));
+		e.set("range", std::move(range));
+		e.set("left", s.left == nullptr ? value::null()
+			: h(tree_t::get(s.left).hash));
+		e.set("right", s.right == nullptr ? value::null()
+			: h(tree_t::get(s.right).hash));
+		e.set("stored_hash", h(s.stored_hash));
+		e.set("recomputed_hash", h(s.recomputed_hash));
+		sample_arr.push_back(std::move(e));
+	}
+	value v = value::object();
+	v.set("get_hits", n(tree_t::get_hits()))
+	 .set("get_misses", n(tree_t::get_misses()))
+	 .set("geth_calls", n(tree_t::geth_calls()))
+	 .set("buckets", n(buckets))
+	 .set("entries", n(entries))
+	 .set("load_factor", value::number(load_factor))
+	 .set("max_chain", n(max_chain))
+	 .set("mean_chain", value::number(mean_chain))
+	 .set("distinct_hashes", n(distinct_hashes))
+	 .set("largest_group_size", n(largest_group_size))
+	 .set("distinct_values", n(distinct_values))
+	 .set("distinct_child_pairs", n(distinct_child_pairs))
+	 .set("leaf_count", n(leaf_count))
+	 .set("stale_hash_count", n(stale_hash_count))
+	 .set("largest_group_hash", h(largest_group_hash))
+	 .set("largest_group_stale_count", n(largest_group_stale_count))
+	 .set("chain_length_histogram", std::move(histogram))
+	 .set("top_hash_groups", std::move(top_groups))
+	 .set("largest_group_samples", std::move(sample_arr));
+	return v;
 }
 
 static void print_version() {
@@ -145,25 +466,35 @@ const std::string& tgf_repl_evaluator::source() const noexcept {
 	return grammar_source;
 }
 
+const std::string& tgf_repl_evaluator::start_symbol() const noexcept {
+	return opt.start;
+}
+
 bool tgf_repl_evaluator::has_fixed_grammar() const noexcept {
 	return fixed_grammar;
 }
 
-void tgf_repl_evaluator::print_source() const {
-	cout << "grammar:\n";
+diagnostics::report tgf_repl_evaluator::take_report() {
+	diagnostics::report r = std::move(report);
+	report.clear();
+	return r;
+}
+
+void tgf_repl_evaluator::print_source(ostream& os) const {
+	os << "grammar:\n";
 	if (!grammar_source.empty()) {
-		cout << grammar_source << "\n\n";
+		os << grammar_source << "\n\n";
 		return;
 	}
 
 	ifstream f(tgf_filename);
 	if (!f) {
-		cout << "error: could not open file: " << tgf_filename << "\n";
+		os << "error: could not open file: " << tgf_filename << "\n";
 		return;
 	}
 	string line;
-	while (getline(f, line)) cout << line << "\n";
-	cout << "\n";
+	while (getline(f, line)) os << line << "\n";
+	os << "\n";
 }
 
 void tgf_repl_evaluator::reprompt() {
@@ -273,65 +604,96 @@ void tgf_repl_evaluator::set_repl(repl<tgf_repl_evaluator>& r_) {
 	reprompt();
 }
 
-void tgf_repl_evaluator::parsed(parser_type::result& r) {
+format::json::value tgf_repl_evaluator::parsed(parser_type::result& r,
+	std::string& text)
+{
+	using value = format::json::value;
 	if (!r.good() || !r.found) {
 		report.append(std::move(r.report()));
-		return;
+		return value::object();
 	}
 	auto f = r.get_forest();
-	stringstream ss;
-	if (opt.print_input) ss << "input: \"" << r.get_input() << "\"\n";
-	if (opt.print_ambiguity) r.print_ambiguous_nodes(ss);
-	if (opt.print_terminals) ss << "parsed terminals: "
-		<< TC_T << to_std_string(r.get_terminals())
-		<< TC_CLEARED_DEFAULT << "\n";
 	using c_t = parser_type::char_type;
 	using t_t = parser_type::terminal_type;
-	auto cb_next_g = [&r, &ss, this](parser_type::pgraph& g) {
-		r.inline_grammar_transformations(g);
-		//if (opt.print_graphs) pretty_print(ss << "parsed graph:\n",
-		//	t, {}, false, 1);
-		if (opt.tml_rules) to_tml_rules<c_t, t_t, parser_type::pgraph>(
-			ss << "TML rules:\n", g), ss << "\n";
-		return true;
-	};
-	if (opt.tml_rules) f->extract_graphs(f->root(), cb_next_g);
-	if (opt.tml_facts) to_tml_facts<c_t, t_t>(ss << "TML facts:\n", r);
-	if (opt.print_graphs) {
-		auto str2ntids = [this](const set<string>& list) {
-			set<size_t> r;
-			for (const auto& s : list) r.insert(nt_id(s));
-			return r;
+	if (!opt.json_api) {
+		stringstream ss;
+		if (opt.print_input) ss << "input: \"" << r.get_input() << "\"\n";
+		if (opt.print_ambiguity) r.print_ambiguous_nodes(ss);
+		if (opt.print_terminals) ss << "parsed terminals: "
+			<< TC_T << to_std_string(r.get_terminals())
+			<< TC_CLEARED_DEFAULT << "\n";
+		auto cb_next_g = [&r, &ss, this](parser_type::pgraph& g) {
+			r.inline_grammar_transformations(g);
+			if (opt.tml_rules) to_tml_rules<c_t, t_t,
+				parser_type::pgraph>(ss << "TML rules:\n", g),
+				ss << "\n";
+			return true;
 		};
-		shaping_options sopt;
-		sopt.trim_terminals = g().opt.shaping.trim_terminals;
-		sopt.inline_char_classes = g().opt.shaping.inline_char_classes;
-		if (opt.to_trim.size()) sopt.to_trim = str2ntids(opt.to_trim);
-		else sopt.to_trim = g().opt.shaping.to_trim;
-		sopt.to_trim_children = opt.to_trim_children.size()
-			? str2ntids(opt.to_trim_children)
-			: g().opt.shaping.to_trim_children;
-		sopt.dont_trim_terminals_of = opt.dont_trim_terminals_of.size()
-			? str2ntids(opt.dont_trim_terminals_of)
-			: g().opt.shaping.dont_trim_terminals_of;
-		sopt.to_trim_children_terminals =
-				opt.to_trim_children_terminals.size()
-			? str2ntids(opt.to_trim_children_terminals)
-			: g().opt.shaping.to_trim_children_terminals;
-		if (opt.to_inline.size()) {
-			for (const auto& tp : opt.to_inline) {
-				vector<size_t> v;
-				for (const auto& s : tp)
-					v.push_back(nt_id(s));
-				sopt.to_inline.insert(v);
-			}
-		}
-		else sopt.to_inline = g().opt.shaping.to_inline;
-		pretty_print(ss << "parsed graph:\n",
-			r.get_shaped_tree2(sopt), {}, false, 1);
+		if (opt.tml_rules) f->extract_graphs(f->root(), cb_next_g);
+		if (opt.tml_facts) to_tml_facts<c_t, t_t>(
+			ss << "TML facts:\n", r);
+		if (opt.print_graphs) pretty_print(ss << "parsed graph:\n",
+			r.get_shaped_tree2(shaping()), {}, false, 1);
+		text = ss.str();
+		report.append(std::move(r.report()));
+		return value::object();
 	}
-	cout << ss.str();
+	auto v = value::object();
+	if (opt.print_input) v.set("input", value::string(r.get_input()));
+	if (opt.print_ambiguity) {
+		auto amb = value::object();
+		amb.set("trees", value::number(
+			static_cast<double>(r.count_trees())));
+		auto nodes = value::array();
+		for (const auto& [n, alts] : r.ambiguous_nodes()) {
+			auto a = value::object();
+			a.set("symbol", value::string(
+				n.first.to_std_string()))
+			 .set("id", value::number(
+				static_cast<double>(n.first.n())))
+			 .set("range", range_value(n.second));
+			auto alts_arr = value::array();
+			for (const auto& ns : alts) {
+				auto alt = value::object();
+				auto children = value::array();
+				for (const auto& child : ns) {
+					tref t = r.get_tree2(child);
+					if (t) children.push_back(
+						format::ast_json::
+							node_to_value<tree>(t));
+				}
+				alt.set("children", std::move(children));
+				alts_arr.push_back(std::move(alt));
+			}
+			a.set("alternatives", std::move(alts_arr));
+			nodes.push_back(std::move(a));
+		}
+		amb.set("nodes", std::move(nodes));
+		v.set("ambiguous", std::move(amb));
+	}
+	if (opt.print_terminals) v.set("terminals",
+		value::string(to_std_string(r.get_terminals())));
+	if (opt.tml_rules) {
+		stringstream ss;
+		auto cb_next_g = [&r, &ss](parser_type::pgraph& g) {
+			r.inline_grammar_transformations(g);
+			to_tml_rules<c_t, t_t, parser_type::pgraph>(
+				ss << "TML rules:\n", g), ss << "\n";
+			return true;
+		};
+		f->extract_graphs(f->root(), cb_next_g);
+		v.set("tml_rules", value::string(ss.str()));
+	}
+	if (opt.tml_facts) {
+		stringstream ss;
+		to_tml_facts<c_t, t_t>(ss << "TML facts:\n", r);
+		v.set("tml_facts", value::string(ss.str()));
+	}
+	if (opt.print_graphs) v.set("tree",
+		format::ast_json::node_to_value<tree>(
+			r.get_shaped_tree2(shaping())));
 	report.append(std::move(r.report()));
+	return v;
 }
 
 tgf_repl_evaluator::parser_type::parse_options
@@ -345,7 +707,8 @@ tgf_repl_evaluator::parser_type::parse_options
 		.measure_preprocess = opt.measure_preprocess,
 		.debug              = opt.debug,
 		.error_verbosity    = opt.error_verbosity,
-		.tree_path          = opt.tree_path
+		.tree_path          = opt.tree_path,
+		.enable_gc          = opt.gc
 	};
 	if (opt.measure) { /// `opt.measure` is a master ENABLE for now
 		po.measure_scopes       = true;
@@ -356,26 +719,104 @@ tgf_repl_evaluator::parser_type::parse_options
 	return po;
 }
 
-void tgf_repl_evaluator::parse(const char* input, size_t size) {
-	if (!good()) return;
-	//cout << "parsing: " << input << "\n";
+format::json::value tgf_repl_evaluator::parse(const char* input, size_t size,
+	std::string& text)
+{
+	if (!good()) return format::json::value::object();
 	auto po = get_parse_options();
 	auto r = p().parse(input, size, po);
-	parsed(r);
+	return parsed(r, text);
 }
 
-void tgf_repl_evaluator::parse(istream& instream) {
-	if (!good()) return;
+format::json::value tgf_repl_evaluator::parse(istream& instream,
+	std::string& text)
+{
+	if (!good()) return format::json::value::object();
 	auto po = get_parse_options();
 	auto r = p().parse(instream, po);
-	parsed(r);
+	return parsed(r, text);
 }
 
-void tgf_repl_evaluator::parse(const string& infile) {
-	if (!good()) return;
+format::json::value tgf_repl_evaluator::parse(const string& infile,
+	std::string& text)
+{
+	if (!good()) return format::json::value::object();
 	auto po = get_parse_options();
 	auto r = p().parse(infile, po);
-	parsed(r);
+	return parsed(r, text);
+}
+
+shaping_options tgf_repl_evaluator::shaping() {
+	auto str2ntids = [this](const set<string>& list) {
+		set<size_t> r;
+		for (const auto& s : list) r.insert(nt_id(s));
+		return r;
+	};
+	shaping_options sopt;
+	sopt.trim_terminals = g().opt.shaping.trim_terminals;
+	sopt.inline_char_classes = g().opt.shaping.inline_char_classes;
+	sopt.to_trim = str2ntids(opt.to_trim);
+	sopt.to_trim_children = str2ntids(opt.to_trim_children);
+	sopt.dont_trim_terminals_of = str2ntids(opt.dont_trim_terminals_of);
+	sopt.to_trim_children_terminals =
+		str2ntids(opt.to_trim_children_terminals);
+	for (const auto& tp : opt.to_inline) {
+		vector<size_t> v;
+		for (const auto& s : tp) v.push_back(nt_id(s));
+		sopt.to_inline.insert(v);
+	}
+	return sopt;
+}
+
+std::string tgf_repl_evaluator::production_string(size_t p) const {
+	std::string s = g()(p).to_std_string();
+	s += " =>";
+	size_t j = 0;
+	for (const auto& c : g()[p]) {
+		if (j++ != 0) s += " &";
+		if (c.neg) s += " ~(";
+		for (const auto& l : c) {
+			s += " ";
+			if (l.nt()) s += l.to_std_string();
+			else if (l.is_null()) s += "null";
+			else s += l.to_std_string();
+		}
+		if (c.neg) s += " )";
+	}
+	s += ".";
+	return s;
+}
+
+format::json::value tgf_repl_evaluator::production_id_entry(
+	size_t p) const
+{
+	using value = format::json::value;
+	auto v = value::object();
+	v.set("index", value::number(static_cast<double>(p)));
+	v.set("head", value::number(
+		static_cast<double>(g()(p).n())));
+	auto body = value::array();
+	for (const auto& c : g()[p]) {
+		auto conj = value::array();
+		for (const auto& l : c) {
+			if (l.nt()) conj.push_back(value::number(
+				static_cast<double>(l.n())));
+			else conj.push_back(value::null());
+		}
+		body.push_back(std::move(conj));
+	}
+	v.set("body", std::move(body));
+	const std::string* guard = g().production_guard(p);
+	v.set("guard", guard ? value::string(*guard) : value::null());
+	v.set("conjunctive", value::boolean(g().conjunctive(p)));
+	return v;
+}
+
+bool tgf_repl_evaluator::load_grammar(const std::string& new_tgf_file) {
+	if (!load_file(new_tgf_file)) return false;
+	update_opts_by_grammar_opts();
+	apply_auto_disambiguate();
+	return true;
 }
 
 bool tgf_repl_evaluator::reload(const string& new_tgf_file) {
@@ -383,106 +824,116 @@ bool tgf_repl_evaluator::reload(const string& new_tgf_file) {
 		report.warning(parser_strings::messages::loading_grammars_unavailable);
 		return false;
 	}
-	if (!load_file(new_tgf_file)) {
-		cout << "reload failed: " << new_tgf_file << "\n";
-		flush_report();
+	if (!load_grammar(new_tgf_file)) {
+		report.error(diagnostics::code::io_error,
+			parser_strings::messages::reload_failed,
+			{{parser_strings::label::path, new_tgf_file}});
 		return false;
 	}
-	update_opts_by_grammar_opts();
-	apply_auto_disambiguate();
-	cout << "loaded: " << tgf_filename << "\n";
+	report.info(parser_strings::messages::reload_succeeded,
+		{{parser_strings::label::path, tgf_filename}});
 	return true;
 }
 
-bool tgf_repl_evaluator::reload() {
-	return reload(tgf_filename);
+// Data of the load and reload commands. @p new_tgf_file is the file to
+// load; on success tgf_filename names it. The caller checked fixed_grammar.
+format::json::value tgf_repl_evaluator::reload_data(
+	const std::string& new_tgf_file)
+{
+	using value = format::json::value;
+	auto v = value::object();
+	if (!load_grammar(new_tgf_file))
+		return v.set("grammar", value::string(new_tgf_file))
+			.set("loaded", value::boolean(false));
+	return v.set("grammar", value::string(tgf_filename))
+		.set("loaded", value::boolean(true));
 }
 
-void tgf_repl_evaluator::get_cmd(const tt& n) {
-	using p = tgf_repl_parser;
-	using lvl = parser_type::error::info_lvl;
-	static auto pbool = [] (bool b) { return b ? "on" : "off"; };
-	static auto pverb = [] (lvl v) {
-		switch (v) {
-		case lvl::INFO_BASIC:      return "basic";
-		case lvl::INFO_DETAILED:   return "detailed";
-		case lvl::INFO_ROOT_CAUSE: return "root-cause";
-		default: return "unknown";
-		}
-	};
-	static auto plist = [] (const set<string>& l) {
-		if (l.empty()) return string("(empty)");
-		stringstream ss;
-		bool first = true;
-		for (auto& s : l) ss << (first ? first = false, "" : ", ") << s;
-		return ss.str();
-	};
-	static auto ptreepaths = [](const set<vector<string>>& l) {
-		if (l.empty()) return string("(empty)");
-		stringstream ss;
-		bool first = true;
-		for (auto& tp : l) {
-			ss << (first ? first = false, "" : ", ");
-			bool first_s = true;
-			for (auto& s : tp) ss
-				<< (first_s ? first_s = false, "" : " > ") << s;
-		}
-		return ss.str();
-	};
-	static const map<size_t, function<void()>> printers = {
-	{ p::enabled_prods_opt, [this]() { cout <<
-		"enabled_productions:    " << plist(g().opt.enabled_guards) << "\n"; } },
-	{ p::debug_opt,   [this]() { cout <<
-		"show debug:             " << pbool(opt.debug) << "\n"; } },
-	{ p::status_opt,   [this]() { cout <<
-		"show status:            " << pbool(opt.status) << "\n"; } },
-	{ p::colors_opt,   [this]() { cout <<
-		"colors:                 " << pbool(opt.colors) << "\n"; } },
-	{ p::measure_parsing_opt, [this]() { cout <<
-		"measure-parsing:        " << pbool(opt.measure) << "\n"; } },
-	{ p::measure_each_pos_opt, [this]() { cout <<
-		"measure-each:           " << pbool(opt.measure_each_pos) << "\n"; } },
-	{ p::measure_forest_opt, [this]() { cout <<
-		"measure-forest:         " << pbool(opt.measure_forest) << "\n"; } },
-	{ p::measure_preprocess_opt, [this]() { cout <<
-		"measure-preprocess:     " << pbool(opt.measure_preprocess) << "\n"; } },
-	{ p::gc_opt, [this]() { cout <<
-		"gc:                     " << pbool(opt.gc) << "\n"; } },
-	{ p::print_terminals_opt, [this]() { cout <<
-		"print-terminals:        " << pbool(opt.print_terminals) << "\n"; } },
-	{ p::print_graphs_opt, [this]() { cout <<
-		"print-graphs:           " << pbool(opt.print_graphs) << "\n"; } },
-	{ p::print_ambiguity_opt, [this]() { cout <<
-		"print-ambiguity:        " << pbool(opt.print_ambiguity) << "\n"; } },
-	{ p::print_rules_opt, [this]() { cout <<
-		"print-rules:            " << pbool(opt.tml_rules) << "\n"; } },
-	{ p::print_facts_opt, [this]() { cout <<
-		"print-facts:            " << pbool(opt.tml_facts) << "\n"; } },
-	{ p::trim_terminals_opt, [this]() { cout <<
-		"trim-terminals:         " << pbool(g().opt.shaping.trim_terminals) << "\n"; } },
-	{ p::inline_cc_opt, [this]() { cout <<
-		"inline-char-classes:    " << pbool(g().opt.shaping.inline_char_classes) << "\n"; } },
-	{ p::trim_opt, [this]() { cout <<
-		"trim:                   " << plist(opt.to_trim) << "\n"; } },
-	{ p::trim_children_opt, [this]() { cout <<
-		"trim-children:          " << plist(opt.to_trim_children) << "\n"; } },
-	{ p::trim_children_terminals_opt, [this]() { cout <<
-		"trim-children-terminals:" << plist(opt.to_trim_children_terminals) << "\n"; } },
-	{ p::inline_opt, [this]() { cout <<
-		"inline:                 " << ptreepaths(opt.to_inline) << "\n"; } },
-	{ p::auto_disambiguate_opt, [this]() { cout <<
-		"auto-disambiguate:      " << pbool(g().opt.auto_disambiguate) << "\n"; } },
-	{ p::derive_char_classes_opt, [this]() { cout <<
-		"derive-char-classes:    " << pbool(g().opt.derive_char_classes)
-			<< "\n"; } },
-	{ p::nodisambig_list_opt, [this]() { cout <<
-		"nodisambig-list:        " << plist(opt.nodisambig_list) << "\n"; } },
-	{ p::error_verbosity_opt, [this]() { cout <<
-		"error-verbosity:        " << pverb(opt.error_verbosity) << "\n"; } }};
-	if (!n) { for (auto& [_, v] : printers) v(); return; }
+format::json::value tgf_repl_evaluator::get_cmd(const tt& n) {
+	using value = format::json::value;
+	if (!n) {
+		auto v = value::object();
+		v.set("options", option_values());
+		return v;
+	}
 	auto [o, _] = get_opt(n);
-	if (auto it = printers.find(o); it != printers.end()) it->second();
-	else cout << "error: unknown option\n";
+	const option_desc* d = find_option(o);
+	if (!d) {
+		report.error(diagnostics::code::invalid_argument,
+			parser_strings::messages::unknown_option);
+		return value::object();
+	}
+	auto v = value::object();
+	v.set("option", value::string(d->name))
+	 .set("value", option_value(o));
+	return v;
+}
+
+format::json::value tgf_repl_evaluator::option_value(size_t o) const {
+	using value = format::json::value;
+	switch (o) {
+	case tgf_repl_parser::status_opt:
+		return value::boolean(opt.status);
+	case tgf_repl_parser::colors_opt:
+		return value::boolean(opt.colors);
+	case tgf_repl_parser::print_ambiguity_opt:
+		return value::boolean(opt.print_ambiguity);
+	case tgf_repl_parser::print_graphs_opt:
+		return value::boolean(opt.print_graphs);
+	case tgf_repl_parser::print_rules_opt:
+		return value::boolean(opt.tml_rules);
+	case tgf_repl_parser::print_facts_opt:
+		return value::boolean(opt.tml_facts);
+	case tgf_repl_parser::print_terminals_opt:
+		return value::boolean(opt.print_terminals);
+	case tgf_repl_parser::measure_parsing_opt:
+		return value::boolean(opt.measure);
+	case tgf_repl_parser::measure_each_pos_opt:
+		return value::boolean(opt.measure_each_pos);
+	case tgf_repl_parser::measure_forest_opt:
+		return value::boolean(opt.measure_forest);
+	case tgf_repl_parser::measure_preprocess_opt:
+		return value::boolean(opt.measure_preprocess);
+	case tgf_repl_parser::gc_opt:
+		return value::boolean(opt.gc);
+	case tgf_repl_parser::debug_opt:
+		return value::boolean(opt.debug);
+	case tgf_repl_parser::auto_disambiguate_opt:
+		return value::boolean(g().opt.auto_disambiguate);
+	case tgf_repl_parser::trim_terminals_opt:
+		return value::boolean(g().opt.shaping.trim_terminals);
+	case tgf_repl_parser::inline_cc_opt:
+		return value::boolean(g().opt.shaping.inline_char_classes);
+	case tgf_repl_parser::derive_char_classes_opt:
+		return value::boolean(g().opt.derive_char_classes);
+	case tgf_repl_parser::nodisambig_list_opt: {
+		value v = value::array();
+		for (size_t id : g().opt.nodisambig_list)
+			v.push_back(value::string(nt_name(id)));
+		return v;
+	}
+	case tgf_repl_parser::enabled_prods_opt:
+		return strings_value(g().opt.enabled_guards);
+	case tgf_repl_parser::trim_opt:
+		return strings_value(opt.to_trim);
+	case tgf_repl_parser::trim_children_opt:
+		return strings_value(opt.to_trim_children);
+	case tgf_repl_parser::trim_children_terminals_opt:
+		return strings_value(opt.to_trim_children_terminals);
+	case tgf_repl_parser::inline_opt:
+		return treepaths_value(opt.to_inline);
+	case tgf_repl_parser::error_verbosity_opt:
+		return value::string(verbosity_name(opt.error_verbosity));
+	default: return value::null();
+	}
+}
+
+format::json::value tgf_repl_evaluator::option_values() const {
+	using value = format::json::value;
+	auto v = value::object();
+	for (const auto& [nt, d] : option_table)
+		v.set(d.name, option_value(nt));
+	return v;
 }
 
 vector<string> tgf_repl_evaluator::treepath(const tt& tp) const {
@@ -492,16 +943,20 @@ vector<string> tgf_repl_evaluator::treepath(const tt& tp) const {
 	return v;
 }
 
-void tgf_repl_evaluator::set_cmd(const tt& n) {
+format::json::value tgf_repl_evaluator::set_cmd(const tt& n) {
 	using p = tgf_repl_parser;
+	using value = format::json::value;
 	auto [o, v] = get_opt(n);
 	switch (o) {
 	case p::debug_opt:
 		opt.debug = get_bool_value(v); break;
 	case p::status_opt:
 		opt.status = get_bool_value(v); break;
-	case p::colors_opt:
-		TC.set((opt.colors = get_bool_value(v))); break;
+	case p::colors_opt: {
+		opt.colors = get_bool_value(v);
+		if (!opt.json_api) TC.set(opt.colors);
+		break;
+	}
 	case p::print_terminals_opt:
 		opt.print_terminals = get_bool_value(v); break;
 	case p::print_graphs_opt:
@@ -560,12 +1015,15 @@ void tgf_repl_evaluator::set_cmd(const tt& n) {
 	case p::nodisambig_list_opt:
 		g().opt.nodisambig_list.clear();
 		for (const auto& s : (v || p::symbol)())
-			opt.nodisambig_list.insert(s | tt::terminals);
+			g().opt.nodisambig_list.insert(nt_id(s | tt::terminals));
 		break;
 	case p::error_verbosity_opt: {
-		auto vrb = v | p::error_verbosity;
+		auto vrb = v;
 		if (!vrb.has_value()) {
-			cout << "error: invalid error verbosity value\n"; return; }
+			report.error(diagnostics::code::invalid_argument,
+				parser_strings::messages::invalid_error_verbosity);
+			return value::object();
+		}
 		auto vrb_type = vrb | tt::only_child | tt::nonterminal;
 		using lvl = parser_type::error::info_lvl;
 		switch (vrb_type) {
@@ -575,83 +1033,117 @@ void tgf_repl_evaluator::set_cmd(const tt& n) {
 			opt.error_verbosity = lvl::INFO_DETAILED; break;
 		case p::root_cause_sym:
 			opt.error_verbosity = lvl::INFO_ROOT_CAUSE; break;
-		default: cout << "error: invalid error verbosity value\n";
-			return;
+		default:
+			report.error(diagnostics::code::invalid_argument,
+				parser_strings::messages::invalid_error_verbosity);
+			return value::object();
 		}
 		break;
 	}
-	default: assert(false);
+	default:
+		report.error(diagnostics::code::invalid_argument,
+			parser_strings::messages::unknown_option);
+		return value::object();
 	};
-	get_cmd(n);
+	return get_cmd(n);
 }
 
-void tgf_repl_evaluator::add_cmd(const tt& n) {
+format::json::value tgf_repl_evaluator::add_cmd(const tt& n) {
 	using p = tgf_repl_parser;
+	using value = format::json::value;
 	auto [o, v] = get_opt(n);
-	set<string> empty{};
 	if (o == p::inline_opt) {
 		for (const auto& tp : (v || p::treepath)())
 			opt.to_inline.insert(treepath(tp));
-		get_cmd(n);
-		return;
+		return get_cmd(n);
 	}
 	if (o == p::enabled_prods_opt) {
 		for (const auto& s : (v || p::symbol)())
 			g().opt.enabled_guards.insert(s | tt::terminals);
 		g().set_enabled_productions(g().opt.enabled_guards);
-		get_cmd(n);
-		return;
+		return get_cmd(n);
 	}
-	auto& l(o == p::nodisambig_list_opt ? opt.nodisambig_list :
-		o == p::trim_opt            ? opt.to_trim :
-		o == p::trim_children_opt   ? opt.to_trim_children :
-		o == p::trim_children_terminals_opt
-						? opt.to_trim_children_terminals
-						: empty);
-	for (const auto& s : (v || p::symbol)())
-		l.insert(s | tt::terminals);
-	get_cmd(n);
+	if (o == p::nodisambig_list_opt) {
+		for (const auto& s : (v || p::symbol)())
+			g().opt.nodisambig_list.insert(nt_id(s | tt::terminals));
+		return get_cmd(n);
+	}
+	if (o == p::trim_opt) {
+		for (const auto& s : (v || p::symbol)())
+			opt.to_trim.insert(s | tt::terminals);
+		return get_cmd(n);
+	}
+	if (o == p::trim_children_opt) {
+		for (const auto& s : (v || p::symbol)())
+			opt.to_trim_children.insert(s | tt::terminals);
+		return get_cmd(n);
+	}
+	if (o == p::trim_children_terminals_opt) {
+		for (const auto& s : (v || p::symbol)())
+			opt.to_trim_children_terminals.insert(s | tt::terminals);
+		return get_cmd(n);
+	}
+	report.error(diagnostics::code::invalid_argument,
+		parser_strings::messages::unknown_option);
+	return value::object();
 }
 
-void tgf_repl_evaluator::del_cmd(const tt& n) {
+format::json::value tgf_repl_evaluator::del_cmd(const tt& n) {
 	using p = tgf_repl_parser;
+	using value = format::json::value;
 	auto [o, v] = get_opt(n);
 	if (o == p::inline_opt) {
 		for (const auto& tp : (v || p::treepath)())
 			opt.to_inline.erase(treepath(tp));
-		get_cmd(n);
-		return;
+		return get_cmd(n);
 	}
 	if (o == p::enabled_prods_opt) {
 		for (const auto& s : (v || p::symbol)())
 			g().opt.enabled_guards.erase(s | tt::terminals);
 		g().set_enabled_productions(g().opt.enabled_guards);
-		get_cmd(n);
-		return;
+		return get_cmd(n);
 	}
-	set<string> empty{};
-	auto& l(o == p::nodisambig_list_opt ? opt.nodisambig_list :
-		o == p::trim_opt            ? opt.to_trim :
-		o == p::trim_children_opt   ? opt.to_trim_children :
-		o == p::trim_children_terminals_opt
-						? opt.to_trim_children_terminals
-						: empty);
-	for (const auto& s : (n || p::symbol)())
-		l.erase(s | tt::terminals);
-	get_cmd(n);
+	if (o == p::nodisambig_list_opt) {
+		for (const auto& s : (v || p::symbol)())
+			g().opt.nodisambig_list.erase(nt_id(s | tt::terminals));
+		return get_cmd(n);
+	}
+	if (o == p::trim_opt) {
+		for (const auto& s : (v || p::symbol)())
+			opt.to_trim.erase(s | tt::terminals);
+		return get_cmd(n);
+	}
+	if (o == p::trim_children_opt) {
+		for (const auto& s : (v || p::symbol)())
+			opt.to_trim_children.erase(s | tt::terminals);
+		return get_cmd(n);
+	}
+	if (o == p::trim_children_terminals_opt) {
+		for (const auto& s : (v || p::symbol)())
+			opt.to_trim_children_terminals.erase(s | tt::terminals);
+		return get_cmd(n);
+	}
+	report.error(diagnostics::code::invalid_argument,
+		parser_strings::messages::unknown_option);
+	return value::object();
 }
 
-void tgf_repl_evaluator::update_bool_opt_cmd(
+format::json::value tgf_repl_evaluator::update_bool_opt_cmd(
 	const tt& n,
 	const function<bool(bool&)>& update_fn)
 {
 	using p = tgf_repl_parser;
+	using value = format::json::value;
 	auto option_type = n | tgf_repl_parser::bool_option
 		| tt::only_child | tt::nonterminal;
 	switch (option_type) {
 	case p::debug_opt:             update_fn(opt.debug); break;
 	case p::status_opt:            update_fn(opt.status); break;
-	case p::colors_opt:     TC.set(update_fn(opt.colors)); break;
+	case p::colors_opt: {
+		bool b = update_fn(opt.colors);
+		if (!opt.json_api) TC.set(b);
+		break;
+	}
 	case p::print_terminals_opt:   update_fn(opt.print_terminals); break;
 	case p::print_graphs_opt:      update_fn(opt.print_graphs); break;
 	case p::print_ambiguity_opt:   update_fn(opt.print_ambiguity); break;
@@ -670,14 +1162,18 @@ void tgf_repl_evaluator::update_bool_opt_cmd(
 	}
 	case p::trim_terminals_opt:    update_fn(g().opt.shaping.trim_terminals); break;
 	case p::inline_cc_opt:         update_fn(g().opt.shaping.inline_char_classes); break;
-	default: cout << ": unknown bool option\n"; break;
+	default:
+		report.error(diagnostics::code::invalid_argument,
+			parser_strings::messages::unknown_bool_option);
+		return value::object();
 	}
-	get_cmd(n);
+	return get_cmd(n);
 }
 
 // TODO (LOW) write proper help messages
-static void help(size_t nt, bool show_load_reload) {
+static std::string help_text(size_t nt, bool show_load_reload) {
 	using p = tgf_repl_parser;
+	std::ostringstream os;
 	static const string bool_options =
 		"  status                 show status                        on/off\n"
 		"  colors                 use term colors                    on/off\n"
@@ -711,7 +1207,7 @@ static void help(size_t nt, bool show_load_reload) {
 		string{} +
 		"Available options:\n" + list_options + treepaths_options;
 	switch (nt) {
-	case p::help_sym: cout
+	case p::help_sym: os
 		<< "tgf commands:\n"
 		<< "  help or h                    print this help\n"
 		<< "  help <command>               print help for a command\n"
@@ -743,255 +1239,428 @@ static void help(size_t nt, bool show_load_reload) {
 		<< "  parse file or pf or f        parse input file\n"
 		<< "\n";
 		break;
-	case p::version_sym: cout
+	case p::version_sym: os
 		<< "version or v prints out current TGF commit id\n";
 		break;
-	case p::quit_sym: cout
+	case p::quit_sym: os
 		<< "command: quit or exit\n"
 		<< "short: q or e\n"
 		<< "\texits the repl\n";
 		break;
-	case p::clear_sym: cout
+	case p::clear_sym: os
 		<< "command: clear\n"
 		<< "short: cls\n"
 		<< "\tclears the screen\n";
 		break;
-	case p::get_sym: cout
+	case p::get_sym: os
 		<< "command: get [<option>]\n"
 		<< "\tprints the value of the given option\n"
 		<< "\tprints all option values if no option provided\n"
 		<< "\n"
 		<< all_available_options;
 		break;
-	case p::set_sym: cout
+	case p::set_sym: os
 		<< "command: set <option> [=] <value>\n"
 		<< "\tsets value of the given option\n"
 		<< "\n"
 		<< all_available_options;
 		break;
-	case p::toggle_sym: cout
+	case p::toggle_sym: os
 		<< "command: toggle <option>\n"
 		<< "short: tog\n"
 		<< "\t toggles value between on/off of the given option\n"
 		<< "\n"
 		<< bool_available_options;
 		break;
-	case p::enable_sym: cout
+	case p::enable_sym: os
 		<< "command: enable <option>\n"
 		<< "short: en\n"
 		<< "\tsets the value of the given option to on\n"
 		<< "\n"
 		<< bool_available_options;
 		break;
-	case p::disable_sym: cout
+	case p::disable_sym: os
 		<< "command: disable <option>\n"
 		<< "short: dis\n"
 		<< "\tsets the value of the given option to off\n"
 		<< "\n"
 		<< bool_available_options;
 		break;
-	case p::add_sym: cout
+	case p::add_sym: os
 		<< "command: add <option> <value>\n"
 		<< "\tadds the value to the given option list\n"
 		<< "\n"
 		<< list_and_treepaths_available_options;
 		break;
-	case p::del_sym: cout
+	case p::del_sym: os
 		<< "command: delete <option> <value>\n"
 		<< "or: del, remove, rem or rm\n"
 		<< "\tremoves the value from the given option list\n"
 		<< "\n"
 		<< list_and_treepaths_available_options;
 		break;
-	case p::load_sym: cout
-		<< "command: file \"TGF filepath\"\n"
-		<< "short: f\n"
+	case p::load_sym: os
+		<< "command: load \"TGF filepath\"\n"
+		<< "short: l\n"
 		<< "\tload a TGF file from drive\n";
 		break;
-	case p::start_sym: cout
+	case p::start_sym: os
 		<< "command: start [<start symbol>]\n"
 		<< "short: s\n"
 		<< "\tset a new start symbol for parsing"
 		<< "\tprint the current start symbol if no argument\n";
 		break;
-	case p::grammar_sym: cout
+	case p::grammar_sym: os
 		<< "command: grammar\n"
 		<< "short: g\n"
 		<< "\tprints the actual TGF file\n";
 		break;
-	case p::igrammar_sym: cout
+	case p::igrammar_sym: os
 		<< "command: internal-grammar [<start symbol>]\n"
 		<< "short: ig or i\n"
 		<< "\tprints the internal grammar\n"
 		<< "\tif start symbol provided prints the internal sub-grammar\n";
 		break;
-	case p::unreachable_sym: cout
+	case p::unreachable_sym: os
 		<< "command: unreachable [<symbol>]\n"
 		<< "short: u\n"
 		<< "\tprints unreachable production rules for provided symbol\n"
 		<< "\tif no symbol provided prints unreachable rules for start symbol\n";
 		break;
-	case p::parse_sym: cout
+	case p::parse_sym: os
 		<< "command: parse <input>\n"
 		<< "short: p\n"
 		<< "\tparse the given input\n";
 		break;
-	case p::parse_file_sym: cout
+	case p::parse_file_sym: os
 		<< "command: parse file \"<input file>\"\n"
 		<< "short: pf or f\n"
 		<< "\tparse the given input file\n";
 		break;
 	}
+	return os.str();
 }
 
-idni::diagnostics::result<int> tgf_repl_evaluator::eval(const tt& s) {
+cmd_result tgf_repl_evaluator::run(const trv& s) {
 	using p = tgf_repl_parser;
+	using value = format::json::value;
 	const auto nt = s | tt::nonterminal;
-	auto _ = report.open_if(opt.measure || nt == p::parse_cmd,
-		tgf_repl_parser::instance().name(nt),
-		idni::diagnostics::code::info_micros);
-	int ret = 0;
-	switch (nt) {
-	case p::quit_cmd: ret = (cout << "Quit.\n", 1); break;
-	case p::clear_cmd:
-		if (r) r->clear();
+	cmd_result res;
+	res.cmd = command_name(nt);
+	{
+		auto _ = report.open_if(opt.measure || nt == p::parse_cmd,
+			tgf_repl_parser::instance().name(nt),
+			idni::diagnostics::code::info_micros);
+		switch (nt) {
+		case p::quit_cmd:
+			res.status = cmd_status::quit;
+			break;
+		case p::clear_cmd:
+			if (r) r->clear();
 #ifdef TAU_PARSER_HAS_FTXUI
-		else if (r_ftx) r_ftx->clear();
+			else if (r_ftx) r_ftx->clear();
 #endif
-		break;
-	case p::help_cmd: {
-		auto optarg = s | p::help_arg
-				| tt::only_child | tt::nonterminal;
-		if (optarg) help(optarg, !fixed_grammar);
-		else help(p::help_sym, !fixed_grammar);
-		break;
-	}
-	case p::version_cmd: print_version(); break;
-	case p::license_cmd: print_license(); break;
-	case p::get_cmd:     get_cmd(s | p::option); break;
-	case p::set_cmd:     set_cmd(s); break;
-	case p::toggle_cmd:
-		update_bool_opt_cmd(s, [](bool& b){ return b = !b; }); break;
-	case p::enable_cmd:
-		update_bool_opt_cmd(s, [](bool& b){ return b = true; }); break;
-	case p::disable_cmd:
-		update_bool_opt_cmd(s, [](bool& b){ return b = false; }); break;
-	case p::add_cmd:     add_cmd(s); break;
-	case p::del_cmd:     del_cmd(s); break;
-	case p::reload_cmd:
-		if (fixed_grammar) {
-			report.warning(parser_strings::messages::loading_grammars_unavailable);
+			break;
+		case p::help_cmd: {
+			auto optarg = s | p::help_arg
+					| tt::only_child | tt::nonterminal;
+			size_t target = optarg
+				? static_cast<size_t>(optarg)
+				: static_cast<size_t>(p::help_sym);
+			auto v = value::object();
+			v.set("command", value::string(help_arg_name(target)))
+			 .set("text", value::string(
+				help_text(target, !fixed_grammar)));
+			res.data = std::move(v);
 			break;
 		}
-		reload();
-		break;
-	case p::load_cmd: {
-		if (fixed_grammar) {
-			report.warning(parser_strings::messages::loading_grammars_unavailable);
+		case p::version_cmd: {
+			auto v = value::object();
+			v.set("version", value::string(tauparser::full_version));
+			res.data = std::move(v);
 			break;
 		}
-		auto n = s | p::filename;
-		auto filename = unquote(n | tt::terminals, report);
-		if (report.has_error()) break;
-		reload(filename);
-		break;
-	}
-	case p::start_cmd: {
-		auto n = s | p::symbol;
-		string start;
-		if (n.has_value() && (start = n | tt::terminals).size())
-			cout << "start symbol set: " << TC_NT
-				<< (opt.start = start) << TC_DEFAULT << "\n";
-		else
-			cout << "start symbol: " << TC_NT << opt.start
-				<< TC_DEFAULT << "\n";
-		break;
-	}
-	case p::igrammar_cmd: {
-		auto n = s | p::symbol;
-		string start = n.has_value() ? n | tt::terminals : opt.start;
-		g().print_internal_grammar_for(cout
-			<< "\ninternal grammar for symbol "
-		 	<< TC_NT << start << TC_DEFAULT << ":\n",
-			start, "  ", true, TC);
-		break;
-	}
-	case p::grammar_cmd:
-		print_source();
-		break;
-	case p::unreachable_cmd: {
-		auto n = s | p::symbol;
-		string start = n.has_value() ? n | tt::terminals : opt.start;
-		auto unreachable = g().unreachable_productions(g().nt(start));
-		if (unreachable.size()) {
-			cout << "unreachable production rules for symbol: "
-				<< TC_NT << start << TC_DEFAULT << "\n";
-			for (auto& p : unreachable) g().print_production(
-				cout << "  ", p, true, TC) << "\n";
+		case p::license_cmd: {
+			auto v = value::object();
+			v.set("license", value::string(tauparser::license));
+			res.data = std::move(v);
+			break;
 		}
-		else cout << "all production rules reachable for symbol: "
-			<< TC_NT << start << TC_DEFAULT << "\n";
-		break;
+		case p::get_cmd:
+			res.data = get_cmd(s | p::option);
+			break;
+		case p::set_cmd:
+			res.data = set_cmd(s);
+			break;
+		case p::toggle_cmd:
+			res.data = update_bool_opt_cmd(s,
+				[](bool& b){ return b = !b; });
+			break;
+		case p::enable_cmd:
+			res.data = update_bool_opt_cmd(s,
+				[](bool& b){ return b = true; });
+			break;
+		case p::disable_cmd:
+			res.data = update_bool_opt_cmd(s,
+				[](bool& b){ return b = false; });
+			break;
+		case p::add_cmd:
+			res.data = add_cmd(s);
+			break;
+		case p::del_cmd:
+			res.data = del_cmd(s);
+			break;
+		case p::reload_cmd:
+			if (fixed_grammar) {
+				report.warning(parser_strings::messages::
+					loading_grammars_unavailable);
+				break;
+			}
+			res.data = reload_data(tgf_filename);
+			break;
+		case p::load_cmd: {
+			if (fixed_grammar) {
+				report.warning(parser_strings::messages::
+					loading_grammars_unavailable);
+				break;
+			}
+			auto n = s | p::filename;
+			auto filename = unquote(n | tt::terminals, report);
+			if (report.has_error()) break;
+			res.data = reload_data(filename);
+			break;
+		}
+		case p::start_cmd: {
+			auto n = s | p::symbol;
+			string start;
+			bool changed = false;
+			if (n.has_value()
+				&& (start = n | tt::terminals).size()) {
+				opt.start = start;
+				changed = true;
+			}
+			auto v = value::object();
+			v.set("start", value::string(opt.start))
+			 .set("changed", value::boolean(changed));
+			res.data = std::move(v);
+			break;
+		}
+		case p::igrammar_cmd: {
+			auto n = s | p::symbol;
+			string start = n.has_value()
+				? n | tt::terminals : opt.start;
+			auto v = value::object();
+			v.set("start", value::string(start));
+			auto prods = value::array();
+			auto pids = value::array();
+			for (size_t p : g().reachable_productions(g().nt(start))) {
+				prods.push_back(value::string(production_string(p)));
+				pids.push_back(production_id_entry(p));
+			}
+			v.set("productions", std::move(prods));
+			v.set("production_ids", std::move(pids));
+			res.data = std::move(v);
+			if (!opt.json_api) {
+				ostringstream ts;
+				g().print_internal_grammar_for(ts
+					<< "\ninternal grammar for symbol "
+					<< TC_NT << start << TC_DEFAULT << ":\n",
+					start, "  ", true, TC);
+				res.text = ts.str();
+			}
+			break;
+		}
+		case p::grammar_cmd: {
+			auto v = value::object();
+			v.set("file", value::string(tgf_filename));
+			string src = grammar_source;
+			if (src.empty()) {
+				ifstream f(tgf_filename);
+				for (string line; getline(f, line); )
+					src += line + "\n";
+			}
+			v.set("source", value::string(std::move(src)));
+			res.data = std::move(v);
+			break;
+		}
+		case p::unreachable_cmd: {
+			auto n = s | p::symbol;
+			string start = n.has_value()
+				? n | tt::terminals : opt.start;
+			auto unreachable = g().unreachable_productions(
+				g().nt(start));
+			auto v = value::object();
+			v.set("symbol", value::string(start));
+			auto prods = value::array();
+			auto pids = value::array();
+			for (size_t p : unreachable) {
+				prods.push_back(value::string(production_string(p)));
+				pids.push_back(production_id_entry(p));
+			}
+			v.set("productions", std::move(prods));
+			v.set("production_ids", std::move(pids));
+			res.data = std::move(v);
+			if (!opt.json_api) {
+				ostringstream ts;
+				if (unreachable.size()) {
+					ts << "unreachable production rules for symbol: "
+						<< TC_NT << start << TC_DEFAULT << "\n";
+					for (auto& p : unreachable) g().print_production(
+						ts << "  ", p, true, TC) << "\n";
+				}
+				else ts << "all production rules reachable for "
+					"symbol: " << TC_NT << start
+					<< TC_DEFAULT << "\n";
+				res.text = ts.str();
+			}
+			break;
+		}
+		case p::parse_cmd: {
+			string input{};
+			auto i = s | p::parse_input;
+			if (auto seq = i | p::parse_input_char_seq;
+				seq.has_value()) input = seq | tt::terminals;
+			else if (auto qstr = i | p::quoted_string;
+				qstr.has_value()) input = unquote(
+					qstr | tt::terminals, report);
+			res.data = parse(input.c_str(), input.size(),
+				res.text);
+			break;
+		}
+		case p::parse_file_cmd: {
+			auto n = s | p::filename;
+			auto filename = unquote(n | tt::terminals, report);
+			if (report.has_error()) break;
+			res.data = parse(filename, res.text);
+			break;
+		}
+		default:
+			report.error(diagnostics::code::invalid_argument,
+				parser_strings::messages::unknown_command);
+			break;
+		}
 	}
-	case p::parse_cmd: {
-		string input{};
-		auto i = s | p::parse_input;
-		if (auto seq = i | p::parse_input_char_seq;
-			seq.has_value()) input = seq | tt::terminals;
-		else if (auto qstr = i | p::quoted_string;
-			qstr.has_value()) input = unquote(qstr
-				|| p::quoted_string_char
-				|| tt::terminals, report);
-		//if (opt.debug) cout << "input: " << input << "\n";
-		parse(input.c_str(), input.size());
-		break;
-	}
-	case p::parse_file_cmd: {
-		auto n = s | p::filename;
-		auto filename = unquote(n | tt::terminals, report);
-		if (report.has_error()) break;
-		parse(filename);
-		break;
-	}
-	default: cout << "error: unknown command\n"; break;
-	}
-	return idni::diagnostics::result<int>(ret);
+	res.report = std::move(report);
+	report.clear();
+	if (res.report.has_error()) res.status = cmd_status::error;
+	return res;
 }
 
-idni::diagnostics::result<int> tgf_repl_evaluator::eval(const string& src) {
+eval_result tgf_repl_evaluator::run(const std::string& src,
+	const std::function<void(cmd_result&)>& each)
+{
+	eval_result er;
 	static tgf_repl_parser rp;
-	int quit = 0;
 	auto r = rp.parse(src.c_str(), src.size());
 	if (!r.found) {
 		if (opt.continue_on_eof && r.parse_error.at_eof()) {
-			// incomplete input is a recovery, not a failure: demote
-			// before append so the invariant does not drop the value
-			idni::diagnostics::result<int> res(2);
+			er.status = cmd_status::incomplete;
 			r.report().demote_errors_to_warnings();
-			res.append(std::move(r.report()));
-			return res;
+			er.report.append(std::move(r.report()));
+			return er;
 		}
-		report.append(std::move(r.report()));
-		flush_report();
-	} else {
+		er.status = cmd_status::error;
+		er.report.append(std::move(r.report()));
+		return er;
+	}
+	if (!opt.json_api) {
 		r.print_ambiguous_nodes(cout);
-		if (opt.debug) {
-			pretty_print(cout << "input command graph:\n",
-				r.get_shaped_tree2(), {}, false, 1);
-			//g().print_internal_grammar(cout << "\ngrammar:\n\n", "  ");
+		if (opt.debug) pretty_print(cout << "input command graph:\n",
+			r.get_shaped_tree2(), {}, false, 1);
+	}
+	tref ref = r.get_shaped_tree2();
+	auto t = tt(ref);
+	auto statements = t || tgf_repl_parser::statement;
+	for (const auto& statement : statements()) {
+		er.results.push_back(run(statement | tt::only_child));
+		cmd_result& cr = er.results.back();
+		if (each) each(cr);
+		if (cr.status == cmd_status::quit) {
+			er.status = cmd_status::quit;
+			break;
 		}
-		tref ref = r.get_shaped_tree2();
-		auto t = tt(ref);
-		auto statements = t || tgf_repl_parser::statement;
-		for (const auto& statement : statements()) {
-			quit = eval(statement | tt::only_child).value_or(0);
-			flush_report();
-			if (quit == 1) return idni::diagnostics::result<int>(quit);
+		if (cr.status == cmd_status::error)
+			er.status = cmd_status::error;
+	}
+	return er;
+}
+
+void tgf_repl_evaluator::render_text(const cmd_result& r,
+	std::ostream& os) const
+{
+	if (!r.text.empty()) { os << r.text; return; }
+	if (r.cmd == "quit") { os << "Quit.\n"; return; }
+	if (r.cmd == "clear") return;
+	if (r.cmd == "version") {
+		if (auto v = r.data.find("version"); v)
+			os << v->as_string() << "\n";
+		return;
+	}
+	if (r.cmd == "license") {
+		if (auto v = r.data.find("license"); v)
+			os << v->as_string() << "\n";
+		return;
+	}
+	if (r.cmd == "help") {
+		if (auto v = r.data.find("text"); v) os << v->as_string();
+		return;
+	}
+	if (r.cmd == "start") {
+		auto s = r.data.find("start");
+		auto ch = r.data.find("changed");
+		if (!s || !ch) return;
+		if (ch->as_bool()) os << "start symbol set: " << TC_NT
+			<< s->as_string() << TC_DEFAULT << "\n";
+		else os << "start symbol: " << TC_NT << s->as_string()
+			<< TC_DEFAULT << "\n";
+		return;
+	}
+	if (r.cmd == "grammar") { print_source(os); return; }
+	if (r.cmd == "load" || r.cmd == "reload") {
+		auto l = r.data.find("loaded");
+		if (!l) return;   // fixed grammar: only the warning
+		auto name = r.data.find("grammar");
+		if (l->as_bool()) os << "loaded: " << name->as_string() << "\n";
+		else os << "reload failed: " << name->as_string() << "\n";
+		return;
+	}
+	if (auto o = r.data.find("option"); o) {
+		const option_desc* d = option_desc_by_name(o->as_string());
+		os << (d ? d->label : "")
+			<< option_text(*r.data.find("value")) << "\n";
+		return;
+	}
+	if (auto opts = r.data.find("options"); opts) {
+		for (const auto& kv : opts->members()) {
+			const option_desc* d = option_desc_by_name(kv.first);
+			os << (d ? d->label : "")
+				<< option_text(kv.second) << "\n";
 		}
+		return;
+	}
+}
+
+idni::diagnostics::result<int> tgf_repl_evaluator::eval(const string& src) {
+	auto er = run(src, [this](cmd_result& r) {
+		render_text(r, cout);
+		report.append(std::move(r.report));
+		flush_report();
+	});
+	if (er.status == cmd_status::incomplete) {
+		idni::diagnostics::result<int> res(2);
+		res.append(std::move(er.report));
+		return res;
+	}
+	if (er.status == cmd_status::quit) {
+		return idni::diagnostics::result<int>(1);
+	}
+	if (er.report.nodes().size()) {
+		report.append(std::move(er.report));
+		flush_report();
 	}
 	cout << endl;
-	if (quit == 0) reprompt();
-	return idni::diagnostics::result<int>(quit);
+	reprompt();
+	return idni::diagnostics::result<int>(0);
 }
 
 tgf_repl_evaluator::tgf_repl_evaluator(std::string tgf_file)
@@ -1002,7 +1671,7 @@ tgf_repl_evaluator::tgf_repl_evaluator(std::string tgf_file)
 tgf_repl_evaluator::tgf_repl_evaluator(std::string tgf_file, options opt)
 	: opt(opt), tgf_filename(std::move(tgf_file))
 {
-	TC.set(opt.colors);
+	TC.set(opt.json_api ? false : opt.colors);
 	if (!load_file(tgf_filename)) return;
 	update_opts_by_grammar_opts();
 	apply_auto_disambiguate();
@@ -1028,7 +1697,7 @@ tgf_repl_evaluator::tgf_repl_evaluator(
 	  grammar_source(std::move(grammar_source)),
 	  p_(&parser)
 {
-	TC.set(opt.colors);
+	TC.set(opt.json_api ? false : opt.colors);
 	update_opts_by_grammar_opts();
 	apply_auto_disambiguate();
 }
@@ -1089,8 +1758,10 @@ static tgf_repl_evaluator::options
 		cmd.get<bool>("colors");
 	if (cmd.has("measure"))                 tgf_repl_opt.measure =
 		cmd.get<bool>("measure");
-	if (cmd.has("json"))                    tgf_repl_opt.print_json =
-		cmd.get<bool>("json");
+	if (cmd.has("json")) {
+		tgf_repl_opt.print_json = cmd.get<bool>("json");
+		tgf_repl_opt.json_api  = tgf_repl_opt.print_json;
+	}
 	if (cmd.has("print-input"))             tgf_repl_opt.print_input =
 		cmd.get<bool>("print-input");
 	if (cmd.has("print-ambiguity"))         tgf_repl_opt.print_ambiguity =
@@ -1177,14 +1848,28 @@ static parser_gen_options gen_options_from_cmd(const cli::command& cmd) {
 static int gen_command(const cli::command& cmd,
 	const tgf_repl_evaluator& re)
 {
+	using format::json::value;
 	const bool print_json = cmd.has("json") && cmd.get<bool>("json");
 	auto gen_opt = gen_options_from_cmd(cmd);
 	auto gr = !re.has_fixed_grammar()
 		? generate_parser_cpp_from_file<char>(re.filename(), gen_opt,
-			print_json)
+			false)
 		: generate_parser_cpp_from_string<char>(re.filename(),
-			re.source(), gen_opt, print_json);
-	print_diagnostics_report(gr.report(), print_json);
+			re.source(), gen_opt, false);
+	if (print_json) {
+		auto data = value::object();
+		auto files = value::array();
+		if (gr.has_value())
+			for (const auto& f : gr.value())
+				files.push_back(value::string(f));
+		data.set("files", std::move(files));
+		cmd_status st = gr.has_value()
+			? cmd_status::ok : cmd_status::error;
+		json_write_line(cout, json_result_response(st, data,
+			state_value(re), gr.report()));
+		return st == cmd_status::error ? 1 : 0;
+	}
+	print_diagnostics_report(gr.report(), false);
 	return gr.has_value() ? 0 : 1;
 }
 
@@ -1221,8 +1906,43 @@ static void print_char_class_report(tgf_repl_evaluator& re) {
 static int show_command(const cli::command& cmd,
 	tgf_repl_evaluator& re)
 {
+	using format::json::value;
+	const bool json = cmd.has("json") && cmd.get<bool>("json");
 	string start = cmd.get<string>("start");
 	if (start.empty()) start = re.g().start_literal().to_std_string();
+	if (json) {
+		auto v = value::object();
+		v.set("start", value::string(start));
+		auto prods = value::array();
+		auto pids = value::array();
+		for (size_t p : re.g().reachable_productions(re.g().nt(start))) {
+			prods.push_back(value::string(
+				re.production_string(p)));
+			pids.push_back(re.production_id_entry(p));
+		}
+		v.set("productions", std::move(prods));
+		v.set("production_ids", std::move(pids));
+		if (cmd.get<bool>("nullable")) {
+			auto nl = value::array();
+			for (const auto& [head, p] :
+					re.g().nullable_recursive_productions()) {
+				auto e = value::object();
+				e.set("symbol", value::string(
+					head.to_std_string()))
+				 .set("id", value::number(
+					static_cast<double>(head.n())))
+				 .set("index", value::number(
+					static_cast<double>(p)))
+				 .set("production", value::string(
+					re.production_string(p)));
+				nl.push_back(std::move(e));
+			}
+			v.set("nullable", std::move(nl));
+		}
+		json_write_line(cout, json_result_response(cmd_status::ok,
+			v, state_value(re), re.take_report()));
+		return 0;
+	}
 	if (cmd.get<bool>("grammar")) re.g().print_internal_grammar_for(
 		cout, start, {}, true);
 	if (cmd.get<bool>("nullable"))
@@ -1262,6 +1982,17 @@ static int run_command(cli& cl, const cli::command& cmd,
 	}
 
 	if (cmd.name() == "repl") {
+		const bool json = cmd.has("json") && cmd.get<bool>("json");
+		if (json) {
+			if (auto ev = cmd.get<string>("evaluate"); ev.size()) {
+				auto er = re.run(ev);
+				json_write_line(cout, json_eval_response(
+					format::json::value::null(), er,
+					state_value(re)));
+				return er.status == cmd_status::error ? 1 : 0;
+			}
+			return tgf_json_loop(re, cin, cout);
+		}
 		auto with_report_flush = [&](auto run) {
 			re.flush_report();
 			int ret = run();
@@ -1298,19 +2029,61 @@ static int run_command(cli& cl, const cli::command& cmd,
 		if (cmd.has("derive-char-classes")
 			&& !cmd.get<bool>("derive-char-classes"))
 				re.g().derive_char_classes(false);
+		using format::json::value;
+		const bool json = cmd.has("json") && cmd.get<bool>("json");
 		string infile = cmd.get<string>("input");
 		string inexp  = cmd.get<string>("input-expression");
 		if (infile.size() && inexp.size())
 			return cl.error("multiple inputs specified, use ei"
 				"ther --input or --input-expression, not both");
+		if (json) {
+			value data = value::object();
+			string text;
+			if (infile.size())
+				if (infile == "-")
+					data = re.parse(cin, text);
+				else
+					data = re.parse(infile, text);
+			else
+				data = re.parse(inexp.c_str(), inexp.size(),
+					text);
+			if (cmd.get<bool>("grammar")) {
+				string start = re.start_symbol();
+				auto ig = value::object();
+				ig.set("start", value::string(start));
+				auto prods = value::array();
+				auto pids = value::array();
+				for (size_t p : re.g().reachable_productions(
+						re.g().nt(start))) {
+					prods.push_back(value::string(
+						re.production_string(p)));
+					pids.push_back(re.production_id_entry(p));
+				}
+				ig.set("productions", std::move(prods));
+				ig.set("production_ids", std::move(pids));
+				data.set("internal_grammar", std::move(ig));
+			}
+			if (cmd.get<bool>("measure"))
+				data.set("bintree_totals",
+					bintree_process_totals_value());
+			auto rep = re.take_report();
+			cmd_status st = rep.has_error()
+				? cmd_status::error : cmd_status::ok;
+			json_write_line(cout,
+				json_result_response(st, data, state_value(re),
+					rep));
+			return st == cmd_status::error ? 1 : 0;
+		}
 		if (cmd.get<bool>("grammar")) re.eval("i");
+		string text;
 		if (infile.size())
 			if (infile == "-")
-				re.parse(cin);
+				re.parse(cin, text);
 			else
-				re.parse(infile);
+				re.parse(infile, text);
 		else
-			re.parse(inexp.c_str(), inexp.size());
+			re.parse(inexp.c_str(), inexp.size(), text);
+		cout << text;
 		re.flush_report();
 		if (cmd.get<bool>("measure")) print_bintree_process_totals();
 	}

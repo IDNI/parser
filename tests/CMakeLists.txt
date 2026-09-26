@@ -139,6 +139,7 @@ set(DOCTESTS
 	tgf
 	tgf_cli
 	derived_char_classes
+	tgf_json_api
 )
 
 foreach(X IN LISTS DOCTESTS)
@@ -148,10 +149,18 @@ foreach(X IN LISTS DOCTESTS)
 			OR X STREQUAL "derived_char_classes"))
 		continue()
 	endif()
+	# The JSON API test drives the evaluator, so it needs tgf_cli_core.
+	if(X STREQUAL "tgf_json_api")
+		if(EMSCRIPTEN OR NOT TARGET tgf_cli_core)
+			continue()
+		endif()
+	endif()
 	set(N "doctest_${X}")
 	add_executable(${N} "${N}.cpp")
 	if(EMSCRIPTEN)
 		tauparser_emcc_setup(${N})
+	elseif(X STREQUAL "tgf_json_api")
+		tauparser_setup(${N} PRIVATE tgf_cli_core)
 	else()
 		tauparser_setup(${N} PRIVATE "")
 	endif()
@@ -181,6 +190,11 @@ foreach(X IN LISTS DOCTESTS)
 			OR N STREQUAL "doctest_tgf_cli") AND NOT EMSCRIPTEN)
 		target_compile_definitions(${N} PRIVATE
 			PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+	endif()
+	if(${N} STREQUAL "doctest_tgf_json_api")
+		target_compile_definitions(${N} PRIVATE
+			PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+			PROJECT_BINARY_DIR="${PROJECT_BINARY_DIR}")
 	endif()
 	# the highlighter compiles treemr patterns, so it needs the DSL parser
 	if(${N} STREQUAL "doctest_highlight" AND NOT EMSCRIPTEN AND NOT TAU_PARSER_BUILD_HEADER_ONLY)
@@ -325,6 +339,26 @@ if(TARGET tgf AND NOT WIN32)
 						repl_ftxui_drain_test
 					PROPERTIES TIMEOUT 300 RESOURCE_LOCK repl_tau)
 			endif()
+		endif()
+	endif()
+endif()
+
+# Validate the tree of a real tgf parse against the AST schema when the
+# Python jsonschema module is available.
+if(TARGET tgf AND NOT WIN32)
+	find_program(PYTHON3_SCHEMA_EXECUTABLE python3)
+	if(PYTHON3_SCHEMA_EXECUTABLE)
+		execute_process(
+			COMMAND "${PYTHON3_SCHEMA_EXECUTABLE}" -c
+				"import jsonschema"
+			RESULT_VARIABLE _jsonschema_missing)
+		if(NOT _jsonschema_missing)
+			add_test(NAME ast_schema_check
+				COMMAND "${PYTHON3_SCHEMA_EXECUTABLE}"
+					"${CMAKE_CURRENT_SOURCE_DIR}/ast_schema_check.py"
+					"$<TARGET_FILE:tgf>"
+					"${PROJECT_SOURCE_DIR}/tests/fixtures/ambig.tgf"
+					"${PROJECT_SOURCE_DIR}/src/format/ast.json/ast.schema.json")
 		endif()
 	endif()
 endif()

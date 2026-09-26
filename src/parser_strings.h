@@ -216,6 +216,20 @@ struct messages {
 		"Production has too many conjuncts";
 	static constexpr sv too_many_literals =
 		"Conjunct has too many literals";
+	// REPL command errors
+	static constexpr sv unknown_option         = "Unknown option";
+	static constexpr sv unknown_bool_option    = "Unknown bool option";
+	static constexpr sv invalid_error_verbosity =
+		"Invalid error verbosity value";
+	static constexpr sv unknown_command        = "Unknown command";
+	// load and reload command results
+	static constexpr sv reload_succeeded       = "Grammar reloaded";
+	static constexpr sv reload_failed          = "Grammar reload failed";
+	// JSON API request errors
+	static constexpr sv missing_field          = "Missing field";
+	static constexpr sv invalid_field_type     = "Invalid field type";
+	static constexpr sv invalid_symbol         = "Invalid symbol";
+	static constexpr sv invalid_help_argument  = "Invalid help argument";
 	// escape decode errors
 	static constexpr sv escape_trailing         = "Trailing escape character.";
 	static constexpr sv escape_lone_delimiter   = "Lone delimiter not doubled.";
