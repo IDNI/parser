@@ -103,6 +103,12 @@ static std::string to_line(const json::value& v) {
 	return os.str();
 }
 
+// A quoted REPL string. The encoder turns a backslash into an escape
+// sequence, so a native path survives the REPL string decoder.
+static std::string repl_string(const std::string& s) {
+	return "\"" + escapes::encode(s, escapes::tgf_string) + "\"";
+}
+
 // {"id":id,"cmd":"eval","src":src}
 static std::string eval_request(int id, const std::string& src) {
 	json::value v = json::value::object();
@@ -171,9 +177,13 @@ TEST_SUITE("tgf json api: hello") {
 		auto p = parse_line(line);
 		auto h = p.find("hello");
 		REQUIRE(h != nullptr);
+		REQUIRE(h->find("protocol") != nullptr);
 		CHECK(h->find("protocol")->as_number() == 1);
+		REQUIRE(h->find("grammar") != nullptr);
 		CHECK(h->find("grammar")->as_string() == grammar_path());
+		REQUIRE(h->find("fixed_grammar") != nullptr);
 		CHECK(h->find("fixed_grammar")->is_bool());
+		REQUIRE(h->find("start") != nullptr);
 		CHECK(h->find("start")->as_string() == "start");
 		auto opts = h->find("options");
 		REQUIRE(opts != nullptr);
@@ -185,7 +195,9 @@ TEST_SUITE("tgf json api: hello") {
 		CHECK(h->find("report") != nullptr);
 		const json::value* s = p.find("state");
 		REQUIRE(s != nullptr);
+		REQUIRE(s->find("grammar") != nullptr);
 		CHECK(s->find("grammar")->as_string() == grammar_path());
+		REQUIRE(s->find("start") != nullptr);
 		CHECK(s->find("start")->as_string() == "start");
 	}
 }
@@ -201,6 +213,7 @@ TEST_SUITE("tgf json api: eval form") {
 		REQUIRE(res != nullptr);
 		REQUIRE(res->size() == 1);
 		CHECK((*res)[0].find("cmd")->as_string() == "version");
+		REQUIRE((*res)[0].find("result") != nullptr);
 		CHECK((*res)[0].find("result")->find("version") != nullptr);
 	}
 
@@ -271,7 +284,11 @@ TEST_SUITE("tgf json api: options") {
 			R"({"id":2,"cmd":"set","option":"trim","value":[]})",
 			R"({"id":3,"cmd":"get","option":"trim"})"});
 		REQUIRE(r.responses.size() == 3);
+		REQUIRE(result_of(r.responses[1]) != nullptr);
+		REQUIRE(result_of(r.responses[1])->find("value") != nullptr);
 		CHECK(result_of(r.responses[1])->find("value")->size() == 0);
+		REQUIRE(result_of(r.responses[2]) != nullptr);
+		REQUIRE(result_of(r.responses[2])->find("value") != nullptr);
 		CHECK(result_of(r.responses[2])->find("value")->size() == 0);
 	}
 
@@ -282,11 +299,18 @@ TEST_SUITE("tgf json api: options") {
 			R"({"id":3,"cmd":"eval","src":"set trim a . set trim = . get trim"})"});
 		REQUIRE(r.responses.size() == 3);
 		auto res0 = r.responses[0].find("results");
+		REQUIRE(res0 != nullptr);
 		REQUIRE(res0->size() == 2);
+		REQUIRE((*res0)[1].find("result") != nullptr);
+		REQUIRE((*res0)[1].find("result")->find("value") != nullptr);
 		CHECK((*res0)[1].find("result")->find("value")->size() == 2);
 		auto res1 = r.responses[1].find("results");
+		REQUIRE(res1 != nullptr);
+		REQUIRE((*res1)[1].find("result")->find("value") != nullptr);
 		CHECK((*res1)[1].find("result")->find("value")->size() == 0);
 		auto res2 = r.responses[2].find("results");
+		REQUIRE(res2 != nullptr);
+		REQUIRE((*res2)[2].find("result")->find("value") != nullptr);
 		CHECK((*res2)[2].find("result")->find("value")->size() == 0);
 	}
 
@@ -303,6 +327,8 @@ TEST_SUITE("tgf json api: options") {
 			R"({"id":2,"cmd":"add","option":"trim","value":["b"]})",
 			R"({"id":3,"cmd":"delete","option":"trim","value":["a"]})"});
 		REQUIRE(r.responses.size() == 3);
+		REQUIRE(result_of(r.responses[1]) != nullptr);
+		REQUIRE(result_of(r.responses[1])->find("value") != nullptr);
 		CHECK(result_of(r.responses[1])->find("value")->size() == 2);
 		auto v = result_of(r.responses[2])->find("value");
 		REQUIRE(v != nullptr);
@@ -317,6 +343,8 @@ TEST_SUITE("tgf json api: options") {
 		auto b = run_repl({
 			R"({"id":1,"cmd":"get","option":"trim"})"});
 		REQUIRE(b.responses.size() == 1);
+		REQUIRE(result_of(b.responses[0]) != nullptr);
+		REQUIRE(result_of(b.responses[0])->find("value") != nullptr);
 		CHECK(result_of(b.responses[0])->find("value")->size() == 0);
 	}
 
@@ -342,6 +370,7 @@ TEST_SUITE("tgf json api: parse data") {
 		const json::value* tree = res->find("tree");
 		REQUIRE(tree != nullptr);
 		CHECK(res->find("ambiguous") != nullptr);
+		REQUIRE(tree->find("symbol") != nullptr);
 		CHECK(tree->find("symbol")->as_string() == "start");
 		REQUIRE(tree->find("id") != nullptr);
 		CHECK(tree->find("id")->is_number());
@@ -363,8 +392,10 @@ TEST_SUITE("tgf json api: parse data") {
 		REQUIRE(dk != nullptr);
 		REQUIRE(dk->size() == 1);
 		const json::value& leaf = (*dk)[0];
+		REQUIRE(leaf.find("symbol") != nullptr);
 		CHECK(leaf.find("symbol")->as_string() == "");
 		CHECK(leaf.find("id") == nullptr);
+		REQUIRE(leaf.find("text") != nullptr);
 		CHECK(leaf.find("text")->as_string() == "1");
 	}
 
@@ -390,6 +421,8 @@ TEST_SUITE("tgf json api: help and quit") {
 		auto r = run_repl({
 			R"({"id":1,"cmd":"help","command":"load"})"});
 		REQUIRE(r.responses.size() == 1);
+		REQUIRE(result_of(r.responses[0]) != nullptr);
+		REQUIRE(result_of(r.responses[0])->find("text") != nullptr);
 		auto text = result_of(r.responses[0])->find("text")->as_string();
 		CHECK(text.find("load") != std::string::npos);
 		CHECK(text.find("short: l") != std::string::npos);
@@ -408,7 +441,7 @@ TEST_SUITE("tgf json api: parse file") {
 	TEST_CASE("eval form parses an input file") {
 		scratch_file in("tgf_json_api_input.txt", "123");
 		auto r = run_repl({
-			eval_request(1, "parse file \"" + in.path + "\"") });
+			eval_request(1, "parse file " + repl_string(in.path)) });
 		REQUIRE(r.responses.size() == 1);
 		CHECK(r.responses[0].find("status")->as_string() == "ok");
 		auto res = r.responses[0].find("results");
@@ -419,6 +452,7 @@ TEST_SUITE("tgf json api: parse file") {
 		const json::value* data = response_data(r.responses[0]);
 		REQUIRE(data != nullptr);
 		CHECK(data->find("tree") != nullptr);
+		REQUIRE(data->find("terminals") != nullptr);
 		CHECK(data->find("terminals")->as_string() == "123");
 	}
 
@@ -430,6 +464,7 @@ TEST_SUITE("tgf json api: parse file") {
 		const json::value* data = response_data(r.responses[0]);
 		REQUIRE(data != nullptr);
 		CHECK(data->find("tree") != nullptr);
+		REQUIRE(data->find("terminals") != nullptr);
 		CHECK(data->find("terminals")->as_string() == "123");
 	}
 }
@@ -445,7 +480,9 @@ TEST_SUITE("tgf json api: grammar commands") {
 			CHECK(resp.find("status")->as_string() == "ok");
 			const json::value* data = response_data(resp);
 			REQUIRE(data != nullptr);
+			REQUIRE(data->find("file") != nullptr);
 			CHECK(data->find("file")->as_string() == grammar_path());
+			REQUIRE(data->find("source") != nullptr);
 			CHECK(data->find("source")->as_string() == text);
 		}
 	}
@@ -466,6 +503,7 @@ TEST_SUITE("tgf json api: grammar commands") {
 			CHECK(prods->is_array());
 			CHECK(prods->size() > 0);
 			for (const auto& p : *prods) CHECK(p.is_string());
+			REQUIRE(data->find("start") != nullptr);
 			CHECK(data->find("start")->as_string()
 				== (i >= 2 ? "num" : "start"));
 		}
@@ -482,8 +520,10 @@ TEST_SUITE("tgf json api: grammar commands") {
 			CHECK(r.responses[i].find("status")->as_string() == "ok");
 			const json::value* data = response_data(r.responses[i]);
 			REQUIRE(data != nullptr);
+			REQUIRE(data->find("start") != nullptr);
 			CHECK(data->find("start")->as_string()
 				== (i >= 2 ? "num" : "start"));
+			REQUIRE(data->find("changed") != nullptr);
 			CHECK(data->find("changed")->as_bool() == (i >= 2));
 		}
 	}
@@ -499,8 +539,10 @@ TEST_SUITE("tgf json api: grammar commands") {
 			CHECK(r.responses[i].find("status")->as_string() == "ok");
 			const json::value* data = response_data(r.responses[i]);
 			REQUIRE(data != nullptr);
+			REQUIRE(data->find("symbol") != nullptr);
 			CHECK(data->find("symbol")->as_string()
 				== (i >= 2 ? "num" : "start"));
+			REQUIRE(data->find("productions") != nullptr);
 			CHECK(data->find("productions")->is_array());
 		}
 	}
@@ -512,7 +554,7 @@ TEST_SUITE("tgf json api: load and reload") {
 			read_file(grammar_path()));
 		auto r = run_repl({
 			file_request(1, "load", g.path),
-			eval_request(2, "load \"" + g.path + "\""),
+			eval_request(2, "load " + repl_string(g.path)),
 			R"({"id":3,"cmd":"reload"})",
 			eval_request(4, "reload"),
 			R"({"id":5,"cmd":"grammar"})" });
@@ -522,10 +564,13 @@ TEST_SUITE("tgf json api: load and reload") {
 			const json::value* data = response_data(r.responses[i]);
 			REQUIRE(data != nullptr);
 			if (i == 4) {
+				REQUIRE(data->find("file") != nullptr);
 				CHECK(data->find("file")->as_string() == g.path);
 				continue;
 			}
+			REQUIRE(data->find("loaded") != nullptr);
 			CHECK(data->find("loaded")->as_bool());
+			REQUIRE(data->find("grammar") != nullptr);
 			CHECK(data->find("grammar")->as_string() == g.path);
 		}
 	}
@@ -575,14 +620,20 @@ TEST_SUITE("tgf json api: option commands") {
 		const json::value* v0 = result_of(r.responses[0])->find("value");
 		REQUIRE(v0 != nullptr);
 		CHECK(v0->as_bool());
+		REQUIRE(result_of(r.responses[1]) != nullptr);
+		REQUIRE(result_of(r.responses[1])->find("option") != nullptr);
 		CHECK(result_of(r.responses[1])->find("option")->as_string()
 			== "derive-char-classes");
+		REQUIRE(result_of(r.responses[1])->find("value") != nullptr);
 		CHECK(!result_of(r.responses[1])->find("value")->as_bool());
+		REQUIRE(result_of(r.responses[2])->find("value") != nullptr);
 		CHECK(!result_of(r.responses[2])->find("value")->as_bool());
 		auto res = r.responses[3].find("results");
 		REQUIRE(res != nullptr);
 		REQUIRE(res->size() == 2);
+		REQUIRE((*res)[0].find("result")->find("value") != nullptr);
 		CHECK((*res)[0].find("result")->find("value")->as_bool());
+		REQUIRE((*res)[1].find("result")->find("value") != nullptr);
 		CHECK((*res)[1].find("result")->find("value")->as_bool());
 	}
 	TEST_CASE("toggle, enable and disable flip a bool option") {
@@ -599,8 +650,10 @@ TEST_SUITE("tgf json api: option commands") {
 			CHECK(r.responses[i].find("status")->as_string() == "ok");
 			const json::value* data = response_data(r.responses[i]);
 			REQUIRE(data != nullptr);
+			REQUIRE(data->find("option") != nullptr);
 			CHECK(data->find("option")->as_string()
 				== "print-ambiguity");
+			REQUIRE(data->find("value") != nullptr);
 			CHECK(data->find("value")->as_bool() == want[i]);
 		}
 	}
@@ -622,8 +675,10 @@ TEST_SUITE("tgf json api: option commands") {
 			CHECK(r.responses[i].find("status")->as_string() == "ok");
 			const json::value* data = response_data(r.responses[i]);
 			REQUIRE(data != nullptr);
+			REQUIRE(data->find("option") != nullptr);
 			CHECK(data->find("option")->as_string()
 				== "error-verbosity");
+			REQUIRE(data->find("value") != nullptr);
 			CHECK(data->find("value")->as_string() == want[i]);
 		}
 		CHECK(r.responses[6].find("status")->as_string() == "error");
@@ -677,6 +732,7 @@ TEST_SUITE("tgf json api: option commands") {
 			CHECK(vs[i].find("status")->as_string() == "ok");
 			const json::value* data = response_data(vs[i]);
 			REQUIRE(data != nullptr);
+			REQUIRE(data->find("value") != nullptr);
 			CHECK(data->find("value")->as_bool() == want[i]);
 		}
 		CHECK(!re.get_parse_options().enable_gc);
@@ -697,6 +753,7 @@ TEST_SUITE("tgf json api: request safety") {
 		CHECK(r.responses[3].find("status")->as_string() == "ok");
 		const json::value* data = response_data(r.responses[3]);
 		REQUIRE(data != nullptr);
+		REQUIRE(data->find("version") != nullptr);
 		CHECK(data->find("version")->as_string().size() > 0);
 	}
 
@@ -723,15 +780,24 @@ TEST_SUITE("tgf json api: state") {
 		for (const auto& resp : r.responses) {
 			const json::value* s = resp.find("state");
 			REQUIRE(s != nullptr);
+			REQUIRE(s->find("grammar") != nullptr);
 			CHECK(s->find("grammar")->as_string() == grammar_path());
 			REQUIRE(s->find("start") != nullptr);
 		}
+		REQUIRE(r.responses[0].find("state") != nullptr);
+		REQUIRE(r.responses[0].find("state")->find("start") != nullptr);
 		CHECK(r.responses[0].find("state")->find("start")
 			->as_string() == "start");
+		REQUIRE(r.responses[1].find("state") != nullptr);
+		REQUIRE(r.responses[1].find("state")->find("start") != nullptr);
 		CHECK(r.responses[1].find("state")->find("start")
 			->as_string() == "num");
+		REQUIRE(r.responses[2].find("state") != nullptr);
+		REQUIRE(r.responses[2].find("state")->find("start") != nullptr);
 		CHECK(r.responses[2].find("state")->find("start")
 			->as_string() == "num");
+		REQUIRE(r.responses[3].find("state") != nullptr);
+		REQUIRE(r.responses[3].find("state")->find("start") != nullptr);
 		CHECK(r.responses[3].find("state")->find("start")
 			->as_string() == "num");
 		auto res = r.responses[3].find("results");
@@ -756,9 +822,12 @@ TEST_SUITE("tgf json api: production ids") {
 		CHECK(pids->size() == prods->size());
 		for (size_t i = 0; i != pids->size(); ++i) {
 			const json::value& e = (*pids)[i];
+			REQUIRE(e.find("index") != nullptr);
 			CHECK(e.find("index")->as_number()
 				== static_cast<double>(i));
+			REQUIRE(e.find("head") != nullptr);
 			CHECK(e.find("head")->is_number());
+			REQUIRE(e.find("body") != nullptr);
 			CHECK(e.find("body")->is_array());
 			REQUIRE(e.find("guard") != nullptr);
 			CHECK(e.find("guard")->is_null());
@@ -802,11 +871,14 @@ TEST_SUITE("tgf json api: production ids") {
 		const json::value* pids = data->find("production_ids");
 		REQUIRE(pids != nullptr);
 		bool found = false;
-		for (const auto& e : *pids)
+		for (const auto& e : *pids) {
+			REQUIRE(e.find("conjunctive") != nullptr);
 			if (e.find("conjunctive")->as_bool()) {
+				REQUIRE(e.find("body") != nullptr);
 				CHECK(e.find("body")->size() >= 2);
 				found = true;
 			}
+		}
 		CHECK(found);
 	}
 }
@@ -820,13 +892,16 @@ TEST_SUITE("tgf json api: ambiguous data") {
 		REQUIRE(data != nullptr);
 		const json::value* amb = data->find("ambiguous");
 		REQUIRE(amb != nullptr);
+		REQUIRE(amb->find("trees") != nullptr);
 		CHECK(amb->find("trees")->as_number() == 2);
 		const json::value* nodes = amb->find("nodes");
 		REQUIRE(nodes != nullptr);
 		REQUIRE(nodes->size() == 1);
 		const json::value& n = (*nodes)[0];
+		REQUIRE(n.find("symbol") != nullptr);
 		CHECK(n.find("symbol")->as_string() == "A");
 		CHECK(n.find("id")->is_number());
+		REQUIRE(n.find("range") != nullptr);
 		CHECK(n.find("range")->size() == 2);
 		const json::value* alts = n.find("alternatives");
 		REQUIRE(alts != nullptr);
@@ -836,6 +911,7 @@ TEST_SUITE("tgf json api: ambiguous data") {
 			const json::value* ch = (*alts)[i].find("children");
 			REQUIRE(ch != nullptr);
 			REQUIRE(ch->size() == 1);
+			REQUIRE((*ch)[0].find("symbol") != nullptr);
 			got.insert((*ch)[0].find("symbol")->as_string());
 			CHECK((*ch)[0].find("id")->is_number());
 			CHECK((*ch)[0].find("children") != nullptr);
@@ -877,10 +953,13 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 		auto vs = lines_of(text);
 		REQUIRE(vs.size() == 1);
 		CHECK(vs[0].find("status")->as_string() == "ok");
+		REQUIRE(vs[0].find("result") != nullptr);
 		CHECK(vs[0].find("result")->find("tree") != nullptr);
 		const json::value* s = vs[0].find("state");
 		REQUIRE(s != nullptr);
+		REQUIRE(s->find("grammar") != nullptr);
 		CHECK(s->find("grammar")->as_string() == grammar_path());
+		REQUIRE(s->find("start") != nullptr);
 		CHECK(s->find("start")->as_string() == "start");
 		CHECK(code == 0);
 	}
@@ -893,9 +972,11 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 		REQUIRE(vs.size() == 1);
 		auto res = vs[0].find("result");
 		REQUIRE(res != nullptr);
+		REQUIRE(res->find("start") != nullptr);
 		CHECK(res->find("start")->as_string() == "start");
 		CHECK(res->find("productions") != nullptr);
 		REQUIRE(res->find("production_ids") != nullptr);
+		REQUIRE(res->find("productions") != nullptr);
 		CHECK(res->find("production_ids")->size()
 			== res->find("productions")->size());
 		CHECK(vs[0].find("state") != nullptr);
@@ -913,6 +994,7 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 		auto vs = lines_of(text);
 		REQUIRE(vs.size() == 1);
 		CHECK(vs[0].find("status")->as_string() == "ok");
+		REQUIRE(vs[0].find("result") != nullptr);
 		auto files = vs[0].find("result")->find("files");
 		REQUIRE(files != nullptr);
 		CHECK(files->size() >= 2);
@@ -933,6 +1015,8 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 		REQUIRE(res != nullptr);
 		REQUIRE(res->size() == 1);
 		CHECK((*res)[0].find("cmd")->as_string() == "version");
+		REQUIRE(vs[0].find("state") != nullptr);
+		REQUIRE(vs[0].find("state")->find("start") != nullptr);
 		CHECK(vs[0].find("state")->find("start")->as_string()
 			== "start");
 		CHECK(code == 0);
@@ -945,8 +1029,10 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 		auto vs = lines_of(text);
 		REQUIRE(vs.size() == 1);
 		CHECK(vs[0].find("status")->as_string() == "ok");
+		REQUIRE(vs[0].find("result") != nullptr);
 		auto ig = vs[0].find("result")->find("internal_grammar");
 		REQUIRE(ig != nullptr);
+		REQUIRE(ig->find("start") != nullptr);
 		CHECK(ig->find("start")->as_string() == "start");
 		auto prods = ig->find("productions");
 		REQUIRE(prods != nullptr);
@@ -963,6 +1049,7 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 		auto vs = lines_of(text);
 		REQUIRE(vs.size() == 1);
 		CHECK(vs[0].find("status")->as_string() == "ok");
+		REQUIRE(vs[0].find("result") != nullptr);
 		auto bt = vs[0].find("result")->find("bintree_totals");
 		REQUIRE(bt != nullptr);
 		CHECK(bt->find("get_hits") != nullptr);
@@ -974,7 +1061,9 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 		REQUIRE(groups != nullptr);
 		CHECK(groups->size() == 5);
 		for (const auto& g : *groups) {
+			REQUIRE(g.find("size") != nullptr);
 			CHECK(g.find("size")->is_number());
+			REQUIRE(g.find("triples") != nullptr);
 			CHECK(g.find("triples")->is_number());
 		}
 		REQUIRE(bt->find("largest_group_samples") != nullptr);
@@ -990,13 +1079,18 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 			"--json", "--nullable" }, code);
 		auto vs = lines_of(text);
 		REQUIRE(vs.size() == 1);
+		REQUIRE(vs[0].find("result") != nullptr);
 		auto nl = vs[0].find("result")->find("nullable");
 		REQUIRE(nl != nullptr);
 		REQUIRE(nl->size() == 1);
 		const json::value& e = (*nl)[0];
+		REQUIRE(e.find("symbol") != nullptr);
 		CHECK(e.find("symbol")->as_string() == "a");
+		REQUIRE(e.find("id") != nullptr);
 		CHECK(e.find("id")->is_number());
+		REQUIRE(e.find("index") != nullptr);
 		CHECK(e.find("index")->is_number());
+		REQUIRE(e.find("production") != nullptr);
 		CHECK(e.find("production")->is_string());
 		CHECK(code == 0);
 	}

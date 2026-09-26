@@ -11,6 +11,7 @@ set(TOP_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 
 set(TGF_STANDALONE_SOURCES
     ${TOP_SRC}/src/tgf/tgf_cli.cpp
+    ${TOP_SRC}/src/tgf/tgf_json_api.cpp
     ${TOP_SRC}/src/format/tgf/tgf_parser.generated.cpp
     ${TOP_SRC}/src/format/json/json_parser.generated.cpp
     ${TOP_SRC}/src/format/treemr/treemr_parser.generated.cpp
