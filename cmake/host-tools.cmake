@@ -44,6 +44,20 @@ else()
 		-DTAU_PARSER_INSTALL=OFF
 		-DTAU_SHARED_PREFIX=${TAU_SHARED_PREFIX_RESOLVED}
 		-DTAU_BUILD_JOBS=${TAU_BUILD_JOBS_RESOLVED})
+	# The host build must not fall back to the distro gcc when a cross build
+	# supplies an explicit native compiler.
+	set(TAU_PARSER_HOST_C_COMPILER "" CACHE FILEPATH
+		"Native C compiler for the host tgf when cross-compiling")
+	set(TAU_PARSER_HOST_CXX_COMPILER "" CACHE FILEPATH
+		"Native C++ compiler for the host tgf when cross-compiling")
+	if(TAU_PARSER_HOST_C_COMPILER)
+		list(APPEND TAU_HOST_TGF_CMAKE_ARGS
+			-DCMAKE_C_COMPILER=${TAU_PARSER_HOST_C_COMPILER})
+	endif()
+	if(TAU_PARSER_HOST_CXX_COMPILER)
+		list(APPEND TAU_HOST_TGF_CMAKE_ARGS
+			-DCMAKE_CXX_COMPILER=${TAU_PARSER_HOST_CXX_COMPILER})
+	endif()
 	# Reuse whatever compiler launcher (ccache, ...) the outer configure
 	# already wired in, rather than forcing a choice of our own.
 	if(CMAKE_C_COMPILER_LAUNCHER)

@@ -125,9 +125,18 @@ if(TAU_PARSER_INSTALL)
 		FILES_MATCHING
 			PATTERN "*.h"
 			PATTERN "tgf" EXCLUDE
+			PATTERN "doctest*.h" EXCLUDE
 			PATTERN "CMakeFiles" EXCLUDE
 			PATTERN "CMakeLists.txt" EXCLUDE
 			PATTERN "*.cmake*" EXCLUDE
+	)
+	# `PATTERN "tgf" EXCLUDE` drops the whole format/tgf/ directory, but parser.h
+	# includes format/tgf/tgf.h unless TAU_PARSER_NO_TGF is set, so the SDK must
+	# carry it. Re-add just that directory's headers.
+	install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/format/tgf
+		DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}/format
+		COMPONENT "Library"
+		FILES_MATCHING PATTERN "*.h"
 	)
 	# Install targets based on what was built
 	if(TAU_PARSER_BUILD_STATIC_LIBRARY)
@@ -136,8 +145,8 @@ if(TAU_PARSER_INSTALL)
 			RUNTIME       DESTINATION ${CMAKE_INSTALL_BINDIR}
 			LIBRARY       DESTINATION ${CMAKE_INSTALL_LIBDIR}
 			ARCHIVE       DESTINATION ${CMAKE_INSTALL_LIBDIR}
+			COMPONENT     "Library"
 			INCLUDES      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}
-			COMPONENT "Library"
 		)
 	endif()
 
@@ -147,8 +156,8 @@ if(TAU_PARSER_INSTALL)
 			RUNTIME       DESTINATION ${CMAKE_INSTALL_BINDIR}
 			LIBRARY       DESTINATION ${CMAKE_INSTALL_LIBDIR}
 			ARCHIVE       DESTINATION ${CMAKE_INSTALL_LIBDIR}
+			COMPONENT     "Library"
 			INCLUDES      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}
-			COMPONENT "Library"
 		)
 	endif()
 
@@ -165,6 +174,14 @@ if(TAU_PARSER_INSTALL)
 		)
 	elseif(DEFINED unordered_dense_SOURCE_DIR)
 		install(DIRECTORY "${unordered_dense_SOURCE_DIR}/include/ankerl"
+			DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+			COMPONENT "Library"
+			FILES_MATCHING PATTERN "*.h"
+		)
+	elseif(NOT TAU_PARSER_UNORDERED_DENSE_HEADER_ROOT STREQUAL "")
+		# Ship the header from the resolved package prefix, so the SDK stays
+		# self-contained and no package path enters the export.
+		install(DIRECTORY "${TAU_PARSER_UNORDERED_DENSE_HEADER_ROOT}/ankerl"
 			DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 			COMPONENT "Library"
 			FILES_MATCHING PATTERN "*.h"

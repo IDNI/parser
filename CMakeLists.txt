@@ -338,36 +338,7 @@ endfunction()
 ################################################################################
 
 # ankerl/unordered_dense — Robin Hood open-addressing hash map (MIT)
-# Prefer a local vendored copy (external/ankerl/unordered_dense.h) over
-# fetching from the network so offline builds work.
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/ankerl/unordered_dense.h")
-	message(STATUS "Using vendored ankerl/unordered_dense from external/")
-	add_library(unordered_dense INTERFACE)
-	target_include_directories(unordered_dense INTERFACE
-		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external>
-		$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-else()
-	include(FetchContent)
-	FetchContent_Declare(
-		unordered_dense
-		GIT_REPOSITORY https://github.com/martinus/unordered_dense.git
-		GIT_TAG        v4.4.0
-		GIT_SHALLOW    TRUE
-	)
-	FetchContent_MakeAvailable(unordered_dense)
-endif()
-
-# Treat unordered_dense's headers as system includes: some compiler
-# versions (observed: GCC 13.3.0 at -O3) emit a false-positive
-# -Warray-bounds inside its memset-based clear_buckets() once inlined,
-# which downstream -Werror consumers (e.g. tauparser_static) would
-# otherwise turn into a hard build failure over third-party code.
-get_target_property(unordered_dense_include_dirs unordered_dense
-	INTERFACE_INCLUDE_DIRECTORIES)
-if(unordered_dense_include_dirs)
-	set_target_properties(unordered_dense PROPERTIES
-		INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${unordered_dense_include_dirs}")
-endif()
+include(unordered-dense)
 
 ################################################################################
 
