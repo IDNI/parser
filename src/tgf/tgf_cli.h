@@ -260,9 +260,10 @@ format::json::value state_value(const tgf_repl_evaluator& re);
 format::json::value json_eval_response(const format::json::value& id,
 	const eval_result& er, const format::json::value& state);
 
-/// Response of one one-shot CLI command: {"status","result",
+/// Response of one one-shot CLI command: {"cmd","status","result",
 /// "state":{...},"report"}.
 format::json::value json_result_response(cmd_status status,
+	const std::string& cmd,
 	const format::json::value& result,
 	const format::json::value& state,
 	const diagnostics::report& report);

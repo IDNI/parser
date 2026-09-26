@@ -1,0 +1,1818 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://github.com/IDNI/parser/blob/main/src/format/tgf_api.json/tgf_api.schema.json",
+	"title": "tgf JSON API",
+	"description": "One line of the tgf JSON API: the hello line, one request, or one response.",
+	"oneOf": [
+		{
+			"$ref": "#/$defs/hello_line"
+		},
+		{
+			"$ref": "#/$defs/request"
+		},
+		{
+			"$ref": "#/$defs/response"
+		}
+	],
+	"$defs": {
+		"report": {
+			"$ref": "https://github.com/IDNI/parser/blob/main/src/format/json/report.schema.json"
+		},
+		"ast_node": {
+			"$ref": "https://github.com/IDNI/parser/blob/main/src/format/ast.json/ast.schema.json#/$defs/node"
+		},
+		"id": true,
+		"state": {
+			"type": "object",
+			"properties": {
+				"grammar": {
+					"type": "string"
+				},
+				"start": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"grammar",
+				"start"
+			],
+			"additionalProperties": false
+		},
+		"status": {
+			"enum": [
+				"ok",
+				"error",
+				"incomplete",
+				"quit"
+			]
+		},
+		"symbol": {
+			"type": "string",
+			"pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+		},
+		"option_value": {
+			"anyOf": [
+				{
+					"type": "boolean"
+				},
+				{
+					"enum": [
+						"basic",
+						"detailed",
+						"root-cause"
+					]
+				},
+				{
+					"type": "array",
+					"items": {
+						"$ref": "#/$defs/symbol"
+					}
+				},
+				{
+					"type": "array",
+					"items": {
+						"type": "array",
+						"items": {
+							"$ref": "#/$defs/symbol"
+						}
+					}
+				}
+			]
+		},
+		"option_name": {
+			"enum": [
+				"error-verbosity",
+				"status",
+				"colors",
+				"print-ambiguity",
+				"print-graphs",
+				"print-rules",
+				"print-facts",
+				"print-terminals",
+				"measure-parsing",
+				"measure-each-pos",
+				"measure-forest",
+				"measure-preprocess",
+				"gc",
+				"debug",
+				"auto-disambiguate",
+				"trim-terminals",
+				"inline-char-classes",
+				"derive-char-classes",
+				"nodisambig-list",
+				"enabled-productions",
+				"trim",
+				"trim-children",
+				"trim-children-terminals",
+				"inline"
+			]
+		},
+		"bool_option_name": {
+			"enum": [
+				"status",
+				"colors",
+				"print-ambiguity",
+				"print-graphs",
+				"print-rules",
+				"print-facts",
+				"print-terminals",
+				"measure-parsing",
+				"measure-each-pos",
+				"measure-forest",
+				"measure-preprocess",
+				"gc",
+				"debug",
+				"auto-disambiguate",
+				"trim-terminals",
+				"inline-char-classes",
+				"derive-char-classes"
+			]
+		},
+		"list_option_name": {
+			"enum": [
+				"nodisambig-list",
+				"enabled-productions",
+				"trim",
+				"trim-children",
+				"trim-children-terminals"
+			]
+		},
+		"action_option_name": {
+			"enum": [
+				"nodisambig-list",
+				"enabled-productions",
+				"trim",
+				"trim-children",
+				"trim-children-terminals",
+				"inline"
+			]
+		},
+		"symbol_list": {
+			"type": "array",
+			"items": {
+				"$ref": "#/$defs/symbol"
+			}
+		},
+		"treepath_list": {
+			"type": "array",
+			"items": {
+				"type": "array",
+				"items": {
+					"$ref": "#/$defs/symbol"
+				}
+			}
+		},
+		"options": {
+			"type": "object",
+			"properties": {
+				"error-verbosity": {
+					"enum": [
+						"basic",
+						"detailed",
+						"root-cause"
+					]
+				},
+				"status": {
+					"type": "boolean"
+				},
+				"colors": {
+					"type": "boolean"
+				},
+				"print-ambiguity": {
+					"type": "boolean"
+				},
+				"print-graphs": {
+					"type": "boolean"
+				},
+				"print-rules": {
+					"type": "boolean"
+				},
+				"print-facts": {
+					"type": "boolean"
+				},
+				"print-terminals": {
+					"type": "boolean"
+				},
+				"measure-parsing": {
+					"type": "boolean"
+				},
+				"measure-each-pos": {
+					"type": "boolean"
+				},
+				"measure-forest": {
+					"type": "boolean"
+				},
+				"measure-preprocess": {
+					"type": "boolean"
+				},
+				"gc": {
+					"type": "boolean"
+				},
+				"debug": {
+					"type": "boolean"
+				},
+				"auto-disambiguate": {
+					"type": "boolean"
+				},
+				"trim-terminals": {
+					"type": "boolean"
+				},
+				"inline-char-classes": {
+					"type": "boolean"
+				},
+				"derive-char-classes": {
+					"type": "boolean"
+				},
+				"nodisambig-list": {
+					"$ref": "#/$defs/symbol_list"
+				},
+				"enabled-productions": {
+					"$ref": "#/$defs/symbol_list"
+				},
+				"trim": {
+					"$ref": "#/$defs/symbol_list"
+				},
+				"trim-children": {
+					"$ref": "#/$defs/symbol_list"
+				},
+				"trim-children-terminals": {
+					"$ref": "#/$defs/symbol_list"
+				},
+				"inline": {
+					"$ref": "#/$defs/treepath_list"
+				}
+			},
+			"required": [
+				"error-verbosity",
+				"status",
+				"colors",
+				"print-ambiguity",
+				"print-graphs",
+				"print-rules",
+				"print-facts",
+				"print-terminals",
+				"measure-parsing",
+				"measure-each-pos",
+				"measure-forest",
+				"measure-preprocess",
+				"gc",
+				"debug",
+				"auto-disambiguate",
+				"trim-terminals",
+				"inline-char-classes",
+				"derive-char-classes",
+				"nodisambig-list",
+				"enabled-productions",
+				"trim",
+				"trim-children",
+				"trim-children-terminals",
+				"inline"
+			],
+			"additionalProperties": false
+		},
+		"production_id": {
+			"type": "object",
+			"properties": {
+				"index": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"head": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"body": {
+					"type": "array",
+					"items": {
+						"type": "array",
+						"items": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"minimum": 0
+						}
+					}
+				},
+				"guard": {
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"conjunctive": {
+					"type": "boolean"
+				}
+			},
+			"required": [
+				"index",
+				"head",
+				"body",
+				"guard",
+				"conjunctive"
+			],
+			"additionalProperties": false
+		},
+		"production_id_list": {
+			"type": "array",
+			"items": {
+				"$ref": "#/$defs/production_id"
+			}
+		},
+		"production_string_list": {
+			"type": "array",
+			"items": {
+				"type": "string"
+			}
+		},
+		"range": {
+			"type": "array",
+			"items": {
+				"type": "integer",
+				"minimum": 0
+			},
+			"minItems": 2,
+			"maxItems": 2
+		},
+		"ambiguous_alternative": {
+			"type": "object",
+			"properties": {
+				"children": {
+					"type": "array",
+					"items": {
+						"$ref": "#/$defs/ast_node"
+					}
+				}
+			},
+			"required": [
+				"children"
+			],
+			"additionalProperties": false
+		},
+		"ambiguous_node": {
+			"type": "object",
+			"properties": {
+				"symbol": {
+					"type": "string"
+				},
+				"id": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"range": {
+					"$ref": "#/$defs/range"
+				},
+				"alternatives": {
+					"type": "array",
+					"items": {
+						"$ref": "#/$defs/ambiguous_alternative"
+					}
+				}
+			},
+			"required": [
+				"symbol",
+				"id",
+				"range",
+				"alternatives"
+			],
+			"additionalProperties": false
+		},
+		"ambiguous": {
+			"type": "object",
+			"properties": {
+				"trees": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"nodes": {
+					"type": "array",
+					"items": {
+						"$ref": "#/$defs/ambiguous_node"
+					}
+				}
+			},
+			"required": [
+				"trees",
+				"nodes"
+			],
+			"additionalProperties": false
+		},
+		"histogram": {
+			"type": "object",
+			"properties": {
+				"0": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"1": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"2": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"3": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"4-7": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"8-15": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"16-63": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"64+": {
+					"type": "integer",
+					"minimum": 0
+				}
+			},
+			"required": [
+				"0",
+				"1",
+				"2",
+				"3",
+				"4-7",
+				"8-15",
+				"16-63",
+				"64+"
+			],
+			"additionalProperties": false
+		},
+		"hash_group_sample": {
+			"type": "object",
+			"properties": {
+				"value": {
+					"type": "string"
+				},
+				"range": {
+					"$ref": "#/$defs/range"
+				},
+				"left": {
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"right": {
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"stored_hash": {
+					"type": "string"
+				},
+				"recomputed_hash": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"value",
+				"range",
+				"left",
+				"right",
+				"stored_hash",
+				"recomputed_hash"
+			],
+			"additionalProperties": false
+		},
+		"bintree_totals": {
+			"type": "object",
+			"properties": {
+				"get_hits": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"get_misses": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"geth_calls": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"buckets": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"entries": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"load_factor": {
+					"type": "number"
+				},
+				"max_chain": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"mean_chain": {
+					"type": "number"
+				},
+				"distinct_hashes": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"largest_group_size": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"distinct_values": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"distinct_child_pairs": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"leaf_count": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"stale_hash_count": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"largest_group_hash": {
+					"type": "string"
+				},
+				"largest_group_stale_count": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"chain_length_histogram": {
+					"$ref": "#/$defs/histogram"
+				},
+				"top_hash_groups": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"properties": {
+							"size": {
+								"type": "integer",
+								"minimum": 0
+							},
+							"triples": {
+								"type": "integer",
+								"minimum": 0
+							}
+						},
+						"required": [
+							"size",
+							"triples"
+						],
+						"additionalProperties": false
+					}
+				},
+				"largest_group_samples": {
+					"type": "array",
+					"items": {
+						"$ref": "#/$defs/hash_group_sample"
+					}
+				}
+			},
+			"required": [
+				"get_hits",
+				"get_misses",
+				"geth_calls",
+				"buckets",
+				"entries",
+				"load_factor",
+				"max_chain",
+				"mean_chain",
+				"distinct_hashes",
+				"largest_group_size",
+				"distinct_values",
+				"distinct_child_pairs",
+				"leaf_count",
+				"stale_hash_count",
+				"largest_group_hash",
+				"largest_group_stale_count",
+				"chain_length_histogram",
+				"top_hash_groups",
+				"largest_group_samples"
+			],
+			"additionalProperties": false
+		},
+		"parse_result": {
+			"type": "object",
+			"properties": {
+				"input": {
+					"type": "string"
+				},
+				"ambiguous": {
+					"$ref": "#/$defs/ambiguous"
+				},
+				"terminals": {
+					"type": "string"
+				},
+				"tml_rules": {
+					"type": "string"
+				},
+				"tml_facts": {
+					"type": "string"
+				},
+				"tree": {
+					"$ref": "#/$defs/ast_node"
+				}
+			},
+			"additionalProperties": false
+		},
+		"repl_grammar_result": {
+			"type": "object",
+			"properties": {
+				"file": {
+					"type": "string"
+				},
+				"source": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"file",
+				"source"
+			],
+			"additionalProperties": false
+		},
+		"igrammar_result": {
+			"type": "object",
+			"properties": {
+				"start": {
+					"type": "string"
+				},
+				"productions": {
+					"$ref": "#/$defs/production_string_list"
+				},
+				"production_ids": {
+					"$ref": "#/$defs/production_id_list"
+				}
+			},
+			"required": [
+				"start",
+				"productions",
+				"production_ids"
+			],
+			"additionalProperties": false
+		},
+		"start_result": {
+			"type": "object",
+			"properties": {
+				"start": {
+					"type": "string"
+				},
+				"changed": {
+					"type": "boolean"
+				}
+			},
+			"required": [
+				"start",
+				"changed"
+			],
+			"additionalProperties": false
+		},
+		"unreachable_result": {
+			"type": "object",
+			"properties": {
+				"symbol": {
+					"type": "string"
+				},
+				"productions": {
+					"$ref": "#/$defs/production_string_list"
+				},
+				"production_ids": {
+					"$ref": "#/$defs/production_id_list"
+				}
+			},
+			"required": [
+				"symbol",
+				"productions",
+				"production_ids"
+			],
+			"additionalProperties": false
+		},
+		"load_result": {
+			"type": "object",
+			"properties": {
+				"grammar": {
+					"type": "string"
+				},
+				"loaded": {
+					"type": "boolean"
+				}
+			},
+			"required": [
+				"grammar",
+				"loaded"
+			],
+			"additionalProperties": false
+		},
+		"help_result": {
+			"type": "object",
+			"properties": {
+				"command": {
+					"type": "string"
+				},
+				"text": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"command",
+				"text"
+			],
+			"additionalProperties": false
+		},
+		"version_result": {
+			"type": "object",
+			"properties": {
+				"version": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"version"
+			],
+			"additionalProperties": false
+		},
+		"license_result": {
+			"type": "object",
+			"properties": {
+				"license": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"license"
+			],
+			"additionalProperties": false
+		},
+		"empty_result": {
+			"type": "object",
+			"maxProperties": 0
+		},
+		"options_result": {
+			"type": "object",
+			"properties": {
+				"options": {
+					"$ref": "#/$defs/options"
+				}
+			},
+			"required": [
+				"options"
+			],
+			"additionalProperties": false
+		},
+		"single_option_result": {
+			"type": "object",
+			"properties": {
+				"option": {
+					"$ref": "#/$defs/option_name"
+				},
+				"value": true
+			},
+			"required": [
+				"option",
+				"value"
+			],
+			"additionalProperties": false,
+			"allOf": [
+				{
+					"if": {
+						"properties": {
+							"option": {
+								"$ref": "#/$defs/bool_option_name"
+							}
+						},
+						"required": [
+							"option"
+						]
+					},
+					"then": {
+						"properties": {
+							"value": {
+								"type": "boolean"
+							}
+						}
+					}
+				},
+				{
+					"if": {
+						"properties": {
+							"option": {
+								"const": "error-verbosity"
+							}
+						},
+						"required": [
+							"option"
+						]
+					},
+					"then": {
+						"properties": {
+							"value": {
+								"enum": [
+									"basic",
+									"detailed",
+									"root-cause"
+								]
+							}
+						}
+					}
+				},
+				{
+					"if": {
+						"properties": {
+							"option": {
+								"$ref": "#/$defs/list_option_name"
+							}
+						},
+						"required": [
+							"option"
+						]
+					},
+					"then": {
+						"properties": {
+							"value": {
+								"$ref": "#/$defs/symbol_list"
+							}
+						}
+					}
+				},
+				{
+					"if": {
+						"properties": {
+							"option": {
+								"const": "inline"
+							}
+						},
+						"required": [
+							"option"
+						]
+					},
+					"then": {
+						"properties": {
+							"value": {
+								"$ref": "#/$defs/treepath_list"
+							}
+						}
+					}
+				}
+			]
+		},
+		"option_result": {
+			"anyOf": [
+				{
+					"$ref": "#/$defs/single_option_result"
+				},
+				{
+					"$ref": "#/$defs/empty_result"
+				}
+			]
+		},
+		"get_result": {
+			"anyOf": [
+				{
+					"$ref": "#/$defs/options_result"
+				},
+				{
+					"$ref": "#/$defs/single_option_result"
+				},
+				{
+					"$ref": "#/$defs/empty_result"
+				}
+			]
+		},
+		"nullable_entry": {
+			"type": "object",
+			"properties": {
+				"symbol": {
+					"type": "string"
+				},
+				"id": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"index": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"production": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"symbol",
+				"id",
+				"index",
+				"production"
+			],
+			"additionalProperties": false
+		},
+		"cli_grammar_result": {
+			"type": "object",
+			"properties": {
+				"start": {
+					"type": "string"
+				},
+				"productions": {
+					"$ref": "#/$defs/production_string_list"
+				},
+				"production_ids": {
+					"$ref": "#/$defs/production_id_list"
+				},
+				"nullable": {
+					"type": "array",
+					"items": {
+						"$ref": "#/$defs/nullable_entry"
+					}
+				}
+			},
+			"required": [
+				"start",
+				"productions",
+				"production_ids"
+			],
+			"additionalProperties": false
+		},
+		"gen_result": {
+			"type": "object",
+			"properties": {
+				"files": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				}
+			},
+			"required": [
+				"files"
+			],
+			"additionalProperties": false
+		},
+		"parse_oneshot_result": {
+			"type": "object",
+			"properties": {
+				"input": {
+					"type": "string"
+				},
+				"ambiguous": {
+					"$ref": "#/$defs/ambiguous"
+				},
+				"terminals": {
+					"type": "string"
+				},
+				"tml_rules": {
+					"type": "string"
+				},
+				"tml_facts": {
+					"type": "string"
+				},
+				"tree": {
+					"$ref": "#/$defs/ast_node"
+				},
+				"internal_grammar": {
+					"$ref": "#/$defs/igrammar_result"
+				},
+				"bintree_totals": {
+					"$ref": "#/$defs/bintree_totals"
+				}
+			},
+			"additionalProperties": false
+		},
+		"hello": {
+			"type": "object",
+			"properties": {
+				"protocol": {
+					"const": 1
+				},
+				"version": {
+					"type": "string"
+				},
+				"grammar": {
+					"type": "string"
+				},
+				"fixed_grammar": {
+					"type": "boolean"
+				},
+				"start": {
+					"type": "string"
+				},
+				"options": {
+					"$ref": "#/$defs/options"
+				},
+				"report": {
+					"$ref": "#/$defs/report"
+				}
+			},
+			"required": [
+				"protocol",
+				"version",
+				"grammar",
+				"fixed_grammar",
+				"start",
+				"options",
+				"report"
+			],
+			"additionalProperties": false
+		},
+		"hello_line": {
+			"type": "object",
+			"properties": {
+				"hello": {
+					"$ref": "#/$defs/hello"
+				},
+				"state": {
+					"$ref": "#/$defs/state"
+				}
+			},
+			"required": [
+				"hello",
+				"state"
+			],
+			"additionalProperties": false
+		},
+		"request_eval": {
+			"type": "object",
+			"properties": {
+				"id": {
+					"$ref": "#/$defs/id"
+				},
+				"cmd": {
+					"const": "eval"
+				},
+				"src": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"cmd",
+				"src"
+			],
+			"additionalProperties": false
+		},
+		"request_parse": {
+			"type": "object",
+			"properties": {
+				"id": {
+					"$ref": "#/$defs/id"
+				},
+				"cmd": {
+					"const": "parse"
+				},
+				"input": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"cmd",
+				"input"
+			],
+			"additionalProperties": false
+		},
+		"request_file": {
+			"type": "object",
+			"properties": {
+				"id": {
+					"$ref": "#/$defs/id"
+				},
+				"cmd": {
+					"enum": [
+						"parse file",
+						"load"
+					]
+				},
+				"file": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"cmd",
+				"file"
+			],
+			"additionalProperties": false
+		},
+		"request_symbol": {
+			"type": "object",
+			"properties": {
+				"id": {
+					"$ref": "#/$defs/id"
+				},
+				"cmd": {
+					"enum": [
+						"start",
+						"internal-grammar",
+						"unreachable"
+					]
+				},
+				"symbol": {
+					"$ref": "#/$defs/symbol"
+				}
+			},
+			"required": [
+				"cmd"
+			],
+			"additionalProperties": false
+		},
+		"request_help": {
+			"type": "object",
+			"properties": {
+				"id": {
+					"$ref": "#/$defs/id"
+				},
+				"cmd": {
+					"const": "help"
+				},
+				"command": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"cmd"
+			],
+			"additionalProperties": false
+		},
+		"request_get": {
+			"type": "object",
+			"properties": {
+				"id": {
+					"$ref": "#/$defs/id"
+				},
+				"cmd": {
+					"const": "get"
+				},
+				"option": {
+					"$ref": "#/$defs/option_name"
+				}
+			},
+			"required": [
+				"cmd"
+			],
+			"additionalProperties": false
+		},
+		"request_set": {
+			"type": "object",
+			"properties": {
+				"id": {
+					"$ref": "#/$defs/id"
+				},
+				"cmd": {
+					"const": "set"
+				},
+				"option": {
+					"$ref": "#/$defs/option_name"
+				},
+				"value": {
+					"$ref": "#/$defs/option_value"
+				}
+			},
+			"required": [
+				"cmd",
+				"option",
+				"value"
+			],
+			"additionalProperties": false
+		},
+		"request_bool": {
+			"type": "object",
+			"properties": {
+				"id": {
+					"$ref": "#/$defs/id"
+				},
+				"cmd": {
+					"enum": [
+						"toggle",
+						"enable",
+						"disable"
+					]
+				},
+				"option": {
+					"$ref": "#/$defs/bool_option_name"
+				}
+			},
+			"required": [
+				"cmd",
+				"option"
+			],
+			"additionalProperties": false
+		},
+		"request_list": {
+			"type": "object",
+			"properties": {
+				"id": {
+					"$ref": "#/$defs/id"
+				},
+				"cmd": {
+					"enum": [
+						"add",
+						"delete"
+					]
+				},
+				"option": {
+					"$ref": "#/$defs/action_option_name"
+				},
+				"value": {
+					"type": "array",
+					"items": {
+						"anyOf": [
+							{
+								"$ref": "#/$defs/symbol"
+							},
+							{
+								"type": "array",
+								"items": {
+									"$ref": "#/$defs/symbol"
+								}
+							}
+						]
+					}
+				}
+			},
+			"required": [
+				"cmd",
+				"option",
+				"value"
+			],
+			"additionalProperties": false
+		},
+		"request_plain": {
+			"type": "object",
+			"properties": {
+				"id": {
+					"$ref": "#/$defs/id"
+				},
+				"cmd": {
+					"enum": [
+						"grammar",
+						"reload",
+						"version",
+						"license",
+						"quit",
+						"clear"
+					]
+				}
+			},
+			"required": [
+				"cmd"
+			],
+			"additionalProperties": false
+		},
+		"request": {
+			"oneOf": [
+				{
+					"$ref": "#/$defs/request_eval"
+				},
+				{
+					"$ref": "#/$defs/request_parse"
+				},
+				{
+					"$ref": "#/$defs/request_file"
+				},
+				{
+					"$ref": "#/$defs/request_symbol"
+				},
+				{
+					"$ref": "#/$defs/request_help"
+				},
+				{
+					"$ref": "#/$defs/request_get"
+				},
+				{
+					"$ref": "#/$defs/request_set"
+				},
+				{
+					"$ref": "#/$defs/request_bool"
+				},
+				{
+					"$ref": "#/$defs/request_list"
+				},
+				{
+					"$ref": "#/$defs/request_plain"
+				}
+			]
+		},
+		"eval_entry": {
+			"type": "object",
+			"properties": {
+				"cmd": {
+					"$ref": "#/$defs/command_name"
+				},
+				"status": {
+					"enum": [
+						"ok",
+						"error",
+						"quit"
+					]
+				},
+				"result": true,
+				"report": {
+					"$ref": "#/$defs/report"
+				}
+			},
+			"required": [
+				"cmd",
+				"status",
+				"result",
+				"report"
+			],
+			"additionalProperties": false,
+			"allOf": [
+				{
+					"$ref": "#/$defs/command_result_rules"
+				}
+			]
+		},
+		"eval_response": {
+			"type": "object",
+			"properties": {
+				"id": {
+					"$ref": "#/$defs/id"
+				},
+				"status": {
+					"$ref": "#/$defs/status"
+				},
+				"results": {
+					"type": "array",
+					"items": {
+						"$ref": "#/$defs/eval_entry"
+					}
+				},
+				"state": {
+					"$ref": "#/$defs/state"
+				},
+				"report": {
+					"$ref": "#/$defs/report"
+				}
+			},
+			"required": [
+				"id",
+				"status",
+				"results",
+				"state",
+				"report"
+			],
+			"additionalProperties": false
+		},
+		"structured_response": {
+			"type": "object",
+			"properties": {
+				"id": {
+					"$ref": "#/$defs/id"
+				},
+				"cmd": {
+					"$ref": "#/$defs/command_name"
+				},
+				"status": {
+					"enum": [
+						"ok",
+						"error",
+						"quit"
+					]
+				},
+				"result": true,
+				"state": {
+					"$ref": "#/$defs/state"
+				},
+				"report": {
+					"$ref": "#/$defs/report"
+				}
+			},
+			"required": [
+				"id",
+				"cmd",
+				"status",
+				"result",
+				"state",
+				"report"
+			],
+			"additionalProperties": false,
+			"allOf": [
+				{
+					"$ref": "#/$defs/command_result_rules"
+				}
+			]
+		},
+		"bare_response": {
+			"type": "object",
+			"properties": {
+				"id": {
+					"$ref": "#/$defs/id"
+				},
+				"status": {
+					"enum": [
+						"error",
+						"incomplete"
+					]
+				},
+				"state": {
+					"$ref": "#/$defs/state"
+				},
+				"report": {
+					"$ref": "#/$defs/report"
+				}
+			},
+			"required": [
+				"id",
+				"status",
+				"state",
+				"report"
+			],
+			"additionalProperties": false
+		},
+		"oneshot_response": {
+			"type": "object",
+			"properties": {
+				"cmd": {
+					"$ref": "#/$defs/oneshot_command_name"
+				},
+				"status": {
+					"enum": [
+						"ok",
+						"error"
+					]
+				},
+				"result": true,
+				"state": {
+					"$ref": "#/$defs/state"
+				},
+				"report": {
+					"$ref": "#/$defs/report"
+				}
+			},
+			"required": [
+				"cmd",
+				"status",
+				"result",
+				"state",
+				"report"
+			],
+			"additionalProperties": false,
+			"allOf": [
+				{
+					"$ref": "#/$defs/oneshot_result_rules"
+				}
+			]
+		},
+		"response": {
+			"oneOf": [
+				{
+					"$ref": "#/$defs/eval_response"
+				},
+				{
+					"$ref": "#/$defs/structured_response"
+				},
+				{
+					"$ref": "#/$defs/bare_response"
+				},
+				{
+					"$ref": "#/$defs/oneshot_response"
+				}
+			]
+		},
+		"command_result_rules": {
+			"allOf": [
+				{
+					"if": {
+						"properties": {
+							"cmd": {
+								"enum": [
+									"parse",
+									"parse file"
+								]
+							}
+						},
+						"required": [
+							"cmd"
+						]
+					},
+					"then": {
+						"properties": {
+							"result": {
+								"$ref": "#/$defs/parse_result"
+							}
+						}
+					}
+				},
+				{
+					"if": {
+						"properties": {
+							"cmd": {
+								"const": "grammar"
+							}
+						},
+						"required": [
+							"cmd"
+						]
+					},
+					"then": {
+						"properties": {
+							"result": {
+								"$ref": "#/$defs/repl_grammar_result"
+							}
+						}
+					}
+				},
+				{
+					"if": {
+						"properties": {
+							"cmd": {
+								"const": "internal-grammar"
+							}
+						},
+						"required": [
+							"cmd"
+						]
+					},
+					"then": {
+						"properties": {
+							"result": {
+								"$ref": "#/$defs/igrammar_result"
+							}
+						}
+					}
+				},
+				{
+					"if": {
+						"properties": {
+							"cmd": {
+								"const": "start"
+							}
+						},
+						"required": [
+							"cmd"
+						]
+					},
+					"then": {
+						"properties": {
+							"result": {
+								"$ref": "#/$defs/start_result"
+							}
+						}
+					}
+				},
+				{
+					"if": {
+						"properties": {
+							"cmd": {
+								"const": "unreachable"
+							}
+						},
+						"required": [
+							"cmd"
+						]
+					},
+					"then": {
+						"properties": {
+							"result": {
+								"$ref": "#/$defs/unreachable_result"
+							}
+						}
+					}
+				},
+				{
+					"if": {
+						"properties": {
+							"cmd": {
+								"enum": [
+									"reload",
+									"load"
+								]
+							}
+						},
+						"required": [
+							"cmd"
+						]
+					},
+					"then": {
+						"properties": {
+							"result": {
+								"$ref": "#/$defs/load_result"
+							}
+						}
+					}
+				},
+				{
+					"if": {
+						"properties": {
+							"cmd": {
+								"const": "help"
+							}
+						},
+						"required": [
+							"cmd"
+						]
+					},
+					"then": {
+						"properties": {
+							"result": {
+								"$ref": "#/$defs/help_result"
+							}
+						}
+					}
+				},
+				{
+					"if": {
+						"properties": {
+							"cmd": {
+								"const": "version"
+							}
+						},
+						"required": [
+							"cmd"
+						]
+					},
+					"then": {
+						"properties": {
+							"result": {
+								"$ref": "#/$defs/version_result"
+							}
+						}
+					}
+				},
+				{
+					"if": {
+						"properties": {
+							"cmd": {
+								"const": "license"
+							}
+						},
+						"required": [
+							"cmd"
+						]
+					},
+					"then": {
+						"properties": {
+							"result": {
+								"$ref": "#/$defs/license_result"
+							}
+						}
+					}
+				},
+				{
+					"if": {
+						"properties": {
+							"cmd": {
+								"enum": [
+									"quit",
+									"clear"
+								]
+							}
+						},
+						"required": [
+							"cmd"
+						]
+					},
+					"then": {
+						"properties": {
+							"result": {
+								"$ref": "#/$defs/empty_result"
+							}
+						}
+					}
+				},
+				{
+					"if": {
+						"properties": {
+							"cmd": {
+								"const": "get"
+							}
+						},
+						"required": [
+							"cmd"
+						]
+					},
+					"then": {
+						"properties": {
+							"result": {
+								"$ref": "#/$defs/get_result"
+							}
+						}
+					}
+				},
+				{
+					"if": {
+						"properties": {
+							"cmd": {
+								"enum": [
+									"set",
+									"toggle",
+									"enable",
+									"disable",
+									"add",
+									"delete"
+								]
+							}
+						},
+						"required": [
+							"cmd"
+						]
+					},
+					"then": {
+						"properties": {
+							"result": {
+								"$ref": "#/$defs/option_result"
+							}
+						}
+					}
+				}
+			]
+		},
+		"command_name": {
+			"enum": [
+				"parse",
+				"parse file",
+				"grammar",
+				"internal-grammar",
+				"start",
+				"unreachable",
+				"reload",
+				"load",
+				"help",
+				"version",
+				"license",
+				"quit",
+				"clear",
+				"get",
+				"set",
+				"toggle",
+				"enable",
+				"disable",
+				"add",
+				"delete"
+			]
+		},
+		"oneshot_command_name": {
+			"enum": [
+				"parse",
+				"grammar",
+				"gen"
+			]
+		},
+		"oneshot_result_rules": {
+			"allOf": [
+				{
+					"if": {
+						"properties": {
+							"cmd": {
+								"const": "parse"
+							}
+						},
+						"required": [
+							"cmd"
+						]
+					},
+					"then": {
+						"properties": {
+							"result": {
+								"$ref": "#/$defs/parse_oneshot_result"
+							}
+						}
+					}
+				},
+				{
+					"if": {
+						"properties": {
+							"cmd": {
+								"const": "grammar"
+							}
+						},
+						"required": [
+							"cmd"
+						]
+					},
+					"then": {
+						"properties": {
+							"result": {
+								"$ref": "#/$defs/cli_grammar_result"
+							}
+						}
+					}
+				},
+				{
+					"if": {
+						"properties": {
+							"cmd": {
+								"const": "gen"
+							}
+						},
+						"required": [
+							"cmd"
+						]
+					},
+					"then": {
+						"properties": {
+							"result": {
+								"$ref": "#/$defs/gen_result"
+							}
+						}
+					}
+				}
+			]
+		}
+	}
+}

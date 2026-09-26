@@ -920,6 +920,27 @@ TEST_SUITE("tgf json api: ambiguous data") {
 	}
 }
 
+TEST_SUITE("tgf json api: cmd echo") {
+	TEST_CASE("a structured response carries the canonical cmd") {
+		auto r = run_repl({
+			R"({"id":1,"cmd":"set","option":"trim","value":["a"]})",
+			R"({"id":2,"cmd":"internal-grammar"})",
+			eval_request(3, "p 12") });
+		REQUIRE(r.responses.size() == 3);
+		CHECK(r.responses[0].find("cmd")->as_string() == "set");
+		CHECK(r.responses[1].find("cmd")->as_string()
+			== "internal-grammar");
+		const auto& m = r.responses[0].members();
+		REQUIRE(m.size() >= 2);
+		CHECK(m[0].first == "id");
+		CHECK(m[1].first == "cmd");
+		auto res = r.responses[2].find("results");
+		REQUIRE(res != nullptr);
+		REQUIRE(res->size() == 1);
+		CHECK((*res)[0].find("cmd")->as_string() == "parse");
+	}
+}
+
 TEST_SUITE("tgf json api: one-shot CLI") {
 	static std::string capture_run(const std::vector<std::string>& args,
 		int& code)
@@ -953,6 +974,7 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 		auto vs = lines_of(text);
 		REQUIRE(vs.size() == 1);
 		CHECK(vs[0].find("status")->as_string() == "ok");
+		CHECK(vs[0].find("cmd")->as_string() == "parse");
 		REQUIRE(vs[0].find("result") != nullptr);
 		CHECK(vs[0].find("result")->find("tree") != nullptr);
 		const json::value* s = vs[0].find("state");
@@ -970,6 +992,7 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 			"--json" }, code);
 		auto vs = lines_of(text);
 		REQUIRE(vs.size() == 1);
+		CHECK(vs[0].find("cmd")->as_string() == "grammar");
 		auto res = vs[0].find("result");
 		REQUIRE(res != nullptr);
 		REQUIRE(res->find("start") != nullptr);
@@ -994,6 +1017,7 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 		auto vs = lines_of(text);
 		REQUIRE(vs.size() == 1);
 		CHECK(vs[0].find("status")->as_string() == "ok");
+		CHECK(vs[0].find("cmd")->as_string() == "gen");
 		REQUIRE(vs[0].find("result") != nullptr);
 		auto files = vs[0].find("result")->find("files");
 		REQUIRE(files != nullptr);
@@ -1029,6 +1053,7 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 		auto vs = lines_of(text);
 		REQUIRE(vs.size() == 1);
 		CHECK(vs[0].find("status")->as_string() == "ok");
+		CHECK(vs[0].find("cmd")->as_string() == "parse");
 		REQUIRE(vs[0].find("result") != nullptr);
 		auto ig = vs[0].find("result")->find("internal_grammar");
 		REQUIRE(ig != nullptr);
@@ -1049,6 +1074,7 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 		auto vs = lines_of(text);
 		REQUIRE(vs.size() == 1);
 		CHECK(vs[0].find("status")->as_string() == "ok");
+		CHECK(vs[0].find("cmd")->as_string() == "parse");
 		REQUIRE(vs[0].find("result") != nullptr);
 		auto bt = vs[0].find("result")->find("bintree_totals");
 		REQUIRE(bt != nullptr);
@@ -1079,6 +1105,7 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 			"--json", "--nullable" }, code);
 		auto vs = lines_of(text);
 		REQUIRE(vs.size() == 1);
+		CHECK(vs[0].find("cmd")->as_string() == "grammar");
 		REQUIRE(vs[0].find("result") != nullptr);
 		auto nl = vs[0].find("result")->find("nullable");
 		REQUIRE(nl != nullptr);

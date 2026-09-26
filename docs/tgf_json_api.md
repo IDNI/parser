@@ -11,6 +11,11 @@ line, compact JSON, with no ANSI color codes. Every response carries
 `{"grammar":"g.tgf","start":"start"}`. An `eval` response carries
 it once, on the top object.
 
+Two JSON Schema files describe this API:
+`src/format/tgf_api.json/tgf_api.schema.json` covers every request and
+response, and `src/format/json/report.schema.json` covers the report
+tree. The parse tree uses `src/format/ast.json/ast.schema.json`.
+
 ## Request forms
 
 Two forms reach the same command handlers.
@@ -69,7 +74,7 @@ An `eval` response carries one entry per statement:
 
 A structured request carries one result:
 
-    {"id":2,"status":"ok","result":{...},
+    {"id":2,"cmd":"set","status":"ok","result":{...},
      "state":{"grammar":"g.tgf","start":"start"},"report":{...}}
 
 An error before a command runs (invalid JSON, missing `cmd`, a missing or
@@ -82,8 +87,10 @@ wrongly typed field, an unknown command, a failed check) has no `result`:
 means the request text ends inside a command; the client sends the full
 text again. `quit` means the loop stops after the response.
 
-The top `status` of an `eval` response is `error` when one entry has
-`error`, `quit` when one entry has `quit`, else `ok`.
+The top `status` of an `eval` response is `quit` when a statement has
+`quit`, and the loop stops. Else it is `error` when a statement has
+`error`. Else it is `ok`. A request text that ends inside a command
+gives the top `status` `incomplete` and no entries.
 
 ## The report
 
@@ -188,8 +195,8 @@ A null node is skipped. The schema is
 - `repl --json --evaluate "<src>"` prints one `eval` response and exits.
   No `hello` line.
 - `parse --json`, `grammar --json` and `gen --json` print one response
-  `{"status":..,"result":..,"report":..}` and exit. No `hello` line and
-  no `id`.
+  `{"cmd":..,"status":..,"result":..,"state":{...},"report":..}` and
+  exit. No `hello` line and no `id`.
 - `parse --json --grammar` adds the internal grammar under
   `internal_grammar`, in the shape of the `internal-grammar` command.
 - `parse --json --measure` writes no text and adds the bintree totals
@@ -213,8 +220,8 @@ The exit code is `1` when the status is `error`, else `0`.
     $ tgf tests/fixtures/tiny.tgf repl --json
     {"hello":{"protocol":1,...},"state":{"grammar":"tests/fixtures/tiny.tgf","start":"start"}}
     {"id":1,"cmd":"set","option":"trim","value":["a","b"]}
-    {"id":1,"status":"ok","result":{"option":"trim","value":["a","b"]},"state":{...},"report":{"nodes":[]}}
+    {"id":1,"cmd":"set","status":"ok","result":{"option":"trim","value":["a","b"]},"state":{...},"report":{"nodes":[]}}
     {"id":2,"cmd":"parse","input":"123"}
-    {"id":2,"status":"ok","result":{"ambiguous":{"trees":1,"nodes":[]},"terminals":"123","tree":{"symbol":"start",...}},"state":{...},"report":{"nodes":[]}}
+    {"id":2,"cmd":"parse","status":"ok","result":{"ambiguous":{"trees":1,"nodes":[]},"terminals":"123","tree":{"symbol":"start",...}},"state":{...},"report":{"nodes":[]}}
     {"id":3,"cmd":"quit"}
-    {"id":3,"status":"quit","result":{},"state":{...},"report":{"nodes":[]}}
+    {"id":3,"cmd":"quit","status":"quit","result":{},"state":{...},"report":{"nodes":[]}}

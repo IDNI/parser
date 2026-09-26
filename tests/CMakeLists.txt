@@ -343,21 +343,31 @@ if(TARGET tgf AND NOT WIN32)
 	endif()
 endif()
 
-# Validate the tree of a real tgf parse against the AST schema when the
-# Python jsonschema module is available.
+# Validate real tgf JSON output against the AST schema and the API schema
+# when the Python jsonschema module is available.
 if(TARGET tgf AND NOT WIN32)
 	find_program(PYTHON3_SCHEMA_EXECUTABLE python3)
 	if(PYTHON3_SCHEMA_EXECUTABLE)
 		execute_process(
 			COMMAND "${PYTHON3_SCHEMA_EXECUTABLE}" -c
-				"import jsonschema"
+				"import jsonschema, referencing"
 			RESULT_VARIABLE _jsonschema_missing)
 		if(NOT _jsonschema_missing)
 			add_test(NAME ast_schema_check
 				COMMAND "${PYTHON3_SCHEMA_EXECUTABLE}"
-					"${CMAKE_CURRENT_SOURCE_DIR}/ast_schema_check.py"
+					"${CMAKE_CURRENT_SOURCE_DIR}/schema_check.py"
+					"--ast"
 					"$<TARGET_FILE:tgf>"
 					"${PROJECT_SOURCE_DIR}/tests/fixtures/ambig.tgf"
+					"${PROJECT_SOURCE_DIR}/src/format/ast.json/ast.schema.json")
+			add_test(NAME tgf_api_schema_check
+				COMMAND "${PYTHON3_SCHEMA_EXECUTABLE}"
+					"${CMAKE_CURRENT_SOURCE_DIR}/schema_check.py"
+					"--api"
+					"$<TARGET_FILE:tgf>"
+					"${PROJECT_SOURCE_DIR}/tests/fixtures/ambig.tgf"
+					"${PROJECT_SOURCE_DIR}/src/format/tgf_api.json/tgf_api.schema.json"
+					"${PROJECT_SOURCE_DIR}/src/format/json/report.schema.json"
 					"${PROJECT_SOURCE_DIR}/src/format/ast.json/ast.schema.json")
 		endif()
 	endif()

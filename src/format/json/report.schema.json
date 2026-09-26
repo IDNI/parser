@@ -1,0 +1,49 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://github.com/IDNI/parser/blob/main/src/format/json/report.schema.json",
+	"title": "Diagnostics report",
+	"description": "A diagnostics report as a nested tree of nodes.",
+	"type": "object",
+	"properties": {
+		"nodes": {
+			"type": "array",
+			"items": { "$ref": "#/$defs/node" }
+		}
+	},
+	"required": ["nodes"],
+	"additionalProperties": false,
+	"$defs": {
+		"attr": {
+			"type": "object",
+			"properties": {
+				"key": { "type": "string" },
+				"value": { "type": ["string", "integer"] }
+			},
+			"required": ["key", "value"],
+			"additionalProperties": false
+		},
+		"node": {
+			"type": "object",
+			"properties": {
+				"tag": {
+					"type": "integer",
+					"minimum": 0,
+					"maximum": 65535
+				},
+				"message": { "type": "string" },
+				"key": { "type": "string" },
+				"value": { "type": "integer" },
+				"attrs": {
+					"type": "array",
+					"items": { "$ref": "#/$defs/attr" }
+				},
+				"children": {
+					"type": "array",
+					"items": { "$ref": "#/$defs/node" }
+				}
+			},
+			"required": ["tag", "message", "key", "value", "attrs"],
+			"additionalProperties": false
+		}
+	}
+}

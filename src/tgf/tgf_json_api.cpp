@@ -295,10 +295,11 @@ static value incomplete_response(const value& id, const value& state,
 }
 
 format::json::value json_result_response(cmd_status status,
-	const value& result, const value& state,
+	const std::string& cmd, const value& result, const value& state,
 	const diagnostics::report& r)
 {
 	value v = value::object();
+	v.set("cmd", value::string(cmd));
 	v.set("status", value::string(cmd_status_name(status)));
 	v.set("result", result);
 	v.set("state", state);
@@ -307,11 +308,12 @@ format::json::value json_result_response(cmd_status status,
 }
 
 static format::json::value json_id_response(const value& id,
-	cmd_status status, const value& result, const value& state,
-	const diagnostics::report& r)
+	const std::string& cmd, cmd_status status, const value& result,
+	const value& state, const diagnostics::report& r)
 {
 	value v = value::object();
 	v.set("id", id);
+	v.set("cmd", value::string(cmd));
 	v.set("status", value::string(cmd_status_name(status)));
 	v.set("result", result);
 	v.set("state", state);
@@ -399,8 +401,8 @@ static std::pair<value, cmd_status> handle_request(
 	const cmd_result& r = er.results.front();
 	cmd_status st = r.status == cmd_status::quit
 		? cmd_status::quit : cmd_status::ok;
-	return { json_id_response(id, r.status, r.data, state_value(re),
-		r.report), st };
+	return { json_id_response(id, r.cmd, r.status, r.data,
+		state_value(re), r.report), st };
 }
 
 int tgf_json_loop(tgf_repl_evaluator& re, std::istream& in,

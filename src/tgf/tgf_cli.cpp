@@ -1865,7 +1865,7 @@ static int gen_command(const cli::command& cmd,
 		data.set("files", std::move(files));
 		cmd_status st = gr.has_value()
 			? cmd_status::ok : cmd_status::error;
-		json_write_line(cout, json_result_response(st, data,
+		json_write_line(cout, json_result_response(st, "gen", data,
 			state_value(re), gr.report()));
 		return st == cmd_status::error ? 1 : 0;
 	}
@@ -1940,7 +1940,7 @@ static int show_command(const cli::command& cmd,
 			v.set("nullable", std::move(nl));
 		}
 		json_write_line(cout, json_result_response(cmd_status::ok,
-			v, state_value(re), re.take_report()));
+			"grammar", v, state_value(re), re.take_report()));
 		return 0;
 	}
 	if (cmd.get<bool>("grammar")) re.g().print_internal_grammar_for(
@@ -2070,8 +2070,8 @@ static int run_command(cli& cl, const cli::command& cmd,
 			cmd_status st = rep.has_error()
 				? cmd_status::error : cmd_status::ok;
 			json_write_line(cout,
-				json_result_response(st, data, state_value(re),
-					rep));
+				json_result_response(st, "parse", data,
+					state_value(re), rep));
 			return st == cmd_status::error ? 1 : 0;
 		}
 		if (cmd.get<bool>("grammar")) re.eval("i");
