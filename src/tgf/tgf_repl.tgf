@@ -83,7 +83,9 @@ bool_option            => ("s" | "status"):status_opt
                         | ("ad" | "auto-disambiguate"):auto_disambiguate_opt
                         | ("tt" | "trim-terminals"):trim_terminals_opt
                         | ("icc" | "inline-cc" | "inline-char-classes")
-                                                        :inline_cc_opt.
+                                                        :inline_cc_opt
+                        | ("dcc" | "derive-char-classes")
+                                                        :derive_char_classes_opt.
 list_option            => ("nd" | "ndl" | "nodisambig-list"):nodisambig_list_opt
                         | ("guards" | "enabled-productions"):enabled_prods_opt
                         | "trim":trim_opt

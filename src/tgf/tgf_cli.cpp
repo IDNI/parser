@@ -472,6 +472,9 @@ void tgf_repl_evaluator::get_cmd(const tt& n) {
 		"inline:                 " << ptreepaths(opt.to_inline) << "\n"; } },
 	{ p::auto_disambiguate_opt, [this]() { cout <<
 		"auto-disambiguate:      " << pbool(g().opt.auto_disambiguate) << "\n"; } },
+	{ p::derive_char_classes_opt, [this]() { cout <<
+		"derive-char-classes:    " << pbool(g().opt.derive_char_classes)
+			<< "\n"; } },
 	{ p::nodisambig_list_opt, [this]() { cout <<
 		"nodisambig-list:        " << plist(opt.nodisambig_list) << "\n"; } },
 	{ p::error_verbosity_opt, [this]() { cout <<
@@ -552,6 +555,8 @@ void tgf_repl_evaluator::set_cmd(const tt& n) {
 		break;
 	case p::auto_disambiguate_opt:
 		g().opt.auto_disambiguate = get_bool_value(v); break;
+	case p::derive_char_classes_opt:
+		g().derive_char_classes(get_bool_value(v)); break;
 	case p::nodisambig_list_opt:
 		g().opt.nodisambig_list.clear();
 		for (const auto& s : (v || p::symbol)())
@@ -658,6 +663,11 @@ void tgf_repl_evaluator::update_bool_opt_cmd(
 	case p::measure_preprocess_opt:update_fn(opt.measure_preprocess); break;
 	case p::gc_opt:                update_fn(opt.gc); break;
 	case p::auto_disambiguate_opt: update_fn(g().opt.auto_disambiguate); break;
+	case p::derive_char_classes_opt: {
+		bool on = update_fn(g().opt.derive_char_classes);
+		g().derive_char_classes(on);
+		break;
+	}
 	case p::trim_terminals_opt:    update_fn(g().opt.shaping.trim_terminals); break;
 	case p::inline_cc_opt:         update_fn(g().opt.shaping.inline_char_classes); break;
 	default: cout << ": unknown bool option\n"; break;
@@ -682,7 +692,8 @@ static void help(size_t nt, bool show_load_reload) {
 		"  measure-preprocess     measures forest preprocess time    on/off\n"
 		"  gc                     Earley chart garbage collection    on/off\n"
 		"  trim-terminals         trim terminals                     on/off\n"
-		"  inline-char-classes    inline character classes           on/off\n";
+		"  inline-char-classes    inline character classes           on/off\n"
+		"  derive-char-classes    derived character classes         on/off\n";
 	static const string list_options =
 		"  nodisambig-list        list of nodes to keep ambiguous    symbol1, symbol2...\n"
 		"  trim                   list of nodes to trim              symbol1, symbol2...\n"
