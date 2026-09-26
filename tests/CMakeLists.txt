@@ -336,3 +336,13 @@ add_test(NAME tau_store_local
 		"${CMAKE_CURRENT_SOURCE_DIR}/tau-store-self-check.cmake"
 		"${PROJECT_SOURCE_DIR}/cmake/tau-store.cmake"
 		"${CMAKE_CURRENT_BINARY_DIR}")
+
+find_program(TAU_TEST_BASH bash NO_CACHE)
+if(TAU_TEST_BASH)
+	# Transport round-trip and its failure paths: export, import, verify, a
+	# forced mode loss, a truncated archive, a content corruption, and a missing
+	# expected entry.
+	add_test(NAME tau_store_transport
+		COMMAND "${TAU_TEST_BASH}"
+			"${CMAKE_CURRENT_SOURCE_DIR}/store-transport-self-check.sh")
+endif()
