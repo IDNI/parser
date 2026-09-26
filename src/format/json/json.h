@@ -109,8 +109,6 @@ using code   = idni::diagnostics::code;
 using result = idni::diagnostics::result<value>;
 using label  = idni::parser_strings::label;
 
-namespace detail {
-
 using tree = json_parser::tree;
 using trv  = tree::traverser;
 
@@ -183,8 +181,6 @@ inline value build(const trv& t, result& R) {
 	}
 }
 
-} // namespace detail
-
 /// Parse a JSON text into a @ref value. On a syntax error, or an escape
 /// (e.g. an unpaired \u surrogate) the grammar cannot catch, the result
 /// carries no value and @ref result::has_error is true.
@@ -200,8 +196,8 @@ inline result parse(std::string_view s) {
 	}
 	tref n = pr.get_shaped_tree2();
 	if (!pr.report().nodes().empty()) R.append(std::move(pr.report()));
-	detail::trv root(n);
-	value v = detail::build(root | json_parser::value, R);
+	trv root(n);
+	value v = build(root | json_parser::value, R);
 	// emplace() on an already-errored R throws: its own return path
 	// dereferences the optional after resetting it back to empty.
 	if (!R.has_error()) R.emplace(std::move(v));
@@ -250,38 +246,65 @@ inline std::ostream& print(const value& v, std::ostream& os) {
 	return os;
 }
 
-/// Serialize a diagnostics report as JSON. With @p print_names = true,
-/// each node carries an extra "message" field with the symbolic code name.
+/// Build one nested report node. @p kids[i] lists the children of node i,
+/// so the parent index never reaches the JSON.
+inline value report_node_to_value(const diagnostics::report& r, size_t i,
+	const std::vector<std::vector<size_t>>& kids, bool names)
+{
+	const auto& n = r.nodes()[i];
+	auto v = value::object();
+	v.set("tag", value::number(static_cast<uint16_t>(n.tag)));
+	if (names) v.set("message",
+		value::string(diagnostics::code_name(n.tag)));
+	v.set("key", value::string(std::string(r.str(n.key))))
+	 .set("value", value::number(static_cast<double>(n.value)));
+	auto attrs = value::array();
+	for (uint8_t a = 0; a < n.attr_cnt; ++a) {
+		const auto& at = r.attrs()[n.attr_off + a];
+		auto av = value::object();
+		av.set("key", value::string(std::string(r.str(at.key))));
+		// a text label stores an interned string key in value
+		if (parser_strings::is_text_label(at.key))
+			av.set("value", value::string(std::string(
+				r.str(static_cast<int_t>(at.value)))));
+		else av.set("value", value::number(
+			static_cast<double>(at.value)));
+		attrs.push_back(std::move(av));
+	}
+	v.set("attrs", std::move(attrs));
+	if (!kids[i].empty()) {
+		auto ch = value::array();
+		for (size_t k : kids[i])
+			ch.push_back(report_node_to_value(r, k, kids, names));
+		v.set("children", std::move(ch));
+	}
+	return v;
+}
+
+/// Convert a diagnostics report into a nested JSON tree. A node with
+/// parent -1 is a root; children is absent when a node has none. With
+/// @p names = true each node carries a "message" field with its code name.
+inline value to_value(const diagnostics::report& r, bool names = true) {
+	const auto& nodes = r.nodes();
+	std::vector<std::vector<size_t>> kids(nodes.size());
+	for (size_t i = 0; i < nodes.size(); ++i)
+		if (nodes[i].parent >= 0)
+			kids[nodes[i].parent].push_back(i);
+	auto roots = value::array();
+	for (size_t i = 0; i < nodes.size(); ++i)
+		if (nodes[i].parent < 0)
+			roots.push_back(report_node_to_value(r, i, kids, names));
+	auto v = value::object();
+	v.set("nodes", std::move(roots));
+	return v;
+}
+
+/// Serialize a diagnostics report as JSON on one line. With @p print_names
+/// = true, each node carries an extra "message" field with its code name.
 inline std::ostream& print(const diagnostics::report& r, std::ostream& os,
 	bool print_names = false)
 {
-	os << "{\n  \"nodes\": [\n";
-	const auto& nodes = r.nodes();
-	const auto& attrs = r.attrs();
-	for (size_t i = 0; i < nodes.size(); ++i) {
-		if (i) os << ",\n";
-		const auto& n = nodes[i];
-		os << "    {\"tag\": " << static_cast<unsigned>(n.tag);
-		if (print_names) {
-			os << ", \"message\": ";
-			escape(os, diagnostics::code_name(n.tag));
-		}
-		os << ", \"key\": ";
-		escape(os, r.str(n.key));
-		os << ", \"parent\": " << n.parent
-		   << ", \"value\": " << n.value
-		   << ", \"attrs\": [";
-		for (uint8_t a = 0; a < n.attr_cnt; ++a) {
-			if (a) os << ", ";
-			const auto& at = attrs[n.attr_off + a];
-			os << "{\"key\": ";
-			escape(os, r.str(at.key));
-			os << ", \"value\": " << at.value << "}";
-		}
-		os << "]}";
-	}
-	os << "\n  ]\n}";
-	return os;
+	return print(to_value(r, print_names), os);
 }
 
 }

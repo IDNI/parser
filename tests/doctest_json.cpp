@@ -6,7 +6,9 @@
 #include "format/json/json.h"
 
 #include <sstream>
+#include <string>
 
+using namespace idni;
 using namespace idni::format::json;
 
 TEST_SUITE("json: value kinds") {
@@ -179,5 +181,74 @@ TEST_SUITE("json: writer builds arbitrary objects and arrays") {
 		CHECK(r.value().find("result")->as_string() == "ok");
 		REQUIRE(r.value().find("nums") != nullptr);
 		CHECK(r.value().find("nums")->size() == 2);
+	}
+}
+
+TEST_SUITE("json: report to nested value") {
+	using idni::diagnostics::code;
+	using idni::diagnostics::report;
+	using idni::parser_strings::label;
+
+	TEST_CASE("nested tree carries message names on request") {
+		report r;
+		{
+			auto s = r.open("parse", code::info_count, size_t(120));
+			r.info("child");
+		}
+		auto v = to_value(r, true);
+		REQUIRE(v.is_object());
+		auto nodes = v.find("nodes");
+		REQUIRE(nodes != nullptr);
+		REQUIRE(nodes->is_array());
+		REQUIRE(nodes->size() == 1);
+		const auto& n = (*nodes)[0];
+		CHECK(n.find("tag")->as_number()
+			== static_cast<double>(code::info_count));
+		CHECK(n.find("message")->as_string()
+			== std::string(idni::diagnostics::code_name(code::info_count)));
+		CHECK(n.find("key")->as_string() == "parse");
+		CHECK(n.find("value")->as_number() == 120);
+		auto kids = n.find("children");
+		REQUIRE(kids != nullptr);
+		REQUIRE(kids->size() == 1);
+		CHECK((*kids)[0].find("message")->as_string()
+			== std::string(idni::diagnostics::code_name(code::info)));
+		CHECK((*kids)[0].find("children") == nullptr);
+	}
+
+	TEST_CASE("names false omits the message field") {
+		report r;
+		r.error(code::parse_error, "bad");
+		auto v = to_value(r, false);
+		REQUIRE(v.find("nodes")->size() == 1);
+		CHECK((*v.find("nodes"))[0].find("message") == nullptr);
+	}
+
+	TEST_CASE("a text label attr is a string, a numeric attr a number") {
+		report r;
+		r.error(code::io_error, "failed", 7,
+			{{label::name, std::string_view("tok")},
+			 {label::exit_code, idni::int_t(-1)}});
+		auto v = to_value(r, true);
+		REQUIRE(v.find("nodes")->size() == 1);
+		const auto& n = (*v.find("nodes"))[0];
+		CHECK(n.find("value")->as_number() == 7);
+		auto attrs = n.find("attrs");
+		REQUIRE(attrs != nullptr);
+		REQUIRE(attrs->size() == 2);
+		CHECK((*attrs)[0].find("key")->as_string() == "name");
+		CHECK((*attrs)[0].find("value")->is_string());
+		CHECK((*attrs)[0].find("value")->as_string() == "tok");
+		CHECK((*attrs)[1].find("value")->is_number());
+		CHECK((*attrs)[1].find("value")->as_number() == -1);
+	}
+
+	TEST_CASE("the report print is one line") {
+		report r;
+		r.error(code::parse_error, "bad");
+		std::ostringstream os;
+		print(r, os, true);
+		CHECK(os.str().find('\n') == std::string::npos);
+		CHECK(os.str().find("\"nodes\"") != std::string::npos);
 	}
 }
