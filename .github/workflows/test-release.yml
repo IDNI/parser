@@ -183,7 +183,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        preset: [release-msvc-all, release-clang-cl-all]
+        preset: [release-msvc-all, release-msvc-all-clang-cl]
     steps:
       - name: Checkout
         uses: actions/checkout@v7

@@ -156,9 +156,9 @@ WORKDIR /parser
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	echo " (BUILD) -- Running tests under wine: $TESTS" && \
 	if [ "$TESTS" = "yes" ]; then \
-		./dev preset release-mingw-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+		./dev preset release-w64-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 	else \
-		./dev preset release-mingw-tests -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+		./dev preset release-w64-tests -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 	fi
 
 # The wine parity test lives in the native tree and registers itself once the
@@ -202,11 +202,11 @@ RUN if [ "$RELEASE" = "yes" ]; then \
 	./dev preset release-packages -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 fi
 
-# Windows packages. The mingw presets build in build/release-mingw, so they
-# never share a cache with the native build.
+# Windows packages build in build/release-w64, so they never share a cache
+# with the native build.
 RUN if [ "$RELEASE" = "yes" ]; then \
-	./dev preset release-mingw-packages -DTAU_BUILD_JOBS=${BUILD_JOBS} && \
-	./dev preset release-mingw-packages-zip -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+	./dev preset release-w64-packages -DTAU_BUILD_JOBS=${BUILD_JOBS} && \
+	./dev preset release-w64-packages-zip -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 fi
 
 # If tgf executable does not exist already, build it
@@ -258,7 +258,7 @@ ARG BUILD_JOBS=1
 COPY --from=source /parser /parser
 
 RUN echo "(BUILD) -- Building and running the wasm node tests" && \
-	./dev preset release-tests-emscripten run -DTAU_BUILD_JOBS=${BUILD_JOBS}
+	./dev preset release-wasm-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS}
 
 
 # ------------------------------------------------------------
@@ -309,4 +309,4 @@ RUN echo "(BUILD) -- Building native tgf" && \
 # Browser tests launch Chrome as root, which needs --no-sandbox; the test
 # scripts already pass it.
 RUN echo "(BUILD) -- Building and running the wasm browser tests" && \
-	./dev preset release-tests-emscripten-browser run -DTAU_BUILD_JOBS=${BUILD_JOBS}
+	./dev preset release-wasm-tests-browser run -DTAU_BUILD_JOBS=${BUILD_JOBS}

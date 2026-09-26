@@ -32,7 +32,7 @@ fi
 # --- build wasm highlight target -------------------------------------------
 if [ ! -f "$EMSCRIPTEN_BUILD/CMakeCache.txt" ]; then
 	echo "Configuring emscripten build..."
-	cmake -B "$EMSCRIPTEN_BUILD" --preset emscripten \
+	cmake -B "$EMSCRIPTEN_BUILD" --preset release-wasm \
 		-DTAU_PARSER_BUILD_EMSCRIPTEN=ON
 fi
 

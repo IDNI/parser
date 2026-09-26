@@ -36,7 +36,7 @@ fi
 # --- configure + build ------------------------------------------------
 export TAU_BUILD_JOBS="${TAU_BUILD_JOBS:-4}"
 echo "Building tgf_standalone (jobs=$TAU_BUILD_JOBS)..."
-(cd "$TOP" && "$TOP/dev" preset release-tests-emscripten-browser -DTAU_BUILD_JOBS="$TAU_BUILD_JOBS")
+(cd "$TOP" && "$TOP/dev" preset release-wasm-tests-browser -DTAU_BUILD_JOBS="$TAU_BUILD_JOBS")
 
 OUT="$BUILD_DIR/js/tgf/tgf_standalone.js"
 echo "Built: $OUT ($(du -h "$OUT" | cut -f1))"

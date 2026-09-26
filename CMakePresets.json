@@ -127,13 +127,13 @@
 		},
 
 		{
-			"name": "_build_dir-release-mingw",
+			"name": "_build_dir-release-w64",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/release-mingw"
 		},
 
 		{
-			"name": "_build_dir-debug-mingw",
+			"name": "_build_dir-debug-w64",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/debug-mingw"
 		},
@@ -145,7 +145,7 @@
 		},
 
 		{
-			"name": "_build_dir-release-clang-cl",
+			"name": "_build_dir-release-msvc-clang-cl",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/release-clang-cl"
 		},
@@ -163,13 +163,13 @@
 		},
 
 		{
-			"name": "_build_dir-emscripten",
+			"name": "_build_dir-release-wasm",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/emscripten"
 		},
 
 		{
-			"name": "_build_dir-debug-emscripten",
+			"name": "_build_dir-debug-wasm",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/debug-emscripten"
 		},
@@ -329,7 +329,7 @@
 		},
 
 		{
-			"name": "_emscripten",
+			"name": "_toolchain-wasm",
 			"hidden": true,
 			"cacheVariables": {
 				"TAU_PARSER_BUILD_EMSCRIPTEN": "ON"
@@ -417,9 +417,9 @@
 		},
 
 		{
-			"name": "release-mingw",
+			"name": "release-w64",
 			"inherits": [
-				"_build_dir-release-mingw",
+				"_build_dir-release-w64",
 				"_generator-make",
 				"_toolchain-mingw",
 				"_build-type-release"
@@ -427,9 +427,9 @@
 		},
 
 		{
-			"name": "debug-mingw",
+			"name": "debug-w64",
 			"inherits": [
-				"_build_dir-debug-mingw",
+				"_build_dir-debug-w64",
 				"_generator-make",
 				"_toolchain-mingw",
 				"_build-type-debug"
@@ -498,12 +498,12 @@
 		},
 
 		{
-			"name": "release-clang-cl-all",
+			"name": "release-msvc-all-clang-cl",
 			"displayName": "Release all targets (clang-cl / Ninja / x64)",
 			"description": "Native Windows. Requires clang-cl on PATH, inside an MSVC environment.",
 			"inherits": [
 				"_condition-windows",
-				"_build_dir-release-clang-cl",
+				"_build_dir-release-msvc-clang-cl",
 				"_toolchain-clang-cl",
 				"_build-type-release",
 				"_build-static",
@@ -517,7 +517,7 @@
 		},
 
 		{
-			"name": "all-msvc",
+			"name": "msvc-all",
 			"inherits": ["release-msvc-all"]
 		},
 
@@ -688,26 +688,26 @@
 		},
 
 		{
-			"name": "release-mingw-tests",
-			"inherits": ["release-mingw", "_build-tests", "_build-tgf"],
+			"name": "release-w64-tests",
+			"inherits": ["release-w64", "_build-tests", "_build-tgf"],
 			"cacheVariables": {
 				"CMAKE_CROSSCOMPILING_EMULATOR": "wine"
 			}
 		},
 
 		{
-			"name": "release-mingw-packages",
+			"name": "release-w64-packages",
 			"inherits": [
-				"release-mingw",
+				"release-w64",
 				"_build-packages",
 				"_windows-package"
 			]
 		},
 
 		{
-			"name": "release-mingw-packages-zip",
+			"name": "release-w64-packages-zip",
 			"inherits": [
-				"release-mingw",
+				"release-w64",
 				"_build-packages",
 				"_windows-zip-package"
 			]
@@ -753,58 +753,58 @@
 		},
 
 		{
-			"name": "emscripten",
+			"name": "release-wasm",
 			"inherits": [
-				"_build_dir-emscripten",
+				"_build_dir-release-wasm",
 				"_generator-make",
-				"_emscripten",
+				"_toolchain-wasm",
 				"_build-type-release"
 			]
 		},
 
 		{
-			"name": "release-tests-emscripten",
-			"inherits": ["emscripten", "_build-tests"]
+			"name": "release-wasm-tests",
+			"inherits": ["release-wasm", "_build-tests"]
 		},
 
 		{
-			"name": "release-tests-emscripten-browser",
-			"inherits": ["emscripten", "_build-tests", "_build-browser-tests"]
+			"name": "release-wasm-tests-browser",
+			"inherits": ["release-wasm", "_build-tests", "_build-browser-tests"]
 		},
 
 		{
-			"name": "release-tgf-emscripten",
-			"inherits": ["emscripten", "_build-tgf"]
+			"name": "release-wasm-tgf",
+			"inherits": ["release-wasm", "_build-tgf"]
 		},
 
 		{
-			"name": "release-all-emscripten",
-			"inherits": ["emscripten", "_build-all"]
+			"name": "release-wasm-all",
+			"inherits": ["release-wasm", "_build-all"]
 		},
 
 		{
-			"name": "debug-emscripten",
+			"name": "debug-wasm",
 			"inherits": [
-				"_build_dir-debug-emscripten",
+				"_build_dir-debug-wasm",
 				"_generator-make",
-				"_emscripten",
+				"_toolchain-wasm",
 				"_build-type-debug"
 			]
 		},
 
 		{
-			"name": "debug-tests-emscripten",
-			"inherits": ["debug-emscripten", "_build-tests"]
+			"name": "debug-wasm-tests",
+			"inherits": ["debug-wasm", "_build-tests"]
 		},
 
 		{
-			"name": "debug-tgf-emscripten",
-			"inherits": ["debug-emscripten", "_build-tgf"]
+			"name": "debug-wasm-tgf",
+			"inherits": ["debug-wasm", "_build-tgf"]
 		},
 
 		{
-			"name": "debug-all-emscripten",
-			"inherits": ["debug-emscripten", "_build-all"]
+			"name": "debug-wasm-all",
+			"inherits": ["debug-wasm", "_build-all"]
 		}
 	],
 	"buildPresets": [
@@ -889,40 +889,40 @@
 			"configurePreset": "release-shared"
 		},
 		{
-			"name": "emscripten",
-			"configurePreset": "emscripten"
+			"name": "release-wasm",
+			"configurePreset": "release-wasm"
 		},
 		{
-			"name": "release-tests-emscripten",
-			"configurePreset": "release-tests-emscripten"
+			"name": "release-wasm-tests",
+			"configurePreset": "release-wasm-tests"
 		},
 		{
-			"name": "release-tests-emscripten-browser",
-			"configurePreset": "release-tests-emscripten-browser"
+			"name": "release-wasm-tests-browser",
+			"configurePreset": "release-wasm-tests-browser"
 		},
 		{
-			"name": "release-tgf-emscripten",
-			"configurePreset": "release-tgf-emscripten"
+			"name": "release-wasm-tgf",
+			"configurePreset": "release-wasm-tgf"
 		},
 		{
-			"name": "release-all-emscripten",
-			"configurePreset": "release-all-emscripten"
+			"name": "release-wasm-all",
+			"configurePreset": "release-wasm-all"
 		},
 		{
-			"name": "debug-emscripten",
-			"configurePreset": "debug-emscripten"
+			"name": "debug-wasm",
+			"configurePreset": "debug-wasm"
 		},
 		{
-			"name": "debug-tests-emscripten",
-			"configurePreset": "debug-tests-emscripten"
+			"name": "debug-wasm-tests",
+			"configurePreset": "debug-wasm-tests"
 		},
 		{
-			"name": "debug-tgf-emscripten",
-			"configurePreset": "debug-tgf-emscripten"
+			"name": "debug-wasm-tgf",
+			"configurePreset": "debug-wasm-tgf"
 		},
 		{
-			"name": "debug-all-emscripten",
-			"configurePreset": "debug-all-emscripten"
+			"name": "debug-wasm-all",
+			"configurePreset": "debug-wasm-all"
 		},
 		{
 			"name": "release-make-gcc",
@@ -957,16 +957,16 @@
 			"configurePreset": "debug-ninja-clang"
 		},
 		{
-			"name": "release-mingw",
-			"configurePreset": "release-mingw"
+			"name": "release-w64",
+			"configurePreset": "release-w64"
 		},
 		{
-			"name": "release-mingw-tests",
-			"configurePreset": "release-mingw-tests"
+			"name": "release-w64-tests",
+			"configurePreset": "release-w64-tests"
 		},
 		{
-			"name": "debug-mingw",
-			"configurePreset": "debug-mingw"
+			"name": "debug-w64",
+			"configurePreset": "debug-w64"
 		},
 		{
 			"name": "release-msvc",
@@ -1005,16 +1005,16 @@
 			"configurePreset": "release-msvc-all"
 		},
 		{
-			"name": "release-clang-cl-all",
-			"configurePreset": "release-clang-cl-all"
+			"name": "release-msvc-all-clang-cl",
+			"configurePreset": "release-msvc-all-clang-cl"
 		},
 		{
 			"name": "debug-msvc-all",
 			"configurePreset": "debug-msvc-all"
 		},
 		{
-			"name": "all-msvc",
-			"configurePreset": "all-msvc"
+			"name": "msvc-all",
+			"configurePreset": "msvc-all"
 		},
 		{
 			"name": "release-msvc-packages",
@@ -1045,12 +1045,12 @@
 			"configurePreset": "release-packages"
 		},
 		{
-			"name": "release-mingw-packages",
-			"configurePreset": "release-mingw-packages"
+			"name": "release-w64-packages",
+			"configurePreset": "release-w64-packages"
 		},
 		{
-			"name": "release-mingw-packages-zip",
-			"configurePreset": "release-mingw-packages-zip"
+			"name": "release-w64-packages-zip",
+			"configurePreset": "release-w64-packages-zip"
 		},
 		{
 			"name": "release-macos-packages",
@@ -1091,20 +1091,20 @@
 			"configurePreset": "release-tests"
 		},
 		{
-			"name": "release-mingw-tests",
-			"configurePreset": "release-mingw-tests"
+			"name": "release-w64-tests",
+			"configurePreset": "release-w64-tests"
 		},
 		{
-			"name": "release-tests-emscripten",
-			"configurePreset": "release-tests-emscripten"
+			"name": "release-wasm-tests",
+			"configurePreset": "release-wasm-tests"
 		},
 		{
-			"name": "release-tests-emscripten-browser",
-			"configurePreset": "release-tests-emscripten-browser"
+			"name": "release-wasm-tests-browser",
+			"configurePreset": "release-wasm-tests-browser"
 		},
 		{
-			"name": "debug-tests-emscripten",
-			"configurePreset": "debug-tests-emscripten"
+			"name": "debug-wasm-tests",
+			"configurePreset": "debug-wasm-tests"
 		},
 		{
 			"name": "grammar-tests",
@@ -1115,16 +1115,16 @@
 			"configurePreset": "release-all"
 		},
 		{
-			"name": "release-all-emscripten",
-			"configurePreset": "release-all-emscripten"
+			"name": "release-wasm-all",
+			"configurePreset": "release-wasm-all"
 		},
 		{
 			"name": "debug-all",
 			"configurePreset": "debug-all"
 		},
 		{
-			"name": "debug-all-emscripten",
-			"configurePreset": "debug-all-emscripten"
+			"name": "debug-wasm-all",
+			"configurePreset": "debug-wasm-all"
 		},
 		{
 			"name": "all",
@@ -1151,16 +1151,16 @@
 			"configurePreset": "release-msvc-all"
 		},
 		{
-			"name": "release-clang-cl-all",
-			"configurePreset": "release-clang-cl-all"
+			"name": "release-msvc-all-clang-cl",
+			"configurePreset": "release-msvc-all-clang-cl"
 		},
 		{
 			"name": "debug-msvc-all",
 			"configurePreset": "debug-msvc-all"
 		},
 		{
-			"name": "all-msvc",
-			"configurePreset": "all-msvc"
+			"name": "msvc-all",
+			"configurePreset": "msvc-all"
 		}
 	]
 }

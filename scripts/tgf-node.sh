@@ -28,7 +28,7 @@ OUT="$BUILD_DIR/js/tgf/tgf_standalone.js"
 if [ ! -f "$OUT" ]; then
 	export TAU_BUILD_JOBS="${TAU_BUILD_JOBS:-4}"
 	echo "Building tgf_standalone (jobs=$TAU_BUILD_JOBS)..."
-	(cd "$TOP" && "$TOP/dev" preset release-tgf-emscripten -DTAU_BUILD_JOBS="$TAU_BUILD_JOBS")
+	(cd "$TOP" && "$TOP/dev" preset release-wasm-tgf -DTAU_BUILD_JOBS="$TAU_BUILD_JOBS")
 fi
 
 # the program has no default grammar, so pass the preloaded one
