@@ -109,6 +109,24 @@ TEST_SUITE("json: escaped string round trip") {
 	}
 }
 
+TEST_SUITE("json: CR whitespace") {
+	TEST_CASE("CR is whitespace between every token") {
+		auto r = parse("{\r\"a\"\r:\r[\r1\r,\r2\r]\r,\r\"b\"\r:\rtrue\r}\r");
+		REQUIRE(r.has_value());
+		CHECK(r.value().is_object());
+		REQUIRE(r.value().find("a") != nullptr);
+		CHECK(r.value().find("a")->is_array());
+		CHECK(r.value().find("a")->size() == 2);
+		REQUIRE(r.value().find("b") != nullptr);
+		CHECK(r.value().find("b")->as_bool());
+	}
+	TEST_CASE("CR before the first token") {
+		auto r = parse("\r\r1");
+		REQUIRE(r.has_value());
+		CHECK(r.value().as_number() == 1);
+	}
+}
+
 TEST_SUITE("json: empty containers") {
 	TEST_CASE("empty array") {
 		auto r = parse("[]");

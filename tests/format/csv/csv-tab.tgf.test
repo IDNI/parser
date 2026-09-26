@@ -1,7 +1,7 @@
 # Tests the csv.tgf grammar with the tab and crlf productions enabled.
 #
 # What changes from the comma/crlf default: SEP is tab, comma is plain
-# data, LF alone and a bare CR are still rejected.
+# data, a bare CR is still rejected.
 #
 # To run:
 #   tgf csv.tgf test --productions tab,crlf,no_header csv-tab.tgf.test
@@ -57,14 +57,13 @@ start > file > record > escaped > ^ 'a' '\t' 'b' $ : "\"a\tb\"".
 start > file > record > ^ escaped non_escaped $ : "\"a\tb\"\tc".
 
 # ===========================================================================
-# 5  NEGATION -- LF and bare CR must be rejected
+# 5  EOL AND NEGATION -- LF ends a record, a bare CR does not
 # ===========================================================================
 
-# LF-only rows: lf guard is disabled, so '\n' alone is not EOL and not
-# TEXTDATA either.
-~start : "a\tb\nc\td".
+# a bare LF is also a record end, and gives the same fields as CRLF.
+start > file > ^ record record $ : "a\tb\r\nc\td", "a\tb\nc\td".
 
-# bare CR (not part of CRLF): CR is not TEXTDATA, parse fails.
+# bare CR (not part of CRLF or LF): CR is not TEXTDATA, parse fails.
 ~start : "a\tb\rc\td".
 
 # tab is the separator, so an unclosed escaped field is still an error.

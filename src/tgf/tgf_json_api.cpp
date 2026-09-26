@@ -2,6 +2,7 @@
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #include <cctype>
+#include <iostream>
 #include <istream>
 #include <ostream>
 #include <set>
@@ -9,6 +10,11 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#endif
 
 #include "defs.h"
 #include "parser.h"
@@ -343,6 +349,10 @@ format::json::value json_eval_response(const value& id,
 }
 
 void json_write_line(std::ostream& os, const value& v) {
+#ifdef _WIN32
+	// A JSON message ends with one '\n', so stdout must not add a '\r'.
+	if (&os == &std::cout) ::_setmode(::_fileno(stdout), _O_BINARY);
+#endif
 	format::json::print(v, os) << '\n' << std::flush;
 }
 

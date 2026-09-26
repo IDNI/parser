@@ -480,10 +480,21 @@ diagnostics::report tgf_repl_evaluator::take_report() {
 	return r;
 }
 
+// A text stream adds the CR of a CRLF back on Windows, so drop it here.
+static void print_text_source(ostream& os, const string& src) {
+	for (size_t i = 0; i != src.size(); ++i) {
+		if (src[i] == '\r' && i + 1 != src.size()
+				&& src[i + 1] == '\n')
+			continue;
+		os << src[i];
+	}
+}
+
 void tgf_repl_evaluator::print_source(ostream& os) const {
 	os << "grammar:\n";
 	if (!grammar_source.empty()) {
-		os << grammar_source << "\n\n";
+		print_text_source(os, grammar_source);
+		os << "\n\n";
 		return;
 	}
 
@@ -493,7 +504,7 @@ void tgf_repl_evaluator::print_source(ostream& os) const {
 		return;
 	}
 	string line;
-	while (getline(f, line)) os << line << "\n";
+	while (getline(f, line)) print_text_source(os, line + "\n");
 	os << "\n";
 }
 
@@ -1475,9 +1486,10 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			v.set("file", value::string(tgf_filename));
 			string src = grammar_source;
 			if (src.empty()) {
-				ifstream f(tgf_filename);
-				for (string line; getline(f, line); )
-					src += line + "\n";
+				// The exact bytes of the file, so no line translation.
+				ifstream f(tgf_filename, ios::binary);
+				src.assign(istreambuf_iterator<char>(f),
+					istreambuf_iterator<char>());
 			}
 			v.set("source", value::string(std::move(src)));
 			res.data = std::move(v);

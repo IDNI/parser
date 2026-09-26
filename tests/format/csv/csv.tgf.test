@@ -4,6 +4,9 @@
 #   non_escaped: zero or more printable chars except '"', ',', CR, LF.
 #   escaped: double-quoted, an interior '"' must be doubled ("").
 #
+# A record ends with CRLF; a bare LF also ends a record and gives the
+# same fields, so an LF file and a CRLF file parse alike.
+#
 # Grammar defaults (comma, crlf) are used, dialect variants live in the
 # sibling csv-lf.tgf.test, csv-tab.tgf.test, csv-tab-lf.tgf.test files
 # and require --productions.
@@ -51,9 +54,12 @@ start : "1,2,3\r\n4,5,6\r\n7,8,9".
 
 start > file > ^ record record record $ : "1,2,3\r\n4,5,6\r\n7,8,9".
 
-# 3c  a lone LF between records is not the enabled EOL, and is not
-# TEXTDATA either, so the record boundary itself is a syntax error.
-~start : "a,b\nc,d", "1,2,3\n4,5,6".
+# 3c  a record ends with CRLF; a bare LF is also a record end, and the
+# two give the same fields.
+start : "a,b\nc,d", "1,2,3\n4,5,6".
+
+start > file > ^ record record $ : "a,b\r\nc,d", "a,b\nc,d".
+start > file > record > ^ non_escaped non_escaped $ : "a,b\r\n", "a,b\n".
 
 # 3d  a lone CR is neither TEXTDATA nor a complete EOL[crlf].
 ~start : "a\rb".
@@ -203,8 +209,8 @@ start > file > record > ^ non_escaped! non_escaped! $ : ",".
 # or EOL in between.
 ~start : "\"a\"b".
 
-# a lone LF is not the enabled EOL[crlf] and is not TEXTDATA.
-~start : "a,b\nc,d".
+# a bare CR is not the EOL of any dialect and is not TEXTDATA.
+~start : "a,b\rc,d".
 
 # tab is excluded from the printable character class, so it is never
 # valid TEXTDATA under any dialect, comma included.

@@ -101,7 +101,7 @@ TEST_CASE("csv.tgf highlights quoted fields") {
 }
 
 TEST_CASE("csv.tgf highlights CRLF-terminated rows") {
-	// csv.tgf enables only the crlf EOL production; a bare '\n' fails to parse.
+	// CRLF ends the first record, so the second row starts on the next line.
 	string g_src = read_grammar("src/format/csv/csv.tgf");
 	syntax_highlighter hl(g_src);
 	REQUIRE(hl.good());

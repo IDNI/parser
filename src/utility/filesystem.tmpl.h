@@ -222,9 +222,10 @@ inline result<file_handle> open(const path& p, mmap_mode m) {
 	using label = idni::parser_strings::label;
 	result<file_handle> r;
 	// A read of a missing file must fail instead of creating an empty file.
+	// Sharing delete lets another handle remove a file this one holds open.
 	file_handle f = ::CreateFileW(p.c_str(),
 		m == MMAP_READ ? GENERIC_READ : GENERIC_READ | GENERIC_WRITE,
-		FILE_SHARE_READ | FILE_SHARE_WRITE,
+		FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
 		0, m == MMAP_READ ? OPEN_EXISTING : OPEN_ALWAYS,
 		FILE_ATTRIBUTE_NORMAL, 0);
 	if (f == invalid_file_handle)

@@ -5,6 +5,10 @@ response API on stdin and stdout. One JSON object goes on each line.
 `tgf <grammar> parse --json`, `grammar --json` and `gen --json` run one
 command and print one response.
 
+Each message ends with one `\n`, on every platform. A request line may
+end with `\r\n`, and CR counts as whitespace wherever the JSON reader
+takes whitespace.
+
 The client never parses text that a human reads. Every response is one
 line, compact JSON, with no ANSI color codes. Every response carries
 `state`, the current grammar file and start symbol:
@@ -23,6 +27,11 @@ Two forms reach the same command handlers.
 The `eval` form takes REPL text:
 
     {"id":1,"cmd":"eval","src":"set trim a, b . get trim"}
+
+The `src` text is TGF source, so a path in a `parse file` or `load`
+command takes TGF string escapes: one `\` is written `\\`. The
+structured form takes the path as a plain JSON string and needs no
+escape.
 
 A structured form names the command and its fields:
 
@@ -129,6 +138,9 @@ option: true scans one-character rules as character classes.
 `input` is present when `print-input` is on. `terminals` is present
 when `print-terminals` is on. `tml_rules` and `tml_facts` carry text when
 their option is on. `tree` is present when `print-graphs` is on.
+
+`source` of `grammar` is the exact content of the grammar file, byte for
+byte, on every platform.
 
 `ambiguous` is present when `print-ambiguity` is on:
 

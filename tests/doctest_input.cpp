@@ -406,10 +406,13 @@ TEST_SUITE("input: file map") {
 		auto path = filesystem::temp_directory_path()
 			/ "tau_input_content.txt";
 		{ ofstream os(path, ios::binary); os << "a"; }
-		file_input_parser f;
-		auto r = f.p.parse(path.string());
-		CHECK(r.found);
-		CHECK(!report_has_io_error(r.report()));
+		{
+			file_input_parser f;
+			auto r = f.p.parse(path.string());
+			CHECK(r.found);
+			CHECK(!report_has_io_error(r.report()));
+		}
+		// The result holds the mapping, so remove after its scope closes.
 		filesystem::remove(path);
 	}
 
@@ -427,11 +430,14 @@ TEST_SUITE("input: file map") {
 		auto path = filesystem::temp_directory_path()
 			/ "tau_input_empty.txt";
 		{ ofstream os(path, ios::binary); }
-		file_input_parser f;
-		auto r = f.p.parse(path.string());
-		CHECK(!r.found);
-		CHECK(r.report().has_error());
-		CHECK(!report_has_io_error(r.report()));
+		{
+			file_input_parser f;
+			auto r = f.p.parse(path.string());
+			CHECK(!r.found);
+			CHECK(r.report().has_error());
+			CHECK(!report_has_io_error(r.report()));
+		}
+		// The result holds the open file, so remove after its scope closes.
 		filesystem::remove(path);
 	}
 }

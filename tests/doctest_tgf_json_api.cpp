@@ -576,6 +576,72 @@ TEST_SUITE("tgf json api: load and reload") {
 	}
 }
 
+// A grammar and an input, both with CRLF line ends, written in binary so
+// the test does not depend on the checkout line ends.
+static std::string crlf_grammar() {
+	return "@use char class digit, space.\r\n"
+		"start => num __.\r\n"
+		"num => digit+.\r\n"
+		"__ => space+.\r\n";
+}
+
+TEST_SUITE("tgf json api: CRLF text") {
+	TEST_CASE("load, reload and grammar keep the CRLF source") {
+		scratch_file g("tgf_json_api_crlf.tgf", crlf_grammar());
+		auto r = run_repl({
+			file_request(1, "load", g.path),
+			eval_request(2, "reload"),
+			eval_request(3, "grammar") });
+		REQUIRE(r.responses.size() == 3);
+		for (const auto& resp : r.responses)
+			CHECK(resp.find("status")->as_string() == "ok");
+		const json::value* data = response_data(r.responses[2]);
+		REQUIRE(data != nullptr);
+		REQUIRE(data->find("source") != nullptr);
+		CHECK(data->find("source")->as_string() == crlf_grammar());
+	}
+
+	TEST_CASE("parse file reads a CRLF input file") {
+		scratch_file g("tgf_json_api_crlf2.tgf", crlf_grammar());
+		scratch_file in("tgf_json_api_crlf_input.txt", "123\r\n");
+		auto r = run_repl({
+			file_request(1, "load", g.path),
+			file_request(2, "parse file", in.path) });
+		REQUIRE(r.responses.size() == 2);
+		CHECK(r.responses[1].find("status")->as_string() == "ok");
+		const json::value* data = response_data(r.responses[1]);
+		REQUIRE(data != nullptr);
+		REQUIRE(data->find("terminals") != nullptr);
+		CHECK(data->find("terminals")->as_string() == "123\r\n");
+	}
+
+	TEST_CASE("a request line that ends with CRLF is accepted") {
+		auto r = run_repl({
+			"{\"id\":1,\"cmd\":\"version\"}\r",
+			"{\"id\":2,\"cmd\":\"parse\",\"input\":\"123\"\r}",
+			"{\"id\":3,\r\"cmd\":\"version\"}" });
+		REQUIRE(r.responses.size() == 3);
+		for (const auto& resp : r.responses)
+			CHECK(resp.find("status")->as_string() == "ok");
+	}
+
+	TEST_CASE("the text grammar command drops the CR of a CRLF source") {
+		scratch_file lf("tgf_json_api_text_lf.tgf", "start => 'a'.\n");
+		scratch_file crlf("tgf_json_api_text_crlf.tgf",
+			"start => 'a'.\r\n");
+		tgf_repl_evaluator lfe(lf.path), ce(crlf.path);
+		std::ostringstream lfos, cos;
+		std::streambuf* old = std::cout.rdbuf();
+		std::cout.rdbuf(lfos.rdbuf());
+		lfe.eval("grammar");
+		std::cout.rdbuf(cos.rdbuf());
+		ce.eval("grammar");
+		std::cout.rdbuf(old);
+		CHECK(cos.str().find('\r') == std::string::npos);
+		CHECK(cos.str() == lfos.str());
+	}
+}
+
 TEST_SUITE("tgf json api: version, license and clear") {
 	TEST_CASE("version and license give non-empty strings") {
 		auto r = run_repl({

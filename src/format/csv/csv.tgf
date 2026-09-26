@@ -1,9 +1,10 @@
 # CSV grammar
 
 # RFC 4180 uses comma, crlf and no_header
+# a record ends with CRLF, and the crlf dialect also takes a bare LF
 # three guard groups select the dialect:
 #   separator: comma or tab
-#   eol: crlf or lf
+#   eol: crlf (CRLF or LF) or lf (LF only)
 #   header: header or no_header
 
 @enable productions comma, crlf, no_header.
@@ -32,7 +33,7 @@ sep_char[comma] => ','.
 sep_char[tab]   => '\t'.
 CR              => '\r'.
 LF              => '\n'.
-EOL[crlf]       => CR LF.
+EOL[crlf]       => CR LF | LF.
 EOL[lf]         => LF.
 DQUOTE          => '"'.
 TEXTDATA        => printable & ~( DQUOTE | SEP | CR | LF ).
