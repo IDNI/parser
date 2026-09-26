@@ -260,7 +260,7 @@ private:
 			//for (auto& n : opt.to_inline) std::cout << n << " ";
 			//std::cout << "\n";
 			return grammar<C, T>(nts, ps, start == nul
-				? prods_t(nts("start")) : start, cc, opt);
+				? prods_t(nts("start")) : start, cc, opt, diag);
 		}
 	private:
 		size_t id = 0;

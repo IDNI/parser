@@ -204,6 +204,15 @@ struct messages {
 		"Unknown highlight type";
 	static constexpr sv dynamic_names_need_semicolon =
 		"Dynamic directive names must be separated by ';', not ','.";
+	// chart field limits
+	static constexpr sv input_too_long =
+		"Input is longer than the largest parse position";
+	static constexpr sv too_many_productions =
+		"Grammar has too many productions";
+	static constexpr sv too_many_conjuncts =
+		"Production has too many conjuncts";
+	static constexpr sv too_many_literals =
+		"Conjunct has too many literals";
 	// escape decode errors
 	static constexpr sv escape_trailing         = "Trailing escape character.";
 	static constexpr sv escape_lone_delimiter   = "Lone delimiter not doubled.";

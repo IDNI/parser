@@ -16,6 +16,9 @@ inline void report_parse_error(idni::diagnostics::report& r,
 {
 	using namespace idni::diagnostics;
 	using namespace idni::parser_strings;
+	// A non-syntax abort (such as an input limit) already reported its own
+	// error; a default error carries no syntax message.
+	if (err.ctxt.empty()) return;
 	auto msg = err.to_str(verbosity);
 	r.error(code::parse_error, msg,
 		{{label::loc,  err.loc},

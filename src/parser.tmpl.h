@@ -35,7 +35,19 @@ typename forest<pnode_type<C,T>>::node pnode_type<C,T>::ptrof(const pnode_type<C
 
 template <typename C, typename T>
 parser<C, T>::item::item(size_t set, size_t prod, size_t con, size_t from,
-	size_t dot) : set(set), prod(prod), con(con), from(from), dot(dot) {}
+	size_t dot) :
+	set(static_cast<uint32_t>(set)),
+	prod(static_cast<uint32_t>(prod)),
+	from(static_cast<uint32_t>(from)),
+	con(static_cast<uint16_t>(con)),
+	dot(static_cast<uint16_t>(dot))
+{
+	DBG(assert(set <= UINT32_MAX);)
+	DBG(assert(prod <= UINT32_MAX);)
+	DBG(assert(from <= UINT32_MAX);)
+	DBG(assert(con <= UINT16_MAX);)
+	DBG(assert(dot <= UINT16_MAX);)
+}
 template <typename C, typename T>
 bool parser<C, T>::item::operator<(const item& i) const {
 	if (set  != i.set)  return set  < i.set;
@@ -157,6 +169,12 @@ bool parser<C, T>::input::tnext() {
 	if ((decoder && teof()) ||
 		(!decoder && (eof() || !next()))) return false;
 	return ++tp, true;
+}
+template <typename C, typename T>
+size_t parser<C, T>::input::known_length() const {
+	if (max_l) return max_l;
+	if (isstream()) return 0;
+	return l;
 }
 template <typename C, typename T>
 size_t parser<C, T>::input::tpos() { return tp; }
@@ -839,6 +857,24 @@ template <typename C, typename T>
 parser<C, T>::result parser<C, T>::_parse() {
 	// Fresh report per parse.
 	report_.clear();
+	// A chart position and span field is 32-bit, so a longer input cannot
+	// be represented and is stopped before the first item is built.
+	const size_t max_item_pos = static_cast<size_t>(UINT32_MAX) - 1;
+	auto item_limit_result = [&]() -> result {
+		report_.error(idni::diagnostics::code::out_of_range,
+			messages::input_too_long,
+			{{ label::limit, max_item_pos }});
+		error err;
+		if (po.tree_path == parse_tree_path::bintree_path)
+			return result(*this, std::move(in_), tref(0), false, err);
+		return result(*this, std::move(in_), std::unique_ptr<pforest>(),
+			false, err);
+	};
+	if (in_->known_length() > max_item_pos) {
+		result r = item_limit_result();
+		po = o.parse_opts;
+		return r;
+	}
 	std::optional<idni::diagnostics::report::scope_guard> parse_scope;
 	if (po.measure_scopes)
 		parse_scope.emplace(report_.open(label::parse));
@@ -889,6 +925,7 @@ parser<C, T>::result parser<C, T>::_parse() {
 	if (!o.dynamic_grow_nts.empty()) g.sync_dynamic_context(*dyn_ctx);
 
 	lit<C, T> start_lit;
+	bool too_long = false;
 	auto run_earley = [&]() {
 	size_t n = 0;
 	// fromS is only read by GC drain and conjunctive cascade machinery.
@@ -928,6 +965,7 @@ parser<C, T>::result parser<C, T>::_parse() {
 	do {
 		if ((new_pos = (cn != in_->pos()))) cn = in_->pos();
 		ch = in_->tcur(), n = in_->tpos();
+		if (n > max_item_pos) { too_long = true; break; }
 		if (n >= S.size()) S.resize(n + 1);
 		if (debug && debug_at.second > 0) debug =
 			debug_at.first <= n && n <= debug_at.second;
@@ -1094,6 +1132,12 @@ parser<C, T>::result parser<C, T>::_parse() {
 		#endif
 		run_earley();
 		MC(if (po.measure_counters) flush_parsing_counters();)
+	}
+
+	if (too_long) {
+		result r = item_limit_result();
+		po = o.parse_opts;
+		return r;
 	}
 
 	in_->clear();

@@ -1581,3 +1581,24 @@ TEST_SUITE("forest_path: long input") {
 		CHECK(terminal_count(t) == 64000);
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Chart item size and the grammar limits that keep its fields in range.
+// ---------------------------------------------------------------------------
+TEST_SUITE("chart item size") {
+
+	TEST_CASE("an item occupies 16 bytes") {
+		CHECK(sizeof(parser<char>::item) == 16);
+		CHECK(sizeof(parser<char32_t, char32_t>::item) == 16);
+	}
+
+	TEST_CASE("a conjunct with too many literals is a load error") {
+		nonterminals<char> nts;
+		prods<char> ps, start(nts("start"));
+		// 65536 literals in one conjunct: one over the 16-bit dot range.
+		ps(start, prods<char>(string(65536, 'a')));
+		idni::diagnostics::report rep;
+		grammar<char> g(nts, ps, start, {}, {}, &rep);
+		CHECK(rep.has_error());
+	}
+}

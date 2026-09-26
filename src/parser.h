@@ -474,7 +474,7 @@ struct grammar {
 	grammar(nonterminals<C, T>& nts, options opt = {});
 	grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
 		const prods<C, T>& start, const char_class_fns<T>& cc_fns,
-		options opt = {});
+		options opt = {}, idni::diagnostics::report* diag = nullptr);
 	/// Sets guards of enabled productions
 	void set_enabled_productions(const std::set<std::string>&);
 	/**
@@ -961,13 +961,15 @@ public:
 					const std::vector<terminal_type>&)>;
 	using counters        = idni::parser_strings::counters;
 
-	/// earley item
+	/// earley item. Fields are 32 and 16 bit so one item fits in 16 bytes.
 	struct item {
 		item(size_t set, size_t prod,size_t con,size_t from,size_t dot);
 		bool operator<(const item& i) const;
 		bool operator==(const item& i) const;
-		size_t set, prod, con, from, dot;
+		uint32_t set, prod, from;
+		uint16_t con, dot;
 	};
+	static_assert(sizeof(item) == 16, "item must stay 16 bytes");
 	struct item_hash {
 		size_t operator()(const item& i) const {
 			std::uint64_t seed = grcprime;
@@ -1032,6 +1034,9 @@ public:
 		bool teof();
 		/// Reads value at tpos
 		T tat(size_t p);
+		/// Number of input positions known before the parse, or 0 for an
+		/// unbounded stream.
+		size_t known_length() const;
 	private:
 		void decode();
 		/// input type

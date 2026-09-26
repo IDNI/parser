@@ -499,7 +499,7 @@ grammar<C, T>::grammar(nonterminals<C, T>& nts,
 template <typename C, typename T>
 grammar<C, T>::grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
 	const prods<C, T>& start, const char_class_fns<T>& cc_fns,
-	typename grammar<C, T>::options opt)
+	typename grammar<C, T>::options opt, idni::diagnostics::report* diag)
 	: opt(opt), nts(nts), start(start.to_lit()), cc_fns(cc_fns)
 {
 	// a caller may pass a container another grammar already used
@@ -537,6 +537,38 @@ grammar<C, T>::grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
 		}
 	}
 	source_productions_ = G.size();
+	// A production id is 32-bit and a conjunct or literal index is 16-bit.
+	// The prods API builds sets, so reject here before the chart sees them.
+	if (diag) {
+		using idni::parser_strings::label;
+		using idni::parser_strings::messages;
+		bool over = G.size() >= static_cast<size_t>(UINT32_MAX);
+		if (over) diag->error(idni::diagnostics::code::out_of_range,
+			messages::too_many_productions,
+			{{ label::limit, static_cast<size_t>(UINT32_MAX) }});
+		for (size_t p = 0; !over && p != G.size(); ++p) {
+			if (G[p].second.size() > static_cast<size_t>(UINT16_MAX)) {
+				diag->error(idni::diagnostics::code::out_of_range,
+					messages::too_many_conjuncts,
+					{{ label::limit, static_cast<size_t>(UINT16_MAX) }});
+				over = true;
+				break;
+			}
+			for (size_t c = 0; c != G[p].second.size(); ++c)
+				if (G[p].second[c].size()
+						> static_cast<size_t>(UINT16_MAX))
+				{
+					diag->error(
+						idni::diagnostics::code::out_of_range,
+						messages::too_many_literals,
+						{{ label::limit,
+							static_cast<size_t>(UINT16_MAX) }});
+					over = true;
+					break;
+				}
+		}
+		if (over) return;
+	}
 	for (const auto& [name, values] : opt.dynamic)
 		host_dynamic_values(nt(name), values);
 	compute_nullables();
