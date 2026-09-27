@@ -154,6 +154,14 @@ struct tgf_repl_evaluator {
 
 	[[nodiscard]] const std::string& filename() const noexcept;
 	[[nodiscard]] const std::string& source() const noexcept;
+	/// The text of the loaded grammar: the stored source, or the bytes of
+	/// the grammar file. Empty when no grammar is loaded. A server sends
+	/// it to a session child so the child starts with the same grammar.
+	[[nodiscard]] std::string grammar_text() const;
+	/// Keep the loaded grammar but mark it as loaded from text, so a later
+	/// reload uses the stored text and needs no path. A built-in grammar
+	/// keeps its own source. The grammar name stays.
+	void make_grammar_source_backed();
 	[[nodiscard]] const std::string& start_symbol() const noexcept;
 	[[nodiscard]] bool has_fixed_grammar() const noexcept;
 
@@ -179,6 +187,10 @@ struct tgf_repl_evaluator {
 	/// Load a grammar from text and adopt it. @p name is a label for the
 	/// grammar in state and hello. A later reload reloads the stored text.
 	bool load_source(const std::string& name, const std::string& text);
+	/// Load a grammar from the bytes of @p filename and keep those bytes
+	/// as the source. A server uses this so a session and a reload see the
+	/// bytes of the load, not a later change of the file.
+	bool load_file_source(const std::string& filename);
 	/// Data of the load command from source text: {"grammar", "loaded"}.
 	format::json::value load_source_data(const std::string& name,
 		const std::string& text);
@@ -301,6 +313,26 @@ void json_write_line(std::ostream& os, const format::json::value& v);
 
 /// The {"grammar","start"} state object that every response carries.
 format::json::value state_value(const tgf_repl_evaluator& re);
+
+/// Print @p report the way the text REPL does. With @p json true, print it
+/// as one JSON line (with the code names when @p print_names is true).
+/// Otherwise route errors and warnings to stderr and info to stdout, which
+/// is @ref diagnostics::report::print. The client of `tgf serve` rebuilds a
+/// report from its JSON and calls this too, so both print the same text.
+void print_diagnostics_report(const diagnostics::report& report,
+	bool json, bool print_names = true);
+
+/// Text of one command result from its data only. The local REPL and the
+/// remote evaluator of `tgf connect` share it, so the remote text matches
+/// the local text.
+void render_command_text(const cmd_result& r, std::ostream& os,
+	const term::colors& TC,
+	const std::set<size_t>* char_classes = nullptr);
+
+/// One structured JSON request for one parsed REPL statement. A `load`
+/// carries the field `file` and a `parse file` keeps that command name;
+/// the client of `tgf serve` reads the file and rewrites both.
+format::json::value statement_request(const tgf_repl_evaluator::trv& n);
 
 /// Response of one eval request: {"id","status","results":[...],
 /// "state":{...},"report"}.

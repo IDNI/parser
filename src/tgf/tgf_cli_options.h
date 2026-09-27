@@ -198,6 +198,42 @@ inline cli::commands tgf_commands() {
 
 	// ---------------------------------------------------------------------
 
+	CMD(cli::command("serve", "serve TGF sessions on a TCP port"));
+
+	OPT(help);
+	OPT(start);
+	OPT(productions);
+	OPT(cli::option("port", 'p', 0));
+		DESC("TCP port to listen on, 0 picks a free port");
+	OPT(cli::option("max-sessions", '\0', 16));
+		DESC("refuse a new session at this count");
+	OPT(cli::option("idle-timeout", '\0', 30));
+		DESC("end a session after this many minutes with no traffic");
+	OPT(cli::option("session-memory", '\0', 0));
+		DESC("address space limit of a session in MB, 0 means no limit");
+	OPT(cli::option("max-line", '\0', 16777216));
+		DESC("largest request line in bytes, a longer line is an error");
+	OPT(cli::option("write-timeout", '\0', 30));
+		DESC("close a connection that does not drain its output within "
+			"this many seconds, 0 disables");
+	OPT(cli::option("log-dir", '\0', ""));
+		DESC("directory of the session logs and server.log, empty "
+			"uses ~/.tau/tgf/logs");
+	OPT(cli::option("no-log", '\0', false));
+		DESC("write no session logs");
+
+	// ---------------------------------------------------------------------
+
+	CMD(cli::command("connect", "run a text REPL in a tgf serve session"));
+
+	OPT(help);
+	OPT(cli::option("session", '\0', ""));
+		DESC("session id to attach again");
+	OPT(cli::option("legacy-repl", 'X', false));
+		DESC("use legacy terminal REPL instead of FTXUI");
+
+	// ---------------------------------------------------------------------
+
 	CMD(cli::command("test", "run tester (with provided tgf.test file)"));
 	OPT(help);
 	OPT(productions);

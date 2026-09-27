@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <cstdint>
 #include <fstream>
 #include <map>
 #include <optional>
@@ -18,6 +19,10 @@
 #include "recoders.h"
 #include "format/tgf/tgf.h"
 #include "tgf_cli.h"
+#ifdef TAU_PARSER_BUILD_SERVE
+#include "tgf_serve.h"
+#include "tgf_connect.h"
+#endif
 #include "format/tgf.test/tgf_test.h"
 #ifndef DEBUG
 #include "utility/devhelpers.h"
@@ -276,9 +281,8 @@ const char* cmd_status_name(cmd_status s) {
 	return "ok";
 }
 
-static void print_diagnostics_report(
-	const idni::diagnostics::report& report,
-	bool json, bool print_names = true)
+void print_diagnostics_report(const idni::diagnostics::report& report,
+	bool json, bool print_names)
 {
 	if (report.nodes().empty()) return;
 	if (json) format::json::print(report, std::cout, print_names) << '\n';
@@ -528,6 +532,37 @@ format::json::value tgf_repl_evaluator::directives_value() const {
 
 const std::string& tgf_repl_evaluator::source() const noexcept {
 	return grammar_source;
+}
+
+std::string tgf_repl_evaluator::grammar_text() const {
+	if (!grammar_loaded) return {};
+	if (!grammar_source.empty() || grammar_from_source)
+		return grammar_source;
+	if (tgf_filename.empty()) return {};
+	ifstream f(tgf_filename, ios::binary);
+	if (!f) return {};
+	return std::string(istreambuf_iterator<char>(f),
+		istreambuf_iterator<char>());
+}
+
+void tgf_repl_evaluator::make_grammar_source_backed() {
+	// A built-in grammar cannot reload; a grammar that already came from
+	// text needs no change.
+	if (!grammar_loaded || fixed_grammar || grammar_from_source) return;
+	grammar_source = grammar_text();
+	grammar_from_source = true;
+}
+
+bool tgf_repl_evaluator::load_file_source(const std::string& filename) {
+	ifstream f(filename, ios::binary);
+	if (!f) {
+		report.error(diagnostics::code::io_error,
+			parser_strings::messages::cannot_open_file);
+		return false;
+	}
+	std::string text((istreambuf_iterator<char>(f)),
+		istreambuf_iterator<char>());
+	return load_source(filename, text);
 }
 
 const std::string& tgf_repl_evaluator::start_symbol() const noexcept {
@@ -2061,7 +2096,7 @@ static void render_data_productions(const cmd_result& r, std::ostream& os,
 }
 
 void render_command_text(const cmd_result& r, std::ostream& os,
-	const term::colors& TC, const std::set<size_t>* char_classes = nullptr)
+	const term::colors& TC, const std::set<size_t>* char_classes)
 {
 	// A text result the evaluator built from live objects wins; the data
 	// renderer covers the client, which holds only the response data.
@@ -2133,6 +2168,123 @@ void tgf_repl_evaluator::render_text(const cmd_result& r,
 	// data only.
 	if (r.cmd == "grammar") { print_source(os); return; }
 	render_command_text(r, os, TC);
+}
+
+// The value of one option as a structured field of a set, add or delete
+// request.
+static format::json::value option_request_value(size_t o, const tt& v) {
+	using p = tgf_repl_parser;
+	using format::json::value;
+	const option_desc* d = find_option(o);
+	if (!d) return value::null();
+	switch (d->kind) {
+	case option_kind::boolean:
+		return value::boolean(get_bool_value(v));
+	case option_kind::string_value: {
+		auto t = v | tt::only_child | tt::nonterminal;
+		if (t == p::detailed_sym) return value::string("detailed");
+		if (t == p::root_cause_sym)
+			return value::string("root-cause");
+		return value::string("basic");
+	}
+	case option_kind::symbol_value:
+		return value::string(v | tt::terminals);
+	case option_kind::list: {
+		value arr = value::array();
+		for (const auto& s : (v || p::symbol)())
+			arr.push_back(value::string(s | tt::terminals));
+		return arr;
+	}
+	case option_kind::treepaths: {
+		value arr = value::array();
+		for (const auto& tp : (v || p::treepath)()) {
+			value path = value::array();
+			for (const auto& s : (tp || p::symbol)())
+				path.push_back(value::string(
+					s | tt::terminals));
+			arr.push_back(std::move(path));
+		}
+		return arr;
+	}
+	}
+	return value::null();
+}
+
+format::json::value statement_request(const tgf_repl_evaluator::trv& n) {
+	using p = tgf_repl_parser;
+	using format::json::value;
+	const auto nt = n | tt::nonterminal;
+	value req = value::object();
+	req.set("cmd", value::string(command_name(nt)));
+	switch (nt) {
+	case p::parse_cmd: {
+		auto i = n | p::parse_input;
+		std::string input;
+		if (auto seq = i | p::parse_input_char_seq; seq.has_value())
+			input = seq | tt::terminals;
+		else if (auto qs = i | p::quoted_string; qs.has_value()) {
+			diagnostics::report rep;
+			input = unquote(qs | tt::terminals, rep);
+		}
+		req.set("input", value::string(std::move(input)));
+		break;
+	}
+	case p::parse_file_cmd:
+	case p::load_cmd: {
+		auto fn = n | p::filename;
+		diagnostics::report rep;
+		req.set("file", value::string(
+			unquote(fn | tt::terminals, rep)));
+		break;
+	}
+	case p::start_cmd:
+	case p::igrammar_cmd:
+	case p::unreachable_cmd: {
+		auto sym = n | p::symbol;
+		if (sym.has_value())
+			req.set("symbol", value::string(
+				sym | tt::terminals));
+		break;
+	}
+	case p::help_cmd: {
+		auto h = n | p::help_arg;
+		if (h.has_value())
+			req.set("command", value::string(help_arg_name(
+				h | tt::only_child | tt::nonterminal)));
+		break;
+	}
+	case p::get_cmd: {
+		auto o = n | p::option;
+		if (o.has_value()) {
+			auto [opt_nt, _] = get_opt(o);
+			const option_desc* d = find_option(opt_nt);
+			if (d) req.set("option", value::string(d->name));
+		}
+		break;
+	}
+	case p::set_cmd:
+	case p::add_cmd:
+	case p::del_cmd: {
+		auto [o, v] = get_opt(n);
+		const option_desc* d = find_option(o);
+		if (d) req.set("option", value::string(d->name));
+		req.set("value", option_request_value(o, v));
+		break;
+	}
+	case p::toggle_cmd:
+	case p::enable_cmd:
+	case p::disable_cmd: {
+		auto [o, _] = get_opt(n);
+		const option_desc* d = find_option(o);
+		if (d) req.set("option", value::string(d->name));
+		break;
+	}
+	default:
+		// grammar, reload, version, license, quit and clear carry no
+		// field beyond cmd.
+		break;
+	}
+	return req;
 }
 
 idni::diagnostics::result<int> tgf_repl_evaluator::eval(const string& src) {
@@ -2484,6 +2636,95 @@ static int show_command(const cli::command& cmd,
 	return 0;
 }
 
+static int serve_command(cli& cl, const cli::command& cmd,
+	tgf_repl_evaluator& re)
+{
+#ifndef TAU_PARSER_BUILD_SERVE
+	(void)cmd;
+	(void)re;
+	return cl.error("tgf serve was not built: configure with "
+		"-DTAU_PARSER_BUILD_SERVE=ON");
+#else
+	serve_options opt;
+	int port = cmd.get<int>("port");
+	if (port < 0 || port > 65535)
+		return cl.error("--port must be between 0 and 65535");
+	opt.port = static_cast<uint16_t>(port);
+	int max_sessions = cmd.get<int>("max-sessions");
+	if (max_sessions < 1)
+		return cl.error("--max-sessions must be at least 1");
+	opt.max_sessions = static_cast<size_t>(max_sessions);
+	int idle = cmd.get<int>("idle-timeout");
+	if (idle < 0)
+		return cl.error("--idle-timeout must not be negative");
+	opt.idle_timeout_minutes = static_cast<size_t>(idle);
+	int mem = cmd.get<int>("session-memory");
+	if (mem < 0)
+		return cl.error("--session-memory must not be negative");
+	opt.session_memory_mb = static_cast<size_t>(mem);
+	int max_line = cmd.get<int>("max-line");
+	if (max_line < 1)
+		return cl.error("--max-line must be at least 1");
+	opt.max_line = static_cast<size_t>(max_line);
+	int write_timeout = cmd.get<int>("write-timeout");
+	if (write_timeout < 0)
+		return cl.error("--write-timeout must not be negative");
+	opt.write_timeout_seconds = static_cast<size_t>(write_timeout);
+	opt.log_dir = cmd.get<string>("log-dir");
+	opt.no_log = cmd.get<bool>("no-log");
+	opt.evaluator = &re;
+	auto r = tgf_serve_run(opt);
+	// A warning (for example the Windows session memory note) is not an
+	// error, so print the report even on a clean stop.
+	print_diagnostics_report(r.report(), false);
+	return r.has_value() ? r.value() : 1;
+#endif
+}
+
+// Parse "<host>:<port>". IPv6 is out of scope: the server binds an IPv4
+// loopback address only.
+static bool connect_parse_host_port(const string& s, string& host,
+	uint16_t& port)
+{
+	auto pos = s.rfind(':');
+	if (pos == string::npos || pos == 0 || pos + 1 >= s.size())
+		return false;
+	host = s.substr(0, pos);
+	unsigned long p = 0;
+	for (size_t i = pos + 1; i != s.size(); ++i) {
+		char c = s[i];
+		if (c < '0' || c > '9') return false;
+		p = p * 10 + static_cast<unsigned long>(c - '0');
+		if (p > 65535) return false;
+	}
+	port = static_cast<uint16_t>(p);
+	return true;
+}
+
+static int connect_command(cli& cl, const cli::command& cmd) {
+#ifndef TAU_PARSER_BUILD_SERVE
+	(void)cmd;
+	return cl.error("tgf connect was not built: configure with "
+		"-DTAU_PARSER_BUILD_SERVE=ON");
+#else
+	auto files = cl.get_files();
+	if (files.size() != 1)
+		return cl.error("connect needs one <host>:<port> argument");
+	connect_options opt;
+	if (!connect_parse_host_port(files.front(), opt.host, opt.port))
+		return cl.error("invalid <host>:<port> argument");
+	if (cmd.has("session")) opt.session = cmd.get<string>("session");
+	if (cmd.has("legacy-repl"))
+		opt.legacy_repl = cmd.get<bool>("legacy-repl");
+	auto r = tgf_connect_run(opt);
+	if (!r.has_value()) {
+		print_diagnostics_report(r.report(), false);
+		return 1;
+	}
+	return r.value();
+#endif
+}
+
 static int run_command(cli& cl, const cli::command& cmd,
 	tgf_repl_evaluator& re)
 {
@@ -2506,6 +2747,10 @@ static int run_command(cli& cl, const cli::command& cmd,
 	}
 
 	if (cmd.name() == "grammar") return show_command(cmd, re);
+
+	if (cmd.name() == "serve") return serve_command(cl, cmd, re);
+
+	if (cmd.name() == "connect") return connect_command(cl, cmd);
 
 	if (cmd.name() == "gen") return gen_command(cmd, re);
 
@@ -2707,6 +2952,15 @@ int tgf_run(int argc, char** argv) {
 		return run_command(cl, cmd, re);
 	}
 	if (!exists) return cl.error("TGF file does not exist ", true);
+
+	// A server parses the bytes it read once and keeps them, so a session
+	// and a reload see the bytes of the load, not a later file change.
+	if (cmd.name() == "serve") {
+		tgf_repl_evaluator re(repl_options_from_cmd(cmd, args));
+		if (!re.load_file_source(tgf_file))
+			return re.flush_report(), 1;
+		return run_command(cl, cmd, re);
+	}
 
 	tgf_repl_evaluator re(tgf_file, repl_options_from_cmd(cmd, args));
 	if (!re.good()) return re.flush_report(), 1;

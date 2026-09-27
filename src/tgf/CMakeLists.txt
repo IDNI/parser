@@ -27,6 +27,24 @@ if(NOT WIN32)
 	target_compile_options(tgf_cli_core PRIVATE -fPIC)
 endif()
 
+# tgf serve and tgf connect need Boost.Asio. The option keeps the parser
+# core free of Boost; only tgf_serve.cpp includes Asio.
+if(TAU_PARSER_BUILD_SERVE)
+	target_sources(tgf_cli_core PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/tgf_serve.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/tgf_connect.cpp")
+	target_compile_definitions(tgf_cli_core PRIVATE TAU_PARSER_BUILD_SERVE)
+	target_include_directories(tgf_cli_core PUBLIC
+		"${TAU_BOOST_INCLUDE_DIR_RESOLVED}")
+	find_package(Threads REQUIRED)
+	target_link_libraries(tgf_cli_core PUBLIC Threads::Threads)
+	if(WIN32)
+		# Asio's accept path calls AcceptEx and GetAcceptExSockaddrs, which live in mswsock.
+		# The session id reads the OS entropy source through BCryptGenRandom.
+		target_link_libraries(tgf_cli_core PUBLIC ws2_32 mswsock bcrypt)
+	endif()
+endif()
+
 # FTXUI-based REPL.  TAU_PARSER_HAS_FTXUI is defined when the FTXUI targets resolve;
 # otherwise the REPL silently falls back to the legacy terminal REPL.
 include(ftxui)

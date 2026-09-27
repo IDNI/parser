@@ -142,6 +142,12 @@ set(DOCTESTS
 	tgf_json_api
 )
 
+# The serve and connect tests need Boost.Asio. They run on every platform;
+# a cross build runs them through CMAKE_CROSSCOMPILING_EMULATOR.
+if(TAU_PARSER_BUILD_SERVE AND NOT EMSCRIPTEN AND TARGET tgf)
+	list(APPEND DOCTESTS tgf_serve tgf_connect)
+endif()
+
 foreach(X IN LISTS DOCTESTS)
 	# The highlight and derived-char-class tests read host grammar files
 	# through PROJECT_SOURCE_DIR and are not WASM-runnable.
@@ -155,11 +161,20 @@ foreach(X IN LISTS DOCTESTS)
 			continue()
 		endif()
 	endif()
+	if(X STREQUAL "tgf_serve" OR X STREQUAL "tgf_connect")
+		if(NOT TARGET tgf_cli_core)
+			continue()
+		endif()
+	endif()
 	set(N "doctest_${X}")
 	add_executable(${N} "${N}.cpp")
 	if(EMSCRIPTEN)
 		tauparser_emcc_setup(${N})
 	elseif(X STREQUAL "tgf_json_api")
+		tauparser_setup(${N} PRIVATE tgf_cli_core)
+	elseif(X STREQUAL "tgf_serve")
+		tauparser_setup(${N} PRIVATE tgf_cli_core)
+	elseif(X STREQUAL "tgf_connect")
 		tauparser_setup(${N} PRIVATE tgf_cli_core)
 	else()
 		tauparser_setup(${N} PRIVATE "")
@@ -191,7 +206,9 @@ foreach(X IN LISTS DOCTESTS)
 		target_compile_definitions(${N} PRIVATE
 			PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 	endif()
-	if(${N} STREQUAL "doctest_tgf_json_api")
+	if(${N} STREQUAL "doctest_tgf_json_api"
+			OR ${N} STREQUAL "doctest_tgf_serve"
+			OR ${N} STREQUAL "doctest_tgf_connect")
 		target_compile_definitions(${N} PRIVATE
 			PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
 			PROJECT_BINARY_DIR="${PROJECT_BINARY_DIR}")
@@ -228,6 +245,13 @@ foreach(X IN LISTS DOCTESTS)
 		endif()
 	endif()
 	add_test(NAME ${N} COMMAND ${TEST_RUNNER} ${N}${TEST_SUFFIX})
+	if(${N} STREQUAL "doctest_tgf_serve"
+			OR ${N} STREQUAL "doctest_tgf_connect")
+		# The Windows fixture starts the real tgf; ctest passes its path
+		# through the environment so no backslash needs escaping.
+		set_tests_properties(${N} PROPERTIES
+			ENVIRONMENT "TGF_BINARY_PATH=$<TARGET_FILE:tgf>")
+	endif()
 	# add_dependencies(${N} ${TAU_PARSER_STATIC_LIB_NAME})
 endforeach()
 
@@ -279,6 +303,21 @@ if(TARGET tgf)
 				"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tiny.tgf"
 				${CMAKE_CROSSCOMPILING_EMULATOR}
 				$<TARGET_FILE:tgf>)
+	endif()
+endif()
+
+# A real server process on a free port, driven over a plain socket. The
+# harness runs the native python3 and passes the emulator before tgf.exe.
+if(TARGET tgf AND TAU_PARSER_BUILD_SERVE AND NOT EMSCRIPTEN)
+	find_program(PYTHON3_SERVE_EXECUTABLE NAMES python3 python)
+	if(PYTHON3_SERVE_EXECUTABLE)
+		add_test(NAME tgf_serve_smoke
+			COMMAND "${PYTHON3_SERVE_EXECUTABLE}"
+				"${CMAKE_CURRENT_SOURCE_DIR}/serve/tgf_serve_smoke.py"
+				"${PROJECT_SOURCE_DIR}/tests/fixtures/tiny.tgf"
+				${CMAKE_CROSSCOMPILING_EMULATOR}
+				$<TARGET_FILE:tgf>)
+		set_tests_properties(tgf_serve_smoke PROPERTIES TIMEOUT 120)
 	endif()
 endif()
 

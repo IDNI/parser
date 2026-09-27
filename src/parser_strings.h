@@ -230,6 +230,32 @@ struct messages {
 		"File paths are not allowed in a server session";
 	static constexpr sv line_too_long          =
 		"Line is longer than the limit";
+	// server session errors
+	static constexpr sv too_many_sessions      = "Too many sessions";
+	static constexpr sv unknown_session        = "Unknown session id";
+	static constexpr sv session_attached       =
+		"Session already has a client";
+	static constexpr sv session_start_failed   = "Could not start a session";
+	static constexpr sv entropy_failed         =
+		"Could not read the OS entropy source";
+	static constexpr sv session_memory_failed  =
+		"Could not set the session memory limit";
+	// server start and log errors
+	static constexpr sv bad_address            =
+		"Invalid listen address";
+	static constexpr sv bind_failed            =
+		"Could not bind the listen port";
+	static constexpr sv listen_failed          =
+		"Could not listen on the port";
+	static constexpr sv log_write_failed       =
+		"Could not write a session log";
+	static constexpr sv session_memory_unsupported =
+		"The session memory limit is not supported on this platform";
+	static constexpr sv serve_failed           =
+		"The server stopped with an error";
+	// client errors
+	static constexpr sv connect_failed         =
+		"Could not connect to the session";
 	// load and reload command results
 	static constexpr sv reload_succeeded       = "Grammar reloaded";
 	static constexpr sv reload_failed          = "Grammar reload failed";
