@@ -299,6 +299,58 @@ inline value to_value(const diagnostics::report& r, bool names = true) {
 	return v;
 }
 
+/// Rebuild one nested report node from JSON and append it under the
+/// current parent of @p r. The children recurse, so the tree nests again.
+/// A missing tag reads as @ref diagnostics::code::unknown; the message
+/// field is ignored because the tag carries the code.
+inline void report_node_from_value(diagnostics::report& r,
+	const value& n)
+{
+	using diagnostics::attr_in;
+	using diagnostics::code;
+	code tag = code::unknown;
+	if (auto t = n.find("tag"); t && t->is_number())
+		tag = static_cast<code>(
+			static_cast<uint16_t>(t->as_number()));
+	diagnostics::report::key key = 0;
+	if (auto k = n.find("key"); k && k->is_string())
+		key = r.intern(k->as_string());
+	int64_t node_value = 0;
+	if (auto v = n.find("value"); v && v->is_number())
+		node_value = static_cast<int64_t>(v->as_number());
+	std::vector<attr_in> attrs;
+	if (auto a = n.find("attrs"); a && a->is_array())
+		for (const auto& at : *a) {
+			auto ak = at.find("key");
+			auto av = at.find("value");
+			if (!ak || !ak->is_string()) continue;
+			diagnostics::report::key akey =
+				r.intern(ak->as_string());
+			if (av && av->is_string())
+				attrs.emplace_back(akey,
+					std::string_view(av->as_string()));
+			else if (av && av->is_number())
+				attrs.emplace_back(akey,
+					static_cast<int_t>(
+						av->as_number()));
+		}
+	r.push_node(tag, key, node_value, attrs);
+	if (auto ch = n.find("children"); ch && ch->is_array())
+		for (const auto& c : *ch) report_node_from_value(r, c);
+	r.pop_node();
+}
+
+/// Rebuild a diagnostics report from its nested JSON form, the reverse of
+/// @ref to_value. The @c message field is ignored: the tag carries the
+/// code.
+inline diagnostics::report report_from_value(const value& v) {
+	diagnostics::report r;
+	auto nodes = v.find("nodes");
+	if (!nodes || !nodes->is_array()) return r;
+	for (const auto& n : *nodes) report_node_from_value(r, n);
+	return r;
+}
+
 /// Serialize a diagnostics report as JSON on one line. With @p print_names
 /// = true, each node carries an extra "message" field with its code name.
 inline std::ostream& print(const diagnostics::report& r, std::ostream& os,

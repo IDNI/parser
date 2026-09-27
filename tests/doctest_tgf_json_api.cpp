@@ -44,6 +44,13 @@ static tgf_repl_evaluator::options json_options() {
 	return opt;
 }
 
+// JSON options with the server path restriction of a `tgf serve` session.
+static tgf_repl_evaluator::options no_paths_options() {
+	auto opt = json_options();
+	opt.no_server_paths = true;
+	return opt;
+}
+
 // Parse one response line.
 static json::value parse_line(const std::string& line) {
 	auto p = json::parse(line);
@@ -144,6 +151,68 @@ static std::string file_request(int id, const std::string& cmd,
 	return to_line(v);
 }
 
+// {"id":id,"cmd":"load","name":name,"source":source}
+static std::string load_source_request(int id, const std::string& name,
+	const std::string& source)
+{
+	json::value v = json::value::object();
+	v.set("id", json::value::number(static_cast<double>(id)))
+	 .set("cmd", json::value::string("load"))
+	 .set("name", json::value::string(name))
+	 .set("source", json::value::string(source));
+	return to_line(v);
+}
+
+static bool json_node_has_key(const json::value& node,
+	const std::string& key)
+{
+	if (auto k = node.find("key"); k && k->is_string()
+			&& k->as_string() == key) return true;
+	if (auto ch = node.find("children"); ch && ch->is_array())
+		for (const auto& c : *ch)
+			if (json_node_has_key(c, key)) return true;
+	return false;
+}
+
+static bool report_contains_key(const json::value& resp,
+	const std::string& key)
+{
+	auto has_key = [&key](const json::value& rep) {
+		auto nodes = rep.find("nodes");
+		if (!nodes || !nodes->is_array()) return false;
+		for (const auto& n : *nodes)
+			if (json_node_has_key(n, key)) return true;
+		return false;
+	};
+	if (auto rep = resp.find("report"); rep && has_key(*rep)) return true;
+	// An eval response carries the report of each statement.
+	if (auto res = resp.find("results"); res && res->is_array())
+		for (const auto& e : *res)
+			if (auto rep = e.find("report"); rep && has_key(*rep))
+				return true;
+	return false;
+}
+
+// Run tgf_run with @p input on stdin and capture stdout. Only the repl
+// --json path reads stdin.
+static std::string capture_run_with_stdin(
+	const std::vector<std::string>& args, const std::string& input,
+	int& code)
+{
+	std::vector<char*> argv;
+	argv.reserve(args.size());
+	for (const auto& a : args)
+		argv.push_back(const_cast<char*>(a.c_str()));
+	std::istringstream in(input);
+	auto* old_in = std::cin.rdbuf(in.rdbuf());
+	std::ostringstream cap;
+	auto* old_out = std::cout.rdbuf(cap.rdbuf());
+	code = tgf_run(static_cast<int>(argv.size()), argv.data());
+	std::cout.rdbuf(old_out);
+	std::cin.rdbuf(old_in);
+	return cap.str();
+}
+
 static std::string read_file(const std::string& path) {
 	std::ifstream f(path, std::ios::binary);
 	std::ostringstream os;
@@ -214,6 +283,91 @@ TEST_SUITE("tgf json api: hello") {
 		CHECK(s->find("grammar")->as_string() == grammar_path());
 		REQUIRE(s->find("start") != nullptr);
 		CHECK(s->find("start")->as_string() == "start");
+		// state names the character class nonterminals.
+		REQUIRE(s->find("char_classes") != nullptr);
+		CHECK(s->find("char_classes")->is_array());
+		CHECK(s->find("char_classes")->size() >= 1);
+		// hello carries the directives of the grammar file.
+		auto d = h->find("directives");
+		REQUIRE(d != nullptr);
+		REQUIRE(d->is_object());
+		auto uc = d->find("use_char_classes");
+		REQUIRE(uc != nullptr);
+		REQUIRE(uc->is_array());
+		REQUIRE(uc->size() == 1);
+		CHECK((*uc)[0].as_string() == "digit");
+		REQUIRE(d->find("start") != nullptr);
+		CHECK(d->find("start")->is_null());
+	}
+
+	TEST_CASE("the load and reload answers carry the directives") {
+		tgf_repl_evaluator re(json_options());
+		std::string src = "@start num.\n"
+			"@use char classes digit, alpha.\n"
+			"@enable productions comma, crlf.\n"
+			"num => digit+.\n";
+		json::value req = json::value::object();
+		req.set("id", json::value::number(1))
+		   .set("cmd", json::value::string("load"))
+		   .set("name", json::value::string("g.tgf"))
+		   .set("source", json::value::string(src));
+		auto r = run_repl_re(re, { to_line(req),
+			R"({"id":2,"cmd":"reload"})" });
+		REQUIRE(r.responses.size() == 2);
+		for (const auto& resp : r.responses) {
+			const json::value* data = response_data(resp);
+			REQUIRE(data != nullptr);
+			auto d = data->find("directives");
+			REQUIRE(d != nullptr);
+			REQUIRE(d->is_object());
+			auto st = d->find("start");
+			REQUIRE(st != nullptr);
+			REQUIRE(st->is_string());
+			CHECK(st->as_string() == "num");
+			auto uc = d->find("use_char_classes");
+			REQUIRE(uc != nullptr);
+			REQUIRE(uc->size() == 2);
+			CHECK((*uc)[1].as_string() == "alpha");
+			auto ep = d->find("enabled_productions");
+			REQUIRE(ep != nullptr);
+			CHECK(ep->size() >= 2);
+		}
+	}
+
+	TEST_CASE("the guard lists hold only guard names") {
+		tgf_repl_evaluator re(json_options());
+		std::string src = "@enable productions guard1.\n"
+			"@enable disambiguation.\n"
+			"@disable disambiguation.\n"
+			"start => 'a'.\n";
+		json::value req = json::value::object();
+		req.set("id", json::value::number(1))
+		   .set("cmd", json::value::string("load"))
+		   .set("name", json::value::string("g.tgf"))
+		   .set("source", json::value::string(src));
+		auto r = run_repl_re(re, { to_line(req) });
+		REQUIRE(r.responses.size() == 1);
+		const json::value* data = response_data(r.responses[0]);
+		REQUIRE(data != nullptr);
+		auto d = data->find("directives");
+		REQUIRE(d != nullptr);
+		REQUIRE(d->is_object());
+		auto ep = d->find("enable_productions");
+		REQUIRE(ep != nullptr);
+		bool has_guard1 = false;
+		for (const auto& e : *ep) {
+			CHECK(e.as_string() != "disambiguation");
+			if (e.as_string() == "guard1") has_guard1 = true;
+		}
+		CHECK(has_guard1);
+		auto dp = d->find("disable_productions");
+		REQUIRE(dp != nullptr);
+		for (const auto& e : *dp)
+			CHECK(e.as_string() != "disambiguation");
+		auto en = d->find("enabled_productions");
+		REQUIRE(en != nullptr);
+		for (const auto& e : *en)
+			CHECK(e.as_string() != "disambiguation");
 	}
 }
 
@@ -1065,12 +1219,17 @@ TEST_SUITE("tgf json api: no grammar") {
 		CHECK(!h->find("fixed_grammar")->as_bool());
 		REQUIRE(h->find("start") != nullptr);
 		CHECK(h->find("start")->is_null());
+		REQUIRE(h->find("directives") != nullptr);
+		CHECK(h->find("directives")->is_null());
 		auto s = p.find("state");
 		REQUIRE(s != nullptr);
 		REQUIRE(s->find("grammar") != nullptr);
 		CHECK(s->find("grammar")->is_null());
 		REQUIRE(s->find("start") != nullptr);
 		CHECK(s->find("start")->is_null());
+		REQUIRE(s->find("char_classes") != nullptr);
+		CHECK(s->find("char_classes")->is_array());
+		CHECK(s->find("char_classes")->size() == 0);
 	}
 
 	TEST_CASE("set start and get start in eval and structured form") {
@@ -1428,5 +1587,188 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 		CHECK(code == 0);
 		CHECK(text.find("start:") != std::string::npos);
 		CHECK(text.find("num") != std::string::npos);
+	}
+}
+
+TEST_SUITE("tgf json api: hello request") {
+	TEST_CASE("a hello request answers a fresh hello object") {
+		auto r = run_repl({ R"({"id":1,"cmd":"hello"})" });
+		REQUIRE(r.responses.size() == 1);
+		const auto& v = r.responses[0];
+		REQUIRE(v.find("id") != nullptr);
+		CHECK(v.find("id")->as_number() == 1);
+		REQUIRE(v.find("cmd") != nullptr);
+		CHECK(v.find("cmd")->as_string() == "hello");
+		REQUIRE(v.find("status") != nullptr);
+		CHECK(v.find("status")->as_string() == "ok");
+		auto h = v.find("hello");
+		REQUIRE(h != nullptr);
+		REQUIRE(h->find("protocol") != nullptr);
+		CHECK(h->find("protocol")->as_number() == 1);
+		REQUIRE(h->find("grammar") != nullptr);
+		CHECK(h->find("grammar")->as_string() == grammar_path());
+		CHECK(h->find("session") == nullptr);
+		CHECK(v.find("state") != nullptr);
+	}
+
+	TEST_CASE("the session id appears in the hello line and the response") {
+		tgf_repl_evaluator re(grammar_path(), json_options());
+		re.session_id = "0123456789abcdef";
+		auto r = run_repl_re(re, { R"({"id":1,"cmd":"hello"})" });
+		std::istringstream ls(r.raw);
+		std::string line;
+		REQUIRE(static_cast<bool>(std::getline(ls, line)));
+		auto first = parse_line(line);
+		REQUIRE(first.find("hello") != nullptr);
+		REQUIRE(first.find("hello")->find("session") != nullptr);
+		CHECK(first.find("hello")->find("session")->as_string()
+			== "0123456789abcdef");
+		REQUIRE(r.responses.size() == 1);
+		auto h = r.responses[0].find("hello");
+		REQUIRE(h != nullptr);
+		REQUIRE(h->find("session") != nullptr);
+		CHECK(h->find("session")->as_string()
+			== "0123456789abcdef");
+	}
+
+	TEST_CASE("--session sets the hello session id") {
+		int code = -1;
+		auto text = capture_run_with_stdin({ "tgf", grammar_path(),
+			"repl", "--json", "--session", "deadbeef" },
+			"{\"id\":1,\"cmd\":\"hello\"}\n", code);
+		REQUIRE(code == 0);
+		std::istringstream ls(text);
+		std::string line;
+		REQUIRE(static_cast<bool>(std::getline(ls, line)));
+		auto first = parse_line(line);
+		REQUIRE(first.find("hello") != nullptr);
+		REQUIRE(first.find("hello")->find("session") != nullptr);
+		CHECK(first.find("hello")->find("session")->as_string()
+			== "deadbeef");
+	}
+}
+
+TEST_SUITE("tgf json api: load from source") {
+	TEST_CASE("structured load source adopts and reload reloads the text") {
+		const std::string text = read_file(grammar_path());
+		auto r = run_repl({
+			load_source_request(1, "label.tgf", text),
+			R"({"id":2,"cmd":"reload"})",
+			R"({"id":3,"cmd":"grammar"})",
+			R"({"id":4,"cmd":"parse","input":"123"})" });
+		REQUIRE(r.responses.size() == 4);
+		for (size_t i = 0; i != 3; ++i)
+			CHECK(r.responses[i].find("status")->as_string()
+				== "ok");
+		REQUIRE(result_of(r.responses[0]) != nullptr);
+		CHECK(result_of(r.responses[0])->find("loaded")->as_bool());
+		CHECK(result_of(r.responses[0])->find("grammar")
+			->as_string() == "label.tgf");
+		REQUIRE(result_of(r.responses[1]) != nullptr);
+		CHECK(result_of(r.responses[1])->find("loaded")->as_bool());
+		CHECK(result_of(r.responses[1])->find("grammar")
+			->as_string() == "label.tgf");
+		REQUIRE(result_of(r.responses[2]) != nullptr);
+		CHECK(result_of(r.responses[2])->find("file")->as_string()
+			== "label.tgf");
+		CHECK(result_of(r.responses[2])->find("source")->as_string()
+			== text);
+		CHECK(r.responses[3].find("status")->as_string() == "ok");
+		CHECK(result_of(r.responses[3])->find("tree") != nullptr);
+		CHECK(r.responses[3].find("state")->find("grammar")
+			->as_string() == "label.tgf");
+	}
+
+	TEST_CASE("load source with no grammar installs one") {
+		auto r = run_repl_no_grammar({
+			load_source_request(1, "g.tgf", "start => 'a'.\n"),
+			R"({"id":2,"cmd":"parse","input":"a"})" });
+		REQUIRE(r.responses.size() == 2);
+		CHECK(r.responses[0].find("status")->as_string() == "ok");
+		CHECK(result_of(r.responses[0])->find("loaded")->as_bool());
+		CHECK(r.responses[1].find("status")->as_string() == "ok");
+	}
+
+	TEST_CASE("a bad load source keeps the previous grammar") {
+		const std::string text = read_file(grammar_path());
+		auto r = run_repl({
+			load_source_request(1, "g.tgf", text),
+			load_source_request(2, "bad.tgf", ".\n"),
+			R"({"id":3,"cmd":"grammar"})" });
+		REQUIRE(r.responses.size() == 3);
+		CHECK(r.responses[0].find("status")->as_string() == "ok");
+		CHECK(r.responses[1].find("status")->as_string() == "error");
+		CHECK(!result_of(r.responses[1])->find("loaded")->as_bool());
+		CHECK(result_of(r.responses[2])->find("file")->as_string()
+			== "g.tgf");
+	}
+}
+
+TEST_SUITE("tgf json api: server paths") {
+	TEST_CASE("file paths are refused when no_server_paths is on") {
+		scratch_file in("tgf_json_api_server_input.txt", "123");
+		tgf_repl_evaluator re(grammar_path(), no_paths_options());
+		auto r = run_repl_re(re, {
+			file_request(1, "parse file", in.path),
+			file_request(2, "load", grammar_path()),
+			R"({"id":3,"cmd":"reload"})",
+			eval_request(4, "parse file " + repl_string(in.path)),
+			eval_request(5, "load " + repl_string(grammar_path())),
+			eval_request(6, "reload") });
+		REQUIRE(r.responses.size() == 6);
+		for (const auto& resp : r.responses) {
+			CHECK(resp.find("status")->as_string() == "error");
+			CHECK(report_contains_key(resp,
+				"File paths are not allowed in a server session"));
+		}
+	}
+
+	TEST_CASE("load source and its reload are allowed") {
+		const std::string text = read_file(grammar_path());
+		tgf_repl_evaluator re(grammar_path(), no_paths_options());
+		auto r = run_repl_re(re, {
+			load_source_request(1, "g.tgf", text),
+			R"({"id":2,"cmd":"reload"})",
+			R"({"id":3,"cmd":"parse","input":"123"})" });
+		REQUIRE(r.responses.size() == 3);
+		for (const auto& resp : r.responses)
+			CHECK(resp.find("status")->as_string() == "ok");
+		CHECK(result_of(r.responses[2])->find("tree") != nullptr);
+	}
+}
+
+TEST_SUITE("tgf json api: line limit") {
+	TEST_CASE("a line over the limit is an error and the loop goes on") {
+		tgf_repl_evaluator re(grammar_path(), json_options());
+		std::istringstream in(
+			"{\"id\":1,\"cmd\":\"version\"}\n"
+			"{\"cmd\":\"version\"}\n"
+			"{\"id\":3,\"cmd\":\"version\"}\n"
+			"{\"cmd\":\"version\"}\n");
+		std::ostringstream out;
+		tgf_json_loop(re, in, out, 20);
+		std::istringstream ls(out.str());
+		std::string line;
+		REQUIRE(static_cast<bool>(std::getline(ls, line)));   // hello
+		// The first line is over the limit.
+		REQUIRE(static_cast<bool>(std::getline(ls, line)));
+		auto v1 = parse_line(line);
+		CHECK(v1.find("status")->as_string() == "error");
+		CHECK(v1.find("id")->is_null());
+		CHECK(report_contains_key(v1,
+			"Line is longer than the limit"));
+		// The next line works, so the loop went on.
+		REQUIRE(static_cast<bool>(std::getline(ls, line)));
+		auto v2 = parse_line(line);
+		CHECK(v2.find("status")->as_string() == "ok");
+		CHECK(v2.find("cmd")->as_string() == "version");
+		// A second over-limit line and a second working line.
+		REQUIRE(static_cast<bool>(std::getline(ls, line)));
+		CHECK(parse_line(line).find("status")->as_string()
+			== "error");
+		REQUIRE(static_cast<bool>(std::getline(ls, line)));
+		CHECK(parse_line(line).find("cmd")->as_string()
+			== "version");
+		CHECK(!std::getline(ls, line));   // no more output
 	}
 }

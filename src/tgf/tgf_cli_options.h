@@ -188,6 +188,11 @@ inline cli::commands tgf_commands() {
 		DESC("run repl command with input to evaluate and quit");
 	OPT(cli::option("legacy-repl", 'X', false));
 		DESC("use legacy terminal REPL instead of FTXUI");
+	OPT(cli::option("session", '\0', ""));
+		DESC("session id for the JSON API, used by tgf serve");
+	OPT(cli::option("init-stdin", '\0', false));
+		DESC("read one init line before the first hello, used by "
+			"tgf serve");
 	//OPT(char_type);
 	//OPT(terminal_type);
 

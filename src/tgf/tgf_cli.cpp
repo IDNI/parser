@@ -467,6 +467,65 @@ const std::string& tgf_repl_evaluator::filename() const noexcept {
 	return tgf_filename;
 }
 
+// One JSON object for the directives of a loaded grammar.
+static format::json::value directives_to_value(const tgf_directives& d) {
+	using value = format::json::value;
+	auto str_array = [](const std::vector<std::string>& xs) {
+		value a = value::array();
+		for (const auto& s : xs) a.push_back(value::string(s));
+		return a;
+	};
+	value v = value::object();
+	v.set("use_char_classes", str_array(d.use_char_classes));
+	v.set("start", d.start.empty() ? value::null()
+		: value::string(d.start));
+	v.set("enable_productions", str_array(d.enable_productions));
+	v.set("disable_productions", str_array(d.disable_productions));
+	v.set("enabled_productions", str_array(d.enabled_productions));
+	v.set("trim", str_array(d.trim));
+	v.set("trim_children", str_array(d.trim_children));
+	v.set("trim_children_terminals",
+		str_array(d.trim_children_terminals));
+	v.set("trim_terminals", str_array(d.trim_terminals));
+	v.set("trim_all_terminals", value::boolean(d.trim_all_terminals));
+	value paths = value::array();
+	for (const auto& p : d.inline_paths) paths.push_back(str_array(p));
+	v.set("inline", std::move(paths));
+	v.set("inline_char_classes", value::boolean(d.inline_char_classes));
+	v.set("ambiguous", str_array(d.ambiguous));
+	value hl = value::array();
+	for (const auto& h : d.highlights) {
+		value e = value::object();
+		e.set("type", value::string(h.first));
+		e.set("patterns", str_array(h.second));
+		hl.push_back(std::move(e));
+	}
+	v.set("highlight", std::move(hl));
+	v.set("highlight_auto", value::boolean(d.highlight_auto));
+	value dyn = value::object();
+	for (const auto& kv : d.dynamic)
+		dyn.set(kv.first, str_array(kv.second));
+	v.set("dynamic", std::move(dyn));
+	return v;
+}
+
+format::json::value tgf_repl_evaluator::directives_value() const {
+	if (!grammar_loaded) return format::json::value::null();
+	if (!directives_cached) {
+		// A built-in grammar has no load-time snapshot, so parse it
+		// here once on the first read.
+		if (fixed_grammar) {
+			tgf_directives dirs;
+			nonterminals_type tmp;
+			tgf<char_type, terminal_type>::from_string(tmp,
+				grammar_source, false, &dirs);
+			directives_ = directives_to_value(dirs);
+		}
+		directives_cached = true;
+	}
+	return directives_;
+}
+
 const std::string& tgf_repl_evaluator::source() const noexcept {
 	return grammar_source;
 }
@@ -484,6 +543,21 @@ bool tgf_repl_evaluator::require_grammar() {
 	report.error(diagnostics::code::no_grammar,
 		parser_strings::messages::no_grammar_loaded);
 	return false;
+}
+
+bool tgf_repl_evaluator::paths_allowed() {
+	if (!opt.no_server_paths) return true;
+	report.error(diagnostics::code::server_path,
+		parser_strings::messages::server_path_forbidden);
+	return false;
+}
+
+void tgf_repl_evaluator::begin_server_session(const std::string& id) {
+	session_id = id;
+	opt.no_server_paths = true;
+	opt.json_api = true;
+	opt.colors = false;
+	TC.set(false);
 }
 
 diagnostics::report tgf_repl_evaluator::take_report() {
@@ -504,7 +578,7 @@ static void print_text_source(ostream& os, const string& src) {
 
 void tgf_repl_evaluator::print_source(ostream& os) const {
 	os << "grammar:\n";
-	if (!grammar_source.empty()) {
+	if (!grammar_source.empty() || grammar_from_source) {
 		print_text_source(os, grammar_source);
 		os << "\n\n";
 		return;
@@ -569,8 +643,9 @@ void tgf_repl_evaluator::flush_report() {
 
 bool tgf_repl_evaluator::load_file(const std::string& filename) {
 	auto next_nts = make_unique<nonterminals_type>();
+	tgf_directives dirs;
 	auto gr = tgf<char_type, terminal_type>::from_file(*next_nts, filename,
-		opt.measure);
+		opt.measure, &dirs);
 	if (!gr.has_value()) {
 		report.append(std::move(gr).report());
 		return false;
@@ -586,7 +661,41 @@ bool tgf_repl_evaluator::load_file(const std::string& filename) {
 	p_            = owned_p.get();
 	tgf_filename = filename;
 	grammar_source.clear();
+	grammar_from_source = false;
 	grammar_loaded = true;
+	directives_ = directives_to_value(dirs);
+	directives_cached = true;
+	return true;
+}
+
+bool tgf_repl_evaluator::load_source(const std::string& name,
+	const std::string& text)
+{
+	auto next_nts = make_unique<nonterminals_type>();
+	tgf_directives dirs;
+	auto gr = tgf<char_type, terminal_type>::from_string(*next_nts, text,
+		opt.measure, &dirs);
+	if (!gr.has_value()) {
+		report.append(std::move(gr).report());
+		return false;
+	}
+	auto next_grammar = make_unique<grammar_type>(std::move(gr).value());
+	auto next_parser = make_unique<parser_type>(*next_grammar,
+		default_parser_options<char_type, terminal_type>());
+	report.append(std::move(gr).report());
+
+	owned_nts           = std::move(next_nts);
+	owned_g             = std::move(next_grammar);
+	owned_p             = std::move(next_parser);
+	p_                  = owned_p.get();
+	tgf_filename        = name;
+	grammar_source      = text;
+	grammar_from_source = true;
+	grammar_loaded      = true;
+	directives_ = directives_to_value(dirs);
+	directives_cached = true;
+	update_opts_by_grammar_opts();
+	apply_auto_disambiguate();
 	return true;
 }
 
@@ -857,6 +966,22 @@ bool tgf_repl_evaluator::reload(const string& new_tgf_file) {
 		report.warning(parser_strings::messages::loading_grammars_unavailable);
 		return false;
 	}
+
+	// A grammar loaded from text has no file to read; reload the stored
+	// text instead. @p new_tgf_file is ignored in that case.
+	if (grammar_from_source) {
+		std::string name = tgf_filename;
+		std::string text = grammar_source;
+		if (!load_source(name, text)) {
+			report.error(diagnostics::code::io_error,
+				parser_strings::messages::reload_failed,
+				{{parser_strings::label::path, name}});
+			return false;
+		}
+		report.info(parser_strings::messages::reload_succeeded,
+			{{parser_strings::label::path, tgf_filename}});
+		return true;
+	}
 	if (!load_grammar(new_tgf_file)) {
 		report.error(diagnostics::code::io_error,
 			parser_strings::messages::reload_failed,
@@ -877,9 +1002,45 @@ format::json::value tgf_repl_evaluator::reload_data(
 	auto v = value::object();
 	if (!load_grammar(new_tgf_file))
 		return v.set("grammar", value::string(new_tgf_file))
-			.set("loaded", value::boolean(false));
+			.set("loaded", value::boolean(false))
+			.set("directives", directives_value());
 	return v.set("grammar", value::string(tgf_filename))
-		.set("loaded", value::boolean(true));
+		.set("loaded", value::boolean(true))
+		.set("directives", directives_value());
+}
+
+format::json::value tgf_repl_evaluator::load_source_data(
+	const std::string& name, const std::string& text)
+{
+	using value = format::json::value;
+	auto v = value::object();
+	if (fixed_grammar) {
+		report.warning(parser_strings::messages::loading_grammars_unavailable);
+		return v.set("grammar", value::string(name))
+			.set("loaded", value::boolean(false))
+			.set("directives", directives_value());
+	}
+	if (!load_source(name, text))
+		return v.set("grammar", value::string(name))
+			.set("loaded", value::boolean(false))
+			.set("directives", directives_value());
+	return v.set("grammar", value::string(tgf_filename))
+		.set("loaded", value::boolean(true))
+		.set("directives", directives_value());
+}
+
+format::json::value tgf_repl_evaluator::reload_source_data() {
+	using value = format::json::value;
+	auto v = value::object();
+	std::string name = tgf_filename;
+	std::string text = grammar_source;
+	if (!load_source(name, text))
+		return v.set("grammar", value::string(name))
+			.set("loaded", value::boolean(false))
+			.set("directives", directives_value());
+	return v.set("grammar", value::string(tgf_filename))
+		.set("loaded", value::boolean(true))
+		.set("directives", directives_value());
 }
 
 format::json::value tgf_repl_evaluator::get_cmd(const tt& n) {
@@ -1458,7 +1619,11 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 				break;
 			}
 			if (!require_grammar()) break;
-			res.data = reload_data(tgf_filename);
+			// A file-backed grammar needs a path; a source-backed one
+			// reloads from the text it was loaded from.
+			if (!grammar_from_source && !paths_allowed()) break;
+			res.data = grammar_from_source
+				? reload_source_data() : reload_data(tgf_filename);
 			break;
 		case p::load_cmd: {
 			if (fixed_grammar) {
@@ -1466,6 +1631,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 					loading_grammars_unavailable);
 				break;
 			}
+			if (!paths_allowed()) break;
 			auto n = s | p::filename;
 			auto filename = unquote(n | tt::terminals, report);
 			if (report.has_error()) break;
@@ -1519,7 +1685,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			auto v = value::object();
 			v.set("file", value::string(tgf_filename));
 			string src = grammar_source;
-			if (src.empty()) {
+			if (src.empty() && !grammar_from_source) {
 				// The exact bytes of the file, so no line translation.
 				ifstream f(tgf_filename, ios::binary);
 				src.assign(istreambuf_iterator<char>(f),
@@ -1575,6 +1741,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			break;
 		}
 		case p::parse_file_cmd: {
+			if (!paths_allowed()) break;
 			auto n = s | p::filename;
 			auto filename = unquote(n | tt::terminals, report);
 			if (report.has_error()) break;
@@ -1632,10 +1799,282 @@ eval_result tgf_repl_evaluator::run(const std::string& src,
 	return er;
 }
 
-void tgf_repl_evaluator::render_text(const cmd_result& r,
-	std::ostream& os) const
+// One ambiguous node of a parse, from its data only.
+static void render_data_ambiguous_node(std::ostream& os,
+	const format::json::value& node)
 {
+	auto sym = node.find("symbol");
+	std::string symbol = sym && sym->is_string() ? sym->as_string() : "";
+	auto range = node.find("range");
+	os << "\t `" << symbol << "` [";
+	if (range && range->is_array() && range->size() >= 2)
+		os << static_cast<long long>((*range)[0].as_number()) << ","
+			<< static_cast<long long>((*range)[1].as_number());
+	os << "]\n";
+	size_t d = 0;
+	if (auto alts = node.find("alternatives"); alts && alts->is_array())
+		for (const auto& alt : *alts) {
+			os << "\t\t " << d++ << "\t";
+			if (auto ch = alt.find("children");
+					ch && ch->is_array())
+				for (const auto& c : *ch) {
+					auto s = c.find("symbol");
+					auto rg = c.find("range");
+					os << " `" << (s && s->is_string()
+						? s->as_string() : "") << "`[";
+					if (rg && rg->is_array()
+							&& rg->size() >= 2)
+						os << static_cast<long long>(
+							(*rg)[0].as_number()) << ","
+							<< static_cast<long long>(
+							(*rg)[1].as_number());
+					os << "] ";
+				}
+			os << "\n";
+		}
+}
+
+// One AST JSON node in the shape of the text tree printer.
+static void render_data_tree(std::ostream& os,
+	const format::json::value& node, size_t l,
+	const term::colors& TC)
+{
+	for (size_t i = 0; i != l; ++i) os << "\t";
+	auto sym = node.find("symbol");
+	std::string symbol = sym && sym->is_string() ? sym->as_string() : "";
+	auto id = node.find("id");
+	auto range = node.find("range");
+	if (!symbol.empty()) {
+		os << TC_NT << symbol << TC.CLEAR() << TC_NT_ID << "(";
+		if (id && id->is_number())
+			os << static_cast<long long>(id->as_number());
+		os << ")" << TC.CLEAR();
+	} else if (auto text = node.find("text");
+			text && text->is_string())
+		os << TC_T << text->as_string() << TC.CLEAR();
+	os << TC_RANGE << "[";
+	if (range && range->is_array() && range->size() >= 2)
+		os << static_cast<long long>((*range)[0].as_number()) << ", "
+			<< static_cast<long long>((*range)[1].as_number());
+	os << "]" << TC.CLEAR() << "\n";
+	if (auto ch = node.find("children"); ch && ch->is_array())
+		for (const auto& c : *ch) render_data_tree(os, c, l + 1, TC);
+}
+
+// The parse text from the response data.
+static void render_data_parse(const cmd_result& r, std::ostream& os,
+	const term::colors& TC)
+{
+	if (auto in = r.data.find("input"); in && in->is_string())
+		os << "input: \"" << in->as_string() << "\"\n";
+	if (auto amb = r.data.find("ambiguous"); amb && amb->is_object()) {
+		auto trees = amb->find("trees");
+		double n = trees && trees->is_number()
+			? trees->as_number() : 0;
+		// The text printer stays silent for an unambiguous parse.
+		if (n > 1) {
+			os << "# n trees: " << static_cast<long long>(n)
+				<< "\n# ambiguous nodes:\n";
+			if (auto nodes = amb->find("nodes");
+					nodes && nodes->is_array())
+				for (const auto& node : *nodes)
+					render_data_ambiguous_node(os, node);
+		}
+	}
+	if (auto t = r.data.find("terminals"); t && t->is_string())
+		os << "parsed terminals: " << TC_T << t->as_string()
+			<< TC_CLEARED_DEFAULT << "\n";
+	if (auto tml = r.data.find("tml_rules");
+			tml && tml->is_string()) os << tml->as_string();
+	if (auto tml = r.data.find("tml_facts");
+			tml && tml->is_string()) os << tml->as_string();
+	if (auto tree = r.data.find("tree"); tree && tree->is_object()) {
+		os << "parsed graph:\n";
+		render_data_tree(os, *tree, 1, TC);
+	}
+}
+
+// The grammar source text from the response data. The text printer of a
+// file-backed grammar drops the CR of a CRLF and prints one blank line
+// after the last line.
+static void render_data_grammar(const cmd_result& r, std::ostream& os) {
+	os << "grammar:\n";
+	std::string src;
+	if (auto v = r.data.find("source"); v && v->is_string())
+		src = v->as_string();
+	std::ostringstream norm;
+	print_text_source(norm, src);
+	std::string s = norm.str();
+	if (s.empty()) { os << "\n"; return; }
+	if (s.back() == '\n') s.pop_back();
+	os << s << "\n\n";
+}
+
+// The production list of internal-grammar and unreachable, from data.
+// Split a production body on spaces. The internal grammar writes one
+// literal per token and every literal is a name or a quoted character, so
+// no literal carries a space; '&', '~(' and ')' are the only other tokens.
+static std::vector<std::string> split_production_body(const std::string& s) {
+	std::vector<std::string> out;
+	size_t i = 0;
+	while (i != s.size()) {
+		while (i != s.size() && s[i] == ' ') ++i;
+		size_t b = i;
+		while (i != s.size() && s[i] != ' ') ++i;
+		if (i != b) out.push_back(s.substr(b, i - b));
+	}
+	return out;
+}
+
+// One production in the text form of grammar::print_production, from the
+// production string and its production_ids entry. The literal names come
+// from the string and the nonterminal ids from production_ids.
+static void render_data_production(std::ostream& os,
+	const std::string& pstr, const format::json::value* pid,
+	const term::colors& TC, const std::set<size_t>* char_classes)
+{
+	using value = format::json::value;
+	const size_t id_width = 6;
+	const size_t head_width = 20;
+	size_t arrow = pstr.find(" =>");
+	std::string head = arrow == std::string::npos
+		? pstr : pstr.substr(0, arrow);
+	std::string body = arrow == std::string::npos
+		? std::string() : pstr.substr(arrow + 3);
+	if (!body.empty() && body.back() == '.') body.pop_back();
+
+	size_t index = 0;
+	long long head_id = 0;
+	bool have_head = false;
+	const value* body_ids = nullptr;
+	bool conjunctive = false;
+	std::string guard;
+	if (pid && pid->is_object()) {
+		if (auto i = pid->find("index"); i && i->is_number())
+			index = static_cast<size_t>(i->as_number());
+		if (auto h = pid->find("head"); h && h->is_number()) {
+			head_id = static_cast<long long>(h->as_number());
+			have_head = true;
+		}
+		if (auto b = pid->find("body"); b && b->is_array())
+			body_ids = b;
+		if (auto c = pid->find("conjunctive"); c && c->is_bool())
+			conjunctive = c->as_bool();
+		if (auto g = pid->find("guard"); g && g->is_string())
+			guard = g->as_string();
+	}
+	// "G<p>:" padded to id_width, then the head with its id padded to
+	// head_width, then " =>".
+	std::string id = "G" + std::to_string(index) + ":";
+	os << id;
+	for (size_t i = id.size(); i < id_width; ++i) os << " ";
+	// A character class nonterminal takes the character class color; the
+	// rest are plain nonterminals.
+	auto nt_begin = [&](long long nt_id) -> std::string {
+		return (char_classes && char_classes->count(
+			static_cast<size_t>(nt_id))) ? TC_CC : TC_NT;
+	};
+	std::string head_id_s = have_head
+		? "(" + std::to_string(head_id) + ")" : std::string();
+	os << (have_head ? nt_begin(head_id) : TC_NT) << head
+		<< TC_DEFAULT << TC_NT_ID << head_id_s << TC_DEFAULT;
+	for (size_t i = head.size() + head_id_s.size(); i < head_width; ++i)
+		os << " ";
+	os << " =>";
+	// The tokens and the production_ids body describe the same literals in
+	// the same order, so they walk in parallel.
+	std::vector<std::string> tok = split_production_body(body);
+	size_t t = 0;
+	size_t nconj = body_ids ? body_ids->size() : 0;
+	if (!body_ids && !body.empty()) os << " " << body;
+	for (size_t j = 0; j != nconj; ++j) {
+		if (j != 0) {
+			os << " &";
+			if (t != tok.size() && tok[t] == "&") ++t;
+		}
+		bool neg = t != tok.size() && tok[t] == "~(";
+		if (neg) { os << " " << TC_NEG << "~("; ++t; }
+		const value& conj = (*body_ids)[j];
+		for (size_t k = 0; k != conj.size() && t != tok.size(); ++k) {
+			os << " ";
+			const std::string& name = tok[t++];
+			if (conj[k].is_number())
+				os << nt_begin(static_cast<long long>(
+					conj[k].as_number())) << name
+					<< TC_DEFAULT << TC_NT_ID
+					<< "(" << static_cast<long long>(
+						conj[k].as_number()) << ")"
+					<< TC_DEFAULT;
+			else if (name == "null")
+				os << TC_NULL << "null" << TC_DEFAULT;
+			else {
+				os << TC_T << name << TC.CLEAR();
+				if (neg) os << TC_NEG;
+			}
+		}
+		if (neg) {
+			os << TC_NEG << " )" << TC.CLEAR();
+			if (t != tok.size() && tok[t] == ")") ++t;
+		}
+	}
+	os << ".";
+	if (conjunctive)
+		os << "\t " << TC_NULL << "# conjunctive" << TC_DEFAULT;
+	if (!guard.empty())
+		os << "\t " << TC_NULL << "# guarded: " << guard
+			<< TC_DEFAULT;
+}
+
+static void render_data_productions(const cmd_result& r, std::ostream& os,
+	const term::colors& TC, const std::set<size_t>* char_classes)
+{
+	auto prods = r.data.find("productions");
+	auto pids = r.data.find("production_ids");
+	auto sym = r.data.find("symbol");
+	auto start = r.data.find("start");
+	auto name = r.cmd == "unreachable" ? sym : start;
+	std::string s = name && name->is_string() ? name->as_string() : "";
+	if (r.cmd == "unreachable") {
+		bool any = prods && prods->is_array()
+			&& prods->size() != 0;
+		if (any)
+			os << "unreachable production rules for symbol: "
+				<< TC_NT << s << TC_DEFAULT << "\n";
+		else
+			os << "all production rules reachable for "
+				"symbol: " << TC_NT << s << TC_DEFAULT
+				<< "\n";
+	} else {
+		os << "\ninternal grammar for symbol " << TC_NT << s
+			<< TC_DEFAULT << ":\n";
+	}
+	if (!prods || !prods->is_array()) return;
+	for (size_t i = 0; i != prods->size(); ++i) {
+		const format::json::value* pid = nullptr;
+		if (pids && pids->is_array() && i < pids->size())
+			pid = &(*pids)[i];
+		os << "  ";
+		render_data_production(os, (*prods)[i].as_string(), pid, TC,
+			char_classes);
+		os << "\n";
+	}
+}
+
+void render_command_text(const cmd_result& r, std::ostream& os,
+	const term::colors& TC, const std::set<size_t>* char_classes = nullptr)
+{
+	// A text result the evaluator built from live objects wins; the data
+	// renderer covers the client, which holds only the response data.
 	if (!r.text.empty()) { os << r.text; return; }
+	if (r.cmd == "parse" || r.cmd == "parse file") {
+		render_data_parse(r, os, TC);
+		return;
+	}
+	if (r.cmd == "grammar") { render_data_grammar(r, os); return; }
+	if (r.cmd == "internal-grammar" || r.cmd == "unreachable") {
+		render_data_productions(r, os, TC, char_classes);
+		return;
+	}
 	if (r.cmd == "quit") { os << "Quit.\n"; return; }
 	if (r.cmd == "clear") return;
 	if (r.cmd == "version") {
@@ -1662,7 +2101,6 @@ void tgf_repl_evaluator::render_text(const cmd_result& r,
 			<< TC_DEFAULT << "\n";
 		return;
 	}
-	if (r.cmd == "grammar") { print_source(os); return; }
 	if (r.cmd == "load" || r.cmd == "reload") {
 		auto l = r.data.find("loaded");
 		if (!l) return;   // fixed grammar: only the warning
@@ -1685,6 +2123,16 @@ void tgf_repl_evaluator::render_text(const cmd_result& r,
 		}
 		return;
 	}
+}
+
+void tgf_repl_evaluator::render_text(const cmd_result& r,
+	std::ostream& os) const
+{
+	// The live evaluator prints the loaded source, so its text matches
+	// the REPL text. A client with no evaluator renders the grammar from
+	// data only.
+	if (r.cmd == "grammar") { print_source(os); return; }
+	render_command_text(r, os, TC);
 }
 
 idni::diagnostics::result<int> tgf_repl_evaluator::eval(const string& src) {
@@ -1757,6 +2205,9 @@ tgf_repl_evaluator::tgf_repl_evaluator(
 	  p_(&parser)
 {
 	TC.set(opt.json_api ? false : opt.colors);
+	// The directives snapshot is parsed lazily on the first
+	// directives_value() call, so a run that never asks for it pays
+	// nothing for the built-in grammar.
 	update_opts_by_grammar_opts();
 	apply_auto_disambiguate();
 }
@@ -2036,6 +2487,13 @@ static int show_command(const cli::command& cmd,
 static int run_command(cli& cl, const cli::command& cmd,
 	tgf_repl_evaluator& re)
 {
+	if (cmd.has("session")) {
+		std::string sid = cmd.get<string>("session");
+		// A session child runs the JSON API for `tgf serve`, so it sets
+		// no_server_paths itself and refuses a path a client sends.
+		if (!sid.empty()) re.begin_server_session(sid);
+	}
+
 	// apply --productions from command line
 	if (string prods = cmd.has("productions")
 			? cmd.get<string>("productions") : string{};
@@ -2070,7 +2528,9 @@ static int run_command(cli& cl, const cli::command& cmd,
 					state_value(re)));
 				return er.status == cmd_status::error ? 1 : 0;
 			}
-			return tgf_json_loop(re, cin, cout);
+			return tgf_json_loop(re, cin, cout, tgf_json_max_line,
+				cmd.has("init-stdin")
+					&& cmd.get<bool>("init-stdin"));
 		}
 		auto with_report_flush = [&](auto run) {
 			re.flush_report();

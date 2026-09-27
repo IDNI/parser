@@ -59,6 +59,7 @@ enum class code : uint16_t {
 	runtime_error            = 16,
 	unknown_char_class       = 17,
 	no_grammar               = 18,
+	server_path              = 19,
 
 	// 01 band — warnings
 	warning                  = 0x4000,
@@ -326,6 +327,14 @@ struct report {
 	/// close.
 	void set_node_value(int32_t idx, int64_t v);
 
+	/// Append a node under the current parent and open it as the current
+	/// parent, with an exact tag, key, value and attributes. @ref pop_node
+	/// closes it.
+	void push_node(code tag, key name, int64_t value,
+		const std::vector<attr_in>& extra = {});
+	/// Close the node opened by the last @ref push_node.
+	void pop_node();
+
 private:
 	std::vector<node> nodes_;
 	std::vector<attr> attrs_;
@@ -353,6 +362,8 @@ private:
 
 	int32_t push_tagged(code tag, key name, int64_t v,
 		std::initializer_list<attr_in> extra = {});
+	int32_t push_tagged_impl(code tag, key name, int64_t v,
+		const attr_in* extra, size_t extra_count);
 
 	// Interns a text attribute at the point it is recorded, so a caller
 	// never interns one by hand.

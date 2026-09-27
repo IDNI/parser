@@ -15,6 +15,44 @@
 
 namespace idni {
 
+/// What a grammar file says, as the builder read it. A client gets this
+/// read-only snapshot; the live option values stay in grammar::options.
+struct tgf_directives {
+	/// @use char class names.
+	std::vector<std::string> use_char_classes{};
+	/// @start symbol, empty when the file names none.
+	std::string start{};
+	/// @enable guard names, as written.
+	std::vector<std::string> enable_productions{};
+	/// @disable guard names, as written.
+	std::vector<std::string> disable_productions{};
+	/// Guard names that are on after the load.
+	std::vector<std::string> enabled_productions{};
+	/// @trim names.
+	std::vector<std::string> trim{};
+	/// @trim children names.
+	std::vector<std::string> trim_children{};
+	/// @trim children terminals names.
+	std::vector<std::string> trim_children_terminals{};
+	/// @trim all terminals: names after "except children of".
+	std::vector<std::string> trim_terminals{};
+	/// True when the file says @trim all terminals.
+	bool trim_all_terminals = false;
+	/// @inline tree paths, each a list of names.
+	std::vector<std::vector<std::string>> inline_paths{};
+	/// True when the file says @inline char classes.
+	bool inline_char_classes = false;
+	/// @ambiguous symbol names.
+	std::vector<std::string> ambiguous{};
+	/// @highlight entries: the type name and its patterns.
+	std::vector<std::pair<std::string, std::vector<std::string>>>
+		highlights{};
+	/// True when the file says @highlight auto.
+	bool highlight_auto = false;
+	/// @dynamic names and their default values.
+	std::map<std::string, std::vector<std::string>> dynamic{};
+};
+
 template <typename C = char, typename T = C>
 struct tgf {
 	using tree     = tgf_parser::tree;
@@ -26,10 +64,12 @@ struct tgf {
 	using messages = idni::parser_strings::messages;
 	using label    = idni::parser_strings::label;
 
-	/// Parse TGF from string
+	/// Parse TGF from string. @p directives, when given, receives what
+	/// the file says in its @ directives.
 	static result from_string(nonterminals<C, T>& nts_,
 				  const std::basic_string<C>& s,
-				  bool measure = false)
+				  bool measure = false,
+				  tgf_directives* directives = nullptr)
 	{
 		auto& p = tgf_parser::instance();
 		tgf_parser::parse_options po{
@@ -64,16 +104,18 @@ struct tgf {
 				// on has_error() — this is the canonical pattern;
 				// see the comment on predefined_char_classes in
 				// src/grammar.tmpl.h.
-				b.build(trv(n), &R.report(), s.c_str());
+				b.build(trv(n), &R.report(), s.c_str(), directives);
 				if (!R.report().has_error()) R.emplace(b.g());
 			}
 		}
 		return R;
 	}
-	/// Parse TGF from a file
+	/// Parse TGF from a file. @p directives, when given, receives what
+	/// the file says in its @ directives.
 	static result from_file(nonterminals<C, T>& nts_,
 				const std::string& filename,
-				bool measure = false)
+				bool measure = false,
+				tgf_directives* directives = nullptr)
 	{
 		std::ifstream ifs(filename);
 		if (!ifs) {
@@ -86,7 +128,7 @@ struct tgf {
 		return from_string(nts_,
 			std::string(std::istreambuf_iterator<C>(ifs),
 				std::istreambuf_iterator<C>()),
-			measure);
+			measure, directives);
 	}
 
 	/// Parse TGF from a string but split it to statements first
@@ -179,6 +221,7 @@ private:
 		grammar<C, T>::options opt{};
 		char_class_fns<T> cc;
 		idni::diagnostics::report* diag = nullptr;
+		tgf_directives* dirs = nullptr;
 		const char* source_ = nullptr;
 		grammar_builder(nonterminals<C, T>& nts) : nts(nts) {}
 		grammar_builder(nonterminals<C, T>& nts, const trv& t,
@@ -186,16 +229,19 @@ private:
 			: nts(nts) { build(t, diag); }
 		void build(const trv& t,
 			idni::diagnostics::report* diag = nullptr,
-			const char* source = nullptr) {
+			const char* source = nullptr,
+			tgf_directives* directives = nullptr) {
 			this->diag = diag;
 			source_ = source;
+			dirs = directives;
 			auto statements  = t || tgf_parser::statement;
-			auto directives  = statements || tgf_parser::directive;
-			for (const auto& d : directives()) collect_cc_names(d);
+			auto directive_nodes = statements || tgf_parser::directive;
+			for (const auto& d : directive_nodes()) collect_cc_names(d);
 			cc = predefined_char_classes<C, T>(cc_names, nts, diag);
-			for (const auto& d : directives()) directive(d);
+			for (const auto& d : directive_nodes()) directive(d);
 			auto productions = statements || tgf_parser::production;
 			for (const auto& pr : productions()) production(pr);
+			if (dirs) fill_directives();
 			if (!diag) return;
 			std::set<size_t> defined, referenced;
 			for (const auto& p : ps) {
@@ -226,6 +272,54 @@ private:
 				diag->warning(
 					messages::unproductive_nonterminal,
 					{{ label::name, name }});
+			}
+		}
+		// Snapshot the directives and the options they set, so a client
+		// reads what the file said, not what a later set changed.
+		void fill_directives() {
+			dirs->use_char_classes = cc_names;
+			dirs->start = (start == nul) ? std::string()
+				: start.to_lit().to_std_string();
+			dirs->enabled_productions.reserve(
+				opt.enabled_guards.size());
+			for (const auto& g : opt.enabled_guards)
+				// @enable productions names the keyword, not a guard.
+				if (g != "productions")
+					dirs->enabled_productions.push_back(g);
+			auto add_ids = [this](const std::set<size_t>& ids,
+				std::vector<std::string>& out)
+			{
+				for (size_t id : ids)
+					out.push_back(idni::to_std_string(
+						nts.get(id)));
+			};
+			add_ids(opt.shaping.to_trim, dirs->trim);
+			add_ids(opt.shaping.to_trim_children,
+				dirs->trim_children);
+			add_ids(opt.shaping.to_trim_children_terminals,
+				dirs->trim_children_terminals);
+			add_ids(opt.shaping.dont_trim_terminals_of,
+				dirs->trim_terminals);
+			dirs->trim_all_terminals = opt.shaping.trim_terminals;
+			dirs->inline_char_classes =
+				opt.shaping.inline_char_classes;
+			for (const auto& path : opt.shaping.to_inline) {
+				std::vector<std::string> names;
+				for (size_t id : path)
+					names.push_back(idni::to_std_string(
+						nts.get(id)));
+				dirs->inline_paths.push_back(std::move(names));
+			}
+			add_ids(opt.nodisambig_list, dirs->ambiguous);
+			dirs->highlights = opt.highlights;
+			dirs->highlight_auto = opt.highlight_heuristics;
+			for (const auto& kv : opt.dynamic) {
+				std::vector<std::string> vals;
+				for (const auto& v : kv.second)
+					vals.push_back(
+						idni::to_std_string(v));
+				dirs->dynamic[idni::to_std_string(kv.first)]
+					= std::move(vals);
 			}
 		}
 		int parse(const char* s, size_t l, size_t line,
@@ -490,6 +584,15 @@ private:
 
 	void disable_dir(const trv& t) {
 		auto args = dir_sym_args(t);
+		if (dirs) {
+			for (auto& a : args) {
+				// @disable productions and @disable disambiguation
+				// name keywords, not guards.
+				if (a != "productions" && a != "disambiguation")
+					dirs->disable_productions
+						.push_back(a);
+			}
+		}
 		for (auto& a : args) {
 			if (a == "disambiguation") {
 				opt.auto_disambiguate = false;
@@ -510,6 +613,15 @@ private:
 
 	void enable_dir(const trv& t) {
 		auto args = dir_sym_args(t);
+		if (dirs) {
+			for (auto& a : args) {
+				// @enable productions and @enable disambiguation
+				// name keywords, not guards.
+				if (a != "productions" && a != "disambiguation")
+					dirs->enable_productions
+						.push_back(a);
+			}
+		}
 		for (auto& a : args) {
 			if (a == "disambiguation") {
 				opt.auto_disambiguate = true;

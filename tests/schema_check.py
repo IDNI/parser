@@ -153,6 +153,8 @@ def run_api(tgf, fixture, api_path, report_path, ast_path):
         with open(input_path, "w", encoding="utf-8") as f:
             f.write("12")
         gen_dir = os.path.join(tmp, "gen")
+        with open(fixture, "r", encoding="utf-8") as f:
+            fixture_source = f.read()
 
         requests = [
             ("eval", {"id": 1, "cmd": "eval", "src": "version"}, True),
@@ -190,6 +192,10 @@ def run_api(tgf, fixture, api_path, report_path, ast_path):
                 "option": "start"}, True),
             ("set start", {"id": 27, "cmd": "set", "option": "start",
                 "value": "start"}, True),
+            ("hello", {"id": 28, "cmd": "hello"}, True),
+            ("load source", {"id": 29, "cmd": "load",
+                "name": "g.tgf", "source": fixture_source}, True),
+            ("reload source", {"id": 30, "cmd": "reload"}, True),
             ("error before command", {"id": 22, "cmd": "bogus"},
                 False),
             ("error in command", {"id": 23, "cmd": "parse",

@@ -8,6 +8,12 @@
 			"$ref": "#/$defs/hello_line"
 		},
 		{
+			"$ref": "#/$defs/listening_line"
+		},
+		{
+			"$ref": "#/$defs/init_line"
+		},
+		{
 			"$ref": "#/$defs/request"
 		},
 		{
@@ -22,6 +28,10 @@
 			"$ref": "https://github.com/IDNI/parser/blob/main/src/format/ast.json/ast.schema.json#/$defs/node"
 		},
 		"id": true,
+		"session_id": {
+			"type": "string",
+			"pattern": "^[0-9a-f]{32}$"
+		},
 		"state": {
 			"type": "object",
 			"properties": {
@@ -30,11 +40,19 @@
 				},
 				"start": {
 					"type": ["string", "null"]
+				},
+				"char_classes": {
+					"type": "array",
+					"items": {
+						"type": "integer",
+						"minimum": 0
+					}
 				}
 			},
 			"required": [
 				"grammar",
-				"start"
+				"start",
+				"char_classes"
 			],
 			"additionalProperties": false
 		},
@@ -705,6 +723,100 @@
 			],
 			"additionalProperties": false
 		},
+		"string_list": {
+			"type": "array",
+			"items": {
+				"type": "string"
+			}
+		},
+		"directives": {
+			"type": ["object", "null"],
+			"properties": {
+				"use_char_classes": {
+					"$ref": "#/$defs/string_list"
+				},
+				"start": {
+					"type": ["string", "null"]
+				},
+				"enable_productions": {
+					"$ref": "#/$defs/string_list"
+				},
+				"disable_productions": {
+					"$ref": "#/$defs/string_list"
+				},
+				"enabled_productions": {
+					"$ref": "#/$defs/string_list"
+				},
+				"trim": {
+					"$ref": "#/$defs/string_list"
+				},
+				"trim_children": {
+					"$ref": "#/$defs/string_list"
+				},
+				"trim_children_terminals": {
+					"$ref": "#/$defs/string_list"
+				},
+				"trim_terminals": {
+					"$ref": "#/$defs/string_list"
+				},
+				"trim_all_terminals": {
+					"type": "boolean"
+				},
+				"inline": {
+					"$ref": "#/$defs/treepath_list"
+				},
+				"inline_char_classes": {
+					"type": "boolean"
+				},
+				"ambiguous": {
+					"$ref": "#/$defs/string_list"
+				},
+				"highlight": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"properties": {
+							"type": {
+								"type": "string"
+							},
+							"patterns": {
+								"$ref": "#/$defs/string_list"
+							}
+						},
+						"required": ["type", "patterns"],
+						"additionalProperties": false
+					}
+				},
+				"highlight_auto": {
+					"type": "boolean"
+				},
+				"dynamic": {
+					"type": "object",
+					"additionalProperties": {
+						"$ref": "#/$defs/string_list"
+					}
+				}
+			},
+			"required": [
+				"use_char_classes",
+				"start",
+				"enable_productions",
+				"disable_productions",
+				"enabled_productions",
+				"trim",
+				"trim_children",
+				"trim_children_terminals",
+				"trim_terminals",
+				"trim_all_terminals",
+				"inline",
+				"inline_char_classes",
+				"ambiguous",
+				"highlight",
+				"highlight_auto",
+				"dynamic"
+			],
+			"additionalProperties": false
+		},
 		"load_result": {
 			"type": "object",
 			"properties": {
@@ -713,11 +825,15 @@
 				},
 				"loaded": {
 					"type": "boolean"
+				},
+				"directives": {
+					"$ref": "#/$defs/directives"
 				}
 			},
 			"required": [
 				"grammar",
-				"loaded"
+				"loaded",
+				"directives"
 			],
 			"additionalProperties": false
 		},
@@ -1021,6 +1137,9 @@
 				"version": {
 					"type": "string"
 				},
+				"session": {
+					"type": "string"
+				},
 				"grammar": {
 					"type": ["string", "null"]
 				},
@@ -1033,6 +1152,9 @@
 				"options": {
 					"$ref": "#/$defs/options"
 				},
+				"directives": {
+					"$ref": "#/$defs/directives"
+				},
 				"report": {
 					"$ref": "#/$defs/report"
 				}
@@ -1044,6 +1166,7 @@
 				"fixed_grammar",
 				"start",
 				"options",
+				"directives",
 				"report"
 			],
 			"additionalProperties": false
@@ -1059,6 +1182,102 @@
 				}
 			},
 			"required": [
+				"hello",
+				"state"
+			],
+			"additionalProperties": false
+		},
+		"listening_line": {
+			"type": "object",
+			"properties": {
+				"listening": {
+					"type": "integer",
+					"minimum": 0,
+					"maximum": 65535
+				}
+			},
+			"required": [
+				"listening"
+			],
+			"additionalProperties": false
+		},
+		"init_line": {
+			"type": "object",
+			"description": "The init line of a session child that runs repl --json --init-stdin, written by tgf serve.",
+			"properties": {
+				"init": {
+					"$ref": "#/$defs/init"
+				}
+			},
+			"required": [
+				"init"
+			],
+			"additionalProperties": false
+		},
+		"init": {
+			"type": "object",
+			"properties": {
+				"grammar": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/init_grammar"
+						},
+						{
+							"type": "null"
+						}
+					]
+				},
+				"start": {
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"options": {
+					"$ref": "#/$defs/options"
+				}
+			},
+			"additionalProperties": false
+		},
+		"init_grammar": {
+			"type": "object",
+			"properties": {
+				"name": {
+					"type": "string"
+				},
+				"source": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"name",
+				"source"
+			],
+			"additionalProperties": false
+		},
+		"hello_response": {
+			"type": "object",
+			"properties": {
+				"id": {
+					"$ref": "#/$defs/id"
+				},
+				"cmd": {
+					"const": "hello"
+				},
+				"status": {
+					"const": "ok"
+				},
+				"hello": {
+					"$ref": "#/$defs/hello"
+				},
+				"state": {
+					"$ref": "#/$defs/state"
+				}
+			},
+			"required": [
+				"id",
+				"cmd",
+				"status",
 				"hello",
 				"state"
 			],
@@ -1121,6 +1340,93 @@
 			"required": [
 				"cmd",
 				"file"
+			],
+			"additionalProperties": false
+		},
+		"request_load_source": {
+			"type": "object",
+			"properties": {
+				"id": {
+					"$ref": "#/$defs/id"
+				},
+				"cmd": {
+					"const": "load"
+				},
+				"name": {
+					"type": "string"
+				},
+				"source": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"cmd",
+				"name",
+				"source"
+			],
+			"additionalProperties": false
+		},
+		"request_hello": {
+			"type": "object",
+			"properties": {
+				"id": {
+					"$ref": "#/$defs/id"
+				},
+				"cmd": {
+					"const": "hello"
+				}
+			},
+			"required": [
+				"cmd"
+			],
+			"additionalProperties": false
+		},
+		"request_new": {
+			"type": "object",
+			"properties": {
+				"id": {
+					"$ref": "#/$defs/id"
+				},
+				"cmd": {
+					"const": "new"
+				}
+			},
+			"required": [
+				"cmd"
+			],
+			"additionalProperties": false
+		},
+		"request_attach": {
+			"type": "object",
+			"properties": {
+				"id": {
+					"$ref": "#/$defs/id"
+				},
+				"cmd": {
+					"const": "attach"
+				},
+				"session": {
+					"$ref": "#/$defs/session_id"
+				}
+			},
+			"required": [
+				"cmd",
+				"session"
+			],
+			"additionalProperties": false
+		},
+		"request_end_session": {
+			"type": "object",
+			"properties": {
+				"id": {
+					"$ref": "#/$defs/id"
+				},
+				"cmd": {
+					"const": "end-session"
+				}
+			},
+			"required": [
+				"cmd"
 			],
 			"additionalProperties": false
 		},
@@ -1301,6 +1607,21 @@
 					"$ref": "#/$defs/request_file"
 				},
 				{
+					"$ref": "#/$defs/request_load_source"
+				},
+				{
+					"$ref": "#/$defs/request_hello"
+				},
+				{
+					"$ref": "#/$defs/request_new"
+				},
+				{
+					"$ref": "#/$defs/request_attach"
+				},
+				{
+					"$ref": "#/$defs/request_end_session"
+				},
+				{
 					"$ref": "#/$defs/request_symbol"
 				},
 				{
@@ -1451,6 +1772,48 @@
 			],
 			"additionalProperties": false
 		},
+		"server_quit_response": {
+			"$comment": "An answer the server builds itself. No state: this is the only response without one.",
+			"type": "object",
+			"properties": {
+				"id": {
+					"$ref": "#/$defs/id"
+				},
+				"cmd": {
+					"const": "quit"
+				},
+				"status": {
+					"const": "quit"
+				}
+			},
+			"required": [
+				"id",
+				"cmd",
+				"status"
+			],
+			"additionalProperties": false
+		},
+		"server_error_response": {
+			"$comment": "An answer the server builds itself, such as a line over the limit. No state.",
+			"type": "object",
+			"properties": {
+				"id": {
+					"$ref": "#/$defs/id"
+				},
+				"status": {
+					"const": "error"
+				},
+				"report": {
+					"$ref": "#/$defs/report"
+				}
+			},
+			"required": [
+				"id",
+				"status",
+				"report"
+			],
+			"additionalProperties": false
+		},
 		"oneshot_response": {
 			"type": "object",
 			"properties": {
@@ -1494,7 +1857,16 @@
 					"$ref": "#/$defs/structured_response"
 				},
 				{
+					"$ref": "#/$defs/hello_response"
+				},
+				{
 					"$ref": "#/$defs/bare_response"
+				},
+				{
+					"$ref": "#/$defs/server_quit_response"
+				},
+				{
+					"$ref": "#/$defs/server_error_response"
 				},
 				{
 					"$ref": "#/$defs/oneshot_response"

@@ -6,6 +6,7 @@
 #include <istream>
 #include <ostream>
 #include <set>
+#include <streambuf>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -285,6 +286,17 @@ format::json::value state_value(const tgf_repl_evaluator& re) {
 		? value::string(re.filename()) : value::null());
 	v.set("start", re.start_symbol().empty() ? value::null()
 		: value::string(re.start_symbol()));
+	// The client colors a nonterminal name from this list, so the text
+	// matches the local printer's character class color.
+	value cc = value::array();
+	if (re.has_grammar()) {
+		const auto& nts = re.g().get_nts();
+		for (size_t i = 0; i != nts.size(); ++i)
+			if (re.g().is_cc_fn(i))
+				cc.push_back(value::number(
+					static_cast<double>(i)));
+	}
+	v.set("char_classes", std::move(cc));
 	return v;
 }
 
@@ -366,21 +378,36 @@ void json_write_line(std::ostream& os, const value& v) {
 	format::json::print(v, os) << '\n' << std::flush;
 }
 
-// The hello line carries the evaluator state and the pending report of the
-// grammar load, which take_report() then clears.
-static value hello(tgf_repl_evaluator& re) {
+// The hello object carries the evaluator state and the pending report of
+// the grammar load, which take_report() then clears. The session field is
+// present only when the evaluator has a session id. @p extra holds the
+// errors of an init line, which go out with the first hello.
+static value hello_object(tgf_repl_evaluator& re,
+	const diagnostics::report& extra = diagnostics::report{})
+{
 	value h = value::object();
 	h.set("protocol", value::number(1));
 	h.set("version", value::string(tauparser::full_version));
+	if (!re.session_id.empty())
+		h.set("session", value::string(re.session_id));
 	h.set("grammar", re.has_grammar()
 		? value::string(re.filename()) : value::null());
 	h.set("fixed_grammar", value::boolean(re.has_fixed_grammar()));
 	h.set("start", re.start_symbol().empty() ? value::null()
 		: value::string(re.start_symbol()));
 	h.set("options", re.option_values());
-	h.set("report", report_value(re.take_report()));
+	h.set("directives", re.directives_value());
+	diagnostics::report r = re.take_report();
+	r.append(extra);
+	h.set("report", report_value(r));
+	return h;
+}
+
+static value hello(tgf_repl_evaluator& re,
+	const diagnostics::report& extra = diagnostics::report{})
+{
 	value v = value::object();
-	v.set("hello", std::move(h));
+	v.set("hello", hello_object(re, extra));
 	v.set("state", state_value(re));
 	return v;
 }
@@ -409,6 +436,33 @@ static std::pair<value, cmd_status> handle_request(
 			? cmd_status::quit : cmd_status::ok;
 		return { json_eval_response(id, er, state_value(re)), st };
 	}
+	if (cmd.value() == "hello") {
+		value v = value::object();
+		v.set("id", id);
+		v.set("cmd", value::string("hello"));
+		v.set("status", value::string("ok"));
+		v.set("hello", hello_object(re));
+		v.set("state", state_value(re));
+		return { std::move(v), cmd_status::ok };
+	}
+	// The load form with source text carries no path, so it runs the
+	// evaluator directly instead of going through the REPL text.
+	if (cmd.value() == "load" && q.find("source") != nullptr) {
+		auto name = string_field(q, "name");
+		if (!name.has_value())
+			return { error_response(id, state_value(re),
+				name.report()), cmd_status::error };
+		auto source = string_field(q, "source");
+		if (!source.has_value())
+			return { error_response(id, state_value(re),
+				source.report()), cmd_status::error };
+		auto data = re.load_source_data(name.value(), source.value());
+		auto rep = re.take_report();
+		cmd_status st = rep.has_error()
+			? cmd_status::error : cmd_status::ok;
+		return { json_id_response(id, "load", st, data,
+			state_value(re), rep), st };
+	}
 	auto src = request_to_src(cmd.value(), q);
 	if (!src.has_value())
 		return { error_response(id, state_value(re), src.report()),
@@ -427,16 +481,176 @@ static std::pair<value, cmd_status> handle_request(
 		state_value(re), r.report), st };
 }
 
-int tgf_json_loop(tgf_repl_evaluator& re, std::istream& in,
-	std::ostream& out)
+// Apply one element of the init option values as a `set` request. A bad
+// value reports an error; the rest of the init stays applied.
+static void apply_init_option(tgf_repl_evaluator& re,
+	const std::string& name, const value& val, diagnostics::report& r)
 {
-	json_write_line(out, hello(re));
-	for (std::string line; std::getline(in, line); ) {
+	const option_desc* d = option_desc_by_name(name);
+	if (!d) {
+		r.error(diagnostics::code::invalid_argument,
+			parser_strings::messages::unknown_option);
+		return;
+	}
+	// A null value names no setting, for example start with no symbol.
+	if (val.is_null()) return;
+	value q = value::object();
+	q.set("option", value::string(name));
+	q.set("value", val);
+	auto src = request_to_src("set", q);
+	if (!src.has_value()) { r.append(src.report()); return; }
+	auto er = re.run(src.value());
+	r.append(std::move(er.report));
+	for (auto& cr : er.results) r.append(std::move(cr.report));
+}
+
+// Apply the init line of a session child: the grammar, the start symbol,
+// the option values and the line limit. A bad part reports an error and
+// the child goes on with what it could apply.
+static diagnostics::report apply_init(tgf_repl_evaluator& re,
+	const value& init, size_t& max_line)
+{
+	diagnostics::report r;
+	if (!init.is_object()) {
+		r.error(diagnostics::code::invalid_argument,
+			parser_strings::messages::invalid_field_type);
+		return r;
+	}
+	// The line limit applies to the lines after the init line, which was
+	// already read with the limit the caller passed.
+	if (auto m = init.find("max_line"); m && !m->is_null()) {
+		if (!m->is_number())
+			r.error(diagnostics::code::invalid_argument,
+				parser_strings::messages::invalid_field_type);
+		else max_line = static_cast<size_t>(m->as_number());
+	}
+	// The grammar key is null with no grammar and absent for a built-in
+	// grammar, which the child already has and keeps.
+	if (auto g = init.find("grammar"); g && !g->is_null()) {
+		if (!g->is_object()) {
+			r.error(diagnostics::code::invalid_argument,
+				parser_strings::messages::invalid_field_type);
+		} else {
+			auto name = string_field(*g, "name");
+			auto source = string_field(*g, "source");
+			if (!name.has_value()) r.append(name.report());
+			else if (!source.has_value())
+				r.append(source.report());
+			else if (re.has_fixed_grammar()) {
+				// A built-in grammar is kept, like the normal
+				// load of a fixed-grammar evaluator.
+				r.warning(parser_strings::messages::
+					loading_grammars_unavailable);
+			} else {
+				re.load_source(name.value(), source.value());
+				r.append(re.take_report());
+			}
+		}
+	}
+	if (auto s = init.find("start"); s && !s->is_null()) {
+		if (!s->is_string()) {
+			r.error(diagnostics::code::invalid_argument,
+				parser_strings::messages::invalid_field_type);
+		} else apply_init_option(re, "start", *s, r);
+	}
+	if (auto o = init.find("options"); o && !o->is_null()) {
+		if (!o->is_object()) {
+			r.error(diagnostics::code::invalid_argument,
+				parser_strings::messages::invalid_field_type);
+		} else {
+			for (const auto& kv : o->members())
+				apply_init_option(re, kv.first, kv.second, r);
+		}
+	}
+	return r;
+}
+
+// Read one line into @p line without ever holding more than @p max_line
+// bytes. Bytes past the limit are dropped up to the next newline. The
+// return value is false only at end of input; @p too_long marks a line
+// that was cut at the limit.
+static bool json_read_line(std::istream& in, std::string& line,
+	size_t max_line, bool& too_long)
+{
+	line.clear();
+	too_long = false;
+	std::streambuf* sb = in.rdbuf();
+	if (!sb) return false;
+	for (;;) {
+		std::streambuf::int_type ci = sb->sbumpc();
+		if (ci == std::streambuf::traits_type::eof()) {
+			in.setstate(std::ios::eofbit);
+			return !line.empty() || too_long;
+		}
+		char c = static_cast<char>(ci);
+		if (c == '\n') return true;
+		if (line.size() >= max_line) {
+			// The bytes past the limit are dropped, so a long
+			// line never sits whole in memory.
+			too_long = true;
+			continue;
+		}
+		line.push_back(c);
+	}
+}
+
+int tgf_json_loop(tgf_repl_evaluator& re, std::istream& in,
+	std::ostream& out, size_t max_line, bool init_stdin,
+	diagnostics::report extra)
+{
+	diagnostics::report init_report = std::move(extra);
+	size_t limit = max_line;
+	if (init_stdin) {
+		std::string init_line;
+		bool too_long = false;
+		if (json_read_line(in, init_line, limit, too_long)) {
+			if (!init_line.empty() && init_line.back() == '\r')
+				init_line.pop_back();
+			if (too_long)
+				init_report.error(
+					diagnostics::code::out_of_range,
+					parser_strings::messages::line_too_long);
+			else if (init_line.empty())
+				init_report.error(
+					diagnostics::code::invalid_argument,
+					parser_strings::messages::missing_field);
+			else {
+				auto parsed = format::json::parse(init_line);
+				auto node = parsed.has_value()
+					? parsed.value().find("init") : nullptr;
+				if (!parsed.has_value())
+					init_report.append(parsed.report());
+				else if (!node)
+					init_report.error(
+						diagnostics::code::invalid_argument,
+						parser_strings::messages::missing_field);
+				else init_report.append(apply_init(re, *node, limit));
+			}
+		} else init_report.error(
+			diagnostics::code::invalid_argument,
+			parser_strings::messages::missing_field);
+	}
+	json_write_line(out, hello(re, init_report));
+	for (std::string line; ; ) {
+		bool too_long = false;
+		if (!json_read_line(in, line, limit, too_long)) break;
 		if (!line.empty() && line.back() == '\r') line.pop_back();
+		if (too_long) {
+			// Parsing a huge line costs time and memory, so refuse
+			// it and go on with the next line.
+			diagnostics::report rep;
+			rep.error(diagnostics::code::out_of_range,
+				parser_strings::messages::line_too_long);
+			json_write_line(out, error_response(value::null(),
+				state_value(re), rep));
+			continue;
+		}
 		if (line.empty()) continue;
 		auto [resp, st] = handle_request(re, line);
 		json_write_line(out, resp);
-		if (st == cmd_status::quit) break;
+		// The child of a server session stays alive after a quit: the
+		// parent owns the connection and closes it after this answer.
+		if (st == cmd_status::quit && re.session_id.empty()) break;
 	}
 	return 0;
 }

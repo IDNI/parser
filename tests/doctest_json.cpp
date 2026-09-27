@@ -271,6 +271,24 @@ TEST_SUITE("json: report to nested value") {
 		CHECK(os.str().find('\n') == std::string::npos);
 		CHECK(os.str().find("\"nodes\"") != std::string::npos);
 	}
+
+	TEST_CASE("report to JSON and back prints the same text") {
+		report r;
+		{
+			auto s = r.open("parse", code::info_count, size_t(120));
+			r.info("child");
+		}
+		r.error(code::io_error, "failed", 7,
+			{{label::name, std::string_view("tok")},
+			 {label::exit_code, idni::int_t(-1)}});
+		r.warning("careful");
+		auto v = to_value(r, true);
+		auto back = report_from_value(v);
+		std::ostringstream a, b;
+		r.print(a);
+		back.print(b);
+		CHECK(a.str() == b.str());
+	}
 }
 
 TEST_SUITE("ast_json: parser tree to AST JSON") {

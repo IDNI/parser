@@ -568,6 +568,24 @@ inline void report::pop_scope(int32_t idx) {
 inline int32_t report::push_tagged(code tag, key name, int64_t v,
 	std::initializer_list<attr_in> extra)
 {
+	return push_tagged_impl(tag, name, v, extra.begin(), extra.size());
+}
+
+inline void report::push_node(code tag, key name, int64_t value,
+	const std::vector<attr_in>& extra)
+{
+	int32_t idx = push_tagged_impl(tag, name, value, extra.data(),
+		extra.size());
+	scope_stack_.push_back(idx);
+}
+
+inline void report::pop_node() {
+	if (!scope_stack_.empty()) scope_stack_.pop_back();
+}
+
+inline int32_t report::push_tagged_impl(code tag, key name, int64_t v,
+	const attr_in* extra, size_t extra_count)
+{
 	// Catches only the explicitly-unused 0xC000 band; out-of-enum
 	// values inside the valid bands still pass.
 	DBG(assert(code_band(tag) != 0xC000u);)
@@ -577,15 +595,15 @@ inline int32_t report::push_tagged(code tag, key name, int64_t v,
 	n.key    = name;
 	n.parent = current_parent();
 	n.value  = v;
-	if (extra.size()) {
+	if (extra_count) {
 		DBG(assert(attrs_.size() <= std::numeric_limits<
 			decltype(n.attr_off)>::max());)
-		DBG(assert(extra.size() <= std::numeric_limits<
+		DBG(assert(extra_count <= std::numeric_limits<
 			decltype(n.attr_cnt)>::max());)
 		n.attr_off = static_cast<decltype(n.attr_off)>(attrs_.size());
-		n.attr_cnt = static_cast<decltype(n.attr_cnt)>(extra.size());
-		for (const auto& a : extra) {
-			attr resolved = resolve(a);
+		n.attr_cnt = static_cast<decltype(n.attr_cnt)>(extra_count);
+		for (size_t i = 0; i != extra_count; ++i) {
+			attr resolved = resolve(extra[i]);
 			// Catches a text label whose value is not a genuine
 			// interned string key for this report.
 			DBG(assert(!idni::parser_strings::is_text_label(resolved.key)

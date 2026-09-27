@@ -101,6 +101,8 @@ struct tgf_repl_evaluator {
 		/// True when the evaluator is driven as a JSON API: no colors,
 		/// no output on cout or cerr.
 		bool json_api           = false;
+		/// True when the evaluator refuses commands that read a file path.
+		bool no_server_paths    = false;
 		bool measure            = false;
 		bool measure_each_pos   = false;
 #ifdef TAU_PARSER_MEASURE_SCOPES
@@ -155,11 +157,33 @@ struct tgf_repl_evaluator {
 	[[nodiscard]] const std::string& start_symbol() const noexcept;
 	[[nodiscard]] bool has_fixed_grammar() const noexcept;
 
+	/// Random id of the server session, empty in a standalone run. A
+	/// non-empty id adds the hello.session field.
+	std::string session_id{};
+
+	/// Mark this evaluator as a server session: JSON only, no terminal
+	/// colors, no file paths, and the given session id.
+	void begin_server_session(const std::string& id);
+
 	/// Move the pending report out and clear it. The JSON front end uses
 	/// it for the hello line, which carries the grammar-load report.
 	diagnostics::report take_report();
 
+	/// The directives the loaded grammar file carries, as read at load
+	/// time; null with no grammar. The JSON front end sends it in hello
+	/// and in the load and reload answers.
+	[[nodiscard]] format::json::value directives_value() const;
+
 	bool reload(const std::string& new_tgf_file);
+
+	/// Load a grammar from text and adopt it. @p name is a label for the
+	/// grammar in state and hello. A later reload reloads the stored text.
+	bool load_source(const std::string& name, const std::string& text);
+	/// Data of the load command from source text: {"grammar", "loaded"}.
+	format::json::value load_source_data(const std::string& name,
+		const std::string& text);
+	/// Data of the reload command for a grammar loaded from source text.
+	format::json::value reload_source_data();
 
 	void flush_report();
 	void set_repl(repl<tgf_repl_evaluator>& r_);
@@ -224,6 +248,8 @@ private:
 	options opt;
 	bool fixed_grammar = false;
 	bool grammar_loaded = false;
+	/// True when the grammar came from stored text, not a file.
+	bool grammar_from_source = false;
 	std::string tgf_filename;
 	std::string grammar_source;
 
@@ -233,6 +259,11 @@ private:
 #endif
 	term::colors TC;
 	idni::diagnostics::report report;
+	/// Snapshot of the loaded grammar directives, taken when the grammar
+	/// is installed or on the first read; null with no grammar.
+	mutable format::json::value directives_{};
+	/// True once directives_ holds the value for the loaded grammar.
+	mutable bool directives_cached = false;
 
 	std::unique_ptr<nonterminals_type> owned_nts;
 	std::unique_ptr<grammar_type> owned_g;
@@ -240,6 +271,8 @@ private:
 	parser_type* p_ = nullptr;
 
 	bool load_file(const std::string& filename);
+	/// Report "server path" and return false when paths are forbidden.
+	bool paths_allowed();
 	/// Load a grammar file and adopt it, without printing. @p new_tgf_file
 	/// is the file to load; on success tgf_filename names it.
 	bool load_grammar(const std::string& new_tgf_file);
@@ -255,9 +288,13 @@ int tgf_specialized_run(int argc, char** argv,
 	const char* grammar_source);
 
 /// Run the JSON request loop on @p in until end of input or a quit
-/// request. Writes one response line per request and flushes each.
+/// request. With @p init_stdin, one init line is read first and applied
+/// before the first hello. @p extra is appended to the first hello report.
+inline constexpr size_t tgf_json_max_line = 16u * 1024 * 1024;
 int tgf_json_loop(tgf_repl_evaluator& re, std::istream& in,
-	std::ostream& out);
+	std::ostream& out, size_t max_line = tgf_json_max_line,
+	bool init_stdin = false,
+	diagnostics::report extra = diagnostics::report{});
 
 /// Write @p v as one JSON line and flush.
 void json_write_line(std::ostream& os, const format::json::value& v);

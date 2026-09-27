@@ -131,6 +131,7 @@ using id_t = idni::int_t;
 	X(runtime_error,            "Runtime error.") \
 	X(unknown_char_class,       "Unknown character class.") \
 	X(no_grammar,               "No grammar.") \
+	X(server_path,              "Server path.") \
 	X(warning,                  "Warning.") \
 	X(info,                     "Info.") \
 	X(info_micros,              "Time.") \
@@ -225,6 +226,10 @@ struct messages {
 	static constexpr sv unknown_command        = "Unknown command";
 	static constexpr sv no_grammar_loaded      =
 		"no grammar loaded, use load";
+	static constexpr sv server_path_forbidden  =
+		"File paths are not allowed in a server session";
+	static constexpr sv line_too_long          =
+		"Line is longer than the limit";
 	// load and reload command results
 	static constexpr sv reload_succeeded       = "Grammar reloaded";
 	static constexpr sv reload_failed          = "Grammar reload failed";
