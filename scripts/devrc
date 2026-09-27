@@ -472,7 +472,7 @@ source "${__devrc_dir}/dep-build"
 
 dep_vars_reset
 DEP_POSITIONAL=()
-DEP_TARGET="native"
+DEP_TARGET="$(dep_host_target)"
 
 dep_done_if_exists() {
 	local path="$1" label="$2"

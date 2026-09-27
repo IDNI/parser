@@ -40,7 +40,7 @@ _dep_ftxui_field_block() {
 	store_hash="$(dep_sha256 "$store")" || return 1
 	printf '%s\n' \
 		"dep=ftxui" \
-		"target=${DEP_FTXUI_TARGET:-native}" \
+		"target=${DEP_FTXUI_TARGET:-$(dep_host_target)}" \
 		"repo=${FTXUI_REPO}" \
 		"commit=${FTXUI_COMMIT}" \
 		"recipe_hash=${recipe_hash}" \
@@ -59,7 +59,7 @@ _dep_ftxui_field_block() {
 		"ninja_version=$("$DEP_FTXUI_NINJA" --version)" \
 		"compiler_id=$(_dep_ftxui_compiler_id)" \
 		"compiler_version=$(dep_compiler_version "$DEP_FTXUI_CXX")" \
-		"target_triple=$(dep_compiler_triple "$DEP_FTXUI_CXX" "${DEP_FTXUI_TARGET:-native}")" \
+		"target_triple=$(dep_compiler_triple "$DEP_FTXUI_CXX" "${DEP_FTXUI_TARGET:-$(dep_host_target)}")" \
 		"os=$(uname -s)" \
 		"arch=$(uname -m)" \
 		"os_release_hash=$(dep_os_release_hash)" \
@@ -135,14 +135,14 @@ _dep_ftxui_producer() {
 
 dep_entry "$@"
 
-case "${DEP_TARGET:-native}" in
-	native|w64|wasm|darwin-arm64|darwin-x86_64|win-msvc-x64) ;;
+case "${DEP_TARGET:-$(dep_host_target)}" in
+	linux-x86_64|darwin-arm64|darwin-x86_64|wasm32-emscripten|windows-x86_64-mingw|windows-x86_64-msvc) ;;
 	*)
 		echo "dep-ftxui: unsupported target '${DEP_TARGET}'" >&2
 		exit 2
 		;;
 esac
-dep_require_target_host dep-ftxui "${DEP_TARGET:-native}"
+dep_require_target_host dep-ftxui "${DEP_TARGET:-$(dep_host_target)}"
 
 mode="$(dep_var TAU_DEP_MODE producer)"
 case "$mode" in
@@ -179,7 +179,7 @@ if [ -z "$DEP_FTXUI_CC" ] || [ -z "$DEP_FTXUI_CXX" ]; then
 fi
 DEP_FTXUI_CFLAGS="$(dep_var TAU_DEP_CFLAGS "")"
 DEP_FTXUI_CXXFLAGS="$(dep_var TAU_DEP_CXXFLAGS "")"
-DEP_FTXUI_TARGET="${DEP_TARGET:-native}"
+DEP_FTXUI_TARGET="${DEP_TARGET:-$(dep_host_target)}"
 DEP_FTXUI_TOOLCHAIN="$(dep_var TAU_DEP_TOOLCHAIN "")"
 _DEP_FTXUI_TOOLCHAIN_ARGS=()
 if dep_target_needs_toolchain "$DEP_FTXUI_TARGET"; then

@@ -31,7 +31,7 @@ dep_vars_reset() {
 dep_entry() {
 	dep_vars_reset
 	DEP_POSITIONAL=()
-	DEP_TARGET="native"
+	DEP_TARGET="$(dep_host_target)"
 	local arg name value key
 	for arg in "$@"; do
 		case "$arg" in
@@ -112,11 +112,35 @@ dep_jobs() {
 
 dep_target_host() {
 	case "$1" in
-		native|w64|wasm) echo linux ;;
+		linux-x86_64|windows-x86_64-mingw|wasm32-emscripten)
+			echo linux ;;
 		darwin-arm64|darwin-x86_64) echo darwin ;;
-		win-msvc-x64) echo windows ;;
+		windows-x86_64-msvc) echo windows ;;
 		*) echo unknown ;;
 	esac
+}
+
+dep_host_arch() {
+	case "$(uname -m)" in
+		aarch64|arm64) echo aarch64 ;;
+		x86_64|amd64) echo x86_64 ;;
+		*) echo unknown ;;
+	esac
+}
+
+# The store target of the machine this runs on, by the same rule
+# CMakeLists.txt uses for TAU_DEPS_TARGET. Empty when the host has no target,
+# which the producer's own guard then rejects.
+dep_host_target() {
+	local os arch
+	os="$(dep_host_os)"
+	arch="$(dep_host_arch)"
+	case "${os}:${arch}" in
+		linux:x86_64) echo linux-x86_64 ;;
+		darwin:aarch64) echo darwin-arm64 ;;
+		darwin:x86_64) echo darwin-x86_64 ;;
+		windows:x86_64) echo windows-x86_64-mingw ;;
+		esac
 }
 
 dep_host_os() {
@@ -148,7 +172,7 @@ dep_require_target_host() {
 # build with the host compiler the preset selected, so they pass none.
 dep_target_needs_toolchain() {
 	case "$1" in
-		w64|wasm) return 0 ;;
+		windows-x86_64-mingw|wasm32-emscripten) return 0 ;;
 		*) return 1 ;;
 	esac
 }
@@ -199,7 +223,7 @@ dep_compiler_version() {
 # cl.exe has no -dumpmachine. The only MSVC preset is x64, so the triple is
 # derivable from the compiler alone.
 dep_compiler_triple() {
-	local cxx="$1" target="${2:-native}"
+	local cxx="$1" target="${2:-$(dep_host_target)}"
 	if [ "$(dep_compiler_id "$cxx")" = "MSVC" ]; then
 		echo "x86_64-pc-windows-msvc"
 		return 0

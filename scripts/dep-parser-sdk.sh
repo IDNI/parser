@@ -107,7 +107,7 @@ _dep_parser_field_block() {
 	store_hash="$(dep_sha256 "$store")" || return 1
 	printf '%s\n' \
 		"dep=${dep}" \
-		"target=${DEP_PARSER_TARGET:-native}" \
+		"target=${DEP_PARSER_TARGET:-$(dep_host_target)}" \
 		"parser_commit=${PARSER_COMMIT}" \
 		"parser_tree_hash=${PARSER_TREE_HASH}" \
 		"recipe_hash=${recipe_hash}" \
@@ -128,7 +128,7 @@ _dep_parser_field_block() {
 		"ninja_version=$("$DEP_PARSER_NINJA" --version)" \
 		"compiler_id=$(_dep_parser_compiler_id)" \
 		"compiler_version=$(dep_compiler_version "$DEP_PARSER_CXX")" \
-		"target_triple=$(dep_compiler_triple "$DEP_PARSER_CXX" "${DEP_PARSER_TARGET:-native}")" \
+		"target_triple=$(dep_compiler_triple "$DEP_PARSER_CXX" "${DEP_PARSER_TARGET:-$(dep_host_target)}")" \
 		"os=$(uname -s)" \
 		"arch=$(uname -m)" \
 		"os_release_hash=$(dep_os_release_hash)" \
@@ -237,14 +237,14 @@ PY
 
 dep_entry "$@"
 
-case "${DEP_TARGET:-native}" in
-	native|w64|wasm|darwin-arm64|darwin-x86_64|win-msvc-x64) ;;
+case "${DEP_TARGET:-$(dep_host_target)}" in
+	linux-x86_64|darwin-arm64|darwin-x86_64|wasm32-emscripten|windows-x86_64-mingw|windows-x86_64-msvc) ;;
 	*)
 		echo "dep-parser-sdk: unsupported target '${DEP_TARGET}'" >&2
 		exit 2
 		;;
 esac
-dep_require_target_host dep-parser-sdk "${DEP_TARGET:-native}"
+dep_require_target_host dep-parser-sdk "${DEP_TARGET:-$(dep_host_target)}"
 
 mode="$(dep_var TAU_DEP_MODE producer)"
 case "$mode" in
@@ -327,7 +327,7 @@ if [ -z "$DEP_PARSER_CC" ] || [ -z "$DEP_PARSER_CXX" ]; then
 fi
 DEP_PARSER_CFLAGS="$(dep_var TAU_DEP_CFLAGS "")"
 DEP_PARSER_CXXFLAGS="$(dep_var TAU_DEP_CXXFLAGS "")"
-DEP_PARSER_TARGET="${DEP_TARGET:-native}"
+DEP_PARSER_TARGET="${DEP_TARGET:-$(dep_host_target)}"
 DEP_PARSER_TOOLCHAIN="$(dep_var TAU_DEP_TOOLCHAIN "")"
 _DEP_PARSER_TOOLCHAIN_ARGS=()
 if dep_target_needs_toolchain "$DEP_PARSER_TARGET"; then
