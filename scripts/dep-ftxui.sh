@@ -136,7 +136,7 @@ _dep_ftxui_producer() {
 dep_entry "$@"
 
 case "${DEP_TARGET:-$(dep_host_target)}" in
-	linux-x86_64|darwin-arm64|darwin-x86_64|wasm32-emscripten|windows-x86_64-mingw|windows-x86_64-msvc) ;;
+	linux-x86_64|linux-arm64|darwin-arm64|darwin-x86_64|wasm32-emscripten|windows-x86_64-mingw|windows-x86_64-msvc) ;;
 	*)
 		echo "dep-ftxui: unsupported target '${DEP_TARGET}'" >&2
 		exit 2

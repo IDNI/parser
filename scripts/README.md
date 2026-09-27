@@ -151,6 +151,8 @@ Default preset name is `release` if omitted. Every build-type preset has
 | `relwithdebinfo` (+ `-tests`, `-tgf`, …) | RelWithDebInfo variants | `build/relwithdebinfo` |
 | `release-w64`, `debug-w64` (+ `devel-w64`) | Windows cross-compile | `build/release-w64`, … |
 | `release-w64-packages`, `release-w64-packages-zip` | MinGW + cpack (NSIS or ZIP) | `build/release-w64` |
+| `release-arm64`, `debug-arm64` (+ `devel-arm64`) | Linux arm64 cross-compile (clang, qemu) | `build/release-arm64`, … |
+| `release-arm64-tests` (+ `debug-`, `devel-`) | Linux arm64 cross-compile + tests under qemu | `build/release-arm64` |
 | `release-wasm`, `debug-wasm` (+ `devel-wasm`) | Emscripten (`EMSCRIPTEN_DIR` defaults via `TAU_SHARED_PREFIX`) | `build/release-wasm`, … |
 | `release-wasm-tests` (+ `debug-`, `devel-`) | Emscripten + tests, run under Node.js | `build/release-wasm` |
 | `release-wasm-tgf`, `debug-wasm-tgf` | Emscripten + the tgf FTXUI REPL, run by `./dev tgf-node` | `build/release-wasm`, … |

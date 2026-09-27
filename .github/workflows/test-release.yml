@@ -174,6 +174,49 @@ jobs:
           ./dev docker linux-mingw64-wine --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --cache-from type=gha,scope=parser-base
 
+  # The native arm64 gate. The same image as the linux job on an arm runner,
+  # so the arm64 store packages are built natively.
+  linux-arm64:
+    name: Linux arm64
+    needs: base
+    runs-on: ubuntu-24.04-arm
+    env:
+      # ubuntu-24.04-arm runners are 4-core
+      BUILD_JOBS: 4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      - name: Build and test
+        run: |
+          ./dev docker linux --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --cache-from type=gha,scope=parser-base
+
+  # The cross gate: an x86 host builds the arm64 suite with clang and runs it
+  # under qemu.
+  linux-arm64-cross:
+    name: Linux arm64 cross (clang, qemu)
+    runs-on: ubuntu-24.04
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install the cross toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang g++-aarch64-linux-gnu qemu-user ninja-build
+
+      - name: Build and test under qemu
+        run: ./dev preset release-arm64-tests run -DTAU_BUILD_JOBS=${{ env.BUILD_JOBS }}
+
   windows-msvc:
     name: Native Windows (${{ matrix.preset }})
     runs-on: windows-latest

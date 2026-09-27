@@ -292,6 +292,9 @@ preset_binary_dir() {
 		*-w64*)
 			echo "build/${type}-w64"
 			;;
+		*-arm64*)
+			echo "build/${type}-arm64"
+			;;
 		*-clang-cl)
 			echo "build/${type}-msvc-clang-cl"
 			;;

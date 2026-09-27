@@ -112,10 +112,21 @@ dep_jobs() {
 
 dep_target_host() {
 	case "$1" in
-		linux-x86_64|windows-x86_64-mingw|wasm32-emscripten)
+		linux-x86_64|linux-arm64|windows-x86_64-mingw|wasm32-emscripten)
 			echo linux ;;
 		darwin-arm64|darwin-x86_64) echo darwin ;;
 		windows-x86_64-msvc) echo windows ;;
+		*) echo unknown ;;
+	esac
+}
+
+# The machine arch a target's packages run on.
+dep_target_arch() {
+	case "$1" in
+		linux-x86_64|windows-x86_64-mingw|windows-x86_64-msvc|darwin-x86_64)
+			echo x86_64 ;;
+		linux-arm64|darwin-arm64) echo aarch64 ;;
+		wasm32-emscripten) echo wasm32 ;;
 		*) echo unknown ;;
 	esac
 }
@@ -137,10 +148,21 @@ dep_host_target() {
 	arch="$(dep_host_arch)"
 	case "${os}:${arch}" in
 		linux:x86_64) echo linux-x86_64 ;;
+		linux:aarch64) echo linux-arm64 ;;
 		darwin:aarch64) echo darwin-arm64 ;;
 		darwin:x86_64) echo darwin-x86_64 ;;
 		windows:x86_64) echo windows-x86_64-mingw ;;
 		esac
+}
+
+# A target whose packages run on another machine arch is a cross build: the
+# preset passes a toolchain file, and the host cannot run its outputs.
+dep_target_is_cross() {
+	local target_arch host_arch
+	target_arch="$(dep_target_arch "$1")"
+	host_arch="$(dep_host_arch)"
+	[ "$target_arch" != "unknown" ] && [ "$host_arch" != "unknown" ] \
+		&& [ "$target_arch" != "$host_arch" ]
 }
 
 dep_host_os() {
@@ -169,10 +191,12 @@ dep_require_target_host() {
 }
 
 # Only a cross toolchain target takes a CMake toolchain file. macOS and MSVC
-# build with the host compiler the preset selected, so they pass none.
+# build with the host compiler the preset selected, so they pass none. An
+# arm64 target is cross only off an arm64 host, which has no toolchain file.
 dep_target_needs_toolchain() {
 	case "$1" in
 		windows-x86_64-mingw|wasm32-emscripten) return 0 ;;
+		linux-arm64) dep_target_is_cross "$1" ;;
 		*) return 1 ;;
 	esac
 }

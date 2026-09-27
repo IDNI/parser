@@ -33,6 +33,11 @@
 			"toolchainFile": "cmake/mingw-w64-x86_64.cmake"
 		},
 		{
+			"name": "_toolchain-arm64",
+			"hidden": true,
+			"toolchainFile": "cmake/aarch64-linux-gnu.cmake"
+		},
+		{
 			"name": "_condition-windows",
 			"hidden": true,
 			"condition": {
@@ -121,6 +126,21 @@
 			"name": "_build_dir-devel-w64",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/devel-w64"
+		},
+		{
+			"name": "_build_dir-release-arm64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/release-arm64"
+		},
+		{
+			"name": "_build_dir-debug-arm64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-arm64"
+		},
+		{
+			"name": "_build_dir-devel-arm64",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/devel-arm64"
 		},
 		{
 			"name": "_build_dir-release-msvc",
@@ -508,6 +528,66 @@
 				"release-w64",
 				"_build-packages",
 				"_windows-zip-package"
+			]
+		},
+		{
+			"name": "release-arm64",
+			"displayName": "Release Linux arm64 (cross from x86)",
+			"inherits": [
+				"_build_dir-release-arm64",
+				"_generator-make",
+				"_toolchain-arm64",
+				"_build-type-release"
+			],
+			"cacheVariables": {
+				"TAU_PARSER_LTO": "OFF"
+			}
+		},
+		{
+			"name": "debug-arm64",
+			"displayName": "Debug Linux arm64 (cross from x86)",
+			"inherits": [
+				"_build_dir-debug-arm64",
+				"_generator-make",
+				"_toolchain-arm64",
+				"_build-type-debug"
+			]
+		},
+		{
+			"name": "devel-arm64",
+			"displayName": "Devel Linux arm64 (cross from x86)",
+			"inherits": [
+				"_build_dir-devel-arm64",
+				"_generator-make",
+				"_toolchain-arm64",
+				"_build-type-devel"
+			],
+			"cacheVariables": {
+				"TAU_PARSER_LTO": "OFF"
+			}
+		},
+		{
+			"name": "release-arm64-tests",
+			"inherits": [
+				"release-arm64",
+				"_build-tests",
+				"_build-tgf"
+			]
+		},
+		{
+			"name": "debug-arm64-tests",
+			"inherits": [
+				"debug-arm64",
+				"_build-tests",
+				"_build-tgf"
+			]
+		},
+		{
+			"name": "devel-arm64-tests",
+			"inherits": [
+				"devel-arm64",
+				"_build-tests",
+				"_build-tgf"
 			]
 		},
 		{
@@ -1246,6 +1326,30 @@
 			"configurePreset": "release-w64-packages-zip"
 		},
 		{
+			"name": "release-arm64",
+			"configurePreset": "release-arm64"
+		},
+		{
+			"name": "debug-arm64",
+			"configurePreset": "debug-arm64"
+		},
+		{
+			"name": "devel-arm64",
+			"configurePreset": "devel-arm64"
+		},
+		{
+			"name": "release-arm64-tests",
+			"configurePreset": "release-arm64-tests"
+		},
+		{
+			"name": "debug-arm64-tests",
+			"configurePreset": "debug-arm64-tests"
+		},
+		{
+			"name": "devel-arm64-tests",
+			"configurePreset": "devel-arm64-tests"
+		},
+		{
 			"name": "release-msvc",
 			"configurePreset": "release-msvc"
 		},
@@ -1610,6 +1714,18 @@
 		{
 			"name": "devel-w64-tests",
 			"configurePreset": "devel-w64-tests"
+		},
+		{
+			"name": "release-arm64-tests",
+			"configurePreset": "release-arm64-tests"
+		},
+		{
+			"name": "debug-arm64-tests",
+			"configurePreset": "debug-arm64-tests"
+		},
+		{
+			"name": "devel-arm64-tests",
+			"configurePreset": "devel-arm64-tests"
 		},
 		{
 			"name": "grammar-tests",
