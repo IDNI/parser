@@ -125,8 +125,8 @@ fi
 ARG TAU_STORE_PUBLISH=OFF
 RUN --mount=type=secret,id=gh_token \
 	if [ "$TAU_STORE_PUBLISH" = "ON" ]; then \
-		scripts/with-gh-token ./dev preset ${BUILD_PRESET} -DTAU_PARSER_DEPS_FROM_STORE=ON \
-			-DTAU_BUILD_JOBS=${BUILD_JOBS} && \
+		scripts/with-gh-token ./dev preset ${BUILD_PRESET} --configure-only \
+			-DTAU_PARSER_DEPS_FROM_STORE=ON -DTAU_BUILD_JOBS=${BUILD_JOBS} && \
 		scripts/with-gh-token ./dev store-publish; \
 	fi
 
@@ -189,9 +189,16 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	if [ "$TESTS" = "yes" ]; then \
 		scripts/with-gh-token ./dev preset release-w64-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS} \
 			-DTAU_PARSER_DEPS_FROM_STORE=ON; \
-	else \
-		scripts/with-gh-token ./dev preset release-w64-tests -DTAU_BUILD_JOBS=${BUILD_JOBS} \
-			-DTAU_PARSER_DEPS_FROM_STORE=ON; \
+	fi
+
+# The trusted workflow turns this on to publish the mingw packages the w64
+# consumers read.
+ARG TAU_STORE_PUBLISH=OFF
+RUN --mount=type=secret,id=gh_token \
+	if [ "$TAU_STORE_PUBLISH" = "ON" ]; then \
+		scripts/with-gh-token ./dev preset release-w64-tests --configure-only \
+			-DTAU_PARSER_DEPS_FROM_STORE=ON -DTAU_BUILD_JOBS=${BUILD_JOBS} && \
+		scripts/with-gh-token ./dev store-publish; \
 	fi
 
 # The parity script needs only the native tgf beside the cross-built
