@@ -318,7 +318,18 @@ RUN echo "(BUILD) -- Installing the xterm.js vendor" && \
 RUN --mount=type=secret,id=gh_token \
 	echo "(BUILD) -- Building the wasm artifacts" && \
 	scripts/with-gh-token ./dev preset release-wasm-tests -DTAU_BUILD_JOBS=${BUILD_JOBS} \
-		-DTAU_PARSER_DEPS_FROM_STORE=ON -DTAU_PARSER_BUILD_BROWSER_PAGE=ON && \
+		-DTAU_PARSER_DEPS_FROM_STORE=ON -DTAU_PARSER_BUILD_BROWSER_PAGE=ON
+
+# The trusted workflow turns this on. It runs before the parser-wasm producer
+# below, so only the wasm FTXUI and unordered_dense packages are published;
+# parser-wasm travels through the layer cache within one run.
+ARG TAU_STORE_PUBLISH=OFF
+RUN --mount=type=secret,id=gh_token \
+	if [ "$TAU_STORE_PUBLISH" = "ON" ]; then \
+		scripts/with-gh-token ./dev store-publish; \
+	fi
+
+RUN --mount=type=secret,id=gh_token \
 	scripts/with-gh-token ./dev dep-parser-wasm.sh \
 		-DTAU_DEP_MODE=producer \
 		-DTAU_PARSER_WASM_BUILD_DIR=build/release-wasm \
