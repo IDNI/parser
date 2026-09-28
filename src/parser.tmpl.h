@@ -1268,7 +1268,7 @@ bool parser<C, T>::found(size_t start) {
 		f = true;
 		item all(in_->tpos(), n, 0, 0, 0);
 		for (size_t c = 0; c != g.n_conjs(n); ++c) {
-			all.con = c, all.dot = g.len(n, c);
+			all = item(in_->tpos(), n, c, 0, g.len(n, c));
 			bool neg = g[n][c].neg;
 			//DBG(print(std::cout << "search: ", all) << "\n";)
 			//DBG(std::cout << "neg: " << neg << "\n";)
@@ -1513,7 +1513,7 @@ typename parser<C, T>::error parser<C, T>::get_error() {
 					//DBGP(std::cout << std::endl;)
 					if (!ok || !completed(cit)) {
 						//DBGP(std::cout << "err 1: " << unexp << std::endl;)
-						x.con = c, x.dot = cit.dot;
+						x = item(x.set, x.prod, c, x.from, cit.dot);
 						//DBG(print(std::cout << "x = ", x) << "\n";)
 						err.expv.emplace_back(
 							item2_ept(x));
