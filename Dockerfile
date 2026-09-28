@@ -383,9 +383,9 @@ ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
 COPY --from=source /parser /parser
 
 # The parser-wasm store entry the wasm-build stage published, plus the wasm
-# unordered_dense entry its id references and the wasm configure's cache for
-# that id. The layer cache keeps this stage from rebuilding wasm: a cache
-# miss reruns the producer, a hit copies it.
+# ftxui and unordered_dense entries its id references and the wasm configure's
+# cache. The layer cache keeps this stage from rebuilding wasm: a cache miss
+# reruns the producer, a hit copies it.
 COPY --from=wasm-build /root/.tau/store /root/.tau/store
 COPY --from=wasm-build /parser/build/release-wasm/CMakeCache.txt /parser-wasm-cmakecache.txt
 
