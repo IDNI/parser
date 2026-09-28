@@ -191,12 +191,10 @@ _dep_parser_producer() {
 			"$DEP_PARSER_CMAKE" --install "$build" \
 			|| { rm -rf "$work"; return 1; }
 	fi
-	# GCC's LTO metadata keeps the compiler working directory for inlined
-	# template locations and does not apply -fdebug-prefix-map there, so a few
-	# byte-length-prefixed copies of the build tree survive. Rewrite those exact
-	# bytes to an equal-length placeholder: the value is diagnostic only, and an
-	# equal length keeps the LTO records valid. Do this only for the archive,
-	# which is the only installed file that can carry LTO IR.
+	# GCC's LTO metadata keeps a byte-length-prefixed copy of the build tree,
+	# and lib.exe records each member under the full object path it was handed.
+	# Rewrite both spellings to an equal-length placeholder in the archive, the
+	# only installed file that can carry them.
 	local archive
 	for archive in "$staging_prefix/lib/libtauparser.a" \
 			"$staging_prefix/lib/tauparser.lib"; do
@@ -209,9 +207,9 @@ data = open(path, 'rb').read()
 for old in sorted(olds, key=len, reverse=True):
 	if not old:
 		continue
-	b = old.encode()
-	if b in data:
-		data = data.replace(b, b'@' * len(b))
+	for b in {old.encode(), old.replace('/', '\\').encode()}:
+		if b in data:
+			data = data.replace(b, b'@' * len(b))
 open(path, 'wb').write(data)
 PY
 		then

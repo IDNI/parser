@@ -143,6 +143,29 @@ _dep_ftxui_producer() {
 			return 1
 		fi
 	fi
+	# lib.exe records each member under the full object path it was handed, so
+	# the MSVC .lib files carry the staging and build paths. Mask both slash
+	# spellings with an equal-length placeholder so none is published.
+	local archive
+	for archive in "$staging_prefix"/lib/*.lib "$staging_prefix"/lib/*.a; do
+		[ -f "$archive" ] || continue
+		if ! python3 - "$archive" "$build" "$work" "$staging" \
+				"$staging_prefix" <<'PY'
+import sys
+path, *olds = sys.argv[1:]
+data = open(path, 'rb').read()
+for old in sorted({p for p in olds if p}, key=len, reverse=True):
+	for b in {old.encode(), old.replace('/', '\\').encode()}:
+		if b in data:
+			data = data.replace(b, b'@' * len(b))
+open(path, 'wb').write(data)
+PY
+		then
+			echo "dep-ftxui: cannot rewrite the baked paths in ${archive}" >&2
+			rm -rf "$work"
+			return 1
+		fi
+	done
 	rm -rf "$work"
 	return 0
 }
