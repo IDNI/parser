@@ -23,6 +23,17 @@ fail() {
 	exit 1
 }
 
+# dep_ensure's stderr and the fake oras log hold the reason a remote pull or
+# import gave up; print both so a failure names it and not only the symptom.
+fail_remote() {
+	local log
+	for log in "$SCRATCH/remote.err" "$ORAS_LOG"; do
+		echo "store-remote self-check: --- ${log} ---" >&2
+		[ -f "$log" ] && cat "$log" >&2
+	done
+	fail "$*"
+}
+
 # A TMPDIR ending in / leaves // on macOS, and Git Bash reports /tmp and short
 # names where CMake sees C:/...; either one breaks the string compare, so
 # normalize the path before translating it.
@@ -127,16 +138,16 @@ before="$(calls)"
 remote_out=""
 if ! dep_ensure remote_out producer demo "$BLOCK" fake_producer \
 		2>"$SCRATCH/remote.err"; then
-	fail "a remote-hit read failed"
+	fail_remote "a remote-hit read failed"
 fi
 [ "$(calls)" -eq "$before" ] \
-	|| fail "a remote hit called the producer ($(calls) calls)"
+	|| fail_remote "a remote hit called the producer ($(calls) calls)"
 [ -f "$remote_out/file.txt" ] || fail "a remote hit exposed no package"
 case "$remote_out" in
 	"$TAU_SHARED_PREFIX"/store/demo/*/prefix) ;;
 	*) fail "the remote prefix is not store-based: $remote_out (shared prefix: $TAU_SHARED_PREFIX)" ;;
 esac
-grep -q "^pull " "$ORAS_LOG" || fail "a remote hit never called oras pull"
+grep -q "^pull " "$ORAS_LOG" || fail_remote "a remote hit never called oras pull"
 
 # ── 3. a remote miss builds: the producer is called ─────────────────────
 unset FAKE_ORAS_PULL_SRC
