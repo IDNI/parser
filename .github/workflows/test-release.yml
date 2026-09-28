@@ -277,12 +277,38 @@ jobs:
             clang g++-aarch64-linux-gnu qemu-user qemu-user-binfmt \
             ninja-build python3-pexpect python3-pyte
 
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.tau/store
+          key: parser-store-linux-arm64-cross-${{ github.sha }}
+          restore-keys: |
+            parser-store-linux-arm64-cross-
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
       - name: Build and test under qemu
-        run: ./dev preset release-arm64-tests run -DTAU_BUILD_JOBS=${{ env.BUILD_JOBS }}
+        run: ./dev preset release-arm64-tests run -DTAU_BUILD_JOBS=${{ env.BUILD_JOBS }} \
+          -DTAU_PARSER_DEPS_FROM_STORE=ON
+
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.tau/store
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}
 
   windows-msvc:
     name: Native Windows (${{ matrix.preset }})
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
     env:
       # windows-latest runners are 4-core
       TAU_BUILD_JOBS: 4
@@ -304,10 +330,32 @@ jobs:
         with:
           arch: x64
 
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.tau/store
+          key: parser-store-windows-latest-${{ github.sha }}
+          restore-keys: |
+            parser-store-windows-latest-
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
       # Git Bash runs ./dev, and the preset carries the compiler choice.
       - name: Build and test
-        shell: bash
-        run: ./dev preset ${{ matrix.preset }} run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+        run: ./dev preset ${{ matrix.preset }} run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+          -DTAU_PARSER_DEPS_FROM_STORE=ON
+
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.tau/store
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}
 
   macos:
     name: macOS
@@ -328,6 +376,29 @@ jobs:
           "$RUNNER_TEMP/tau-python/bin/pip" install pexpect pyte
           echo "$RUNNER_TEMP/tau-python/bin" >> "$GITHUB_PATH"
 
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.tau/store
+          key: parser-store-macos-15-${{ github.sha }}
+          restore-keys: |
+            parser-store-macos-15-
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
       # `run` on an -all preset makes ./dev call ctest itself.
       - name: Build and test
-        run: ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+        run: ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+          -DTAU_PARSER_DEPS_FROM_STORE=ON
+
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.tau/store
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}
