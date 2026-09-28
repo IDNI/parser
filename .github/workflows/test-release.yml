@@ -158,7 +158,7 @@ jobs:
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=parser-wasm-deps \
-            --cache-to   type=gha,scope=parser-wasm-node,mode=max
+            --cache-to   type=gha,scope=parser-wasm-build,mode=max
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -184,7 +184,7 @@ jobs:
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=parser-wasm-deps \
-            --cache-from type=gha,scope=parser-wasm-node
+            --cache-from type=gha,scope=parser-wasm-build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

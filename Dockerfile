@@ -296,11 +296,11 @@ RUN EMSDK_NODE_BIN="$(ls -d /root/.tau/emsdk/node/*/bin | head -n1)" && \
 
 
 # ------------------------------------------------------------
-# WebAssembly Node.js gate: build the Emscripten artifacts and the browser
-# page (the page is a build output, not a browser test), publish them as
-# parser-wasm, and run the node tests. No Chrome or puppeteer here.
+# WebAssembly build gate: build the Emscripten artifacts and the browser page
+# (the page is a build output, not a browser test), and publish them as the
+# parser-wasm store package the browser gate consumes. No tests here.
 
-FROM wasm-deps AS wasm-node
+FROM wasm-deps AS wasm-build
 
 ARG BUILD_JOBS=1
 
@@ -315,8 +315,6 @@ COPY --from=source /parser /parser
 RUN echo "(BUILD) -- Installing the xterm.js vendor" && \
 	npm ci --prefix js/tau-wasm-terminal --no-audit --no-fund
 
-# Build the wasm artifacts and the browser page, then publish them as the
-# parser-wasm store package the browser gate consumes.
 RUN --mount=type=secret,id=gh_token \
 	echo "(BUILD) -- Building the wasm artifacts" && \
 	scripts/with-gh-token ./dev preset release-wasm-tests -DTAU_BUILD_JOBS=${BUILD_JOBS} \
@@ -326,7 +324,14 @@ RUN --mount=type=secret,id=gh_token \
 		-DTAU_PARSER_WASM_BUILD_DIR=build/release-wasm \
 		-DTAU_PARSER_WASM_CMAKE_CACHE=build/release-wasm/CMakeCache.txt
 
-# The node tests read the same build directory.
+
+# ------------------------------------------------------------
+# WebAssembly Node.js gate: run the node tests on the wasm-build stage.
+
+FROM wasm-build AS wasm-node
+
+ARG BUILD_JOBS=1
+
 RUN echo "(BUILD) -- Running the wasm node tests" && \
 	ctest --preset release-wasm-tests -j ${BUILD_JOBS} --output-on-failure
 
@@ -377,12 +382,12 @@ ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
 
 COPY --from=source /parser /parser
 
-# The parser-wasm store entry the wasm-node stage published, plus the wasm
+# The parser-wasm store entry the wasm-build stage published, plus the wasm
 # unordered_dense entry its id references and the wasm configure's cache for
 # that id. The layer cache keeps this stage from rebuilding wasm: a cache
 # miss reruns the producer, a hit copies it.
-COPY --from=wasm-node /root/.tau/store /root/.tau/store
-COPY --from=wasm-node /parser/build/release-wasm/CMakeCache.txt /parser-wasm-cmakecache.txt
+COPY --from=wasm-build /root/.tau/store /root/.tau/store
+COPY --from=wasm-build /parser/build/release-wasm/CMakeCache.txt /parser-wasm-cmakecache.txt
 
 # Native tgf is the parity reference for the browser parity tests.
 RUN --mount=type=secret,id=gh_token \

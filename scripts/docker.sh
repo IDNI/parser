@@ -25,6 +25,7 @@ case "${CMD}" in
 		echo "  w64-deps           - build the w64-deps image (wine)"
 		echo "  linux-mingw64-wine - cross-build for Windows, run the suite under wine"
 		echo "  wasm-deps          - build the wasm-deps image (emsdk + node)"
+		echo "  wasm-build         - build the wasm artifacts and publish parser-wasm"
 		echo "  wasm-node          - build the wasm-node image and run the node suite"
 		echo "  wasm-browser-deps  - build the wasm-browser-deps image (Chrome, npm packages)"
 		echo "  wasm-browser       - build the wasm-browser image and run the browser suite"
@@ -48,6 +49,9 @@ case "${CMD}" in
 		;;
 	"wasm-deps")
 		build --target wasm-deps -t parser:wasm-deps "${@:2}"
+		;;
+	"wasm-build")
+		build --target wasm-build -t parser:wasm-build "${@:2}"
 		;;
 	"wasm-node")
 		build --target wasm-node -t parser:wasm-node "${@:2}"
