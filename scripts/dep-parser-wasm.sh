@@ -23,26 +23,25 @@ source "${DEV_ROOT}/scripts/devrc"
 
 TAU_PARSER_WASM_RECIPE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 
-# Content hash of the parser working tree. The recipe and the publish helpers
-# are excluded: each is hashed on its own or cannot change the package bytes.
-# Tracked files only, so an untracked build artifact cannot move the id.
+# Content hash of the parser tree. The skip set matches .dockerignore plus the
+# build outputs generated in the source tree (doctest.h, version_license.h),
+# so the hash covers the source and stays deterministic without a .git dir.
 _dep_parser_wasm_tree_hash() {
 	local src="$1" value digest
-	local exclude='^(scripts/(dep-parser-wasm\.sh|devrc|dep-build)|cmake/(tau-manifest\.cmake|tau-store\.cmake))$'
+	local exclude='^\./(scripts/(dep-parser-wasm\.sh|devrc|dep-build)|cmake/(tau-manifest\.cmake|tau-store\.cmake))$'
 	if command -v sha256sum > /dev/null 2>&1; then
 		digest="sha256sum"
 	else
 		digest="shasum -a 256"
 	fi
-	# A tau submodule checkout has a .git file that points outside the Docker
-	# build context, so git ls-files cannot work there.
-	if [ ! -d "$src/.git" ]; then
-		echo "dep-parser-wasm: '$src' has no .git directory; the wasm package needs a parser checkout with its own .git folder" >&2
-		return 1
-	fi
-	value="$(cd "$src" && git ls-files -z --cached \
-		| grep -zvE "$exclude" \
-		| LC_ALL=C sort -z | xargs -0 -r $digest | dep_sha256_stdin)"
+	value="$(cd "$src" && find . \
+		\( -name .git -o -name .local -o -name .claude -o -name node_modules \
+			-o -name __pycache__ -o -name tau-lang -o -name build -o -name 'build-*' \
+			-o -name doctest.h -o -name version_license.h -o -name '.*_history' \) -prune -o \
+		-type f -print \
+		| LC_ALL=C sort \
+		| grep -vE "$exclude" \
+		| xargs -r $digest | dep_sha256_stdin)"
 	[ -n "$value" ] || { echo "dep-parser-wasm: parser tree hash is empty" >&2; return 1; }
 	printf '%s' "$value"
 }
