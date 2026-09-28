@@ -173,7 +173,8 @@ class ReplTester:
         try:
             self.child.sendline(b"quit")
             self.child.expect(pexpect.EOF, timeout=10)
-        except (pexpect.TIMEOUT, pexpect.EOF):
+        except (pexpect.TIMEOUT, pexpect.EOF, OSError):
+            # The child can exit between isalive() and the write; macOS then raises EIO.
             pass
         if self.child.isalive():
             self.child.kill(9)
