@@ -1217,10 +1217,33 @@ struct pre_order {
 	 * @tparam slot Memory slot to use for memorization, disabled by default
 	 * @param f Function to apply on each node. Must not have side effects due to memorization
 	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
+	 * @param up Function to apply to processed node in post order
+	 * @param cache_ok Decides whether a node's transformed result may enter the cache
+	 * @return The tree obtained after applying f to root
+	 */
+	template<size_t slot = 0>
+	tref apply_unique(auto& f, auto& visit_subtree, auto& up, auto& cache_ok);
+
+	/**
+	 * @brief Apply f in pre order to root according to visit_subtree.
+	 * If f is applied to a node, the traversal will continue with the children of the transformed node
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node. Must not have side effects due to memorization
+	 * @param visit_subtree If a node does not satisfy visit_subtree, children are not visited
 	 * @return The tree obtained after applying f to root
 	 */
 	template<size_t slot = 0>
 	tref apply_unique(auto& f, auto& visit_subtree);
+
+	/**
+	 * @brief Apply f in pre order to root while caching only results cache_ok accepts.
+	 * @tparam slot Memory slot to use for memorization, disabled by default
+	 * @param f Function to apply on each node. Must not have side effects due to memorization
+	 * @param cache_ok Decides whether a node's transformed result may enter the cache
+	 * @return The tree obtained after applying f to root
+	 */
+	template<size_t slot = 0>
+	tref apply_unique_if(auto& f, auto& cache_ok);
 
 	/**
 	 * @brief Apply f in pre order to root.
@@ -1364,8 +1387,13 @@ private:
 			size_t>>;
 	inline static cache_t& m = bintree<node>::template create_cache<cache_t>();
 
+	// Accepts every result; the traversals that cache unconditionally pass
+	// it as their cache_ok.
+	static bool cache_all(tref, tref) { return true; }
+
 	template<bool break_on_change, size_t slot, bool unique>
-	tref traverse(tref n, auto& f, auto& visit_subtree, auto& up);
+	tref traverse(tref n, auto& f, auto& visit_subtree, auto& up,
+						[[maybe_unused]] auto& cache_ok);
 
 	template<bool search, bool unique>
 	void const_traverse(tref n, auto& visit, auto& visit_subtree,

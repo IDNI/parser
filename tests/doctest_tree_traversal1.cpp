@@ -281,6 +281,39 @@ TEST_SUITE("pre_order::apply_unique") {
 }
 
 // ============================================================================
+// pre_order — apply_unique_if
+// ============================================================================
+
+TEST_SUITE("pre_order::apply_unique_if") {
+
+	TEST_CASE("rejected node is recomputed, accepted node is cached") {
+		// 'r' and 'k' each occur twice under the root, so the cache
+		// alone decides whether their leaves are traversed a second time.
+		tref rejected = n('r', {n('x')});
+		tref accepted = n('k', {n('y')});
+		tref root = n('a', {rejected, accepted, rejected, accepted});
+		int x_calls = 0, y_calls = 0;
+		auto count = [&](tref nd) -> tref {
+			const char v = chtree::get(nd).value;
+			if (v == 'x') ++x_calls;
+			else if (v == 'y') ++y_calls;
+			return nd;
+		};
+		auto cache_ok = [&](tref nd, tref) {
+			return nd != rejected && nd != root;
+		};
+		pre_order<char>(root).apply_unique_if<42>(count, cache_ok);
+		CHECK( x_calls == 2 );
+		CHECK( y_calls == 1 );
+		pre_order<char>(root).apply_unique_if<42>(count, cache_ok);
+		// 'r' never entered the cache, so its leaf is traversed twice again.
+		CHECK( x_calls == 4 );
+		// 'k' entered the cache, so its leaf is not traversed again.
+		CHECK( y_calls == 1 );
+	}
+}
+
+// ============================================================================
 // pre_order — apply (non-unique)
 // ============================================================================
 
