@@ -103,10 +103,7 @@ if(TAU_PARSER_DEPS_FROM_STORE)
 	_parser_deps_ensure(unordered_dense
 		"${PROJECT_SOURCE_DIR}/scripts/dep-unordered-dense.sh"
 		TAU_PARSER_UNORDERED_DENSE_PREFIX)
-	# dep-ftxui.sh does not apply cmake/ftxui-emscripten-listener-eof.patch,
-	# which the Emscripten build needs, so the wasm FTXUI stays on the
-	# FetchContent path in cmake/ftxui.cmake.
-	if(NOT TAU_PARSER_DONT_USE_FTXUI AND NOT TAU_PARSER_BUILD_EMSCRIPTEN)
+	if(NOT TAU_PARSER_DONT_USE_FTXUI)
 		_parser_deps_ensure(ftxui
 			"${PROJECT_SOURCE_DIR}/scripts/dep-ftxui.sh"
 			TAU_PARSER_FTXUI_PREFIX)

@@ -69,6 +69,12 @@ _dep_ftxui_field_block() {
 		"lto=OFF" \
 		"sanitizer=OFF" \
 		"deps=none"
+	# The Emscripten build applies the listener-eof patch; the patched package
+	# must hash differently from the unpatched one.
+	if [ "${DEP_FTXUI_TARGET}" = "wasm32-emscripten" ]; then
+		printf 'emscripten_patch_hash=%s\n' \
+			"$(dep_sha256 "${__devrc_dir}/../cmake/ftxui-emscripten-listener-eof.patch")"
+	fi
 }
 
 # Producer callback. $1 is the staging prefix. The source tree and build tree
@@ -91,6 +97,14 @@ _dep_ftxui_producer() {
 		echo "dep-ftxui: checkout is ${head}, expected ${FTXUI_COMMIT}" >&2
 		rm -rf "$work"
 		return 1
+	fi
+	# The Emscripten build needs the listener-eof patch, the same one
+	# cmake/ftxui.cmake applies on the FetchContent path.
+	if [ "${DEP_FTXUI_TARGET}" = "wasm32-emscripten" ]; then
+		(cd "$work" && "$DEP_FTXUI_CMAKE" \
+			-DPATCH="${__devrc_dir}/../cmake/ftxui-emscripten-listener-eof.patch" \
+			-P "${__devrc_dir}/../cmake/ftxui-apply-patch.cmake") \
+			|| { rm -rf "$work"; return 1; }
 	fi
 	# The recorded flags travel in the configure arguments. Clear the ambient
 	# ones so the environment cannot add a second, unrecorded value.
