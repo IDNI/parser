@@ -111,7 +111,7 @@ _dep_ftxui_producer() {
 	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS \
 		"$DEP_FTXUI_CMAKE" -S "$work" -B "$build" \
 		"${_DEP_FTXUI_CONFIGURE_ARGS[@]}" \
-		"${_DEP_FTXUI_TOOLCHAIN_ARGS[@]}" \
+		${_DEP_FTXUI_TOOLCHAIN_ARGS[@]+"${_DEP_FTXUI_TOOLCHAIN_ARGS[@]}"} \
 		-DCMAKE_C_COMPILER="$DEP_FTXUI_CC" \
 		-DCMAKE_CXX_COMPILER="$DEP_FTXUI_CXX" \
 		-DCMAKE_INSTALL_PREFIX="$staging_prefix" \

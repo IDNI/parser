@@ -107,17 +107,17 @@ normalize_args() {
 }
 
 resolve_jobs() {
-	dep_entry "${DEV_CMAKE[@]}"
+	dep_entry ${DEV_CMAKE[@]+"${DEV_CMAKE[@]}"}
 	local jobs
 	jobs="$(dep_jobs)"
 	echo "TAU_BUILD_JOBS: ${jobs}"
 	# preset configure uses env; cmake --preset rejects -DTAU_BUILD_JOBS
 	local filtered=() arg
-	for arg in "${DEV_CMAKE[@]}"; do
+	for arg in ${DEV_CMAKE[@]+"${DEV_CMAKE[@]}"}; do
 		[[ $arg == -DTAU_BUILD_JOBS=* ]] && continue
 		filtered+=("$arg")
 	done
-	DEV_CMAKE=("${filtered[@]}")
+	DEV_CMAKE=(${filtered[@]+"${filtered[@]}"})
 	export TAU_BUILD_JOBS="$jobs"
 	export CMAKE_BUILD_PARALLEL_LEVEL="$jobs"
 }
@@ -245,7 +245,7 @@ build_run() {
 	echo "Configuring with ${GENERATOR} build system"
 	cmake .. -G "${GENERATOR}" -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
 		-DTAU_BUILD_JOBS="${TAU_BUILD_JOBS}" \
-		"${DEV_CMAKE[@]}"
+		${DEV_CMAKE[@]+"${DEV_CMAKE[@]}"}
 
 	echo "Building with ${GENERATOR}"
 	echo "Parallel jobs: ${TAU_BUILD_JOBS}"
@@ -254,7 +254,7 @@ build_run() {
 	if [[ -n $TARGET ]]; then
 		build_target=(--target "$TARGET")
 	fi
-	cmake --build . "${build_target[@]}" -- -j "${TAU_BUILD_JOBS}" \
+	cmake --build . ${build_target[@]+"${build_target[@]}"} -- -j "${TAU_BUILD_JOBS}" \
 		${verbose_flag}
 	local status=$?
 
@@ -378,7 +378,7 @@ preset_entry() {
 	echo "Preset: ${PRESET}"
 	echo "Run: ${RUN}"
 	if [[ ${#generator_args[@]} -gt 0 || ${#DEV_CMAKE[@]} -gt 0 ]]; then
-		echo "CMake args: ${generator_args[*]} ${DEV_CMAKE[*]}"
+		echo "CMake args: ${generator_args[*]+"${generator_args[*]}"} ${DEV_CMAKE[*]+"${DEV_CMAKE[*]}"}"
 	fi
 
 	TAU_BUILD_JOBS="${TAU_BUILD_JOBS:-1}"
@@ -390,8 +390,9 @@ preset_entry() {
 		fresh=()
 	fi
 	echo "Configuring with preset ${PRESET}"
-	cmake "${fresh[@]}" --preset "${PRESET}" "${generator_args[@]}" \
-		"${DEV_CMAKE[@]}"
+	cmake ${fresh[@]+"${fresh[@]}"} --preset "${PRESET}" \
+		${generator_args[@]+"${generator_args[@]}"} \
+		${DEV_CMAKE[@]+"${DEV_CMAKE[@]}"}
 
 	if [[ ${CONFIGURE_ONLY:-} == 1 ]]; then
 		echo "Configure-only; skipping the build"
@@ -405,7 +406,7 @@ preset_entry() {
 		echo "Target: ${TARGET}"
 		build_target=(--target "$TARGET")
 	fi
-	cmake --build --preset "${PRESET}" "${build_target[@]}" \
+	cmake --build --preset "${PRESET}" ${build_target[@]+"${build_target[@]}"} \
 		-- -j "${TAU_BUILD_JOBS}"
 	local status=$?
 	if [[ $status -ne 0 ]]; then
@@ -438,12 +439,12 @@ preset_entry() {
 			fi
 			echo "All tests passed"
 		else
-			local build_dir run_args=("${DEV_PROGRAM[@]}")
+			local build_dir run_args=(${DEV_PROGRAM[@]+"${DEV_PROGRAM[@]}"})
 			build_dir="$(preset_binary_dir "${PRESET}")"
 			if [[ ${run_args[0]:-} == -- ]]; then
 				run_args=("${run_args[@]:1}")
 			fi
-			"./${build_dir}/${PRESET_RUN_BIN}" "${run_args[@]}"
+			"./${build_dir}/${PRESET_RUN_BIN}" ${run_args[@]+"${run_args[@]}"}
 		fi
 	fi
 }

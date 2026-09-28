@@ -167,14 +167,14 @@ import)
 			expected+=("$(basename "$(dirname "$d")")/${id}")
 		done < <(find "$extract" -mindepth 2 -maxdepth 2 -type d -print | sort)
 	fi
-	for entry in "${expected[@]}"; do
+	for entry in ${expected[@]+"${expected[@]}"}; do
 		_check_entry "$entry" || exit 2
 		[ -f "${extract}/${entry}/manifest.json" ] || {
 			echo "store-transport: archive is missing entry '${entry}'" >&2; exit 1; }
 	done
-	_check_import_modes "$archive" "$extract" "${expected[@]}" || exit 1
+	_check_import_modes "$archive" "$extract" ${expected[@]+"${expected[@]}"} || exit 1
 
-	for entry in "${expected[@]}"; do
+	for entry in ${expected[@]+"${expected[@]}"}; do
 		dep="${entry%%/*}"; id="${entry##*/}"
 		dep_dir="${dest_store}/store/${dep}"
 		staging="${dep_dir}/${id}.staging-$(_token)"
