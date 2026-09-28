@@ -231,7 +231,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl unzip xz-u
 
 # Only the files dep-emsdk.sh runs, so a source change keeps the emsdk layer.
 COPY ./dev /parser/
-COPY ./scripts/devrc ./scripts/dep-emsdk.sh /parser/scripts/
+COPY ./scripts/devrc ./scripts/dep-emsdk.sh ./scripts/dep-build /parser/scripts/
 COPY ./cmake/tau-resolve.cmake /parser/cmake/
 WORKDIR /parser
 
