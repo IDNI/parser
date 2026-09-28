@@ -337,6 +337,11 @@ endfunction()
 
 ################################################################################
 
+# Store-resolved dependencies (unordered_dense, and FTXUI off wasm). Opt-in:
+# -DTAU_PARSER_DEPS_FROM_STORE=ON; otherwise the paths below keep the
+# system-package / FetchContent fallbacks.
+include(parser-deps)
+
 # ankerl/unordered_dense — Robin Hood open-addressing hash map (MIT)
 include(unordered-dense)
 
