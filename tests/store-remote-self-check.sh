@@ -23,7 +23,18 @@ fail() {
 	exit 1
 }
 
+# Git Bash reports a scratch path as /tmp/..., CMake as C:/...; -m puts the
+# shell side in CMake's form so the two compare equal.
+to_cmake_path() {
+	if command -v cygpath >/dev/null 2>&1; then
+		cygpath -m "$1"
+	else
+		printf '%s' "$1"
+	fi
+}
+
 SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/tau-store-remote.XXXXXX")" || exit 1
+SCRATCH="$(to_cmake_path "$SCRATCH")"
 cleanup() { rm -rf "$SCRATCH"; }
 trap cleanup EXIT
 export TMPDIR="$SCRATCH/tmp"

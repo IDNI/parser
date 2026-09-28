@@ -20,7 +20,18 @@ fail() {
 	exit 1
 }
 
+# Git Bash reports a scratch path as /tmp/..., CMake as C:/...; -m puts the
+# shell side in CMake's form so the two compare equal.
+to_cmake_path() {
+	if command -v cygpath >/dev/null 2>&1; then
+		cygpath -m "$1"
+	else
+		printf '%s' "$1"
+	fi
+}
+
 SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/tau-dep-ensure.XXXXXX")" || exit 1
+SCRATCH="$(to_cmake_path "$SCRATCH")"
 cleanup() { rm -rf "$SCRATCH"; }
 trap cleanup EXIT
 export TAU_SHARED_PREFIX="$SCRATCH/shared"
@@ -154,8 +165,8 @@ if ls -d "$TAU_SHARED_PREFIX/store/faildep/"*.claim >/dev/null 2>&1; then
 	fail "a failed producer left a claim"
 fi
 lookup="$(cmake -P "$PARSER_ROOT/cmake/tau-store.cmake" lookup \
-	"$TAU_SHARED_PREFIX" faildep "$fail_id" 2>/dev/null)" \
-	|| fail "lookup after a failed producer errored"
+	"$TAU_SHARED_PREFIX" faildep "$fail_id" 2>"${SCRATCH}/lookup.err")" \
+	|| { cat "${SCRATCH}/lookup.err" >&2; fail "lookup after a failed producer errored"; }
 [ "$lookup" = "miss" ] || fail "a failed producer left a final entry"
 
 # 7b. a producer that calls exit is cleaned up by the EXIT trap
@@ -171,8 +182,8 @@ if ls -d "$TAU_SHARED_PREFIX/store/exitdep/"*.claim >/dev/null 2>&1; then
 	fail "an exiting producer left a claim"
 fi
 lookup="$(cmake -P "$PARSER_ROOT/cmake/tau-store.cmake" lookup \
-	"$TAU_SHARED_PREFIX" exitdep "$exit_id" 2>/dev/null)" \
-	|| fail "lookup after an exiting producer errored"
+	"$TAU_SHARED_PREFIX" exitdep "$exit_id" 2>"${SCRATCH}/lookup.err")" \
+	|| { cat "${SCRATCH}/lookup.err" >&2; fail "lookup after an exiting producer errored"; }
 [ "$lookup" = "miss" ] || fail "an exiting producer left a final entry"
 if ls "$TMPDIR/"tau-dep-block.* >/dev/null 2>&1; then
 	fail "an exiting producer left a block temp file"
@@ -312,8 +323,8 @@ if ls -d "$TAU_SHARED_PREFIX/store/pathdep/"*.staging* >/dev/null 2>&1; then
 	fail "a gate failure left a staging entry"
 fi
 lookup="$(cmake -P "$PARSER_ROOT/cmake/tau-store.cmake" lookup \
-	"$TAU_SHARED_PREFIX" pathdep "$path_id" 2>/dev/null)" \
-	|| fail "lookup after a gate failure errored"
+	"$TAU_SHARED_PREFIX" pathdep "$path_id" 2>"${SCRATCH}/lookup.err")" \
+	|| { cat "${SCRATCH}/lookup.err" >&2; fail "lookup after a gate failure errored"; }
 [ "$lookup" = "miss" ] || fail "a gate failure left a final entry"
 grep -q "absolute build, staging, store, or home path" "$SCRATCH/path.err" \
 	|| fail "the gate failure was not reported"
@@ -327,8 +338,8 @@ if dep_ensure unused_foreign producer foreigndep "$FOREIGN_BLOCK" \
 fi
 [ "$(calls)" -eq $((before + 1)) ] || fail "the foreign path producer was not called"
 lookup="$(cmake -P "$PARSER_ROOT/cmake/tau-store.cmake" lookup \
-	"$TAU_SHARED_PREFIX" foreigndep "$foreign_id" 2>/dev/null)" \
-	|| fail "lookup after a foreign gate failure errored"
+	"$TAU_SHARED_PREFIX" foreigndep "$foreign_id" 2>"${SCRATCH}/lookup.err")" \
+	|| { cat "${SCRATCH}/lookup.err" >&2; fail "lookup after a foreign gate failure errored"; }
 [ "$lookup" = "miss" ] || fail "a foreign gate failure left a final entry"
 grep -q "absolute build, staging, store, or home path" "$SCRATCH/foreign.err" \
 	|| fail "the foreign gate failure was not reported"

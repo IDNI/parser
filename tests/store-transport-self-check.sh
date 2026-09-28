@@ -19,7 +19,19 @@ for f in "$TRANSPORT" "$MANIFEST" "$STORE_MODULE"; do
 done
 
 TMP_ROOT="${TMPDIR:-/tmp}"
+
+# Git Bash reports a scratch path as /tmp/..., CMake as C:/...; -m puts the
+# shell side in CMake's form so the two compare equal.
+to_cmake_path() {
+	if command -v cygpath >/dev/null 2>&1; then
+		cygpath -m "$1"
+	else
+		printf '%s' "$1"
+	fi
+}
+
 ROOT="$(mktemp -d "${TMP_ROOT}/tau-transport-self.XXXXXX")" || exit 1
+ROOT="$(to_cmake_path "$ROOT")"
 fail() { echo "store-transport self-check: $*" >&2; rm -rf "$ROOT"; exit 1; }
 
 block_file="${ROOT}/block"
@@ -42,12 +54,21 @@ make_store() {
 src="${ROOT}/src"; make_store "$src"
 entry="demo/${id}"
 tar="${ROOT}/store.tar"
-"$TRANSPORT" export "$src" "$tar" "$entry" >/dev/null 2>&1 || fail "export failed"
+"$TRANSPORT" export "$src" "$tar" "$entry" >"${ROOT}/export.log" 2>&1 || {
+	cat "${ROOT}/export.log" >&2
+	fail "export failed"
+}
 
 # round trip
 dst="${ROOT}/dst"
-"$TRANSPORT" import "$tar" "$dst" "$entry" >/dev/null 2>&1 || fail "import failed"
-"$TRANSPORT" verify "$dst" "$entry" >/dev/null 2>&1 || fail "verify failed"
+"$TRANSPORT" import "$tar" "$dst" "$entry" >"${ROOT}/import.log" 2>&1 || {
+	cat "${ROOT}/import.log" >&2
+	fail "import failed"
+}
+"$TRANSPORT" verify "$dst" "$entry" >"${ROOT}/verify.log" 2>&1 || {
+	cat "${ROOT}/verify.log" >&2
+	fail "verify failed"
+}
 [ -x "${dst}/store/demo/${id}/prefix/bin/tool" ] || fail "imported bin/tool is not executable"
 [ -f "${dst}/store/demo/${id}/prefix/lib/data" ] || fail "imported lib/data is missing"
 
