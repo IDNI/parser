@@ -21,6 +21,8 @@ case "${CMD}" in
 		echo "Every action runs docker build. Extra options are appended."
 		echo "Available actions:"
 		echo "  base               - build the base image (system packages)"
+		echo "  deps               - build the deps image (oras store client)"
+		echo "  source             - build the source image"
 		echo "  linux              - build and run the suite on Linux"
 		echo "  w64-deps           - build the w64-deps image (wine)"
 		echo "  linux-mingw64-wine - cross-build for Windows, run the suite under wine"
@@ -37,6 +39,12 @@ case "${CMD}" in
 		;;
 	"base")
 		build --target base -t parser:base "${@:2}"
+		;;
+	"deps")
+		build --target deps -t parser:deps "${@:2}"
+		;;
+	"source")
+		build --target source -t parser:source "${@:2}"
 		;;
 	"linux")
 		build --target linux -t parser:linux "${@:2}"
