@@ -34,6 +34,12 @@ _dep_parser_wasm_tree_hash() {
 	else
 		digest="shasum -a 256"
 	fi
+	# A tau submodule checkout has a .git file that points outside the Docker
+	# build context, so git ls-files cannot work there.
+	if [ ! -d "$src/.git" ]; then
+		echo "dep-parser-wasm: '$src' has no .git directory; the wasm package needs a parser checkout with its own .git folder" >&2
+		return 1
+	fi
 	value="$(cd "$src" && git ls-files -z --cached \
 		| grep -zvE "$exclude" \
 		| LC_ALL=C sort -z | xargs -0 -r $digest | dep_sha256_stdin)"
