@@ -80,6 +80,9 @@ jobs:
   # it instead of each one installing it.
   deps:
     name: Build deps image (oras)
+    # Reads the parser-base cache, so it waits for base instead of building
+    # the same layers beside it.
+    needs: base
     runs-on: ubuntu-24.04
     env:
       # ubuntu-24.04 runners are 4-core
