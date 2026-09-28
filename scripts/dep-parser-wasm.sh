@@ -39,10 +39,10 @@ _dep_parser_wasm_tree_hash() {
 		\( -name .git -o -name .local -o -name .claude -o -name node_modules \
 			-o -name __pycache__ -o -name tau-lang -o -name build -o -name 'build-*' \
 			-o -name doctest.h -o -name version_license.h -o -name '.*_history' \) -prune -o \
-		-type f -print \
-		| LC_ALL=C sort \
-		| grep -vE "$exclude" \
-		| xargs -r $digest | dep_sha256_stdin)"
+		-type f -print0 \
+		| LC_ALL=C sort -z \
+		| grep -zvE "$exclude" \
+		| xargs -0 -r $digest | dep_sha256_stdin)"
 	[ -n "$value" ] || { echo "dep-parser-wasm: parser tree hash is empty" >&2; return 1; }
 	printf '%s' "$value"
 }
