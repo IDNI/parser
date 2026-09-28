@@ -18,21 +18,22 @@ def fail(message, tester):
     raise SystemExit(1)
 
 
-def wait_for_eval_done(tester, timeout=10.0):
-    """Wait until the evaluation spinner has appeared and then cleared.
+def wait_done(tester, condition, timeout=10.0):
+    """Wait for a step to finish: no spinner, its output, a stable screen.
 
-    "No evaluating" alone is also true before the first frame is drawn, so
-    waiting only on that plus a fixed sleep races on a slow runner.
+    A fast step can raise and clear the spinner between two reads, so the
+    spinner alone is not a reliable signal; a screen that stops changing is.
     """
     deadline = time.monotonic() + timeout
-    seen_spinner = False
+    last = None
     while time.monotonic() < deadline:
         tester._drain(timeout=0.02)
-        if any("evaluating" in line for line in tester.render()):
-            seen_spinner = True
-        elif seen_spinner:
+        screen = tester.render()
+        if (not any("evaluating" in line for line in screen)
+                and condition(screen) and screen == last):
             return True
-        time.sleep(0.01)
+        last = screen
+        time.sleep(0.1)
     return False
 
 
@@ -57,6 +58,19 @@ def find_line_ending(lines, suffix, start=0):
         if lines[i].endswith(suffix):
             return i
     return -1
+
+
+def output_after(lines, prompt_text, output_text, exact=False):
+    """The step's output sits below the step's own prompt on the screen.
+
+    The visible screen scrolls, and two steps' output lines read alike, so a
+    count cannot tell a later step's output from an earlier one; the prompt can.
+    """
+    prompt_idx = (find_line_ending(lines, prompt_text) if exact
+        else find_line(lines, prompt_text))
+    if prompt_idx == -1:
+        return False
+    return find_line(lines, output_text, prompt_idx + 1) != -1
 
 
 def check_prompt_before(screen, tester, prompt_text, output_text, context,
@@ -92,7 +106,8 @@ def main():
             fail("initial prompt did not appear", tester)
 
         tester.send("p x = 0 || y = 1")
-        if not wait_for_eval_done(tester):
+        if not wait_done(tester, lambda screen: output_after(screen,
+                "tgf> p x = 0 || y = 1", "parsed terminals")):
             fail("evaluation of a valid formula did not finish", tester)
         screen = tester.render()
         if not any("parsed terminals" in line for line in screen):
@@ -103,7 +118,8 @@ def main():
         check_no_column_zero_echo(screen, tester, "p x = 0 || y = 1")
 
         tester.send("p x = 2")
-        if not wait_for_eval_done(tester):
+        if not wait_done(tester, lambda screen: output_after(screen,
+                "tgf> p x = 2", "Syntax Error")):
             fail("evaluation of a syntax error did not finish", tester)
         screen = tester.render()
         if not any("Syntax Error" in line for line in screen):
@@ -118,12 +134,13 @@ def main():
 
         # "p" alone is incomplete input, so the next line continues it.
         tester.send("p")
-        if not wait_for_eval_done(tester):
+        if not wait_done(tester, lambda screen: True):
             fail("evaluation of the incomplete formula did not finish",
                 tester)
 
         tester.send("x = 0 || y = 1")
-        if not wait_for_eval_done(tester):
+        if not wait_done(tester, lambda screen: output_after(screen,
+                "tgf> p", "parsed terminals", exact=True)):
             fail("evaluation of the completed multiline formula did not "
                 "finish", tester)
         screen = tester.render()
@@ -139,7 +156,9 @@ def main():
         check_no_column_zero_echo(screen, tester, "x = 0 || y = 1")
 
         tester.send("quit")
-        if not wait_for_eval_done(tester):
+        if not wait_done(tester, lambda screen:
+                any(line.strip() == "Quit." for line in screen)
+                or not tester.child.isalive()):
             fail("evaluation of quit did not finish", tester)
         screen = tester.render()
         if not any(line.strip() == "Quit." for line in screen):
