@@ -967,7 +967,7 @@ public:
 		/// Start non-terminal, SIZE_MAX = use default
 		size_t start = SIZE_MAX;
 		/// End of a stream
-		C eof = std::char_traits<C>::eof();
+		int_type eof = std::char_traits<C>::eof();
 		/// Record timed scopes in diagnostics report
 		bool measure_scopes = false;
 		/// Record parse counters and RSS metrics in report
