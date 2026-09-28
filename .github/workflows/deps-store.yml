@@ -1,17 +1,15 @@
 name: Dependencies (store)
 
-# The only job allowed to write packages. It runs on push to the protected
-# branches, or by hand, so recipes come from the pushed commit, never from a
-# pull request head. parser-wasm is never published: it travels only through
-# the layer cache within one run.
+# The only workflow allowed to write packages. It runs on every push, but a
+# guard job checks the pusher's repository permission before any publish job
+# runs. Pull requests never trigger it. parser-wasm is never published: it
+# travels only through the layer cache within one run.
 on:
   push:
-    branches: [ "devel-tklip", "devel", "master" ]
   workflow_dispatch:
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -22,8 +20,35 @@ env:
   TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
 
 jobs:
+  guard:
+    name: Check the pusher's repository permission
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      allowed: ${{ steps.permission.outputs.allowed }}
+    steps:
+      - name: Read the pusher's permission
+        id: permission
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # GitHub checks the pusher, not the commit author.
+          perm="$(gh api "repos/${{ github.repository }}/collaborators/${{ github.triggering_actor }}/permission" --jq '.permission')" \
+            || echo "::warning::cannot read the permission of ${{ github.triggering_actor }}"
+          echo "pusher ${{ github.triggering_actor }}: permission '${perm}'"
+          case "$perm" in
+            write|maintain|admin) echo "allowed=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "allowed=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+
   publish:
     name: Publish Linux, MinGW and cross-arm64 packages
+    needs: guard
+    if: needs.guard.outputs.allowed == 'true'
+    permissions:
+      contents: read
+      packages: write
     runs-on: ubuntu-24.04
     env:
       # ubuntu-24.04 runners are 4-core
@@ -88,6 +113,11 @@ jobs:
   # their consumers use.
   publish-linux-arm64:
     name: Publish Linux arm64 packages
+    needs: guard
+    if: needs.guard.outputs.allowed == 'true'
+    permissions:
+      contents: read
+      packages: write
     runs-on: ubuntu-24.04-arm
     env:
       BUILD_JOBS: 4
@@ -113,6 +143,11 @@ jobs:
   # The macOS packages are AppleClang-built and cannot come from the Linux job.
   publish-macos:
     name: Publish macOS packages
+    needs: guard
+    if: needs.guard.outputs.allowed == 'true'
+    permissions:
+      contents: read
+      packages: write
     runs-on: macos-15
     env:
       TAU_BUILD_JOBS: 3
@@ -136,6 +171,11 @@ jobs:
   # The MSVC packages are cl.exe-built and cannot come from the Linux job.
   publish-windows:
     name: Publish Windows MSVC packages
+    needs: guard
+    if: needs.guard.outputs.allowed == 'true'
+    permissions:
+      contents: read
+      packages: write
     runs-on: windows-latest
     defaults:
       run:
