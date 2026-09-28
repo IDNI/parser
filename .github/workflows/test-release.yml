@@ -450,6 +450,9 @@ jobs:
       # builds the venv, and its bin lands ahead of the runner python3 in PATH.
       - name: Set up uv
         uses: astral-sh/setup-uv@v10.2.0
+        with:
+          # the same uv as the Docker base image
+          version: "0.12.13"
 
       - name: Install the Python test modules
         run: |
@@ -626,6 +629,9 @@ jobs:
       # configure finds the python3 probe.
       - name: Set up uv
         uses: astral-sh/setup-uv@v10.2.0
+        with:
+          # the same uv as the Docker base image
+          version: "0.12.13"
 
       - name: Install the Python test modules
         run: |

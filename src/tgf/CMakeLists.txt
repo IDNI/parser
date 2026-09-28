@@ -34,7 +34,7 @@ if(TAU_PARSER_BUILD_SERVE)
 		"${CMAKE_CURRENT_SOURCE_DIR}/tgf_serve.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/tgf_connect.cpp")
 	target_compile_definitions(tgf_cli_core PRIVATE TAU_PARSER_BUILD_SERVE)
-	target_include_directories(tgf_cli_core PUBLIC
+	target_include_directories(tgf_cli_core SYSTEM PUBLIC
 		"${TAU_BOOST_INCLUDE_DIR_RESOLVED}")
 	find_package(Threads REQUIRED)
 	target_link_libraries(tgf_cli_core PUBLIC Threads::Threads)
