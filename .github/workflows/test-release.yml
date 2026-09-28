@@ -99,9 +99,10 @@ jobs:
             --cache-to   type=gha,scope=parser-deps,mode=max
 
   # The linux-x86_64 resolver: it reads the store, builds what is missing and
-  # publishes it, so no other job builds these packages.
-  linux:
-    name: Linux
+  # publishes it, so the test job resolves nothing and a failed test keeps the
+  # publish.
+  linux-resolve:
+    name: Linux store (x86_64)
     needs: [guard, deps]
     runs-on: ubuntu-24.04
     permissions:
@@ -111,6 +112,36 @@ jobs:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
       TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      - name: Resolve and publish the store packages
+        run: |
+          ./dev docker linux-deps \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=parser-deps \
+            --cache-from type=gha,scope=parser-base \
+            --cache-to   type=gha,scope=parser-linux-deps,mode=max
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # The linux-x86_64 test job reads the resolver's layers, so the deps stage
+  # is a cache hit and nothing resolves here.
+  linux:
+    name: Linux
+    needs: linux-resolve
+    runs-on: ubuntu-24.04
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -140,8 +171,8 @@ jobs:
           ./dev docker linux \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
-            --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
             --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=parser-linux-deps \
             --cache-from type=gha,scope=parser-deps \
             --cache-from type=gha,scope=parser-base
         env:
@@ -207,12 +238,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The browser gate's native tgf configure resolves the same linux-x86_64
-  # packages the linux job resolves, so it waits for that job instead of
-  # building them a second time.
+  # The browser gate's native tgf configure reads the linux-x86_64 packages
+  # the linux resolver publishes, so it waits for that job instead of
+  # building them a second time. It does not wait for the linux test job.
   wasm-browser:
     name: WebAssembly (browser)
-    needs: [wasm-deps, wasm-node, linux]
+    needs: [wasm-deps, wasm-node, linux-resolve]
     runs-on: ubuntu-24.04
     env:
       # ubuntu-24.04 runners are 4-core
@@ -236,9 +267,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The windows-x86_64-mingw resolver.
-  linux-mingw64-wine:
-    name: Windows cross-build (MinGW, wine)
+  # The windows-x86_64-mingw resolver. It publishes before the tests, so a
+  # failed wine test keeps the mingw packages.
+  linux-mingw64-wine-resolve:
+    name: Windows cross-build store (MinGW)
     needs: [guard, deps]
     runs-on: ubuntu-24.04
     permissions:
@@ -248,6 +280,36 @@ jobs:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
       TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      - name: Resolve and publish the store packages
+        run: |
+          ./dev docker linux-mingw64-wine-deps \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=parser-deps \
+            --cache-from type=gha,scope=parser-base \
+            --cache-to   type=gha,scope=parser-mingw64-wine-deps,mode=max
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # The mingw test job reads the resolver's layers, so the deps stage is a
+  # cache hit and nothing resolves here.
+  linux-mingw64-wine:
+    name: Windows cross-build (MinGW, wine)
+    needs: linux-mingw64-wine-resolve
+    runs-on: ubuntu-24.04
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -277,17 +339,18 @@ jobs:
           ./dev docker linux-mingw64-wine \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
-            --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
             --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=parser-mingw64-wine-deps \
             --cache-from type=gha,scope=parser-deps \
             --cache-from type=gha,scope=parser-base
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The native arm64 resolver. The same image as the linux job on an arm
-  # runner, so the arm64 store packages are built natively.
-  linux-arm64:
-    name: Linux arm64
+  # The native arm64 resolver. The same image as the x86_64 resolver on an
+  # arm runner, so the arm64 store packages are built natively. It publishes
+  # before the tests, so a failed test keeps the publish.
+  linux-arm64-resolve:
+    name: Linux arm64 store
     needs: [guard, deps]
     runs-on: ubuntu-24.04-arm
     permissions:
@@ -305,13 +368,43 @@ jobs:
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
+      - name: Resolve and publish the store packages
+        run: |
+          ./dev docker linux-deps \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=parser-deps \
+            --cache-from type=gha,scope=parser-base \
+            --cache-to   type=gha,scope=parser-linux-arm64-deps,mode=max
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # The native arm64 test job reads the resolver's layers, so the deps stage
+  # is a cache hit and nothing resolves here.
+  linux-arm64:
+    name: Linux arm64
+    needs: linux-arm64-resolve
+    runs-on: ubuntu-24.04-arm
+    env:
+      # ubuntu-24.04-arm runners are 4-core
+      BUILD_JOBS: 4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+
       - name: Build and test
         run: |
           ./dev docker linux \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
-            --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
             --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=parser-linux-arm64-deps \
             --cache-from type=gha,scope=parser-deps \
             --cache-from type=gha,scope=parser-base
         env:
@@ -355,9 +448,10 @@ jobs:
       - name: Log in to the dependency store
         run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
 
-      - name: Build and test under qemu
+      - name: Resolve the store packages
         run: |
-          ./dev preset release-arm64-tests run -DTAU_BUILD_JOBS=${{ env.BUILD_JOBS }} \
+          ./dev preset release-arm64-tests --configure-only \
+            -DTAU_BUILD_JOBS=${{ env.BUILD_JOBS }} \
             -DTAU_PARSER_DEPS_FROM_STORE=ON
 
       - name: Publish the store packages
@@ -365,6 +459,11 @@ jobs:
         run: ./dev store-publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and test under qemu
+        run: |
+          ./dev preset release-arm64-tests run -DTAU_BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            -DTAU_PARSER_DEPS_FROM_STORE=ON
 
       - name: Save the dependency store (~/.tau/store)
         if: always()
@@ -521,10 +620,10 @@ jobs:
       - name: Log in to the dependency store
         run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
 
-      # `run` on an -all preset makes ./dev call ctest itself.
-      - name: Build and test
+      - name: Resolve the store packages
         run: |
-          ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+          ./dev preset release-all --configure-only \
+            -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
             -DTAU_PARSER_DEPS_FROM_STORE=ON
 
       - name: Publish the store packages
@@ -532,6 +631,12 @@ jobs:
         run: ./dev store-publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # `run` on an -all preset makes ./dev call ctest itself.
+      - name: Build and test
+        run: |
+          ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DTAU_PARSER_DEPS_FROM_STORE=ON
 
       - name: Save the dependency store (~/.tau/store)
         if: always()
