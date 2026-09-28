@@ -214,5 +214,17 @@ fi
 [ -f "$local_out/file.txt" ] || fail "a local build exposed no package"
 [ ! -s "$ORAS_LOG" ] || fail "oras ran with TAU_STORE_REMOTE unset"
 
+# ── 6. an upper-case repository is folded down ──────────────────────────
+# The real remote is written with the repository's case, but an OCI
+# repository name must be lower case, so the ref folds it before oras sees it.
+export TAU_STORE_REMOTE="ghcr.io/Self-Check/Tau-Store"
+: > "$ORAS_LOG"
+if ! "$PARSER_ROOT/scripts/store-remote.sh" push "$TAU_SHARED_PREFIX" \
+		"demo/${ID}" 2>"$SCRATCH/upper.err"; then
+	fail_remote "a push to an upper-case remote failed"
+fi
+grep -q "^push .*ghcr.io/self-check/tau-store:demo-${ID}" "$ORAS_LOG" \
+	|| fail_remote "an upper-case repository was not folded down"
+
 echo "store-remote self-check passed" >&2
 exit 0

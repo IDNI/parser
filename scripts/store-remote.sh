@@ -40,9 +40,25 @@ store_remote_configured() {
 	[ -n "${TAU_STORE_REMOTE:-}" ]
 }
 
+# The reference oras addresses. An OCI repository name must be lower case, and
+# a remote is written with the repository's real case (ghcr.io/IDNI/parser),
+# so the repository half is folded down and the registry half is left alone.
 store_remote_ref() {
-	local dep="$1" id="$2"
-	printf '%s:%s' "$TAU_STORE_REMOTE" "$(store_remote_tag "$dep" "$id")"
+	local dep="$1" id="$2" registry repository
+	case "$TAU_STORE_REMOTE" in
+		*/*)
+			registry="${TAU_STORE_REMOTE%%/*}"
+			repository="${TAU_STORE_REMOTE#*/}"
+			printf '%s/%s:%s' "$registry" \
+				"$(printf '%s' "$repository" | tr '[:upper:]' '[:lower:]')" \
+				"$(store_remote_tag "$dep" "$id")"
+			;;
+		*)
+			printf '%s:%s' \
+				"$(printf '%s' "$TAU_STORE_REMOTE" | tr '[:upper:]' '[:lower:]')" \
+				"$(store_remote_tag "$dep" "$id")"
+			;;
+	esac
 }
 
 # Exit 0 only when the remote answers for the entry's tag. Any other outcome,
