@@ -472,6 +472,9 @@ void tgf_repl_evaluator::get_cmd(const tt& n) {
 		"inline:                 " << ptreepaths(opt.to_inline) << "\n"; } },
 	{ p::auto_disambiguate_opt, [this]() { cout <<
 		"auto-disambiguate:      " << pbool(g().opt.auto_disambiguate) << "\n"; } },
+	{ p::derive_char_classes_opt, [this]() { cout <<
+		"derive-char-classes:    " << pbool(g().opt.derive_char_classes)
+			<< "\n"; } },
 	{ p::nodisambig_list_opt, [this]() { cout <<
 		"nodisambig-list:        " << plist(opt.nodisambig_list) << "\n"; } },
 	{ p::error_verbosity_opt, [this]() { cout <<
@@ -552,6 +555,8 @@ void tgf_repl_evaluator::set_cmd(const tt& n) {
 		break;
 	case p::auto_disambiguate_opt:
 		g().opt.auto_disambiguate = get_bool_value(v); break;
+	case p::derive_char_classes_opt:
+		g().derive_char_classes(get_bool_value(v)); break;
 	case p::nodisambig_list_opt:
 		g().opt.nodisambig_list.clear();
 		for (const auto& s : (v || p::symbol)())
@@ -658,6 +663,11 @@ void tgf_repl_evaluator::update_bool_opt_cmd(
 	case p::measure_preprocess_opt:update_fn(opt.measure_preprocess); break;
 	case p::gc_opt:                update_fn(opt.gc); break;
 	case p::auto_disambiguate_opt: update_fn(g().opt.auto_disambiguate); break;
+	case p::derive_char_classes_opt: {
+		bool on = update_fn(g().opt.derive_char_classes);
+		g().derive_char_classes(on);
+		break;
+	}
 	case p::trim_terminals_opt:    update_fn(g().opt.shaping.trim_terminals); break;
 	case p::inline_cc_opt:         update_fn(g().opt.shaping.inline_char_classes); break;
 	default: cout << ": unknown bool option\n"; break;
@@ -682,7 +692,8 @@ static void help(size_t nt, bool show_load_reload) {
 		"  measure-preprocess     measures forest preprocess time    on/off\n"
 		"  gc                     Earley chart garbage collection    on/off\n"
 		"  trim-terminals         trim terminals                     on/off\n"
-		"  inline-char-classes    inline character classes           on/off\n";
+		"  inline-char-classes    inline character classes           on/off\n"
+		"  derive-char-classes    derived character classes         on/off\n";
 	static const string list_options =
 		"  nodisambig-list        list of nodes to keep ambiguous    symbol1, symbol2...\n"
 		"  trim                   list of nodes to trim              symbol1, symbol2...\n"
@@ -1177,6 +1188,36 @@ static int gen_command(const cli::command& cmd,
 	return gr.has_value() ? 0 : 1;
 }
 
+// Print the derived character class report of the loaded grammar, one line
+// per rule, grouped by state.
+static void print_char_class_report(tgf_repl_evaluator& re) {
+	using state = cc_rule_info<
+		tgf_repl_evaluator::terminal_type>::state;
+	auto& g = re.g();
+	auto& nts = g.get_nts();
+	auto report = g.derive_char_classes_report();
+	auto print_group = [&](const char* title, state st) {
+		cout << title << ":\n";
+		for (const auto& e : report) {
+			if (e.st != st) continue;
+			cout << "\t" << nts.get(e.nt);
+			if (st == state::rejected) cout << " " << e.reason;
+			else {
+				cout << " guards=";
+				bool first = true;
+				for (const auto& gd : e.guards)
+					cout << (first ? "" : ",") << gd,
+						first = false;
+			}
+			cout << "\n";
+		}
+	};
+	print_group("derived", state::derived);
+	print_group("inner", state::inner);
+	print_group("unused", state::unused);
+	print_group("rejected", state::rejected);
+}
+
 static int show_command(const cli::command& cmd,
 	tgf_repl_evaluator& re)
 {
@@ -1186,6 +1227,9 @@ static int show_command(const cli::command& cmd,
 		cout, start, {}, true);
 	if (cmd.get<bool>("nullable"))
 		re.g().check_nullable_recursive_production(cout);
+	if (cmd.has("char-class-report")
+		&& cmd.get<bool>("char-class-report"))
+			print_char_class_report(re);
 	re.flush_report();
 	return 0;
 }
@@ -1250,6 +1294,10 @@ static int run_command(cli& cl, const cli::command& cmd,
 	}
 
 	if (cmd.name() == "parse") {
+		// the classes are on by default; the option can turn them off
+		if (cmd.has("derive-char-classes")
+			&& !cmd.get<bool>("derive-char-classes"))
+				re.g().derive_char_classes(false);
 		string infile = cmd.get<string>("input");
 		string inexp  = cmd.get<string>("input-expression");
 		if (infile.size() && inexp.size())

@@ -35,7 +35,19 @@ typename forest<pnode_type<C,T>>::node pnode_type<C,T>::ptrof(const pnode_type<C
 
 template <typename C, typename T>
 parser<C, T>::item::item(size_t set, size_t prod, size_t con, size_t from,
-	size_t dot) : set(set), prod(prod), con(con), from(from), dot(dot) {}
+	size_t dot) :
+	set(static_cast<uint32_t>(set)),
+	prod(static_cast<uint32_t>(prod)),
+	from(static_cast<uint32_t>(from)),
+	con(static_cast<uint16_t>(con)),
+	dot(static_cast<uint16_t>(dot))
+{
+	DBG(assert(set <= UINT32_MAX);)
+	DBG(assert(prod <= UINT32_MAX);)
+	DBG(assert(from <= UINT32_MAX);)
+	DBG(assert(con <= UINT16_MAX);)
+	DBG(assert(dot <= UINT16_MAX);)
+}
 template <typename C, typename T>
 bool parser<C, T>::item::operator<(const item& i) const {
 	if (set  != i.set)  return set  < i.set;
@@ -166,6 +178,12 @@ bool parser<C, T>::input::tnext() {
 	return ++tp, true;
 }
 template <typename C, typename T>
+size_t parser<C, T>::input::known_length() const {
+	if (max_l) return max_l;
+	if (isstream()) return 0;
+	return l;
+}
+template <typename C, typename T>
 size_t parser<C, T>::input::tpos() { return tp; }
 template <typename C, typename T>
 T parser<C, T>::input::tat(size_t p) {
@@ -197,6 +215,10 @@ parser<C, T>::parser(grammar<C, T>& g, options o) : g(g), o(o), po(o.parse_opts)
 			DBG(assert(it->first != it->second);)
 			it = this->o.dynamic_grow_nts.erase(it);
 		} else ++it;
+	std::set<size_t> grow_children;
+	for (const auto& [p, c] : this->o.dynamic_grow_nts)
+		grow_children.insert(c);
+	if (!grow_children.empty()) g.exclude_from_char_classes(grow_children);
 	for (size_t p = 0; p < g.size(); p++)
 		if (g.conjunctive(p)) { any_conj = true; break; }
 }
@@ -311,8 +333,26 @@ bool parser<C, T>::nt_still_completed(size_t nt_id, size_t from, size_t set)
 	return it != completion_count.end() && it->second > 0;
 }
 
+// waiting items of one position; the nt id groups them by symbol
+template <typename C, typename T>
+void parser<C, T>::cache_insert(size_t nt, size_t pos, const item& i) {
+	if (cache.size() <= pos) cache.resize(pos + 1);
+	auto& v = cache[pos];
+	for (const wait_entry& e : v)
+		if (e.nt == nt && e.it == i) return;
+	v.push_back(wait_entry{ static_cast<uint32_t>(nt), i });
+}
+// Erasing tombstones the entry: moving it would break complete_memo.
+template <typename C, typename T>
+void parser<C, T>::cache_erase(size_t nt, size_t pos, const item& i) {
+	if (pos >= cache.size()) return;
+	for (wait_entry& e : cache[pos])
+		if (e.nt == nt && e.it == i) { e.nt = dead_wait; return; }
+}
+
 template <typename C, typename T>
 void parser<C, T>::retract_item(const item& x, container_t& c) {
+	++reprocess_epoch_;
 	if (U.size() < S.size()) U.resize(S.size());
 	c.erase(x);
 	if (x.set >= S.size()) return;
@@ -320,10 +360,8 @@ void parser<C, T>::retract_item(const item& x, container_t& c) {
 	U[x.set].insert(x);
 	if (sit == S[x.set].end()) return;
 	S[x.set].erase(sit);
-	if (!completed(x) && get_lit(x).nt()) {
-		auto cit = cache.find({ get_lit(x).n(), x.set });
-		if (cit != cache.end()) cit->second.erase(x);
-	}
+	if (!completed(x) && get_lit(x).nt())
+		cache_erase(get_lit(x).n(), x.set, x);
 	if (auto fit = fromS.find(x.from); fit != fromS.end()) {
 		MC(count(cnt.fromS_reads);)
 		fit->second.erase(x.set);
@@ -451,15 +489,16 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 	if (!negative(i)) confirm_dynamic_parent(i);
 	//const container_t& cont = S[i.from];
 	auto smbl = get_nt(i);
-	auto &rng = cache[{smbl.n(), i.from}];
+	static const std::vector<wait_entry> no_waiters;
+	const std::vector<wait_entry>& vec = i.from < cache.size()
+		? cache[i.from] : no_waiters;
 	completion_key ckey{ smbl.n(), i.from, i.set };
 	if (any_conj && counted_completions.insert(i).second)
 		++completion_count[ckey];
-	// per-item memoization: only iterate cache entries new since last call.
-	const size_t cur_size = rng.size();
+	// per-item memoization: only iterate wait entries new since last call
+	const size_t cur_size = vec.size();
 	size_t& last_idx = complete_memo[i];
 	if (last_idx >= cur_size) return;
-	const auto& vec = rng.values();
 	const size_t start_idx = last_idx;
 	last_idx = cur_size;
 	// i's own head (smbl) is what just completed. Whether a given
@@ -470,10 +509,10 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 	bool smbl_is_dyn_child = !o.dynamic_grow_nts.empty() && smbl.nt() &&
 		dyn_child_ids.count(smbl.n());
 	for (size_t k = start_idx; k < cur_size; k++) {
-		const auto& eit = vec[k];
-		const auto* it = &eit;
-		if (n_literals(*it) <= it->dot ||
-			get_lit(*it) != get_nt(i)) continue;
+		const wait_entry& we = vec[k];
+		if (we.nt == dead_wait || we.nt != smbl.n()) continue;
+		const auto* it = &we.it;
+		if (n_literals(*it) <= it->dot) continue;
 		// Predictor may have been evicted from S; it can still drive
 		// completion only if conjunction-cascade machinery kept it in U.
 		bool in_S = S[it->set].find(*it) != S[it->set].end();
@@ -520,7 +559,10 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 			c.insert(j);
 			if (any_conj) {
 				completion_deps[ckey].push_back(j);
-				forward_deps[*it].push_back(j);
+				// a predictor from an earlier set is never
+				// retracted (see the end of the position loop)
+				if (it->set == i.set)
+					forward_deps[*it].push_back(j);
 				MC(maks(cnt.completion_deps_size_peak,
 					completion_deps[ckey].size());)
 			}
@@ -531,7 +573,10 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 		if (add(t, j).second) {
 			if (any_conj) {
 				completion_deps[ckey].push_back(j);
-				forward_deps[*it].push_back(j);
+				// a predictor from an earlier set is never
+				// retracted (see the end of the position loop)
+				if (it->set == i.set)
+					forward_deps[*it].push_back(j);
 				MC(maks(cnt.completion_deps_size_peak,
 					completion_deps[ckey].size());)
 			}
@@ -611,7 +656,7 @@ void parser<C, T>::predict(const item& i, container_t& t, T ch) {
 		// Should we use S[n] to see if new item is insertable
 		for (size_t c = 0; c != g.n_conjs(p); ++c) {
 			//just once
-			if (c==0 && parl.nt()) cache[{parl.n(), i.set}].insert(i);
+			if (c==0 && parl.nt()) cache_insert(parl.n(), i.set, i);
 			// One-character lookahead: a conjunct that starts with a
 			// terminal or a character class the current character
 			// cannot satisfy would only be scanned and dropped at
@@ -732,7 +777,7 @@ void parser<C, T>::scan_cc_function(const item& i, size_t n, T ch,
 		if (p == static_cast<size_t>(-1)) return;
 	}
 	if (!eof) n++;
-	if( l.nt()) cache[{l.n(), i.set}].insert(i);
+	if( l.nt()) cache_insert(l.n(), i.set, i);
 	item k(n, p, 0, n - (eof ? 0 : 1), 1); // complete char functions's char
 	DBGP(print(std::cout << " +  adding from cc scan into S[" << k.set <<
 		"] \t", k) << "\n";)
@@ -821,6 +866,24 @@ template <typename C, typename T>
 parser<C, T>::result parser<C, T>::_parse() {
 	// Fresh report per parse.
 	report_.clear();
+	// A chart position and span field is 32-bit, so a longer input cannot
+	// be represented and is stopped before the first item is built.
+	const size_t max_item_pos = static_cast<size_t>(UINT32_MAX) - 1;
+	auto item_limit_result = [&]() -> result {
+		report_.error(idni::diagnostics::code::out_of_range,
+			messages::input_too_long,
+			{{ label::limit, max_item_pos }});
+		error err;
+		if (po.tree_path == parse_tree_path::bintree_path)
+			return result(*this, std::move(in_), tref(0), false, err);
+		return result(*this, std::move(in_), std::unique_ptr<pforest>(),
+			false, err);
+	};
+	if (in_->known_length() > max_item_pos) {
+		result r = item_limit_result();
+		po = o.parse_opts;
+		return r;
+	}
 	std::optional<idni::diagnostics::report::scope_guard> parse_scope;
 	if (po.measure_scopes)
 		parse_scope.emplace(report_.open(label::parse));
@@ -871,6 +934,7 @@ parser<C, T>::result parser<C, T>::_parse() {
 	if (!o.dynamic_grow_nts.empty()) g.sync_dynamic_context(*dyn_ctx);
 
 	lit<C, T> start_lit;
+	bool too_long = false;
 	auto run_earley = [&]() {
 	size_t n = 0;
 	// fromS is only read by GC drain and conjunctive cascade machinery.
@@ -910,6 +974,7 @@ parser<C, T>::result parser<C, T>::_parse() {
 	do {
 		if ((new_pos = (cn != in_->pos()))) cn = in_->pos();
 		ch = in_->tcur(), n = in_->tpos();
+		if (n > max_item_pos) { too_long = true; break; }
 		if (n >= S.size()) S.resize(n + 1);
 		if (debug && debug_at.second > 0) debug =
 			debug_at.first <= n && n <= debug_at.second;
@@ -923,6 +988,8 @@ parser<C, T>::result parser<C, T>::_parse() {
 		}
 
 		MC(size_t pos_iters = 0;)
+		size_t done = 0, epoch = reprocess_epoch_;
+		revisit_.clear();
 		do {
 			MC(count(cnt.inner_loop_iterations);)
 			MC(count(pos_iters);)
@@ -937,7 +1004,31 @@ parser<C, T>::result parser<C, T>::_parse() {
 				}
 			}
 			t.clear();
-			snapshot_.assign(S[n].begin(), S[n].end());
+			// A round processes the items added to S[n] since the
+			// previous round plus revisit_; revisiting any other item
+			// is a no-op. revisit_ holds the completed items whose
+			// revisit still matters: an empty-span item, which
+			// predictions made at n since may wait on, and a conjunct,
+			// which must be parked in c every round so that
+			// resolve_conjunctions() sees its whole group. Retraction,
+			// GC erase, dynamic grammar growth and span merges bump
+			// reprocess_epoch_ and force a full pass. GC forces it
+			// always: its reference counts rely on predict() running
+			// on every revisit.
+			const auto& cur = S[n].values();
+			if (po.enable_gc || reprocess_epoch_ != epoch
+				|| done > cur.size())
+				epoch = reprocess_epoch_, done = 0,
+				revisit_.clear();
+			snapshot_.clear();
+			for (size_t k : revisit_) snapshot_.push_back(cur[k]);
+			for (size_t k = done; k < cur.size(); ++k) {
+				snapshot_.push_back(cur[k]);
+				if (completed(cur[k]) && (cur[k].from == n
+					|| g.conjunctive(cur[k].prod)))
+					revisit_.push_back(k);
+			}
+			done = cur.size();
 			//DBGP(print(std::cout << "\nto process:\n", snapshot_);)
 			for (const item& x : snapshot_) {
 				DBGP(print(std::cout << "----------------------"
@@ -965,6 +1056,19 @@ parser<C, T>::result parser<C, T>::_parse() {
 			//DBGP(if (!t.empty()) print(std::cout << "t not empty:\n", t) << "\n";)
 			} while (!t.empty());
 			MC(maks(cnt.inner_loop_iterations_max, pos_iters);)
+			// Retraction starts from items completed at this position
+			// and only reaches items derived from them, so from here on
+			// nothing at a set <= n is ever retracted and complete() is
+			// never again called on an item of set n. The dependency
+			// and completion bookkeeping keyed on those items is dead.
+			if (!complete_memo.empty()) complete_memo.clear();
+			if (any_conj) {
+				if (!forward_deps.empty()) forward_deps.clear();
+				if (!completion_deps.empty()) completion_deps.clear();
+				if (!completion_count.empty()) completion_count.clear();
+				if (!counted_completions.empty())
+					counted_completions.clear();
+			}
 			MC(maks(cnt.s_max_per_pos, S[n].size());)
 
 		if (po.measure_each_pos && new_pos) {
@@ -999,13 +1103,11 @@ parser<C, T>::result parser<C, T>::_parse() {
 					if (!can_remove) { ++it; continue; }
 					auto its = S[rm.set].find(rm);
 					if ( its != S[rm.set].end() ){
+						++reprocess_epoch_;
 						S[rm.set].erase(its);
-						if (!completed(rm) && get_lit(rm).nt()) {
-							auto cit = cache.find(
-								{get_lit(rm).n(), rm.set});
-							if (cit != cache.end())
-								cit->second.erase(rm);
-						}
+						if (!completed(rm) && get_lit(rm).nt())
+							cache_erase(get_lit(rm).n(),
+								rm.set, rm);
 
 						// also clean from fromS
 						if (auto fit = fromS.find(rm.from);
@@ -1041,6 +1143,12 @@ parser<C, T>::result parser<C, T>::_parse() {
 		MC(if (po.measure_counters) flush_parsing_counters();)
 	}
 
+	if (too_long) {
+		result r = item_limit_result();
+		po = o.parse_opts;
+		return r;
+	}
+
 	in_->clear();
 	MC({
 		size_t s_remaining = 0;
@@ -1049,6 +1157,21 @@ parser<C, T>::result parser<C, T>::_parse() {
 		count(cnt.gcready_size_final, gcready.size());
 		count(cnt.refi_size_final, refi.size());
 	})
+
+	if (debug) debug = false;
+
+	bool fnd = found(po.start);
+	error err = fnd ? error{} : get_error();
+	// progress past a child is strong evidence, not proof the parent
+	// completes, so a confirmed grow only survives a successful parse;
+	// this runs regardless of dynamic_grow_nts, so a hook added outside
+	// its firing is decided too, by the end of the very next parse
+	if (fnd) g.commit_dynamic(*dyn_ctx);
+	else g.rollback_dynamic();
+
+	// The tree builders read S, the sorted indexes and the binarization
+	// temporaries; every other recognition container is dead here.
+	release_recognition();
 
 	tref fr = 0;
 	if (po.tree_path == parse_tree_path::bintree_path) {
@@ -1080,17 +1203,6 @@ parser<C, T>::result parser<C, T>::_parse() {
 				cnt.bintree_nodes);
 	})
 
-	if (debug) debug = false;
-
-	bool fnd = found(po.start);
-	error err = fnd ? error{} : get_error();
-	// progress past a child is strong evidence, not proof the parent
-	// completes, so a confirmed grow only survives a successful parse;
-	// this runs regardless of dynamic_grow_nts, so a hook added outside
-	// its firing is decided too, by the end of the very next parse
-	if (fnd) g.commit_dynamic(*dyn_ctx);
-	else g.rollback_dynamic();
-
 	if (f) {
 		DBGP(
 		MC({
@@ -1117,6 +1229,7 @@ parser<C, T>::result parser<C, T>::_parse() {
 	}
 
 	parse_scope.reset();
+	release_chart();
 	if (po.tree_path == parse_tree_path::bintree_path) {
 		result r(*this, std::move(in_), fr, fnd, err);
 		po = o.parse_opts;
@@ -1125,6 +1238,25 @@ parser<C, T>::result parser<C, T>::_parse() {
 	result r(*this, std::move(in_), std::move(f), fnd, err);
 	po = o.parse_opts;
 	return r;
+}
+// Recognition is over and the result is decided. Every container the tree
+// builders do not read is freed here, before the tree build, so it does not
+// fragment the heap under the tree allocations.
+template <typename C, typename T>
+void parser<C, T>::release_recognition() {
+	auto drop = [](auto& c) { std::decay_t<decltype(c)> e; std::swap(c, e); };
+	drop(U), drop(snapshot_), drop(revisit_), drop(fromS), drop(cache),
+	drop(refi), drop(gcready), drop(completion_deps),
+	drop(completion_count), drop(counted_completions), drop(forward_deps),
+	drop(complete_memo), drop(dyn_child_span);
+}
+// The tree and the error report are built. The chart and the binarization
+// temporaries the tree builders read go back to the allocator instead of
+// staying in the parser until the next parse.
+template <typename C, typename T>
+void parser<C, T>::release_chart() {
+	auto drop = [](auto& c) { std::decay_t<decltype(c)> e; std::swap(c, e); };
+	drop(S), drop(bin_tnt), drop(sorted_citem), drop(rsorted_citem);
 }
 template <typename C, typename T>
 bool parser<C, T>::found(size_t start) {
@@ -1351,6 +1483,21 @@ typename parser<C, T>::error parser<C, T>::get_error() {
 					err.unexp.emplace_back(in.tat(k));
 				err.loc = t.from, unexp_neg = true;
 			}
+		// The negation of a derived class runs inside the class, so the
+		// chart has no __N_* item for it. Look at the class waiters of
+		// the previous position instead.
+		if (!unexp_neg && i > 0) {
+			T prev = in.tat(i - 1);
+			for (const item& t : S[i - 1]) {
+				if (completed(t) || !get_lit(t).nt()) continue;
+				size_t n = get_lit(t).n();
+				if (!g.cc_fns.is_derived(n)) continue;
+				if (!g.cc_rejects_by_negation(n, prev)) continue;
+				err.unexp = lits<C, T>{ { prev } };
+				err.loc = i - 1, unexp_neg = true;
+				break;
+			}
+		}
 		// smallest length item that may be used as delimiter
 		for (const item& t : S[i]) {
 			//DBG(print(std::cout << "t0 = ", t) << "\n";)
@@ -1474,10 +1621,14 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 	tid = 0;
 	pnode root(start_lit, { 0, in_->tpos() });
 
-	// preprocess parser items for faster retrieval
-	int preprocess_count = do_preprocess();
-	if (po.debug) report_.info(messages::preprocess,
-		{{label::size, preprocess_count}});
+	// The child scan reads S directly. Binarization needs the temporaries
+	// that pre_process() adds to the indexes.
+	use_citem_index = o.binarize;
+	if (use_citem_index) {
+		int preprocess_count = do_preprocess();
+		if (po.debug) report_.info(messages::preprocess,
+			{{label::size, preprocess_count}});
+	}
 
 	auto check_allowed = [this](const pnode& n) {
 		if (!g.opt.auto_disambiguate) return false;
@@ -1522,49 +1673,30 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 		return s.size() >= 4 && s.substr(0, 4) == "__E_";
 	};
 
-	auto is_amb = [](tref n) {
-		if (!n) return false;
-		auto& l = tree::get(n).value.first;
-		return l.nt() && l.to_std_string() == "__AMB__";
-	};
-
 	std::set<pnode> visiting;
-	std::function<tref(const pnode&)> build;
-	std::function<tref(const pnode&, const pnodes&)> build_pack;
 
-	auto build_children = [&](const pnodes& pack, trefs& out) {
-		for (auto& nxt : pack) {
-			if (is_ebnf(nxt)) {
-				auto ch = build(nxt);
-				if (ch && is_amb(ch)) out.push_back(ch);
-				else if (ch) for (auto c
-					: tree::get(ch).children())
-					out.push_back(c);
-			} else if (auto ch = build(nxt); ch)
-				out.push_back(ch);
-		}
-	};
-
-	build_pack = [&](const pnode& node, const pnodes& pack) {
-		trefs children;
-		build_children(pack, children);
-		return tree::get(node, children);
-	};
-
-	build = [&](const pnode& node) -> tref {
-		if (!node.first.nt()) return tree::get(node);
-		if (visiting.count(node)) return tree::get(node);
-		visiting.insert(node);
-
-		auto& items = sorted_citem[{ node.first.n(),
-						node.second[0] }];
+	// collects the child packs of a node; sets ad_allowed for the node
+	auto collect_packs = [&](const pnode& node, bool& ad_allowed)
+		-> pnodes_set
+	{
 		pnodes_set packs;
-		bool ad_allowed = check_allowed(node);
+		ad_allowed = check_allowed(node);
+		const size_t nt = node.first.n(), from = node.second[0],
+			set = node.second[1];
+		if (set == from + 1 && g.uses_derived_recipe(nt)) {
+			derived_class_packs(nt, from, ad_allowed, packs);
+			return packs;
+		}
+		if (set >= S.size()) return packs;
+		auto matches = [&](const item& cur) {
+			return cur.from == from && completed(cur)
+				&& g(cur.prod).n() == nt;
+		};
 
 		if (ad_allowed) {
 			size_t best_prod = SIZE_MAX;
-			for (auto& cur : items) {
-				if (cur.set != node.second[1]) continue;
+			for (auto& cur : S[set]) {
+				if (!matches(cur)) continue;
 				if (cur.prod >= best_prod) continue;
 				pnodes nxtlits;
 				pnodes_set cur_packs;
@@ -1572,47 +1704,114 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 					binarize_comb(cur, cur_packs);
 				else
 					sbl_chd_forest(cur, nxtlits,
-						cur.from, cur_packs);
+						cur.set, cur_packs);
 				if (!cur_packs.empty()) {
 					best_prod = cur.prod;
 					packs = std::move(cur_packs);
 				}
 			}
 		} else {
-			for (auto& cur : items) {
-				if (cur.set != node.second[1]) continue;
+			for (auto& cur : S[set]) {
+				if (!matches(cur)) continue;
 				pnodes nxtlits;
 				pnodes_set cur_packs;
 				if (o.binarize)
 					binarize_comb(cur, cur_packs);
 				else
 					sbl_chd_forest(cur, nxtlits,
-						cur.from, cur_packs);
+						cur.set, cur_packs);
 				for (auto& p : cur_packs)
 					packs.insert(std::move(p));
 			}
 		}
+		// A predefined class that a derived class replaced is not in the
+		// chart, so its child is the character itself.
+		if (packs.empty() && set == from + 1 && g.is_cc_fn(nt)
+			&& !g.cc_fns.is_derived(nt) && !g.is_eof_fn(nt))
+				packs.insert({ pnode(lit<C, T>{ in_->tat(from) },
+					{ from, set }) });
+		return packs;
+	};
 
-		tref r;
+	// One frame per node under construction. A flattened EBNF helper
+	// delivers its children to the nearest ancestor that builds a node,
+	// so a long repetition costs stack frames on the heap, not the C stack.
+	struct frame {
+		pnode node;
+		size_t sink;             // frame index that takes the output
+		bool flatten = false;    // EBNF helper: no node of its own
+		bool amb = false;        // one alternative node per pack
+		std::vector<pnodes> packs;
+		size_t pi = 0, ei = 0;
+		trefs children, alts;
+	};
+	std::vector<frame> stack;
+	trefs result;
+	auto sink_of = [&](size_t fi) -> trefs& {
+		return fi == SIZE_MAX ? result : stack[fi].children;
+	};
+	auto push_frame = [&](const pnode& n, size_t from, bool flatten,
+		bool amb_node, std::vector<pnodes>&& packs)
+	{
+		size_t sink = from == SIZE_MAX ? SIZE_MAX
+			: stack[from].flatten ? stack[from].sink : from;
+		visiting.insert(n);
+		stack.push_back(frame{ n, sink, flatten, amb_node,
+			std::move(packs), 0, 0, {}, {} });
+	};
+	auto open_node = [&](const pnode& n, size_t from) {
+		bool ad_allowed = false;
+		pnodes_set packs = collect_packs(n, ad_allowed);
+		bool ebnf = is_ebnf(n);
+		trefs& out = sink_of(from == SIZE_MAX ? SIZE_MAX
+			: stack[from].flatten ? stack[from].sink : from);
 		if (packs.empty()) {
-			r = tree::get(node);
-		} else if (packs.size() == 1) {
-			r = build_pack(node, *packs.begin());
-		} else if (ad_allowed) {
-			r = build_pack(node, pick_best(packs));
-		} else {
-			auto amb = g.nt(from_str<C>(
-				std::string("__AMB__")));
-			trefs alts;
-			for (auto& pack : packs)
-				if (auto alt = build_pack(node,
-						pack); alt)
-					alts.push_back(alt);
-			r = tree::get(pnode(amb, node.second), alts);
+			if (!ebnf) out.push_back(tree::get(n));
+			return;
 		}
-
-		visiting.erase(node);
-		return r;
+		if (packs.size() == 1)
+			push_frame(n, from, ebnf, false, { *packs.begin() });
+		else if (ad_allowed)
+			push_frame(n, from, ebnf, false, { pick_best(packs) });
+		else push_frame(n, from, false, true,
+			std::vector<pnodes>(packs.begin(), packs.end()));
+	};
+	auto build = [&](const pnode& root) -> tref {
+		if (!root.first.nt()) return tree::get(root);
+		open_node(root, SIZE_MAX);
+		while (!stack.empty()) {
+			size_t fi = stack.size() - 1;
+			frame& f = stack[fi];
+			if (f.pi < f.packs.size()) {
+				const pnodes& pack = f.packs[f.pi];
+				if (f.ei < pack.size()) {
+					pnode nxt = pack[f.ei++];
+					trefs& out = sink_of(f.flatten ? f.sink : fi);
+					if (!nxt.first.nt())
+						out.push_back(tree::get(nxt));
+					else if (visiting.count(nxt)) {
+						if (!is_ebnf(nxt))
+							out.push_back(tree::get(nxt));
+					} else open_node(nxt, fi);
+					continue;
+				}
+				if (f.amb) {
+					if (auto alt = tree::get(f.node, f.children); alt)
+						f.alts.push_back(alt);
+					f.children.clear();
+				}
+				f.pi++, f.ei = 0;
+				continue;
+			}
+			tref r = nullptr;
+			if (f.amb) r = tree::get(pnode(g.nt(from_str<C>(
+				std::string("__AMB__"))), f.node.second), f.alts);
+			else if (!f.flatten) r = tree::get(f.node, f.children);
+			if (r) sink_of(f.sink).push_back(r);
+			visiting.erase(f.node);
+			stack.pop_back();
+		}
+		return result.empty() ? nullptr : result[0];
 	};
 
 	tref ret = report_.step(po.measure_scopes && po.measure_forest,
@@ -1635,6 +1834,7 @@ bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
 	pnode root(start_lit, { 0, in_->tpos() });
 	f.root(root);
 
+	use_citem_index = true;
 	// preprocess parser items for faster retrieval
 	int preprocess_count = do_preprocess();
 	if (po.debug) {
@@ -1653,48 +1853,43 @@ bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
 // span of the item and stores them in the set ambset.
 template <typename C, typename T>
 void parser<C, T>::sbl_chd_forest(const item& eitem,
-	pnodes& curchd, size_t xfrom,
+	pnodes& curchd, size_t xto,
 	pnodes_set& ambset)
 {
-	//check if we have reached the end of the rhs of prod
-	if (g.len(eitem.prod, eitem.con) <= curchd.size())  {
-		// match the end of the span we are searching in.
-		if (curchd.back()->second[1] == eitem.set) ambset.insert(curchd);
+	// walks the rhs from its last symbol, which must end at eitem.set
+	size_t len = g.len(eitem.prod, eitem.con);
+	if (len <= curchd.size()) {
+		if (xto == eitem.from)
+			ambset.insert(pnodes(curchd.rbegin(), curchd.rend()));
 		return;
 	}
-	// curchd.size() refers to index of cur literal to process in the rhs of production
-	const lit<C, T>& nxtlit = g[eitem.prod][eitem.con][curchd.size()];
-	// set the span start/end of the terminal symbol
+	const lit<C, T>& nxtlit =
+		g[eitem.prod][eitem.con][len - 1 - curchd.size()];
 	if (!nxtlit.nt()) {
-		size_t from = xfrom, to;
-		// for empty, use same span edge as from
-		if (nxtlit.is_null()) to = xfrom;
-		// ensure well-formed combination (matching input) early
-		else if (xfrom < in_->tpos()
-			 && in_->tat(xfrom) == nxtlit.t())
-				to = ++xfrom;
-		else // if not building the correction variation, prune this path quickly
-			return;
-		// build from the next in the line
+		size_t from, to = xto;
+		if (nxtlit.is_null()) from = xto;
+		else if (xto > eitem.from
+			&& in_->tat(xto - 1) == nxtlit.t()) from = xto - 1;
+		else return;
 		size_t lastpos = curchd.size();
 		curchd.push_back(pnode(nxtlit, { from, to })),
-		sbl_chd_forest(eitem, curchd, xfrom, ambset);
+		sbl_chd_forest(eitem, curchd, from, ambset);
 		curchd.resize(lastpos);
 	} else {
-		// get the from/to span of all non-terminals in the rhs of production.
-		size_t from = xfrom;
-
-		//auto& nxtl_froms = sorted_citem[nxtl.n()][xfrom];
-		auto& nxtl_froms = sorted_citem[{ nxtlit.n(), xfrom }];
-		for (auto& v : nxtl_froms) {
-			// ignore beyond the span
-			if (v.set > eitem.set) continue;
-			// store current and recursively build for next nt
+		auto try_item = [&](const item& v) {
+			if (v.from < eitem.from) return;
 			size_t lastpos = curchd.size();
-			curchd.push_back(pnode(nxtlit, { from, v.set })),
-			xfrom = v.set,
-			sbl_chd_forest(eitem, curchd, xfrom, ambset);
+			curchd.push_back(pnode(nxtlit, { v.from, xto })),
+			sbl_chd_forest(eitem, curchd, v.from, ambset);
 			curchd.resize(lastpos);
+		};
+		if (use_citem_index) {
+			for (auto& v : rsorted_citem[{ nxtlit.n(), xto }])
+				try_item(v);
+		} else if (xto < S.size()) {
+			for (auto& v : S[xto])
+				if (completed(v) && g(v.prod).n() == nxtlit.n())
+					try_item(v);
 		}
 	}
 }
@@ -1768,117 +1963,171 @@ bool parser<C, T>::binarize_comb(const item& eitem,
 	}
 	return true;
 }
+// Builds the packs of a derived class or inner rule from its enabled source
+// productions and the character at pos, so the tree keeps its original shape.
+template <typename C, typename T>
+void parser<C, T>::derived_class_packs(size_t nt, size_t pos, bool ad_allowed,
+	pnodes_set& packs) const
+{
+	T ch = in_->tat(pos);
+	for (size_t p : g.enabled_source_prods(nt)) {
+		if (!g.rule_prod_accepts(p, ch)) continue;
+		for (const lits<C, T>& cj : g[p]) {
+			if (cj.neg) continue;
+			packs.insert({ pnode(cj[0], { pos, pos + 1 }) });
+			if (ad_allowed) return;
+		}
+	}
+}
 // default-mode build_forest — builds a pforest from a root pnode
 template <typename C, typename T>
-bool parser<C, T>::build_forest(pforest& f, const pnode& root) {
-	if (!root.first.nt()) return false;
-	if (f.contains(root)) return false;
-	// std::cout << "build_forest for node: `" << root << "`" << std::endl;
-	//auto& nxtset = sorted_citem[root.n()][root.second[0]];
-	auto &nxtset = sorted_citem[{ root.first.n(), root.second[0] }];
+bool parser<C, T>::build_forest(pforest& f, const pnode& root0) {
+	// One explicit stack replaces one C frame per child, so a long
+	// repetition does not overflow the C stack.
+	std::vector<pnode> stack{ root0 };
+	bool built = false;
+	while (!stack.empty()) {
+		pnode root = stack.back();
+		stack.pop_back();
+		if (!root.first.nt()) continue;
+		if (f.contains(root)) continue;
+		// std::cout << "build_forest for node: `" << root << "`" << std::endl;
+		//auto& nxtset = sorted_citem[root.n()][root.second[0]];
+		pnodes_set ambset, cambset;
+		std::set<pnode> snodes;
+		size_t last_p = SIZE_MAX;
+		auto check_allowed = [this](const pnode &cnode) {
+			if (g.opt.auto_disambiguate == false) return false;
+			for (auto &nt : g.opt.nodisambig_list)
+				if (cnode.first.nt() && cnode.first.n() == nt)
+					return false;
+			return true;
+		};
 
-	pnodes_set ambset, cambset;
-	std::set<pnode> snodes;
-	size_t last_p = SIZE_MAX;
-	auto check_allowed = [this](const pnode &cnode) {
-		if (g.opt.auto_disambiguate == false) return false;
-		for (auto &nt : g.opt.nodisambig_list)
-			if (cnode.first.nt() && cnode.first.n() == nt)
-				return false;
-		return true;
-	};
-
-	for (auto& cur : nxtset) {
-		// print(std::cout << "cur: ", cur) << std::endl;
-		if (cur.set != root.second[1]) continue;
-		pnode cnode(completed(cur) /*&& !negative(cur)*/
-			? g(cur.prod) : g.nt(root.first.n()),
-			{ cur.from, cur.set });
-		cambset.clear();
-		bool allowed_disambg = check_allowed(cnode);
-		if (o.binarize) binarize_comb(cur,
-						allowed_disambg ? cambset : ambset);
-		else {
-			pnodes nxtlits;
-			//std::cout << "\n" << cur.prod << " " << last_p << " " << ambset.size();
-			sbl_chd_forest(cur, nxtlits, cur.from,
-						allowed_disambg ? cambset : ambset);
+		bool recipe = root.second[1] == root.second[0] + 1
+			&& g.uses_derived_recipe(root.first.n());
+		bool cc_free = root.second[1] == root.second[0] + 1
+			&& g.is_cc_fn(root.first.n())
+			&& !g.cc_fns.is_derived(root.first.n())
+			&& !g.is_eof_fn(root.first.n());
+		bool fallback = false;
+		if (!recipe && cc_free) {
+			auto &ccset = sorted_citem[{ root.first.n(), root.second[0] }];
+			bool has = false;
+			for (auto& cur : ccset)
+				if (cur.set == root.second[1]) { has = true; break; }
+			fallback = !has;
 		}
+		if (recipe) {
+			derived_class_packs(root.first.n(), root.second[0],
+				check_allowed(root), ambset);
+			snodes.insert(root);
+			f[root] = ambset;
+		} else if (fallback) {
+			// A predefined class that a derived class replaced.
+			ambset.insert({ pnode(lit<C, T>{ in_->tat(root.second[0]) },
+				{ root.second[0], root.second[1] } ) });
+			snodes.insert(root);
+			f[root] = ambset;
+		} else {
+			auto &nxtset = sorted_citem[{ root.first.n(), root.second[0] }];
 
-		// resolve ambiguity across productions, due to different earley items
-		// with different prod id
-		if (allowed_disambg) {
-			if (cambset.size()) { // any new sub forest
-				if (ambset.size() == 0) // first time if
-					last_p = cur.prod, ambset = cambset;
+			for (auto& cur : nxtset) {
+				// print(std::cout << "cur: ", cur) << std::endl;
+				if (cur.set != root.second[1]) continue;
+				pnode cnode(completed(cur) /*&& !negative(cur)*/
+					? g(cur.prod) : g.nt(root.first.n()),
+					{ cur.from, cur.set });
+				cambset.clear();
+				bool allowed_disambg = check_allowed(cnode);
+				if (o.binarize) binarize_comb(cur,
+								allowed_disambg ? cambset : ambset);
 				else {
-					// get the smallest one
-					if (last_p > cur.prod) ambset.clear(),
-						last_p = cur.prod,
-						ambset = cambset;
+					pnodes nxtlits;
+					//std::cout << "\n" << cur.prod << " " << last_p << " " << ambset.size();
+					sbl_chd_forest(cur, nxtlits, cur.set,
+								allowed_disambg ? cambset : ambset);
 				}
+
+				// resolve ambiguity across productions, due to different earley items
+				// with different prod id
+				if (allowed_disambg) {
+					if (cambset.size()) { // any new sub forest
+						if (ambset.size() == 0) // first time if
+							last_p = cur.prod, ambset = cambset;
+						else {
+							// get the smallest one
+							if (last_p > cur.prod) ambset.clear(),
+								last_p = cur.prod,
+								ambset = cambset;
+						}
+					}
+
+					snodes.insert(cnode);
+				}
+				f[cnode] = ambset;
+				//std::cout << "\n A " << cur.prod << " " << last_p << " " << ambset.size();
 			}
-
-			snodes.insert(cnode);
 		}
-		f[cnode] = ambset;
-		//std::cout << "\n A " << cur.prod << " " << last_p << " " << ambset.size();
-	}
 
-	if (snodes.size() && check_allowed(*snodes.begin())) {
+		if (snodes.size() && check_allowed(*snodes.begin())) {
 
-		// resolve ambiguity if WITHIN production, where same production with same symbols
-		// of different individual span
-		// iterator views of the set: the pack index is a container
-		// subscript for [k] and a signed difference for std::next, so
-		// only an iterator keeps both free of a sign conversion
-		std::vector<typename pnodes_set::const_iterator> cand;
-		for (auto it = ambset.begin(); it != ambset.end(); ++it)
-			cand.push_back(it);
-		// smallest node count in ambset
-		size_t maxk = cand.empty() ? 0 : cand.front()->size();
-		for (auto it : cand)
-			if (it->size() < maxk) maxk = it->size();
+			// resolve ambiguity if WITHIN production, where same production with same symbols
+			// of different individual span
+			// iterator views of the set: the pack index is a container
+			// subscript for [k] and a signed difference for std::next, so
+			// only an iterator keeps both free of a sign conversion
+			std::vector<typename pnodes_set::const_iterator> cand;
+			for (auto it = ambset.begin(); it != ambset.end(); ++it)
+				cand.push_back(it);
+			// smallest node count in ambset
+			size_t maxk = cand.empty() ? 0 : cand.front()->size();
+			for (auto it : cand)
+				if (it->size() < maxk) maxk = it->size();
 
 
-		//choose the one with the first smallest span from upto size of
-		// smallest set in ambset
-		size_t k = 0;
-		std::vector<typename pnodes_set::const_iterator> gi;
-		do {
-			gi.clear();
-			size_t gspan = SIZE_MAX;
-			for (auto it : cand) {
-				const pnode& n = (*it)[k];
-				size_t span = n.second[1] - n.second[0];
-				if (gspan == span) gi.push_back(it);
-				if (gspan > span) gspan = span,
-						gi.clear(), gi.push_back(it);
+			//choose the one with the first smallest span from upto size of
+			// smallest set in ambset
+			size_t k = 0;
+			std::vector<typename pnodes_set::const_iterator> gi;
+			do {
+				gi.clear();
+				size_t gspan = SIZE_MAX;
+				for (auto it : cand) {
+					const pnode& n = (*it)[k];
+					size_t span = n.second[1] - n.second[0];
+					if (gspan == span) gi.push_back(it);
+					if (gspan > span) gspan = span,
+							gi.clear(), gi.push_back(it);
+				}
+				cand = gi;
 			}
-			cand = gi;
-		}
-		while(++k < maxk && gi.size() > 1);
+			while(++k < maxk && gi.size() > 1);
 
-		cambset.clear();
-		if (ambset.size())
-			cambset.insert(
-				gi.size()
-					? *gi[0]
-					: *ambset.begin());
+			cambset.clear();
+			if (ambset.size())
+				cambset.insert(
+					gi.size()
+						? *gi[0]
+						: *ambset.begin());
 
-	//std::cout <<" camb "<< cambset.size() << std::endl;
-		if (snodes.size()) {
-			DBG(assert(snodes.size() == 1));
-			f[*snodes.begin()] = cambset;
+		//std::cout <<" camb "<< cambset.size() << std::endl;
+			if (snodes.size()) {
+				DBG(assert(snodes.size() == 1));
+				f[*snodes.begin()] = cambset;
+			}
+		//std::cout << gi.size() << std::endl;
 		}
-	//std::cout << gi.size() << std::endl;
+
+		const pnodes_set& chosen =
+			(snodes.size() && check_allowed(*snodes.begin()))
+			? cambset : ambset;
+		for (auto pit = chosen.rbegin(); pit != chosen.rend(); ++pit)
+			for (auto nit = pit->rbegin(); nit != pit->rend(); ++nit)
+				stack.push_back(*nit);
+		built = true;
 	}
-
-	for (auto& aset : (snodes.size() && check_allowed(*snodes.begin()))
-			? cambset : ambset)
-		for (const auto &nxt : aset) build_forest(f, nxt);
-
-	return true;
+	return built;
 }
 
 template <typename C, typename T>

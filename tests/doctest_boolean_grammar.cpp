@@ -663,7 +663,7 @@ TEST_SUITE("boolean grammar: string escaping") {
 		grammar<char> g(nts, ps, start, {}, make_grammar_options());
 		expect_rejects(g, "\"\"c\"");
 		expect_parse_error(g, "\"\"c\"",
-			"Unexpected '\"' at 1:2 (2)");
+			"Unexpected 'c' at 1:3 (3)");
 	}
 }
 

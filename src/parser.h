@@ -249,6 +249,45 @@ struct prods : public std::vector<prod<C, T>> {
 template <typename T = char>
 using char_class_fn = std::function<bool(T)>;
 /**
+ * @brief A single character predicate built from classes and literals.
+ *
+ * It holds copies of every class function it uses, so it never points into
+ * a grammar. A grammar may be copied or moved after construction.
+ */
+template <typename T = char>
+struct cc_expr {
+	enum class kind : uint8_t { eq, fn, any_of, all_of, neg };
+	kind k = kind::any_of;
+	T ch = {};                    // eq
+	char_class_fn<T> fn = {};     // fn: a copy of an existing class
+	std::vector<cc_expr> sub = {};
+	/// True when the predicate accepts c.
+	bool operator()(T c) const;
+};
+/**
+ * @brief Result of the derived character class analysis for one nonterminal.
+ *
+ * A rejected entry carries the reason. An accepted entry carries the
+ * predicate. The state tells how a source production uses the rule.
+ */
+template <typename T = char>
+struct cc_rule_info {
+	enum class state : uint8_t { derived, inner, rejected, unused };
+	size_t nt = 0;
+	state st = state::rejected;
+	std::string reason = {};
+	char_class_fn<T> fn = {};
+	/// Names of the guards of the enabled source productions the predicate
+	/// reads, directly or through inner rules.
+	std::set<std::string> guards = {};
+};
+/// Number of nodes in a predicate tree.
+template <typename T>
+size_t cc_expr_node_count(const cc_expr<T>& e);
+/// Depth of a predicate tree. A single node has depth 1.
+template <typename T>
+size_t cc_expr_depth(const cc_expr<T>& e);
+/**
  * @brief Container for character class functions.
  *
  * It can be passed to a grammar when instantiated.
@@ -259,12 +298,16 @@ struct char_class_fns {
 	std::map<size_t, char_class_fn<T>> fns = {};
 	/// char -> production
 	std::map<size_t, std::map<T, size_t>> ps = {};
+	/// Nonterminals that the analysis turned into a derived class.
+	std::set<size_t> derived = {};
 	/// Adds new char class function.
 	void operator()(size_t nt, const char_class_fn<T>& fn);
 	/// Returns true if a \p nt is a character class function.
 	bool is_fn(size_t nt) const;
 	/// Returns true if a \p nt is an eof character class function.
 	bool is_eof_fn(size_t nt) const;
+	/// Returns true if a \p nt is a derived character class.
+	bool is_derived(size_t nt) const;
 	/// id of an eof function.
 	size_t eof_fn = SIZE_MAX;
 };
@@ -420,13 +463,33 @@ struct grammar {
 			highlights = {};
 		/// @highlight auto: enable name and content heuristics.
 		bool highlight_heuristics = false;
+		/**
+		 * @brief Scan a rule that always matches one character as a class.
+		 *
+		 * A generated parser does not write this field, so it uses the
+		 * default.
+		 */
+		bool derive_char_classes = true;
 	} opt;
 	grammar(nonterminals<C, T>& nts, options opt = {});
 	grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
 		const prods<C, T>& start, const char_class_fns<T>& cc_fns,
-		options opt = {});
+		options opt = {}, idni::diagnostics::report* diag = nullptr);
 	/// Sets guards of enabled productions
 	void set_enabled_productions(const std::set<std::string>&);
+	/**
+	 * Turns the derived character class scanner on or off and applies it.
+	 * The grammar object is shared by every parser that uses it, so this
+	 * must not run during a parse. A dynamic_grow_nts child that is a
+	 * derived class is not supported.
+	 */
+	void derive_char_classes(bool on);
+	/**
+	 * Rejects the given nonterminals as derived classes and applies the
+	 * classes again. The parser passes the children of dynamic_grow_nts,
+	 * which grow during a parse.
+	 */
+	void exclude_from_char_classes(const std::set<size_t>& nts);
 	void productions_enable(const std::string& guard);
 	void productions_disable(const std::string& guard);
 	/**
@@ -462,6 +525,21 @@ struct grammar {
 	size_t get_char_class_production(lit<C, T> l, T ch);
 	/// Adds a new production rule: l => ch and returns index of it.
 	size_t add_char_class_production(lit<C, T> l, T ch);
+	/**
+	 * Runs the derived character class analysis on the source productions.
+	 * Returns one entry per nonterminal it visited, in nonterminal id order.
+	 * The analysis only reads the grammar and never changes it.
+	 */
+	std::vector<cc_rule_info<T>> derive_char_classes_report() const;
+	/// True when the current guard state accepts production p for ch.
+	bool rule_prod_accepts(size_t p, T ch) const;
+	/// Enabled source productions of a rule, in production order.
+	std::vector<size_t> enabled_source_prods(size_t nt) const;
+	/// True when nt is scanned through the derived class recipe.
+	bool uses_derived_recipe(size_t nt) const;
+	/// True when ch is rejected by a negated conjunct of a derived class
+	/// or inner rule. Used for the parse error hint.
+	bool cc_rejects_by_negation(size_t nt, T ch) const;
 	/**
 	 * Adds one pending alternative to a @dynamic nonterminal l, skipping
 	 * the full rebuild add_dynamic does (same trade as
@@ -593,6 +671,59 @@ private:
 	std::set<size_t> nullables = {};
 	std::set<size_t> conjunctives = {};
 	std::vector<production> G;
+	/// Number of productions that come from the source grammar. Dynamic
+	/// host values and cached character productions are appended after it.
+	size_t source_productions_ = 0;
+	/// One cached `A => ch` production per derived class and character,
+	/// shared by every guard state. Keyed by nonterminal then character.
+	std::map<size_t, std::map<T, size_t>> cc_char_prods_ = {};
+	/// Production indices of the derived class `A => ch` productions, so
+	/// the enabled-production index never links them.
+	std::set<size_t> cc_char_prod_ids_ = {};
+	/// Accept caches of a derived class per guard state, kept aside while
+	/// another guard state is active.
+	std::map<size_t,
+		std::map<std::set<std::string>, std::map<T, size_t>>>
+			cc_ps_states_ = {};
+	/// Guard set of the active accept cache of each derived class.
+	std::map<size_t, std::set<std::string>> cc_active_guards_ = {};
+	/// Per-production predicate of every accepted derived and inner rule,
+	/// keyed by production index for the current guard state.
+	std::map<size_t, cc_expr<T>> cc_prod_exprs_ = {};
+	/// Rules the analysis accepts but only accepted rules use.
+	std::set<size_t> cc_inner_nts_ = {};
+	/// Rules the analysis must reject. The parser sets the children of
+	/// dynamic_grow_nts, which grow during a parse.
+	std::set<size_t> cc_excluded_nts_ = {};
+	/// Enabled source productions of each rule for the current guard
+	/// state, rebuilt whenever the guards or the derived classes change.
+	std::map<size_t, std::vector<size_t>> cc_source_prods_ = {};
+	/// Applies the derived classes to the enabled-production index. Called
+	/// at the end of set_enabled_productions().
+	void apply_derived_char_classes();
+	/// Analysis mark for one nonterminal: open while its rule is being
+	/// built, ok when accepted, fail when rejected.
+	enum class cc_mark : uint8_t { open, ok, fail };
+	struct cc_walk {
+		std::map<size_t, cc_mark> mark = {};
+		std::map<size_t, cc_expr<T>> expr = {};
+		std::map<size_t, std::string> reason = {};
+		std::map<size_t, std::set<std::string>> guards = {};
+		std::map<size_t, cc_expr<T>> prod_expr = {};
+	};
+	/// Turns a finished walk into the report entries.
+	std::vector<cc_rule_info<T>> classify_cc_walk(const cc_walk& w) const;
+	/// True when the literal accepts ch, using the class or rule predicate.
+	bool cc_lit_accepts(const lit<C, T>& l, T ch) const;
+	/**
+	 * Returns a predicate for a rule that matches exactly one character, or
+	 * nullopt when the rule is not such a rule. Marks the walk so a rule is
+	 * analyzed once and a cycle is detected.
+	 */
+	std::optional<cc_expr<T>> single_char_rule(size_t nt, cc_walk& w) const;
+	/// Marks a rule rejected with first reason kept and returns nullopt.
+	std::optional<cc_expr<T>> cc_reject(size_t nt, cc_walk& w,
+		const char* reason) const;
 	/// A dynamic production's full lifecycle state. host: from opt.dynamic
 	/// or add_dynamic, never retired by sync_dynamic_context. committed:
 	/// confirmed by a parse, or supplied by sync_dynamic_context's ctx.
@@ -830,13 +961,15 @@ public:
 					const std::vector<terminal_type>&)>;
 	using counters        = idni::parser_strings::counters;
 
-	/// earley item
+	/// earley item. Fields are 32 and 16 bit so one item fits in 16 bytes.
 	struct item {
 		item(size_t set, size_t prod,size_t con,size_t from,size_t dot);
 		bool operator<(const item& i) const;
 		bool operator==(const item& i) const;
-		size_t set, prod, con, from, dot;
+		uint32_t set, prod, from;
+		uint16_t con, dot;
 	};
+	static_assert(sizeof(item) == 16, "item must stay 16 bytes");
 	struct item_hash {
 		size_t operator()(const item& i) const {
 			std::uint64_t seed = grcprime;
@@ -901,6 +1034,9 @@ public:
 		bool teof();
 		/// Reads value at tpos
 		T tat(size_t p);
+		/// Number of input positions known before the parse, or 0 for an
+		/// unbounded stream.
+		size_t known_length() const;
 	private:
 		void decode();
 		/// input type
@@ -1304,6 +1440,10 @@ public:
 		if (!dynamic_grow_nts_valid(nts)) return false;
 		o.on_dynamic_grow = fn;
 		o.dynamic_grow_nts = std::move(nts);
+		std::set<size_t> children;
+		for (const auto& [p, c] : o.dynamic_grow_nts)
+			children.insert(c);
+		if (!children.empty()) g.exclude_from_char_classes(children);
 		return true;
 	}
 	bool debug = false;
@@ -1347,13 +1487,31 @@ private:
 	std::vector<container_t> U; /// uncompleted
 	/// reused across fixpoint iterations so the item snapshot allocates once
 	std::vector<item> snapshot_ = {};
+	/// indices into S[n] of the completed items the position loop in
+	/// _parse revisits every round (empty-span items and conjuncts)
+	std::vector<size_t> revisit_ = {};
+	/// Bumped whenever an Earley set loses an item or the grammar or a
+	/// dynamic span annotation changes; see the position loop in _parse.
+	size_t reprocess_epoch_ = 0;
 		///mapping from to position of end in S for items
 	ankerl::unordered_dense::map<size_t,
 		ankerl::unordered_dense::set<size_t>> fromS;
 	/// true iff fromS writes are needed this parse (enable_gc || any_conj)
 	bool need_fromS = false;
-	ankerl::unordered_dense::map<std::pair<size_t /*nt_id*/, size_t>,
-		container_t> cache;
+	/// One item waiting for a nonterminal at a position. The nonterminal
+	/// id sits beside the item so one position vector holds every symbol.
+	struct wait_entry {
+		uint32_t nt;
+		item it;
+	};
+	static_assert(sizeof(wait_entry) == 20, "wait_entry must stay 20 bytes");
+	/// Sentinel nonterminal id of a tombstoned entry. Erasing marks the
+	/// entry dead instead of moving it, so complete_memo stays valid.
+	static constexpr uint32_t dead_wait = static_cast<uint32_t>(-1);
+	/// items that wait for a nonterminal, grouped by position
+	std::vector<std::vector<wait_entry>> cache;
+	void cache_insert(size_t nt, size_t pos, const item& i);
+	void cache_erase(size_t nt, size_t pos, const item& i);
 
 	/// refcounter for the earley item
 	/// default value is 0, which means it can be garbaged
@@ -1361,13 +1519,21 @@ private:
 	std::map<item, int_t> refi;
 	/// items ready for collection
 	container_t gcready;
-	ankerl::unordered_dense::map<std::pair<size_t, size_t>,
-		std::vector<item>> sorted_citem, rsorted_citem;
+	/// The tree builders scan these indexes by (nt, position) in their hot
+	/// loops; a cache-line start fixes their offset as other members change.
+	using cc_index_t = ankerl::unordered_dense::map<
+		std::pair<size_t, size_t>, std::vector<item>>;
+	struct cc_index_align_probe { alignas(64) cc_index_t v; };
+	static_assert(alignof(cc_index_align_probe) == 64,
+		"the chart index must start on a cache line");
+	alignas(64) cc_index_t sorted_citem, rsorted_citem;
 
 	/// completion key (nt_id, from, set) for dependency tracking
 	using completion_key = std::tuple<size_t, size_t, size_t>;
 	std::unordered_map<completion_key, std::vector<item>>
 		completion_deps;
+	/// child scans read the item indexes instead of S
+	bool use_citem_index = false;
 	/// O(1) "is anything still completed?" predicate.
 	ankerl::unordered_dense::map<completion_key, size_t> completion_count;
 	/// completed items currently counted in completion_count (one count per live item)
@@ -1378,11 +1544,10 @@ private:
 	/// True iff any production in `g` is conjunctive. Cascade machinery
 	/// is dead code when this is false, so its bookkeeping is skipped.
 	bool any_conj = false;
-	/// Per-item memoization for complete(): index into the underlying
-	/// cache vector at the last call. complete() only re-processes cache
-	/// entries [last, current_size) instead of the whole cache. The cache
-	/// only grows during a parse, so indices into its underlying vector
-	/// are stable.
+	/// Per-item memoization for complete(): index into the position wait
+	/// vector at the last call. complete() only re-processes entries
+	/// [last, current_size) instead of the whole vector. Tombstones keep
+	/// the vector from shrinking, so the index stays valid.
 	ankerl::unordered_dense::map<item, size_t, item_hash> complete_memo;
 	/// One registered child's span, consumed on the way to some item's
 	/// own parent in o.dynamic_grow_nts. fired marks that on_dynamic_grow
@@ -1413,6 +1578,7 @@ private:
 	void merge_dyn_child_span(const item& j,
 		const std::vector<dyn_child_entry>& incoming)
 	{
+		++reprocess_epoch_;
 		auto it = dyn_child_span.find(j);
 		std::vector<dyn_child_entry> merged = it != dyn_child_span.end()
 			? it->second : std::vector<dyn_child_entry>{};
@@ -1439,6 +1605,7 @@ private:
 		size_t to)
 	{
 		if (!o.on_dynamic_grow) return;
+		++reprocess_epoch_;
 		auto prev = g.active_grow_;
 		g.active_grow_ = { parent_nt, child_nt };
 		o.on_dynamic_grow(*in_, child_nt, from, to);
@@ -1455,6 +1622,8 @@ private:
 	// pre_process(), wrapped in a measured scope. Returns the
 	// number of items visited (for the caller's debug printing).
 	int do_preprocess();
+	void release_recognition();
+	void release_chart();
 
 #ifdef TAU_PARSER_MEASURE_COUNTERS
 	void count(size_t& c, size_t n = 1) {
@@ -1514,6 +1683,10 @@ private:
 	bool build_forest(pforest& f, const idni::pnode_type<C, T>& root);
 	bool binarize_comb(const item&, pnodes_set&);
 	void sbl_chd_forest(const item&, pnodes&, size_t, pnodes_set&);
+	/// Builds the packs of a derived class or inner rule from its source
+	/// productions and the character at pos, instead of from the chart.
+	void derived_class_packs(size_t nt, size_t pos, bool ad_allowed,
+		pnodes_set& packs) const;
 #ifdef DEBUG
 	template <typename CharU>
 	friend std::ostream& operator<<(std::ostream& os, lit<C, T>& l);

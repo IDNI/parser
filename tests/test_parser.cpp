@@ -316,7 +316,7 @@ int main(int argc, char **argv)
 	run_test<char>(ps,nt,start, "\"abc\"");                      // 2
 	run_test<char>(ps,nt,start, "\"\\\"a\\\"c\\\"\"");           // 3
 	run_test<char>(ps,nt,start, "\"\\\"a\\\"a\\\"a\\\"a\\\"\""); // 4
-	o.error_expected = "Unexpected '\"' at 1:2 (2)";
+	o.error_expected = "Unexpected 'c' at 1:3 (3)";
 	run_test<char>(ps,nt,start, "\"\"c\"", {}, o);               // 5
 	ps.clear();
 
@@ -396,6 +396,53 @@ int main(int argc, char **argv)
 	ps(mul,        expression + '*' + expression);
 	run_test<char>(ps, nt, start, "1+2*3", cc);
 	run_test<char>(ps, nt, start, "3*2+1", cc);
+	ps.clear();
+
+	// A conjunct ending in a terminal is scanned straight into the
+	// Earley set while a conjunct ending in a nonterminal only gets
+	// there once resolve_conjunctions() accepts it. Every later
+	// resolution at that position must still see both conjuncts.
+	TEST("boolean", "scanned_and_completed_conjuncts")
+	ps(start, (X + b) & (X + X));
+	ps(X,     b);
+	o = {}, o.ambiguity_fails = false;
+	run_test<char>(ps, nt, start, "bb", {}, o);
+	o = {};
+	ps.clear();
+
+	// A conjunct re-checked at a later resolution of the same position
+	// must not leave behind a completed item without a derivation:
+	// "ab" is not in the language of start even without the negation.
+	TEST("boolean", "late_conjunction_recheck")
+	ps(start, B + b);
+	ps(A,     a & ~B);
+	ps(B,     (A + B + b) | (A + A) | nll);
+	o.error_expected = "Unexpected";
+	run_test<char>(ps, nt, start, "ab", {}, o);
+	o = {};
+	ps.clear();
+
+	// A conjunct whose last child is nullable completes at the position
+	// its child was predicted at: the child's span is empty, so the
+	// parent is completed by an item of the same Earley set. The group
+	// must still resolve, and a negated conjunct of the same shape must
+	// still reject.
+	TEST("boolean", "conjuncts_completed_by_empty_children")
+	ps(start, (a + X) & (a + Y));
+	ps(X,     nll);
+	ps(Y,     nll);
+	o = {}, o.ambiguity_fails = false;
+	run_test<char>(ps, nt, start, "a", {}, o);
+	o = {}, o.error_expected = "Unexpected 'b' at 1:1 (1)";
+	run_test<char>(ps, nt, start, "b", {}, o);
+	o = {};
+	ps.clear();
+	ps(start, (a + X) & ~(a + Y));
+	ps(X,     nll);
+	ps(Y,     nll);
+	o.error_expected = "Unexpected";
+	run_test<char>(ps, nt, start, "a", {}, o);
+	o = {};
 	ps.clear();
 
 	// all cycles
@@ -505,6 +552,28 @@ int main(int argc, char **argv)
 		dg.productions_enable("e");
 		check(parse_ok(dp, "zz"), "guarded production on after productions_enable");
 		check(parse_ok(dp, "u8"), "dynamic value still accepted, guard index map intact");
+	}
+
+/*******************************************************************************
+*       GARBAGE COLLECTION
+*******************************************************************************/
+
+	// With enable_gc an item that no longer feeds a later position is
+	// erased from its Earley set during the parse. The erase must not
+	// change the outcome: a long enough input still parses to a single
+	// tree, and an error is still reported where it occurs.
+	TEST("gc", "erased_items_keep_the_result")
+	{
+		const bool gc_saved = testing::parse_options<char>.enable_gc;
+		testing::parse_options<char>.enable_gc = true;
+		ps(start, (a + start) | (b + X));
+		ps(X,     c | (c + X));
+		run_test<char>(ps, nt, start, "aaaabccc");
+		o.error_expected = "Unexpected 'a' at 1:6 (6)";
+		run_test<char>(ps, nt, start, "aaaabaccc", {}, o);
+		o = {};
+		ps.clear();
+		testing::parse_options<char>.enable_gc = gc_saved;
 	}
 
 /*******************************************************************************

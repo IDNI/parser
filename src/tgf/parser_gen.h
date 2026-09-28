@@ -115,9 +115,11 @@ void generate_parser_cpp(const std::string& tgf_filename,
 	auto gen_cc_fns = [&gi]() {
 		std::stringstream os;
 		auto& x = gi.nts();
-		for (const auto& fn : gi.cc_fns().fns)
+		for (const auto& fn : gi.cc_fns().fns) {
+			if (gi.cc_fns().is_derived(fn.first)) continue;
 			if (x[fn.first].size()) os << "\t\t\""
 				<< to_std_string(x[fn.first]) << "\",\n";
+		}
 		return os.str();
 	};
 	auto gen_grammar_opts = [&g, &opt]() {
@@ -245,6 +247,12 @@ void generate_parser_cpp(const std::string& tgf_filename,
 	};
 	auto gen_prods = [&g, &gi, &ts]() {
 		std::stringstream os;
+		// every cached A => ch production is synthetic, whatever class
+		// made it, so keep it out of the generated source
+		std::set<size_t> cc_prods = gi.cc_char_prod_ids();
+		for (const auto& ps_nt : gi.cc_fns().ps)
+			for (const auto& ps_ch : ps_nt.second)
+				cc_prods.insert(ps_ch.second);
 		auto terminal = [&ts](const lit<C, T>& l) {
 			for (size_t n = 0; n != ts.size(); ++n)
 				if (ts[n] == l.t()) return n;
@@ -252,6 +260,7 @@ void generate_parser_cpp(const std::string& tgf_filename,
 			return ts.size() - 1;
 		};
 		for (size_t i = 0; i != gi.G().size(); ++i) {
+			if (cc_prods.count(i)) continue;
 			const auto& p = gi.G()[i];
 			g.print_production(os << "//", i, true) << "\n";
 			os << "\tp(NT(" << p.first.n() << "), ";

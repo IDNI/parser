@@ -58,6 +58,9 @@ inline cli::commands tgf_commands() {
 	OPT(productions);
 	OPT(cli::option("nullable", 'N', false));
 		DESC("report nullable recursive productions");
+	auto char_class_report = OPT(cli::option("char-class-report", 'C',
+		false));
+		DESC("prints the derived character class report");
 	OPT(print_json);
 	CMD(cli::command("parse", "parse an input string, file or stdin"));
 
@@ -92,6 +95,10 @@ inline cli::commands tgf_commands() {
 	auto tree_path_opt = OPT(cli::option("tree-path", 'P',
 		"bintree"));
 		DESC("parse tree path: bintree or forest");
+	auto derive_char_classes_opt = OPT(cli::option("derive-char-classes",
+		'd', true));
+		DESC("scans rules that match one character as character "
+			"classes");
 	auto auto_disam_opt = OPT(cli::option("auto-disambiguate", 'a',
 		true));
 		DESC("enables auto-disambiguation");
