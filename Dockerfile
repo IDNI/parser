@@ -102,14 +102,33 @@ ARG TESTS=yes
 # Argument BUILD_JOBS=N raises the parallelism. One job is the safe default.
 ARG BUILD_JOBS=1
 
+# The remote store: configure reads a missing package from it before it
+# builds one (cmake/parser-deps.cmake). The token is mounted only for the
+# configure step; an empty value keeps the remote out of a local build.
+ARG TAU_STORE_REMOTE=
+ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
+
 # Build tests and run them if TESTS is set to yes. Stop the build if they fail
 RUN echo " (BUILD) -- Running tests: $TESTS"
 # `run` on a -tests preset makes ./dev call ctest itself
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	--mount=type=secret,id=gh_token \
 	if [ "$TESTS" = "yes" ]; then \
-	./dev preset ${BUILD_PRESET}-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+	scripts/with-gh-token ./dev preset ${BUILD_PRESET}-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+		-DTAU_PARSER_DEPS_FROM_STORE=ON \
 		|| exit 1; \
 fi
+
+# The trusted workflow turns this on: the same image that resolves the store
+# packages publishes the ones the remote lacks, so the Linux ids match what
+# every Docker consumer requests. Off for every other build.
+ARG TAU_STORE_PUBLISH=OFF
+RUN --mount=type=secret,id=gh_token \
+	if [ "$TAU_STORE_PUBLISH" = "ON" ]; then \
+		scripts/with-gh-token ./dev preset ${BUILD_PRESET} -DTAU_PARSER_DEPS_FROM_STORE=ON \
+			-DTAU_BUILD_JOBS=${BUILD_JOBS} && \
+		scripts/with-gh-token ./dev store-publish; \
+	fi
 
 # Argument TEST_GCC_BUILD=no skips the make and gcc check
 ARG TEST_GCC_BUILD=yes
@@ -149,6 +168,11 @@ ARG TESTS=yes
 # Argument BUILD_JOBS=N raises the parallelism. One job is the safe default.
 ARG BUILD_JOBS=1
 
+# The remote store: configure reads a missing package from it before it
+# builds one (cmake/parser-deps.cmake).
+ARG TAU_STORE_REMOTE=
+ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
+
 # ccache keeps compiled objects in a cache mount, so a source change only
 # recompiles what it touches. CI carries the mount across runs.
 ENV CMAKE_C_COMPILER_LAUNCHER=ccache CMAKE_CXX_COMPILER_LAUNCHER=ccache \
@@ -160,20 +184,25 @@ WORKDIR /parser
 # wine, not wine64: the Ubuntu package runs these 64-bit PE binaries on its
 # own, and needs no i386 multiarch.
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	--mount=type=secret,id=gh_token \
 	echo " (BUILD) -- Running tests under wine: $TESTS" && \
 	if [ "$TESTS" = "yes" ]; then \
-		./dev preset release-w64-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+		scripts/with-gh-token ./dev preset release-w64-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+			-DTAU_PARSER_DEPS_FROM_STORE=ON; \
 	else \
-		./dev preset release-w64-tests -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+		scripts/with-gh-token ./dev preset release-w64-tests -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+			-DTAU_PARSER_DEPS_FROM_STORE=ON; \
 	fi
 
 # The parity script needs only the native tgf beside the cross-built
 # tgf.exe, so build that one target and run the comparison directly instead
 # of the whole native suite. A missing binary or a mismatch stops the stage.
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	--mount=type=secret,id=gh_token \
 	if [ "$TESTS" = "yes" ]; then \
 		echo " (BUILD) -- Running the wine parity test" && \
-		./dev preset release-tgf -DTAU_BUILD_JOBS=${BUILD_JOBS} && \
+		scripts/with-gh-token ./dev preset release-tgf -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+			-DTAU_PARSER_DEPS_FROM_STORE=ON && \
 		test -x build/release/tgf && \
 		test -f build/release-w64/tgf.exe && \
 		sh tests/parity/tgf_wine_parity.sh \
@@ -267,10 +296,17 @@ FROM wasm-deps AS wasm-node
 
 ARG BUILD_JOBS=1
 
+# The remote store: configure reads a missing package from it before it
+# builds one (cmake/parser-deps.cmake).
+ARG TAU_STORE_REMOTE=
+ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
+
 COPY --from=source /parser /parser
 
-RUN echo "(BUILD) -- Building and running the wasm node tests" && \
-	./dev preset release-wasm-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS}
+RUN --mount=type=secret,id=gh_token \
+	echo "(BUILD) -- Building and running the wasm node tests" && \
+	scripts/with-gh-token ./dev preset release-wasm-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+		-DTAU_PARSER_DEPS_FROM_STORE=ON
 
 
 # ------------------------------------------------------------
@@ -312,13 +348,22 @@ FROM wasm-browser-deps AS wasm-browser
 
 ARG BUILD_JOBS=1
 
+# The remote store: configure reads a missing package from it before it
+# builds one (cmake/parser-deps.cmake).
+ARG TAU_STORE_REMOTE=
+ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
+
 COPY --from=source /parser /parser
 
 # Native tgf is the parity reference for the browser parity tests.
-RUN echo "(BUILD) -- Building native tgf" && \
-	./dev preset release-tgf -DTAU_BUILD_JOBS=${BUILD_JOBS}
+RUN --mount=type=secret,id=gh_token \
+	echo "(BUILD) -- Building native tgf" && \
+	scripts/with-gh-token ./dev preset release-tgf -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+		-DTAU_PARSER_DEPS_FROM_STORE=ON
 
 # Browser tests launch Chrome as root, which needs --no-sandbox; the test
 # scripts already pass it.
-RUN echo "(BUILD) -- Building and running the wasm browser tests" && \
-	./dev preset release-wasm-tests-browser run -DTAU_BUILD_JOBS=${BUILD_JOBS}
+RUN --mount=type=secret,id=gh_token \
+	echo "(BUILD) -- Building and running the wasm browser tests" && \
+	scripts/with-gh-token ./dev preset release-wasm-tests-browser run -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+		-DTAU_PARSER_DEPS_FROM_STORE=ON
