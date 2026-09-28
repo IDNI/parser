@@ -29,12 +29,14 @@ fi
 # reading as a home path under another account. PCRE provides the lookbehind;
 # without it the extended pattern is used and the false positive returns, so
 # prefer a grep with -P.
+# Git Bash and MSVC spell the home directory as /c/Users/<user>,
+# C:/Users/<user>, or C:\Users\<user>; all three are home paths.
 if echo x | grep -qP 'x' 2>/dev/null; then
 	grep_mode=-aoP
-	pattern='(?<![A-Za-z0-9_/])(/home/[A-Za-z0-9_.+-]+|/Users/[A-Za-z0-9_.+-]+|/root|/tmp/[A-Za-z0-9_.+-]+)/[A-Za-z0-9_./+-]*'
+	pattern='(?<![A-Za-z0-9_/\\])(/home/[A-Za-z0-9_.+-]+|/Users/[A-Za-z0-9_.+-]+|/[A-Za-z]/Users/[A-Za-z0-9_.+-]+|/root|/tmp/[A-Za-z0-9_.+-]+|[A-Za-z]:[\\/]Users[\\/][A-Za-z0-9_.+-]+)[\\/A-Za-z0-9_.+-]*'
 else
 	grep_mode=-aoE
-	pattern='(/home/[A-Za-z0-9_.+-]+|/Users/[A-Za-z0-9_.+-]+|/root|/tmp/[A-Za-z0-9_.+-]+)/[A-Za-z0-9_./+-]*'
+	pattern='(/home/[A-Za-z0-9_.+-]+|/Users/[A-Za-z0-9_.+-]+|/[A-Za-z]/Users/[A-Za-z0-9_.+-]+|/root|/tmp/[A-Za-z0-9_.+-]+|[A-Za-z]:[\\/]Users[\\/][A-Za-z0-9_.+-]+)[\\/A-Za-z0-9_.+-]*'
 fi
 staging='\.staging-[A-Za-z0-9_-]+'
 
