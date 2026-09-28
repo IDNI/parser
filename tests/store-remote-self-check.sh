@@ -47,8 +47,11 @@ to_cmake_path() {
 	fi
 }
 
+# SCRATCH stays the POSIX form: PATH and the shell's own paths need it, and a
+# converted C:/... path holds a colon that splits the :-separated PATH. Only a
+# path compared against CMake's output takes the converted form.
 SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/tau-store-remote.XXXXXX")" || exit 1
-SCRATCH="$(to_cmake_path "$SCRATCH")"
+SCRATCH_CMAKE="$(to_cmake_path "$SCRATCH")"
 cleanup() { rm -rf "$SCRATCH"; }
 trap cleanup EXIT
 export TMPDIR="$SCRATCH/tmp"
@@ -121,7 +124,7 @@ expr "x${long_tag}" : 'x[A-Za-z0-9_][A-Za-z0-9._-]*$' > /dev/null \
 	|| fail "the shortened tag '${long_tag}' is not a valid OCI tag"
 
 # ── 2. a remote read on a miss: the producer is not called ──────────────
-export TAU_SHARED_PREFIX="$SCRATCH/source-store"
+export TAU_SHARED_PREFIX="$SCRATCH_CMAKE/source-store"
 source_out=""
 dep_ensure source_out producer demo "$BLOCK" fake_producer \
 	|| fail "the source producer failed"
@@ -133,7 +136,7 @@ dep_ensure source_out producer demo "$BLOCK" fake_producer \
 
 export TAU_STORE_REMOTE="ghcr.io/self-check/tau-store"
 export FAKE_ORAS_PULL_SRC="$SCRATCH/remote.tar"
-export TAU_SHARED_PREFIX="$SCRATCH/remote-store"
+export TAU_SHARED_PREFIX="$SCRATCH_CMAKE/remote-store"
 before="$(calls)"
 remote_out=""
 if ! dep_ensure remote_out producer demo "$BLOCK" fake_producer \
@@ -151,7 +154,7 @@ grep -q "^pull " "$ORAS_LOG" || fail_remote "a remote hit never called oras pull
 
 # ── 3. a remote miss builds: the producer is called ─────────────────────
 unset FAKE_ORAS_PULL_SRC
-export TAU_SHARED_PREFIX="$SCRATCH/miss-store"
+export TAU_SHARED_PREFIX="$SCRATCH_CMAKE/miss-store"
 before="$(calls)"
 miss_out=""
 if ! dep_ensure miss_out producer demo "$BLOCK" fake_producer \
@@ -166,7 +169,7 @@ grep -q "is not on ${TAU_STORE_REMOTE}; building" "$SCRATCH/miss.err" \
 
 # ── 4. no remote: oras is never invoked and the producer builds ─────────
 unset TAU_STORE_REMOTE
-export TAU_SHARED_PREFIX="$SCRATCH/local-store"
+export TAU_SHARED_PREFIX="$SCRATCH_CMAKE/local-store"
 : > "$ORAS_LOG"
 before="$(calls)"
 local_out=""
