@@ -660,13 +660,15 @@ _tau_dep_ensure_run() {
 	shift 4
 	local _tau_dep_ensure_manifest_cmake="${__devrc_dir}/../cmake/tau-manifest.cmake"
 	local _tau_dep_ensure_store_cmake="${__devrc_dir}/../cmake/tau-store.cmake"
-	local _tau_dep_ensure_prefix _tau_dep_ensure_claim_dir _tau_dep_ensure_block_file
+	local _tau_dep_ensure_prefix _tau_dep_ensure_claim_dir
 	local _tau_dep_ensure_id _tau_dep_ensure_lookup _tau_dep_ensure_status
-	local _tau_dep_ensure_prefix_out _tau_dep_ensure_claim _tau_dep_ensure_staging
+	local _tau_dep_ensure_prefix_out
 	local _tau_dep_ensure_published _tau_dep_ensure_timeout _tau_dep_ensure_poll
 	local _tau_dep_ensure_now _tau_dep_ensure_deadline
 	local _tau_dep_ensure_host _tau_dep_ensure_owner_file
 	local _tau_dep_ensure_owner_host _tau_dep_ensure_owner_pid
+	# Not `local`: bash 3.2 unwinds locals before it runs the EXIT trap of a
+	# command-substitution subshell, so the trap would see these empty.
 	_tau_dep_ensure_claim=""
 	_tau_dep_ensure_staging=""
 	_tau_dep_ensure_block_file=""
