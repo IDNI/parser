@@ -299,8 +299,11 @@ TEST_SUITE("pre_order::apply_unique_if") {
 			else if (v == 'y') ++y_calls;
 			return nd;
 		};
+		// The traversal rebuilds each child with its sibling, so the
+		// standalone trefs are never seen; reject by node value instead.
 		auto cache_ok = [&](tref nd, tref) {
-			return nd != rejected && nd != root;
+			const char v = chtree::get(nd).value;
+			return v != 'r' && v != 'a';
 		};
 		pre_order<char>(root).apply_unique_if<42>(count, cache_ok);
 		CHECK( x_calls == 2 );
