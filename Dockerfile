@@ -527,5 +527,6 @@ RUN --mount=type=secret,id=gh_token \
 		-DTAU_BUILD_JOBS=${BUILD_JOBS} -DTAU_PARSER_DEPS_FROM_STORE=ON \
 		-DTAU_PARSER_WASM_PREFIX="${wasm_prefix}"; \
 	echo "(BUILD) -- Running the wasm browser tests"; \
-	ctest --preset release-wasm-tests-browser -R tgf_browser \
+	# The browser tests read the package, so the build of the tree is not needed.
+	ctest --preset release-wasm-tests-browser -R tgf_browser -FA build_tree \
 		-j ${BUILD_JOBS} --output-on-failure
