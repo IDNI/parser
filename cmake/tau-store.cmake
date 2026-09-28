@@ -191,6 +191,56 @@ function(_tau_store_mv_no_clobber_supported out scratch)
 	set(${out} "${_ok}" PARENT_SCOPE)
 endfunction()
 
+# Move <src> to <dst> with renamex_np(RENAME_EXCL) through a python3 ctypes
+# helper. Sets <out-rc> to the process exit code: 0 when moved, non-zero when
+# the destination exists or the call failed. python3 is already required on
+# every host by store-transport.sh, and renamex_np is macOS's atomic
+# no-replace rename.
+function(_tau_store_renamex_np src dst out_rc)
+	find_program(_python3 python3 NO_CACHE)
+	if(NOT _python3)
+		set(${out_rc} "python3 not found" PARENT_SCOPE)
+		return()
+	endif()
+	execute_process(COMMAND "${_python3}" -c
+		"import ctypes,sys;c=ctypes.CDLL(None,use_errno=True);f=c.renamex_np;f.argtypes=[ctypes.c_char_p,ctypes.c_char_p,ctypes.c_uint];f.restype=ctypes.c_int;sys.exit(0 if f(sys.argv[1].encode(),sys.argv[2].encode(),0x4)==0 else 1)"
+		"${src}" "${dst}"
+		RESULT_VARIABLE _rc OUTPUT_QUIET ERROR_QUIET)
+	set(${out_rc} "${_rc}" PARENT_SCOPE)
+endfunction()
+
+# Probe whether renamex_np(RENAME_EXCL) is available and behaves as required:
+# an absent destination is moved, an existing destination is left untouched
+# and the source is kept. Sets <out-ok> to TRUE only when both cases are
+# observed, and only on macOS.
+function(_tau_store_renamex_np_supported out scratch)
+	set(_ok FALSE)
+	if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
+		find_program(_python3 python3 NO_CACHE)
+		if(_python3)
+			string(RANDOM LENGTH 12 _tok)
+			set(_a_src "${scratch}/.tau-rnx-${_tok}-a-src")
+			set(_a_dst "${scratch}/.tau-rnx-${_tok}-a-dst")
+			set(_b_src "${scratch}/.tau-rnx-${_tok}-b-src")
+			set(_b_dst "${scratch}/.tau-rnx-${_tok}-b-dst")
+			file(MAKE_DIRECTORY "${_a_src}")
+			file(WRITE "${_a_src}/s" "s")
+			file(MAKE_DIRECTORY "${_a_dst}")
+			file(WRITE "${_a_dst}/keep" "k")
+			file(MAKE_DIRECTORY "${_b_src}")
+			file(WRITE "${_b_src}/s" "s")
+			_tau_store_renamex_np("${_a_src}" "${_a_dst}" _arc)
+			_tau_store_renamex_np("${_b_src}" "${_b_dst}" _brc)
+			if(EXISTS "${_a_src}/s" AND EXISTS "${_a_dst}/keep"
+					AND NOT EXISTS "${_b_src}" AND EXISTS "${_b_dst}/s")
+				set(_ok TRUE)
+			endif()
+			file(REMOVE_RECURSE "${_a_src}" "${_a_dst}" "${_b_src}" "${_b_dst}")
+		endif()
+	endif()
+	set(${out} "${_ok}" PARENT_SCOPE)
+endfunction()
+
 # Require an existing final entry to be complete, non-symlinked, and to agree
 # with the staging manifest bytes and digests. Sets <out-prefix> on agreement.
 # A partial entry, a symlink, a manifest mismatch, or a digest mismatch is a
@@ -288,7 +338,22 @@ function(tau_store_publish out_prefix prefix dep input_id staging)
 				set(_rename_rc "mv no-clobber left an unexpected state")
 			endif()
 		else()
-			set(_rename_rc "no no-replace directory move is available")
+			_tau_store_renamex_np_supported(_rnx_ok "${_dep_dir}")
+			if(_rnx_ok)
+				_tau_store_renamex_np("${_staging}" "${_entry}" _rnx_rc)
+				# Judge the outcome from the filesystem.
+				if(NOT EXISTS "${_staging}" AND EXISTS "${_entry}")
+					set(_rename_rc 0)
+				elseif(EXISTS "${_staging}" AND EXISTS "${_entry}")
+					set(_rename_rc "NO_REPLACE")
+				else()
+					set(_rename_rc
+						"renamex_np left an unexpected state")
+				endif()
+			else()
+				set(_rename_rc
+					"no no-replace directory move is available")
+			endif()
 		endif()
 	endif()
 	if(NOT _rename_rc EQUAL 0)
