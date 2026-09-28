@@ -212,7 +212,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            clang g++-aarch64-linux-gnu qemu-user ninja-build
+            clang g++-aarch64-linux-gnu qemu-user qemu-user-binfmt \
+            ninja-build python3-pexpect python3-pyte
 
       - name: Build and test under qemu
         run: ./dev preset release-arm64-tests run -DTAU_BUILD_JOBS=${{ env.BUILD_JOBS }}
@@ -255,6 +256,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      # Homebrew's python3 is externally managed (PEP 668), so it refuses a
+      # plain pip install. A venv holds the modules and its bin lands on PATH
+      # ahead of Homebrew, where configure's python3 probe finds it.
+      - name: Install the REPL test modules
+        run: |
+          python3 -m venv "$RUNNER_TEMP/tau-python"
+          "$RUNNER_TEMP/tau-python/bin/pip" install pexpect pyte
+          echo "$RUNNER_TEMP/tau-python/bin" >> "$GITHUB_PATH"
 
       # `run` on an -all preset makes ./dev call ctest itself.
       - name: Build and test
