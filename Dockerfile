@@ -161,12 +161,18 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 		./dev preset release-w64-tests -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 	fi
 
-# The wine parity test lives in the native tree and registers itself once the
-# cross-built tgf.exe is there, so the native suite runs it.
+# The parity script needs only the native tgf beside the cross-built
+# tgf.exe, so build that one target and run the comparison directly instead
+# of the whole native suite. A missing binary or a mismatch stops the stage.
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	if [ "$TESTS" = "yes" ]; then \
-		echo " (BUILD) -- Running the native suite with the wine parity test" && \
-		./dev preset release-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+		echo " (BUILD) -- Running the wine parity test" && \
+		./dev preset release-tgf -DTAU_BUILD_JOBS=${BUILD_JOBS} && \
+		test -x build/release/tgf && \
+		test -f build/release-w64/tgf.exe && \
+		sh tests/parity/tgf_wine_parity.sh \
+			build/release/tgf build/release-w64/tgf.exe \
+			src/format/json/json.tgf; \
 	fi
 
 
