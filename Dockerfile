@@ -297,9 +297,8 @@ RUN EMSDK_NODE_BIN="$(ls -d /root/.tau/emsdk/node/*/bin | head -n1)" && \
 
 # ------------------------------------------------------------
 # WebAssembly Node.js gate: build the Emscripten artifacts and the browser
-# page, publish them as parser-wasm, and run the node tests. The -browser
-# configure also installs Chrome and puppeteer (to generate the page), but
-# they are not run here.
+# page (the page is a build output, not a browser test), publish them as
+# parser-wasm, and run the node tests. No Chrome or puppeteer here.
 
 FROM wasm-deps AS wasm-node
 
@@ -320,19 +319,16 @@ RUN echo "(BUILD) -- Installing the xterm.js vendor" && \
 # parser-wasm store package the browser gate consumes.
 RUN --mount=type=secret,id=gh_token \
 	echo "(BUILD) -- Building the wasm artifacts" && \
-	scripts/with-gh-token ./dev preset release-wasm-tests-browser -DTAU_BUILD_JOBS=${BUILD_JOBS} \
-		-DTAU_PARSER_DEPS_FROM_STORE=ON && \
+	scripts/with-gh-token ./dev preset release-wasm-tests -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+		-DTAU_PARSER_DEPS_FROM_STORE=ON -DTAU_PARSER_BUILD_BROWSER_PAGE=ON && \
 	scripts/with-gh-token ./dev dep-parser-wasm.sh \
 		-DTAU_DEP_MODE=producer \
 		-DTAU_PARSER_WASM_BUILD_DIR=build/release-wasm \
 		-DTAU_PARSER_WASM_CMAKE_CACHE=build/release-wasm/CMakeCache.txt
 
-# The node tests read the same build directory. The browser tests need Chrome,
-# which this gate does not carry, so only the node pair runs here.
+# The node tests read the same build directory.
 RUN echo "(BUILD) -- Running the wasm node tests" && \
-	ctest --preset release-wasm-tests-browser \
-		-R 'tgf_wasm_parity_emcc|embindings_api_emcc' \
-		-j ${BUILD_JOBS} --output-on-failure
+	ctest --preset release-wasm-tests -j ${BUILD_JOBS} --output-on-failure
 
 
 # ------------------------------------------------------------
