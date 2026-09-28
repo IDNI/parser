@@ -62,6 +62,19 @@ _parser_wasm_prefix_id() {
 	basename "$(dirname "$prefix")"
 }
 
+# The emscripten cache does not record the compiler; derive emcc from the
+# toolchain file it does record.
+_parser_wasm_emcc() {
+	local cache="$1" toolchain d1 d2 d3 d4
+	toolchain="$(_parser_wasm_cache_value "$cache" CMAKE_TOOLCHAIN_FILE)"
+	[ -n "$toolchain" ] || return 1
+	d1="$(dirname "$toolchain")"
+	d2="$(dirname "$d1")"
+	d3="$(dirname "$d2")"
+	d4="$(dirname "$d3")"
+	printf '%s/emcc' "$d4"
+}
+
 _dep_parser_wasm_field_block() {
 	local recipe_hash tree_hash build_type threads cflags cxxflags compiler
 	local ftxui_id unordered_dense_id
@@ -70,8 +83,8 @@ _dep_parser_wasm_field_block() {
 	build_type="$(_parser_wasm_cache_value "$TAU_PARSER_WASM_CMAKE_CACHE" CMAKE_BUILD_TYPE)"
 	[ -n "$build_type" ] || { echo "dep-parser-wasm: no CMAKE_BUILD_TYPE in the cache" >&2; return 1; }
 	build_type="$(printf '%s' "$build_type" | tr '[:lower:]' '[:upper:]')"
-	compiler="$(_parser_wasm_cache_value "$TAU_PARSER_WASM_CMAKE_CACHE" CMAKE_CXX_COMPILER)"
-	[ -n "$compiler" ] || { echo "dep-parser-wasm: no CMAKE_CXX_COMPILER in the cache" >&2; return 1; }
+	compiler="$(_parser_wasm_emcc "$TAU_PARSER_WASM_CMAKE_CACHE")" \
+		|| { echo "dep-parser-wasm: no CMAKE_TOOLCHAIN_FILE in the cache" >&2; return 1; }
 	cflags="$(_parser_wasm_flags "$TAU_PARSER_WASM_CMAKE_CACHE" C "$build_type")"
 	cxxflags="$(_parser_wasm_flags "$TAU_PARSER_WASM_CMAKE_CACHE" CXX "$build_type")"
 	threads="OFF"
