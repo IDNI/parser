@@ -65,7 +65,7 @@ _dep_parser_tree_hash() {
 	fi
 	# BSD tools have no -z/--zero; NUL records become newline records for the
 	# sort and back for xargs, which is exact for every path without a newline.
-	value="$(cd "$src" && git ls-files -z --cached --others --exclude-standard \
+	value="$(cd "$src" && git ls-files -z --cached \
 		| tr '\0' '\n' | grep -vE "$exclude" | LC_ALL=C sort \
 		| tr '\n' '\0' | xargs -0 -n 100 $digest | $digest | awk '{print $1}')"
 	if [ -z "$value" ]; then
