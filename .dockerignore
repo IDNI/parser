@@ -5,5 +5,6 @@ tau-lang/
 .local/
 .claude/
 **/node_modules/
-# Each runner writes its own .git, so COPY ./ would differ and miss the cache.
-.git/
+# Git metadata differs per checkout, so it must never enter the digest of a build layer.
+.git
+**/.git

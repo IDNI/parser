@@ -130,6 +130,14 @@ RUN --mount=type=secret,id=gh_token \
 
 FROM linux-resolve AS linux
 
+# The build context carries no .git, so the stamp arrives as a build argument.
+ARG TAU_PARSER_GIT_DESCRIBED=
+ARG TAU_PARSER_GIT_BRANCH=
+ARG TAU_PARSER_GIT_COMMIT_HASH=
+ENV TAU_PARSER_GIT_DESCRIBED=${TAU_PARSER_GIT_DESCRIBED} \
+	TAU_PARSER_GIT_BRANCH=${TAU_PARSER_GIT_BRANCH} \
+	TAU_PARSER_GIT_COMMIT_HASH=${TAU_PARSER_GIT_COMMIT_HASH}
+
 # ccache keeps compiled objects in a cache mount, so a source change only
 # recompiles what it touches. CI carries the mount across runs.
 ENV CMAKE_C_COMPILER_LAUNCHER=ccache CMAKE_CXX_COMPILER_LAUNCHER=ccache \
@@ -225,6 +233,14 @@ RUN --mount=type=secret,id=gh_token \
 # Windows cross build, with the suite run under wine
 
 FROM linux-mingw64-wine-resolve AS linux-mingw64-wine
+
+# The build context carries no .git, so the stamp arrives as a build argument.
+ARG TAU_PARSER_GIT_DESCRIBED=
+ARG TAU_PARSER_GIT_BRANCH=
+ARG TAU_PARSER_GIT_COMMIT_HASH=
+ENV TAU_PARSER_GIT_DESCRIBED=${TAU_PARSER_GIT_DESCRIBED} \
+	TAU_PARSER_GIT_BRANCH=${TAU_PARSER_GIT_BRANCH} \
+	TAU_PARSER_GIT_COMMIT_HASH=${TAU_PARSER_GIT_COMMIT_HASH}
 
 ARG TESTS=yes
 
@@ -387,6 +403,14 @@ RUN --mount=type=secret,id=gh_token \
 
 FROM wasm-resolve AS wasm-build
 
+# The build context carries no .git, so the stamp arrives as a build argument.
+ARG TAU_PARSER_GIT_DESCRIBED=
+ARG TAU_PARSER_GIT_BRANCH=
+ARG TAU_PARSER_GIT_COMMIT_HASH=
+ENV TAU_PARSER_GIT_DESCRIBED=${TAU_PARSER_GIT_DESCRIBED} \
+	TAU_PARSER_GIT_BRANCH=${TAU_PARSER_GIT_BRANCH} \
+	TAU_PARSER_GIT_COMMIT_HASH=${TAU_PARSER_GIT_COMMIT_HASH}
+
 RUN --mount=type=secret,id=gh_token \
 	echo "(BUILD) -- Building the wasm artifacts" && \
 	scripts/with-gh-token ./dev preset release-wasm-tests --keep-cache \
@@ -453,6 +477,14 @@ RUN echo "(BUILD) -- Installing js/tau-wasm-terminal dependencies" && \
 # browser REPL, and the puppeteer/Chrome test layer.
 
 FROM wasm-browser-deps AS wasm-browser
+
+# The build context carries no .git, so the stamp arrives as a build argument.
+ARG TAU_PARSER_GIT_DESCRIBED=
+ARG TAU_PARSER_GIT_BRANCH=
+ARG TAU_PARSER_GIT_COMMIT_HASH=
+ENV TAU_PARSER_GIT_DESCRIBED=${TAU_PARSER_GIT_DESCRIBED} \
+	TAU_PARSER_GIT_BRANCH=${TAU_PARSER_GIT_BRANCH} \
+	TAU_PARSER_GIT_COMMIT_HASH=${TAU_PARSER_GIT_COMMIT_HASH}
 
 ARG BUILD_JOBS=1
 
