@@ -19,6 +19,8 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/dep-build"
 MANIFEST_MODULE="${SCRIPT_DIR}/../cmake/tau-manifest.cmake"
 STORE_MODULE="${SCRIPT_DIR}/../cmake/tau-store.cmake"
 [ -f "$MANIFEST_MODULE" ] || { echo "store-transport: missing ${MANIFEST_MODULE}" >&2; exit 2; }
@@ -83,12 +85,18 @@ PY
 # check the transport owns: a manifest is only as good as the writer that
 # scanned the prefix the archive was made from.
 _check_import_modes() {
-	local archive="$1" root="$2"
+	local archive="$1" root="$2" compare_modes=1
 	shift 2
-	python3 - "$archive" "$root" "$@" <<'PY'
+	# Windows has no POSIX permission bits: the manifest records the constant
+	# mode 0 there, so the archive's modes carry nothing to verify.
+	if [ "$(dep_host_os)" = windows ]; then
+		compare_modes=0
+	fi
+	python3 - "$archive" "$root" "$compare_modes" "$@" <<'PY'
 import os, stat, sys, tarfile
 archive, root = sys.argv[1], sys.argv[2]
-entries = sys.argv[3:]
+compare_modes = sys.argv[3] == "1"
+entries = sys.argv[4:]
 failed = []
 with tarfile.open(archive) as t:
 	for m in t.getmembers():
@@ -103,7 +111,7 @@ with tarfile.open(archive) as t:
 			continue
 		actual = stat.S_IMODE(os.stat(path).st_mode)
 		expected = m.mode & 0o7777
-		if actual != expected:
+		if compare_modes and actual != expected:
 			failed.append(f"mode mismatch {m.name}: archive {expected:o} extracted {actual:o}")
 for entry in entries:
 	prefix = os.path.join(root, entry, "prefix")

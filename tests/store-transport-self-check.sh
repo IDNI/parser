@@ -9,6 +9,8 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PARSER_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# shellcheck source=/dev/null
+source "${PARSER_ROOT}/scripts/dep-build"
 TRANSPORT="${PARSER_ROOT}/scripts/store-transport.sh"
 MANIFEST="${PARSER_ROOT}/cmake/tau-manifest.cmake"
 STORE_MODULE="${PARSER_ROOT}/cmake/tau-store.cmake"
@@ -80,8 +82,11 @@ modefix="${ROOT}/modefix"; mkdir -p "$modefix"
 tar -xf - -C "$modefix" < "$tar" || fail "cannot extract for modefix"
 chmod 644 "${modefix}/demo/${id}/prefix/bin/tool"
 tar --format=posix -cf - -C "$modefix" "$entry" > "${ROOT}/modefix.tar" || fail "cannot re-tar modefix"
-if "$TRANSPORT" import "${ROOT}/modefix.tar" "${ROOT}/modefix-dst" "$entry" >/dev/null 2>&1; then
-	fail "a lost executable bit was accepted"
+# Windows has no POSIX modes, so the transport cannot detect the loss there.
+if [ "$(dep_host_os)" != windows ]; then
+	if "$TRANSPORT" import "${ROOT}/modefix.tar" "${ROOT}/modefix-dst" "$entry" >/dev/null 2>&1; then
+		fail "a lost executable bit was accepted"
+	fi
 fi
 
 # a truncated archive is rejected (cut into the member data, not just padding)
