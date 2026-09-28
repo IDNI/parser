@@ -270,8 +270,13 @@ fi
 RECLAIM_SUB_BLOCK="$(printf 'dep=reclaimsub\nsource=abc')"
 reclaim_sub_id="$(bridge_id "$RECLAIM_SUB_BLOCK")"
 mkdir -p "$TAU_SHARED_PREFIX/store/reclaimsub/$reclaim_sub_id.claim"
-( printf '%s %s\n' "$(uname -n)" "${BASHPID:-$(sh -c 'echo $PPID')}" \
-	> "$TAU_SHARED_PREFIX/store/reclaimsub/$reclaim_sub_id.claim/owner" )
+( {
+	if [ -n "${BASHPID:-}" ]; then
+		printf '%s %s\n' "$(uname -n)" "$BASHPID"
+	else
+		sh -c 'printf "%s %s\n" "$1" "$PPID"' _ "$(uname -n)"
+	fi
+} > "$TAU_SHARED_PREFIX/store/reclaimsub/$reclaim_sub_id.claim/owner" )
 before="$(calls)"
 if ! TAU_DEP_CLAIM_TIMEOUT=5 TAU_DEP_CLAIM_POLL=1 \
 		dep_ensure out_reclaim_sub producer reclaimsub "$RECLAIM_SUB_BLOCK" \

@@ -777,8 +777,16 @@ _tau_dep_ensure_run() {
 	while :; do
 		if mkdir "${_tau_dep_ensure_claim_dir}/${_tau_dep_ensure_id}.claim" 2>/dev/null; then
 			_tau_dep_ensure_claim="${_tau_dep_ensure_claim_dir}/${_tau_dep_ensure_id}.claim"
-			if ! printf '%s %s\n' "$_tau_dep_ensure_host" "${BASHPID:-$(sh -c 'echo $PPID')}" \
-					> "${_tau_dep_ensure_claim}/owner"; then
+			# bash 3.2 has no BASHPID, and a command substitution there records
+			# a short-lived subshell pid that a waiter reads as dead.
+			if ! {
+				if [ -n "${BASHPID:-}" ]; then
+					printf '%s %s\n' "$_tau_dep_ensure_host" "$BASHPID"
+				else
+					sh -c 'printf "%s %s\n" "$1" "$PPID"' _ \
+						"$_tau_dep_ensure_host"
+				fi
+			} > "${_tau_dep_ensure_claim}/owner"; then
 				echo "dep_ensure: cannot write the claim owner file for ${_tau_dep_ensure_claim}" >&2
 				_tau_dep_ensure_cleanup
 				return 1
