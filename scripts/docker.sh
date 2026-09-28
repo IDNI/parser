@@ -23,8 +23,10 @@ case "${CMD}" in
 		echo "  base               - build the base image (system packages)"
 		echo "  deps               - build the deps image (oras store client)"
 		echo "  source             - build the source image"
+		echo "  linux-deps         - resolve and publish the Linux store packages"
 		echo "  linux              - build and run the suite on Linux"
 		echo "  w64-deps           - build the w64-deps image (wine)"
+		echo "  linux-mingw64-wine-deps - resolve and publish the MinGW store packages"
 		echo "  linux-mingw64-wine - cross-build for Windows, run the suite under wine"
 		echo "  wasm-deps          - build the wasm-deps image (emsdk + node)"
 		echo "  wasm-build         - build the wasm artifacts and publish parser-wasm"
@@ -46,11 +48,17 @@ case "${CMD}" in
 	"source")
 		build --target source -t parser:source "${@:2}"
 		;;
+	"linux-deps")
+		build --target linux-deps -t parser:linux-deps "${@:2}"
+		;;
 	"linux")
 		build --target linux -t parser:linux "${@:2}"
 		;;
 	"w64-deps")
 		build --target w64-deps -t parser:w64-deps "${@:2}"
+		;;
+	"linux-mingw64-wine-deps")
+		build --target linux-mingw64-wine-deps -t parser:mingw64-wine-deps "${@:2}"
 		;;
 	"linux-mingw64-wine")
 		build --target linux-mingw64-wine -t parser:mingw64-wine "${@:2}"

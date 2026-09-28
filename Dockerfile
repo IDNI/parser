@@ -84,14 +84,11 @@ RUN echo "(BUILD) -- Building version: $(head -n 1 VERSION)"
 
 
 # ------------------------------------------------------------
-# Linux build and its test suite
+# linux-x86_64 store resolver: resolve the packages the build reads and
+# publish the ones the remote lacks, before any test runs. A failed test
+# then keeps the publish in place.
 
-FROM source AS linux
-
-# ccache keeps compiled objects in a cache mount, so a source change only
-# recompiles what it touches. CI carries the mount across runs.
-ENV CMAKE_C_COMPILER_LAUNCHER=ccache CMAKE_CXX_COMPILER_LAUNCHER=ccache \
-	CCACHE_DIR=/root/.ccache CCACHE_MAXSIZE=1G
+FROM source AS linux-deps
 
 # Argument BUILD_PRESET=release/debug picks the CMake preset family
 ARG BUILD_PRESET=release
@@ -108,6 +105,42 @@ ARG BUILD_JOBS=1
 ARG TAU_STORE_REMOTE=
 ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
 
+# A TESTS=no build (the nightly packages) never reads the store.
+RUN --mount=type=secret,id=gh_token \
+	if [ "$TESTS" = "yes" ]; then \
+		scripts/with-gh-token ./dev preset ${BUILD_PRESET} --configure-only \
+			-DTAU_PARSER_DEPS_FROM_STORE=ON -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+	fi
+
+# The trusted workflow turns this on: this stage publishes the packages the
+# remote lacks, so the Linux ids match what every Docker consumer requests.
+# Off for every other build.
+ARG TAU_STORE_PUBLISH=OFF
+RUN --mount=type=secret,id=gh_token \
+	if [ "$TAU_STORE_PUBLISH" = "ON" ]; then \
+		scripts/with-gh-token ./dev store-publish; \
+	fi
+
+
+# ------------------------------------------------------------
+# Linux build and its test suite
+
+FROM linux-deps AS linux
+
+# ccache keeps compiled objects in a cache mount, so a source change only
+# recompiles what it touches. CI carries the mount across runs.
+ENV CMAKE_C_COMPILER_LAUNCHER=ccache CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+	CCACHE_DIR=/root/.ccache CCACHE_MAXSIZE=1G
+
+# Argument BUILD_PRESET=release/debug picks the CMake preset family
+ARG BUILD_PRESET=release
+
+# Argument TESTS=no is used to skip running tests
+ARG TESTS=yes
+
+# Argument BUILD_JOBS=N raises the parallelism. One job is the safe default.
+ARG BUILD_JOBS=1
+
 # Build tests and run them if TESTS is set to yes. Stop the build if they fail
 RUN echo " (BUILD) -- Running tests: $TESTS"
 # `run` on a -tests preset makes ./dev call ctest itself
@@ -118,17 +151,6 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 		-DTAU_PARSER_DEPS_FROM_STORE=ON \
 		|| exit 1; \
 fi
-
-# The trusted workflow turns this on: the same image that resolves the store
-# packages publishes the ones the remote lacks, so the Linux ids match what
-# every Docker consumer requests. Off for every other build.
-ARG TAU_STORE_PUBLISH=OFF
-RUN --mount=type=secret,id=gh_token \
-	if [ "$TAU_STORE_PUBLISH" = "ON" ]; then \
-		scripts/with-gh-token ./dev preset ${BUILD_PRESET} --configure-only \
-			-DTAU_PARSER_DEPS_FROM_STORE=ON -DTAU_BUILD_JOBS=${BUILD_JOBS} && \
-		scripts/with-gh-token ./dev store-publish; \
-	fi
 
 # Argument TEST_GCC_BUILD=no skips the make and gcc check
 ARG TEST_GCC_BUILD=yes
@@ -159,9 +181,10 @@ RUN wineboot --init && wineserver -w
 
 
 # ------------------------------------------------------------
-# Windows cross build, with the suite run under wine
+# windows-x86_64-mingw store resolver: resolve the packages the cross build
+# reads and publish the ones the remote lacks, before any test runs.
 
-FROM w64-deps AS linux-mingw64-wine
+FROM w64-deps AS linux-mingw64-wine-deps
 
 ARG TESTS=yes
 
@@ -173,13 +196,39 @@ ARG BUILD_JOBS=1
 ARG TAU_STORE_REMOTE=
 ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
 
+COPY --from=source /parser /parser
+WORKDIR /parser
+
+# A TESTS=no build never reads the store.
+RUN --mount=type=secret,id=gh_token \
+	if [ "$TESTS" = "yes" ]; then \
+		scripts/with-gh-token ./dev preset release-w64-tests --configure-only \
+			-DTAU_PARSER_DEPS_FROM_STORE=ON -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+	fi
+
+# The trusted workflow turns this on to publish the mingw packages the w64
+# consumers read. It runs before the tests, so their failure keeps it.
+ARG TAU_STORE_PUBLISH=OFF
+RUN --mount=type=secret,id=gh_token \
+	if [ "$TAU_STORE_PUBLISH" = "ON" ]; then \
+		scripts/with-gh-token ./dev store-publish; \
+	fi
+
+
+# ------------------------------------------------------------
+# Windows cross build, with the suite run under wine
+
+FROM linux-mingw64-wine-deps AS linux-mingw64-wine
+
+ARG TESTS=yes
+
+# Argument BUILD_JOBS=N raises the parallelism. One job is the safe default.
+ARG BUILD_JOBS=1
+
 # ccache keeps compiled objects in a cache mount, so a source change only
 # recompiles what it touches. CI carries the mount across runs.
 ENV CMAKE_C_COMPILER_LAUNCHER=ccache CMAKE_CXX_COMPILER_LAUNCHER=ccache \
 	CCACHE_DIR=/root/.ccache CCACHE_MAXSIZE=1G
-
-COPY --from=source /parser /parser
-WORKDIR /parser
 
 # wine, not wine64: the Ubuntu package runs these 64-bit PE binaries on its
 # own, and needs no i386 multiarch.
@@ -189,16 +238,6 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	if [ "$TESTS" = "yes" ]; then \
 		scripts/with-gh-token ./dev preset release-w64-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS} \
 			-DTAU_PARSER_DEPS_FROM_STORE=ON; \
-	fi
-
-# The trusted workflow turns this on to publish the mingw packages the w64
-# consumers read.
-ARG TAU_STORE_PUBLISH=OFF
-RUN --mount=type=secret,id=gh_token \
-	if [ "$TAU_STORE_PUBLISH" = "ON" ]; then \
-		scripts/with-gh-token ./dev preset release-w64-tests --configure-only \
-			-DTAU_PARSER_DEPS_FROM_STORE=ON -DTAU_BUILD_JOBS=${BUILD_JOBS} && \
-		scripts/with-gh-token ./dev store-publish; \
 	fi
 
 # The parity script needs only the native tgf beside the cross-built
@@ -316,18 +355,26 @@ RUN echo "(BUILD) -- Installing the xterm.js vendor" && \
 	npm ci --prefix js/tau-wasm-terminal --no-audit --no-fund
 
 RUN --mount=type=secret,id=gh_token \
-	echo "(BUILD) -- Building the wasm artifacts" && \
-	scripts/with-gh-token ./dev preset release-wasm-tests -DTAU_BUILD_JOBS=${BUILD_JOBS} \
-		-DTAU_PARSER_DEPS_FROM_STORE=ON -DTAU_PARSER_BUILD_BROWSER_PAGE=ON
+	echo "(BUILD) -- Resolving the wasm dependencies" && \
+	scripts/with-gh-token ./dev preset release-wasm-tests --configure-only \
+		-DTAU_BUILD_JOBS=${BUILD_JOBS} -DTAU_PARSER_DEPS_FROM_STORE=ON \
+		-DTAU_PARSER_BUILD_BROWSER_PAGE=ON
 
 # The trusted workflow turns this on. It runs before the parser-wasm producer
 # below, so only the wasm FTXUI and unordered_dense packages are published;
-# parser-wasm travels through the layer cache within one run.
+# parser-wasm travels through the layer cache within one run. It runs before
+# the wasm build, so a failed build keeps the publish.
 ARG TAU_STORE_PUBLISH=OFF
 RUN --mount=type=secret,id=gh_token \
 	if [ "$TAU_STORE_PUBLISH" = "ON" ]; then \
 		scripts/with-gh-token ./dev store-publish; \
 	fi
+
+RUN --mount=type=secret,id=gh_token \
+	echo "(BUILD) -- Building the wasm artifacts" && \
+	scripts/with-gh-token ./dev preset release-wasm-tests --keep-cache \
+		-DTAU_BUILD_JOBS=${BUILD_JOBS} -DTAU_PARSER_DEPS_FROM_STORE=ON \
+		-DTAU_PARSER_BUILD_BROWSER_PAGE=ON
 
 RUN --mount=type=secret,id=gh_token \
 	scripts/with-gh-token ./dev dep-parser-wasm.sh \
