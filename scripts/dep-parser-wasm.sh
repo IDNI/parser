@@ -4,7 +4,7 @@
 #   ./dev dep-parser-wasm \
 #     -DTAU_DEP_MODE=producer \
 #     -DTAU_PARSER_WASM_BUILD_DIR=build/release-wasm \
-#     -DTAU_PARSER_FTXUI_ID=<id> -DTAU_PARSER_UNORDERED_DENSE_ID=<id> \
+#     -DTAU_PARSER_UNORDERED_DENSE_ID=<id> \
 #     -DTAU_DEP_CC=<emcc> -DTAU_DEP_CXX=<emcc> \
 #     -DTAU_DEP_CFLAGS=<flags> -DTAU_DEP_CXXFLAGS=<flags> \
 #     -DTAU_DEP_TARGET=wasm32-emscripten
@@ -15,7 +15,8 @@
 # looks up the entry and never compiles wasm.
 #
 # The id hashes the source tree and the build-affecting toolchain inputs: the
-# wasm-target FTXUI and unordered_dense package ids, the emcc compiler and the
+# wasm-target unordered_dense package id (FTXUI stays on the patched
+# FetchContent path, so the tree hash covers it), the emcc compiler and the
 # recorded flags. Writer and scanner hashes are provenance, not id inputs.
 set -u
 
@@ -68,7 +69,6 @@ _dep_parser_wasm_field_block() {
 		"cflags=${TAU_PARSER_WASM_CFLAGS}" \
 		"cxxflags=${TAU_PARSER_WASM_CXXFLAGS}" \
 		"threads=${threads}" \
-		"ftxui_package_id=${TAU_PARSER_FTXUI_ID}" \
 		"unordered_dense_package_id=${TAU_PARSER_UNORDERED_DENSE_ID}" \
 		"recipe_hash=${recipe_hash}" \
 		"helper_build_hash=${build_hash}" \
@@ -115,7 +115,6 @@ case "$mode" in
 esac
 
 TAU_PARSER_WASM_BUILD_DIR="$(dep_var TAU_PARSER_WASM_BUILD_DIR "")"
-TAU_PARSER_FTXUI_ID="$(dep_var TAU_PARSER_FTXUI_ID "")"
 TAU_PARSER_UNORDERED_DENSE_ID="$(dep_var TAU_PARSER_UNORDERED_DENSE_ID "")"
 TAU_PARSER_WASM_TREE="$(dep_var TAU_PARSER_WASM_TREE "$DEV_ROOT")"
 
@@ -129,7 +128,6 @@ if [ "$mode" = "producer" ] && [ -z "$TAU_PARSER_WASM_BUILD_DIR" ]; then
 	echo "dep-parser-wasm: -DTAU_PARSER_WASM_BUILD_DIR is required" >&2
 	exit 2
 fi
-[ -n "$TAU_PARSER_FTXUI_ID" ] || { echo "dep-parser-wasm: -DTAU_PARSER_FTXUI_ID is required" >&2; exit 2; }
 [ -n "$TAU_PARSER_UNORDERED_DENSE_ID" ] || { echo "dep-parser-wasm: -DTAU_PARSER_UNORDERED_DENSE_ID is required" >&2; exit 2; }
 [ -n "$TAU_PARSER_WASM_CXX" ] || { echo "dep-parser-wasm: no compiler; pass -DTAU_DEP_CXX" >&2; exit 2; }
 [ -n "$TAU_PARSER_WASM_CC" ] || { echo "dep-parser-wasm: no compiler; pass -DTAU_DEP_CC" >&2; exit 2; }

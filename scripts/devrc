@@ -24,6 +24,7 @@ normalize_args() {
 	PRESET=""
 	RUN=""
 	KEEP_CACHE=""
+	CONFIGURE_ONLY=""
 	local past_dd=false
 	local args=("$@")
 	local i=0 arg next
@@ -63,6 +64,10 @@ normalize_args() {
 				;;
 			--keep-cache)
 				KEEP_CACHE="1"
+				((i++)) || true
+				;;
+			--configure-only)
+				CONFIGURE_ONLY="1"
 				((i++)) || true
 				;;
 			--target)
@@ -387,6 +392,11 @@ preset_entry() {
 	echo "Configuring with preset ${PRESET}"
 	cmake "${fresh[@]}" --preset "${PRESET}" "${generator_args[@]}" \
 		"${DEV_CMAKE[@]}"
+
+	if [[ ${CONFIGURE_ONLY:-} == 1 ]]; then
+		echo "Configure-only; skipping the build"
+		return 0
+	fi
 
 	echo "Building with preset ${PRESET}"
 	echo "Parallel jobs: ${TAU_BUILD_JOBS}"
