@@ -25,6 +25,7 @@ TAU_PARSER_WASM_RECIPE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename
 
 # Content hash of the parser working tree. The recipe and the publish helpers
 # are excluded: each is hashed on its own or cannot change the package bytes.
+# Tracked files only, so an untracked build artifact cannot move the id.
 _dep_parser_wasm_tree_hash() {
 	local src="$1" value digest
 	local exclude='^(scripts/(dep-parser-wasm\.sh|devrc|dep-build)|cmake/(tau-manifest\.cmake|tau-store\.cmake))$'
@@ -33,7 +34,7 @@ _dep_parser_wasm_tree_hash() {
 	else
 		digest="shasum -a 256"
 	fi
-	value="$(cd "$src" && git ls-files -z --cached --others --exclude-standard \
+	value="$(cd "$src" && git ls-files -z --cached \
 		| grep -zvE "$exclude" \
 		| LC_ALL=C sort -z | xargs -0 -r $digest | dep_sha256_stdin)"
 	[ -n "$value" ] || { echo "dep-parser-wasm: parser tree hash is empty" >&2; return 1; }
