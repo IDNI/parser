@@ -200,6 +200,23 @@ composed by the public presets above; see [`CMakePresets.json`](../CMakePresets.
 Any further options go to `docker build`, for example
 `./dev docker linux --build-arg TESTS=no`.
 
+## Boost
+
+- `dep-boost-headers` — produce the `boost_headers` package in the dependency
+  store. The producer downloads the pinned Boost 1.86.0 release archive,
+  verifies its SHA-256, and installs only the `boost/` headers and the
+  upstream license as `<prefix>/include/boost/...` and
+  `<prefix>/share/licenses/boost/LICENSE_1_0.txt`. Every target produces the
+  same headers, so no compiler enters the package identity. The store name is
+  `boost_headers`, because tau-lang owns the `boost` name.
+- A store build resolves `boost_headers` at configure time when
+  `TAU_PARSER_DEPS_FROM_STORE=ON` and `TAU_PARSER_BUILD_SERVE=ON`. Look up an
+  existing package only with `-DTAU_DEP_MODE=consumer`. The cache variable
+  `TAU_PARSER_BOOST_HEADERS_PREFIX` holds the resolved prefix.
+- Outside the store, `TAU_BOOST_INCLUDE_DIR=<dir>` names the directory that
+  holds `boost/`. With neither, configure falls back to a system Boost 1.86
+  and fails with a fix when it finds none.
+
 ## Emscripten
 
 - `dep-emsdk` — download and install emsdk into `<TAU_SHARED_PREFIX>/emsdk`,

@@ -34,14 +34,17 @@ fi
 # Emscripten bakes its virtual home, /home/web_user, into every JS file that
 # carries its file system; it is not a build path, so it and anything below it
 # are exempt, while every other home still counts.
+# Two Boost comments name an example path: framework.ipp writes
+# /tmp/mylogsink.xml and parameter_cache.hpp writes /home/user/.boost_compute.
+# Neither is a build path, so the exact literals are exempt too.
 if echo x | grep -qP 'x' 2>/dev/null; then
 	grep_mode=-aoP
 	pattern='(?<![A-Za-z0-9_/\\])(/home/(?!web_user(?:$|[^A-Za-z0-9_.+-]))[A-Za-z0-9_.+-]+|/Users/[A-Za-z0-9_.+-]+|/[A-Za-z]/Users/[A-Za-z0-9_.+-]+|/root|/tmp/[A-Za-z0-9_.+-]+|[A-Za-z]:[\\/]Users[\\/][A-Za-z0-9_.+-]+)[\\/A-Za-z0-9_.+-]*'
-	exclude='XXXXXX$'
+	exclude='XXXXXX$|^/tmp/mylogsink\.xml$|^/home/user/\.boost_compute/'
 else
 	grep_mode=-aoE
 	pattern='(/home/[A-Za-z0-9_.+-]+|/Users/[A-Za-z0-9_.+-]+|/[A-Za-z]/Users/[A-Za-z0-9_.+-]+|/root|/tmp/[A-Za-z0-9_.+-]+|[A-Za-z]:[\\/]Users[\\/][A-Za-z0-9_.+-]+)[\\/A-Za-z0-9_.+-]*'
-	exclude='XXXXXX$|^/home/web_user(/|$)'
+	exclude='XXXXXX$|^/home/web_user(/|$)|^/tmp/mylogsink\.xml$|^/home/user/\.boost_compute/'
 fi
 staging='\.staging-[A-Za-z0-9_-]+'
 

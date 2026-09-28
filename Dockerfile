@@ -110,7 +110,8 @@ ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
 RUN --mount=type=secret,id=gh_token \
 	if [ "$TESTS" = "yes" ]; then \
 		scripts/with-gh-token ./dev preset ${BUILD_PRESET} --configure-only \
-			-DTAU_PARSER_DEPS_FROM_STORE=ON -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+			-DTAU_PARSER_DEPS_FROM_STORE=ON -DTAU_PARSER_BUILD_SERVE=ON \
+			-DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 	fi
 
 FROM linux-resolve AS linux-publish
@@ -159,7 +160,7 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=gh_token \
 	if [ "$TESTS" = "yes" ]; then \
 	scripts/with-gh-token ./dev preset ${BUILD_PRESET}-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS} \
-		-DTAU_PARSER_DEPS_FROM_STORE=ON \
+		-DTAU_PARSER_DEPS_FROM_STORE=ON -DTAU_PARSER_BUILD_SERVE=ON \
 		|| exit 1; \
 fi
 
@@ -215,7 +216,8 @@ WORKDIR /parser
 RUN --mount=type=secret,id=gh_token \
 	if [ "$TESTS" = "yes" ]; then \
 		scripts/with-gh-token ./dev preset release-w64-tests --configure-only \
-			-DTAU_PARSER_DEPS_FROM_STORE=ON -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+			-DTAU_PARSER_DEPS_FROM_STORE=ON -DTAU_PARSER_BUILD_SERVE=ON \
+			-DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 	fi
 
 FROM linux-mingw64-wine-resolve AS linux-mingw64-wine-publish
@@ -259,7 +261,7 @@ RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	echo " (BUILD) -- Running tests under wine: $TESTS" && \
 	if [ "$TESTS" = "yes" ]; then \
 		scripts/with-gh-token ./dev preset release-w64-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS} \
-			-DTAU_PARSER_DEPS_FROM_STORE=ON; \
+			-DTAU_PARSER_DEPS_FROM_STORE=ON -DTAU_PARSER_BUILD_SERVE=ON; \
 	fi
 
 # The parity script needs only the native tgf beside the cross-built

@@ -55,6 +55,16 @@ option(TAU_PARSER_BUILD_EMSCRIPTEN     "Build for Emscripten"               OFF)
 option(TAU_PARSER_BUILD_TESTS          "Build library tests"                OFF)
 option(TAU_PARSER_BUILD_EXAMPLES       "Build examples"                     OFF)
 option(TAU_PARSER_BUILD_TGF            "Build tgf tool"                     OFF)
+# Remember whether the user set the serve option, so TAU_PARSER_BUILD_ALL
+# turns it on only when the user did not choose a value.
+if(DEFINED TAU_PARSER_BUILD_SERVE)
+	set(_TAU_SERVE_USER_SET ON)
+else()
+	set(_TAU_SERVE_USER_SET OFF)
+endif()
+option(TAU_PARSER_BUILD_SERVE          "Build tgf serve and tgf connect (needs the Boost headers)" OFF)
+set(TAU_BOOST_INCLUDE_DIR "" CACHE PATH
+	"Boost headers for TAU_PARSER_BUILD_SERVE (empty tries the store, then the system)")
 option(TAU_RUN_GRAMMAR_TESTS           "Run the .tgf.test grammar suites"   OFF)
 option(TAU_PARSER_BUILD_BROWSER_TESTS  "Run WASM tests in headless Chrome (Emscripten only)" OFF)
 option(TAU_PARSER_BUILD_BROWSER_PAGE   "Build the browser page files (Emscripten only)" OFF)
@@ -102,6 +112,7 @@ set_property(CACHE TAU_PARSER_BUILD_EMSCRIPTEN      PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_TESTS           PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_EXAMPLES        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_TGF             PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_PARSER_BUILD_SERVE           PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_RUN_GRAMMAR_TESTS            PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_BROWSER_TESTS   PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_BROWSER_PAGE    PROPERTY STRINGS "OFF" "ON")
@@ -156,6 +167,24 @@ if(TAU_PARSER_BUILD_TGF)
 	set(TAU_PARSER_MEASURE_SCOPES ON CACHE BOOL "Measure timed scopes in reports" FORCE)
 	set(TAU_PARSER_MEASURE_COUNTERS ON CACHE BOOL "Measure parse counters and metrics" FORCE)
 endif()
+
+# tgf serve and tgf connect need the Boost headers; the core library never
+# does. BUILD_ALL turns them on unless the user set the option. This runs after
+# the final TAU_PARSER_BUILD_TGF value and before parser-deps.
+if(TAU_PARSER_BUILD_EMSCRIPTEN)
+	# Emscripten has no sockets or processes.
+	set(TAU_PARSER_BUILD_SERVE OFF
+		CACHE BOOL "Build tgf serve and tgf connect (needs the Boost headers)" FORCE)
+elseif(NOT TAU_PARSER_BUILD_TGF)
+	# Serve is part of tgf. A plain variable keeps the cached choice for a
+	# later configure that turns tgf on.
+	set(TAU_PARSER_BUILD_SERVE OFF)
+elseif(TAU_PARSER_BUILD_ALL AND NOT _TAU_SERVE_USER_SET)
+	set(TAU_PARSER_BUILD_SERVE ON
+		CACHE BOOL "Build tgf serve and tgf connect (needs the Boost headers)" FORCE)
+endif()
+unset(_TAU_SERVE_USER_SET)
+message(STATUS "TAU_PARSER_BUILD_SERVE: ${TAU_PARSER_BUILD_SERVE}")
 
 if(TAU_PARSER_BUILD_HEADER_ONLY AND (TAU_PARSER_BUILD_STATIC_LIBRARY OR TAU_PARSER_BUILD_SHARED_LIBRARY))
 	message(FATAL_ERROR "Cannot build header-only library together with static or shared libraries")
@@ -350,6 +379,31 @@ endfunction()
 # -DTAU_PARSER_DEPS_FROM_STORE=ON; otherwise the paths below keep the
 # system-package / FetchContent fallbacks.
 include(parser-deps)
+
+# Resolve the Boost include directory for the serve targets. The store prefix
+# wins over a system package, because a store build must use the headers it
+# resolved. The check fails early with a fix instead of a compiler error.
+set(TAU_BOOST_INCLUDE_DIR_RESOLVED "")
+if(TAU_PARSER_BUILD_SERVE)
+	if(TAU_BOOST_INCLUDE_DIR)
+		set(TAU_BOOST_INCLUDE_DIR_RESOLVED "${TAU_BOOST_INCLUDE_DIR}")
+	elseif(TAU_PARSER_DEPS_FROM_STORE AND TAU_PARSER_BOOST_HEADERS_PREFIX)
+		set(TAU_BOOST_INCLUDE_DIR_RESOLVED
+			"${TAU_PARSER_BOOST_HEADERS_PREFIX}/include")
+	else()
+		find_package(Boost 1.86 CONFIG QUIET)
+		if(Boost_FOUND AND Boost_INCLUDE_DIRS)
+			set(TAU_BOOST_INCLUDE_DIR_RESOLVED "${Boost_INCLUDE_DIRS}")
+		endif()
+	endif()
+	if(NOT EXISTS "${TAU_BOOST_INCLUDE_DIR_RESOLVED}/boost/version.hpp")
+		message(FATAL_ERROR
+			"TAU_PARSER_BUILD_SERVE needs the Boost headers, but no "
+			"boost/version.hpp was found. Set -DTAU_BOOST_INCLUDE_DIR=<dir>, "
+			"enable -DTAU_PARSER_DEPS_FROM_STORE=ON, or install Boost 1.86.")
+	endif()
+	message(STATUS "TAU_BOOST_INCLUDE_DIR: ${TAU_BOOST_INCLUDE_DIR_RESOLVED}")
+endif()
 
 # ankerl/unordered_dense — Robin Hood open-addressing hash map (MIT)
 include(unordered-dense)

@@ -1,15 +1,16 @@
 # cmake/parser-deps.cmake
-# Resolve FTXUI and unordered_dense from the dependency store at configure
-# time. OFF by default: a build that does not opt in (tau's parser SDK, a
-# local build) keeps the system-package / FetchContent paths in cmake/ftxui.cmake
-# and cmake/unordered-dense.cmake. CI stages pass -DTAU_PARSER_DEPS_FROM_STORE=ON.
+# Resolve FTXUI, unordered_dense, and the Boost headers from the dependency
+# store at configure time. OFF by default: a build that does not opt in (tau's
+# parser SDK, a local build) keeps the system-package / FetchContent paths in
+# cmake/ftxui.cmake and cmake/unordered-dense.cmake. CI stages pass
+# -DTAU_PARSER_DEPS_FROM_STORE=ON.
 
 include_guard(GLOBAL)
 
 include("${CMAKE_CURRENT_LIST_DIR}/tau-store.cmake")
 
 option(TAU_PARSER_DEPS_FROM_STORE
-	"Resolve FTXUI and unordered_dense from the dependency store" OFF)
+	"Resolve FTXUI, unordered_dense, and the Boost headers from the dependency store" OFF)
 
 # The producer scripts are bash; CMake must reach a bash that is not WSL's.
 if(NOT DEFINED TAU_BASH OR TAU_BASH STREQUAL "")
@@ -112,5 +113,12 @@ if(TAU_PARSER_DEPS_FROM_STORE)
 		_parser_deps_ensure(ftxui
 			"${PROJECT_SOURCE_DIR}/scripts/dep-ftxui.sh"
 			TAU_PARSER_FTXUI_PREFIX)
+	endif()
+	# The headers are identical on every target, so the producer needs no
+	# compiler. Only serve and connect read them.
+	if(TAU_PARSER_BUILD_SERVE)
+		_parser_deps_ensure(boost_headers
+			"${PROJECT_SOURCE_DIR}/scripts/dep-boost-headers.sh"
+			TAU_PARSER_BOOST_HEADERS_PREFIX)
 	endif()
 endif()
