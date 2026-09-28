@@ -142,7 +142,7 @@ bool parser<C, T>::input::next() {
 template <typename C, typename T>
 size_t parser<C, T>::input::pos() { return n; }
 template <typename C, typename T>
-bool parser<C, T>::input::eof() { return cur() == e; }
+bool parser<C, T>::input::eof() { return cur() == static_cast<C>(e); }
 template <typename C, typename T>
 C parser<C, T>::input::at(size_t p) {
 	if (isstream()) return static_cast<C>(
