@@ -21,10 +21,10 @@ done
 TMP_ROOT="${TMPDIR:-/tmp}"
 
 # Git Bash reports a scratch path as /tmp/..., CMake as C:/...; -m puts the
-# shell side in CMake's form so the two compare equal.
+# shell side in CMake's form and -l the long name, so the two compare equal.
 to_cmake_path() {
 	if command -v cygpath >/dev/null 2>&1; then
-		cygpath -m "$1"
+		cygpath -m -l "$1"
 	else
 		printf '%s' "$1"
 	fi

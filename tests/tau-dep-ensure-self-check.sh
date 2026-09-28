@@ -21,10 +21,10 @@ fail() {
 }
 
 # Git Bash reports a scratch path as /tmp/..., CMake as C:/...; -m puts the
-# shell side in CMake's form so the two compare equal.
+# shell side in CMake's form and -l the long name, so the two compare equal.
 to_cmake_path() {
 	if command -v cygpath >/dev/null 2>&1; then
-		cygpath -m "$1"
+		cygpath -m -l "$1"
 	else
 		printf '%s' "$1"
 	fi
@@ -110,20 +110,20 @@ dep_ensure out producer demo "$BLOCK" fake_producer || fail "cold producer faile
 [ -f "$out/file.txt" ] || fail "cold producer did not expose the package"
 case "$out" in
 	"$TAU_SHARED_PREFIX"/store/demo/*/prefix) ;;
-	*) fail "output prefix is not store-based: $out" ;;
+	*) fail "output prefix is not store-based: $out (shared prefix: $TAU_SHARED_PREFIX)" ;;
 esac
 
 # 2. a warm hit never calls the producer
 out_warm=""
 dep_ensure out_warm producer demo "$BLOCK" fake_producer || fail "warm hit failed"
 [ "$(calls)" -eq 1 ] || fail "warm hit called the producer (calls=$(calls))"
-[ "$out_warm" = "$out" ] || fail "warm hit returned a different prefix"
+[ "$out_warm" = "$out" ] || fail "warm hit returned a different prefix: $out_warm, expected $out"
 
 # 3. a consumer hit never calls the producer
 out_consumer=""
 dep_ensure out_consumer consumer demo "$BLOCK" fake_producer || fail "consumer hit failed"
 [ "$(calls)" -eq 1 ] || fail "consumer hit called the producer (calls=$(calls))"
-[ "$out_consumer" = "$out" ] || fail "consumer hit returned a different prefix"
+[ "$out_consumer" = "$out" ] || fail "consumer hit returned a different prefix: $out_consumer, expected $out"
 
 # 4. a changed field creates a new id and calls the producer again
 out_changed=""
@@ -150,7 +150,7 @@ out_semi_warm=""
 dep_ensure out_semi_warm producer demo "$BLOCK_SEMI" fake_producer \
 	|| fail "semicolon warm hit failed"
 [ "$(calls)" -eq "$before" ] || fail "semicolon warm hit called the producer"
-[ "$out_semi_warm" = "$out_semi" ] || fail "semicolon warm hit returned a different prefix"
+[ "$out_semi_warm" = "$out_semi" ] || fail "semicolon warm hit returned a different prefix: $out_semi_warm, expected $out_semi"
 
 # 7. a producer failure leaves no final entry and removes its staging
 before="$(calls)"
@@ -210,11 +210,11 @@ fi
 
 # 8. common output variable names are set on the caller
 dep_ensure prefix producer demo "$BLOCK" fake_producer || fail "out-var prefix failed"
-[ "$prefix" = "$out" ] || fail "out-var prefix was not set to the store prefix"
+[ "$prefix" = "$out" ] || fail "out-var prefix was not set to the store prefix: $prefix, expected $out"
 dep_ensure id producer demo "$BLOCK" fake_producer || fail "out-var id failed"
-[ "$id" = "$out" ] || fail "out-var id was not set"
+[ "$id" = "$out" ] || fail "out-var id was not set: $id, expected $out"
 dep_ensure status producer demo "$BLOCK" fake_producer || fail "out-var status failed"
-[ "$status" = "$out" ] || fail "out-var status was not set"
+[ "$status" = "$out" ] || fail "out-var status was not set: $status, expected $out"
 
 # 9. invalid arguments fail
 dep_ensure out bogus demo "$BLOCK" fake_producer && fail "an invalid mode was accepted"
@@ -297,7 +297,7 @@ wait "$p2" || fail "the second concurrent call failed"
 	|| fail "a concurrent cold start ran the producer $(( $(calls) - before )) times"
 [ -s "$SCRATCH/c1" ] && [ -s "$SCRATCH/c2" ] || fail "a concurrent call produced no prefix"
 [ "$(cat "$SCRATCH/c1")" = "$(cat "$SCRATCH/c2")" ] \
-	|| fail "concurrent calls returned different prefixes"
+	|| fail "concurrent calls returned different prefixes: $(cat "$SCRATCH/c1"), $(cat "$SCRATCH/c2")"
 
 # 12. corruption fails without a rebuild and keeps the CMake diagnostics
 printf 'corrupted\n' > "$out/file.txt"
