@@ -697,3 +697,187 @@ TEST_SUITE("diagnostics: resolve() lets the label decide, not text.data()") {
 			!= std::string::npos);
 	}
 }
+
+// result<void> is the shape for a function that only succeeds or fails:
+// success is the absence of an error, so there is no value to set and no
+// third "neither value nor error" state.
+static result<void> void_succeeds() {
+	result<void> r;
+	return r.with_value();
+}
+
+static result<void> void_fails() {
+	result<void> r;
+	return r.with_error(code::internal_error, "boom", 7);
+}
+
+static result<void> void_fails_with_assert_check() {
+	result<void> r;
+	return r.with_assert_check_error(code::solver_error, "backend failed");
+}
+
+TEST_SUITE("diagnostics: result<void>") {
+
+	TEST_CASE("a fresh result<void> is a success") {
+		result<void> r;
+		CHECK(r.has_value());
+		CHECK_FALSE(r.has_error());
+		CHECK(r.is_well_formed());
+	}
+
+	TEST_CASE("error() makes it fail") {
+		result<void> r;
+		r.error(code::parse_error, "bad token");
+		CHECK_FALSE(r.has_value());
+		CHECK(r.has_error());
+		CHECK(r.report().nodes().back().tag == code::parse_error);
+	}
+
+	TEST_CASE("with_error returns from a by-value result<void> function") {
+		result<void> r = void_fails();
+		CHECK_FALSE(r.has_value());
+		CHECK(r.has_error());
+		CHECK(r.report().nodes().back().tag == code::internal_error);
+		CHECK(r.report().nodes().back().value == 7);
+	}
+
+	TEST_CASE("with_assert_check_error returns from a by-value function") {
+		result<void> r = void_fails_with_assert_check();
+		CHECK_FALSE(r.has_value());
+		CHECK(r.has_error());
+		CHECK(r.report().nodes().back().tag == code::solver_error);
+	}
+
+	TEST_CASE("with_value returns from a by-value result<void> function") {
+		result<void> r = void_succeeds();
+		CHECK(r.has_value());
+		CHECK_FALSE(r.has_error());
+	}
+
+	TEST_CASE("with_value does not clear an error already held") {
+		result<void> r;
+		r.error(code::internal_error, "boom");
+		result<void> out = r.with_value();
+		CHECK_FALSE(out.has_value());
+		CHECK(out.has_error());
+	}
+
+	TEST_CASE("merge of a failed void child fails a void result") {
+		result<void> outer;
+		result<void> child;
+		child.error(code::parse_error, "child failed");
+		outer.merge(std::move(child));
+		CHECK_FALSE(outer.has_value());
+		CHECK(outer.has_error());
+		CHECK(outer.report().nodes().back().tag == code::parse_error);
+	}
+
+	TEST_CASE("operator<< chains merges into a result<void>") {
+		result<void> outer;
+		result<void> a, b;
+		a.report().count("a", 1);
+		b.report().count("b", 1);
+		outer << std::move(a) << std::move(b);
+		CHECK(outer.has_value());
+		CHECK(outer.report().nodes().size() == 2);
+	}
+
+	TEST_CASE("a result<void> merges a result<int> child") {
+		result<void> outer;
+		result<int> child;
+		child = 7;
+		child.report().count("child-metric", 1);
+		outer.merge(std::move(child));
+		CHECK(outer.has_value());
+		CHECK(outer.report().nodes().size() == 1);
+		CHECK(outer.report().str(outer.report().nodes()[0].key)
+			== "child-metric");
+	}
+
+	TEST_CASE("a result<int> merges a void child and keeps its value") {
+		result<int> outer;
+		outer = 5;
+		result<void> child;
+		child.report().count("child-metric", 1);
+		outer.merge(std::move(child));
+		CHECK(outer.has_value());
+		CHECK_FALSE(outer.has_error());
+		CHECK(*outer == 5);
+		CHECK(outer.report().nodes().size() == 1);
+	}
+
+	TEST_CASE("a failed void child drops a result<int>'s value") {
+		result<int> outer;
+		outer = 5;
+		result<void> child;
+		child.error(code::solver_error, "child failed");
+		outer.merge(std::move(child));
+		CHECK_FALSE(outer.has_value());
+		CHECK(outer.has_error());
+		CHECK(outer.report().nodes().back().tag == code::solver_error);
+	}
+}
+
+TEST_SUITE("diagnostics: merge_ok") {
+
+	TEST_CASE("a void child that succeeded reports true and merges") {
+		result<void> outer;
+		result<void> child;
+		child.report().count("child-metric", 1);
+		CHECK(outer.merge_ok(std::move(child)));
+		CHECK(outer.has_value());
+		CHECK(outer.report().nodes().size() == 1);
+	}
+
+	TEST_CASE("a failed void child reports false and still merges") {
+		result<void> outer;
+		result<void> child;
+		child.error(code::internal_error, "child failed");
+		CHECK_FALSE(outer.merge_ok(std::move(child)));
+		CHECK(outer.has_error());
+		CHECK(outer.report().nodes().back().tag == code::internal_error);
+	}
+
+	TEST_CASE("a result<int> merge_ok a void child and keeps its value") {
+		result<int> outer;
+		outer = 5;
+		result<void> child;
+		child.report().count("child-metric", 1);
+		CHECK(outer.merge_ok(std::move(child)));
+		CHECK(outer.has_value());
+		CHECK(*outer == 5);
+		CHECK(outer.report().nodes().size() == 1);
+	}
+
+	TEST_CASE("a result<int> merge_ok failure drops its value") {
+		result<int> outer;
+		outer = 5;
+		result<void> child;
+		child.error(code::solver_error, "child failed");
+		CHECK_FALSE(outer.merge_ok(std::move(child)));
+		CHECK_FALSE(outer.has_value());
+		CHECK(outer.has_error());
+	}
+}
+
+// merge_take's constraint is on the child's value type, so a result<void>
+// parent can still take a value out of a result<int> child.
+TEST_SUITE("diagnostics: a result<void> takes a child's value") {
+
+	TEST_CASE("merge_take takes the child's value or its error") {
+		result<void> outer;
+		result<int> ok;
+		ok = 7;
+		auto v = outer.merge_take(std::move(ok));
+		CHECK(v == 7);
+		CHECK(outer.has_value());
+
+		result<void> failed;
+		result<int> bad;
+		bad.error(code::solver_error, "child failed");
+		auto none = failed.merge_take(std::move(bad));
+		CHECK(none == std::nullopt);
+		CHECK_FALSE(failed.has_value());
+		CHECK(failed.report().nodes().back().tag == code::solver_error);
+	}
+}
