@@ -11,7 +11,16 @@ if(NOT NODE_EXECUTABLE)
 endif()
 
 set(WASM_NODE_DIR    "${CMAKE_CURRENT_SOURCE_DIR}/build/release-wasm")
-set(WASM_BROWSER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/release-wasm/js/tgf")
+
+# A browser-only run (no wasm build) passes the parser-wasm store prefix; the
+# browser tests then serve the package instead of the build directory.
+set(TAU_PARSER_WASM_PREFIX "" CACHE PATH
+	"Store prefix holding the parser-wasm package; empty to use the build dir")
+if(TAU_PARSER_WASM_PREFIX)
+	set(WASM_BROWSER_DIR "${TAU_PARSER_WASM_PREFIX}/js/tgf")
+else()
+	set(WASM_BROWSER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/release-wasm/js/tgf")
+endif()
 
 # tgf_wasm_parity_emcc - run tgf_node.js against preloaded tau.tgf
 add_test(NAME tgf_wasm_parity_emcc
