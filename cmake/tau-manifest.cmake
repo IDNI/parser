@@ -87,6 +87,12 @@ endif()
 
 include_guard(GLOBAL)
 
+# Functions record the policies in effect where they are defined, so the
+# functions below need a current policy under `cmake -P` and under include(),
+# while the file that includes this module keeps its own.
+cmake_policy(PUSH)
+cmake_policy(VERSION 3.10...3.31)
+
 # Split one key=value at the first '='. Values may contain '='.
 function(_tau_manifest_parse pair out_key out_value)
 	string(FIND "${pair}" "=" _eq)
@@ -779,5 +785,8 @@ if(CMAKE_SCRIPT_MODE_FILE STREQUAL CMAKE_CURRENT_LIST_FILE)
 	else()
 		message(FATAL_ERROR "tau-manifest: unknown command '${CMAKE_ARGV3}'")
 	endif()
+	cmake_policy(POP)
 	return()
 endif()
+
+cmake_policy(POP)

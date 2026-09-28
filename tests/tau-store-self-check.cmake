@@ -11,6 +11,8 @@
 # Every path is under a random scratch namespace below the temp dir. The real
 # ~/.tau is never touched.
 
+cmake_minimum_required(VERSION 3.10...3.31)
+
 if(CMAKE_ARGC LESS 4)
 	message(FATAL_ERROR
 		"usage: cmake -P tau-store-self-check.cmake <store-module> [<temp-dir>]")
@@ -138,6 +140,7 @@ endif()
 # child dispatcher for the fatal paths
 set(_child "${_root}/tau-store-child.cmake")
 file(WRITE "${_child}"
+	"cmake_minimum_required(VERSION 3.10...3.31)\n"
 	"include(\"${_module}\")\n"
 	"if(CMAKE_ARGV3 STREQUAL \"lookup\")\n"
 	"\ttau_store_lookup(\"\${CMAKE_ARGV4}\" \"\${CMAKE_ARGV5}\" "

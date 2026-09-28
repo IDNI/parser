@@ -11,6 +11,8 @@
 # Every path is under a random scratch namespace below the temp dir. The real
 # ~/.tau is never touched.
 
+cmake_minimum_required(VERSION 3.10...3.31)
+
 if(CMAKE_ARGC LESS 4)
 	message(FATAL_ERROR
 		"usage: cmake -P tau-manifest-self-check.cmake <module> [<temp-dir>]")
@@ -241,10 +243,12 @@ if(UNIX)
 	# child dispatchers
 	set(_verify_child "${_root}/verify.cmake")
 	file(WRITE "${_verify_child}"
+		"cmake_minimum_required(VERSION 3.10...3.31)\n"
 		"include(\"${_module}\")\n"
 		"tau_manifest_verify(\"\${CMAKE_ARGV3}\" \"\${CMAKE_ARGV4}\" \"\${CMAKE_ARGV5}\")\n")
 	set(_map_child "${_root}/map.cmake")
 	file(WRITE "${_map_child}"
+		"cmake_minimum_required(VERSION 3.10...3.31)\n"
 		"include(\"${_module}\")\n"
 		"tau_output_map(_m \"\${CMAKE_ARGV3}\")\n")
 
@@ -312,6 +316,7 @@ if(UNIX)
 	# a write whose id does not match its fields is rejected
 	set(_mw_child "${_root}/mismatch-write.cmake")
 	file(WRITE "${_mw_child}"
+		"cmake_minimum_required(VERSION 3.10...3.31)\n"
 		"include(\"${_module}\")\n"
 		"tau_manifest_write(\"${_root}/mismatch.json\" "
 		"\"0000000000000000000000000000000000000000000000000000000000000000\" "
