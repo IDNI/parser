@@ -134,8 +134,10 @@ _dep_parser_wasm_producer() {
 	local staging_prefix="$1" build_dir="$2"
 	local rel
 	local files="tauparser.js tauparser.wasm tauparser.node.js tauparser.html
-		tgf_node.js tgf_node.wasm syntax_highlighter.js syntax_highlighter.wasm
+		tgf_node.js tgf_node.wasm tgf_node.data
+		syntax_highlighter.js syntax_highlighter.wasm
 		js/tgf/tgf_standalone.js js/tgf/tgf_standalone.wasm
+		js/tgf/tgf_standalone.data
 		js/tgf/index.html js/tgf/index.mjs
 		js/tgf/shell.css js/tgf/terminal.js js/tgf/sw.js
 		js/tgf/vendor/xterm.js js/tgf/vendor/xterm.css
