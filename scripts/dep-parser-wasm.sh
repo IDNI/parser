@@ -4,20 +4,18 @@
 #   ./dev dep-parser-wasm \
 #     -DTAU_DEP_MODE=producer \
 #     -DTAU_PARSER_WASM_BUILD_DIR=build/release-wasm \
-#     -DTAU_PARSER_UNORDERED_DENSE_ID=<id> \
-#     -DTAU_DEP_CC=<emcc> -DTAU_DEP_CXX=<emcc> \
-#     -DTAU_DEP_CFLAGS=<flags> -DTAU_DEP_CXXFLAGS=<flags> \
-#     -DTAU_DEP_TARGET=wasm32-emscripten
+#     -DTAU_PARSER_WASM_CMAKE_CACHE=build/release-wasm/CMakeCache.txt
 #
 # The producer does not build anything: it publishes the artifacts the wasm
-# preset already wrote (a -browser build, so the browser page files exist),
-# so the entry holds the bytes the browser gate serves. Consumer mode only
-# looks up the entry and never compiles wasm.
+# preset already wrote (a build with the browser page enabled), so the entry
+# holds the bytes the browser gate serves. Consumer mode only looks up the
+# entry and never compiles wasm.
 #
-# The id hashes the source tree and the build-affecting toolchain inputs: the
-# wasm-target unordered_dense package id (FTXUI stays on the patched
-# FetchContent path, so the tree hash covers it), the emcc compiler and the
-# recorded flags. Writer and scanner hashes are provenance, not id inputs.
+# Both modes read the identity from the same CMakeCache.txt, so the id cannot
+# drift from the build: the compiler, the build-type flags, the thread option
+# and the dependency prefixes (and so their ids). The source tree hash covers
+# the per-target flags the cache does not record. Writer and scanner hashes
+# are provenance, not id inputs.
 set -u
 
 DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -42,14 +40,46 @@ _dep_parser_wasm_tree_hash() {
 	printf '%s' "$value"
 }
 
+# One cache value, empty when the key is absent. The value may hold spaces.
+_parser_wasm_cache_value() {
+	local cache="$1" key="$2" line
+	line="$(grep -m1 "^${key}:" "$cache" 2>/dev/null)" || { printf ''; return 0; }
+	printf '%s' "${line#*=}"
+}
+
+# The build-type flags the configure used: base flags plus the type override.
+_parser_wasm_flags() {
+	local cache="$1" lang="$2" type="$3"
+	printf '%s' "$(_parser_wasm_cache_value "$cache" "CMAKE_${lang}_FLAGS") $(_parser_wasm_cache_value "$cache" "CMAKE_${lang}_FLAGS_${type}")" \
+		| sed -e 's/^ *//' -e 's/ *$//'
+}
+
+# The store id of a dependency prefix recorded in the cache.
+_parser_wasm_prefix_id() {
+	local cache="$1" key="$2" prefix
+	prefix="$(_parser_wasm_cache_value "$cache" "$key")"
+	[ -n "$prefix" ] || return 1
+	basename "$(dirname "$prefix")"
+}
+
 _dep_parser_wasm_field_block() {
-	local recipe_hash tree_hash threads
+	local recipe_hash tree_hash build_type threads cflags cxxflags compiler
+	local ftxui_id unordered_dense_id
 	local build_helper publish_helper manifest store
 	local build_hash publish_hash manifest_hash store_hash
-	# The browser page and tgf_standalone are built with pthreads, so the
-	# pthread variant is a different package.
+	build_type="$(_parser_wasm_cache_value "$TAU_PARSER_WASM_CMAKE_CACHE" CMAKE_BUILD_TYPE)"
+	[ -n "$build_type" ] || { echo "dep-parser-wasm: no CMAKE_BUILD_TYPE in the cache" >&2; return 1; }
+	build_type="$(printf '%s' "$build_type" | tr '[:lower:]' '[:upper:]')"
+	compiler="$(_parser_wasm_cache_value "$TAU_PARSER_WASM_CMAKE_CACHE" CMAKE_CXX_COMPILER)"
+	[ -n "$compiler" ] || { echo "dep-parser-wasm: no CMAKE_CXX_COMPILER in the cache" >&2; return 1; }
+	cflags="$(_parser_wasm_flags "$TAU_PARSER_WASM_CMAKE_CACHE" C "$build_type")"
+	cxxflags="$(_parser_wasm_flags "$TAU_PARSER_WASM_CMAKE_CACHE" CXX "$build_type")"
 	threads="OFF"
-	case " ${TAU_PARSER_WASM_CXXFLAGS:-} " in *" -pthread "*) threads="ON" ;; esac
+	case " ${cxxflags} " in *" -pthread "*) threads="ON" ;; esac
+	ftxui_id="$(_parser_wasm_prefix_id "$TAU_PARSER_WASM_CMAKE_CACHE" TAU_PARSER_FTXUI_PREFIX)" \
+		|| { echo "dep-parser-wasm: no TAU_PARSER_FTXUI_PREFIX in the cache" >&2; return 1; }
+	unordered_dense_id="$(_parser_wasm_prefix_id "$TAU_PARSER_WASM_CMAKE_CACHE" TAU_PARSER_UNORDERED_DENSE_PREFIX)" \
+		|| { echo "dep-parser-wasm: no TAU_PARSER_UNORDERED_DENSE_PREFIX in the cache" >&2; return 1; }
 	build_helper="${__devrc_dir}/dep-build"
 	publish_helper="${__devrc_dir}/devrc"
 	manifest="${__devrc_dir}/../cmake/tau-manifest.cmake"
@@ -63,13 +93,14 @@ _dep_parser_wasm_field_block() {
 	printf '%s\n' \
 		"dep=parser-wasm" \
 		"parser_tree_hash=${tree_hash}" \
-		"compiler_id=$(dep_compiler_id "$TAU_PARSER_WASM_CXX")" \
-		"compiler_version=$(dep_compiler_version "$TAU_PARSER_WASM_CXX")" \
+		"compiler_id=$(dep_compiler_id "$compiler")" \
+		"compiler_version=$(dep_compiler_version "$compiler")" \
 		"target_triple=wasm32" \
-		"cflags=${TAU_PARSER_WASM_CFLAGS}" \
-		"cxxflags=${TAU_PARSER_WASM_CXXFLAGS}" \
+		"cflags=${cflags}" \
+		"cxxflags=${cxxflags}" \
 		"threads=${threads}" \
-		"unordered_dense_package_id=${TAU_PARSER_UNORDERED_DENSE_ID}" \
+		"ftxui_package_id=${ftxui_id}" \
+		"unordered_dense_package_id=${unordered_dense_id}" \
 		"recipe_hash=${recipe_hash}" \
 		"helper_build_hash=${build_hash}" \
 		"provenance.publish_helper_hash=${publish_hash}" \
@@ -115,24 +146,19 @@ case "$mode" in
 esac
 
 TAU_PARSER_WASM_BUILD_DIR="$(dep_var TAU_PARSER_WASM_BUILD_DIR "")"
-TAU_PARSER_UNORDERED_DENSE_ID="$(dep_var TAU_PARSER_UNORDERED_DENSE_ID "")"
+TAU_PARSER_WASM_CMAKE_CACHE="$(dep_var TAU_PARSER_WASM_CMAKE_CACHE "")"
 TAU_PARSER_WASM_TREE="$(dep_var TAU_PARSER_WASM_TREE "$DEV_ROOT")"
-
-TAU_PARSER_WASM_CC="$(dep_var TAU_DEP_CC "")"
-TAU_PARSER_WASM_CXX="$(dep_var TAU_DEP_CXX "")"
-TAU_PARSER_WASM_CFLAGS="$(dep_var TAU_DEP_CFLAGS "")"
-TAU_PARSER_WASM_CXXFLAGS="$(dep_var TAU_DEP_CXXFLAGS "")"
-TAU_PARSER_WASM_TARGET="$(dep_var TAU_DEP_TARGET "")"
 
 if [ "$mode" = "producer" ] && [ -z "$TAU_PARSER_WASM_BUILD_DIR" ]; then
 	echo "dep-parser-wasm: -DTAU_PARSER_WASM_BUILD_DIR is required" >&2
 	exit 2
 fi
-[ -n "$TAU_PARSER_UNORDERED_DENSE_ID" ] || { echo "dep-parser-wasm: -DTAU_PARSER_UNORDERED_DENSE_ID is required" >&2; exit 2; }
-[ -n "$TAU_PARSER_WASM_CXX" ] || { echo "dep-parser-wasm: no compiler; pass -DTAU_DEP_CXX" >&2; exit 2; }
-[ -n "$TAU_PARSER_WASM_CC" ] || { echo "dep-parser-wasm: no compiler; pass -DTAU_DEP_CC" >&2; exit 2; }
-[ "$TAU_PARSER_WASM_TARGET" = "wasm32-emscripten" ] || {
-	echo "dep-parser-wasm: target must be wasm32-emscripten, got '${TAU_PARSER_WASM_TARGET}'" >&2
+[ -n "$TAU_PARSER_WASM_CMAKE_CACHE" ] || {
+	echo "dep-parser-wasm: -DTAU_PARSER_WASM_CMAKE_CACHE is required" >&2
+	exit 2
+}
+[ -f "$TAU_PARSER_WASM_CMAKE_CACHE" ] || {
+	echo "dep-parser-wasm: cache is not a file: '$TAU_PARSER_WASM_CMAKE_CACHE'" >&2
 	exit 2
 }
 

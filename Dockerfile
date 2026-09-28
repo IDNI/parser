@@ -310,12 +310,6 @@ ARG BUILD_JOBS=1
 ARG TAU_STORE_REMOTE=
 ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
 
-# The wasm toolchain and flags the package identity records. Both wasm stages
-# must pass the same values, so consumer mode in the browser gate resolves
-# the same id.
-ARG TAU_PARSER_WASM_EMCC=/root/.tau/emsdk/upstream/emscripten/emcc
-ARG TAU_PARSER_WASM_FLAGS=-O3 -DNDEBUG
-
 COPY --from=source /parser /parser
 
 # The browser page ships in the package, and its build reads the xterm vendor.
@@ -328,15 +322,10 @@ RUN --mount=type=secret,id=gh_token \
 	echo "(BUILD) -- Building the wasm artifacts" && \
 	scripts/with-gh-token ./dev preset release-wasm-tests-browser -DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		-DTAU_PARSER_DEPS_FROM_STORE=ON && \
-	unordered_dense_id="$(sed -n 's/^TAU_PARSER_UNORDERED_DENSE_PREFIX:[^=]*=//p' build/release-wasm/CMakeCache.txt \
-		| xargs -r dirname | xargs -r basename)" && \
 	scripts/with-gh-token ./dev dep-parser-wasm.sh \
 		-DTAU_DEP_MODE=producer \
 		-DTAU_PARSER_WASM_BUILD_DIR=build/release-wasm \
-		-DTAU_PARSER_UNORDERED_DENSE_ID="${unordered_dense_id}" \
-		-DTAU_DEP_CC="${TAU_PARSER_WASM_EMCC}" -DTAU_DEP_CXX="${TAU_PARSER_WASM_EMCC}" \
-		-DTAU_DEP_CFLAGS="${TAU_PARSER_WASM_FLAGS}" -DTAU_DEP_CXXFLAGS="${TAU_PARSER_WASM_FLAGS}" \
-		-DTAU_DEP_TARGET=wasm32-emscripten
+		-DTAU_PARSER_WASM_CMAKE_CACHE=build/release-wasm/CMakeCache.txt
 
 # The node tests read the same build directory. The browser tests need Chrome,
 # which this gate does not carry, so only the node pair runs here.
@@ -390,11 +379,6 @@ ARG BUILD_JOBS=1
 ARG TAU_STORE_REMOTE=
 ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
 
-# The wasm toolchain and flags the package identity records. The browser gate
-# only consumes, so these must match the wasm-node stage's producer values.
-ARG TAU_PARSER_WASM_EMCC=/root/.tau/emsdk/upstream/emscripten/emcc
-ARG TAU_PARSER_WASM_FLAGS=-O3 -DNDEBUG
-
 COPY --from=source /parser /parser
 
 # The parser-wasm store entry the wasm-node stage published, plus the wasm
@@ -413,14 +397,9 @@ RUN --mount=type=secret,id=gh_token \
 # Consume the parser-wasm package and register the browser tests against it.
 # This configure generates the page and test lists but never builds wasm.
 RUN --mount=type=secret,id=gh_token \
-	unordered_dense_id="$(sed -n 's/^TAU_PARSER_UNORDERED_DENSE_PREFIX:[^=]*=//p' /parser-wasm-cmakecache.txt \
-		| xargs -r dirname | xargs -r basename)" && \
 	wasm_prefix="$(scripts/with-gh-token ./dev dep-parser-wasm.sh \
 		-DTAU_DEP_MODE=consumer \
-		-DTAU_PARSER_UNORDERED_DENSE_ID="${unordered_dense_id}" \
-		-DTAU_DEP_CC="${TAU_PARSER_WASM_EMCC}" -DTAU_DEP_CXX="${TAU_PARSER_WASM_EMCC}" \
-		-DTAU_DEP_CFLAGS="${TAU_PARSER_WASM_FLAGS}" -DTAU_DEP_CXXFLAGS="${TAU_PARSER_WASM_FLAGS}" \
-		-DTAU_DEP_TARGET=wasm32-emscripten)" && \
+		-DTAU_PARSER_WASM_CMAKE_CACHE=/parser-wasm-cmakecache.txt)" && \
 	scripts/with-gh-token ./dev preset release-wasm-tests-browser --configure-only \
 		-DTAU_BUILD_JOBS=${BUILD_JOBS} -DTAU_PARSER_DEPS_FROM_STORE=ON \
 		-DTAU_PARSER_WASM_PREFIX="${wasm_prefix}" && \
