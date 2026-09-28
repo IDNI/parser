@@ -382,6 +382,13 @@ struct hash_lcrs_tref {
 	size_t operator()(tref r) const;
 };
 
+// Hash of a (subtree, slot) key that agrees with subtree_pair_equal:
+// the subtree part ignores the sibling, the slot is combined on top.
+template <typename T, typename PT>
+struct hash_lcrs_tref_pair {
+	size_t operator()(const std::pair<tref, PT>& p) const;
+};
+
 template <typename T>
 struct hash_htree {
 	size_t operator()(const htree& h) const;
@@ -1120,7 +1127,7 @@ struct post_order {
 private:
 	tref root;
 	using cache_t = std::unordered_map<std::pair<tref, size_t>, tref,
-		std::hash<std::pair<tref, size_t> >, subtree_pair_equal<node,
+		hash_lcrs_tref_pair<node, size_t>, subtree_pair_equal<node,
 			size_t>>;
 	inline static cache_t& m = bintree<node>::template create_cache<cache_t>();
 
@@ -1383,7 +1390,7 @@ struct pre_order {
 private:
 	tref root;
 	using cache_t = std::unordered_map<std::pair<tref, size_t>, tref,
-		std::hash<std::pair<tref, size_t> >, subtree_pair_equal<node,
+		hash_lcrs_tref_pair<node, size_t>, subtree_pair_equal<node,
 			size_t>>;
 	inline static cache_t& m = bintree<node>::template create_cache<cache_t>();
 

@@ -518,6 +518,14 @@ size_t hash_lcrs_tref<T>::operator()(tref r) const {
 	return static_cast<size_t>(seed);
 }
 
+template <typename T, typename PT>
+size_t hash_lcrs_tref_pair<T, PT>::operator()(
+				const std::pair<tref, PT>& p) const {
+	std::uint64_t seed = 0;
+	hash_combine(seed, hash_lcrs_tref<T>{}(p.first), p.second);
+	return static_cast<size_t>(seed);
+}
+
 template <typename T>
 size_t hash_htree<T>::operator()(const htree& h) const {
 	return hash_tref<T>{}(h.get());
