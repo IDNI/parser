@@ -393,6 +393,11 @@ preset_entry() {
 	cmake ${fresh[@]+"${fresh[@]}"} --preset "${PRESET}" \
 		${generator_args[@]+"${generator_args[@]}"} \
 		${DEV_CMAKE[@]+"${DEV_CMAKE[@]}"}
+	local status=$?
+	if [[ $status -ne 0 ]]; then
+		echo "Configure failed"
+		return $status
+	fi
 
 	if [[ ${CONFIGURE_ONLY:-} == 1 ]]; then
 		echo "Configure-only; skipping the build"
@@ -408,7 +413,7 @@ preset_entry() {
 	fi
 	cmake --build --preset "${PRESET}" ${build_target[@]+"${build_target[@]}"} \
 		-- -j "${TAU_BUILD_JOBS}"
-	local status=$?
+	status=$?
 	if [[ $status -ne 0 ]]; then
 		echo "Build failed"
 		exit $status
