@@ -85,11 +85,11 @@ RUN echo "(BUILD) -- Building version: $(head -n 1 VERSION)"
 
 
 # ------------------------------------------------------------
-# linux-x86_64 store resolver: resolve the packages the build reads and
-# publish the ones the remote lacks, before any test runs. A failed test
-# then keeps the publish in place.
+# linux-x86_64 store resolver: resolve the packages the build reads, so the
+# test job finds them in the layer cache. The publish is a side stage, so an
+# argument that only the publish uses never changes a resolve layer.
 
-FROM source AS linux-deps
+FROM source AS linux-resolve
 
 # Argument BUILD_PRESET=release/debug picks the CMake preset family
 ARG BUILD_PRESET=release
@@ -113,6 +113,8 @@ RUN --mount=type=secret,id=gh_token \
 			-DTAU_PARSER_DEPS_FROM_STORE=ON -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 	fi
 
+FROM linux-resolve AS linux-publish
+
 # The trusted workflow turns this on: this stage publishes the packages the
 # remote lacks, so the Linux ids match what every Docker consumer requests.
 # Off for every other build.
@@ -126,7 +128,7 @@ RUN --mount=type=secret,id=gh_token \
 # ------------------------------------------------------------
 # Linux build and its test suite
 
-FROM linux-deps AS linux
+FROM linux-resolve AS linux
 
 # ccache keeps compiled objects in a cache mount, so a source change only
 # recompiles what it touches. CI carries the mount across runs.
@@ -183,9 +185,10 @@ RUN wineboot --init && wineserver -w
 
 # ------------------------------------------------------------
 # windows-x86_64-mingw store resolver: resolve the packages the cross build
-# reads and publish the ones the remote lacks, before any test runs.
+# reads, so the test job finds them in the layer cache. The publish is a side
+# stage, so a publish argument never changes a resolve layer.
 
-FROM w64-deps AS linux-mingw64-wine-deps
+FROM w64-deps AS linux-mingw64-wine-resolve
 
 ARG TESTS=yes
 
@@ -207,8 +210,10 @@ RUN --mount=type=secret,id=gh_token \
 			-DTAU_PARSER_DEPS_FROM_STORE=ON -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 	fi
 
+FROM linux-mingw64-wine-resolve AS linux-mingw64-wine-publish
+
 # The trusted workflow turns this on to publish the mingw packages the w64
-# consumers read. It runs before the tests, so their failure keeps it.
+# consumers read.
 ARG TAU_STORE_PUBLISH=OFF
 RUN --mount=type=secret,id=gh_token \
 	if [ "$TAU_STORE_PUBLISH" = "ON" ]; then \
@@ -219,7 +224,7 @@ RUN --mount=type=secret,id=gh_token \
 # ------------------------------------------------------------
 # Windows cross build, with the suite run under wine
 
-FROM linux-mingw64-wine-deps AS linux-mingw64-wine
+FROM linux-mingw64-wine-resolve AS linux-mingw64-wine
 
 ARG TESTS=yes
 
@@ -338,11 +343,11 @@ RUN EMSDK_NODE_BIN="$(ls -d /root/.tau/emsdk/node/*/bin | head -n1)" && \
 
 
 # ------------------------------------------------------------
-# WebAssembly build gate: build the Emscripten artifacts and the browser page
-# (the page is a build output, not a browser test), and publish them as the
-# parser-wasm store package the browser gate consumes. No tests here.
+# WebAssembly resolve: install the xterm vendor and resolve the wasm
+# dependencies. The publish and the build are separate stages, so a publish
+# argument never changes a stage the browser job has to rebuild.
 
-FROM wasm-deps AS wasm-build
+FROM wasm-deps AS wasm-resolve
 
 ARG BUILD_JOBS=1
 
@@ -363,15 +368,24 @@ RUN --mount=type=secret,id=gh_token \
 		-DTAU_BUILD_JOBS=${BUILD_JOBS} -DTAU_PARSER_DEPS_FROM_STORE=ON \
 		-DTAU_PARSER_BUILD_BROWSER_PAGE=ON
 
+FROM wasm-resolve AS wasm-publish
+
 # The trusted workflow turns this on. It runs before the parser-wasm producer
 # below, so only the wasm FTXUI and unordered_dense packages are published;
-# parser-wasm travels through the layer cache within one run. It runs before
-# the wasm build, so a failed build keeps the publish.
+# parser-wasm travels through the layer cache within one run.
 ARG TAU_STORE_PUBLISH=OFF
 RUN --mount=type=secret,id=gh_token \
 	if [ "$TAU_STORE_PUBLISH" = "ON" ]; then \
 		scripts/with-gh-token ./dev store-publish; \
 	fi
+
+
+# ------------------------------------------------------------
+# WebAssembly build gate: build the Emscripten artifacts and the browser page
+# (the page is a build output, not a browser test), and produce the
+# parser-wasm store package the browser gate consumes. No tests here.
+
+FROM wasm-resolve AS wasm-build
 
 RUN --mount=type=secret,id=gh_token \
 	echo "(BUILD) -- Building the wasm artifacts" && \

@@ -23,13 +23,17 @@ case "${CMD}" in
 		echo "  base               - build the base image (system packages)"
 		echo "  deps               - build the deps image (oras store client)"
 		echo "  source             - build the source image"
-		echo "  linux-deps         - resolve and publish the Linux store packages"
+		echo "  linux-resolve      - resolve the Linux store packages"
+		echo "  linux-publish      - publish the Linux store packages"
 		echo "  linux              - build and run the suite on Linux"
 		echo "  w64-deps           - build the w64-deps image (wine)"
-		echo "  linux-mingw64-wine-deps - resolve and publish the MinGW store packages"
+		echo "  linux-mingw64-wine-resolve - resolve the MinGW store packages"
+		echo "  linux-mingw64-wine-publish - publish the MinGW store packages"
 		echo "  linux-mingw64-wine - cross-build for Windows, run the suite under wine"
 		echo "  wasm-deps          - build the wasm-deps image (emsdk + node)"
-		echo "  wasm-build         - build the wasm artifacts and publish parser-wasm"
+		echo "  wasm-resolve       - resolve the wasm store packages"
+		echo "  wasm-publish       - publish the wasm store packages"
+		echo "  wasm-build         - build the wasm artifacts and produce parser-wasm"
 		echo "  wasm-node          - build the wasm-node image and run the node suite"
 		echo "  wasm-browser-deps  - build the wasm-browser-deps image (Chrome, npm packages)"
 		echo "  wasm-browser       - build the wasm-browser image and run the browser suite"
@@ -48,8 +52,11 @@ case "${CMD}" in
 	"source")
 		build --target source -t parser:source "${@:2}"
 		;;
-	"linux-deps")
-		build --target linux-deps -t parser:linux-deps "${@:2}"
+	"linux-resolve")
+		build --target linux-resolve -t parser:linux-resolve "${@:2}"
+		;;
+	"linux-publish")
+		build --target linux-publish -t parser:linux-publish "${@:2}"
 		;;
 	"linux")
 		build --target linux -t parser:linux "${@:2}"
@@ -57,14 +64,23 @@ case "${CMD}" in
 	"w64-deps")
 		build --target w64-deps -t parser:w64-deps "${@:2}"
 		;;
-	"linux-mingw64-wine-deps")
-		build --target linux-mingw64-wine-deps -t parser:mingw64-wine-deps "${@:2}"
+	"linux-mingw64-wine-resolve")
+		build --target linux-mingw64-wine-resolve -t parser:mingw64-wine-resolve "${@:2}"
+		;;
+	"linux-mingw64-wine-publish")
+		build --target linux-mingw64-wine-publish -t parser:mingw64-wine-publish "${@:2}"
 		;;
 	"linux-mingw64-wine")
 		build --target linux-mingw64-wine -t parser:mingw64-wine "${@:2}"
 		;;
 	"wasm-deps")
 		build --target wasm-deps -t parser:wasm-deps "${@:2}"
+		;;
+	"wasm-resolve")
+		build --target wasm-resolve -t parser:wasm-resolve "${@:2}"
+		;;
+	"wasm-publish")
+		build --target wasm-publish -t parser:wasm-publish "${@:2}"
 		;;
 	"wasm-build")
 		build --target wasm-build -t parser:wasm-build "${@:2}"

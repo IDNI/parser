@@ -125,7 +125,7 @@ jobs:
 
       - name: Resolve and publish the store packages
         run: |
-          ./dev docker linux-deps \
+          ./dev docker linux-publish \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
@@ -207,9 +207,10 @@ jobs:
             --cache-from type=gha,scope=parser-wasm-deps \
             --cache-to   type=gha,scope=parser-wasm-deps,mode=max
 
-  # The wasm32-emscripten resolver: the wasm-build stage it drives publishes
+  # The wasm32-emscripten resolver: the wasm-publish stage it drives publishes
   # the FTXUI and unordered_dense packages. parser-wasm is produced after that
-  # publish, so it never reaches GHCR.
+  # publish, so it never reaches GHCR. The publish is its own stage, so the
+  # node build imports the same resolve layers the browser job reads.
   wasm-node:
     name: WebAssembly (Node.js)
     needs: [guard, wasm-deps]
@@ -229,14 +230,26 @@ jobs:
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
-      - name: Build and test
+      - name: Publish the wasm store packages
         run: |
-          ./dev docker wasm-node \
+          ./dev docker wasm-publish \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=parser-wasm-deps \
+            --cache-to   type=gha,scope=parser-wasm-build,mode=max
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and test
+        run: |
+          ./dev docker wasm-node \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=parser-wasm-deps \
+            --cache-from type=gha,scope=parser-wasm-build \
             --cache-to   type=gha,scope=parser-wasm-build,mode=max
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -293,7 +306,7 @@ jobs:
 
       - name: Resolve and publish the store packages
         run: |
-          ./dev docker linux-mingw64-wine-deps \
+          ./dev docker linux-mingw64-wine-publish \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
