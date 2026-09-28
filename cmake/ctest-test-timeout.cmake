@@ -16,7 +16,7 @@ function(tau_set_default_test_timeout)
 	endif()
 	foreach(_test IN LISTS _tests)
 		get_test_property("${_test}" TIMEOUT _timeout)
-		if("${_timeout}" MATCHES "-NOTFOUND$")
+		if(_timeout STREQUAL "NOTFOUND")
 			set_tests_properties("${_test}" PROPERTIES
 				TIMEOUT "${TAU_TEST_TIMEOUT}")
 		endif()
