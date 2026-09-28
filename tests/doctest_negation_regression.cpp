@@ -37,12 +37,14 @@ static void tgf_parses(const char* g_tgf, const string& input)
 	nonterminals<char> nts;
 	auto gr = tgf<char>::from_string(nts, string(g_tgf));
 	if (!gr.has_value()) {
-		FAIL_CHECK("TGF compile failed for grammar:\n" << g_tgf);
+		FAIL_CHECK(string("TGF compile failed for grammar:\n")
+			<< string(g_tgf));
 		return;
 	}
 	grammar<char> g = std::move(gr).value();
 	if (g.size() == 0) {
-		FAIL_CHECK("TGF produced empty grammar:\n" << g_tgf);
+		FAIL_CHECK(string("TGF produced empty grammar:\n")
+			<< string(g_tgf));
 		return;
 	}
 	for (auto tree_path : {parse_tree_path::bintree_path,
@@ -54,8 +56,9 @@ static void tgf_parses(const char* g_tgf, const string& input)
 		if (!r.found) {
 			string msg = r.parse_error.to_str(
 				parser<char>::error::info_lvl::INFO_BASIC);
-			FAIL_CHECK("expected input to parse (enable_gc="
-				<< gc << "), got error: '" << msg << "'");
+			FAIL_CHECK(string("expected input to parse (enable_gc=")
+				<< gc << string("), got error: '") << msg
+				<< string("'"));
 		}
 	}
 }
@@ -66,12 +69,14 @@ static void tgf_rejects(const char* g_tgf, const string& input)
 	nonterminals<char> nts;
 	auto gr = tgf<char>::from_string(nts, string(g_tgf));
 	if (!gr.has_value()) {
-		FAIL_CHECK("TGF compile failed for grammar:\n" << g_tgf);
+		FAIL_CHECK(string("TGF compile failed for grammar:\n")
+			<< string(g_tgf));
 		return;
 	}
 	grammar<char> g = std::move(gr).value();
 	if (g.size() == 0) {
-		FAIL_CHECK("TGF produced empty grammar:\n" << g_tgf);
+		FAIL_CHECK(string("TGF produced empty grammar:\n")
+			<< string(g_tgf));
 		return;
 	}
 	for (auto tree_path : {parse_tree_path::bintree_path,
@@ -81,8 +86,8 @@ static void tgf_rejects(const char* g_tgf, const string& input)
 		auto r = p.parse(input.data(), input.size(),
 			{ .tree_path = tree_path, .enable_gc = gc, .gc_lag = 1 });
 		if (r.found)
-			FAIL_CHECK("expected input to be rejected (enable_gc="
-				<< gc << "), but parse succeeded");
+			FAIL_CHECK(string("expected input to be rejected (enable_gc=")
+				<< gc << string("), but parse succeeded"));
 	}
 }
 
