@@ -473,12 +473,20 @@ RUN --mount=type=secret,id=gh_token \
 # Consume the parser-wasm package and register the browser tests against it.
 # This configure generates the page and test lists but never builds wasm.
 RUN --mount=type=secret,id=gh_token \
-	wasm_prefix="$(scripts/with-gh-token ./dev dep-parser-wasm.sh \
+	set -e; \
+	out="$(scripts/with-gh-token ./dev dep-parser-wasm.sh \
 		-DTAU_DEP_MODE=consumer \
-		-DTAU_PARSER_WASM_CMAKE_CACHE=/parser-wasm-cmakecache.txt)" && \
+		-DTAU_PARSER_WASM_CMAKE_CACHE=/parser-wasm-cmakecache.txt)"; \
+	wasm_prefix="$(printf '%s\n' "$out" | sed -n 's/^dep-parser-wasm: package prefix: //p')"; \
+	test -n "$wasm_prefix" || { \
+		echo "dep-parser-wasm: no package prefix line in the consumer output" >&2; \
+		exit 1; }; \
+	test -d "$wasm_prefix" || { \
+		echo "dep-parser-wasm: the package prefix is not a directory: '$wasm_prefix'" >&2; \
+		exit 1; }; \
 	scripts/with-gh-token ./dev preset release-wasm-tests-browser --configure-only \
 		-DTAU_BUILD_JOBS=${BUILD_JOBS} -DTAU_PARSER_DEPS_FROM_STORE=ON \
-		-DTAU_PARSER_WASM_PREFIX="${wasm_prefix}" && \
-	echo "(BUILD) -- Running the wasm browser tests" && \
+		-DTAU_PARSER_WASM_PREFIX="${wasm_prefix}"; \
+	echo "(BUILD) -- Running the wasm browser tests"; \
 	ctest --preset release-wasm-tests-browser -R tgf_browser \
 		-j ${BUILD_JOBS} --output-on-failure
