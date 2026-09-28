@@ -31,12 +31,17 @@ fi
 # prefer a grep with -P.
 # Git Bash and MSVC spell the home directory as /c/Users/<user>,
 # C:/Users/<user>, or C:\Users\<user>; all three are home paths.
+# Emscripten bakes its virtual home, /home/web_user, into every JS file that
+# carries its file system; it is not a build path, so it and anything below it
+# are exempt, while every other home still counts.
 if echo x | grep -qP 'x' 2>/dev/null; then
 	grep_mode=-aoP
-	pattern='(?<![A-Za-z0-9_/\\])(/home/[A-Za-z0-9_.+-]+|/Users/[A-Za-z0-9_.+-]+|/[A-Za-z]/Users/[A-Za-z0-9_.+-]+|/root|/tmp/[A-Za-z0-9_.+-]+|[A-Za-z]:[\\/]Users[\\/][A-Za-z0-9_.+-]+)[\\/A-Za-z0-9_.+-]*'
+	pattern='(?<![A-Za-z0-9_/\\])(/home/(?!web_user(?:$|[^A-Za-z0-9_.+-]))[A-Za-z0-9_.+-]+|/Users/[A-Za-z0-9_.+-]+|/[A-Za-z]/Users/[A-Za-z0-9_.+-]+|/root|/tmp/[A-Za-z0-9_.+-]+|[A-Za-z]:[\\/]Users[\\/][A-Za-z0-9_.+-]+)[\\/A-Za-z0-9_.+-]*'
+	exclude='XXXXXX$'
 else
 	grep_mode=-aoE
 	pattern='(/home/[A-Za-z0-9_.+-]+|/Users/[A-Za-z0-9_.+-]+|/[A-Za-z]/Users/[A-Za-z0-9_.+-]+|/root|/tmp/[A-Za-z0-9_.+-]+|[A-Za-z]:[\\/]Users[\\/][A-Za-z0-9_.+-]+)[\\/A-Za-z0-9_.+-]*'
+	exclude='XXXXXX$|^/home/web_user(/|$)'
 fi
 staging='\.staging-[A-Za-z0-9_-]+'
 
@@ -45,7 +50,7 @@ scan_file() {
 	local file="$1"
 	local matches count
 	matches="$(grep "${grep_mode}" "${pattern}|${staging}" "${file}" 2>/dev/null \
-		| grep -v 'XXXXXX$' | sort -u)"
+		| grep -vE "${exclude}" | sort -u)"
 	count="$(printf '%s\n' "${matches}" | grep -c . )"
 	if [ "${count}" -gt 0 ]; then
 		printf '%s\t%s\n' "${count}" "${file}"
