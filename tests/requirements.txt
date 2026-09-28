@@ -1,0 +1,13 @@
+# Test modules for tests/schema_check.py and the REPL tests. Every package is
+# pinned, so the Docker image and CI get the same versions. Make it with
+# uv pip compile --python-version 3.12 --universal from the four direct pins.
+attrs==26.1.0
+jsonschema==4.26.0
+jsonschema-specifications==2025.9.1
+pexpect==4.9.0
+ptyprocess==0.7.0
+pyte==0.8.2
+referencing==0.37.0
+rpds-py==2026.6.3
+typing-extensions==4.16.0 ; python_full_version < '3.13'
+wcwidth==0.9.1

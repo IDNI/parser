@@ -287,3 +287,15 @@ previously built `*_grammar` executables remain in the build tree until
 ## Testing
 
 - `test-with-tau` — clone `tau-lang`, build against current parser, run its tests
+
+## Python test modules
+
+The schema checks and the REPL tests import `jsonschema`, `pexpect` and
+`pyte`. Ubuntu's `python3-jsonschema` is too old for `tests/schema_check.py`,
+so build the venv from `tests/requirements.txt`:
+
+```bash
+uv venv --python 3.12 build/tau-python
+uv pip install --python build/tau-python/bin/python -r tests/requirements.txt
+export PATH="$PWD/build/tau-python/bin:$PATH"
+```

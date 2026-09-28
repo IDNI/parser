@@ -31,7 +31,16 @@ RUN apt-get update && apt-get install -y \
 	clang-19=1:19.1.1-1ubuntu1~24.04.2 \
 	mingw-w64=11.0.1-3build1 \
 	python3-distutils-extra \
-	python3-pexpect python3-pyte ccache
+	ccache
+
+# The schema and REPL tests need a newer jsonschema than Ubuntu ships, so uv
+# builds a venv and puts its bin ahead of the system python3.
+COPY --from=ghcr.io/astral-sh/uv:0.12.13@sha256:b485bd65cc2cf1c9a93b3554012c9c3778cf7b1b5fd3d3096ce9e1226c97e1e6 /uv /usr/local/bin/uv
+COPY tests/requirements.txt /opt/tau-python-requirements.txt
+RUN uv venv --python 3.12 /opt/tau-python && \
+	uv pip install --no-cache --python /opt/tau-python/bin/python \
+		-r /opt/tau-python-requirements.txt
+ENV PATH=/opt/tau-python/bin:$PATH
 
 # The presets name clang and clang++. The versioned package does not provide
 # those names.

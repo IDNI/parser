@@ -19,7 +19,7 @@ Options:
   -p, --prompt   Prompt pattern to wait for (default 'tgf>')
 
 Requirements:
-  pip install pexpect pyte   (or install the system packages)
+  pip install -r tests/requirements.txt
 """
 
 import sys
