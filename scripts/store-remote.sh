@@ -62,7 +62,7 @@ store_remote_pull() {
 	dep="${entry%%/*}"; id="${entry##*/}"
 	ref="$(store_remote_ref "$dep" "$id")"
 	tmp="$(mktemp -d "${TMPDIR:-/tmp}/tau-remote.XXXXXX")" || return 1
-	if ! oras pull "$ref" -o "$tmp" >&2; then
+	if ! (cd "$tmp" && oras pull "$ref" -o .) >&2; then
 		rm -rf "$tmp"
 		return 1
 	fi
@@ -98,10 +98,12 @@ store_remote_push() {
 		rm -rf "$tmp"
 		return 1
 	fi
-	if ! oras push \
+	# oras rejects an absolute file path, so push from inside the temp folder
+	# with the bare basename; the subshell keeps the caller's directory.
+	if ! (cd "$tmp" && oras push \
 			--artifact-type "application/vnd.tau.store.entry.v1" \
 			--annotation "dev.tau.store.entry=${entry}" \
-			"$ref" "$tar" >&2; then
+			"$ref" store-entry.tar) >&2; then
 		rm -rf "$tmp"
 		return 1
 	fi

@@ -63,6 +63,9 @@ export ORAS_LOG="$SCRATCH/oras.log"
 cat > "$SCRATCH/bin/oras" <<'SH'
 #!/bin/sh
 printf '%s\n' "$*" >> "$ORAS_LOG"
+# The real oras rejects an absolute path for both the pushed file and, on a
+# pull, the output directory.
+_abs() { case "$1" in /*|[A-Za-z]:[\\/]*) return 0 ;; *) return 1 ;; esac; }
 sub="${1:-}"
 case "$sub" in
 	manifest)
@@ -78,6 +81,10 @@ case "$sub" in
 			esac
 		done
 		[ -n "$dir" ] || exit 1
+		if _abs "$dir"; then
+			echo "Error: absolute file path detected: $dir" >&2
+			exit 1
+		fi
 		if [ -n "${FAKE_ORAS_PULL_SRC:-}" ] && [ -f "$FAKE_ORAS_PULL_SRC" ]; then
 			mkdir -p "$dir"
 			cp "$FAKE_ORAS_PULL_SRC" "$dir/store-entry.tar"
@@ -86,6 +93,18 @@ case "$sub" in
 		exit 1
 		;;
 	push)
+		shift
+		last=""
+		for arg in "$@"; do
+			case "$arg" in
+				-*) ;;
+				*) last="$arg" ;;
+			esac
+		done
+		if [ -z "$last" ] || _abs "$last"; then
+			echo "Error: absolute file path detected: $last" >&2
+			exit 1
+		fi
 		exit 0
 		;;
 esac
@@ -167,7 +186,21 @@ fi
 grep -q "is not on ${TAU_STORE_REMOTE}; building" "$SCRATCH/miss.err" \
 	|| fail "a remote miss was not reported"
 
-# ── 4. no remote: oras is never invoked and the producer builds ─────────
+# ── 4. a push names the tar relative to the temp folder ─────────────────
+# The fake oras rejects an absolute path, as the real one does, so this
+# fails if store_remote_push hands it the staged absolute tar path.
+: > "$ORAS_LOG"
+if ! "$PARSER_ROOT/scripts/store-remote.sh" push "$TAU_SHARED_PREFIX" \
+		"demo/${ID}" 2>"$SCRATCH/push.err"; then
+	fail_remote "a remote push failed"
+fi
+grep -q "^push " "$ORAS_LOG" || fail_remote "a remote push never called oras push"
+case "$(grep '^push ' "$ORAS_LOG" | tail -n 1)" in
+	*" store-entry.tar") ;;
+	*) fail_remote "the push did not name store-entry.tar" ;;
+esac
+
+# ── 5. no remote: oras is never invoked and the producer builds ─────────
 unset TAU_STORE_REMOTE
 export TAU_SHARED_PREFIX="$SCRATCH_CMAKE/local-store"
 : > "$ORAS_LOG"
