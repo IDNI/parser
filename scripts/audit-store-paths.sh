@@ -26,9 +26,7 @@ fi
 # trailing slash stop a mkstemp template such as /tmp/foo_XXXXXX from matching.
 # The path must not be preceded by a path or word character: that is what keeps
 # a Boost Spirit qi header path, whose middle component is the word home, from
-# reading as a home path under another account. PCRE provides the lookbehind;
-# without it the extended pattern is used and the false positive returns, so
-# prefer a grep with -P.
+# reading as a home path under another account.
 # Git Bash and MSVC spell the home directory as /c/Users/<user>,
 # C:/Users/<user>, or C:\Users\<user>; all three are home paths.
 # Emscripten bakes its virtual home, /home/web_user, into every JS file that
@@ -43,16 +41,28 @@ if echo x | grep -qP 'x' 2>/dev/null; then
 	exclude='XXXXXX$|^/tmp/mylogsink\.xml$|^/home/user/\.boost_compute/'
 else
 	grep_mode=-aoE
-	pattern='(/home/[A-Za-z0-9_.+-]+|/Users/[A-Za-z0-9_.+-]+|/[A-Za-z]/Users/[A-Za-z0-9_.+-]+|/root|/tmp/[A-Za-z0-9_.+-]+|[A-Za-z]:[\\/]Users[\\/][A-Za-z0-9_.+-]+)[\\/A-Za-z0-9_.+-]*'
+	pattern='(^|[^A-Za-z0-9_/\\])(/home/[A-Za-z0-9_.+-]+|/Users/[A-Za-z0-9_.+-]+|/[A-Za-z]/Users/[A-Za-z0-9_.+-]+|/root|/tmp/[A-Za-z0-9_.+-]+|[A-Za-z]:[\\/]Users[\\/][A-Za-z0-9_.+-]+)[\\/A-Za-z0-9_.+-]*'
 	exclude='XXXXXX$|^/home/web_user(/|$)|^/tmp/mylogsink\.xml$|^/home/user/\.boost_compute/'
 fi
 staging='\.staging-[A-Za-z0-9_-]+'
+
+# The ERE pattern copies the lookbehind as one leading character, so drop that
+# character before the exclude filter anchors. The PCRE pattern has no such
+# character.
+strip_leading() {
+	if [ "${grep_mode}" = "-aoE" ]; then
+		sed -E 's#^[^/A-Za-z]##'
+	else
+		cat
+	fi
+}
 
 found=0
 scan_file() {
 	local file="$1"
 	local matches count
 	matches="$(grep "${grep_mode}" "${pattern}|${staging}" "${file}" 2>/dev/null \
+		| strip_leading \
 		| grep -vE "${exclude}" | sort -u)"
 	count="$(printf '%s\n' "${matches}" | grep -c . )"
 	if [ "${count}" -gt 0 ]; then
