@@ -394,10 +394,16 @@ RUN --mount=type=secret,id=gh_token \
 		-DTAU_PARSER_BUILD_BROWSER_PAGE=ON
 
 RUN --mount=type=secret,id=gh_token \
-	scripts/with-gh-token ./dev dep-parser-wasm.sh \
+	set -e; \
+	out="$(scripts/with-gh-token ./dev dep-parser-wasm.sh \
 		-DTAU_DEP_MODE=producer \
 		-DTAU_PARSER_WASM_BUILD_DIR=build/release-wasm \
-		-DTAU_PARSER_WASM_CMAKE_CACHE=build/release-wasm/CMakeCache.txt
+		-DTAU_PARSER_WASM_CMAKE_CACHE=build/release-wasm/CMakeCache.txt)"; \
+	prefix="$(printf '%s\n' "$out" | sed -n 's/^dep-parser-wasm: package prefix: //p')"; \
+	test -n "$prefix" || { \
+		echo "dep-parser-wasm: no package prefix line in the producer output" >&2; \
+		exit 1; }; \
+	printf '%s\n' "parser-wasm/$(basename "$(dirname "$prefix")")" > /parser-wasm-entry
 
 
 # ------------------------------------------------------------
@@ -458,11 +464,11 @@ ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
 COPY --from=source /parser /parser
 
 # The parser-wasm store entry the wasm-build stage published, plus the wasm
-# ftxui and unordered_dense entries its id references and the wasm configure's
-# cache. The layer cache keeps this stage from rebuilding wasm: a cache miss
-# reruns the producer, a hit copies it.
+# ftxui and unordered_dense entries its id references, and the entry name the
+# producer recorded. The layer cache keeps this stage from rebuilding wasm: a
+# cache miss reruns the producer, a hit copies it.
 COPY --from=wasm-build /root/.tau/store /root/.tau/store
-COPY --from=wasm-build /parser/build/release-wasm/CMakeCache.txt /parser-wasm-cmakecache.txt
+COPY --from=wasm-build /parser-wasm-entry /parser-wasm-entry
 
 # Native tgf is the parity reference for the browser parity tests.
 RUN --mount=type=secret,id=gh_token \
@@ -470,13 +476,14 @@ RUN --mount=type=secret,id=gh_token \
 	scripts/with-gh-token ./dev preset release-tgf -DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		-DTAU_PARSER_DEPS_FROM_STORE=ON
 
-# Consume the parser-wasm package and register the browser tests against it.
-# This configure generates the page and test lists but never builds wasm.
+# Consume the parser-wasm package the wasm-build stage published and register
+# the browser tests against it. This configure generates the page and test
+# lists but never builds wasm.
 RUN --mount=type=secret,id=gh_token \
 	set -e; \
 	out="$(scripts/with-gh-token ./dev dep-parser-wasm.sh \
 		-DTAU_DEP_MODE=consumer \
-		-DTAU_PARSER_WASM_CMAKE_CACHE=/parser-wasm-cmakecache.txt)"; \
+		-DTAU_PARSER_WASM_ENTRY="$(cat /parser-wasm-entry)")"; \
 	wasm_prefix="$(printf '%s\n' "$out" | sed -n 's/^dep-parser-wasm: package prefix: //p')"; \
 	test -n "$wasm_prefix" || { \
 		echo "dep-parser-wasm: no package prefix line in the consumer output" >&2; \

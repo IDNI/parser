@@ -9,9 +9,10 @@
 # The producer does not build anything: it publishes the artifacts the wasm
 # preset already wrote (a build with the browser page enabled), so the entry
 # holds the bytes the browser gate serves. Consumer mode only looks up the
-# entry and never compiles wasm.
+# entry and never compiles wasm; it takes either the identity from a
+# CMakeCache.txt or a recorded entry via -DTAU_PARSER_WASM_ENTRY=parser-wasm/<id>.
 #
-# Both modes read the identity from the same CMakeCache.txt, so the id cannot
+# The producer reads the identity from the CMakeCache.txt, so the id cannot
 # drift from the build: the compiler, the build-type flags, the thread option
 # and the dependency prefixes (and so their ids). The source tree hash covers
 # the per-target flags the cache does not record. Writer and scanner hashes
@@ -156,6 +157,30 @@ _dep_parser_wasm_producer() {
 	return 0
 }
 
+# Consumer mode with -DTAU_PARSER_WASM_ENTRY=parser-wasm/<id>: look the entry
+# up directly and verify its manifest, without recomputing an id from a tree
+# that may differ from the producer's.
+_dep_parser_wasm_entry_lookup() {
+	local entry="$1" dep id prefix lookup status
+	dep="${entry%%/*}"
+	id="${entry#*/}"
+	if [ "$dep" != "parser-wasm" ] || [ -z "$id" ] || [ "$id" = "$entry" ]; then
+		echo "dep-parser-wasm: -DTAU_PARSER_WASM_ENTRY must be parser-wasm/<id>, got '${entry}'" >&2
+		return 1
+	fi
+	prefix="$(dep_shared_prefix)" || return 1
+	lookup="$(cmake -P "${__devrc_dir}/../cmake/tau-store.cmake" lookup "$prefix" "$dep" "$id")" || {
+		echo "dep-parser-wasm: cannot look up ${entry} in the LOCAL store" >&2
+		return 1
+	}
+	status="$(printf '%s\n' "$lookup" | sed -n '1p')"
+	if [ "$status" != "hit" ]; then
+		echo "dep-parser-wasm: ${entry} is not in the LOCAL store" >&2
+		return 1
+	fi
+	printf '%s' "$(printf '%s\n' "$lookup" | sed -n '2p')"
+}
+
 dep_entry "$@"
 
 mode="$(dep_var TAU_DEP_MODE producer)"
@@ -167,30 +192,42 @@ esac
 TAU_PARSER_WASM_BUILD_DIR="$(dep_var TAU_PARSER_WASM_BUILD_DIR "")"
 TAU_PARSER_WASM_CMAKE_CACHE="$(dep_var TAU_PARSER_WASM_CMAKE_CACHE "")"
 TAU_PARSER_WASM_TREE="$(dep_var TAU_PARSER_WASM_TREE "$DEV_ROOT")"
-
-if [ "$mode" = "producer" ] && [ -z "$TAU_PARSER_WASM_BUILD_DIR" ]; then
-	echo "dep-parser-wasm: -DTAU_PARSER_WASM_BUILD_DIR is required" >&2
-	exit 2
-fi
-[ -n "$TAU_PARSER_WASM_CMAKE_CACHE" ] || {
-	echo "dep-parser-wasm: -DTAU_PARSER_WASM_CMAKE_CACHE is required" >&2
-	exit 2
-}
-[ -f "$TAU_PARSER_WASM_CMAKE_CACHE" ] || {
-	echo "dep-parser-wasm: cache is not a file: '$TAU_PARSER_WASM_CMAKE_CACHE'" >&2
-	exit 2
-}
-
-block="$(_dep_parser_wasm_field_block)" || {
-	echo "dep-parser-wasm: cannot build the identity field block" >&2
-	exit 1
-}
+TAU_PARSER_WASM_ENTRY="$(dep_var TAU_PARSER_WASM_ENTRY "")"
 
 out=""
-if ! dep_ensure out "$mode" parser-wasm "$block" _dep_parser_wasm_producer \
-		"$TAU_PARSER_WASM_BUILD_DIR"; then
-	echo "dep-parser-wasm: ${mode} failed" >&2
-	exit 1
+if [ -n "$TAU_PARSER_WASM_ENTRY" ]; then
+	[ "$mode" = "consumer" ] || {
+		echo "dep-parser-wasm: -DTAU_PARSER_WASM_ENTRY is consumer-only" >&2
+		exit 2
+	}
+	out="$(_dep_parser_wasm_entry_lookup "$TAU_PARSER_WASM_ENTRY")" || {
+		echo "dep-parser-wasm: consumer failed" >&2
+		exit 1
+	}
+else
+	if [ "$mode" = "producer" ] && [ -z "$TAU_PARSER_WASM_BUILD_DIR" ]; then
+		echo "dep-parser-wasm: -DTAU_PARSER_WASM_BUILD_DIR is required" >&2
+		exit 2
+	fi
+	[ -n "$TAU_PARSER_WASM_CMAKE_CACHE" ] || {
+		echo "dep-parser-wasm: -DTAU_PARSER_WASM_CMAKE_CACHE is required" >&2
+		exit 2
+	}
+	[ -f "$TAU_PARSER_WASM_CMAKE_CACHE" ] || {
+		echo "dep-parser-wasm: cache is not a file: '$TAU_PARSER_WASM_CMAKE_CACHE'" >&2
+		exit 2
+	}
+
+	block="$(_dep_parser_wasm_field_block)" || {
+		echo "dep-parser-wasm: cannot build the identity field block" >&2
+		exit 1
+	}
+
+	if ! dep_ensure out "$mode" parser-wasm "$block" _dep_parser_wasm_producer \
+			"$TAU_PARSER_WASM_BUILD_DIR"; then
+		echo "dep-parser-wasm: ${mode} failed" >&2
+		exit 1
+	fi
 fi
 
 # Record the entry as used, so store eviction keeps it by last use.
