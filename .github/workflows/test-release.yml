@@ -9,8 +9,9 @@ on:
 
 permissions:
   contents: read
-  # Normal CI only reads the store packages; the trusted deps-store.yml owns
-  # packages: write.
+  # A job that builds a missing store package publishes it at once, so the
+  # resolving job of each store target asks for packages: write. Every other
+  # job only reads.
   packages: read
 
 env:

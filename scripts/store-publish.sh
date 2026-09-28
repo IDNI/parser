@@ -3,11 +3,10 @@
 #
 #   ./dev store-publish [--registry <remote>]
 #
-# The remote is TAU_STORE_REMOTE, or --registry. This is the only writer of
-# the remote store; only the trusted workflow on devel-tklip, devel and master
-# calls it. The caller builds the packages first (a configure with
-# TAU_STORE_REMOTE set, or without it), so a run only uploads what the remote
-# lacks.
+# The remote is TAU_STORE_REMOTE, or --registry. The job that builds a missing
+# store package publishes it at once, so no two jobs build the same package.
+# The caller resolves first (a configure with TAU_STORE_REMOTE set, or
+# without it), so a run only uploads what the remote lacks.
 set -u
 
 DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
