@@ -293,8 +293,9 @@ jobs:
         run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
 
       - name: Build and test under qemu
-        run: ./dev preset release-arm64-tests run -DTAU_BUILD_JOBS=${{ env.BUILD_JOBS }} \
-          -DTAU_PARSER_DEPS_FROM_STORE=ON
+        run: |
+          ./dev preset release-arm64-tests run -DTAU_BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            -DTAU_PARSER_DEPS_FROM_STORE=ON
 
       - name: Save the dependency store (~/.tau/store)
         if: always()
@@ -347,8 +348,9 @@ jobs:
 
       # Git Bash runs ./dev, and the preset carries the compiler choice.
       - name: Build and test
-        run: ./dev preset ${{ matrix.preset }} run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
-          -DTAU_PARSER_DEPS_FROM_STORE=ON
+        run: |
+          ./dev preset ${{ matrix.preset }} run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DTAU_PARSER_DEPS_FROM_STORE=ON
 
       - name: Save the dependency store (~/.tau/store)
         if: always()
@@ -393,8 +395,9 @@ jobs:
 
       # `run` on an -all preset makes ./dev call ctest itself.
       - name: Build and test
-        run: ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
-          -DTAU_PARSER_DEPS_FROM_STORE=ON
+        run: |
+          ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DTAU_PARSER_DEPS_FROM_STORE=ON
 
       - name: Save the dependency store (~/.tau/store)
         if: always()
