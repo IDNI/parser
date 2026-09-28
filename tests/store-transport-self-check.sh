@@ -20,13 +20,16 @@ done
 
 TMP_ROOT="${TMPDIR:-/tmp}"
 
-# Git Bash reports a scratch path as /tmp/..., CMake as C:/...; -m puts the
-# shell side in CMake's form and -l the long name, so the two compare equal.
+# A TMPDIR ending in / leaves // on macOS, and Git Bash reports /tmp and short
+# names where CMake sees C:/...; either one breaks the string compare, so
+# normalize the path before translating it.
 to_cmake_path() {
+	local path
+	path="$(cd "$1" && pwd)"
 	if command -v cygpath >/dev/null 2>&1; then
-		cygpath -m -l "$1"
+		cygpath -m -l "$path"
 	else
-		printf '%s' "$1"
+		printf '%s' "$path"
 	fi
 }
 
