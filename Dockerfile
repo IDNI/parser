@@ -37,22 +37,28 @@ RUN apt-get update && apt-get install -y \
 RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100 && \
 	update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100
 
-ARG BUILD_JOBS=1
+# ------------------------------------------------------------
+# Dependency store client: oras reads a missing package from the remote
+# store at configure time (cmake/parser-deps.cmake).
 
-# A system FTXUI lets every native build find it with find_package, so no
-# build fetches and compiles it again. Keep the tag equal to the fetched one.
-RUN git clone --depth 1 --branch v6.1.9 https://github.com/ArthurSonzogni/FTXUI.git /tmp/ftxui && \
-	cmake -S /tmp/ftxui -B /tmp/ftxui/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-		-DFTXUI_BUILD_EXAMPLES=OFF -DFTXUI_BUILD_DOCS=OFF -DFTXUI_BUILD_TESTS=OFF && \
-	cmake --build /tmp/ftxui/build -j ${BUILD_JOBS} && \
-	cmake --install /tmp/ftxui/build && \
-	rm -rf /tmp/ftxui
+FROM base AS deps
+
+ARG BUILD_JOBS=5
+
+# Only the files dep-oras.sh runs, so a source change keeps this layer.
+COPY ./dev /parser/
+COPY ./scripts/devrc ./scripts/dep-build ./scripts/dep-oras.sh /parser/scripts/
+COPY ./cmake/tau-resolve.cmake /parser/cmake/
+WORKDIR /parser
+
+RUN echo "(BUILD) -- Building the dependency store client: oras" && \
+	./dev dep-oras
 
 
 # ------------------------------------------------------------
 # Source tree for every stage that builds the parser
 
-FROM base AS source
+FROM deps AS source
 
 # Argument BUILD_PRESET=release/debug picks the CMake preset family
 ARG BUILD_PRESET=release
@@ -119,7 +125,7 @@ fi
 # ------------------------------------------------------------
 # Windows cross build dependencies: wine and its prefix
 
-FROM base AS w64-deps
+FROM deps AS w64-deps
 
 # WINEPREFIX keeps the wine configuration out of the home directory.
 # WINEDEBUG drops wine's own noise, and not the output of a test.
@@ -228,7 +234,7 @@ CMD []
 # ------------------------------------------------------------
 # WebAssembly dependencies image: emsdk and its bundled Node.js
 
-FROM base AS wasm-deps
+FROM deps AS wasm-deps
 
 ARG BUILD_JOBS=1
 
