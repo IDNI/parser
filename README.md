@@ -101,6 +101,8 @@ Above program prints:
 To build the library, the `tgf` tool requires CMake and a compiler supporting C++23 with GNU extensions (`-std=gnu++23`).
 Then, for Windows with Mingw-w64 you can use `w64-debug.sh` or `w64-release.sh` script, and for Linux there are `debug.sh` and `release.sh` scripts for compiling all source files. After successful compilation you can find the artifacts in `build-Debug` and `build-Release` folders.
 
+For a Linux arm64 build use `./dev preset release-arm64`, a cross build from x86 with clang and qemu. The native presets (`release`, `debug`, `devel`) build for arm64 on an arm host. The deb and rpm packages name the arch of the target, so a native arm64 build packages `arm64`/`aarch64`.
+
 
 ### TGF tool
 

@@ -24,6 +24,7 @@ FROM ubuntu:24.04@sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca0
 # Install dependencies
 RUN apt-get update && apt-get install -y \
 	bash wget git nsis rpm doxygen graphviz \
+	curl ca-certificates \
 	cmake=3.28.3-1build7 \
 	g++=4:13.2.0-7ubuntu1 \
 	ninja-build=1.11.1-2 \
@@ -37,22 +38,28 @@ RUN apt-get update && apt-get install -y \
 RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100 && \
 	update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100
 
-ARG BUILD_JOBS=1
+# ------------------------------------------------------------
+# Dependency store client: oras reads a missing package from the remote
+# store at configure time (cmake/parser-deps.cmake).
 
-# A system FTXUI lets every native build find it with find_package, so no
-# build fetches and compiles it again. Keep the tag equal to the fetched one.
-RUN git clone --depth 1 --branch v6.1.9 https://github.com/ArthurSonzogni/FTXUI.git /tmp/ftxui && \
-	cmake -S /tmp/ftxui -B /tmp/ftxui/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-		-DFTXUI_BUILD_EXAMPLES=OFF -DFTXUI_BUILD_DOCS=OFF -DFTXUI_BUILD_TESTS=OFF && \
-	cmake --build /tmp/ftxui/build -j ${BUILD_JOBS} && \
-	cmake --install /tmp/ftxui/build && \
-	rm -rf /tmp/ftxui
+FROM base AS deps
+
+ARG BUILD_JOBS=5
+
+# Only the files dep-oras.sh runs, so a source change keeps this layer.
+COPY ./dev /parser/
+COPY ./scripts/devrc ./scripts/dep-build ./scripts/dep-oras.sh /parser/scripts/
+COPY ./cmake/tau-resolve.cmake /parser/cmake/
+WORKDIR /parser
+
+RUN echo "(BUILD) -- Building the dependency store client: oras" && \
+	./dev dep-oras
 
 
 # ------------------------------------------------------------
 # Source tree for every stage that builds the parser
 
-FROM base AS source
+FROM deps AS source
 
 # Argument BUILD_PRESET=release/debug picks the CMake preset family
 ARG BUILD_PRESET=release
@@ -78,9 +85,58 @@ RUN echo "(BUILD) -- Building version: $(head -n 1 VERSION)"
 
 
 # ------------------------------------------------------------
+# linux-x86_64 store resolver: resolve the packages the build reads, so the
+# test job finds them in the layer cache. The publish is a side stage, so an
+# argument that only the publish uses never changes a resolve layer.
+
+FROM source AS linux-resolve
+
+# Argument BUILD_PRESET=release/debug picks the CMake preset family
+ARG BUILD_PRESET=release
+
+# Argument TESTS=no is used to skip running tests
+ARG TESTS=yes
+
+# Argument BUILD_JOBS=N raises the parallelism. One job is the safe default.
+ARG BUILD_JOBS=1
+
+# The remote store: configure reads a missing package from it before it
+# builds one (cmake/parser-deps.cmake). The token is mounted only for the
+# configure step; an empty value keeps the remote out of a local build.
+ARG TAU_STORE_REMOTE=
+ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
+
+# A TESTS=no build (the nightly packages) never reads the store.
+RUN --mount=type=secret,id=gh_token \
+	if [ "$TESTS" = "yes" ]; then \
+		scripts/with-gh-token ./dev preset ${BUILD_PRESET} --configure-only \
+			-DTAU_PARSER_DEPS_FROM_STORE=ON -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+	fi
+
+FROM linux-resolve AS linux-publish
+
+# The trusted workflow turns this on: this stage publishes the packages the
+# remote lacks, so the Linux ids match what every Docker consumer requests.
+# Off for every other build.
+ARG TAU_STORE_PUBLISH=OFF
+RUN --mount=type=secret,id=gh_token \
+	if [ "$TAU_STORE_PUBLISH" = "ON" ]; then \
+		scripts/with-gh-token ./dev store-publish; \
+	fi
+
+
+# ------------------------------------------------------------
 # Linux build and its test suite
 
-FROM source AS linux
+FROM linux-resolve AS linux
+
+# The build context carries no .git, so the stamp arrives as a build argument.
+ARG TAU_PARSER_GIT_DESCRIBED=
+ARG TAU_PARSER_GIT_BRANCH=
+ARG TAU_PARSER_GIT_COMMIT_HASH=
+ENV TAU_PARSER_GIT_DESCRIBED=${TAU_PARSER_GIT_DESCRIBED} \
+	TAU_PARSER_GIT_BRANCH=${TAU_PARSER_GIT_BRANCH} \
+	TAU_PARSER_GIT_COMMIT_HASH=${TAU_PARSER_GIT_COMMIT_HASH}
 
 # ccache keeps compiled objects in a cache mount, so a source change only
 # recompiles what it touches. CI carries the mount across runs.
@@ -100,8 +156,10 @@ ARG BUILD_JOBS=1
 RUN echo " (BUILD) -- Running tests: $TESTS"
 # `run` on a -tests preset makes ./dev call ctest itself
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	--mount=type=secret,id=gh_token \
 	if [ "$TESTS" = "yes" ]; then \
-	./dev preset ${BUILD_PRESET}-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+	scripts/with-gh-token ./dev preset ${BUILD_PRESET}-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+		-DTAU_PARSER_DEPS_FROM_STORE=ON \
 		|| exit 1; \
 fi
 
@@ -119,7 +177,7 @@ fi
 # ------------------------------------------------------------
 # Windows cross build dependencies: wine and its prefix
 
-FROM base AS w64-deps
+FROM deps AS w64-deps
 
 # WINEPREFIX keeps the wine configuration out of the home directory.
 # WINEDEBUG drops wine's own noise, and not the output of a test.
@@ -134,9 +192,55 @@ RUN wineboot --init && wineserver -w
 
 
 # ------------------------------------------------------------
+# windows-x86_64-mingw store resolver: resolve the packages the cross build
+# reads, so the test job finds them in the layer cache. The publish is a side
+# stage, so a publish argument never changes a resolve layer.
+
+FROM w64-deps AS linux-mingw64-wine-resolve
+
+ARG TESTS=yes
+
+# Argument BUILD_JOBS=N raises the parallelism. One job is the safe default.
+ARG BUILD_JOBS=1
+
+# The remote store: configure reads a missing package from it before it
+# builds one (cmake/parser-deps.cmake).
+ARG TAU_STORE_REMOTE=
+ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
+
+COPY --from=source /parser /parser
+WORKDIR /parser
+
+# A TESTS=no build never reads the store.
+RUN --mount=type=secret,id=gh_token \
+	if [ "$TESTS" = "yes" ]; then \
+		scripts/with-gh-token ./dev preset release-w64-tests --configure-only \
+			-DTAU_PARSER_DEPS_FROM_STORE=ON -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+	fi
+
+FROM linux-mingw64-wine-resolve AS linux-mingw64-wine-publish
+
+# The trusted workflow turns this on to publish the mingw packages the w64
+# consumers read.
+ARG TAU_STORE_PUBLISH=OFF
+RUN --mount=type=secret,id=gh_token \
+	if [ "$TAU_STORE_PUBLISH" = "ON" ]; then \
+		scripts/with-gh-token ./dev store-publish; \
+	fi
+
+
+# ------------------------------------------------------------
 # Windows cross build, with the suite run under wine
 
-FROM w64-deps AS linux-mingw64-wine
+FROM linux-mingw64-wine-resolve AS linux-mingw64-wine
+
+# The build context carries no .git, so the stamp arrives as a build argument.
+ARG TAU_PARSER_GIT_DESCRIBED=
+ARG TAU_PARSER_GIT_BRANCH=
+ARG TAU_PARSER_GIT_COMMIT_HASH=
+ENV TAU_PARSER_GIT_DESCRIBED=${TAU_PARSER_GIT_DESCRIBED} \
+	TAU_PARSER_GIT_BRANCH=${TAU_PARSER_GIT_BRANCH} \
+	TAU_PARSER_GIT_COMMIT_HASH=${TAU_PARSER_GIT_COMMIT_HASH}
 
 ARG TESTS=yes
 
@@ -148,25 +252,30 @@ ARG BUILD_JOBS=1
 ENV CMAKE_C_COMPILER_LAUNCHER=ccache CMAKE_CXX_COMPILER_LAUNCHER=ccache \
 	CCACHE_DIR=/root/.ccache CCACHE_MAXSIZE=1G
 
-COPY --from=source /parser /parser
-WORKDIR /parser
-
 # wine, not wine64: the Ubuntu package runs these 64-bit PE binaries on its
 # own, and needs no i386 multiarch.
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	--mount=type=secret,id=gh_token \
 	echo " (BUILD) -- Running tests under wine: $TESTS" && \
 	if [ "$TESTS" = "yes" ]; then \
-		./dev preset release-mingw-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
-	else \
-		./dev preset release-mingw-tests -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+		scripts/with-gh-token ./dev preset release-w64-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+			-DTAU_PARSER_DEPS_FROM_STORE=ON; \
 	fi
 
-# The wine parity test lives in the native tree and registers itself once the
-# cross-built tgf.exe is there, so the native suite runs it.
+# The parity script needs only the native tgf beside the cross-built
+# tgf.exe, so build that one target and run the comparison directly instead
+# of the whole native suite. A missing binary or a mismatch stops the stage.
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
+	--mount=type=secret,id=gh_token \
 	if [ "$TESTS" = "yes" ]; then \
-		echo " (BUILD) -- Running the native suite with the wine parity test" && \
-		./dev preset release-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+		echo " (BUILD) -- Running the wine parity test" && \
+		scripts/with-gh-token ./dev preset release-tgf -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+			-DTAU_PARSER_DEPS_FROM_STORE=ON && \
+		test -x build/release/tgf && \
+		test -f build/release-w64/tgf.exe && \
+		sh tests/parity/tgf_wine_parity.sh \
+			build/release/tgf build/release-w64/tgf.exe \
+			src/format/json/json.tgf; \
 	fi
 
 
@@ -202,11 +311,11 @@ RUN if [ "$RELEASE" = "yes" ]; then \
 	./dev preset release-packages -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 fi
 
-# Windows packages. The mingw presets build in build/release-mingw, so they
-# never share a cache with the native build.
+# Windows packages build in build/release-w64, so they never share a cache
+# with the native build.
 RUN if [ "$RELEASE" = "yes" ]; then \
-	./dev preset release-mingw-packages -DTAU_BUILD_JOBS=${BUILD_JOBS} && \
-	./dev preset release-mingw-packages-zip -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+	./dev preset release-w64-packages -DTAU_BUILD_JOBS=${BUILD_JOBS} && \
+	./dev preset release-w64-packages-zip -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 fi
 
 # If tgf executable does not exist already, build it
@@ -222,16 +331,18 @@ CMD []
 # ------------------------------------------------------------
 # WebAssembly dependencies image: emsdk and its bundled Node.js
 
-FROM base AS wasm-deps
+FROM deps AS wasm-deps
 
 ARG BUILD_JOBS=1
 
-# dep-emsdk.sh needs curl, unzip and xz; the base image does not carry them.
-RUN apt-get update && apt-get install -y --no-install-recommends curl unzip xz-utils
+# dep-emsdk.sh needs curl, ca-certificates, unzip and xz; the base image
+# does not carry them.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+	curl ca-certificates unzip xz-utils
 
 # Only the files dep-emsdk.sh runs, so a source change keeps the emsdk layer.
 COPY ./dev /parser/
-COPY ./scripts/devrc ./scripts/dep-emsdk.sh /parser/scripts/
+COPY ./scripts/devrc ./scripts/dep-emsdk.sh ./scripts/dep-build /parser/scripts/
 COPY ./cmake/tau-resolve.cmake /parser/cmake/
 WORKDIR /parser
 
@@ -248,17 +359,86 @@ RUN EMSDK_NODE_BIN="$(ls -d /root/.tau/emsdk/node/*/bin | head -n1)" && \
 
 
 # ------------------------------------------------------------
-# WebAssembly Node.js gate: build the Emscripten tests and run them
-# under emsdk's Node.js. No Chrome or puppeteer here.
+# WebAssembly resolve: install the xterm vendor and resolve the wasm
+# dependencies. The publish and the build are separate stages, so a publish
+# argument never changes a stage the browser job has to rebuild.
 
-FROM wasm-deps AS wasm-node
+FROM wasm-deps AS wasm-resolve
 
 ARG BUILD_JOBS=1
 
+# The remote store: configure reads a missing package from it before it
+# builds one (cmake/parser-deps.cmake).
+ARG TAU_STORE_REMOTE=
+ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
+
 COPY --from=source /parser /parser
 
-RUN echo "(BUILD) -- Building and running the wasm node tests" && \
-	./dev preset release-tests-emscripten run -DTAU_BUILD_JOBS=${BUILD_JOBS}
+# The browser page ships in the package, and its build reads the xterm vendor.
+RUN echo "(BUILD) -- Installing the xterm.js vendor" && \
+	npm ci --prefix js/tau-wasm-terminal --no-audit --no-fund
+
+RUN --mount=type=secret,id=gh_token \
+	echo "(BUILD) -- Resolving the wasm dependencies" && \
+	scripts/with-gh-token ./dev preset release-wasm-tests --configure-only \
+		-DTAU_BUILD_JOBS=${BUILD_JOBS} -DTAU_PARSER_DEPS_FROM_STORE=ON \
+		-DTAU_PARSER_BUILD_BROWSER_PAGE=ON
+
+FROM wasm-resolve AS wasm-publish
+
+# The trusted workflow turns this on. It runs before the parser-wasm producer
+# below, so only the wasm FTXUI and unordered_dense packages are published;
+# parser-wasm travels through the layer cache within one run.
+ARG TAU_STORE_PUBLISH=OFF
+RUN --mount=type=secret,id=gh_token \
+	if [ "$TAU_STORE_PUBLISH" = "ON" ]; then \
+		scripts/with-gh-token ./dev store-publish; \
+	fi
+
+
+# ------------------------------------------------------------
+# WebAssembly build gate: build the Emscripten artifacts and the browser page
+# (the page is a build output, not a browser test), and produce the
+# parser-wasm store package the browser gate consumes. No tests here.
+
+FROM wasm-resolve AS wasm-build
+
+# The build context carries no .git, so the stamp arrives as a build argument.
+ARG TAU_PARSER_GIT_DESCRIBED=
+ARG TAU_PARSER_GIT_BRANCH=
+ARG TAU_PARSER_GIT_COMMIT_HASH=
+ENV TAU_PARSER_GIT_DESCRIBED=${TAU_PARSER_GIT_DESCRIBED} \
+	TAU_PARSER_GIT_BRANCH=${TAU_PARSER_GIT_BRANCH} \
+	TAU_PARSER_GIT_COMMIT_HASH=${TAU_PARSER_GIT_COMMIT_HASH}
+
+RUN --mount=type=secret,id=gh_token \
+	echo "(BUILD) -- Building the wasm artifacts" && \
+	scripts/with-gh-token ./dev preset release-wasm-tests --keep-cache \
+		-DTAU_BUILD_JOBS=${BUILD_JOBS} -DTAU_PARSER_DEPS_FROM_STORE=ON \
+		-DTAU_PARSER_BUILD_BROWSER_PAGE=ON
+
+RUN --mount=type=secret,id=gh_token \
+	set -e; \
+	out="$(scripts/with-gh-token ./dev dep-parser-wasm.sh \
+		-DTAU_DEP_MODE=producer \
+		-DTAU_PARSER_WASM_BUILD_DIR=build/release-wasm \
+		-DTAU_PARSER_WASM_CMAKE_CACHE=build/release-wasm/CMakeCache.txt)"; \
+	prefix="$(printf '%s\n' "$out" | sed -n 's/^dep-parser-wasm: package prefix: //p')"; \
+	test -n "$prefix" || { \
+		echo "dep-parser-wasm: no package prefix line in the producer output" >&2; \
+		exit 1; }; \
+	printf '%s\n' "parser-wasm/$(basename "$(dirname "$prefix")")" > /parser-wasm-entry
+
+
+# ------------------------------------------------------------
+# WebAssembly Node.js gate: run the node tests on the wasm-build stage.
+
+FROM wasm-build AS wasm-node
+
+ARG BUILD_JOBS=1
+
+RUN echo "(BUILD) -- Running the wasm node tests" && \
+	ctest --preset release-wasm-tests -j ${BUILD_JOBS} --output-on-failure
 
 
 # ------------------------------------------------------------
@@ -298,15 +478,55 @@ RUN echo "(BUILD) -- Installing js/tau-wasm-terminal dependencies" && \
 
 FROM wasm-browser-deps AS wasm-browser
 
+# The build context carries no .git, so the stamp arrives as a build argument.
+ARG TAU_PARSER_GIT_DESCRIBED=
+ARG TAU_PARSER_GIT_BRANCH=
+ARG TAU_PARSER_GIT_COMMIT_HASH=
+ENV TAU_PARSER_GIT_DESCRIBED=${TAU_PARSER_GIT_DESCRIBED} \
+	TAU_PARSER_GIT_BRANCH=${TAU_PARSER_GIT_BRANCH} \
+	TAU_PARSER_GIT_COMMIT_HASH=${TAU_PARSER_GIT_COMMIT_HASH}
+
 ARG BUILD_JOBS=1
+
+# The remote store: configure reads a missing package from it before it
+# builds one (cmake/parser-deps.cmake).
+ARG TAU_STORE_REMOTE=
+ENV TAU_STORE_REMOTE=${TAU_STORE_REMOTE}
 
 COPY --from=source /parser /parser
 
-# Native tgf is the parity reference for the browser parity tests.
-RUN echo "(BUILD) -- Building native tgf" && \
-	./dev preset release-tgf -DTAU_BUILD_JOBS=${BUILD_JOBS}
+# The parser-wasm store entry the wasm-build stage published, plus the wasm
+# ftxui and unordered_dense entries its id references, and the entry name the
+# producer recorded. The layer cache keeps this stage from rebuilding wasm: a
+# cache miss reruns the producer, a hit copies it.
+COPY --from=wasm-build /root/.tau/store /root/.tau/store
+COPY --from=wasm-build /parser-wasm-entry /parser-wasm-entry
 
-# Browser tests launch Chrome as root, which needs --no-sandbox; the test
-# scripts already pass it.
-RUN echo "(BUILD) -- Building and running the wasm browser tests" && \
-	./dev preset release-tests-emscripten-browser run -DTAU_BUILD_JOBS=${BUILD_JOBS}
+# Native tgf is the parity reference for the browser parity tests.
+RUN --mount=type=secret,id=gh_token \
+	echo "(BUILD) -- Building native tgf" && \
+	scripts/with-gh-token ./dev preset release-tgf -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+		-DTAU_PARSER_DEPS_FROM_STORE=ON
+
+# Consume the parser-wasm package the wasm-build stage published and register
+# the browser tests against it. This configure generates the page and test
+# lists but never builds wasm.
+RUN --mount=type=secret,id=gh_token \
+	set -e; \
+	out="$(scripts/with-gh-token ./dev dep-parser-wasm.sh \
+		-DTAU_DEP_MODE=consumer \
+		-DTAU_PARSER_WASM_ENTRY="$(cat /parser-wasm-entry)")"; \
+	wasm_prefix="$(printf '%s\n' "$out" | sed -n 's/^dep-parser-wasm: package prefix: //p')"; \
+	test -n "$wasm_prefix" || { \
+		echo "dep-parser-wasm: no package prefix line in the consumer output" >&2; \
+		exit 1; }; \
+	test -d "$wasm_prefix" || { \
+		echo "dep-parser-wasm: the package prefix is not a directory: '$wasm_prefix'" >&2; \
+		exit 1; }; \
+	scripts/with-gh-token ./dev preset release-wasm-tests-browser --configure-only \
+		-DTAU_BUILD_JOBS=${BUILD_JOBS} -DTAU_PARSER_DEPS_FROM_STORE=ON \
+		-DTAU_PARSER_WASM_PREFIX="${wasm_prefix}"; \
+	echo "(BUILD) -- Running the wasm browser tests"; \
+	# The browser tests read the package, so the build of the tree is not needed.
+	ctest --preset release-wasm-tests-browser -R tgf_browser -FA build_tree \
+		-j ${BUILD_JOBS} --output-on-failure

@@ -16,7 +16,8 @@ function start(program, args) {
   var out_queue = [];
 
   // FTXUI reads stdin until it gets byte 0, so an empty buffer must give 0,
-  // not null (end of file) or undefined (EAGAIN), which leave its loop spinning.
+  // not null (end of file) or undefined (EAGAIN) which leave its loop
+  // spinning; this host never reports end of file.
   var stdin = function() { return stdin_buffer.shift() || 0; };
 
   function flush_out_queue() {

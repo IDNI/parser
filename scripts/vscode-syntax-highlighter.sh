@@ -14,7 +14,7 @@ source "${TOP}/scripts/devrc"
 dep_entry "$@"
 
 EMSDK_PREFIX="$(dep_shared_prefix)"
-EMSCRIPTEN_BUILD="$TOP/build/emscripten"
+EMSCRIPTEN_BUILD="$TOP/build/release-wasm"
 WASM_SRC="$EMSCRIPTEN_BUILD"
 EXT_DIR="$TOP/editors/vscode"
 
@@ -32,7 +32,7 @@ fi
 # --- build wasm highlight target -------------------------------------------
 if [ ! -f "$EMSCRIPTEN_BUILD/CMakeCache.txt" ]; then
 	echo "Configuring emscripten build..."
-	cmake -B "$EMSCRIPTEN_BUILD" --preset emscripten \
+	cmake -B "$EMSCRIPTEN_BUILD" --preset release-wasm \
 		-DTAU_PARSER_BUILD_EMSCRIPTEN=ON
 fi
 

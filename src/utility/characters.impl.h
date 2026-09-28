@@ -91,6 +91,8 @@ inline std::string to_std_string(const std::u32string& s) {
 	return to_std_string(to_utf8string(s)); }
 inline std::string to_std_string(const char32_t& ch) {
 	return to_std_string(to_utf8string(ch));}
+// A char is one byte of the string, never a code point to encode.
+inline std::string to_std_string(char ch) { return std::string(1, ch); }
 
 // UTF-16 codec — defined below peek_codepoint / emit_codepoint declarations
 // because the conversion functions use them. Templated on the 16-bit code
@@ -102,10 +104,10 @@ inline size_t peek_codepoint_u16(const UTF16Unit* s, size_t l, char32_t& ch) {
 	if (!l) return 0;
 	char16_t a = static_cast<char16_t>(s[0]);
 	if (a < 0xD800 || a >= 0xE000) { ch = a; return 1; }
-	if (a >= 0xDC00) return -1;            // unpaired low surrogate
-	if (l < 2) return -1;
+	if (a >= 0xDC00) return SIZE_MAX;            // unpaired low surrogate
+	if (l < 2) return SIZE_MAX;
 	char16_t b = static_cast<char16_t>(s[1]);
-	if (b < 0xDC00 || b >= 0xE000) return -1;
+	if (b < 0xDC00 || b >= 0xE000) return SIZE_MAX;
 	ch = 0x10000 + ((static_cast<char32_t>(a) - 0xD800) << 10)
 				+ (static_cast<char32_t>(b) - 0xDC00);
 	return 2;
@@ -214,35 +216,35 @@ inline bool is_mb_codepoint(utf8char ch, uint8_t p) {
 	return false;
 }
 inline size_t peek_codepoint(const utf8char* str, size_t l, char32_t& ch) {
-	ch = -1;
+	ch = static_cast<char32_t>(-1);
   	if (!l) return 0;
 	const utf8char* end = str + l;
 	unsigned char s[4] = { str[0] };
 	ch = s[0];
 	if  (ch < 0x80) return 1;
-	if ((ch - 0xc2) > (0xf4 - 0xc2)) return -1;
-	if (str + 1 >= end) return -1;
+	if ((ch - 0xc2) > (0xf4 - 0xc2)) return SIZE_MAX;
+	if (str + 1 >= end) return SIZE_MAX;
 	s[1] = *(str + 1);
 	if (ch < 0xe0) {
-		if (!utf_cont(s[1])) return -1;
+		if (!utf_cont(s[1])) return SIZE_MAX;
 		ch = ((ch & 0x1f) << 6) | (s[1] & 0x3f);
 		return 2;
 	}
-	if (str + 2 >= end) return -1;
+	if (str + 2 >= end) return SIZE_MAX;
 	s[2] = *(str + 2);
 	if (ch < 0xf0) {
-		if (!utf_cont(s[1]) || !utf_cont(s[2])) return -1;
-		if (ch == 0xed && s[1] > 0x9f) return -1;
-		ch = ((ch & 0xf) << 12) | ((s[1] & 0x3f) << 6) | (s[2] &0x3f);
-		if (ch < 0x800) return -1;
+		if (!utf_cont(s[1]) || !utf_cont(s[2])) return SIZE_MAX;
+		if (ch == 0xed && s[1] > 0x9f) return SIZE_MAX;
+		ch = ((ch & 0xfu) << 12) | ((s[1] & 0x3fu) << 6) | (s[2] & 0x3fu);
+		if (ch < 0x800) return SIZE_MAX;
 		return 3;
 	}
-	if (str + 3 >= end) return -1;
+	if (str + 3 >= end) return SIZE_MAX;
 	s[3] = *(str + 3);
-	if (!utf_cont(s[1]) || !utf_cont(s[2]) || !utf_cont(s[3])) return -1;
-	if      (ch == 0xf0) { if (s[1] < 0x90) return -1; }
-	else if (ch == 0xf4) { if (s[1] > 0x8f) return -1; }
-	ch = ((ch&7)<<18) | ((s[1]&0x3f)<<12) | ((s[2]&0x3f)<<6) | (s[3]&0x3f);
+	if (!utf_cont(s[1]) || !utf_cont(s[2]) || !utf_cont(s[3])) return SIZE_MAX;
+	if      (ch == 0xf0) { if (s[1] < 0x90) return SIZE_MAX; }
+	else if (ch == 0xf4) { if (s[1] > 0x8f) return SIZE_MAX; }
+	ch = ((ch&7u)<<18) | ((s[1]&0x3fu)<<12) | ((s[2]&0x3fu)<<6) | (s[3]&0x3fu);
 	return 4;
 }
 inline bool is_valid_utf8(std::string_view s, diagnostics::report* rep) {

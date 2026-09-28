@@ -5,3 +5,6 @@ tau-lang/
 .local/
 .claude/
 **/node_modules/
+# Git metadata differs per checkout, so it must never enter the digest of a build layer.
+.git
+**/.git

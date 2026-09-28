@@ -118,7 +118,7 @@ namespace idni::testing
 
 	// saves resulting forest and graphs into files with various formats
 	template <typename T>
-	int test_out(int c, const grammar<T> &g, const std::basic_string<T> &inputstr,
+	int test_out(size_t c, const grammar<T> &g, const std::basic_string<T> &inputstr,
 				 typename parser<T>::result &r)
 	{
 #ifndef PARSER_BINTREE_FOREST
@@ -188,8 +188,10 @@ namespace idni::testing
 
 			if (storesp.size() > 2)
 			{
-				int ind = std::rand() % (storesp.size());
-				storesp.erase(storesp.begin() + ind);
+				// The modulo runs in the container's difference type: a
+				// vector position is signed in the iterator domain.
+				const auto span = storesp.end() - storesp.begin();
+				storesp.erase(storesp.begin() + (std::rand() % span));
 				bintree<ndtype>::gc();
 			}
 			ssf.str({});
@@ -585,7 +587,7 @@ namespace idni::testing
 					std::cerr << "'" << *it << "' is not a positive number.\n";
 					exit(1);
 				}
-				id(result);
+				id(static_cast<size_t>(result));
 			}
 			else if (opt == "-only_neg") {
 				only_neg = true;

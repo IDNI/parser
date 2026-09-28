@@ -1,6 +1,8 @@
 // To view the license please visit
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
+#include <cstdint>
+
 #include "measure.h"
 
 namespace idni::measures {
@@ -11,17 +13,20 @@ namespace idni::measures {
 inline size_t current_rss_kb() {
 #ifdef __linux__
 	std::ifstream f("/proc/self/statm");
-	if (!f.is_open()) return -1;
-	long total_pages = 0, rss_pages = 0;
-	if (!(f >> total_pages >> rss_pages)) return -1;
-	static long page_size_kb = sysconf(_SC_PAGESIZE) / 1024;
+	if (!f.is_open()) return SIZE_MAX;
+	size_t total_pages = 0, rss_pages = 0;
+	if (!(f >> total_pages >> rss_pages)) return SIZE_MAX;
+	// sysconf returns long and -1 on error; a page size is positive.
+	const long page_kb = sysconf(_SC_PAGESIZE);
+	if (page_kb <= 0) return SIZE_MAX;
+	static const size_t page_size_kb = static_cast<size_t>(page_kb) / 1024;
 	return rss_pages * page_size_kb;
 #elif defined(__APPLE__)
 	task_vm_info_data_t vm_info;
 	mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
 	if (task_info(mach_task_self(), TASK_VM_INFO,
 			(task_info_t)&vm_info, &count) != KERN_SUCCESS)
-		return -1;
+		return SIZE_MAX;
 	return static_cast<size_t>(vm_info.phys_footprint / 1024);
 #elif defined(_WIN32)
 	HANDLE hProcess = GetCurrentProcess();
@@ -29,9 +34,9 @@ inline size_t current_rss_kb() {
 	pmc.cb = sizeof(pmc);
 	if (GetProcessMemoryInfo(hProcess, &pmc, sizeof(pmc)))
 		return static_cast<size_t>(pmc.WorkingSetSize / 1024);
-	return -1;
+	return SIZE_MAX;
 #else
-	return -1;
+	return SIZE_MAX;
 #endif
 }
 
@@ -41,21 +46,21 @@ inline size_t current_rss_kb() {
 inline size_t peak_rss_kb() {
 #if defined(__linux__)
 	struct rusage ru;
-	if (getrusage(RUSAGE_SELF, &ru) != 0) return -1;
-	return ru.ru_maxrss;
+	if (getrusage(RUSAGE_SELF, &ru) != 0) return SIZE_MAX;
+	return static_cast<size_t>(ru.ru_maxrss);
 #elif defined(__APPLE__)
 	struct rusage ru;
-	if (getrusage(RUSAGE_SELF, &ru) != 0) return -1;
-	return ru.ru_maxrss / 1024;
+	if (getrusage(RUSAGE_SELF, &ru) != 0) return SIZE_MAX;
+	return static_cast<size_t>(ru.ru_maxrss / 1024);
 #elif defined(_WIN32)
 	HANDLE hProcess = GetCurrentProcess();
 	PROCESS_MEMORY_COUNTERS pmc;
 	pmc.cb = sizeof(pmc);
 	if (GetProcessMemoryInfo(hProcess, &pmc, sizeof(pmc)))
 		return static_cast<size_t>(pmc.PeakWorkingSetSize / 1024);
-	return -1;
+	return SIZE_MAX;
 #else
-	return -1;
+	return SIZE_MAX;
 #endif
 }
 

@@ -65,7 +65,7 @@ set_target_properties(tgf_standalone PROPERTIES
     SUFFIX ".js"
     LINK_FLAGS "-pthread -Wno-pthreads-mem-growth -s ASYNCIFY -s PROXY_TO_PTHREAD -s STACK_SIZE=16777216 -s ALLOW_MEMORY_GROWTH=1 -s INITIAL_MEMORY=64MB -s MAXIMUM_MEMORY=1GB -s EXIT_RUNTIME=1 -lnodefs.js --preload-file ${TOP_SRC}/tests/fixtures/tau.tgf@/tau.tgf")
 
-if(TAU_PARSER_BUILD_BROWSER_TESTS)
+if(TAU_PARSER_BUILD_BROWSER_PAGE)
     # Browser page files, copied next to the program output
     configure_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/index.html

@@ -82,7 +82,12 @@ class ReplTester:
         """Strip env vars that might interfere with the REPL."""
         import os
         env = {}
-        for k in ("PATH", "HOME", "USER", "TERM", "COLORTERM"):
+        for k in (
+            "PATH", "HOME", "USER", "TERM", "COLORTERM",
+            # QEMU_LD_PREFIX comes from ctest; aarch64 binfmt reads it to find
+            # the cross loader, so the REPL cannot start under qemu without it.
+            "QEMU_LD_PREFIX",
+        ):
             if k in os.environ:
                 env[k] = os.environ[k]
         env.setdefault("TERM", "xterm-256color")
@@ -168,7 +173,8 @@ class ReplTester:
         try:
             self.child.sendline(b"quit")
             self.child.expect(pexpect.EOF, timeout=10)
-        except (pexpect.TIMEOUT, pexpect.EOF):
+        except (pexpect.TIMEOUT, pexpect.EOF, OSError):
+            # The child can exit between isalive() and the write; macOS then raises EIO.
             pass
         if self.child.isalive():
             self.child.kill(9)

@@ -14,6 +14,7 @@
 #include <string_view>
 #include <type_traits>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 #include "term_colors.h"
@@ -410,6 +411,8 @@ private:
 
 std::ostream& operator<<(std::ostream& os, const report& r);
 
+template <typename T> struct result;
+
 /// A result mimics std::expected and additionally carries a unified report
 /// (diagnostic messages and metrics) along with the value.
 template <typename T>
@@ -417,6 +420,11 @@ struct result {
 	using value_type        = T;
 	using diagnostics_report = struct report;
 	using scope_guard       = diagnostics_report::scope_guard;
+	/// A @c void result has no value to store, so it holds @c std::monostate
+	/// and takes its success state from the absence of an error; the value_
+	/// slot then only marks a call to @ref with_value().
+	using stored_t = std::conditional_t<std::is_void_v<T>,
+		std::monostate, T>;
 
 	template <typename U> friend struct result;
 
@@ -430,52 +438,70 @@ struct result {
 	result(const result&)		 = delete;
 	result& operator=(const result&) = delete;
 
-	explicit result(T value)
-		requires(!std::is_same_v<std::decay_t<T>, std::string>);
+	explicit result(stored_t value)
+		requires(!std::is_void_v<T>
+			&& !std::is_same_v<std::decay_t<T>, std::string>);
 	explicit result(diagnostics_report rep);
 
 	~result();
 
 	[[nodiscard]] bool has_value() const;
 
-	T&	 value() &;
-	const T& value() const&;
-	T&&	 value() &&;
+	stored_t&	 value() &
+		requires(!std::is_void_v<T>);
+	const stored_t& value() const&
+		requires(!std::is_void_v<T>);
+	stored_t&&	 value() &&
+		requires(!std::is_void_v<T>);
 
-	T& operator*() &
-		requires(!std::is_pointer_v<T>);
-	const T& operator*() const&
-		requires(!std::is_pointer_v<T>);
-	T&& operator*() &&
-		requires(!std::is_pointer_v<T>);
+	stored_t& operator*() &
+		requires(!std::is_void_v<T> && !std::is_pointer_v<T>);
+	const stored_t& operator*() const&
+		requires(!std::is_void_v<T> && !std::is_pointer_v<T>);
+	stored_t&& operator*() &&
+		requires(!std::is_void_v<T> && !std::is_pointer_v<T>);
 
-	T* operator->()
-		requires(!std::is_pointer_v<T>);
-	const T* operator->() const
-		requires(!std::is_pointer_v<T>);
+	stored_t* operator->()
+		requires(!std::is_void_v<T> && !std::is_pointer_v<T>);
+	const stored_t* operator->() const
+		requires(!std::is_void_v<T> && !std::is_pointer_v<T>);
 
 	/// Set the success value in place. If the report already holds an
 	/// error, the new value is silently dropped (see
 	/// @ref enforce_error_no_value_invariant); a DBG-build assertion
 	/// catches the misuse.
-	T& emplace(T&& v);
+	stored_t& emplace(stored_t&& v)
+		requires(!std::is_void_v<T>);
 	template <typename... Args>
-	T& emplace(Args&&... args);
+	stored_t& emplace(Args&&... args)
+		requires(!std::is_void_v<T>);
 
 	/// Same drop-on-error invariant as @ref emplace.
-	template <typename U = T>
-	result& operator=(U&& v);
+	template <typename U = stored_t>
+	result& operator=(U&& v)
+		requires(!std::is_void_v<T>);
 
 	/// @ref operator=, and it returns the result, so a caller returns in
 	/// one statement. The rvalue return admits no further call.
-	template <typename U = T>
-	[[nodiscard]] result&& with_value(U&& v);
+	template <typename U = stored_t>
+	[[nodiscard]] result&& with_value(U&& v)
+		requires(!std::is_void_v<T>);
 
 	/// @ref with_value, plus a DBG assertion of @ref is_well_formed.
-	template <typename U = T>
-	[[nodiscard]] result&& with_assert_check_value(U&& v);
+	template <typename U = stored_t>
+	[[nodiscard]] result&& with_assert_check_value(U&& v)
+		requires(!std::is_void_v<T>);
 
-	void clear_value();
+	/// @ref with_value for a @c void result, which has no value to pass.
+	[[nodiscard]] result&& with_value()
+		requires(std::is_void_v<T>);
+
+	/// @ref with_assert_check_value for a @c void result.
+	[[nodiscard]] result&& with_assert_check_value()
+		requires(std::is_void_v<T>);
+
+	void clear_value()
+		requires(!std::is_void_v<T>);
 
 	[[nodiscard]] diagnostics_report&      report() &;
 	[[nodiscard]] const diagnostics_report& report() const&;
@@ -592,22 +618,32 @@ struct result {
 	template <typename U>
 	result& operator<<(result<U>&& child);
 
+	/// Merge a void child and report its outcome: true when the child held
+	/// no error. The void counterpart of @ref merge_take, which cannot
+	/// return @c std::optional<void>. The child's report is merged either
+	/// way, so a caller writes `if (!r.merge_ok(expr)) return r;`.
+	[[nodiscard]] bool merge_ok(result<void>&& child);
+
 	/// Take @p child's value (if any), merge its report, return the value.
 	template <typename U>
-	[[nodiscard]] std::optional<U> merge_take(result<U>&& child);
+	[[nodiscard]] std::optional<U> merge_take(result<U>&& child)
+		requires(!std::is_void_v<U>);
 
 	/// Like @ref merge_take, but synthesizes @p c / @p msg on this result
 	/// when @p child is malformed (neither value nor error) after the
 	/// merge — the ordinary error/value cases pass through unchanged.
 	template <typename U>
 	[[nodiscard]] std::optional<U> take_or_error(result<U>&& child,
-		code c, std::string_view msg);
+		code c, std::string_view msg)
+		requires(!std::is_void_v<U>);
 
 	/// @ref take_or_error, with @p extra attrs attached to the synthesized
 	/// error.
 	template <typename U>
 	[[nodiscard]] std::optional<U> take_or_error(result<U>&& child,
-		code c, std::string_view msg, std::initializer_list<attr_in> extra);
+		code c, std::string_view msg,
+		std::initializer_list<attr_in> extra)
+		requires(!std::is_void_v<U>);
 
 	/// Chain a fallible step. On value, calls @p f with the moved value and
 	/// returns its @ref result<U>, this result's report merged in before
@@ -615,7 +651,9 @@ struct result {
 	/// @p f is not called; returns a @ref result<U> carrying the moved
 	/// report. F: T -> result<U>.
 	template <typename F>
-	[[nodiscard]] auto and_then(F&& f) && -> std::invoke_result_t<F, T&&>;
+	[[nodiscard]] auto and_then(F&& f) &&
+		-> std::invoke_result_t<F, stored_t&&>
+		requires(!std::is_void_v<T>);
 
 	/// Chain an infallible transform. On value, wraps @c f(value) in a
 	/// @ref result<U> together with the moved report; a null pointer @c U
@@ -624,7 +662,8 @@ struct result {
 	/// report. F: T -> U.
 	template <typename F>
 	[[nodiscard]] auto transform(F&& f) &&
-		-> result<std::invoke_result_t<F, T&&>>;
+		-> result<std::invoke_result_t<F, stored_t&&>>
+		requires(!std::is_void_v<T>);
 
 	/// Recover from an error. On value, returns this result unchanged and
 	/// @p f is not called. On error, calls @p f with this result's report
@@ -640,7 +679,8 @@ struct result {
 
 	/// The value, or @p fallback on error. The report is dropped by this
 	/// call by design; read it beforehand if it is still needed.
-	[[nodiscard]] T value_or(T fallback) &&;
+	[[nodiscard]] stored_t value_or(stored_t fallback) &&
+		requires(!std::is_void_v<T>);
 
 private:
 	/// Merge this result's report before @p r's, then hand @p r back
@@ -650,7 +690,7 @@ private:
 
 	void enforce_error_no_value_invariant();
 
-	std::optional<T> value_ {};
+	std::optional<stored_t> value_ {};
 	diagnostics_report diag_rep_ {};
 };
 

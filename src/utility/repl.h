@@ -46,7 +46,7 @@ struct repl {
 		while (1) {
 			std::string s;
 			char ch;
-			int read;
+			std::ptrdiff_t read;
 			while ((read = term::in(ch)) == 1) {
 				TDBG(std::cerr << "\n";) TDBG(print_debug();)
 				TDBG(std::cerr << " <pressed '" << ch << "' = "
@@ -114,14 +114,14 @@ struct repl {
 		if (is_pipe_) return;
 		size_t r = r_;
 		clear_input();
-		input_.insert(input_.begin() + pos_ - 1, '\n');
+		input_.insert(it_at(pos_ - 1), '\n');
 		print_input(), go(r, 0);
 	}
 	int evaluate(const std::string& s) {
 		auto ret = re_.eval(s).value_or(0);
 		TDBG(std::cerr << " <EVAL: " << ret << ">";)
 		if (ret == 2) { // Unexpected end of file, continue
-			input_.insert(input_.begin() + pos_ - 1, '\n');
+			input_.insert(it_at(pos_ - 1), '\n');
 			return ret;
 		}
 		history_.store(s);
@@ -149,7 +149,7 @@ struct repl {
 		size_t r = r_, c = c_;
 		TDBG(print_debug();)
 		clear_input();
-		input_.insert(input_.begin() + pos_ - 1, ch);
+		input_.insert(it_at(pos_ - 1), ch);
 		if (is_pipe_) return;
 		print_input();
 		go(r, c);
@@ -163,10 +163,14 @@ struct repl {
 	/// Returns the current prompt
 	std::string prompt() const { return prompt_; }
 private:
+	/// Iterator at index i: an iterator moves by a signed difference while the
+	/// index is a size, so the single conversion lives here.
+	std::vector<char>::iterator it_at(size_t i) {
+		return input_.begin() + static_cast<std::ptrdiff_t>(i);
+	}
 	/// Returns the current input as a string
 	std::string get() const {
-		std::stringstream ss;
-		return ss.write(input_.data(), input_.size()), ss.str();
+		return std::string(input_.begin(), input_.end());
 	}
 	/// Sets the current input from a string
 	void set(const std::string& s) {
@@ -210,13 +214,12 @@ private:
 	}
 	void go(size_t r, size_t c) {
 		if (is_pipe_) return;
-		int up   = static_cast<int>(r_) - static_cast<int>(r);
-		int left = static_cast<int>(c_) - static_cast<int>(c);
 		TDBG(std::cerr << " <GO: [" << r << ", " << c << "] -> "
-			<< "relative [up:" << up << ", left: " << left << "]";)
+			<< "relative [up:" << (r_ - r) << ", left: "
+			<< (c_ - c) << "]";)
 		term::cursor_up(r_ - r);
 		term::cursor_left(c_ - c);
-		r_ -= up, c_ -= left;
+		r_ = r, c_ = c;
 		TDBG(std::cerr << " >";)
 	}
 	/// Delete character before the cursor
@@ -226,7 +229,7 @@ private:
 		if (c) c--;
 		else if (r) c = lws_[--r];
 		clear_input();
-		input_.erase(input_.begin() + --pos_);
+		input_.erase(it_at(--pos_));
 		print_input();
 		go(r, c);
 	}
@@ -235,7 +238,7 @@ private:
 		if (pos_ >= input_.size()) return;
 		size_t r = r_, c = c_;
 		clear_input();
-		input_.erase(input_.begin() + pos_);
+		input_.erase(it_at(pos_));
 		print_input();
 		go(r, c);
 	}
@@ -343,7 +346,8 @@ private:
 	void clear_input() {
 		if (is_pipe_) return;
 		TDBG(std::cerr << " <CLEAR INPUT";)
-		if (r_ < lws_.size() - 1) term::cursor_down(lws_.size() - 1 - r_);
+		if (r_ < lws_.size() - 1)
+			term::cursor_down(lws_.size() - 1 - r_);
 		r_ = lws_.size() - 1;
 		while (r_) r_--, term::clear_line(), term::cursor_up();
 		c_ = 0, term::clear_line();

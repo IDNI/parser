@@ -154,8 +154,9 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 		if (c == nullptr) {
 			// Check if children actually changed
 			auto ch_range = tree::get(c_node).children();
-			if (std::equal(stack.begin() + (upos.back() + 1),
-				stack.end(), ch_range.begin(), ch_range.end()))
+			if (std::equal(stack.data() + (upos.back() + 1),
+				stack.data() + stack.size(),
+				ch_range.begin(), ch_range.end()))
 			{
 				tref res = call(f, c_node, get_parent());
 				if (res == nullptr) return nullptr;
@@ -164,8 +165,8 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 				else cache.emplace(c_node, res);
 				c_node = res;
 				// Pop children from stacks
-				stack.erase(stack.end() - c_pos, stack.end());
-				nxt.erase(nxt.end() - c_pos, nxt.end());
+				stack.resize(stack.size() - c_pos);
+				nxt.resize(nxt.size() - c_pos);
 				upos.pop_back();
 #ifdef MEASURE_TRAVERSER_DEPTH
 				dec_depth();
@@ -180,8 +181,8 @@ tref post_order<node>::traverse(tref n, auto& f, auto& visit_subtree) {
 			DBGT(std::cout << "\tnew node: " << tree::get(res).dump_to_str() << "\n";)
 			if (res == nullptr) return nullptr;
 			// Pop children from stacks
-			stack.erase(stack.end() - c_pos, stack.end());
-			nxt.erase(nxt.end() - c_pos, nxt.end());
+			stack.resize(stack.size() - c_pos);
+			nxt.resize(nxt.size() - c_pos);
 			res = call(f, res, get_parent());
 			if (res == nullptr) return nullptr;
 			if constexpr (slot != 0)
@@ -264,7 +265,7 @@ void post_order<node>::const_traverse(tref n, auto& visitor,
 			// Get child position
 			size_t c_pos = (stack.size() - 1) - upos.back();
 			// Pop children from stacks
-			stack.erase(stack.end() - c_pos, stack.end());
+			stack.resize(stack.size() - c_pos);
 			upos.pop_back();
 #ifdef MEASURE_TRAVERSER_DEPTH
 			dec_depth();

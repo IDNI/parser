@@ -443,8 +443,8 @@ node_adapter parse_node_adapter(const nonterminals<C, T>& nts) {
 struct capture_state {
 	std::vector<tref>                 v;         // current capture slots
 	std::vector<tref>                 ends;      // exclusive end, parallel to v
-	std::vector<std::pair<int, tref>> trail;      // (index, previous v)
-	std::vector<std::pair<int, tref>> end_trail;  // (index, previous end)
+	std::vector<std::pair<size_t, tref>> trail;      // (index, previous v)
+	std::vector<std::pair<size_t, tref>> end_trail;  // (index, previous end)
 
 	explicit capture_state(int n)
 		: v(static_cast<size_t>(n < 0 ? 0 : n), nullptr)
@@ -454,7 +454,7 @@ struct capture_state {
 	size_t mark() const { return trail.size(); }
 
 	// Record-then-write a capture slot and its end so both can be undone.
-	void set(int idx, tref n, tref end) {
+	void set(size_t idx, tref n, tref end) {
 		trail.emplace_back(idx, v[idx]);
 		end_trail.emplace_back(idx, ends[idx]);
 		v[idx] = n;
@@ -548,7 +548,7 @@ bool matcher<NodeT>::match_amb_alts(tref n, capture_state& caps,
 		}
 		if (count != 1) return false;
 		for (size_t idx = 0; idx < caps.v.size(); ++idx)
-			caps.set((int)idx, winner[idx], winner_ends[idx]);
+			caps.set(idx, winner[idx], winner_ends[idx]);
 		return true;
 	}
 	// ALL - every alternative must match. Each alternative's captures
@@ -567,7 +567,7 @@ bool matcher<NodeT>::match_amb_alts(tref n, capture_state& caps,
 	// Written via caps.set() so the merge survives a later rollback.
 	for (size_t idx = 0; idx < caps.v.size(); ++idx) {
 		if (!adapter_.make_node_fn) {
-			caps.set((int)idx, per_alt.front()[idx],
+			caps.set(idx, per_alt.front()[idx],
 				per_alt_ends.front()[idx]);
 			continue;
 		}
@@ -583,13 +583,13 @@ bool matcher<NodeT>::match_amb_alts(tref n, capture_state& caps,
 			}
 		}
 		if (distinct.size() <= 1) {
-			caps.set((int)idx, distinct.empty() ? nullptr
+			caps.set(idx, distinct.empty() ? nullptr
 				: distinct.front(), distinct_end);
 			continue;
 		}
 		// Pin the end to the node's own right sibling, immune to hash-consing reuse.
 		tref synth = adapter_.make_node_fn("__AMB__", distinct);
-		caps.set((int)idx, synth,
+		caps.set(idx, synth,
 			synth ? lcrs_tree<NodeT>::get(synth).right_sibling() : nullptr);
 	}
 	return true;
@@ -675,7 +675,8 @@ bool matcher<NodeT>::match_node(tref n,
 		// nullptr instead of the group's anchor position.
 		if (atom_ok && p.capture_idx >= 0
 			&& (int)caps.v.size() > p.capture_idx)
-			caps.set(p.capture_idx, zero_width ? nullptr : n,
+			caps.set(static_cast<size_t>(p.capture_idx),
+				zero_width ? nullptr : n,
 				zero_width ? nullptr : matched_next);
 		break;
 	}

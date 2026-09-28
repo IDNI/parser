@@ -259,7 +259,7 @@ bool forest<NodeT>::_extract_graph_uniq_edge(std::map<node, size_t>& ndmap,
 		graph curgraph = graphs[gid];
 		std::set<edge> curdone(done);
 		nodes curtodo(todo);
-		size_t rootid = ndmap[root], ambpid = -1;
+		size_t rootid = ndmap[root], ambpid = SIZE_MAX; // first ++ambpid gives 0
 		bool derived = false;
 		for (auto& pack : packs) {
 			++ambpid;
@@ -312,7 +312,7 @@ typename forest<NodeT>::graph forest<NodeT>::extract_first_graph(
 	gs.root = root;
 	std::unordered_map<node, size_t, node> ndmap;
 	ndmap.reserve(this->g.size());
-	int_t id = 0;
+	size_t id = 0;
 	for (auto& it : this->g) {
 		ndmap[it.first] = id++;
 		id += it.second.size(); // ambig node ids;
@@ -325,7 +325,7 @@ typename forest<NodeT>::graph forest<NodeT>::extract_first_graph(
 		auto cit = this->g.find(crt);
 		if(cit == this->g.end() || !cit->second.size()) continue;
 		auto &packs = cit->second;
-		size_t rid = ndmap[crt], ambpid = -1;
+		size_t rid = ndmap[crt], ambpid = SIZE_MAX; // first ++ambpid gives 0
 		for(auto& nextp : packs) {
 			ambpid++;
 			if( de.insert({rid, rid + ambpid + 1}).second) {
@@ -357,7 +357,7 @@ typename forest<NodeT>::graphv forest<NodeT>::extract_graphs(
 	graphs.emplace_back();
 	graphs.back().root = root;
 	std::map<node, size_t> ndmap;
-	int_t id = 0;
+	size_t id = 0;
 	for (auto& it : g) {
 		ndmap[it.first] = id++;
 		id += it.second.size(); // ambig node ids;

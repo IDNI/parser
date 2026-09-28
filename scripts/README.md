@@ -90,8 +90,8 @@ Two layouts coexist on purpose:
 | `Release` | `build-Release` | `build/release` |
 | `Debug` | `build-Debug` | `build/debug` |
 | `RelWithDebInfo` | `build-RelWithDebInfo` | `build/relwithdebinfo` |
-| MinGW Release | `build-Release` + toolchain `-D` | `build/release-mingw` |
-| Emscripten Release | `build-Release` + `-D` | `build/emscripten` |
+| w64 Release | `build-Release` + toolchain `-D` | `build/release-w64` |
+| wasm Release | `build-Release` + `-D` | `build/release-wasm` |
 
 Legacy wrappers are unchanged. Prefer presets for new work; use the matching
 `build/…` tree when running `cpack` after a preset build.
@@ -122,14 +122,15 @@ optionally test or run `tgf` via
 ./dev preset all
 ./dev preset release-examples
 ./dev preset release-packages
-./dev preset release-mingw-packages
+./dev preset release-w64-packages
 ./dev preset relwithdebinfo
 ./dev preset release-measure
 ./dev preset release-tgf run -- --version
-./dev preset emscripten
+./dev preset release-wasm
 ```
 
-Default preset name is `release` if omitted.
+Default preset name is `release` if omitted. Every build-type preset has
+`release-`, `devel-` and `debug-` twins; package presets are release only.
 
 #### Preset reference
 
@@ -138,8 +139,9 @@ Default preset name is `release` if omitted.
 | `release`, `debug` | header-only library (default) | `build/release`, `build/debug` |
 | `release-tests`, `debug-tests` | + tests | same |
 | `release-tgf`, `debug-tgf` | + TGF | same |
-| `release-tgf-clang`, `debug-tgf-clang` | + TGF (clang) | `build/release-clang`, `build/debug-clang` |
-| `release-clang`, `debug-clang` (+ `-make-`, `-ninja-`) | header-only (default) | `build/release-clang`, `build/debug-clang` |
+| `release-tgf-clang`, `debug-tgf-clang` | + TGF (clang) | `build/release`, `build/debug` |
+| `release-clang`, `debug-clang` (+ `-make-`, `-ninja-`) | header-only (default) | `build/release`, `build/debug` |
+| `release-make-gcc`, `release-ninja-gcc` (+ `debug-`, `devel-`) | header-only (gcc) | `build/release-gcc`, … |
 | `release-examples`, `debug-examples` | + examples | same |
 | `release-packages` | TGF + examples (Linux cpack) | `build/release` |
 | `release-all`, `debug-all`, `all` | everything (`TAU_PARSER_BUILD_ALL`) | `build/release` / `build/debug` (`all` → `build/release`) |
@@ -147,17 +149,20 @@ Default preset name is `release` if omitted.
 | `release-measure`, `debug-measure` | + instrumentation | same |
 | `debug-asan` | + address sanitizer | `build/debug` |
 | `relwithdebinfo` (+ `-tests`, `-tgf`, …) | RelWithDebInfo variants | `build/relwithdebinfo` |
-| `release-mingw`, `debug-mingw` | Windows cross-compile | `build/release-mingw`, … |
-| `release-mingw-packages`, `release-mingw-packages-zip` | MinGW + cpack (NSIS or ZIP) | `build/release-mingw` |
-| `emscripten`, `debug-emscripten` | Emscripten (`EMSCRIPTEN_DIR` defaults via `TAU_SHARED_PREFIX`) | `build/emscripten`, … |
-| `release-tests-emscripten` | Emscripten + tests, run under Node.js | `build/emscripten` |
-| `release-tgf-emscripten`, `debug-tgf-emscripten` | Emscripten + the tgf FTXUI REPL, run by `./dev tgf-node` | `build/emscripten`, … |
-| `release-tests-emscripten-browser` | Emscripten tests + tgf, the browser REPL page and the headless Chrome tests | `build/emscripten` |
+| `release-w64`, `debug-w64` (+ `devel-w64`) | Windows cross-compile | `build/release-w64`, … |
+| `release-w64-packages`, `release-w64-packages-zip` | MinGW + cpack (NSIS or ZIP) | `build/release-w64` |
+| `release-arm64`, `debug-arm64` (+ `devel-arm64`) | Linux arm64 cross-compile (clang, qemu) | `build/release-arm64`, … |
+| `release-arm64-tests` (+ `debug-`, `devel-`) | Linux arm64 cross-compile + tests under qemu | `build/release-arm64` |
+| `release-wasm`, `debug-wasm` (+ `devel-wasm`) | Emscripten (`EMSCRIPTEN_DIR` defaults via `TAU_SHARED_PREFIX`) | `build/release-wasm`, … |
+| `release-wasm-tests` (+ `debug-`, `devel-`) | Emscripten + tests, run under Node.js | `build/release-wasm` |
+| `release-wasm-tgf`, `debug-wasm-tgf` | Emscripten + the tgf FTXUI REPL, run by `./dev tgf-node` | `build/release-wasm`, … |
+| `release-wasm-tests-browser` | Emscripten tests + tgf, the browser REPL page and the headless Chrome tests | `build/release-wasm` |
 | `release-msvc`, `debug-msvc` | Native MSVC (static lib) | `build/release-msvc`, `build/debug-msvc` |
 | `release-msvc-tgf`, `debug-msvc-tgf` | + TGF (+ FTXUI fetch) | same |
 | `release-msvc-tests`, `debug-msvc-tests` | + tests | same |
-| `release-msvc-all`, `all-msvc` | everything (`TAU_PARSER_BUILD_ALL`) | `build/release-msvc` |
+| `release-msvc-all`, `msvc-all` | everything (`TAU_PARSER_BUILD_ALL`) | `build/release-msvc` |
 | `release-msvc-packages`, `release-msvc-packages-zip` | TGF + examples + NSIS/ZIP | `build/release-msvc` |
+| `release-msvc-all-clang-cl` (+ `debug-`, `devel-`) | everything, clang-cl / Ninja / x64 | `build/release-msvc-clang-cl` |
 
 Hidden building blocks (`_build-tests`, `_build-packages`, `_build-all`, …) are
 composed by the public presets above; see [`CMakePresets.json`](../CMakePresets.json).
@@ -165,7 +170,7 @@ composed by the public presets above; see [`CMakePresets.json`](../CMakePresets.
 #### `run` and packaging presets
 
 - Presets whose name contains **`package`** run `cpack -C Release` after build
-  (`release-packages`, `release-mingw-packages`, `release-mingw-packages-zip`).
+  (`release-packages`, `release-w64-packages`, `release-w64-packages-zip`).
 - **`run`** — `ctest` when the name contains `test`, ends with `-all`, or is
   `all` (not used on packaging presets); otherwise runs `tgf` (args after `--`).
 
@@ -181,7 +186,7 @@ composed by the public presets above; see [`CMakePresets.json`](../CMakePresets.
 
 - `packages` — legacy: `build-Release` + `cpack`
 - `w64-packages` — legacy: Windows NSIS and ZIP via mingw + `packages`
-- Preset alternative: `./dev preset release-packages`, `./dev preset release-mingw-packages`
+- Preset alternative: `./dev preset release-packages`, `./dev preset release-w64-packages`
 
 ## Docker
 
@@ -204,18 +209,18 @@ Any further options go to `docker build`, for example
 - `dep-chrome` — install Chrome for Testing into `<TAU_SHARED_PREFIX>/chrome`
   through `@puppeteer/browsers`. The browser tests need it. Skips the install
   when the pinned `CHROME_TAG` build already exists.
-- Presets: `./dev preset emscripten` (Release, `build/emscripten`) and
-  `./dev preset debug-emscripten` (`build/debug-emscripten`). Each places
+- Presets: `./dev preset release-wasm` (Release, `build/release-wasm`) and
+  `./dev preset debug-wasm` (`build/debug-wasm`). Each places
   `tauparser.html` / `tauparser.node.js` beside the built `tauparser.js`.
 - `EMSCRIPTEN_DIR` is not set by the preset; it defaults to
   `<TAU_SHARED_PREFIX>/emsdk/upstream/emscripten` (same resolution as
   `dep-emsdk`: `-DTAU_SHARED_PREFIX=`, else `$TAU_SHARED_PREFIX`, else
   `~/.tau`). Override with `-DEMSCRIPTEN_DIR=<dir>`.
 - `tgf-wasm [serve]` — build the browser REPL page with the
-  `release-tests-emscripten-browser` preset. `serve` then starts the page server.
+  `release-wasm-tests-browser` preset. `serve` then starts the page server.
 - `tgf-node [grammar.tgf]` — run the WebAssembly tgf REPL in the terminal
-  through Node.js. Builds it with `release-tgf-emscripten` when it is missing.
-- `tgf-serve [PORT]` — serve the built page from `build/emscripten/js/tgf`
+  through Node.js. Builds it with `release-wasm-tgf` when it is missing.
+- `tgf-serve [PORT]` — serve the built page from `build/release-wasm/js/tgf`
   with the COOP and COEP headers. Default port 8088.
 
 ## TGF

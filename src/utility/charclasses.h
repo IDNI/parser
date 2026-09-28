@@ -11,7 +11,7 @@
 
 namespace idni::charclasses {
 
-template <typename C> bool iseof(C c)  {return c == std::char_traits<C>::eof();}
+template <typename C> bool iseof(C c)  {return c == static_cast<C>(std::char_traits<C>::eof());}
 template <typename C> bool isany(C c)  {return !iseof(c);}
 template <typename C> bool isascii(C c){return static_cast<unsigned int>(c) <= 0x7F;}
 template <typename C> bool isalnum(C c);

@@ -39,6 +39,12 @@
 
 include_guard(GLOBAL)
 
+# Functions record the policies in effect where they are defined, so the
+# functions below need a current policy under `cmake -P` and under include(),
+# while the file that includes this module keeps its own.
+cmake_policy(PUSH)
+cmake_policy(VERSION 3.10...3.31)
+
 # Default memory budget (MiB) per compile job when auto-detecting
 # TAU_BUILD_JOBS. Single source for the two places this literal is needed:
 # the TAU_BUILD_JOB_MEMORY_MB cache variable's default (include mode) and
@@ -154,14 +160,21 @@ function(_tau_resolve_job_memory_mb requested out_var)
 endfunction()
 
 # -D (or, standalone, the <requested> argument) beats the environment beats
-# $HOME/.tau.
+# $HOME/.tau (or %USERPROFILE%\.tau on Windows when HOME is unset).
 function(_tau_resolve_shared_prefix requested out_var)
 	set(prefix "${requested}")
 	if(prefix STREQUAL "")
 		if(DEFINED ENV{TAU_SHARED_PREFIX} AND NOT "$ENV{TAU_SHARED_PREFIX}" STREQUAL "")
 			set(prefix "$ENV{TAU_SHARED_PREFIX}")
-		else()
+		elseif(DEFINED ENV{HOME} AND NOT "$ENV{HOME}" STREQUAL "")
 			set(prefix "$ENV{HOME}/.tau")
+		elseif(DEFINED ENV{USERPROFILE} AND NOT "$ENV{USERPROFILE}" STREQUAL "")
+			# Native Windows cmake has no HOME; Git bash sets one, cmd does not.
+			file(TO_CMAKE_PATH "$ENV{USERPROFILE}/.tau" prefix)
+		else()
+			message(FATAL_ERROR
+				"TAU_SHARED_PREFIX is empty and neither HOME nor USERPROFILE is set; "
+				"set TAU_SHARED_PREFIX to the shared dependency prefix")
 		endif()
 	endif()
 	set("${out_var}" "${prefix}" PARENT_SCOPE)
@@ -226,3 +239,5 @@ else()
 	unset(TAU_BUILD_JOB_MEMORY_MB_DOC)
 	unset(TAU_SHARED_PREFIX_DOC)
 endif()
+
+cmake_policy(POP)

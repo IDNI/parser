@@ -57,6 +57,7 @@ option(TAU_PARSER_BUILD_EXAMPLES       "Build examples"                     OFF)
 option(TAU_PARSER_BUILD_TGF            "Build tgf tool"                     OFF)
 option(TAU_RUN_GRAMMAR_TESTS           "Run the .tgf.test grammar suites"   OFF)
 option(TAU_PARSER_BUILD_BROWSER_TESTS  "Run WASM tests in headless Chrome (Emscripten only)" OFF)
+option(TAU_PARSER_BUILD_BROWSER_PAGE   "Build the browser page files (Emscripten only)" OFF)
 option(TAU_PARSER_DONT_USE_FTXUI       "Disable FTXUI"                      OFF)
 option(TAU_PARSER_BUILD_PIC            "Build position independent code"    OFF)
 option(TAU_PARSER_WINDOWS_PACKAGE      "Build Windows package"              OFF)
@@ -103,6 +104,7 @@ set_property(CACHE TAU_PARSER_BUILD_EXAMPLES        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_TGF             PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_RUN_GRAMMAR_TESTS            PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_BROWSER_TESTS   PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_PARSER_BUILD_BROWSER_PAGE    PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_DONT_USE_FTXUI        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_WINDOWS_PACKAGE       PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_WINDOWS_ZIP_PACKAGE   PROPERTY STRINGS "OFF" "ON")
@@ -136,8 +138,14 @@ if(TAU_RUN_GRAMMAR_TESTS)
 		CACHE BOOL "Build tgf tool" FORCE)
 endif()
 
-# the browser tests run the tgf program in a page
+# the browser tests run the tgf program in a page, so they need the page
 if(TAU_PARSER_BUILD_BROWSER_TESTS)
+	set(TAU_PARSER_BUILD_BROWSER_PAGE ON
+		CACHE BOOL "Build the browser page files (Emscripten only)" FORCE)
+endif()
+
+# the browser page is a build output of the tgf program
+if(TAU_PARSER_BUILD_BROWSER_PAGE)
 	set(TAU_PARSER_BUILD_TGF ON
 		CACHE BOOL "Build tgf tool" FORCE)
 endif()
@@ -295,6 +303,7 @@ message(STATUS "TAU_PARSER_BUILD_EXAMPLES:       ${TAU_PARSER_BUILD_EXAMPLES}")
 message(STATUS "TAU_PARSER_BUILD_TGF:            ${TAU_PARSER_BUILD_TGF}")
 message(STATUS "TAU_RUN_GRAMMAR_TESTS:           ${TAU_RUN_GRAMMAR_TESTS}")
 message(STATUS "TAU_PARSER_BUILD_BROWSER_TESTS:  ${TAU_PARSER_BUILD_BROWSER_TESTS}")
+message(STATUS "TAU_PARSER_BUILD_BROWSER_PAGE:   ${TAU_PARSER_BUILD_BROWSER_PAGE}")
 message(STATUS "TAU_PARSER_DONT_USE_FTXUI:       ${TAU_PARSER_DONT_USE_FTXUI}")
 message(STATUS "TAU_PARSER_SPECIALIZE:           ${TAU_PARSER_SPECIALIZE}")
 message(STATUS "TAU_PARSER_BUILD_PIC:            ${TAU_PARSER_BUILD_PIC}")
@@ -337,37 +346,13 @@ endfunction()
 
 ################################################################################
 
-# ankerl/unordered_dense — Robin Hood open-addressing hash map (MIT)
-# Prefer a local vendored copy (external/ankerl/unordered_dense.h) over
-# fetching from the network so offline builds work.
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/ankerl/unordered_dense.h")
-	message(STATUS "Using vendored ankerl/unordered_dense from external/")
-	add_library(unordered_dense INTERFACE)
-	target_include_directories(unordered_dense INTERFACE
-		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external>
-		$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-else()
-	include(FetchContent)
-	FetchContent_Declare(
-		unordered_dense
-		GIT_REPOSITORY https://github.com/martinus/unordered_dense.git
-		GIT_TAG        v4.4.0
-		GIT_SHALLOW    TRUE
-	)
-	FetchContent_MakeAvailable(unordered_dense)
-endif()
+# Store-resolved dependencies (unordered_dense, and FTXUI off wasm). Opt-in:
+# -DTAU_PARSER_DEPS_FROM_STORE=ON; otherwise the paths below keep the
+# system-package / FetchContent fallbacks.
+include(parser-deps)
 
-# Treat unordered_dense's headers as system includes: some compiler
-# versions (observed: GCC 13.3.0 at -O3) emit a false-positive
-# -Warray-bounds inside its memset-based clear_buckets() once inlined,
-# which downstream -Werror consumers (e.g. tauparser_static) would
-# otherwise turn into a hard build failure over third-party code.
-get_target_property(unordered_dense_include_dirs unordered_dense
-	INTERFACE_INCLUDE_DIRECTORIES)
-if(unordered_dense_include_dirs)
-	set_target_properties(unordered_dense PROPERTIES
-		INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${unordered_dense_include_dirs}")
-endif()
+# ankerl/unordered_dense — Robin Hood open-addressing hash map (MIT)
+include(unordered-dense)
 
 ################################################################################
 
@@ -422,6 +407,8 @@ endif()
 if(TAU_PARSER_BUILD_TESTS OR (TAU_RUN_GRAMMAR_TESTS AND TARGET tgf))
 	include(ctest-build-tree)
 	tau_require_build_tree()
+	include(ctest-test-defaults)
+	tau_set_test_defaults()
 endif()
 
 # Documentation

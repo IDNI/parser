@@ -10,8 +10,17 @@ if(NOT NODE_EXECUTABLE)
 	return()
 endif()
 
-set(WASM_NODE_DIR    "${CMAKE_CURRENT_SOURCE_DIR}/build/emscripten")
-set(WASM_BROWSER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/emscripten/js/tgf")
+set(WASM_NODE_DIR    "${CMAKE_CURRENT_SOURCE_DIR}/build/release-wasm")
+
+# A browser-only run (no wasm build) passes the parser-wasm store prefix; the
+# browser tests then serve the package instead of the build directory.
+set(TAU_PARSER_WASM_PREFIX "" CACHE PATH
+	"Store prefix holding the parser-wasm package; empty to use the build dir")
+if(TAU_PARSER_WASM_PREFIX)
+	set(WASM_BROWSER_DIR "${TAU_PARSER_WASM_PREFIX}/js/tgf")
+else()
+	set(WASM_BROWSER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/release-wasm/js/tgf")
+endif()
 
 # tgf_wasm_parity_emcc - run tgf_node.js against preloaded tau.tgf
 add_test(NAME tgf_wasm_parity_emcc
@@ -103,6 +112,16 @@ if(TAU_PARSER_BUILD_BROWSER_TESTS)
 				PROPERTY RESOURCE_LOCK emcc_browser)
 			set_property(TEST tgf_browser_parity_emcc
 				PROPERTY ENVIRONMENT "TAU_CHROME_BIN=${TAU_CHROME_BIN}")
+		else()
+			message(STATUS
+				"tgf_browser_parity_emcc not registered: "
+				"${CMAKE_CURRENT_SOURCE_DIR}/build/release/tgf is not built")
 		endif()
+	else()
+		message(WARNING
+			"Browser REPL tests skipped: puppeteer-core is not importable from "
+			"${CMAKE_CURRENT_SOURCE_DIR}/tests/repl. Run "
+			"'npm ci --prefix tests/repl' to register tgf_browser_keybindings_emcc "
+			"and tgf_browser_parity_emcc.")
 	endif()
 endif()

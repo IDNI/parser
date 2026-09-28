@@ -7,7 +7,7 @@
 #
 # Returns 0 if outputs match, non-zero otherwise.
 #
-# Prerequisites: tgf_node.js must be built (./dev preset emscripten).
+# Prerequisites: tgf_node.js must be built (./dev preset release-wasm).
 
 set -e
 

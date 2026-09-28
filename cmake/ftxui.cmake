@@ -3,31 +3,44 @@ include_guard(GLOBAL)
 # FTXUI dependency resolution
 #
 # FTXUI is enabled by default.  Set TAU_PARSER_DONT_USE_FTXUI=ON to disable.
-# Prefers a system / package-provided FTXUI (vcpkg, conan, distro),
-# falling back to fetching from source.
+#
+# Resolution takes a store prefix from TAU_PARSER_FTXUI_PREFIX, otherwise
+# searches the toolchain root, and fetches the pinned source when neither finds
+# a package.
 #
 # Sets TAU_PARSER_HAS_FTXUI_DEP=ON when the FTXUI targets are available.
 # The tgf build (src/tgf/CMakeLists.txt) turns this into the TAU_PARSER_HAS_FTXUI
 # compile definition once the source includes repl_ftxui.tmpl.h (see tgf_cli.cpp)
 
 set(TAU_PARSER_HAS_FTXUI_DEP OFF)
+set(TAU_PARSER_FTXUI_PREFIX "" CACHE PATH
+	"Store prefix holding the ftxui package; empty to search the toolchain root and fetch")
 
 if(TAU_PARSER_DONT_USE_FTXUI)
 	message(STATUS "FTXUI: disabled (TAU_PARSER_DONT_USE_FTXUI=ON)")
 else()
-	find_package(ftxui QUIET)
+	if(TAU_PARSER_FTXUI_PREFIX)
+		find_package(ftxui CONFIG REQUIRED
+			PATHS "${TAU_PARSER_FTXUI_PREFIX}"
+			NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
+	else()
+		find_package(ftxui QUIET)
+	endif()
 	if(ftxui_FOUND)
 		# imported targets are directory scoped, and tests/ links them too
 		set_target_properties(ftxui::screen ftxui::dom ftxui::component
 			PROPERTIES IMPORTED_GLOBAL TRUE)
 		set(TAU_PARSER_HAS_FTXUI_DEP ON)
-		message(STATUS "FTXUI: using system package")
+		message(STATUS "FTXUI: using installed package at ${ftxui_DIR}")
 	else()
 		include(FetchContent)
+		# The Emscripten listener in v6.1.9 never checks the read result
+		# and spins forever once stdin reaches EOF.
 		FetchContent_Declare(ftxui
 			GIT_REPOSITORY https://github.com/ArthurSonzogni/FTXUI.git
 			GIT_TAG        v6.1.9   # verified tag (commit 5cfed50)
-			GIT_SHALLOW    TRUE)
+			GIT_SHALLOW    TRUE
+			PATCH_COMMAND ${CMAKE_COMMAND} -DPATCH=${CMAKE_CURRENT_LIST_DIR}/ftxui-emscripten-listener-eof.patch -P ${CMAKE_CURRENT_LIST_DIR}/ftxui-apply-patch.cmake)
 		set(FTXUI_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 		set(FTXUI_BUILD_DOCS     OFF CACHE BOOL "" FORCE)
 		set(FTXUI_BUILD_TESTS    OFF CACHE BOOL "" FORCE)

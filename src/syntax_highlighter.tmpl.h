@@ -189,7 +189,9 @@ inline uint32_t token_classifier::classify_by_content(
 				any_literal_alt = true;
 				bool alt_all_punct = true, alt_all_word = true,
 					alt_all_quote = true, alt_any_alpha = false;
-				for (unsigned char ch : chars) {
+				for (char c : chars) {
+					const unsigned char ch =
+						static_cast<unsigned char>(c);
 					bool word = std::isalnum(ch) || ch == '_';
 					if (!word) alt_all_word = false;
 					else alt_all_punct = false;
@@ -820,19 +822,18 @@ inline std::vector<uint32_t> syntax_highlighter::get_tokens(
 
 	if (!result.found) {
 		// Only advance the fallback start past a prefix that actually parsed.
-		auto err_loc = result.parse_error.loc;
+		const size_t err_loc = result.parse_error.loc;
 		size_t suffix_start = 0;
 		// An error at the end of the input would just repeat the failed parse.
-		if (err_loc > 0 && static_cast<size_t>(err_loc) < src.size()) {
-			auto prefix_result = p_->parse(
-				src.c_str(), static_cast<size_t>(err_loc));
+		if (err_loc > 0 && err_loc < src.size()) {
+			auto prefix_result = p_->parse(src.c_str(), err_loc);
 			if (prefix_result.found) {
 				tref tree = prefix_result.get_shaped_tree2(
 					highlight_shaping_);
 				std::unordered_map<tref, uint32_t> overrides;
 				classifier_.apply_patterns(tree, overrides);
 				extract_tokens(tree, src, tokens, overrides);
-				suffix_start = static_cast<size_t>(err_loc);
+				suffix_start = err_loc;
 			}
 		}
 		// Fallback for everything past the parsed prefix.

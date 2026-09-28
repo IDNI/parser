@@ -253,7 +253,7 @@ endif()
 # a built tgf_node.js (the Emscripten node target).
 if(TARGET tgf AND NOT WIN32)
 	find_program(NODE_EXECUTABLE node)
-	if(NODE_EXECUTABLE AND EXISTS "${PROJECT_SOURCE_DIR}/build/emscripten/tgf_node.js")
+	if(NODE_EXECUTABLE AND EXISTS "${PROJECT_SOURCE_DIR}/build/release-wasm/tgf_node.js")
 		add_test(NAME tgf_wasm_parity
 			COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/parity/tgf_wasm_parity.sh"
 				$<TARGET_FILE:tgf>
@@ -309,7 +309,7 @@ endif()
 # Parity between the native tgf and the MinGW build run under wine.
 # Registered only when the cross-build and wine are both present.
 if(TARGET tgf AND NOT WIN32)
-	set(MINGW_DIR "${PROJECT_BINARY_DIR}/../release-mingw")
+	set(MINGW_DIR "${PROJECT_BINARY_DIR}/../release-w64")
 	find_program(WINE_EXECUTABLE wine)
 	if(WINE_EXECUTABLE AND EXISTS "${MINGW_DIR}/tgf.exe")
 		add_test(NAME tgf_wine_parity
@@ -402,3 +402,42 @@ endif()
 
 include(ctest-build-tree)
 tau_require_build_tree()
+
+# Registered after tau_require_build_tree(): the self-checks run no built
+# binary, so they need no build_tree fixture.
+add_test(NAME tau_manifest_input_id
+	COMMAND ${CMAKE_COMMAND} -P
+		"${CMAKE_CURRENT_SOURCE_DIR}/tau-manifest-self-check.cmake"
+		"${PROJECT_SOURCE_DIR}/cmake/tau-manifest.cmake"
+		"${CMAKE_CURRENT_BINARY_DIR}")
+
+# LOCAL store primitive: another pure, hermetic self-check with the same
+# build-local temp dir.
+add_test(NAME tau_store_local
+	COMMAND ${CMAKE_COMMAND} -P
+		"${CMAKE_CURRENT_SOURCE_DIR}/tau-store-self-check.cmake"
+		"${PROJECT_SOURCE_DIR}/cmake/tau-store.cmake"
+		"${CMAKE_CURRENT_BINARY_DIR}")
+
+# dep_ensure shell bridge: hermetic, fake producer, build-local scratch prefix.
+# Skipped only when bash is unavailable.
+find_program(TAU_TEST_BASH bash NO_CACHE)
+if(TAU_TEST_BASH)
+	add_test(NAME tau_dep_ensure
+		COMMAND "${TAU_TEST_BASH}"
+			"${CMAKE_CURRENT_SOURCE_DIR}/tau-dep-ensure-self-check.sh")
+	# Transport round-trip and its failure paths: export, import, verify, a
+	# forced mode loss, a truncated archive, a content corruption, and a missing
+	# expected entry.
+	add_test(NAME tau_store_transport
+		COMMAND "${TAU_TEST_BASH}"
+			"${CMAKE_CURRENT_SOURCE_DIR}/store-transport-self-check.sh")
+	# Remote store bridge: the <dep>-<id> tag naming and the "remote miss
+	# builds" rule, with a fake oras on PATH.
+	add_test(NAME tau_store_remote
+		COMMAND "${TAU_TEST_BASH}"
+			"${CMAKE_CURRENT_SOURCE_DIR}/store-remote-self-check.sh")
+endif()
+
+include(ctest-test-defaults)
+tau_set_test_defaults()

@@ -23,7 +23,7 @@ function char_code(c) {
 }
 
 async function main() {
-	const buildDir = path.resolve(__dirname, '..', '..', 'build', 'emscripten');
+	const buildDir = path.resolve(__dirname, '..', '..', 'build', 'release-wasm');
 	process.chdir(buildDir);
 	const createTauparser = require(path.join(buildDir, 'tauparser.js'));
 	const tauparser = await createTauparser();

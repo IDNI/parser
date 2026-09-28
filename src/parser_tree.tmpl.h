@@ -197,7 +197,7 @@ size_t parser<C, T>::tree::get_nt() const {
 }
 
 template <typename C, typename T>
-char parser<C, T>::tree::get_t() const {
+T parser<C, T>::tree::get_t() const {
 	if (is_t()) return this->value.first.t();
 	DBG(assert(false);)
 	return 0;

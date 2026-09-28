@@ -821,8 +821,9 @@ result<T>& result<T>::operator=(result&& other) noexcept {
 }
 
 template <typename T>
-result<T>::result(T value)
-	requires(!std::is_same_v<std::decay_t<T>, std::string>)
+result<T>::result(typename result<T>::stored_t value)
+	requires(!std::is_void_v<T>
+		&& !std::is_same_v<std::decay_t<T>, std::string>)
 	: value_(std::move(value)) {}
 
 template <typename T>
@@ -836,26 +837,33 @@ result<T>::~result() = default;
 
 template <typename T>
 bool result<T>::has_value() const {
-	return value_.has_value();
+	// A void result stores no value; success is the absence of an error.
+	if constexpr (std::is_void_v<T>) return !diag_rep_.has_error();
+	else return value_.has_value();
 }
 
 template <typename T>
-T& result<T>::value() & {
+typename result<T>::stored_t& result<T>::value() &
+	requires(!std::is_void_v<T>) {
 	return value_.value();
 }
 
 template <typename T>
-const T& result<T>::value() const& {
+const typename result<T>::stored_t& result<T>::value() const&
+	requires(!std::is_void_v<T>) {
 	return value_.value();
 }
 
 template <typename T>
-T&& result<T>::value() && {
+typename result<T>::stored_t&& result<T>::value() &&
+	requires(!std::is_void_v<T>) {
 	return std::move(value_.value());
 }
 
 template <typename T>
-T& result<T>::emplace(T&& v) {
+typename result<T>::stored_t& result<T>::emplace(
+	typename result<T>::stored_t&& v)
+	requires(!std::is_void_v<T>) {
 	DBG(assert(!diag_rep_.has_error()
 		&& "emplace on errored result silently drops the value");)
 	value_.emplace(std::move(v));
@@ -865,7 +873,8 @@ T& result<T>::emplace(T&& v) {
 
 template <typename T>
 template <typename... Args>
-T& result<T>::emplace(Args&&... args) {
+typename result<T>::stored_t& result<T>::emplace(Args&&... args)
+	requires(!std::is_void_v<T>) {
 	DBG(assert(!diag_rep_.has_error()
 		&& "emplace on errored result silently drops the value");)
 	value_.emplace(std::forward<Args>(args)...);
@@ -875,7 +884,8 @@ T& result<T>::emplace(Args&&... args) {
 
 template <typename T>
 template <typename U>
-result<T>& result<T>::operator=(U&& v) {
+result<T>& result<T>::operator=(U&& v)
+	requires(!std::is_void_v<T>) {
 	DBG(assert(!diag_rep_.has_error()
 		&& "assigning to an errored result silently drops the value");)
 	value_.emplace(std::forward<U>(v));
@@ -885,55 +895,72 @@ result<T>& result<T>::operator=(U&& v) {
 
 template <typename T>
 template <typename U>
-result<T>&& result<T>::with_value(U&& v) {
+result<T>&& result<T>::with_value(U&& v)
+	requires(!std::is_void_v<T>) {
 	*this = std::forward<U>(v);
 	return std::move(*this);
 }
 
 template <typename T>
 template <typename U>
-result<T>&& result<T>::with_assert_check_value(U&& v) {
+result<T>&& result<T>::with_assert_check_value(U&& v)
+	requires(!std::is_void_v<T>) {
 	*this = std::forward<U>(v);
 	DBG(assert(this->is_well_formed());)
 	return std::move(*this);
 }
 
 template <typename T>
-void result<T>::clear_value() {
+result<T>&& result<T>::with_value() requires(std::is_void_v<T>) {
+	value_.emplace();
+	this->enforce_error_no_value_invariant();
+	return std::move(*this);
+}
+
+template <typename T>
+result<T>&& result<T>::with_assert_check_value() requires(std::is_void_v<T>) {
+	value_.emplace();
+	this->enforce_error_no_value_invariant();
+	DBG(assert(this->is_well_formed());)
+	return std::move(*this);
+}
+
+template <typename T>
+void result<T>::clear_value() requires(!std::is_void_v<T>) {
 	value_.reset();
 }
 
 template <typename T>
-T& result<T>::operator*() &
-	requires(!std::is_pointer_v<T>)
+typename result<T>::stored_t& result<T>::operator*() &
+	requires(!std::is_void_v<T> && !std::is_pointer_v<T>)
 {
 	return value();
 }
 
 template <typename T>
-const T& result<T>::operator*() const&
-	requires(!std::is_pointer_v<T>)
+const typename result<T>::stored_t& result<T>::operator*() const&
+	requires(!std::is_void_v<T> && !std::is_pointer_v<T>)
 {
 	return value();
 }
 
 template <typename T>
-T&& result<T>::operator*() &&
-	requires(!std::is_pointer_v<T>)
+typename result<T>::stored_t&& result<T>::operator*() &&
+	requires(!std::is_void_v<T> && !std::is_pointer_v<T>)
 {
 	return std::move(value());
 }
 
 template <typename T>
-T* result<T>::operator->()
-	requires(!std::is_pointer_v<T>)
+typename result<T>::stored_t* result<T>::operator->()
+	requires(!std::is_void_v<T> && !std::is_pointer_v<T>)
 {
 	return &value();
 }
 
 template <typename T>
-const T* result<T>::operator->() const
-	requires(!std::is_pointer_v<T>)
+const typename result<T>::stored_t* result<T>::operator->() const
+	requires(!std::is_void_v<T> && !std::is_pointer_v<T>)
 {
 	return &value();
 }
@@ -1116,7 +1143,7 @@ bool result<T>::print_and_ok(const sinks& s) const {
 
 template <typename T>
 bool result<T>::is_well_formed() const {
-	return value_.has_value() || diag_rep_.has_error();
+	return has_value() || diag_rep_.has_error();
 }
 
 template <typename T>
@@ -1222,8 +1249,17 @@ result<T>& result<T>::operator<<(result<U>&& child) {
 }
 
 template <typename T>
+bool result<T>::merge_ok(result<void>&& child) {
+	const bool ok = child.has_value();
+	diag_rep_.append(std::move(child.diag_rep_));
+	this->enforce_error_no_value_invariant();
+	return ok;
+}
+
+template <typename T>
 template <typename U>
-std::optional<U> result<T>::merge_take(result<U>&& child) {
+std::optional<U> result<T>::merge_take(result<U>&& child)
+	requires(!std::is_void_v<U>) {
 	std::optional<U> v;
 	if (child.has_value()) v.emplace(std::move(child).value());
 	merge(std::move(child));
@@ -1234,6 +1270,7 @@ template <typename T>
 template <typename U>
 std::optional<U> result<T>::take_or_error(result<U>&& child,
 	code c, std::string_view msg)
+	requires(!std::is_void_v<U>)
 {
 	const bool child_well_formed = child.is_well_formed();
 
@@ -1255,6 +1292,7 @@ template <typename T>
 template <typename U>
 std::optional<U> result<T>::take_or_error(result<U>&& child,
 	code c, std::string_view msg, std::initializer_list<attr_in> extra)
+	requires(!std::is_void_v<U>)
 {
 	const bool child_well_formed = child.is_well_formed();
 
@@ -1282,8 +1320,10 @@ result<U> result<T>::carry_report(result<U>&& r) {
 
 template <typename T>
 template <typename F>
-auto result<T>::and_then(F&& f) && -> std::invoke_result_t<F, T&&> {
-	using R = std::invoke_result_t<F, T&&>;
+auto result<T>::and_then(F&& f) &&
+	-> std::invoke_result_t<F, typename result<T>::stored_t&&>
+	requires(!std::is_void_v<T>) {
+	using R = std::invoke_result_t<F, typename result<T>::stored_t&&>;
 	using U = typename R::value_type;
 	if (has_value())
 		return carry_report(
@@ -1294,9 +1334,10 @@ auto result<T>::and_then(F&& f) && -> std::invoke_result_t<F, T&&> {
 template <typename T>
 template <typename F>
 auto result<T>::transform(F&& f) &&
-	-> result<std::invoke_result_t<F, T&&>>
+	-> result<std::invoke_result_t<F, typename result<T>::stored_t&&>>
+	requires(!std::is_void_v<T>)
 {
-	using U = std::invoke_result_t<F, T&&>;
+	using U = std::invoke_result_t<F, typename result<T>::stored_t&&>;
 	if (has_value()) {
 		result<U> r;
 		r = std::invoke(std::forward<F>(f), std::move(*this).value());
@@ -1315,7 +1356,9 @@ result<T> result<T>::or_else(F&& f) && {
 }
 
 template <typename T>
-T result<T>::value_or(T fallback) && {
+typename result<T>::stored_t result<T>::value_or(
+	typename result<T>::stored_t fallback) &&
+	requires(!std::is_void_v<T>) {
 	return has_value() ? std::move(*this).value() : std::move(fallback);
 }
 
@@ -1360,7 +1403,10 @@ template <typename T>
 T exit_on_fail(result<T>&& r, int exit_code, std::ostream& os)
 {
 	if (!r.print_and_ok(os)) std::exit(exit_code);
-	return std::move(r).value();
+	// A void result has no value to return; print_and_ok already read its
+	// success state.
+	if constexpr (std::is_void_v<T>) return;
+	else return std::move(r).value();
 }
 
 } // namespace idni::diagnostics
