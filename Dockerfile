@@ -24,6 +24,7 @@ FROM ubuntu:24.04@sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca0
 # Install dependencies
 RUN apt-get update && apt-get install -y \
 	bash wget git nsis rpm doxygen graphviz \
+	curl ca-certificates \
 	cmake=3.28.3-1build7 \
 	g++=4:13.2.0-7ubuntu1 \
 	ninja-build=1.11.1-2 \
@@ -313,8 +314,10 @@ FROM deps AS wasm-deps
 
 ARG BUILD_JOBS=1
 
-# dep-emsdk.sh needs curl, unzip and xz; the base image does not carry them.
-RUN apt-get update && apt-get install -y --no-install-recommends curl unzip xz-utils
+# dep-emsdk.sh needs curl, ca-certificates, unzip and xz; the base image
+# does not carry them.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+	curl ca-certificates unzip xz-utils
 
 # Only the files dep-emsdk.sh runs, so a source change keeps the emsdk layer.
 COPY ./dev /parser/
