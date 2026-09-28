@@ -296,8 +296,10 @@ RUN EMSDK_NODE_BIN="$(ls -d /root/.tau/emsdk/node/*/bin | head -n1)" && \
 
 
 # ------------------------------------------------------------
-# WebAssembly Node.js gate: build the Emscripten tests and run them
-# under emsdk's Node.js. No Chrome or puppeteer here.
+# WebAssembly Node.js gate: build the Emscripten artifacts and the browser
+# page, publish them as parser-wasm, and run the node tests. The -browser
+# configure also installs Chrome and puppeteer (to generate the page), but
+# they are not run here.
 
 FROM wasm-deps AS wasm-node
 
