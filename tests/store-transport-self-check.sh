@@ -74,9 +74,9 @@ dst="${ROOT}/dst"
 
 # a lost executable bit is rejected (the digest is unchanged)
 modefix="${ROOT}/modefix"; mkdir -p "$modefix"
-tar -xf "$tar" -C "$modefix" || fail "cannot extract for modefix"
+tar -xf - -C "$modefix" < "$tar" || fail "cannot extract for modefix"
 chmod 644 "${modefix}/demo/${id}/prefix/bin/tool"
-tar --format=posix -cf "${ROOT}/modefix.tar" -C "$modefix" "$entry" || fail "cannot re-tar modefix"
+tar --format=posix -cf - -C "$modefix" "$entry" > "${ROOT}/modefix.tar" || fail "cannot re-tar modefix"
 if "$TRANSPORT" import "${ROOT}/modefix.tar" "${ROOT}/modefix-dst" "$entry" >/dev/null 2>&1; then
 	fail "a lost executable bit was accepted"
 fi
@@ -90,9 +90,9 @@ fi
 
 # a content corruption is rejected by the manifest digest
 contentfix="${ROOT}/contentfix"; mkdir -p "$contentfix"
-tar -xf "$tar" -C "$contentfix" || fail "cannot extract for contentfix"
+tar -xf - -C "$contentfix" < "$tar" || fail "cannot extract for contentfix"
 printf 'x' >> "${contentfix}/demo/${id}/prefix/lib/data"
-tar --format=posix -cf "${ROOT}/contentfix.tar" -C "$contentfix" "$entry" || fail "cannot re-tar contentfix"
+tar --format=posix -cf - -C "$contentfix" "$entry" > "${ROOT}/contentfix.tar" || fail "cannot re-tar contentfix"
 if "$TRANSPORT" import "${ROOT}/contentfix.tar" "${ROOT}/contentfix-dst" "$entry" >/dev/null 2>&1; then
 	fail "a content corruption was accepted"
 fi

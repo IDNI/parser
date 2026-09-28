@@ -134,7 +134,7 @@ export)
 		[ -d "${store_root}/store/${entry}/prefix" ] || {
 			echo "store-transport: missing prefix for '${entry}'" >&2; exit 1; }
 	done
-	tar --format=posix -cf "$out_tar" -C "${store_root}/store" "$@" || {
+	tar --format=posix -cf - -C "${store_root}/store" "$@" > "$out_tar" || {
 		echo "store-transport: export failed" >&2; exit 1; }
 	echo "store-transport: exported $# entries to ${out_tar}"
 	;;
@@ -147,7 +147,7 @@ import)
 	extract="$(mktemp -d "${TMPDIR:-/tmp}/tau-transport.XXXXXX")" || exit 1
 	# shellcheck disable=SC2064
 	trap "rm -rf '${extract}'" EXIT
-	tar -xf "$archive" -C "$extract" || {
+	tar -xf - -C "$extract" < "$archive" || {
 		echo "store-transport: extract failed" >&2; exit 1; }
 
 	# The entry list is what the caller expects. With none, import everything the
