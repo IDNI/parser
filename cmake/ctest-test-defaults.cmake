@@ -6,10 +6,10 @@ include_guard(GLOBAL)
 set(TAU_TEST_TIMEOUT 600 CACHE STRING
 	"Default time limit in seconds for a ctest test")
 
-# set_tests_properties reaches only the tests of the calling directory, so call
-# this after the last add_test() of every directory that adds tests. A test
-# that sets TIMEOUT itself keeps it.
-function(tau_set_default_test_timeout)
+# set_tests_properties reaches only the calling directory, so call this after the
+# last add_test() of every directory that adds tests. A cross binary started
+# from a script reaches binfmt, where qemu takes the loader path from QEMU_LD_PREFIX.
+function(tau_set_test_defaults)
 	get_property(_tests DIRECTORY PROPERTY TESTS)
 	if(NOT _tests)
 		return()
@@ -19,6 +19,10 @@ function(tau_set_default_test_timeout)
 		if(_timeout STREQUAL "NOTFOUND")
 			set_tests_properties("${_test}" PROPERTIES
 				TIMEOUT "${TAU_TEST_TIMEOUT}")
+		endif()
+		if(DEFINED TAU_AARCH64_SYSROOT AND CMAKE_CROSSCOMPILING_EMULATOR)
+			set_property(TEST "${_test}" APPEND PROPERTY ENVIRONMENT
+				"QEMU_LD_PREFIX=${TAU_AARCH64_SYSROOT}")
 		endif()
 	endforeach()
 endfunction()

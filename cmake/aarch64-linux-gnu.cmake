@@ -6,13 +6,16 @@ set(CMAKE_SYSTEM_PROCESSOR aarch64)
 set(CMAKE_C_COMPILER clang)
 set(CMAKE_CXX_COMPILER clang++)
 
+# The target sysroot, shared by the find root, the emulator and QEMU_LD_PREFIX.
+set(TAU_AARCH64_SYSROOT /usr/aarch64-linux-gnu)
+
 # The target flag travels in the flags, not in CMAKE_<LANG>_COMPILER_TARGET
 # alone: the flags are what the store hands to a producer without a CMake
 # configure, such as Boost's b2.
 set(CMAKE_C_FLAGS_INIT "--target=aarch64-linux-gnu")
 set(CMAKE_CXX_FLAGS_INIT "--target=aarch64-linux-gnu")
 
-set(CMAKE_FIND_ROOT_PATH /usr/aarch64-linux-gnu)
+set(CMAKE_FIND_ROOT_PATH "${TAU_AARCH64_SYSROOT}")
 
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
@@ -24,7 +27,7 @@ set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 find_program(TAU_AARCH64_QEMU qemu-aarch64)
 if(TAU_AARCH64_QEMU)
 	set(CMAKE_CROSSCOMPILING_EMULATOR
-		qemu-aarch64 -L /usr/aarch64-linux-gnu)
+		qemu-aarch64 -L "${TAU_AARCH64_SYSROOT}")
 endif()
 
 # FindPython searches the build host for the interpreter and the artifacts

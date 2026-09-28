@@ -357,5 +357,5 @@ if(TAU_TEST_BASH)
 			"${CMAKE_CURRENT_SOURCE_DIR}/store-remote-self-check.sh")
 endif()
 
-include(ctest-test-timeout)
-tau_set_default_test_timeout()
+include(ctest-test-defaults)
+tau_set_test_defaults()
