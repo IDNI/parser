@@ -568,8 +568,16 @@ dep_prebuilt() {
 		*.zip)
 			unzip -q "$archive" -d "$unpack_dir" || { echo "Unpack failed"; return 1; }
 			;;
-		*.tar.gz|*.tgz|*.tar.xz|*.tar.zst)
-			tar -xf "$archive" -C "$unpack_dir" || { echo "Unpack failed"; return 1; }
+		# Git Bash tar reads C:/... after -f as host:path, so feed the archive
+		# on stdin; stdin is never sniffed, so name each decompressor.
+		*.tar.gz|*.tgz)
+			tar -xzf - -C "$unpack_dir" < "$archive" || { echo "Unpack failed"; return 1; }
+			;;
+		*.tar.xz)
+			tar -xJf - -C "$unpack_dir" < "$archive" || { echo "Unpack failed"; return 1; }
+			;;
+		*.tar.zst)
+			tar --zstd -xf - -C "$unpack_dir" < "$archive" || { echo "Unpack failed"; return 1; }
 			;;
 		*)
 			echo "Unsupported archive type: ${archive}"

@@ -34,7 +34,8 @@ done
 
 archive_has_entries() {
 	archive="$1"
-	listing="$(tar -tzf "$archive" 2>/dev/null)" || return 1
+	# Git Bash tar reads C:/... after -f as host:path, so read stdin instead.
+	listing="$(tar -tzf - < "$archive" 2>/dev/null)" || return 1
 	for entry in $entries; do
 		# fixed-string + whole-line match handles regex metachars in entry
 		# names (g++, cc1plus, gcc.bin); accept optional ./ prefix.
