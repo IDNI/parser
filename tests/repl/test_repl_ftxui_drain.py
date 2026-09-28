@@ -7,9 +7,9 @@ Usage:
 
 import argparse
 import sys
+import time
 
 from test_repl_ftxui import ReplTester
-from test_repl_ftxui_async import wait_for
 
 
 def fail(message, tester):
@@ -18,8 +18,22 @@ def fail(message, tester):
     raise SystemExit(1)
 
 
-def not_evaluating(lines):
-    return not any("evaluating" in line for line in lines)
+def wait_for_eval_done(tester, timeout=10.0):
+    """Wait until the evaluation spinner has appeared and then cleared.
+
+    "No evaluating" alone is also true before the first frame is drawn, so
+    waiting only on that plus a fixed sleep races on a slow runner.
+    """
+    deadline = time.monotonic() + timeout
+    seen_spinner = False
+    while time.monotonic() < deadline:
+        tester._drain(timeout=0.02)
+        if any("evaluating" in line for line in tester.render()):
+            seen_spinner = True
+        elif seen_spinner:
+            return True
+        time.sleep(0.01)
+    return False
 
 
 def check_no_spinner_fragment(screen, tester):
@@ -78,9 +92,8 @@ def main():
             fail("initial prompt did not appear", tester)
 
         tester.send("p x = 0 || y = 1")
-        if not wait_for(tester, not_evaluating):
+        if not wait_for_eval_done(tester):
             fail("evaluation of a valid formula did not finish", tester)
-        tester._stabilize(0.2)
         screen = tester.render()
         if not any("parsed terminals" in line for line in screen):
             fail("'parsed terminals' missing after a valid parse", tester)
@@ -90,9 +103,8 @@ def main():
         check_no_column_zero_echo(screen, tester, "p x = 0 || y = 1")
 
         tester.send("p x = 2")
-        if not wait_for(tester, not_evaluating):
+        if not wait_for_eval_done(tester):
             fail("evaluation of a syntax error did not finish", tester)
-        tester._stabilize(0.2)
         screen = tester.render()
         if not any("Syntax Error" in line for line in screen):
             fail("'Syntax Error' missing after a bad parse", tester)
@@ -106,16 +118,14 @@ def main():
 
         # "p" alone is incomplete input, so the next line continues it.
         tester.send("p")
-        if not wait_for(tester, not_evaluating):
+        if not wait_for_eval_done(tester):
             fail("evaluation of the incomplete formula did not finish",
                 tester)
-        tester._stabilize(0.2)
 
         tester.send("x = 0 || y = 1")
-        if not wait_for(tester, not_evaluating):
+        if not wait_for_eval_done(tester):
             fail("evaluation of the completed multiline formula did not "
                 "finish", tester)
-        tester._stabilize(0.2)
         screen = tester.render()
         if not any("parsed terminals" in line for line in screen):
             fail("'parsed terminals' missing after a multiline parse",
@@ -129,9 +139,8 @@ def main():
         check_no_column_zero_echo(screen, tester, "x = 0 || y = 1")
 
         tester.send("quit")
-        if not wait_for(tester, not_evaluating):
+        if not wait_for_eval_done(tester):
             fail("evaluation of quit did not finish", tester)
-        tester._stabilize(0.2)
         screen = tester.render()
         if not any(line.strip() == "Quit." for line in screen):
             fail("'Quit.' missing or not on its own line after quit", tester)
