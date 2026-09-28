@@ -64,10 +64,12 @@ function(_parser_deps_producer_command out script)
 	endif()
 	# Git Bash rewrites an argument that starts with / as a path, which mangles
 	# the /D flags in TAU_DEP_CFLAGS when a producer starts the nested cmake.
+	# Exclude the flag arguments only: a real path, such as the toolchain file,
+	# must still convert.
 	set(${out}
 		"${CMAKE_COMMAND}" -E env
 			--unset=CPPFLAGS --unset=CFLAGS --unset=CXXFLAGS --unset=LDFLAGS
-			"MSYS2_ARG_CONV_EXCL=*"
+			"MSYS2_ARG_CONV_EXCL=-DTAU_DEP_CFLAGS=\;-DTAU_DEP_CXXFLAGS=\;-DCMAKE_C_FLAGS=\;-DCMAKE_CXX_FLAGS="
 			"TAU_SHARED_PREFIX=${TAU_SHARED_PREFIX_RESOLVED}"
 			"TAU_BUILD_JOBS=${TAU_BUILD_JOBS_RESOLVED}"
 			"${TAU_BASH}" "${script}" ${_toolchain}
