@@ -84,14 +84,19 @@ function(_parser_deps_ensure dep script cache_var)
 		return()
 	endif()
 	_parser_deps_producer_command(_cmd "${script}")
-	# Stream the producer's stderr while configure waits on it; the capture
-	# stays, so a failure still carries the whole report.
+	# ECHO_ERROR_VARIABLE needs 3.18, and the parser still allows 3.10. It
+	# streams the progress and error lines live; the capture holds those, and
+	# the build output stays in the entry log.
+	set(_echo_error "")
+	if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.18)
+		set(_echo_error ECHO_ERROR_VARIABLE)
+	endif()
 	execute_process(
 		COMMAND ${_cmd}
 		RESULT_VARIABLE _rc
 		OUTPUT_VARIABLE _out
 		ERROR_VARIABLE _err
-		ECHO_ERROR_VARIABLE)
+		${_echo_error})
 	if(NOT _rc EQUAL 0)
 		message(FATAL_ERROR "cannot resolve the ${dep} package.\n${_err}\n${_out}")
 	endif()

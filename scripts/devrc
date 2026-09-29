@@ -671,6 +671,13 @@ _tau_dep_ensure_finish() {
 	printf '%s\n' "$1"
 }
 
+# Last lines of a step log, so a failed step reports why after the container
+# layer or CI job that held the log is gone.
+_tau_dep_ensure_log_tail() {
+	[ -f "$1" ] || return 0
+	tail -n 80 "$1" >&2
+}
+
 # Producer side of dep_ensure. Runs in a command-substitution subshell so its
 # signal traps never touch the caller's traps. Prints the store prefix on
 # stdout; everything else goes to stderr.
@@ -875,6 +882,7 @@ _tau_dep_ensure_run() {
 		"$_tau_dep_ensure_log" >&2
 	if ! dep_build_producer "$_tau_dep_ensure_staging" "$_tau_dep_ensure_producer" "$@" \
 			> "$_tau_dep_ensure_log" 2>&1; then
+		_tau_dep_ensure_log_tail "$_tau_dep_ensure_log"
 		echo "dep_ensure: producer failed for ${_tau_dep_ensure_dep} ${_tau_dep_ensure_id}; log: ${_tau_dep_ensure_log}" >&2
 		_tau_dep_ensure_cleanup
 		return 1

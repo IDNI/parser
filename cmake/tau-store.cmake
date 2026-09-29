@@ -467,6 +467,8 @@ function(tau_store_evict prefix keep)
 				continue()
 			endif()
 			file(REMOVE_RECURSE "${_entry}")
+			# The step log sits beside the entry, so it goes with it.
+			file(REMOVE "${_dep_dir}/${_id}.log")
 			file(LOCK "${_dep_dir}/${_id}.lock" RELEASE)
 			message(STATUS "tau-store: evicted ${_dep}/${_id}")
 		endforeach()
