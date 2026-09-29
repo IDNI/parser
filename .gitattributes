@@ -1,0 +1,4 @@
+# Repository text is LF on every platform. The store's content hashes read
+# working-tree bytes, so a CRLF checkout would move a package id and trip
+# tau's shim provenance guard.
+* -text
