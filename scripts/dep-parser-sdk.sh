@@ -38,9 +38,9 @@ FTXUI_DEP_SCRIPT="${DEV_ROOT}/scripts/dep-ftxui.sh"
 UNORDERED_DENSE_DEP_SCRIPT="${DEV_ROOT}/scripts/dep-unordered-dense.sh"
 PARSER_CXX_STANDARD=17
 
-# SHA-256 over the working-tree content of every tracked and untracked,
-# non-ignored file, in sorted order. Generated build output is gitignored and so
-# stays out. This is the parser tree content hash of the plan.
+# SHA-256 over the content of every file in the parser tree, in sorted order.
+# The skip set matches .dockerignore plus the build outputs generated in the
+# source tree (doctest.h, version_license.h), so no .git directory is needed.
 #
 # Excluded, because each is hashed into the id separately or is provenance and
 # cannot change the produced bytes:
@@ -54,7 +54,7 @@ PARSER_CXX_STANDARD=17
 #   cmake/tau-store.cmake       install); the store writer likewise
 _dep_parser_tree_hash() {
 	local src="$1" value digest
-	local exclude='^(scripts/devrc|scripts/dep-.*\.sh|cmake/tau-manifest\.cmake|cmake/tau-store\.cmake)$'
+	local exclude='^\./(scripts/devrc|scripts/dep-.*\.sh|cmake/tau-manifest\.cmake|cmake/tau-store\.cmake)$'
 	if command -v sha256sum > /dev/null 2>&1; then
 		digest="sha256sum"
 	elif command -v shasum > /dev/null 2>&1; then
@@ -65,9 +65,13 @@ _dep_parser_tree_hash() {
 	fi
 	# BSD tools have no -z/--zero; NUL records become newline records for the
 	# sort and back for xargs, which is exact for every path without a newline.
-	value="$(cd "$src" && git ls-files -z --cached \
+	value="$(cd "$src" && find . \
+		\( -name .git -o -name .local -o -name .claude -o -name node_modules \
+			-o -name __pycache__ -o -name tau-lang -o -name build -o -name 'build-*' \
+			-o -name doctest.h -o -name version_license.h -o -name '.*_history' \) -prune -o \
+		-type f -print0 \
 		| tr '\0' '\n' | grep -vE "$exclude" | LC_ALL=C sort \
-		| tr '\n' '\0' | xargs -0 -n 100 $digest | $digest | awk '{print $1}')"
+		| tr '\n' '\0' | xargs -0 -n 100 $digest | dep_sha256_stdin)"
 	if [ -z "$value" ]; then
 		echo "dep-parser-sdk: parser tree hash is empty" >&2
 		return 1
@@ -287,13 +291,19 @@ if [ "$PARSER_LTO" = "ON" ]; then
 else
 	PARSER_LTO_FAT_EFFECTIVE=OFF
 fi
-if [ ! -d "$PARSER_SOURCE/.git" ] && [ ! -f "$PARSER_SOURCE/.git" ]; then
-	echo "dep-parser-sdk: PARSER_SOURCE is not a git work tree: '${PARSER_SOURCE}'" >&2
-	exit 2
-fi
 PARSER_SOURCE="$(cd "$PARSER_SOURCE" && pwd)"
 
-PARSER_COMMIT_DEFAULT="$(git -C "$PARSER_SOURCE" rev-parse HEAD)"
+# Test for .git itself: a tree that is not its own work tree must not record
+# the HEAD of a parent repository.
+if [ -d "$PARSER_SOURCE/.git" ] || [ -f "$PARSER_SOURCE/.git" ]; then
+	PARSER_COMMIT_DEFAULT="$(git -C "$PARSER_SOURCE" rev-parse HEAD)"
+else
+	PARSER_COMMIT_DEFAULT="${TAU_PARSER_COMMIT:-$(dep_var PARSER_COMMIT "")}"
+fi
+if [ -z "$PARSER_COMMIT_DEFAULT" ]; then
+	echo "dep-parser-sdk: no parser commit: pass -DPARSER_COMMIT or set TAU_PARSER_COMMIT" >&2
+	exit 2
+fi
 PARSER_COMMIT="$(dep_var PARSER_COMMIT "$PARSER_COMMIT_DEFAULT")"
 case "$PARSER_COMMIT" in
 	*[!0-9a-f]*|"")
