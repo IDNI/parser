@@ -84,11 +84,14 @@ function(_parser_deps_ensure dep script cache_var)
 		return()
 	endif()
 	_parser_deps_producer_command(_cmd "${script}")
+	# Stream the producer's stderr while configure waits on it; the capture
+	# stays, so a failure still carries the whole report.
 	execute_process(
 		COMMAND ${_cmd}
 		RESULT_VARIABLE _rc
 		OUTPUT_VARIABLE _out
-		ERROR_VARIABLE _err)
+		ERROR_VARIABLE _err
+		ECHO_ERROR_VARIABLE)
 	if(NOT _rc EQUAL 0)
 		message(FATAL_ERROR "cannot resolve the ${dep} package.\n${_err}\n${_out}")
 	endif()

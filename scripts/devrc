@@ -660,10 +660,14 @@ _tau_dep_ensure_exit_trap() {
 	exit "$_tau_dep_ensure_exit_rc"
 }
 
-# Clean up and print the verified prefix, then return from the caller.
+# Clean up, print the verified prefix on stdout and the outcome line on
+# stderr, then return from the caller.
 _tau_dep_ensure_finish() {
+	local _tau_dep_ensure_elapsed=$(( $(date +%s) - _tau_dep_ensure_start ))
 	_tau_dep_ensure_cleanup
 	trap - EXIT INT TERM
+	printf '%s: %s (%ss)\n' "$_tau_dep_ensure_tag" "$2" \
+		"$_tau_dep_ensure_elapsed" >&2
 	printf '%s\n' "$1"
 }
 
@@ -683,6 +687,7 @@ _tau_dep_ensure_run() {
 	local _tau_dep_ensure_now _tau_dep_ensure_deadline
 	local _tau_dep_ensure_host _tau_dep_ensure_owner_file
 	local _tau_dep_ensure_owner_host _tau_dep_ensure_owner_pid
+	local _tau_dep_ensure_tag _tau_dep_ensure_start _tau_dep_ensure_log
 	# Not `local`: bash 3.2 unwinds locals before it runs the EXIT trap of a
 	# command-substitution subshell, so the trap would see these empty.
 	_tau_dep_ensure_claim=""
@@ -690,6 +695,17 @@ _tau_dep_ensure_run() {
 	_tau_dep_ensure_block_file=""
 	trap 'exit 130' INT TERM
 	trap '_tau_dep_ensure_exit_trap' EXIT
+	# The store target identifies the entry; the dependency name alone is not.
+	_tau_dep_ensure_tag="$(printf '%s\n' "$_tau_dep_ensure_block" \
+		| sed -n 's/^target=//p' | sed -n '1p')"
+	if [ -n "$_tau_dep_ensure_tag" ]; then
+		_tau_dep_ensure_tag="${_tau_dep_ensure_dep} [${_tau_dep_ensure_tag}]"
+	else
+		_tau_dep_ensure_tag="$_tau_dep_ensure_dep"
+	fi
+	_tau_dep_ensure_start="$(date +%s)"
+	# Progress goes to stderr only; stdout carries the prefix the caller reads.
+	printf '%s: resolving\n' "$_tau_dep_ensure_tag" >&2
 	if ! _tau_dep_ensure_prefix="$(dep_shared_prefix)"; then
 		echo "dep_ensure: cannot resolve TAU_SHARED_PREFIX" >&2
 		_tau_dep_ensure_cleanup
@@ -718,6 +734,8 @@ _tau_dep_ensure_run() {
 		_tau_dep_ensure_cleanup
 		return 1
 	fi
+	# The log sits beside the entry, outside the prefix a manifest verifies.
+	_tau_dep_ensure_log="${_tau_dep_ensure_claim_dir}/${_tau_dep_ensure_id}.log"
 	if ! _tau_dep_ensure_lookup="$(cmake -P "$_tau_dep_ensure_store_cmake" lookup \
 			"$_tau_dep_ensure_prefix" "$_tau_dep_ensure_dep" "$_tau_dep_ensure_id")"; then
 		echo "dep_ensure: integrity failure for ${_tau_dep_ensure_dep} ${_tau_dep_ensure_id}" >&2
@@ -727,7 +745,7 @@ _tau_dep_ensure_run() {
 	_tau_dep_ensure_status="$(printf '%s\n' "$_tau_dep_ensure_lookup" | sed -n '1p')"
 	if [ "$_tau_dep_ensure_status" = "hit" ]; then
 		_tau_dep_ensure_prefix_out="$(printf '%s\n' "$_tau_dep_ensure_lookup" | sed -n '2p')"
-		_tau_dep_ensure_finish "$_tau_dep_ensure_prefix_out"
+		_tau_dep_ensure_finish "$_tau_dep_ensure_prefix_out" "local hit"
 		return 0
 	fi
 	if [ "$_tau_dep_ensure_status" != "miss" ]; then
@@ -739,8 +757,16 @@ _tau_dep_ensure_run() {
 	# then builds. An absent or failed remote is not an error, so configure
 	# falls through to the build. Consumer mode reads only the local store.
 	if [ "$_tau_dep_ensure_mode" = "producer" ] && [ -n "${TAU_STORE_REMOTE:-}" ]; then
+		if ! mkdir -p "$_tau_dep_ensure_claim_dir"; then
+			echo "dep_ensure: cannot create ${_tau_dep_ensure_claim_dir}" >&2
+			_tau_dep_ensure_cleanup
+			return 1
+		fi
+		printf '%s: remote pull, log: %s\n' "$_tau_dep_ensure_tag" \
+			"$_tau_dep_ensure_log" >&2
 		if "${__devrc_dir}/store-remote.sh" pull "$_tau_dep_ensure_prefix" \
-				"${_tau_dep_ensure_dep}/${_tau_dep_ensure_id}" >&2; then
+				"${_tau_dep_ensure_dep}/${_tau_dep_ensure_id}" \
+				> "$_tau_dep_ensure_log" 2>&1; then
 			if ! _tau_dep_ensure_lookup="$(cmake -P "$_tau_dep_ensure_store_cmake" lookup \
 					"$_tau_dep_ensure_prefix" "$_tau_dep_ensure_dep" "$_tau_dep_ensure_id")"; then
 				echo "dep_ensure: integrity failure for ${_tau_dep_ensure_dep} ${_tau_dep_ensure_id}" >&2
@@ -750,11 +776,11 @@ _tau_dep_ensure_run() {
 			_tau_dep_ensure_status="$(printf '%s\n' "$_tau_dep_ensure_lookup" | sed -n '1p')"
 			if [ "$_tau_dep_ensure_status" = "hit" ]; then
 				_tau_dep_ensure_prefix_out="$(printf '%s\n' "$_tau_dep_ensure_lookup" | sed -n '2p')"
-				_tau_dep_ensure_finish "$_tau_dep_ensure_prefix_out"
+				_tau_dep_ensure_finish "$_tau_dep_ensure_prefix_out" "remote pull"
 				return 0
 			fi
 		else
-			echo "dep_ensure: ${_tau_dep_ensure_dep} ${_tau_dep_ensure_id} is not on ${TAU_STORE_REMOTE}; building it" >&2
+			echo "dep_ensure: ${_tau_dep_ensure_dep} ${_tau_dep_ensure_id} is not on ${TAU_STORE_REMOTE}; building it (log: ${_tau_dep_ensure_log})" >&2
 		fi
 	fi
 	if [ "$_tau_dep_ensure_mode" = "consumer" ]; then
@@ -815,7 +841,7 @@ _tau_dep_ensure_run() {
 		_tau_dep_ensure_status="$(printf '%s\n' "$_tau_dep_ensure_lookup" | sed -n '1p')"
 		if [ "$_tau_dep_ensure_status" = "hit" ]; then
 			_tau_dep_ensure_prefix_out="$(printf '%s\n' "$_tau_dep_ensure_lookup" | sed -n '2p')"
-			_tau_dep_ensure_finish "$_tau_dep_ensure_prefix_out"
+			_tau_dep_ensure_finish "$_tau_dep_ensure_prefix_out" "local hit"
 			return 0
 		fi
 		_tau_dep_ensure_now="$(date +%s)"
@@ -836,7 +862,7 @@ _tau_dep_ensure_run() {
 	_tau_dep_ensure_status="$(printf '%s\n' "$_tau_dep_ensure_lookup" | sed -n '1p')"
 	if [ "$_tau_dep_ensure_status" = "hit" ]; then
 		_tau_dep_ensure_prefix_out="$(printf '%s\n' "$_tau_dep_ensure_lookup" | sed -n '2p')"
-		_tau_dep_ensure_finish "$_tau_dep_ensure_prefix_out"
+		_tau_dep_ensure_finish "$_tau_dep_ensure_prefix_out" "local hit"
 		return 0
 	fi
 	if ! _tau_dep_ensure_staging="$(dep_build_staging \
@@ -845,8 +871,11 @@ _tau_dep_ensure_run() {
 		_tau_dep_ensure_cleanup
 		return 1
 	fi
-	if ! dep_build_producer "$_tau_dep_ensure_staging" "$_tau_dep_ensure_producer" "$@" 1>&2; then
-		echo "dep_ensure: producer failed for ${_tau_dep_ensure_dep} ${_tau_dep_ensure_id}" >&2
+	printf '%s: building from source, log: %s\n' "$_tau_dep_ensure_tag" \
+		"$_tau_dep_ensure_log" >&2
+	if ! dep_build_producer "$_tau_dep_ensure_staging" "$_tau_dep_ensure_producer" "$@" \
+			> "$_tau_dep_ensure_log" 2>&1; then
+		echo "dep_ensure: producer failed for ${_tau_dep_ensure_dep} ${_tau_dep_ensure_id}; log: ${_tau_dep_ensure_log}" >&2
 		_tau_dep_ensure_cleanup
 		return 1
 	fi
@@ -872,7 +901,7 @@ _tau_dep_ensure_run() {
 		_tau_dep_ensure_cleanup
 		return 1
 	fi
-	_tau_dep_ensure_finish "$_tau_dep_ensure_published"
+	_tau_dep_ensure_finish "$_tau_dep_ensure_published" "built from source"
 	return 0
 }
 
