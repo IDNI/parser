@@ -692,18 +692,14 @@ inline report::value_parts report::format_value_parts(int64_t v, code c) {
 		if (v == 0) p.num = "0", p.unit = "ms";
 		else if (v < 1000)
 			p.num = std::to_string(v), p.unit = "\u00b5s";
-		else if (v < 1'000'000) {
-			int64_t whole = v / 1000;
-			int64_t hundredths = ((v % 1000) + 5) / 10;
-			if (hundredths >= 100) { ++whole; hundredths -= 100; }
-			p.num = two_decimals(whole, hundredths);
-			p.unit = "ms";
-		} else {
-			int64_t whole = v / 1000000;
-			int64_t hundredths = ((v % 1000000) + 5000) / 10000;
-			if (hundredths >= 100) { ++whole; hundredths -= 100; }
-			p.num = two_decimals(whole, hundredths);
-			p.unit = "s";
+		else {
+			// Round to hundredths of the unit, half up, with no addition
+			// before a comparison: gcc -Wstrict-overflow reports that form.
+			const bool ms = v < 1'000'000;
+			const int64_t step = ms ? 10 : 10'000;
+			const int64_t centi = v / step + (v % step >= step / 2 ? 1 : 0);
+			p.num = two_decimals(centi / 100, centi % 100);
+			p.unit = ms ? "ms" : "s";
 		}
 		break;
 	default:
