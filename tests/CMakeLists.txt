@@ -120,6 +120,7 @@ set(DOCTESTS
 	diagnostics
 	dynamic_grow
 	escapes
+	hashing
 	input
 	json
 	measure
