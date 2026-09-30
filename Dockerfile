@@ -431,7 +431,7 @@ RUN --mount=type=secret,id=gh_token \
 RUN --mount=type=secret,id=gh_token \
 	set -e; \
 	out="$(scripts/with-gh-token ./dev dep-parser-wasm.sh \
-		-DTAU_DEP_MODE=producer \
+		-DTAU_DEP_TARGET=wasm32-emscripten -DTAU_DEP_MODE=producer \
 		-DTAU_PARSER_WASM_BUILD_DIR=build/release-wasm \
 		-DTAU_PARSER_WASM_CMAKE_CACHE=build/release-wasm/CMakeCache.txt)"; \
 	prefix="$(printf '%s\n' "$out" | sed -n 's/^dep-parser-wasm: package prefix: //p')"; \
@@ -525,7 +525,7 @@ RUN --mount=type=secret,id=gh_token \
 RUN --mount=type=secret,id=gh_token \
 	set -e; \
 	out="$(scripts/with-gh-token ./dev dep-parser-wasm.sh \
-		-DTAU_DEP_MODE=consumer \
+		-DTAU_DEP_TARGET=wasm32-emscripten -DTAU_DEP_MODE=consumer \
 		-DTAU_PARSER_WASM_ENTRY="$(cat /parser-wasm-entry)")"; \
 	wasm_prefix="$(printf '%s\n' "$out" | sed -n 's/^dep-parser-wasm: package prefix: //p')"; \
 	test -n "$wasm_prefix" || { \

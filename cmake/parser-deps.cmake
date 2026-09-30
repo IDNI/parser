@@ -47,6 +47,31 @@ function(_parser_deps_target out)
 	set(${out} "${_t}" PARENT_SCOPE)
 endfunction()
 
+# The producer of <dep> for this configure's target,
+# scripts/dep/<target>/<dep>.sh, by the same rule as devrc's dep_producer_script.
+function(_parser_deps_producer_script out dep)
+	_parser_deps_target(_target)
+	set(_script "${PROJECT_SOURCE_DIR}/scripts/dep/${_target}/${dep}.sh")
+	if(_target STREQUAL "" OR NOT EXISTS "${_script}")
+		file(GLOB _scripts "${PROJECT_SOURCE_DIR}/scripts/dep/*/${dep}.sh")
+		set(_targets "")
+		foreach(_s IN LISTS _scripts)
+			get_filename_component(_d "${_s}" DIRECTORY)
+			get_filename_component(_d "${_d}" NAME)
+			if(NOT _d STREQUAL "common")
+				list(APPEND _targets "${_d}")
+			endif()
+		endforeach()
+		list(SORT _targets)
+		string(REPLACE ";" " " _targets "${_targets}")
+		if(_targets STREQUAL "")
+			set(_targets "none")
+		endif()
+		message(FATAL_ERROR "dep-${dep}: no producer for target '${_target}'. Targets with a producer: ${_targets}.")
+	endif()
+	set(${out} "${_script}" PARENT_SCOPE)
+endfunction()
+
 # The command that runs one producer with the flag environment cleared and
 # this configure's compiler, flags, target and job count. Every build type
 # passes the release flags, so all build types share one package.
@@ -79,12 +104,14 @@ function(_parser_deps_producer_command out script)
 		PARENT_SCOPE)
 endfunction()
 
-# Run one producer and record its printed prefix in <cache_var>.
-function(_parser_deps_ensure dep script cache_var)
+# Run the producer <producer> of the store package <dep> and record its printed
+# prefix in <cache_var>.
+function(_parser_deps_ensure dep producer cache_var)
 	if(${cache_var})
 		return()
 	endif()
-	_parser_deps_producer_command(_cmd "${script}")
+	_parser_deps_producer_script(_script "${producer}")
+	_parser_deps_producer_command(_cmd "${_script}")
 	# ECHO_ERROR_VARIABLE needs 3.18, and the parser still allows 3.10. It
 	# streams the producer output live, and the entry log keeps a copy.
 	set(_echo_error "")
@@ -118,19 +145,15 @@ function(_parser_deps_ensure dep script cache_var)
 endfunction()
 
 if(TAU_PARSER_DEPS_FROM_STORE)
-	_parser_deps_ensure(unordered_dense
-		"${PROJECT_SOURCE_DIR}/scripts/dep-unordered-dense.sh"
+	_parser_deps_ensure(unordered_dense unordered-dense
 		TAU_PARSER_UNORDERED_DENSE_PREFIX)
 	if(NOT TAU_PARSER_DONT_USE_FTXUI)
-		_parser_deps_ensure(ftxui
-			"${PROJECT_SOURCE_DIR}/scripts/dep-ftxui.sh"
-			TAU_PARSER_FTXUI_PREFIX)
+		_parser_deps_ensure(ftxui ftxui TAU_PARSER_FTXUI_PREFIX)
 	endif()
 	# The headers are identical on every target, so the producer needs no
 	# compiler. Only serve and connect read them.
 	if(TAU_PARSER_BUILD_SERVE)
-		_parser_deps_ensure(boost_headers
-			"${PROJECT_SOURCE_DIR}/scripts/dep-boost-headers.sh"
+		_parser_deps_ensure(boost_headers boost-headers
 			TAU_PARSER_BOOST_HEADERS_PREFIX)
 	endif()
 endif()

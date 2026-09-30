@@ -1,5 +1,6 @@
 #!/bin/bash
-# Build and cache the native Linux ankerl/unordered_dense package in the LOCAL store.
+# Build and cache the ankerl/unordered_dense package in the LOCAL store. Each
+# scripts/dep/<target>/unordered-dense.sh sources this file for its own target.
 #
 #   ./dev dep-unordered-dense -DTAU_BUILD_JOBS=5
 #   ./dev dep-unordered-dense -DTAU_DEP_MODE=consumer -DTAU_BUILD_JOBS=5
@@ -12,16 +13,13 @@
 # headers plus unordered_denseConfig.cmake / unordered_denseTargets.cmake, which
 # consumers reach with find_package(unordered_dense CONFIG). The upstream install
 # omits its LICENSE, so the producer installs it.
-#
-# Only the native, cross-toolchain, macOS and MSVC tuples are produced; any
-# other target or host is rejected.
 
 set -u
 
-DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 source "${DEV_ROOT}/scripts/devrc"
 
-DEP_UNORDERED_DENSE_RECIPE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+DEP_RECIPE_COMMON="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 UNORDERED_DENSE_DEFAULT_REPO="https://github.com/martinus/unordered_dense.git"
 # Full commit for tag v4.4.0. Never build the moving tag.
 UNORDERED_DENSE_DEFAULT_COMMIT="231e48c9426bd21c273669e5fdcd042c146975cf"
@@ -34,12 +32,13 @@ _dep_unordered_dense_compiler_id() {
 
 _dep_unordered_dense_field_block() {
 	local build_helper publish_helper manifest store
-	local recipe_hash build_hash publish_hash manifest_hash store_hash
+	local recipe_hash recipe_common_hash build_hash publish_hash manifest_hash store_hash
 	build_helper="${__devrc_dir}/dep-build"
 	publish_helper="${__devrc_dir}/devrc"
 	manifest="${__devrc_dir}/../cmake/tau-manifest.cmake"
 	store="${__devrc_dir}/../cmake/tau-store.cmake"
-	recipe_hash="$(dep_sha256 "$DEP_UNORDERED_DENSE_RECIPE")" || return 1
+	recipe_hash="$(dep_sha256 "$DEP_RECIPE")" || return 1
+	recipe_common_hash="$(dep_sha256 "$DEP_RECIPE_COMMON")" || return 1
 	build_hash="$(dep_sha256 "$build_helper")" || return 1
 	publish_hash="$(dep_sha256 "$publish_helper")" || return 1
 	manifest_hash="$(dep_sha256 "$manifest")" || return 1
@@ -50,6 +49,7 @@ _dep_unordered_dense_field_block() {
 		"repo=${UNORDERED_DENSE_REPO}" \
 		"commit=${UNORDERED_DENSE_COMMIT}" \
 		"recipe_hash=${recipe_hash}" \
+		"recipe_common_hash=${recipe_common_hash}" \
 		"helper_build_hash=${build_hash}" \
 		"provenance.publish_helper_hash=${publish_hash}" \
 		"provenance.manifest_writer_hash=${manifest_hash}" \
@@ -131,13 +131,7 @@ _dep_unordered_dense_producer() {
 
 dep_entry "$@"
 
-case "${DEP_TARGET:-$(dep_host_target)}" in
-	linux-x86_64|linux-arm64|darwin-arm64|darwin-x86_64|wasm32-emscripten|windows-x86_64-mingw|windows-x86_64-msvc) ;;
-	*)
-		echo "dep-unordered-dense: unsupported target '${DEP_TARGET}'" >&2
-		exit 2
-		;;
-esac
+dep_require_file_target unordered-dense
 dep_require_target_host dep-unordered-dense "${DEP_TARGET:-$(dep_host_target)}"
 
 mode="$(dep_var TAU_DEP_MODE producer)"

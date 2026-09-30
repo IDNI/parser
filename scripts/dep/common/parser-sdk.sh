@@ -1,5 +1,6 @@
 #!/bin/bash
-# Build and cache the native Linux parser packages in the LOCAL store.
+# Build and cache the parser packages in the LOCAL store. Each
+# scripts/dep/<target>/parser-sdk.sh sources this file for its own target.
 #
 #   ./dev dep-parser-sdk -DTAU_PARSER_PACKAGE=sdk -DTAU_BUILD_JOBS=5
 #   ./dev dep-parser-sdk -DTAU_PARSER_PACKAGE=sdk -DTAU_PARSER_LTO=ON -DTAU_BUILD_JOBS=5
@@ -23,19 +24,14 @@
 # The source is the local parser tree, so the identity records both the source
 # commit and a content hash of the tree; uncommitted local changes travel in the
 # tree hash. Nothing here reads the Tau commit, the Tau tree, or TAU_BAS.
-#
-# Only the native, cross-toolchain, macOS and MSVC tuples are produced; any
-# other target or host is rejected.
 
 set -u
 
-DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 source "${DEV_ROOT}/scripts/devrc"
 
-DEP_PARSER_RECIPE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+DEP_RECIPE_COMMON="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 PARSER_SOURCE_DEFAULT="${DEV_ROOT}"
-FTXUI_DEP_SCRIPT="${DEV_ROOT}/scripts/dep-ftxui.sh"
-UNORDERED_DENSE_DEP_SCRIPT="${DEV_ROOT}/scripts/dep-unordered-dense.sh"
 PARSER_CXX_STANDARD=17
 
 # SHA-256 over the content of every file in the parser tree, in sorted order.
@@ -46,7 +42,7 @@ PARSER_CXX_STANDARD=17
 # cannot change the produced bytes:
 #   scripts/devrc               the publish-side driver: accepts, records, places,
 #                               and points at a finished tree; provenance
-#   scripts/dep-*.sh            the narrow build module (dep-build) is
+#   scripts/dep/*, dep-*.sh     the narrow build module (dep-build) is
 #                               helper_build_hash; a dependency producer only
 #                               moves its own package id or the recorded
 #                               dependency id
@@ -54,7 +50,7 @@ PARSER_CXX_STANDARD=17
 #   cmake/tau-store.cmake       install); the store writer likewise
 _dep_parser_tree_hash() {
 	local src="$1" value digest
-	local exclude='^\./(scripts/devrc|scripts/dep-.*\.sh|cmake/tau-manifest\.cmake|cmake/tau-store\.cmake)$'
+	local exclude='^\./(scripts/devrc|scripts/dep-.*\.sh|scripts/dep/.*|cmake/tau-manifest\.cmake|cmake/tau-store\.cmake)$'
 	if command -v sha256sum > /dev/null 2>&1; then
 		digest="sha256sum"
 	elif command -v shasum > /dev/null 2>&1; then
@@ -99,12 +95,13 @@ _dep_parser_resolve_dep() {
 _dep_parser_field_block() {
 	local dep="$1" ftxui_id="$2" unordered_dense_id="$3"
 	local build_helper publish_helper manifest store
-	local recipe_hash build_hash publish_hash manifest_hash store_hash
+	local recipe_hash recipe_common_hash build_hash publish_hash manifest_hash store_hash
 	build_helper="${__devrc_dir}/dep-build"
 	publish_helper="${__devrc_dir}/devrc"
 	manifest="${__devrc_dir}/../cmake/tau-manifest.cmake"
 	store="${__devrc_dir}/../cmake/tau-store.cmake"
-	recipe_hash="$(dep_sha256 "$DEP_PARSER_RECIPE")" || return 1
+	recipe_hash="$(dep_sha256 "$DEP_RECIPE")" || return 1
+	recipe_common_hash="$(dep_sha256 "$DEP_RECIPE_COMMON")" || return 1
 	build_hash="$(dep_sha256 "$build_helper")" || return 1
 	publish_hash="$(dep_sha256 "$publish_helper")" || return 1
 	manifest_hash="$(dep_sha256 "$manifest")" || return 1
@@ -115,6 +112,7 @@ _dep_parser_field_block() {
 		"parser_commit=${PARSER_COMMIT}" \
 		"parser_tree_hash=${PARSER_TREE_HASH}" \
 		"recipe_hash=${recipe_hash}" \
+		"recipe_common_hash=${recipe_common_hash}" \
 		"helper_build_hash=${build_hash}" \
 		"provenance.publish_helper_hash=${publish_hash}" \
 		"provenance.manifest_writer_hash=${manifest_hash}" \
@@ -239,13 +237,7 @@ PY
 
 dep_entry "$@"
 
-case "${DEP_TARGET:-$(dep_host_target)}" in
-	linux-x86_64|linux-arm64|darwin-arm64|darwin-x86_64|wasm32-emscripten|windows-x86_64-mingw|windows-x86_64-msvc) ;;
-	*)
-		echo "dep-parser-sdk: unsupported target '${DEP_TARGET}'" >&2
-		exit 2
-		;;
-esac
+dep_require_file_target parser-sdk
 dep_require_target_host dep-parser-sdk "${DEP_TARGET:-$(dep_host_target)}"
 
 mode="$(dep_var TAU_DEP_MODE producer)"
@@ -357,6 +349,9 @@ if [ -n "$DEP_PARSER_HOST_CXX" ]; then
 fi
 
 # Resolve the consumed dependency packages. The ids are part of this identity.
+FTXUI_DEP_SCRIPT="$(dep_producer_script "$DEV_ROOT" ftxui "$DEP_PARSER_TARGET")" || exit 1
+UNORDERED_DENSE_DEP_SCRIPT="$(dep_producer_script "$DEV_ROOT" unordered-dense "$DEP_PARSER_TARGET")" \
+	|| exit 1
 if ! FTXUI_PREFIX="$(_dep_parser_resolve_dep "$FTXUI_DEP_SCRIPT" "$mode")"; then
 	echo "dep-parser-sdk: cannot resolve the ftxui package" >&2
 	exit 1

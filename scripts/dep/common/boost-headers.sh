@@ -1,5 +1,6 @@
 #!/bin/bash
-# Cache the Boost headers package in the LOCAL store.
+# Cache the Boost headers package in the LOCAL store. Each
+# scripts/dep/<target>/boost-headers.sh sources this file for its own target.
 #
 #   ./dev dep-boost-headers -DTAU_BUILD_JOBS=8
 #   ./dev dep-boost-headers -DTAU_DEP_MODE=consumer
@@ -11,16 +12,13 @@
 # The package is headers only, so no compiler, flags, cmake or ninja enter the
 # identity and every target produces the same bytes. The store name is
 # boost_headers, because tau-lang owns the boost store name.
-#
-# Only the native, cross-toolchain, macOS and MSVC tuples are produced; any
-# other target or host is rejected.
 
 set -u
 
-DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 source "${DEV_ROOT}/scripts/devrc"
 
-DEP_BOOST_RECIPE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+DEP_RECIPE_COMMON="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 BOOST_VERSION="1.86.0"
 BOOST_UNDERSCORE="1_86_0"
 # Official release archive and its published SHA-256, so a build gets the
@@ -30,12 +28,13 @@ BOOST_SHA256_DEFAULT="2575e74ffc3ef1cd0babac2c1ee8bdb5782a0ee672b1912da40e5b4b59
 
 _dep_boost_field_block() {
 	local build_helper publish_helper manifest store
-	local recipe_hash build_hash publish_hash manifest_hash store_hash
+	local recipe_hash recipe_common_hash build_hash publish_hash manifest_hash store_hash
 	build_helper="${__devrc_dir}/dep-build"
 	publish_helper="${__devrc_dir}/devrc"
 	manifest="${__devrc_dir}/../cmake/tau-manifest.cmake"
 	store="${__devrc_dir}/../cmake/tau-store.cmake"
-	recipe_hash="$(dep_sha256 "$DEP_BOOST_RECIPE")" || return 1
+	recipe_hash="$(dep_sha256 "$DEP_RECIPE")" || return 1
+	recipe_common_hash="$(dep_sha256 "$DEP_RECIPE_COMMON")" || return 1
 	build_hash="$(dep_sha256 "$build_helper")" || return 1
 	publish_hash="$(dep_sha256 "$publish_helper")" || return 1
 	manifest_hash="$(dep_sha256 "$manifest")" || return 1
@@ -46,6 +45,7 @@ _dep_boost_field_block() {
 		"version=${BOOST_VERSION}" \
 		"sha256=${BOOST_SHA256}" \
 		"recipe_hash=${recipe_hash}" \
+		"recipe_common_hash=${recipe_common_hash}" \
 		"helper_build_hash=${build_hash}" \
 		"provenance.publish_helper_hash=${publish_hash}" \
 		"provenance.manifest_writer_hash=${manifest_hash}" \
@@ -128,13 +128,7 @@ _dep_boost_producer() {
 
 dep_entry "$@"
 
-case "${DEP_TARGET:-$(dep_host_target)}" in
-	linux-x86_64|linux-arm64|darwin-arm64|darwin-x86_64|wasm32-emscripten|windows-x86_64-mingw|windows-x86_64-msvc) ;;
-	*)
-		echo "dep-boost-headers: unsupported target '${DEP_TARGET}'" >&2
-		exit 2
-		;;
-esac
+dep_require_file_target boost-headers
 dep_require_target_host dep-boost-headers "${DEP_TARGET:-$(dep_host_target)}"
 
 mode="$(dep_var TAU_DEP_MODE producer)"

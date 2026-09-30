@@ -1,7 +1,8 @@
 #!/bin/bash
 # Publish the compiled wasm build as a LOCAL store package.
+# scripts/dep/wasm32-emscripten/parser-wasm.sh sources this file.
 #
-#   ./dev dep-parser-wasm \
+#   ./dev dep-parser-wasm -DTAU_DEP_TARGET=wasm32-emscripten \
 #     -DTAU_DEP_MODE=producer \
 #     -DTAU_PARSER_WASM_BUILD_DIR=build/release-wasm \
 #     -DTAU_PARSER_WASM_CMAKE_CACHE=build/release-wasm/CMakeCache.txt
@@ -19,17 +20,17 @@
 # are provenance, not id inputs.
 set -u
 
-DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 source "${DEV_ROOT}/scripts/devrc"
 
-TAU_PARSER_WASM_RECIPE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+DEP_RECIPE_COMMON="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 
 # Content hash of the parser tree. The skip set matches .dockerignore plus the
 # build outputs generated in the source tree (doctest.h, version_license.h),
 # so the hash covers the source and stays deterministic without a .git dir.
 _dep_parser_wasm_tree_hash() {
 	local src="$1" value digest
-	local exclude='^\./(scripts/(dep-parser-wasm\.sh|devrc|dep-build)|cmake/(tau-manifest\.cmake|tau-store\.cmake))$'
+	local exclude='^\./(scripts/(dep/[^/]+/parser-wasm\.sh|devrc|dep-build)|cmake/(tau-manifest\.cmake|tau-store\.cmake))$'
 	if command -v sha256sum > /dev/null 2>&1; then
 		digest="sha256sum"
 	else
@@ -83,7 +84,7 @@ _parser_wasm_emcc() {
 }
 
 _dep_parser_wasm_field_block() {
-	local recipe_hash tree_hash build_type threads cflags cxxflags compiler
+	local recipe_hash recipe_common_hash tree_hash build_type threads cflags cxxflags compiler
 	local ftxui_id unordered_dense_id
 	local build_helper publish_helper manifest store
 	local build_hash publish_hash manifest_hash store_hash
@@ -104,7 +105,8 @@ _dep_parser_wasm_field_block() {
 	publish_helper="${__devrc_dir}/devrc"
 	manifest="${__devrc_dir}/../cmake/tau-manifest.cmake"
 	store="${__devrc_dir}/../cmake/tau-store.cmake"
-	recipe_hash="$(dep_sha256 "$TAU_PARSER_WASM_RECIPE")" || return 1
+	recipe_hash="$(dep_sha256 "$DEP_RECIPE")" || return 1
+	recipe_common_hash="$(dep_sha256 "$DEP_RECIPE_COMMON")" || return 1
 	tree_hash="$(_dep_parser_wasm_tree_hash "$TAU_PARSER_WASM_TREE")" || return 1
 	build_hash="$(dep_sha256 "$build_helper")" || return 1
 	publish_hash="$(dep_sha256 "$publish_helper")" || return 1
@@ -122,6 +124,7 @@ _dep_parser_wasm_field_block() {
 		"ftxui_package_id=${ftxui_id}" \
 		"unordered_dense_package_id=${unordered_dense_id}" \
 		"recipe_hash=${recipe_hash}" \
+		"recipe_common_hash=${recipe_common_hash}" \
 		"helper_build_hash=${build_hash}" \
 		"provenance.publish_helper_hash=${publish_hash}" \
 		"provenance.manifest_writer_hash=${manifest_hash}" \
@@ -184,6 +187,8 @@ _dep_parser_wasm_entry_lookup() {
 }
 
 dep_entry "$@"
+
+dep_require_file_target parser-wasm
 
 mode="$(dep_var TAU_DEP_MODE producer)"
 case "$mode" in

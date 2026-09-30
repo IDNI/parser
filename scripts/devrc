@@ -493,12 +493,12 @@ resolve_script() {
 	return 1
 }
 
-# --- dep-*.sh helpers --------------------------------------------------
+# --- dep helpers --------------------------------------------------------
 #
-# The dep-*.sh scripts here and in tau-lang (e.g. dep-emsdk.sh in this repo)
-# each pull a handful of -D options, a -DTAU_DEP_TARGET platform value,
-# an idempotency guard, and a clone-once git checkout. dep_entry
-# parses those options generically.
+# The store producers (scripts/dep/<target>/<dep>.sh) and the tool scripts
+# (scripts/dep-*.sh) here and in tau-lang each pull a handful of -D options,
+# a -DTAU_DEP_TARGET platform value, an idempotency guard, and a clone-once
+# git checkout. dep_entry parses those options generically.
 
 # The build configuration and invocation live in the narrow module the
 # producers hash. This driver keeps the publish side and the dist helpers,

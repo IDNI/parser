@@ -1,5 +1,6 @@
 #!/bin/bash
-# Build and cache the native Linux FTXUI package in the LOCAL store.
+# Build and cache the FTXUI package in the LOCAL store. Each
+# scripts/dep/<target>/ftxui.sh sources this file for its own target.
 #
 #   ./dev dep-ftxui -DTAU_BUILD_JOBS=5
 #   ./dev dep-ftxui -DTAU_DEP_MODE=consumer -DTAU_BUILD_JOBS=5
@@ -7,20 +8,22 @@
 # The source is pinned to one immutable commit. Nothing here moves a tag.
 # Producer mode builds into a staging entry and publishes it. Consumer mode
 # only looks up an existing entry and never clones, configures, or builds.
-# Only the native, cross-toolchain, macOS and MSVC tuples are produced; any
-# other target or host is rejected.
 
 set -u
 
-DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 source "${DEV_ROOT}/scripts/devrc"
 
-DEP_FTXUI_RECIPE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+DEP_RECIPE_COMMON="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 FTXUI_DEFAULT_REPO="https://github.com/ArthurSonzogni/FTXUI.git"
 # Full commit for tag v6.1.9. Never build the moving tag.
 FTXUI_DEFAULT_COMMIT="5cfed50702f52d51c1b189b5f97f8beaf5eaa2a6"
 # FTXUI's libraries declare cxx_std_17. Pin it so the standard is an input.
 FTXUI_CXX_STANDARD=17
+
+# A target file that patches the source or adds id fields defines these first.
+declare -F _dep_ftxui_target_fields > /dev/null || _dep_ftxui_target_fields() { :; }
+declare -F _dep_ftxui_target_patch > /dev/null || _dep_ftxui_target_patch() { :; }
 
 _dep_ftxui_compiler_id() {
 	dep_compiler_id "$DEP_FTXUI_CXX"
@@ -28,12 +31,13 @@ _dep_ftxui_compiler_id() {
 
 _dep_ftxui_field_block() {
 	local build_helper publish_helper manifest store
-	local recipe_hash build_hash publish_hash manifest_hash store_hash
+	local recipe_hash recipe_common_hash build_hash publish_hash manifest_hash store_hash
 	build_helper="${__devrc_dir}/dep-build"
 	publish_helper="${__devrc_dir}/devrc"
 	manifest="${__devrc_dir}/../cmake/tau-manifest.cmake"
 	store="${__devrc_dir}/../cmake/tau-store.cmake"
-	recipe_hash="$(dep_sha256 "$DEP_FTXUI_RECIPE")" || return 1
+	recipe_hash="$(dep_sha256 "$DEP_RECIPE")" || return 1
+	recipe_common_hash="$(dep_sha256 "$DEP_RECIPE_COMMON")" || return 1
 	build_hash="$(dep_sha256 "$build_helper")" || return 1
 	publish_hash="$(dep_sha256 "$publish_helper")" || return 1
 	manifest_hash="$(dep_sha256 "$manifest")" || return 1
@@ -44,6 +48,7 @@ _dep_ftxui_field_block() {
 		"repo=${FTXUI_REPO}" \
 		"commit=${FTXUI_COMMIT}" \
 		"recipe_hash=${recipe_hash}" \
+		"recipe_common_hash=${recipe_common_hash}" \
 		"helper_build_hash=${build_hash}" \
 		"provenance.publish_helper_hash=${publish_hash}" \
 		"provenance.manifest_writer_hash=${manifest_hash}" \
@@ -69,12 +74,7 @@ _dep_ftxui_field_block() {
 		"lto=OFF" \
 		"sanitizer=OFF" \
 		"deps=none"
-	# The Emscripten build applies the listener-eof patch; the patched package
-	# must hash differently from the unpatched one.
-	if [ "${DEP_FTXUI_TARGET}" = "wasm32-emscripten" ]; then
-		printf 'emscripten_patch_hash=%s\n' \
-			"$(dep_sha256 "${__devrc_dir}/../cmake/ftxui-emscripten-listener-eof.patch")"
-	fi
+	_dep_ftxui_target_fields
 }
 
 # Producer callback. $1 is the staging prefix. The source tree and build tree
@@ -98,14 +98,7 @@ _dep_ftxui_producer() {
 		rm -rf "$work"
 		return 1
 	fi
-	# The Emscripten build needs the listener-eof patch, the same one
-	# cmake/ftxui.cmake applies on the FetchContent path.
-	if [ "${DEP_FTXUI_TARGET}" = "wasm32-emscripten" ]; then
-		(cd "$work" && "$DEP_FTXUI_CMAKE" \
-			-DPATCH="${__devrc_dir}/../cmake/ftxui-emscripten-listener-eof.patch" \
-			-P "${__devrc_dir}/../cmake/ftxui-apply-patch.cmake") \
-			|| { rm -rf "$work"; return 1; }
-	fi
+	_dep_ftxui_target_patch "$work" || { rm -rf "$work"; return 1; }
 	# The recorded flags travel in the configure arguments. Clear the ambient
 	# ones so the environment cannot add a second, unrecorded value.
 	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS \
@@ -172,13 +165,7 @@ PY
 
 dep_entry "$@"
 
-case "${DEP_TARGET:-$(dep_host_target)}" in
-	linux-x86_64|linux-arm64|darwin-arm64|darwin-x86_64|wasm32-emscripten|windows-x86_64-mingw|windows-x86_64-msvc) ;;
-	*)
-		echo "dep-ftxui: unsupported target '${DEP_TARGET}'" >&2
-		exit 2
-		;;
-esac
+dep_require_file_target ftxui
 dep_require_target_host dep-ftxui "${DEP_TARGET:-$(dep_host_target)}"
 
 mode="$(dep_var TAU_DEP_MODE producer)"

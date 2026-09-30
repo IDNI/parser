@@ -200,6 +200,22 @@ composed by the public presets above; see [`CMakePresets.json`](../CMakePresets.
 Any further options go to `docker build`, for example
 `./dev docker linux --build-arg TESTS=no`.
 
+## Store producers
+
+A store producer has one script for each target it builds,
+`scripts/dep/<target>/<dep>.sh`, and one shared recipe,
+`scripts/dep/common/<dep>.sh`. `<target>` is the store target name, for
+example `linux-x86_64` or `wasm32-emscripten`. `./dev dep-<dep>` runs the
+script of the `-DTAU_DEP_TARGET` target, else of the host target. A target
+without a script has no producer, and `./dev` names the targets that have one.
+
+The id records `recipe_hash` of the target script and `recipe_common_hash` of
+the shared recipe. A change to the shared recipe changes the id on every
+target. A change to a target script changes the id of that target only.
+
+The producers are `dep-ftxui`, `dep-unordered-dense`, `dep-boost-headers`,
+`dep-parser-sdk` (the parser SDK and tgf) and `dep-parser-wasm`.
+
 ## Boost
 
 - `dep-boost-headers` — produce the `boost_headers` package in the dependency
