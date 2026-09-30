@@ -57,6 +57,15 @@ add_test(NAME embindings_api_emcc
 set_property(TEST embindings_api_emcc
 	PROPERTY WORKING_DIRECTORY "${WASM_NODE_DIR}")
 
+# tauparser_smoke_cjs_emcc, tauparser_smoke_esm_emcc - the package smoke
+# scripts, run from the build folder where they load the module beside them
+add_test(NAME tauparser_smoke_cjs_emcc
+	COMMAND ${NODE_EXECUTABLE} "${WASM_NODE_DIR}/tauparser.node.js")
+add_test(NAME tauparser_smoke_esm_emcc
+	COMMAND ${NODE_EXECUTABLE} "${WASM_NODE_DIR}/tauparser.node.mjs")
+set_tests_properties(tauparser_smoke_cjs_emcc tauparser_smoke_esm_emcc
+	PROPERTIES WORKING_DIRECTORY "${WASM_NODE_DIR}")
+
 # Browser tests need Chrome and puppeteer-core, installed before configure.
 # The browser REPL itself is built by this same configure.
 if(TAU_PARSER_BUILD_BROWSER_TESTS)
