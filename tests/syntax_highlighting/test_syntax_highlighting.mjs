@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * test_syntax_highlighter.mjs - Test TGF syntax highlighter WASM module.
+ * test_syntax_highlighting.mjs - Test TGF syntax highlighting WASM module.
  *
  * Usage:
- *   node tests/syntax_highlighter/test_syntax_highlighter.mjs <extension_root>
+ *   node tests/syntax_highlighting/test_syntax_highlighting.mjs <extension_root>
  *
  * <extension_root> is editors/vscode (or a copy of it). It must contain
- * wasm/syntax_highlighter.js, grammars/<langId>.tgf, grammars.json and
+ * wasm/syntax_highlighting.js, grammars/<langId>.tgf, grammars.json and
  * package.json.
  */
 
@@ -19,12 +19,12 @@ const require = createRequire(import.meta.url);
 
 const args = process.argv.slice(2);
 if (args.length < 1) {
-	console.error('Usage: test_syntax_highlighter.mjs <extension_root>');
+	console.error('Usage: test_syntax_highlighting.mjs <extension_root>');
 	process.exit(2);
 }
 
 const EXT_ROOT  = resolve(args[0]);
-const WASM_PATH = EXT_ROOT + '/wasm/syntax_highlighter.js';
+const WASM_PATH = EXT_ROOT + '/wasm/syntax_highlighting.js';
 const GRAMMARS_JSON = EXT_ROOT + '/grammars.json';
 const PACKAGE_JSON  = EXT_ROOT + '/package.json';
 
@@ -71,7 +71,7 @@ for (const langId of Object.keys(grammars)) {
 		continue;
 	}
 	const src = readFileSync(grammarPath, 'utf8');
-	const hl = new HL.syntax_highlighter(src);
+	const hl = new HL.syntax_highlighting(src);
 	if (hl.good()) {
 		console.log(`  PASS: ${langId} (${grammarPath}, ${src.length} bytes)`);
 		passed++;

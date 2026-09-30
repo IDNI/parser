@@ -1,8 +1,8 @@
 // To view the license please visit
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
-#ifndef __IDNI__PARSER__SYNTAX_HIGHLIGHTER_TMPL_H__
-#define __IDNI__PARSER__SYNTAX_HIGHLIGHTER_TMPL_H__
+#ifndef __IDNI__PARSER__SYNTAX_HIGHLIGHTING_TMPL_H__
+#define __IDNI__PARSER__SYNTAX_HIGHLIGHTING_TMPL_H__
 
 #include <sstream>
 #include <cstring>
@@ -440,9 +440,9 @@ inline void token_classifier::apply_patterns(tref root,
 	}
 }
 
-// --- syntax_highlighter ---
+// --- syntax_highlighting ---
 
-inline syntax_highlighter::syntax_highlighter(const std::string& grammar_src,
+inline syntax_highlighting::syntax_highlighting(const std::string& grammar_src,
 	std::optional<bool> heuristics)
 {
 	nts_ = std::make_unique<nonterminals<char, char>>();
@@ -472,16 +472,16 @@ inline syntax_highlighter::syntax_highlighter(const std::string& grammar_src,
 	good_ = true;
 }
 
-inline size_t syntax_highlighter::nt_count() const {
+inline size_t syntax_highlighting::nt_count() const {
 	return nts_ ? nts_->size() : 0;
 }
 
-inline std::string syntax_highlighter::get_nt_name(size_t id) const {
+inline std::string syntax_highlighting::get_nt_name(size_t id) const {
 	if (!nts_ || id >= nts_->size()) return "";
 	return nts_->get(id);
 }
 
-inline std::string syntax_highlighter::get_nt_type(size_t id) const {
+inline std::string syntax_highlighting::get_nt_type(size_t id) const {
 	if (!nts_ || id >= nts_->size()) return "";
 	uint32_t ty = classifier_.classify(id);
 	const auto& names = token_classifier::token_type_names();
@@ -489,7 +489,7 @@ inline std::string syntax_highlighter::get_nt_type(size_t id) const {
 	return names[ty];
 }
 
-inline void syntax_highlighter::build_line_offsets(const std::string& src,
+inline void syntax_highlighting::build_line_offsets(const std::string& src,
 	std::vector<size_t>& offsets) const
 {
 	offsets.clear();
@@ -498,11 +498,11 @@ inline void syntax_highlighter::build_line_offsets(const std::string& src,
 		if (src[i] == '\n') offsets.push_back(i + 1);
 }
 
-inline bool syntax_highlighter::is_delimiter_char(char ch) {
+inline bool syntax_highlighting::is_delimiter_char(char ch) {
 	return ch != 0 && std::strchr(".,;:()[]{}", ch) != nullptr;
 }
 
-inline uint32_t syntax_highlighter::utf16_units(const std::string& src,
+inline uint32_t syntax_highlighting::utf16_units(const std::string& src,
 	size_t a, size_t b) const
 {
 	uint32_t units = 0;
@@ -523,7 +523,7 @@ inline uint32_t syntax_highlighter::utf16_units(const std::string& src,
 	return units;
 }
 
-inline void syntax_highlighter::flush_run(uint32_t type,
+inline void syntax_highlighting::flush_run(uint32_t type,
 	size_t start, size_t end,
 	const std::string& src,
 	const std::vector<size_t>& line_offsets,
@@ -565,7 +565,7 @@ inline void syntax_highlighter::flush_run(uint32_t type,
 	}
 }
 
-inline void syntax_highlighter::extract_tokens(tref root,
+inline void syntax_highlighting::extract_tokens(tref root,
 	const std::string& src,
 	std::vector<extracted_token>& out,
 	const std::unordered_map<tref, uint32_t>& overrides) const
@@ -724,7 +724,7 @@ inline void syntax_highlighter::extract_tokens(tref root,
 	flush();
 }
 
-inline void syntax_highlighter::fallback_tokens(const std::string& src,
+inline void syntax_highlighting::fallback_tokens(const std::string& src,
 	size_t offset,
 	const std::vector<size_t>& line_offsets,
 	std::vector<extracted_token>& out) const
@@ -789,7 +789,7 @@ inline void syntax_highlighter::fallback_tokens(const std::string& src,
 	}
 }
 
-inline std::vector<uint32_t> syntax_highlighter::get_tokens(
+inline std::vector<uint32_t> syntax_highlighting::get_tokens(
 	const std::string& src)
 {
 	std::vector<extracted_token> tokens;
@@ -871,4 +871,4 @@ inline std::vector<uint32_t> syntax_highlighter::get_tokens(
 
 } // namespace idni
 
-#endif // __IDNI__PARSER__SYNTAX_HIGHLIGHTER_TMPL_H__
+#endif // __IDNI__PARSER__SYNTAX_HIGHLIGHTING_TMPL_H__

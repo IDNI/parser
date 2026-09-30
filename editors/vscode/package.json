@@ -1,6 +1,6 @@
 {
-  "name": "tgf-syntax",
-  "displayName": "TGF Grammars' Syntax Highlighter",
+  "name": "tgf",
+  "displayName": "TGF",
   "description": "Syntax highlighting for any language defined by a .tgf grammar",
   "version": "0.1.0",
   "publisher": "idni",
@@ -16,15 +16,15 @@
   "contributes": {
     "commands": [
       {
-        "command": "tgf-syntax.showTokens",
+        "command": "tgf.showTokens",
         "title": "TGF: Show All Tokens"
       },
       {
-        "command": "tgf-syntax.inspectTokens",
+        "command": "tgf.inspectTokens",
         "title": "TGF: Inspect Tokens at Cursor"
       },
       {
-        "command": "tgf-syntax.showMap",
+        "command": "tgf.showMap",
         "title": "TGF: Show Classification Map"
       }
     ],

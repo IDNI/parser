@@ -1,9 +1,9 @@
 #!/bin/bash
-# Build the syntax_highlighter WASM module and assemble the VS Code / Cursor
-# TGF Syntax Highlighter extension in place at editors/vscode/.
+# Build the syntax_highlighting WASM module and assemble the VS Code / Cursor
+# TGF extension in place at editors/vscode/.
 #
 # Usage:
-#   ./scripts/vscode-syntax-highlighter.sh
+#   ./scripts/vscode-syntax-highlighting.sh
 #
 # Prerequisites: scripts/dep-emsdk.sh (run once), node and npm on PATH.
 
@@ -18,7 +18,7 @@ EMSCRIPTEN_BUILD="$TOP/build/release-wasm"
 WASM_SRC="$EMSCRIPTEN_BUILD"
 EXT_DIR="$TOP/editors/vscode"
 
-SYNTAX_HIGHLIGHTER_TARGET="syntax_highlighter"
+SYNTAX_HIGHLIGHTING_TARGET="syntax_highlighting"
 
 # --- activate emsdk --------------------------------------------------------
 if [ -f "$EMSDK_PREFIX/emsdk/emsdk_env.sh" ]; then
@@ -37,14 +37,14 @@ if [ ! -f "$EMSCRIPTEN_BUILD/CMakeCache.txt" ]; then
 fi
 
 JOBS="$(dep_jobs)"
-echo "Building $SYNTAX_HIGHLIGHTER_TARGET (jobs=$JOBS)..."
-cmake --build "$EMSCRIPTEN_BUILD" --target "$SYNTAX_HIGHLIGHTER_TARGET" -j "$JOBS"
+echo "Building $SYNTAX_HIGHLIGHTING_TARGET (jobs=$JOBS)..."
+cmake --build "$EMSCRIPTEN_BUILD" --target "$SYNTAX_HIGHLIGHTING_TARGET" -j "$JOBS"
 
 # --- copy wasm output into the extension ------------------------------------
 mkdir -p "$EXT_DIR/wasm"
-cp "$WASM_SRC/syntax_highlighter.js" "$EXT_DIR/wasm/"
-cp "$WASM_SRC/syntax_highlighter.wasm" "$EXT_DIR/wasm/"
-echo "  wasm: syntax_highlighter.js + .wasm -> $EXT_DIR/wasm/"
+cp "$WASM_SRC/syntax_highlighting.js" "$EXT_DIR/wasm/"
+cp "$WASM_SRC/syntax_highlighting.wasm" "$EXT_DIR/wasm/"
+echo "  wasm: syntax_highlighting.js + .wasm -> $EXT_DIR/wasm/"
 
 # --- copy grammar files into the extension -----------------------------------
 mkdir -p "$EXT_DIR/grammars"
@@ -72,10 +72,11 @@ echo "Installing extension dependencies and compiling TypeScript..."
 
 # --- smoke test --------------------------------------------------------------
 echo "Running WASM smoke test..."
-node "$TOP/tests/syntax_highlighter/test_syntax_highlighter.mjs" "$EXT_DIR"
+node "$TOP/tests/syntax_highlighting/test_syntax_highlighting.mjs" "$EXT_DIR"
 
 echo ""
 echo "Extension ready at: $EXT_DIR"
 echo "To install, symlink:"
-echo "  ~/.cursor/extensions/tgf-syntax        -> $EXT_DIR"
-echo "  ~/.cursor-server/extensions/tgf-syntax -> $EXT_DIR"
+echo "  ~/.cursor/extensions/tgf        -> $EXT_DIR"
+echo "  ~/.cursor-server/extensions/tgf -> $EXT_DIR"
+echo "Remove an old tgf-syntax-highlighting link, else both extensions load."

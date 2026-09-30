@@ -6,13 +6,13 @@ import * as fs from "fs";
 // WASM module types
 // ---------------------------------------------------------------------------
 
-interface TGFSyntaxHighlighterModule {
-  syntax_highlighter: { new (grammarSource: string): TGFSyntaxHighlighter };
+interface TGFSyntaxHighlightingModule {
+  syntax_highlighting: { new (grammarSource: string): TGFSyntaxHighlighting };
   get_token_types(): { size(): number; get(i: number): string };
   get_token_modifiers(): { size(): number; get(i: number): string };
 }
 
-interface TGFSyntaxHighlighter {
+interface TGFSyntaxHighlighting {
   good(): boolean;
   diagnostics(): string;
   get_tokens(source: string): { size(): number; get(i: number): number; delete(): void };
@@ -27,7 +27,7 @@ interface TGFSyntaxHighlighter {
 // ---------------------------------------------------------------------------
 
 interface CachedGrammar {
-  hl: TGFSyntaxHighlighter;
+  hl: TGFSyntaxHighlighting;
   tokenTypes: string[];
   tokenModifiers: string[];
 }
@@ -48,13 +48,13 @@ let output: vscode.OutputChannel;
 // ---------------------------------------------------------------------------
 
 export async function activate(context: vscode.ExtensionContext) {
-  output = vscode.window.createOutputChannel("TGF Syntax Highlighter");
+  output = vscode.window.createOutputChannel("TGF");
   context.subscriptions.push(output);
   output.appendLine("=== activate ===");
 
   statusBar = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Left, 1000);
-  statusBar.name = "TGF Syntax Highlighter";
+  statusBar.name = "TGF";
   statusBar.text = "$(sync~spin) TGF: loading...";
   statusBar.show();
   context.subscriptions.push(statusBar);
@@ -65,19 +65,19 @@ export async function activate(context: vscode.ExtensionContext) {
     output.appendLine("FATAL: " + e);
     statusBar.text = "$(error) TGF: activation failed";
     statusBar.tooltip = String(e);
-    vscode.window.showErrorMessage("TGF Syntax Highlighter activation failed: " + e);
+    vscode.window.showErrorMessage("TGF activation failed: " + e);
   }
 }
 
 async function doActivate(context: vscode.ExtensionContext) {
   // Load WASM (bust require cache safely).
-  const wasmPath = path.join(context.extensionPath, "wasm", "syntax_highlighter.js");
+  const wasmPath = path.join(context.extensionPath, "wasm", "syntax_highlighting.js");
   output.appendLine("wasm path: " + wasmPath);
   try { delete require.cache[require.resolve(wasmPath)]; } catch (_) {}
   output.appendLine("requiring wasm...");
   const factory = require(wasmPath);
   output.appendLine("wasm required, awaiting factory...");
-  const HL: TGFSyntaxHighlighterModule = await factory();
+  const HL: TGFSyntaxHighlightingModule = await factory();
   output.appendLine("wasm factory returned");
 
   // Build legend.
@@ -99,7 +99,7 @@ async function doActivate(context: vscode.ExtensionContext) {
   } catch (e) {
     output.appendLine(`FATAL: could not read/parse grammars.json at ${grammarsJsonPath}: ${e}`);
     vscode.window.showErrorMessage(
-      `TGF Syntax Highlighter: could not read grammars.json: ${e}`);
+      `TGF: could not read grammars.json: ${e}`);
   }
 
   let loaded = 0;
@@ -112,10 +112,10 @@ async function doActivate(context: vscode.ExtensionContext) {
       output.appendLine(`${langId}: could not read grammar file ${grammarPath}: ${e}`);
       continue;
     }
-    let hl: TGFSyntaxHighlighter;
+    let hl: TGFSyntaxHighlighting;
     try {
       output.appendLine(`compiling ${langId} from ${grammarPath} (${src.length} bytes)...`);
-      hl = new HL.syntax_highlighter(src);
+      hl = new HL.syntax_highlighting(src);
     } catch (e) {
       output.appendLine(`${langId}: EXCEPTION compiling ${grammarPath}: ${e}`);
       continue;
@@ -123,7 +123,7 @@ async function doActivate(context: vscode.ExtensionContext) {
     if (!hl.good()) {
       output.appendLine(`${langId}: FAILED to compile ${grammarPath} - ${hl.diagnostics()}`);
       vscode.window.showErrorMessage(
-        `TGF Syntax Highlighter: failed to compile grammar for ${langId}. See output panel.`);
+        `TGF: failed to compile grammar for ${langId}. See output panel.`);
       hl.delete();
       continue;
     }
@@ -160,7 +160,7 @@ async function doActivate(context: vscode.ExtensionContext) {
 
   // Debug command: show all tokens for current document.
   context.subscriptions.push(
-    vscode.commands.registerCommand("tgf-syntax.showTokens", async () => {
+    vscode.commands.registerCommand("tgf.showTokens", async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) return;
       const cached = grammarCache.get(editor.document.languageId);
@@ -189,7 +189,7 @@ async function doActivate(context: vscode.ExtensionContext) {
     })
   );
   context.subscriptions.push(
-    vscode.commands.registerCommand("tgf-syntax.inspectTokens", async () => {
+    vscode.commands.registerCommand("tgf.inspectTokens", async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) return;
       const langId = editor.document.languageId;
@@ -233,7 +233,7 @@ async function doActivate(context: vscode.ExtensionContext) {
 
   // Debug command: show classification map for loaded languages.
   context.subscriptions.push(
-    vscode.commands.registerCommand("tgf-syntax.showMap", async () => {
+    vscode.commands.registerCommand("tgf.showMap", async () => {
       output.show();
       const seen = new Set<object>();
       for (const [langId, cached] of grammarCache) {

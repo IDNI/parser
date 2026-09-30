@@ -418,7 +418,7 @@ version_license(
 if (TAU_PARSER_BUILD_EMSCRIPTEN)
 	if (EMSCRIPTEN)
 		add_subdirectory("js")
-		add_subdirectory("js/syntax_highlighter")
+		add_subdirectory("js/syntax_highlighting")
 		if(TAU_PARSER_BUILD_TGF)
 			add_subdirectory("js/tgf")
 		endif()

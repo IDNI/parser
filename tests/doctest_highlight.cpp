@@ -1,12 +1,12 @@
 // To view the license please visit
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
-// Native verification of syntax_highlighter token extraction.
+// Native verification of syntax_highlighting token extraction.
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 #include "parser.h"
-#include "syntax_highlighter.h"
+#include "syntax_highlighting.h"
 
 #include <fstream>
 #include <sstream>
@@ -61,7 +61,7 @@ vector<decoded_token> decode(const vector<uint32_t>& data,
 
 TEST_CASE("csv.tgf compiles and highlights a simple CSV line") {
 	string g_src = read_grammar("src/format/csv/csv.tgf");
-	syntax_highlighter hl(g_src);
+	syntax_highlighting hl(g_src);
 	REQUIRE(hl.good());
 
 	// Inline-only shaping keeps SEP (commas) visible.
@@ -85,7 +85,7 @@ TEST_CASE("csv.tgf compiles and highlights a simple CSV line") {
 
 TEST_CASE("csv.tgf highlights quoted fields") {
 	string g_src = read_grammar("src/format/csv/csv.tgf");
-	syntax_highlighter hl(g_src);
+	syntax_highlighting hl(g_src);
 	REQUIRE(hl.good());
 
 	// A quoted field, quotes and inner comma alike, merges into one string token.
@@ -103,7 +103,7 @@ TEST_CASE("csv.tgf highlights quoted fields") {
 TEST_CASE("csv.tgf highlights CRLF-terminated rows") {
 	// CRLF ends the first record, so the second row starts on the next line.
 	string g_src = read_grammar("src/format/csv/csv.tgf");
-	syntax_highlighter hl(g_src);
+	syntax_highlighting hl(g_src);
 	REQUIRE(hl.good());
 	string input = "a,b\r\nc,d";
 	auto data = hl.get_tokens(input);
@@ -128,7 +128,7 @@ TEST_CASE("csv.tgf highlights CRLF-terminated rows") {
 
 TEST_CASE("json.tgf highlights an object's braces, key, colon and number") {
 	string g_src = read_grammar("src/format/json/json.tgf");
-	syntax_highlighter hl(g_src);
+	syntax_highlighting hl(g_src);
 	REQUIRE(hl.good());
 
 	string input = R"({"a":1})";
@@ -149,7 +149,7 @@ TEST_CASE("json.tgf highlights an object's braces, key, colon and number") {
 
 TEST_CASE("json.tgf highlights true/false/null as keywords") {
 	string g_src = read_grammar("src/format/json/json.tgf");
-	syntax_highlighter hl(g_src);
+	syntax_highlighting hl(g_src);
 	REQUIRE(hl.good());
 
 	// json.tgf's @highlight lists these directly as keyword.
@@ -166,7 +166,7 @@ TEST_CASE("json.tgf highlights true/false/null as keywords") {
 
 TEST_CASE("json.tgf highlights numbers") {
 	string g_src = read_grammar("src/format/json/json.tgf");
-	syntax_highlighter hl(g_src);
+	syntax_highlighting hl(g_src);
 	REQUIRE(hl.good());
 
 	auto data = hl.get_tokens("42");
@@ -180,7 +180,7 @@ TEST_CASE("json.tgf highlights numbers") {
 
 TEST_CASE("json.tgf: an object key's quotes merge with its text into one string token") {
 	string g_src = read_grammar("src/format/json/json.tgf");
-	syntax_highlighter hl(g_src);
+	syntax_highlighting hl(g_src);
 	REQUIRE(hl.good());
 
 	string input = R"({"key": 1})";
@@ -199,7 +199,7 @@ TEST_CASE("json.tgf: an object key's quotes merge with its text into one string 
 
 TEST_CASE("tgf.tgf highlights a rule's symbols and its production delimiters") {
 	string g_src = read_grammar("src/format/tgf/tgf.tgf");
-	syntax_highlighter hl(g_src);
+	syntax_highlighting hl(g_src);
 	REQUIRE(hl.good());
 
 	string input = "start => expr.";
@@ -220,7 +220,7 @@ TEST_CASE("tgf.tgf highlights a rule's symbols and its production delimiters") {
 
 TEST_CASE("tgf.tgf: quote chars in char and string literals are string") {
 	string g_src = read_grammar("src/format/tgf/tgf.tgf");
-	syntax_highlighter hl(g_src);
+	syntax_highlighting hl(g_src);
 	REQUIRE(hl.good());
 
 	// terminal_char and terminal_string are @highlight'ed as string.
@@ -257,7 +257,7 @@ TEST_CASE("tgf.tgf: quote chars in char and string literals are string") {
 TEST_CASE("tgf.tgf self-highlighting: quotes in tgf.tgf source are string") {
 	// terminal_string and terminal_char regions must be fully opaque string.
 	string g_src = read_grammar("src/format/tgf/tgf.tgf");
-	syntax_highlighter hl(g_src);
+	syntax_highlighting hl(g_src);
 	REQUIRE(hl.good());
 
 	// Each quoted literal merges into one string token; ch is a plain sym, colored variable.
@@ -282,7 +282,7 @@ TEST_CASE("tgf.tgf self-highlighting: quotes in tgf.tgf source are string") {
 
 TEST_CASE("tgf.test.tgf: quotes of a char literal and a string literal are string") {
 	string g_src = read_grammar("src/format/tgf.test/tgf.test.tgf");
-	syntax_highlighter hl(g_src);
+	syntax_highlighting hl(g_src);
 	REQUIRE(hl.good());
 
 	// 'a' is a char_lit embedded in the matcher; "b" is a quoted_string item.
@@ -303,7 +303,7 @@ TEST_CASE("tgf.test.tgf: quotes of a char literal and a string literal are strin
 
 TEST_CASE("incomplete input produces tokens via fallback") {
 	string g_src = read_grammar("src/format/json/json.tgf");
-	syntax_highlighter hl(g_src);
+	syntax_highlighting hl(g_src);
 	REQUIRE(hl.good());
 
 	// Simple incomplete input triggers fallback tokenization.
@@ -321,7 +321,7 @@ TEST_CASE("incomplete input produces tokens via fallback") {
 
 TEST_CASE("fallback colors quoted spans as string, not operator") {
 	string g_src = read_grammar("src/format/json/json.tgf");
-	syntax_highlighter hl(g_src);
+	syntax_highlighting hl(g_src);
 	REQUIRE(hl.good());
 
 	// Does not parse as JSON -> whole input goes through the fallback.
@@ -348,7 +348,7 @@ TEST_CASE("mid-document parse error gives tree tokens then fallback tokens") {
 		"@highlight keyword : a.\n"
 		"start => a.\n"
 		"a => \"foo\".\n";
-	syntax_highlighter hl(g_src);
+	syntax_highlighting hl(g_src);
 	REQUIRE(hl.good());
 
 	string input = "foo$$$";
@@ -362,7 +362,7 @@ TEST_CASE("mid-document parse error gives tree tokens then fallback tokens") {
 }
 
 TEST_CASE("empty source produces no tokens with a minimal grammar") {
-	syntax_highlighter hl("start => 'a'.");
+	syntax_highlighting hl("start => 'a'.");
 	REQUIRE(hl.good());
 	auto data = hl.get_tokens("");
 	CHECK(data.empty());
@@ -370,7 +370,7 @@ TEST_CASE("empty source produces no tokens with a minimal grammar") {
 
 TEST_CASE("empty source produces no tokens") {
 	string g_src = read_grammar("src/format/json/json.tgf");
-	syntax_highlighter hl(g_src);
+	syntax_highlighting hl(g_src);
 	REQUIRE(hl.good());
 	auto data = hl.get_tokens("");
 	CHECK(data.empty());
@@ -379,7 +379,7 @@ TEST_CASE("empty source produces no tokens") {
 // --- Bad grammar ---
 
 TEST_CASE("bad grammar gives good() == false, diagnostics, no exception") {
-	syntax_highlighter hl("start => (.\n");
+	syntax_highlighting hl("start => (.\n");
 	CHECK_FALSE(hl.good());
 	CHECK_FALSE(hl.diagnostics().empty());
 	auto data = hl.get_tokens("anything");
@@ -389,21 +389,21 @@ TEST_CASE("bad grammar gives good() == false, diagnostics, no exception") {
 // --- Heuristics on/off and the resolved flag ---
 
 TEST_CASE("no @highlight and no auto emits no token") {
-	syntax_highlighter hl("start => \"function\".\n");
+	syntax_highlighting hl("start => \"function\".\n");
 	REQUIRE(hl.good());
 	auto data = hl.get_tokens("function");
 	CHECK(data.empty());
 }
 
 TEST_CASE("same grammar with @highlight auto emits tokens") {
-	syntax_highlighter hl("@highlight auto.\nstart => \"function\".\n");
+	syntax_highlighting hl("@highlight auto.\nstart => \"function\".\n");
 	REQUIRE(hl.good());
 	auto data = hl.get_tokens("function");
 	CHECK_FALSE(data.empty());
 }
 
 TEST_CASE("constructor false suppresses tokens even when grammar says auto") {
-	syntax_highlighter hl(
+	syntax_highlighting hl(
 		"@highlight auto.\nstart => \"function\".\n", false);
 	REQUIRE(hl.good());
 	auto data = hl.get_tokens("function");
@@ -411,7 +411,7 @@ TEST_CASE("constructor false suppresses tokens even when grammar says auto") {
 }
 
 TEST_CASE("constructor true emits tokens even when grammar doesn't say auto") {
-	syntax_highlighter hl("start => \"function\".\n", true);
+	syntax_highlighting hl("start => \"function\".\n", true);
 	REQUIRE(hl.good());
 	auto data = hl.get_tokens("function");
 	CHECK_FALSE(data.empty());
@@ -420,7 +420,7 @@ TEST_CASE("constructor true emits tokens even when grammar doesn't say auto") {
 // --- @highlight directive behavior ---
 
 TEST_CASE("@highlight inside a comment has no effect") {
-	syntax_highlighter hl(
+	syntax_highlighting hl(
 		"# @highlight keyword : start.\nstart => \"function\".\n");
 	REQUIRE(hl.good());
 	auto data = hl.get_tokens("function");
@@ -428,7 +428,7 @@ TEST_CASE("@highlight inside a comment has no effect") {
 }
 
 TEST_CASE("@highlight multi-pair directive applies both pairs") {
-	syntax_highlighter hl(
+	syntax_highlighting hl(
 		"@highlight keyword : a; comment : b.\n"
 		"start => a b.\n"
 		"a => \"x\".\n"
@@ -444,13 +444,13 @@ TEST_CASE("@highlight multi-pair directive applies both pairs") {
 }
 
 TEST_CASE("@highlight with an unknown type warns") {
-	syntax_highlighter hl("@highlight keywrod : start.\nstart => \"x\".\n");
+	syntax_highlighting hl("@highlight keywrod : start.\nstart => \"x\".\n");
 	REQUIRE(hl.good());
 	CHECK(hl.diagnostics().find("Unknown highlight type") != string::npos);
 }
 
 TEST_CASE("@highlight of an undefined plain name warns unproductive") {
-	syntax_highlighter hl(
+	syntax_highlighting hl(
 		"@highlight keyword : nosuch.\nstart => \"x\".\n");
 	REQUIRE(hl.good());
 	CHECK(hl.diagnostics().find("Unproductive nonterminal") != string::npos);
@@ -465,7 +465,7 @@ TEST_CASE("clean TGF-like document gives tree tokens: @ is keyword, . is delimit
 		"directive_marker => \"@\".\n"
 		"sym => alpha+.\n"
 		"dot => \".\".\n";
-	syntax_highlighter hl(g_src);
+	syntax_highlighting hl(g_src);
 	REQUIRE(hl.good());
 
 	string input = "@foo.";
@@ -482,7 +482,7 @@ TEST_CASE("clean TGF-like document gives tree tokens: @ is keyword, . is delimit
 
 TEST_CASE("a typed ancestor colors a terminal through an untyped intermediate nonterminal") {
 	// wrapper is typed, middle is not: 'x' must take wrapper's type, not middle's no_type.
-	syntax_highlighter hl(
+	syntax_highlighting hl(
 		"@highlight keyword : wrapper.\n"
 		"start => wrapper.\n"
 		"wrapper => middle.\n"
@@ -499,7 +499,7 @@ TEST_CASE("a typed ancestor colors a terminal through an untyped intermediate no
 // --- treemr patterns in @highlight ---
 
 TEST_CASE("treemr pattern with a capture types only the captured nodes") {
-	syntax_highlighter hl(
+	syntax_highlighting hl(
 		"@use char class alpha.\n"
 		"@highlight variable : sym.\n"
 		"@highlight operator : production > (\"=>\").\n"
@@ -520,7 +520,7 @@ TEST_CASE("treemr pattern with a capture types only the captured nodes") {
 }
 
 TEST_CASE("treemr pattern without captures types the whole match root span") {
-	syntax_highlighter hl(
+	syntax_highlighting hl(
 		"@use char class alpha.\n"
 		"@highlight operator : production > \"=>\".\n"
 		"start => production.\n"
@@ -536,7 +536,7 @@ TEST_CASE("treemr pattern without captures types the whole match root span") {
 }
 
 TEST_CASE("a bad treemr pattern is diagnosed and other entries still work") {
-	syntax_highlighter hl(
+	syntax_highlighting hl(
 		"@use char class alpha.\n"
 		"@highlight keyword : sym.\n"
 		"@highlight operator : (bad.\n"
@@ -554,7 +554,7 @@ TEST_CASE("a bad treemr pattern is diagnosed and other entries still work") {
 }
 
 TEST_CASE("a later treemr pattern wins on the same node") {
-	syntax_highlighter hl(
+	syntax_highlighting hl(
 		"@use char class alpha.\n"
 		"@highlight keyword : production > (\"=>\").\n"
 		"@highlight operator : production > (\"=>\").\n"
@@ -618,7 +618,7 @@ TEST_CASE("content heuristic classifies without naming conventions") {
 		"c  => '\"' alpha+ '\"'.\n" // quote-delimited body -> string
 		"d  => digit+.\n"          // digit class (via +)  -> number
 		"sp => ' '.\n";
-	syntax_highlighter hl(g_src, true);
+	syntax_highlighting hl(g_src, true);
 	REQUIRE(hl.good());
 
 	string input = "function == \"hi\" 42";
@@ -642,7 +642,7 @@ TEST_CASE("content heuristic classifies without naming conventions") {
 }
 
 TEST_CASE("digit/xdigit char classes classify as number") {
-	syntax_highlighter hl(
+	syntax_highlighting hl(
 		"@use char class digit, xdigit.\n"
 		"start => digit+ | xdigit+.\n", true);
 	REQUIRE(hl.good());
@@ -670,7 +670,7 @@ TEST_CASE("digit/xdigit char classes classify as number") {
 // --- merge_pass ---
 
 TEST_CASE("merge_pass joins two adjacent string tokens from different parents") {
-	syntax_highlighter hl(
+	syntax_highlighting hl(
 		"@highlight string : a, b.\n"
 		"start => a b.\n"
 		"a => \"foo\".\n"
@@ -687,7 +687,7 @@ TEST_CASE("merge_pass joins two adjacent string tokens from different parents") 
 // --- UTF-8 / UTF-16 positions ---
 
 TEST_CASE("UTF-8 astral character gives correct UTF-16 length") {
-	syntax_highlighter hl("@use char class any.\nstart => any+.\n", true);
+	syntax_highlighting hl("@use char class any.\nstart => any+.\n", true);
 	REQUIRE(hl.good());
 
 	// U+1F600, a 4-byte UTF-8 sequence that counts as 2 UTF-16 units.
@@ -703,7 +703,7 @@ TEST_CASE("UTF-8 astral character gives correct UTF-16 length") {
 // --- get_token_types / get_nt_name ---
 
 TEST_CASE("token type names match idni::highlight_token_types exactly") {
-	auto names = syntax_highlighter::get_token_types();
+	auto names = syntax_highlighting::get_token_types();
 	REQUIRE(names.size() == highlight_token_types.size());
 	for (size_t i = 0; i < highlight_token_types.size(); ++i) {
 		CAPTURE(i);
@@ -713,7 +713,7 @@ TEST_CASE("token type names match idni::highlight_token_types exactly") {
 
 TEST_CASE("get_nt_name returns names for valid ids") {
 	string g_src = read_grammar("src/format/json/json.tgf");
-	syntax_highlighter hl(g_src);
+	syntax_highlighting hl(g_src);
 	REQUIRE(hl.good());
 
 	// Iterate until we find "start" or exhaust the container.
@@ -733,7 +733,7 @@ TEST_CASE("flush_run drops a comment token's trailing newline") {
 		"start => c x.\n"
 		"c => \"# hi\" '\\n'.\n"
 		"x => \"ok\".\n";
-	syntax_highlighter hl(g_src);
+	syntax_highlighting hl(g_src);
 	REQUIRE(hl.good());
 
 	string input = "# hi\nok";
@@ -748,7 +748,7 @@ TEST_CASE("flush_run drops a comment token's trailing newline") {
 
 TEST_CASE("flush_run splits a CRLF-embedded quoted csv field into one token per line") {
 	string g_src = read_grammar("src/format/csv/csv.tgf");
-	syntax_highlighter hl(g_src);
+	syntax_highlighting hl(g_src);
 	REQUIRE(hl.good());
 
 	string input = "\"ab\r\ncd\",x";
@@ -775,7 +775,7 @@ TEST_CASE("flush_run splits a CRLF-embedded quoted csv field into one token per 
 
 TEST_CASE("an error at end of input gives fallback tokens for the whole document") {
 	string g_src = "start => \"ab\".\n";
-	syntax_highlighter hl(g_src);
+	syntax_highlighting hl(g_src);
 	REQUIRE(hl.good());
 
 	auto data = hl.get_tokens("a");
@@ -791,7 +791,7 @@ TEST_CASE("an error at end of input gives fallback tokens for the whole document
 
 TEST_CASE("classify_by_content: first literal alternative decides for a mixed word/punct rule") {
 	string g_src = "start => x.\nx => \"true\" | \"!\".\n";
-	syntax_highlighter hl(g_src, true);
+	syntax_highlighting hl(g_src, true);
 	REQUIRE(hl.good());
 
 	auto data = hl.get_tokens("true");
@@ -805,7 +805,7 @@ TEST_CASE("classify_by_content: first literal alternative decides for a mixed wo
 
 TEST_CASE("utf16_units counts only the bytes inside a span cut mid-character") {
 	string g_src = "@use char class any.\nstart => any any any.\n";
-	syntax_highlighter hl(g_src, true);
+	syntax_highlighting hl(g_src, true);
 	REQUIRE(hl.good());
 
 	// The first 3 bytes of the 4-byte U+1F600 sequence; the 4th byte never
@@ -852,7 +852,7 @@ TEST_CASE("every @highlight pair in the five repository grammars has an effect")
 		auto& highlights = gr.value().opt.highlights;
 		REQUIRE_FALSE(highlights.empty());
 
-		syntax_highlighter hl(g_src, false);
+		syntax_highlighting hl(g_src, false);
 		REQUIRE(hl.good());
 		auto data = hl.get_tokens(gc.sample);
 		auto tokens = decode(data, gc.sample);
@@ -880,8 +880,8 @@ TEST_CASE("a whitespace rule's name does not affect the token list, only its typ
 		"blank  => ' '.\n"
 		"kw     => \"let\".\n";
 
-	syntax_highlighter hl1(g1, false);
-	syntax_highlighter hl2(g2, false);
+	syntax_highlighting hl1(g1, false);
+	syntax_highlighting hl2(g2, false);
 	REQUIRE(hl1.good());
 	REQUIRE(hl2.good());
 
@@ -904,7 +904,7 @@ TEST_CASE("with heuristics on, a rule named ws still lets a keyword color and em
 		"start => kw ws kw.\n"
 		"ws     => ' '.\n"
 		"kw     => \"let\".\n";
-	syntax_highlighter hl(g_src, true);
+	syntax_highlighting hl(g_src, true);
 	REQUIRE(hl.good());
 
 	string input = "let let";

@@ -138,7 +138,7 @@ _dep_parser_wasm_producer() {
 	local rel
 	local files="tauparser.js tauparser.wasm tauparser.node.js tauparser.html
 		tgf.js tgf.wasm
-		syntax_highlighter.js syntax_highlighter.wasm
+		syntax_highlighting.js syntax_highlighting.wasm
 		js/tgf/tgf_standalone.js js/tgf/tgf_standalone.wasm
 		js/tgf/tgf_standalone.data
 		js/tgf/index.html js/tgf/index.mjs

@@ -8,11 +8,11 @@
 #include <string>
 #include <vector>
 
-#include "syntax_highlighter.h"
+#include "syntax_highlighting.h"
 
 namespace em = emscripten;
 
-using highlighter_type = idni::syntax_highlighter;
+using highlighter_type = idni::syntax_highlighting;
 
 static std::vector<std::string> get_token_types() {
 	return highlighter_type::get_token_types();
@@ -21,8 +21,8 @@ static std::vector<std::string> get_token_modifiers() {
 	return highlighter_type::get_token_modifiers();
 }
 
-EMSCRIPTEN_BINDINGS(syntax_highlighter) {
-	em::class_<highlighter_type>("syntax_highlighter")
+EMSCRIPTEN_BINDINGS(syntax_highlighting) {
+	em::class_<highlighter_type>("syntax_highlighting")
 		.constructor<const std::string&>()
 		.function("good",         &highlighter_type::good)
 		.function("diagnostics",  &highlighter_type::diagnostics)

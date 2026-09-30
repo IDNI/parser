@@ -1,8 +1,8 @@
 // To view the license please visit
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
-#ifndef __IDNI__PARSER__SYNTAX_HIGHLIGHTER_H__
-#define __IDNI__PARSER__SYNTAX_HIGHLIGHTER_H__
+#ifndef __IDNI__PARSER__SYNTAX_HIGHLIGHTING_H__
+#define __IDNI__PARSER__SYNTAX_HIGHLIGHTING_H__
 
 #include <cstdint>
 #include <string>
@@ -97,10 +97,10 @@ private:
 };
 
 // Owns a compiled TGF grammar and parser and extracts semantic tokens from source text.
-struct syntax_highlighter
+struct syntax_highlighting
 {
 	// Compile a TGF grammar; heuristics overrides the grammar's own @highlight auto setting.
-	explicit syntax_highlighter(const std::string& grammar_src,
+	explicit syntax_highlighting(const std::string& grammar_src,
 		std::optional<bool> heuristics = std::nullopt);
 
 	bool good() const { return good_; }
@@ -166,6 +166,6 @@ private:
 
 } // namespace idni
 
-#include "syntax_highlighter.tmpl.h"
+#include "syntax_highlighting.tmpl.h"
 
-#endif // __IDNI__PARSER__SYNTAX_HIGHLIGHTER_H__
+#endif // __IDNI__PARSER__SYNTAX_HIGHLIGHTING_H__
