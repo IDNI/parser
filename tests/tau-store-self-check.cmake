@@ -448,5 +448,82 @@ if(IS_DIRECTORY "${_evict_dep}/${_evict_gone}")
 	tau_fail("eviction kept an entry beyond the newest 3")
 endif()
 
+# Write a complete evict test entry of <dep> under <prefix> with the fields
+# <fields> and last use <used>, and set <out> to its directory.
+function(tau_evict_entry out prefix dep fields used)
+	tau_input_id(_id "dep=${dep}\n${fields}")
+	set(_entry "${prefix}/store/${dep}/${_id}")
+	file(MAKE_DIRECTORY "${_entry}/prefix")
+	file(WRITE "${_entry}/prefix/f" "${fields}")
+	tau_output_map(_map "${_entry}/prefix")
+	tau_manifest_write("${_entry}/manifest.json" "${_id}"
+		"dep=${dep}\n${fields}" "${_map}")
+	file(WRITE "${_entry}/.last-used" "${used}\n")
+	set(${out} "${_entry}" PARENT_SCOPE)
+endfunction()
+
+# eviction keeps the newest <keep> entries of each variant: two targets with 3
+# entries each and keep 2 keep the newest 2 of each target
+set(_var_prefix "${_root}/evict-variant")
+foreach(_rank 1 2 3)
+	foreach(_target linux-x86_64 wasm32-emscripten)
+		# the targets interleave in last use, so one global rank would mix them
+		if(_target STREQUAL "linux-x86_64")
+			math(EXPR _used "${_rank} * 2")
+		else()
+			math(EXPR _used "${_rank} * 2 + 1")
+		endif()
+		tau_evict_entry(_ventry "${_var_prefix}" variant
+			"target=${_target}\ncompiler_id=Clang\ncxxflags=-O3\nrank=${_rank}"
+			"${_used}")
+		set(_var_${_target}_${_rank} "${_ventry}")
+	endforeach()
+endforeach()
+tau_store_evict("${_var_prefix}" 2)
+foreach(_target linux-x86_64 wasm32-emscripten)
+	if(NOT IS_DIRECTORY "${_var_${_target}_3}"
+			OR NOT IS_DIRECTORY "${_var_${_target}_2}")
+		tau_fail("eviction dropped one of the newest 2 ${_target} entries")
+	endif()
+	if(IS_DIRECTORY "${_var_${_target}_1}")
+		tau_fail("eviction kept a third ${_target} entry with keep 2")
+	endif()
+endforeach()
+
+# an in-use entry counts toward its own variant only: it neither protects nor
+# evicts an entry of another target
+set(_cross_prefix "${_root}/evict-cross")
+tau_evict_entry(_cross_a1 "${_cross_prefix}" cross
+	"target=linux-x86_64\ncompiler_id=Clang\ncxxflags=-O3\nn=1" 1)
+tau_evict_entry(_cross_a2 "${_cross_prefix}" cross
+	"target=linux-x86_64\ncompiler_id=Clang\ncxxflags=-O3\nn=2" 2)
+tau_evict_entry(_cross_a3 "${_cross_prefix}" cross
+	"target=linux-x86_64\ncompiler_id=Clang\ncxxflags=-O3\nn=3" 3)
+tau_evict_entry(_cross_b1 "${_cross_prefix}" cross
+	"target=windows-x86_64-mingw\ncompiler_id=GNU\ncxxflags=-O2\nn=1" 4)
+tau_evict_entry(_cross_b2 "${_cross_prefix}" cross
+	"target=windows-x86_64-mingw\ncompiler_id=GNU\ncxxflags=-O2\nn=2" 5)
+tau_evict_entry(_cross_b3 "${_cross_prefix}" cross
+	"target=windows-x86_64-mingw\ncompiler_id=GNU\ncxxflags=-O2\nn=3" 6)
+# an entry whose manifest does not parse is skipped, not removed
+tau_evict_entry(_cross_bad "${_cross_prefix}" cross "n=bad" 0)
+file(WRITE "${_cross_bad}/manifest.json" "not json")
+tau_store_evict("${_cross_prefix}" 2 "${_cross_a1}")
+if(NOT IS_DIRECTORY "${_cross_a1}")
+	tau_fail("eviction removed the in-use entry of its variant")
+endif()
+if(NOT IS_DIRECTORY "${_cross_a3}" OR IS_DIRECTORY "${_cross_a2}")
+	tau_fail("the in-use entry did not count toward its own variant")
+endif()
+if(NOT IS_DIRECTORY "${_cross_b3}" OR NOT IS_DIRECTORY "${_cross_b2}")
+	tau_fail("an in-use entry of another target evicted a newest entry")
+endif()
+if(IS_DIRECTORY "${_cross_b1}")
+	tau_fail("an in-use entry of another target protected an old entry")
+endif()
+if(NOT IS_DIRECTORY "${_cross_bad}")
+	tau_fail("eviction removed an entry whose manifest does not parse")
+endif()
+
 # remove only the random scratch content this self-check created
 file(REMOVE_RECURSE "${_root}")
