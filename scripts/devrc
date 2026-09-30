@@ -678,6 +678,17 @@ _tau_dep_ensure_log_tail() {
 	tail -n 80 "$1" >&2
 }
 
+# GitHub does not nest groups, so only the outermost dep_ensure opens them.
+_tau_dep_ensure_group_open() {
+	[ -n "$_tau_dep_ensure_groups" ] || return 0
+	printf '::group::%s\n' "$1" >&2
+}
+
+_tau_dep_ensure_group_close() {
+	[ -n "$_tau_dep_ensure_groups" ] || return 0
+	printf '::endgroup::\n' >&2
+}
+
 # Producer side of dep_ensure. Runs in a command-substitution subshell so its
 # signal traps never touch the caller's traps. Prints the store prefix on
 # stdout; everything else goes to stderr.
@@ -695,6 +706,7 @@ _tau_dep_ensure_run() {
 	local _tau_dep_ensure_host _tau_dep_ensure_owner_file
 	local _tau_dep_ensure_owner_host _tau_dep_ensure_owner_pid
 	local _tau_dep_ensure_tag _tau_dep_ensure_start _tau_dep_ensure_log
+	local _tau_dep_ensure_rc _tau_dep_ensure_groups=""
 	# Not `local`: bash 3.2 unwinds locals before it runs the EXIT trap of a
 	# command-substitution subshell, so the trap would see these empty.
 	_tau_dep_ensure_claim=""
@@ -711,6 +723,10 @@ _tau_dep_ensure_run() {
 		_tau_dep_ensure_tag="$_tau_dep_ensure_dep"
 	fi
 	_tau_dep_ensure_start="$(date +%s)"
+	if [ "${GITHUB_ACTIONS:-}" = "true" ] && [ -z "${TAU_DEP_LOG_GROUP:-}" ]; then
+		_tau_dep_ensure_groups=1
+		export TAU_DEP_LOG_GROUP=1
+	fi
 	# Progress goes to stderr only; stdout carries the prefix the caller reads.
 	printf '%s: resolving\n' "$_tau_dep_ensure_tag" >&2
 	if ! _tau_dep_ensure_prefix="$(dep_shared_prefix)"; then
@@ -771,9 +787,14 @@ _tau_dep_ensure_run() {
 		fi
 		printf '%s: remote pull, log: %s\n' "$_tau_dep_ensure_tag" \
 			"$_tau_dep_ensure_log" >&2
-		if "${__devrc_dir}/store-remote.sh" pull "$_tau_dep_ensure_prefix" \
-				"${_tau_dep_ensure_dep}/${_tau_dep_ensure_id}" \
-				> "$_tau_dep_ensure_log" 2>&1; then
+		_tau_dep_ensure_group_open "${_tau_dep_ensure_tag} remote pull"
+		# stdout carries the prefix, so the copy of the log goes to stderr.
+		"${__devrc_dir}/store-remote.sh" pull "$_tau_dep_ensure_prefix" \
+			"${_tau_dep_ensure_dep}/${_tau_dep_ensure_id}" 2>&1 \
+			| tee "$_tau_dep_ensure_log" >&2
+		_tau_dep_ensure_rc=${PIPESTATUS[0]}
+		_tau_dep_ensure_group_close
+		if [ "$_tau_dep_ensure_rc" -eq 0 ]; then
 			if ! _tau_dep_ensure_lookup="$(cmake -P "$_tau_dep_ensure_store_cmake" lookup \
 					"$_tau_dep_ensure_prefix" "$_tau_dep_ensure_dep" "$_tau_dep_ensure_id")"; then
 				echo "dep_ensure: integrity failure for ${_tau_dep_ensure_dep} ${_tau_dep_ensure_id}" >&2
@@ -880,8 +901,12 @@ _tau_dep_ensure_run() {
 	fi
 	printf '%s: building from source, log: %s\n' "$_tau_dep_ensure_tag" \
 		"$_tau_dep_ensure_log" >&2
-	if ! dep_build_producer "$_tau_dep_ensure_staging" "$_tau_dep_ensure_producer" "$@" \
-			> "$_tau_dep_ensure_log" 2>&1; then
+	_tau_dep_ensure_group_open "${_tau_dep_ensure_tag} build"
+	dep_build_producer "$_tau_dep_ensure_staging" "$_tau_dep_ensure_producer" "$@" 2>&1 \
+		| tee "$_tau_dep_ensure_log" >&2
+	_tau_dep_ensure_rc=${PIPESTATUS[0]}
+	_tau_dep_ensure_group_close
+	if [ "$_tau_dep_ensure_rc" -ne 0 ]; then
 		_tau_dep_ensure_log_tail "$_tau_dep_ensure_log"
 		echo "dep_ensure: producer failed for ${_tau_dep_ensure_dep} ${_tau_dep_ensure_id}; log: ${_tau_dep_ensure_log}" >&2
 		_tau_dep_ensure_cleanup
@@ -912,9 +937,13 @@ _tau_dep_ensure_run() {
 	# Push at once, so a later failure of the same job cannot hold back an entry
 	# it built. A hit or a pull is on the remote already.
 	if [ "${TAU_STORE_PUBLISH:-}" = "ON" ] && [ -n "${TAU_STORE_REMOTE:-}" ]; then
-		if ! "${__devrc_dir}/store-remote.sh" push "$_tau_dep_ensure_prefix" \
-				"${_tau_dep_ensure_dep}/${_tau_dep_ensure_id}" \
-				>> "$_tau_dep_ensure_log" 2>&1; then
+		_tau_dep_ensure_group_open "${_tau_dep_ensure_tag} push"
+		"${__devrc_dir}/store-remote.sh" push "$_tau_dep_ensure_prefix" \
+			"${_tau_dep_ensure_dep}/${_tau_dep_ensure_id}" 2>&1 \
+			| tee -a "$_tau_dep_ensure_log" >&2
+		_tau_dep_ensure_rc=${PIPESTATUS[0]}
+		_tau_dep_ensure_group_close
+		if [ "$_tau_dep_ensure_rc" -ne 0 ]; then
 			_tau_dep_ensure_log_tail "$_tau_dep_ensure_log"
 			echo "dep_ensure: cannot push ${_tau_dep_ensure_dep} ${_tau_dep_ensure_id} to ${TAU_STORE_REMOTE}; log: ${_tau_dep_ensure_log}" >&2
 			_tau_dep_ensure_cleanup

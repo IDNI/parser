@@ -86,8 +86,7 @@ function(_parser_deps_ensure dep script cache_var)
 	endif()
 	_parser_deps_producer_command(_cmd "${script}")
 	# ECHO_ERROR_VARIABLE needs 3.18, and the parser still allows 3.10. It
-	# streams the progress and error lines live; the capture holds those, and
-	# the build output stays in the entry log.
+	# streams the producer output live, and the entry log keeps a copy.
 	set(_echo_error "")
 	if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.18)
 		set(_echo_error ECHO_ERROR_VARIABLE)
@@ -99,6 +98,10 @@ function(_parser_deps_ensure dep script cache_var)
 		ERROR_VARIABLE _err
 		${_echo_error})
 	if(NOT _rc EQUAL 0)
+		# An echoed stream is on the terminal already.
+		if(_echo_error)
+			message(FATAL_ERROR "cannot resolve the ${dep} package; see the output above.\n${_out}")
+		endif()
 		message(FATAL_ERROR "cannot resolve the ${dep} package.\n${_err}\n${_out}")
 	endif()
 	if(NOT _out MATCHES "package prefix: (.*)")
