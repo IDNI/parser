@@ -27,7 +27,9 @@ jobs:
   # A pull request never publishes, even when its author has write access.
   guard:
     name: Setup · pusher permission
+    # A hung job fails early instead of running to the 6 hour limit.
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     permissions:
       contents: read
     outputs:
@@ -58,6 +60,7 @@ jobs:
     name: Linux x86_64 · environment
     needs: guard
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     permissions:
       contents: read
       packages: write
@@ -105,6 +108,7 @@ jobs:
     name: Linux x86_64 · tests
     needs: linux-resolve
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     permissions:
       contents: read
       packages: read
@@ -163,6 +167,7 @@ jobs:
     name: WebAssembly · environment
     needs: linux-resolve
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
@@ -198,6 +203,7 @@ jobs:
     name: WebAssembly · tests (node)
     needs: [guard, wasm-deps]
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
@@ -243,6 +249,7 @@ jobs:
     name: WebAssembly · tests (browser)
     needs: [wasm-deps, wasm-node, linux-resolve]
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
@@ -272,6 +279,7 @@ jobs:
     name: Windows MinGW · environment
     needs: [guard, linux-resolve]
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     permissions:
       contents: read
       packages: write
@@ -313,6 +321,7 @@ jobs:
     name: Windows MinGW · tests (wine)
     needs: linux-mingw64-wine-resolve
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: read
@@ -370,6 +379,7 @@ jobs:
     name: Linux arm64 · environment
     needs: guard
     runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
     permissions:
       contents: read
       packages: write
@@ -409,6 +419,7 @@ jobs:
     name: Linux arm64 · tests
     needs: linux-arm64-resolve
     runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
     env:
       # ubuntu-24.04-arm runners are 4-core
       BUILD_JOBS: 4
@@ -437,6 +448,7 @@ jobs:
     name: Windows MSVC · environment
     needs: guard
     runs-on: windows-latest
+    timeout-minutes: 60
     permissions:
       contents: read
       packages: write
@@ -489,6 +501,7 @@ jobs:
     name: Windows MSVC · tests
     needs: windows-msvc-store
     runs-on: windows-latest
+    timeout-minutes: 30
     defaults:
       run:
         shell: bash
@@ -549,6 +562,7 @@ jobs:
     name: macOS arm64 · environment
     needs: guard
     runs-on: macos-15
+    timeout-minutes: 240
     permissions:
       contents: read
       packages: write
@@ -599,6 +613,7 @@ jobs:
     name: macOS arm64 · tests
     needs: macos-arm64-store
     runs-on: macos-15
+    timeout-minutes: 240
     env:
       # macos-15 runners are 3-core arm64
       TAU_BUILD_JOBS: 3
@@ -643,6 +658,7 @@ jobs:
     name: macOS x86_64 · environment
     needs: guard
     runs-on: macos-15-intel
+    timeout-minutes: 240
     permissions:
       contents: read
       packages: write
@@ -693,6 +709,7 @@ jobs:
     name: macOS x86_64 · tests
     needs: macos-x86_64-store
     runs-on: macos-15-intel
+    timeout-minutes: 240
     env:
       # macos-15-intel runners are 4-core x86_64
       TAU_BUILD_JOBS: 4

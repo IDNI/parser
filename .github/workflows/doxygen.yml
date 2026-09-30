@@ -17,7 +17,9 @@ concurrency:
 
 jobs:
   build:
+    # A hung job fails early instead of running to the 6 hour limit.
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
     - name: Checkout sources
       uses: actions/checkout@v7
@@ -36,6 +38,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: build
     steps:
       - name: Deploy to GitHub Pages
