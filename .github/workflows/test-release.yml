@@ -51,9 +51,9 @@ jobs:
             *) echo "allowed=false" >> "$GITHUB_OUTPUT" ;;
           esac
 
-  # The base, deps and linux-x86_64 store layers. The other environments
-  # import its base and deps layers. It publishes before the tests, so a
-  # failed test keeps the packages. Change a scope to force a rebuild.
+  # The base and deps layers, and the linux-x86_64 store. Only the tool layers
+  # go to the layer cache: the store is in GHCR, and a reader resolves from it.
+  # Change a scope to force a rebuild.
   linux-resolve:
     name: Linux x86_64 · environment
     needs: guard
@@ -79,14 +79,14 @@ jobs:
         run: |
           ./dev docker base --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --cache-from type=gha,scope=parser-base \
-            --cache-to   type=gha,scope=parser-base,mode=max
+            --cache-to   type=gha,scope=parser-base,mode=min
 
       - name: Build deps stage
         run: |
           ./dev docker deps --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --cache-from type=gha,scope=parser-base \
             --cache-from type=gha,scope=parser-deps \
-            --cache-to   type=gha,scope=parser-deps,mode=max
+            --cache-to   type=gha,scope=parser-deps,mode=min
 
       - name: Resolve and publish the store packages
         run: |
@@ -95,18 +95,21 @@ jobs:
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
             --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=parser-deps \
-            --cache-from type=gha,scope=parser-base \
-            --cache-to   type=gha,scope=parser-linux-deps,mode=max
+            --cache-from type=gha,scope=parser-deps
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The linux-x86_64 test job reads the resolver's layers, so the deps stage
-  # is a cache hit and nothing resolves here.
+  # The deps layers are a cache hit. The resolve step reads the packages that
+  # the environment job published, so it builds nothing.
   linux:
     name: Linux x86_64 · tests
     needs: linux-resolve
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+      # ccache-prune deletes the older ccache entries of this job.
+      actions: write
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
@@ -117,6 +120,14 @@ jobs:
       - uses: docker/setup-buildx-action@v4
 
       - uses: crazy-max/ghaction-github-runtime@v4
+
+      # Before actions/cache, so its post step runs after the ccache save.
+      - name: Keep one ccache entry
+        uses: ./.github/actions/ccache-prune
+        with:
+          key: ccache-linux-${{ github.sha }}
+          prefix: ccache-linux-
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       # A buildkit cache mount lives on the builder, and a runner is
       # discarded after the job, so the ccache directory needs a round trip
@@ -140,7 +151,6 @@ jobs:
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=parser-linux-deps \
             --cache-from type=gha,scope=parser-deps \
             --cache-from type=gha,scope=parser-base
         env:
@@ -164,13 +174,21 @@ jobs:
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
-      - name: Build wasm-deps and wasm-browser-deps stages
+      # mode=min keeps the layers of the final target only, so each slow
+      # stage is the final target of its own build.
+      - name: Build wasm-deps stage
         run: |
-          ./dev docker wasm-browser-deps --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --cache-from type=gha,scope=parser-base \
+          ./dev docker wasm-deps --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --cache-from type=gha,scope=parser-deps \
             --cache-from type=gha,scope=parser-wasm-deps \
-            --cache-to   type=gha,scope=parser-wasm-deps,mode=max
+            --cache-to   type=gha,scope=parser-wasm-deps,mode=min
+
+      - name: Build wasm-browser-deps stage
+        run: |
+          ./dev docker wasm-browser-deps --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --cache-from type=gha,scope=parser-wasm-deps \
+            --cache-from type=gha,scope=parser-wasm-browser-deps \
+            --cache-to   type=gha,scope=parser-wasm-browser-deps,mode=min
 
   # The wasm32-emscripten resolver: the wasm-publish stage it drives publishes
   # the FTXUI and unordered_dense packages. parser-wasm is produced after that
@@ -202,8 +220,7 @@ jobs:
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
             --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=parser-wasm-deps \
-            --cache-to   type=gha,scope=parser-wasm-build,mode=max
+            --cache-from type=gha,scope=parser-wasm-deps
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -215,7 +232,7 @@ jobs:
             --secret id=gh_token,env=GH_TOKEN \
             --cache-from type=gha,scope=parser-wasm-deps \
             --cache-from type=gha,scope=parser-wasm-build \
-            --cache-to   type=gha,scope=parser-wasm-build,mode=max
+            --cache-to   type=gha,scope=parser-wasm-build,mode=min
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -243,7 +260,7 @@ jobs:
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=parser-wasm-deps \
+            --cache-from type=gha,scope=parser-wasm-browser-deps \
             --cache-from type=gha,scope=parser-wasm-build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -270,28 +287,37 @@ jobs:
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
-      # The publish stage derives from w64-deps, so this one build also
-      # writes the wine layers into the mingw scope.
-      - name: Build w64-deps, resolve and publish the store packages
+      # w64-deps is the final target of its own build, so mode=min keeps the
+      # wine layers and leaves the store out of the layer cache.
+      - name: Build w64-deps stage
+        run: |
+          ./dev docker w64-deps --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --cache-from type=gha,scope=parser-deps \
+            --cache-from type=gha,scope=parser-mingw64-wine-deps \
+            --cache-to   type=gha,scope=parser-mingw64-wine-deps,mode=min
+
+      - name: Resolve and publish the store packages
         run: |
           ./dev docker linux-mingw64-wine-publish \
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
             --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=parser-mingw64-wine-deps \
-            --cache-from type=gha,scope=parser-deps \
-            --cache-from type=gha,scope=parser-base \
-            --cache-to   type=gha,scope=parser-mingw64-wine-deps,mode=max
+            --cache-from type=gha,scope=parser-mingw64-wine-deps
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The mingw test job reads the environment's layers, so the deps stage is a
-  # cache hit and nothing resolves here.
+  # The wine layers are a cache hit. The resolve step reads the packages that
+  # the environment job published, so it builds nothing.
   linux-mingw64-wine:
     name: Windows MinGW · tests (wine)
     needs: linux-mingw64-wine-resolve
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+      # ccache-prune deletes the older ccache entries of this job.
+      actions: write
     env:
       # ubuntu-24.04 runners are 4-core
       BUILD_JOBS: 4
@@ -302,6 +328,14 @@ jobs:
       - uses: docker/setup-buildx-action@v4
 
       - uses: crazy-max/ghaction-github-runtime@v4
+
+      # Before actions/cache, so its post step runs after the ccache save.
+      - name: Keep one ccache entry
+        uses: ./.github/actions/ccache-prune
+        with:
+          key: ccache-linux-mingw64-wine-${{ github.sha }}
+          prefix: ccache-linux-mingw64-wine-
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       # A buildkit cache mount lives on the builder, and a runner is
       # discarded after the job, so the ccache directory needs a round trip
@@ -325,15 +359,13 @@ jobs:
             --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=parser-mingw64-wine-deps \
-            --cache-from type=gha,scope=parser-deps \
-            --cache-from type=gha,scope=parser-base
+            --cache-from type=gha,scope=parser-mingw64-wine-deps
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The Linux arm64 environment. The same image as the x86_64 environment on
-  # an arm runner, so the arm64 store packages are built natively. It reads
-  # and writes the arm64 scope only: the x86 layers never match an arm runner.
+  # The x86_64 environment on an arm runner, so the arm64 store packages are
+  # built natively. Its one scope holds the arm64 tool layers only: the x86
+  # layers never match an arm runner.
   linux-arm64-resolve:
     name: Linux arm64 · environment
     needs: guard
@@ -353,6 +385,13 @@ jobs:
 
       - uses: crazy-max/ghaction-github-runtime@v4
 
+      # deps derives from base, so its mode=min layers hold base as well.
+      - name: Build deps stage
+        run: |
+          ./dev docker deps --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --cache-from type=gha,scope=parser-linux-arm64-deps \
+            --cache-to   type=gha,scope=parser-linux-arm64-deps,mode=min
+
       - name: Resolve and publish the store packages
         run: |
           ./dev docker linux-publish \
@@ -360,13 +399,12 @@ jobs:
             --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
             --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
             --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=parser-linux-arm64-deps \
-            --cache-to   type=gha,scope=parser-linux-arm64-deps,mode=max
+            --cache-from type=gha,scope=parser-linux-arm64-deps
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The native arm64 test job reads the environment's layers, so the deps
-  # stage is a cache hit and nothing resolves here.
+  # The deps layers are a cache hit. The resolve step reads the packages that
+  # the environment job published, so it builds nothing.
   linux-arm64:
     name: Linux arm64 · tests
     needs: linux-arm64-resolve

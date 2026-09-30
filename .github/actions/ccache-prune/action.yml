@@ -1,0 +1,20 @@
+name: Prune the older ccache entries
+description: >
+  After a successful job, delete the ccache entries of <prefix><commit> other
+  than <key>, once <key> is in the cache. Declare it before actions/cache: post
+  steps run in reverse order, so this post step runs after the cache save.
+inputs:
+  key:
+    description: The key that the job saves, for example ccache-linux-<sha>.
+    required: true
+  prefix:
+    description: The key prefix of this job, for example ccache-linux-.
+    required: true
+  token:
+    description: A token with actions write access.
+    required: true
+runs:
+  using: node24
+  main: main.js
+  post: post.js
+  post-if: success()
