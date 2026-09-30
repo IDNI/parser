@@ -13,7 +13,7 @@ function gh(args) {
 }
 
 // The commit suffix keeps another job's longer prefix out of this list:
-// ccache-linux- must not match ccache-linux-mingw64-wine-<commit>.
+// ccache-linux- must not match ccache-linux-<other>-<commit>.
 function own_entries() {
 	const list = JSON.parse(gh(["cache", "list", "--repo", repo, "--ref", ref,
 		"--key", prefix, "--limit", "100", "--json", "id,key"]));
