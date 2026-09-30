@@ -462,6 +462,22 @@ resolve_script() {
 	local script_name="$1"; shift
 	script_name="${script_name%.sh}"
 
+	# A store producer has one script per target. The target is the
+	# -DTAU_DEP_TARGET value, else the host, as dep_entry reads it.
+	if [[ "$script_name" == dep-* ]] \
+			&& [ -f "${root}/scripts/dep/common/${script_name#dep-}.sh" ]; then
+		local dep_target="" dep_arg dep_script
+		for dep_arg in "$@"; do
+			case "$dep_arg" in
+				-DTAU_DEP_TARGET=*) dep_target="${dep_arg#-DTAU_DEP_TARGET=}" ;;
+			esac
+		done
+		[ -n "$dep_target" ] || dep_target="$(dep_host_target)"
+		dep_script="$(dep_producer_script "$root" "${script_name#dep-}" "$dep_target")" \
+			|| exit 2
+		exec "$dep_script" "$@"
+	fi
+
 	if [ -f "${root}/scripts/${script_name}.sh" ]; then
 		exec "${root}/scripts/${script_name}.sh" "$@"
 	fi
@@ -492,6 +508,38 @@ source "${__devrc_dir}/dep-build"
 dep_vars_reset
 DEP_POSITIONAL=()
 DEP_TARGET="$(dep_host_target)"
+
+# Print scripts/dep/<target>/<dep>.sh under <root>, or name the targets that
+# have a producer and fail.
+dep_producer_script() {
+	local root="$1" dep="$2" target="$3" file targets=""
+	if [ -n "$target" ] && [ -f "${root}/scripts/dep/${target}/${dep}.sh" ]; then
+		printf '%s\n' "${root}/scripts/dep/${target}/${dep}.sh"
+		return 0
+	fi
+	for file in "${root}"/scripts/dep/*/"${dep}.sh"; do
+		[ -f "$file" ] || continue
+		file="$(basename "$(dirname "$file")")"
+		[ "$file" = common ] && continue
+		targets="${targets}${targets:+ }${file}"
+	done
+	echo "dep-${dep}: no producer for target '${target}'. Targets with a producer: ${targets:-none}." >&2
+	return 1
+}
+
+# The target producer sets DEP_FILE_TARGET and DEP_RECIPE before it sources
+# its common file, and builds that one target only.
+dep_require_file_target() {
+	local dep="$1"
+	if [ -z "${DEP_FILE_TARGET:-}" ] || [ -z "${DEP_RECIPE:-}" ]; then
+		echo "dep-${dep}: run scripts/dep/<target>/${dep}.sh, not the common file" >&2
+		exit 2
+	fi
+	if [ "$DEP_TARGET" != "$DEP_FILE_TARGET" ]; then
+		echo "dep-${dep}: ${DEP_RECIPE} builds ${DEP_FILE_TARGET}, got '${DEP_TARGET}'" >&2
+		exit 2
+	fi
+}
 
 dep_done_if_exists() {
 	local path="$1" label="$2"
