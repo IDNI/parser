@@ -1,0 +1,289 @@
+name: Release Packages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  linux_x86_64_package:
+    name: Linux x86_64 · package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build image with release packages
+        run: >
+          ./dev docker packages
+          --build-arg TESTS=no
+          --build-arg W64_PACKAGES=no
+          --build-arg BUILD_JOBS=4
+
+      - name: Copy release packages from container
+        run: |
+          CID=$(docker create parser:packages)
+          docker cp $CID:/parser/build/release/packages ${{ github.workspace }}/
+          docker rm $CID
+
+      - name: Upload the Linux packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-x86_64-release
+          path: |
+            ${{ github.workspace }}/packages/*.deb
+            ${{ github.workspace }}/packages/*.rpm
+          if-no-files-found: error
+
+  # The same image on an arm runner.
+  linux_arm64_package:
+    name: Linux arm64 · package
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build image with release packages
+        run: >
+          ./dev docker packages
+          --build-arg TESTS=no
+          --build-arg W64_PACKAGES=no
+          --build-arg BUILD_JOBS=4
+
+      - name: Copy release packages from container
+        run: |
+          CID=$(docker create parser:packages)
+          docker cp $CID:/parser/build/release/packages ${{ github.workspace }}/
+          docker rm $CID
+
+      - name: Upload the Linux packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-arm64-release
+          path: |
+            ${{ github.workspace }}/packages/*.deb
+            ${{ github.workspace }}/packages/*.rpm
+          if-no-files-found: error
+
+  # A release is all or nothing: Publish runs only when every package job
+  # passed.
+  publish:
+    name: Publish
+    needs: [linux_x86_64_package, linux_arm64_package, macos_arm64_package,
+      macos_x86_64_package, windows_msvc_package, wasm_npm_package]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # Creating the release needs contents: write. The package jobs keep the
+    # workflow-level read-only token.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Read Version
+        run: echo "version=v$(head -n 1 VERSION)" >> $GITHUB_ENV
+
+      - name: Get ISO date
+        run: echo "date_iso=$(date --iso)" >> $GITHUB_ENV
+
+      - name: Download the Linux x86_64 packages
+        uses: actions/download-artifact@v8
+        with:
+          name: linux-x86_64-release
+          path: ${{ github.workspace }}/packages
+
+      - name: Download the Linux arm64 packages
+        uses: actions/download-artifact@v8
+        with:
+          name: linux-arm64-release
+          path: ${{ github.workspace }}/packages
+
+      - name: Download the macOS arm64 package
+        uses: actions/download-artifact@v8
+        with:
+          name: macos-arm64-release
+          path: ${{ github.workspace }}/packages
+
+      - name: Download the macOS x86_64 package
+        uses: actions/download-artifact@v8
+        with:
+          name: macos-x86_64-release
+          path: ${{ github.workspace }}/packages
+
+      - name: Download the Windows MSVC packages
+        uses: actions/download-artifact@v8
+        with:
+          name: windows-msvc-release
+          path: ${{ github.workspace }}/packages
+
+      - name: Download the WebAssembly npm package
+        uses: actions/download-artifact@v8
+        with:
+          name: wasm-npm-release
+          path: ${{ github.workspace }}/packages
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: "${{ env.version }}"
+          # Pin the new tag to the commit the packages were built from, so a
+          # manual dispatch from a non-default branch cannot tag other source.
+          target_commitish: "${{ github.sha }}"
+          name: "Tau Parser Library ${{ env.version }}"
+          body: "Tau Parser Library ${{ env.version }} release ${{ env.date_iso }} commit ${{ github.sha }}"
+          draft: true
+          prerelease: true
+          files: ${{ github.workspace }}/packages/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  macos_arm64_package:
+    name: macOS arm64 · package
+    runs-on: macos-15
+    timeout-minutes: 240
+    env:
+      # macos-15 runners are 3-core arm64
+      TAU_BUILD_JOBS: 3
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build the macOS package
+        run: ./dev preset release-macos-packages -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      - name: Upload the macOS package
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-arm64-release
+          path: |
+            build/release/packages/*.dmg
+            build/release/packages/*.zip
+          if-no-files-found: error
+
+  macos_x86_64_package:
+    name: macOS x86_64 · package
+    runs-on: macos-15-intel
+    timeout-minutes: 240
+    env:
+      # macos-15-intel runners are 4-core x86_64
+      TAU_BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build the macOS package
+        run: ./dev preset release-macos-packages -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      - name: Upload the macOS package
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-x86_64-release
+          path: |
+            build/release/packages/*.dmg
+            build/release/packages/*.zip
+          if-no-files-found: error
+
+  windows_msvc_package:
+    name: Windows MSVC · package
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: read
+    defaults:
+      run:
+        shell: bash
+    env:
+      # windows-latest runners are 4-core
+      TAU_BUILD_JOBS: 4
+      TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v6
+
+      - name: Setup MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      # The windows-latest image has no NSIS, and CPack needs makensis.
+      - name: Install NSIS
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          Add-Content $env:GITHUB_PATH "${env:ProgramFiles(x86)}\NSIS"
+
+      - name: Restore the dependency store (~/.tau/store)
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.tau/store
+          key: parser-store-windows-latest-${{ github.sha }}
+          restore-keys: |
+            parser-store-windows-latest-
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Build the NSIS installer
+        run: |
+          ./dev preset release-msvc-packages -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DTAU_PARSER_DEPS_FROM_STORE=ON
+
+      - name: Build the zip package
+        run: |
+          ./dev preset release-msvc-packages-zip -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DTAU_PARSER_DEPS_FROM_STORE=ON
+
+      - name: Upload the Windows packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-msvc-release
+          path: |
+            build/release-msvc/packages/*.exe
+            build/release-msvc/packages/*.zip
+          if-no-files-found: error
+
+  # The wasm-npm Docker stage builds release-wasm and runs npm pack. Nothing
+  # publishes the .tgz to a registry.
+  wasm_npm_package:
+    name: WebAssembly · npm
+    runs-on: ubuntu-24.04
+    timeout-minutes: 140
+    permissions:
+      contents: read
+      packages: read
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+      TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      # type=gha needs ACTIONS_RUNTIME_TOKEN/ACTIONS_CACHE_URL, which GitHub
+      # does not expose to run: steps
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      - name: Build the npm package
+        run: |
+          ./dev docker wasm-npm \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=parser-wasm-deps
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PARSER_NPM_DIR: npm
+
+      - name: Upload the npm package
+        uses: actions/upload-artifact@v7
+        with:
+          name: wasm-npm-release
+          path: npm/*.tgz
+          if-no-files-found: error

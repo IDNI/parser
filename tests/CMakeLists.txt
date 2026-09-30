@@ -483,6 +483,10 @@ if(TAU_TEST_BASH)
 	add_test(NAME tau_store_remote
 		COMMAND "${TAU_TEST_BASH}"
 			"${CMAKE_CURRENT_SOURCE_DIR}/store-remote-self-check.sh")
+	# The release workflow must pin a new tag to the built commit.
+	add_test(NAME release_workflow_publish_target
+		COMMAND "${TAU_TEST_BASH}"
+			"${CMAKE_CURRENT_SOURCE_DIR}/release-workflow-self-check.sh")
 endif()
 
 include(ctest-test-defaults)
