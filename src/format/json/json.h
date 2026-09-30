@@ -289,7 +289,7 @@ inline value to_value(const diagnostics::report& r, bool names = true) {
 	std::vector<std::vector<size_t>> kids(nodes.size());
 	for (size_t i = 0; i < nodes.size(); ++i)
 		if (nodes[i].parent >= 0)
-			kids[nodes[i].parent].push_back(i);
+			kids[static_cast<size_t>(nodes[i].parent)].push_back(i);
 	auto roots = value::array();
 	for (size_t i = 0; i < nodes.size(); ++i)
 		if (nodes[i].parent < 0)
