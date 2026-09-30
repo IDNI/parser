@@ -309,6 +309,9 @@ ARG NIGHTLY=no
 # Argument DOCUMENTATION=no skips building of API documentation
 ARG DOCUMENTATION=yes
 
+# Argument W64_PACKAGES=no skips the Windows packages
+ARG W64_PACKAGES=yes
+
 RUN echo "(BUILD) -- Building packages: $RELEASE (nightly: $NIGHTLY)"
 
 # Documentation
@@ -324,7 +327,7 @@ fi
 
 # Windows packages build in build/release-w64, so they never share a cache
 # with the native build.
-RUN if [ "$RELEASE" = "yes" ]; then \
+RUN if [ "$RELEASE" = "yes" ] && [ "$W64_PACKAGES" = "yes" ]; then \
 	./dev preset release-w64-packages -DTAU_BUILD_JOBS=${BUILD_JOBS} && \
 	./dev preset release-w64-packages-zip -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 fi

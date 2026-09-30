@@ -65,14 +65,11 @@ jobs:
             exit 1
           fi
 
-  build_and_deploy_nightly:
+  linux_package:
     needs: [check_date, check_tests]
     if: ${{ needs.check_date.outputs.should_run != 'false' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
 
@@ -80,6 +77,7 @@ jobs:
         run: >
           ./dev docker nightly
           --build-arg TESTS=no
+          --build-arg W64_PACKAGES=no
           --build-arg BUILD_JOBS=4
 
       - name: Copy nightly packages and generated API documentation from container
@@ -89,21 +87,68 @@ jobs:
           docker cp $CID:/parser/build/release/_site ${{ github.workspace }}/
           docker rm $CID
 
-      - name: Read Version
-        id: version
-        run: echo "version=v$(head -n 1 VERSION)" >> $GITHUB_ENV
-
-      - name: Get ISO date
-        id: date_iso
-        run: echo "date_iso=$(date --iso)" >> $GITHUB_ENV
-
-      - name: Upload nightly packages
+      - name: Upload the Linux packages
         uses: actions/upload-artifact@v7
         with:
-          name: "nightly-${{ env.date_iso }}"
+          name: linux-nightly
           path: |
             ${{ github.workspace }}/packages/*.deb
             ${{ github.workspace }}/packages/*.rpm
+          if-no-files-found: error
+
+      - name: Upload the API documentation
+        uses: actions/upload-artifact@v7
+        with:
+          name: site-nightly
+          path: ${{ github.workspace }}/_site
+          if-no-files-found: error
+
+  # A nightly publishes every package job that passed. A failed job does not
+  # stop the others, and the run fails only when no job built a package.
+  publish:
+    needs: [check_date, check_tests, linux_package, macos_package, windows_package]
+    if: ${{ always() && needs.check_date.result == 'success' && needs.check_date.outputs.should_run != 'false' && needs.check_tests.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Read Version
+        run: echo "version=v$(head -n 1 VERSION)" >> $GITHUB_ENV
+
+      - name: Get ISO date
+        run: echo "date_iso=$(date --iso)" >> $GITHUB_ENV
+
+      - name: Download the Linux packages
+        if: needs.linux_package.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          name: linux-nightly
+          path: ${{ github.workspace }}/packages
+
+      - name: Download the macOS package
+        if: needs.macos_package.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          name: macos-nightly
+          path: ${{ github.workspace }}/packages
+
+      - name: Download the Windows packages
+        if: needs.windows_package.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          name: windows-nightly
+          path: ${{ github.workspace }}/packages
+
+      - name: Require at least one package
+        run: |
+          if [ -z "$(find packages -type f 2>/dev/null | head -n 1)" ]; then
+            echo "::error::No package job built a package, so no nightly release is made."
+            exit 1
+          fi
 
       - name: Create Nightly Build Release
         uses: softprops/action-gh-release@v3
@@ -117,15 +162,26 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # The API documentation comes from the Linux job.
+      - name: Download the API documentation
+        if: needs.linux_package.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          name: site-nightly
+          path: ${{ github.workspace }}/_site
+
       - name: Setup Pages
+        if: needs.linux_package.result == 'success'
         uses: actions/configure-pages@v6
 
       - name: Upload artifact
+        if: needs.linux_package.result == 'success'
         uses: actions/upload-pages-artifact@v5
         with:
           path: ${{ github.workspace }}/_site
 
       - name: Deploy to GitHub Pages
+        if: needs.linux_package.result == 'success'
         id: deployment
         uses: actions/deploy-pages@v5
 
@@ -140,18 +196,80 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Get ISO date
-        run: echo "date_iso=$(date +%F)" >> $GITHUB_ENV
-
       - name: Build the macOS package
         run: ./dev preset release-macos-packages -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
 
-      # The artifact stays out of the nightly release on purpose. It is for
-      # testing the package before it becomes official.
       - name: Upload the macOS package
         uses: actions/upload-artifact@v7
         with:
-          name: "macos-nightly-${{ env.date_iso }}"
+          name: macos-nightly
           path: |
             build/release/packages/*.dmg
             build/release/packages/*.zip
+          if-no-files-found: error
+
+  windows_package:
+    needs: [check_date, check_tests]
+    if: ${{ needs.check_date.outputs.should_run != 'false' }}
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: read
+    defaults:
+      run:
+        shell: bash
+    env:
+      # windows-latest runners are 4-core
+      TAU_BUILD_JOBS: 4
+      TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v6
+
+      - name: Setup MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      # The windows-latest image has no NSIS, and CPack needs makensis.
+      - name: Install NSIS
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          Add-Content $env:GITHUB_PATH "${env:ProgramFiles(x86)}\NSIS"
+
+      - name: Restore the dependency store (~/.tau/store)
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.tau/store
+          key: parser-store-windows-latest-${{ github.sha }}
+          restore-keys: |
+            parser-store-windows-latest-
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Build the NSIS installer
+        run: |
+          ./dev preset release-msvc-packages -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DTAU_PARSER_DEPS_FROM_STORE=ON
+
+      - name: Build the zip package
+        run: |
+          ./dev preset release-msvc-packages-zip -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DTAU_PARSER_DEPS_FROM_STORE=ON
+
+      - name: Upload the Windows packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-nightly
+          path: |
+            build/release-msvc/packages/*.exe
+            build/release-msvc/packages/*.zip
+          if-no-files-found: error
