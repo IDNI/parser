@@ -619,14 +619,63 @@ jobs:
           path: ~/.tau/store
           key: ${{ steps.cache-store.outputs.cache-primary-key }}
 
-  # The darwin-arm64 resolver and test job.
-  macos:
-    name: macOS arm64 · tests
+  # The darwin-arm64 environment: resolves and publishes the store and saves
+  # it for the tests job below. The key names the arch, so the two macOS
+  # platforms never share an entry.
+  macos-arm64-store:
+    name: macOS arm64 · environment
     needs: guard
     runs-on: macos-15
     permissions:
       contents: read
       packages: write
+    env:
+      # macos-15 runners are 3-core arm64
+      TAU_BUILD_JOBS: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.tau/store
+          key: parser-store-macos-arm64-${{ github.sha }}
+          restore-keys: |
+            parser-store-macos-arm64-
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Resolve the store packages
+        run: |
+          ./dev preset release-all --configure-only \
+            -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DTAU_PARSER_DEPS_FROM_STORE=ON
+
+      - name: Publish the store packages
+        if: needs.guard.outputs.allowed == 'true'
+        run: ./dev store-publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.tau/store
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}
+
+  # The store comes from the cache that the environment job saved in this
+  # run, so a run without publish rights builds no store package either.
+  macos-arm64:
+    name: macOS arm64 · tests
+    needs: macos-arm64-store
+    runs-on: macos-15
     env:
       # macos-15 runners are 3-core arm64
       TAU_BUILD_JOBS: 3
@@ -650,14 +699,45 @@ jobs:
             -r tests/requirements.txt
           echo "$RUNNER_TEMP/tau-python/bin" >> "$GITHUB_PATH"
 
+      # An exact hit holds every package, so configure never reads the remote.
+      - name: Restore the dependency store (~/.tau/store)
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.tau/store
+          key: parser-store-macos-arm64-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      # `run` on an -all preset makes ./dev call ctest itself.
+      - name: Build and test
+        run: |
+          ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DTAU_PARSER_DEPS_FROM_STORE=ON
+
+  # The darwin-x86_64 environment: resolves and publishes the store and saves
+  # it for the tests job below. The key names the arch, so the two macOS
+  # platforms never share an entry.
+  macos-x86_64-store:
+    name: macOS x86_64 · environment
+    needs: guard
+    runs-on: macos-15-intel
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # macos-15-intel runners are 4-core x86_64
+      TAU_BUILD_JOBS: 4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
       - name: Restore the dependency store (~/.tau/store)
         id: cache-store
         uses: actions/cache/restore@v6
         with:
           path: ~/.tau/store
-          key: parser-store-macos-15-${{ github.sha }}
+          key: parser-store-macos-x86_64-${{ github.sha }}
           restore-keys: |
-            parser-store-macos-15-
+            parser-store-macos-x86_64-
 
       - name: Install oras for the dependency store
         run: ./dev dep-oras
@@ -677,15 +757,52 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # `run` on an -all preset makes ./dev call ctest itself.
-      - name: Build and test
-        run: |
-          ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
-            -DTAU_PARSER_DEPS_FROM_STORE=ON
-
       - name: Save the dependency store (~/.tau/store)
         if: always()
         uses: actions/cache/save@v6
         with:
           path: ~/.tau/store
           key: ${{ steps.cache-store.outputs.cache-primary-key }}
+
+  # The store comes from the cache that the environment job saved in this
+  # run, so a run without publish rights builds no store package either.
+  macos-x86_64:
+    name: macOS x86_64 · tests
+    needs: macos-x86_64-store
+    runs-on: macos-15-intel
+    env:
+      # macos-15-intel runners are 4-core x86_64
+      TAU_BUILD_JOBS: 4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # The schema and REPL tests need new jsonschema, pexpect and pyte. uv
+      # builds the venv, and its bin lands ahead of Homebrew in PATH where
+      # configure finds the python3 probe.
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          # the same uv as the Docker base image
+          version: "0.12.13"
+
+      - name: Install the Python test modules
+        run: |
+          uv venv --python 3.12 "$RUNNER_TEMP/tau-python"
+          uv pip install --python "$RUNNER_TEMP/tau-python/bin/python" \
+            -r tests/requirements.txt
+          echo "$RUNNER_TEMP/tau-python/bin" >> "$GITHUB_PATH"
+
+      # An exact hit holds every package, so configure never reads the remote.
+      - name: Restore the dependency store (~/.tau/store)
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.tau/store
+          key: parser-store-macos-x86_64-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      # `run` on an -all preset makes ./dev call ctest itself.
+      - name: Build and test
+        run: |
+          ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DTAU_PARSER_DEPS_FROM_STORE=ON
