@@ -909,6 +909,19 @@ _tau_dep_ensure_run() {
 		_tau_dep_ensure_cleanup
 		return 1
 	fi
+	# Push at once, so a later failure of the same job cannot hold back an entry
+	# it built. A hit or a pull is on the remote already.
+	if [ "${TAU_STORE_PUBLISH:-}" = "ON" ] && [ -n "${TAU_STORE_REMOTE:-}" ]; then
+		if ! "${__devrc_dir}/store-remote.sh" push "$_tau_dep_ensure_prefix" \
+				"${_tau_dep_ensure_dep}/${_tau_dep_ensure_id}" \
+				>> "$_tau_dep_ensure_log" 2>&1; then
+			_tau_dep_ensure_log_tail "$_tau_dep_ensure_log"
+			echo "dep_ensure: cannot push ${_tau_dep_ensure_dep} ${_tau_dep_ensure_id} to ${TAU_STORE_REMOTE}; log: ${_tau_dep_ensure_log}" >&2
+			_tau_dep_ensure_cleanup
+			return 1
+		fi
+		printf '%s: pushed\n' "$_tau_dep_ensure_tag" >&2
+	fi
 	_tau_dep_ensure_finish "$_tau_dep_ensure_published" "built from source"
 	return 0
 }
