@@ -495,7 +495,7 @@ char_class_fns<T> predefined_char_classes(
 template <typename C, typename T>
 grammar<C, T>::grammar(nonterminals<C, T>& nts,
 	typename grammar<C, T>::options opt)
-	: opt(opt), nts(nts), start(nts.get("start")) { }
+	: opt(opt), nts(nts), start(nts.get("start"), &nts) { }
 template <typename C, typename T>
 grammar<C, T>::grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
 	const prods<C, T>& start, const char_class_fns<T>& cc_fns,

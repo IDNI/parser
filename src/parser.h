@@ -4,6 +4,7 @@
 #ifndef __IDNI__PARSER__PARSER_H__
 #define __IDNI__PARSER__PARSER_H__
 #include <array>
+#include <concepts>
 #include <variant>
 #include <iostream>
 #include <istream>
@@ -84,6 +85,10 @@ struct lit {
 	lit();
 	/// Creates a terminal literal where \p t is a template type of the terminal.
 	lit(T t);
+	/// A wider integer is a nonterminal id, which needs the nonterminals.
+	template <std::integral U>
+		requires (sizeof(U) > sizeof(T))
+	lit(U) = delete;
 	/// Creates a non-terminal literal.
 	lit(size_t n, const nonterminals<C, T>* nts);
 	/**

@@ -389,6 +389,13 @@ TEST_SUITE("parser: basic") {
 		expect_parses(g, "x1", nts.get("chars"));
 		expect_parses(g, "pi", nts.get("chars"));
 	}
+
+	TEST_CASE("grammar from nonterminals starts at a nonterminal") {
+		nonterminals<char, char32_t> nts;
+		grammar<char, char32_t> g(nts);
+		CHECK(g.start_literal().nt());
+		CHECK(g.start_literal().n() == nts.get("start"));
+	}
 }
 
 // ---------------------------------------------------------------------------
