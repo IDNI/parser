@@ -2681,6 +2681,7 @@ static int serve_command(cli& cl, const cli::command& cmd,
 #endif
 }
 
+#ifdef TAU_PARSER_BUILD_SERVE
 // Parse "<host>:<port>". IPv6 is out of scope: the server binds an IPv4
 // loopback address only.
 static bool connect_parse_host_port(const string& s, string& host,
@@ -2700,6 +2701,7 @@ static bool connect_parse_host_port(const string& s, string& host,
 	port = static_cast<uint16_t>(p);
 	return true;
 }
+#endif
 
 static int connect_command(cli& cl, const cli::command& cmd) {
 #ifndef TAU_PARSER_BUILD_SERVE
