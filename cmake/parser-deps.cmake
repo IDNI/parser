@@ -52,11 +52,14 @@ endfunction()
 # passes the release flags, so all build types share one package.
 function(_parser_deps_producer_command out script)
 	_parser_deps_target(_target)
+	# Stripped, so an empty CMAKE_<LANG>_FLAGS adds no space to the store id.
+	string(STRIP "${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_RELEASE}" _cflags)
+	string(STRIP "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_RELEASE}" _cxxflags)
 	set(_toolchain
 		"-DTAU_DEP_CC=${CMAKE_C_COMPILER}"
 		"-DTAU_DEP_CXX=${CMAKE_CXX_COMPILER}"
-		"-DTAU_DEP_CFLAGS=${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_RELEASE}"
-		"-DTAU_DEP_CXXFLAGS=${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_RELEASE}"
+		"-DTAU_DEP_CFLAGS=${_cflags}"
+		"-DTAU_DEP_CXXFLAGS=${_cxxflags}"
 		"-DTAU_DEP_TARGET=${_target}")
 	if(CMAKE_TOOLCHAIN_FILE)
 		list(APPEND _toolchain "-DTAU_DEP_TOOLCHAIN=${CMAKE_TOOLCHAIN_FILE}")
