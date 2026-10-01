@@ -73,10 +73,6 @@ function(target_setup target access compile_definitions compile_options link_opt
 		target_compile_options(${target} PRIVATE "${compile_options}")
 	endif()
 	target_compile_definitions_if(${target} ${access} "${compile_definitions}")
-	if(DEFINED TAU_USE_PORTABLE_HASH)
-		target_compile_definitions(${target} ${access}
-			TAU_USE_PORTABLE_HASH=$<BOOL:${TAU_USE_PORTABLE_HASH}>)
-	endif()
 	if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
 		CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 			target_link_libraries(${target} ${access}

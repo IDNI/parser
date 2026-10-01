@@ -15,15 +15,12 @@
 using idni::portable_hash;
 using idni::portable_string_hash;
 
-#if TAU_USE_PORTABLE_HASH
 // The values of the 64-bit libstdc++ std::hash<std::string>.
 static_assert(portable_string_hash("") == 0x553e93901e462a6eull);
 static_assert(portable_string_hash("a") == 0x454ddee488c1ed6bull);
-#endif
 
 TEST_SUITE("portable string hash") {
 
-#if TAU_USE_PORTABLE_HASH
 	TEST_CASE("pinned values") {
 		CHECK(portable_string_hash("") == 0x553e93901e462a6eull);
 		CHECK(portable_string_hash("a") == 0x454ddee488c1ed6bull);
@@ -34,15 +31,12 @@ TEST_SUITE("portable string hash") {
 			"The quick brown fox jumps over the lazy dog")
 			== 0xdccbf2541704bc75ull);
 	}
-#endif
 
 	TEST_CASE("portable_hash of a string uses the portable string hash") {
 		const std::string s = "bv[2]";
 		CHECK(portable_hash(s) == portable_string_hash(s));
 		CHECK(portable_hash(std::string_view{s}) == portable_string_hash(s));
-#if TAU_USE_PORTABLE_HASH
 		CHECK(portable_hash(s) == 0x87dec06375483aa2ull);
-#endif
 	}
 
 	TEST_CASE("an integral or enum leaf hashes to its own value") {

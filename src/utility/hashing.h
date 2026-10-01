@@ -36,14 +36,9 @@ template<typename> inline constexpr bool is_hashable_tuple = false;
 template<typename... Ts>
 inline constexpr bool is_hashable_tuple<std::tuple<Ts...>> = true;
 
-#ifndef TAU_USE_PORTABLE_HASH
-#define TAU_USE_PORTABLE_HASH 1
-#endif
-
-#if TAU_USE_PORTABLE_HASH
 // MurmurHash64A by Austin Appleby (public domain, SMHasher MurmurHash2.cpp),
 // little-endian, seed 0xc70f6907: the Linux std::hash values, so the tree
-// order is the same on every platform. TAU_USE_PORTABLE_HASH=0 uses std::hash.
+// order is the same on every platform.
 constexpr std::uint64_t portable_string_hash(std::string_view s) {
 	constexpr std::uint64_t m = 0xc6a4a7935bd1e995ull;
 	constexpr int r = 47;
@@ -72,11 +67,6 @@ constexpr std::uint64_t portable_string_hash(std::string_view s) {
 	h ^= h >> r;
 	return h;
 }
-#else
-inline std::uint64_t portable_string_hash(std::string_view s) {
-	return std::hash<std::string_view>{}(s);
-}
-#endif
 
 template <typename T> constexpr std::uint64_t portable_hash(const T& v);
 
