@@ -4,7 +4,15 @@
 
 set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
 set(CPACK_PACKAGE_VERSION "${TAU_PARSER_VERSION}")
-set(CPACK_PACKAGE_FILE_NAME "lib${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}")
+# The system and the arch are in the file name, so the packages of every
+# platform fit in one release.
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|ARM64)$")
+	set(_tauparser_package_arch "arm64")
+else()
+	set(_tauparser_package_arch "x86_64")
+endif()
+set(CPACK_PACKAGE_FILE_NAME
+	"lib${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME}-${_tauparser_package_arch}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
 set(CPACK_PACKAGE_VENDOR "IDNI")
 set(CPACK_PACKAGE_CONTACT "contact@idni.org")

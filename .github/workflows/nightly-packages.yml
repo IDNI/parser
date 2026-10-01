@@ -65,7 +65,8 @@ jobs:
             exit 1
           fi
 
-  linux_package:
+  linux_x86_64_package:
+    name: Linux x86_64 · package
     needs: [check_date, check_tests]
     if: ${{ needs.check_date.outputs.should_run != 'false' }}
     runs-on: ubuntu-24.04
@@ -90,7 +91,7 @@ jobs:
       - name: Upload the Linux packages
         uses: actions/upload-artifact@v7
         with:
-          name: linux-nightly
+          name: linux-x86_64-nightly
           path: |
             ${{ github.workspace }}/packages/*.deb
             ${{ github.workspace }}/packages/*.rpm
@@ -103,10 +104,46 @@ jobs:
           path: ${{ github.workspace }}/_site
           if-no-files-found: error
 
+  # The same image on an arm runner. The API documentation comes from the
+  # x86_64 job only.
+  linux_arm64_package:
+    name: Linux arm64 · package
+    needs: [check_date, check_tests]
+    if: ${{ needs.check_date.outputs.should_run != 'false' }}
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build image with nightly packages
+        run: >
+          ./dev docker nightly
+          --build-arg TESTS=no
+          --build-arg W64_PACKAGES=no
+          --build-arg BUILD_JOBS=4
+
+      - name: Copy nightly packages from container
+        run: |
+          CID=$(docker create parser:nightly)
+          docker cp $CID:/parser/build/release/packages ${{ github.workspace }}/
+          docker rm $CID
+
+      - name: Upload the Linux packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-arm64-nightly
+          path: |
+            ${{ github.workspace }}/packages/*.deb
+            ${{ github.workspace }}/packages/*.rpm
+          if-no-files-found: error
+
   # A nightly publishes every package job that passed. A failed job does not
   # stop the others, and the run fails only when no job built a package.
   publish:
-    needs: [check_date, check_tests, linux_package, macos_package, windows_package]
+    name: Publish
+    needs: [check_date, check_tests, linux_x86_64_package, linux_arm64_package,
+      macos_arm64_package, macos_x86_64_package, windows_msvc_package,
+      wasm_npm_package]
     if: ${{ always() && needs.check_date.result == 'success' && needs.check_date.outputs.should_run != 'false' && needs.check_tests.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -122,25 +159,46 @@ jobs:
       - name: Get ISO date
         run: echo "date_iso=$(date --iso)" >> $GITHUB_ENV
 
-      - name: Download the Linux packages
-        if: needs.linux_package.result == 'success'
+      - name: Download the Linux x86_64 packages
+        if: needs.linux_x86_64_package.result == 'success'
         uses: actions/download-artifact@v8
         with:
-          name: linux-nightly
+          name: linux-x86_64-nightly
           path: ${{ github.workspace }}/packages
 
-      - name: Download the macOS package
-        if: needs.macos_package.result == 'success'
+      - name: Download the Linux arm64 packages
+        if: needs.linux_arm64_package.result == 'success'
         uses: actions/download-artifact@v8
         with:
-          name: macos-nightly
+          name: linux-arm64-nightly
           path: ${{ github.workspace }}/packages
 
-      - name: Download the Windows packages
-        if: needs.windows_package.result == 'success'
+      - name: Download the macOS arm64 package
+        if: needs.macos_arm64_package.result == 'success'
         uses: actions/download-artifact@v8
         with:
-          name: windows-nightly
+          name: macos-arm64-nightly
+          path: ${{ github.workspace }}/packages
+
+      - name: Download the macOS x86_64 package
+        if: needs.macos_x86_64_package.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          name: macos-x86_64-nightly
+          path: ${{ github.workspace }}/packages
+
+      - name: Download the Windows MSVC packages
+        if: needs.windows_msvc_package.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          name: windows-msvc-nightly
+          path: ${{ github.workspace }}/packages
+
+      - name: Download the WebAssembly npm package
+        if: needs.wasm_npm_package.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          name: wasm-npm-nightly
           path: ${{ github.workspace }}/packages
 
       - name: Require at least one package
@@ -164,28 +222,29 @@ jobs:
 
       # The API documentation comes from the Linux job.
       - name: Download the API documentation
-        if: needs.linux_package.result == 'success'
+        if: needs.linux_x86_64_package.result == 'success'
         uses: actions/download-artifact@v8
         with:
           name: site-nightly
           path: ${{ github.workspace }}/_site
 
       - name: Setup Pages
-        if: needs.linux_package.result == 'success'
+        if: needs.linux_x86_64_package.result == 'success'
         uses: actions/configure-pages@v6
 
       - name: Upload artifact
-        if: needs.linux_package.result == 'success'
+        if: needs.linux_x86_64_package.result == 'success'
         uses: actions/upload-pages-artifact@v5
         with:
           path: ${{ github.workspace }}/_site
 
       - name: Deploy to GitHub Pages
-        if: needs.linux_package.result == 'success'
+        if: needs.linux_x86_64_package.result == 'success'
         id: deployment
         uses: actions/deploy-pages@v5
 
-  macos_package:
+  macos_arm64_package:
+    name: macOS arm64 · package
     needs: [check_date, check_tests]
     if: ${{ needs.check_date.outputs.should_run != 'false' }}
     runs-on: macos-15
@@ -202,13 +261,38 @@ jobs:
       - name: Upload the macOS package
         uses: actions/upload-artifact@v7
         with:
-          name: macos-nightly
+          name: macos-arm64-nightly
           path: |
             build/release/packages/*.dmg
             build/release/packages/*.zip
           if-no-files-found: error
 
-  windows_package:
+  macos_x86_64_package:
+    name: macOS x86_64 · package
+    needs: [check_date, check_tests]
+    if: ${{ needs.check_date.outputs.should_run != 'false' }}
+    runs-on: macos-15-intel
+    timeout-minutes: 240
+    env:
+      # macos-15-intel runners are 4-core x86_64
+      TAU_BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build the macOS package
+        run: ./dev preset release-macos-packages -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+
+      - name: Upload the macOS package
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-x86_64-nightly
+          path: |
+            build/release/packages/*.dmg
+            build/release/packages/*.zip
+          if-no-files-found: error
+
+  windows_msvc_package:
+    name: Windows MSVC · package
     needs: [check_date, check_tests]
     if: ${{ needs.check_date.outputs.should_run != 'false' }}
     runs-on: windows-latest
@@ -268,8 +352,52 @@ jobs:
       - name: Upload the Windows packages
         uses: actions/upload-artifact@v7
         with:
-          name: windows-nightly
+          name: windows-msvc-nightly
           path: |
             build/release-msvc/packages/*.exe
             build/release-msvc/packages/*.zip
+          if-no-files-found: error
+
+  # The wasm-npm Docker stage builds release-wasm and runs npm pack. Nothing
+  # publishes the .tgz to a registry.
+  wasm_npm_package:
+    name: WebAssembly · npm
+    needs: [check_date, check_tests]
+    if: ${{ needs.check_date.outputs.should_run != 'false' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 140
+    permissions:
+      contents: read
+      packages: read
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+      TAU_STORE_REMOTE: ghcr.io/${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      # type=gha needs ACTIONS_RUNTIME_TOKEN/ACTIONS_CACHE_URL, which GitHub
+      # does not expose to run: steps
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      # NIGHTLY=yes stamps the date into VERSION, as the Docker nightly does.
+      - name: Build the npm package
+        run: |
+          ./dev docker wasm-npm \
+            --build-arg NIGHTLY=yes \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=parser-wasm-deps
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PARSER_NPM_DIR: npm
+
+      - name: Upload the npm package
+        uses: actions/upload-artifact@v7
+        with:
+          name: wasm-npm-nightly
+          path: npm/*.tgz
           if-no-files-found: error
