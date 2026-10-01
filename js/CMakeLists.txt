@@ -49,49 +49,66 @@ string(APPEND JSLIB_LINK_OPTIONS " -s ASSERTIONS=1")
 
 include(target_setup)
 
-# tauparser.js library
-add_executable(tauparser)
-target_setup(tauparser PRIVATE
-        "${TAU_PARSER_DEFINITIONS}"
-        "${JSLIB_COMPILE_OPTIONS}"
-        ""
-        "")
-
 message(STATUS "JSLIB_LINK_OPTIONS: ${JSLIB_LINK_OPTIONS}")
-target_sources(tauparser PRIVATE ${JSLIB_SOURCES})
-target_include_directories(tauparser PRIVATE
-	${CMAKE_CURRENT_SOURCE_DIR}/../src
-	${CMAKE_CURRENT_SOURCE_DIR}/../src/tgf)
-target_link_libraries(tauparser PRIVATE embind)
-# unordered_dense is set up by the top-level CMakeLists (unconditional)
-if(TARGET unordered_dense)
-	target_link_libraries(tauparser PRIVATE unordered_dense)
-else()
-	target_include_directories(tauparser PRIVATE
-		${CMAKE_CURRENT_SOURCE_DIR}/../external)
-endif()
-set_target_properties(tauparser PROPERTIES LINK_FLAGS ${JSLIB_LINK_OPTIONS})
-target_compile_definitions(tauparser PRIVATE
-        "-DNODEFSMOUNT")
-# header-only mode makes tgf_test.h resolve productions() inline instead
-# of needing the out-of-line definition linked in
-if(TAU_PARSER_BUILD_HEADER_ONLY)
-	target_compile_definitions(tauparser PRIVATE TAU_PARSER_BUILD_HEADER_ONLY)
-endif()
 
-# tauparser.node.js does require('./tauparser.js'), so the harnesses go in the
-# target's own output directory rather than this list file's binary dir
+# EXPORT_ES6 and CommonJS exclude each other in one link, so each module
+# format is its own target. Emscripten names the .wasm after the JS output,
+# so the ES module build writes tauparser.esm.wasm.
+function(tauparser_js_add_target target output_name suffix extra_link_options wrapper)
+	add_executable(${target})
+	target_setup(${target} PRIVATE
+		"${TAU_PARSER_DEFINITIONS}"
+		"${JSLIB_COMPILE_OPTIONS}"
+		""
+		"")
+	set_target_properties(${target} PROPERTIES
+		OUTPUT_NAME "${output_name}"
+		SUFFIX "${suffix}"
+		LINK_FLAGS "${JSLIB_LINK_OPTIONS} ${extra_link_options}")
+	target_sources(${target} PRIVATE ${JSLIB_SOURCES})
+	target_include_directories(${target} PRIVATE
+		${CMAKE_CURRENT_SOURCE_DIR}/../src
+		${CMAKE_CURRENT_SOURCE_DIR}/../src/tgf)
+	target_link_libraries(${target} PRIVATE embind)
+	# unordered_dense is set up by the top-level CMakeLists (unconditional)
+	if(TARGET unordered_dense)
+		target_link_libraries(${target} PRIVATE unordered_dense)
+	else()
+		target_include_directories(${target} PRIVATE
+			${CMAKE_CURRENT_SOURCE_DIR}/../external)
+	endif()
+	target_compile_definitions(${target} PRIVATE
+		"-DNODEFSMOUNT")
+	# header-only mode makes tgf_test.h resolve productions() inline instead
+	# of needing the out-of-line definition linked in
+	if(TAU_PARSER_BUILD_HEADER_ONLY)
+		target_compile_definitions(${target} PRIVATE TAU_PARSER_BUILD_HEADER_ONLY)
+	endif()
+	# The smoke script loads the module by a relative path, so it goes in the
+	# output directory of the module. It has a copy step of its own, so an
+	# edit of the script reaches the build folder without a relink.
+	add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/${wrapper}"
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different
+			"${CMAKE_CURRENT_SOURCE_DIR}/${wrapper}" "${CMAKE_BINARY_DIR}/${wrapper}"
+		DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${wrapper}")
+	add_custom_target(${target}_smoke ALL DEPENDS "${CMAKE_BINARY_DIR}/${wrapper}")
+endfunction()
+
+tauparser_js_add_target(tauparser     tauparser     .js  ""                tauparser.node.js)
+tauparser_js_add_target(tauparser_esm tauparser.esm .mjs "-s EXPORT_ES6=1" tauparser.node.mjs)
+
 add_custom_command(TARGET tauparser POST_BUILD
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
 		${CMAKE_CURRENT_SOURCE_DIR}/tauparser.html
-		${CMAKE_CURRENT_SOURCE_DIR}/tauparser.node.js
 		$<TARGET_FILE_DIR:tauparser>)
 
-# tgf_node.js - TGF REPL for Node.js (legacy repl.h, no FTXUI, no pthreads).
-# Used for fast CI parity testing.  Command sequences are piped via stdin;
-# stdout is captured and diffed against native tgf output.
+# tgf.js - the TGF program for Node.js (legacy repl.h, no FTXUI, no pthreads).
+# `node tgf.js` and the npm bin run main() through tgf.post.js. require() gets
+# the factory, which the parity tests use.
 set(TGF_NODE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/tgf/tgf_cli.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/tgf/tgf_json_api.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/tgf/main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/format/tgf/tgf_parser.generated.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/format/json/json_parser.generated.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/format/treemr/treemr_parser.generated.cpp
@@ -102,18 +119,9 @@ set(TGF_NODE_SOURCES
 if(NOT TAU_PARSER_BUILD_HEADER_ONLY)
     list(APPEND TGF_NODE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../src/format/tgf.test/tgf_test_parser.generated.cpp)
 endif()
-set(TGF_NODE_LINK_OPTIONS
-    -lnodefs.js
-    -s MODULARIZE=1
-    -s EXPORT_NAME='TGF'
-    -s INVOKE_RUN=0
-    -s WASM=1
-    -s ALLOW_MEMORY_GROWTH=1
-    -s EXIT_RUNTIME=1
-    --preload-file ${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/tau.tgf@/tau.tgf
-)
 
 add_executable(tgf_node ${TGF_NODE_SOURCES})
+set_target_properties(tgf_node PROPERTIES OUTPUT_NAME tgf)
 target_setup(tgf_node PRIVATE "${TAU_PARSER_DEFINITIONS}" "" "" "")
 target_include_directories(tgf_node PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../src
@@ -138,15 +146,36 @@ endif()
 # Suppress C++23 extension warnings from parser headers (static lambdas)
 target_compile_options(tgf_node PRIVATE -Wno-c++23-extensions -fsigned-char)
 target_link_libraries(tgf_node PRIVATE embind)
+# INVOKE_RUN=0: a program run mounts the host file system before main().
+# tgf.pre.js puts the #! line first, which the npm bin needs.
 target_link_options(tgf_node PRIVATE
     "SHELL:--bind"
-    "SHELL:--no-entry"
     "SHELL:-lnodefs.js"
     "SHELL:-s MODULARIZE=1"
     "SHELL:-s EXPORT_NAME='TGF'"
+    "SHELL:-s INVOKE_RUN=0"
     "SHELL:-s WASM=1"
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"
     "SHELL:-s EXIT_RUNTIME=1"
-    "SHELL:-s EXPORTED_RUNTIME_METHODS=['FS','NODEFS']"
-    "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/tau.tgf@/tau.tgf"
+    "SHELL:-s EXPORTED_RUNTIME_METHODS=['FS','NODEFS','callMain']"
+    "SHELL:--extern-pre-js ${CMAKE_CURRENT_SOURCE_DIR}/tgf.pre.js"
+    "SHELL:--extern-post-js ${CMAKE_CURRENT_SOURCE_DIR}/tgf.post.js"
 )
+set_property(TARGET tgf_node APPEND PROPERTY LINK_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/tgf.pre.js
+    ${CMAKE_CURRENT_SOURCE_DIR}/tgf.post.js)
+
+# The build directory is the npm package: package.json lands beside
+# tauparser.js, tauparser.esm.mjs and tgf.js, with the license that its
+# "files" list names.
+if(EMSCRIPTEN)
+	configure_file(
+		${CMAKE_CURRENT_SOURCE_DIR}/package.json.in
+		${CMAKE_BINARY_DIR}/package.json
+		@ONLY)
+	add_custom_target(tauparser_js_package_assets ALL
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different
+			${CMAKE_CURRENT_SOURCE_DIR}/../LICENSE.md
+			${CMAKE_BINARY_DIR}/LICENSE.md
+		COMMENT "Copying the npm package license")
+endif()

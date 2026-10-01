@@ -272,12 +272,12 @@ if(TARGET tgf AND TAU_PARSER_HAS_FTXUI_DEP AND NOT WIN32)
 			"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/ambig.tgf")
 endif()
 
-# WASM parity test - compare native tgf output against tgf_node (Node.js)
+# WASM parity test - compare native tgf output against tgf.js (Node.js)
 # for a grammar file and REPL commands. Requires the tgf tool, Node.js and
-# a built tgf_node.js (the Emscripten node target).
+# a built tgf.js (the Emscripten node target).
 if(TARGET tgf AND NOT WIN32)
 	find_program(NODE_EXECUTABLE node)
-	if(NODE_EXECUTABLE AND EXISTS "${PROJECT_SOURCE_DIR}/build/release-wasm/tgf_node.js")
+	if(NODE_EXECUTABLE AND EXISTS "${PROJECT_SOURCE_DIR}/build/release-wasm/tgf.js")
 		add_test(NAME tgf_wasm_parity
 			COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/parity/tgf_wasm_parity.sh"
 				$<TARGET_FILE:tgf>
@@ -288,6 +288,13 @@ if(TARGET tgf AND NOT WIN32)
 				"${CMAKE_CURRENT_SOURCE_DIR}/parity/tgf_wasm_reload.js"
 				"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tiny.tgf"
 				"${PROJECT_SOURCE_DIR}/src/format/json/json.tgf")
+		# The real tgf.js program (not require()), run from host paths
+		# under /tmp; the grammar mount and the cwd both cover /tmp.
+		add_test(NAME tgf_wasm_cli_paths
+			COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/parity/tgf_wasm_cli_paths.sh"
+				"${NODE_EXECUTABLE}"
+				"${PROJECT_SOURCE_DIR}/build/release-wasm/tgf.js"
+				"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tiny.tgf")
 	endif()
 endif()
 

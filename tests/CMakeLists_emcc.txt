@@ -1,7 +1,7 @@
 # Emscripten ctest - WASM-only tests that run via Node.js.
 #
 # These tests run after the same configure builds the WASM artifacts
-# (tgf_node.js, tgf_standalone.js), so they check for the runner and for
+# (tgf.js, tgf_standalone.js), so they check for the runner and for
 # dependencies installed before configure (puppeteer), not for the artifacts
 # that the build itself produces.
 
@@ -22,7 +22,7 @@ else()
 	set(WASM_BROWSER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/release-wasm/js/tgf")
 endif()
 
-# tgf_wasm_parity_emcc - run tgf_node.js against preloaded tau.tgf
+# tgf_wasm_parity_emcc - run tgf.js against tau.tgf, read from disk
 add_test(NAME tgf_wasm_parity_emcc
 	COMMAND ${NODE_EXECUTABLE}
 		"${CMAKE_CURRENT_SOURCE_DIR}/tests/parity/tgf_wasm_parity.js"
@@ -31,13 +31,23 @@ add_test(NAME tgf_wasm_parity_emcc
 set_property(TEST tgf_wasm_parity_emcc
 	PROPERTY WORKING_DIRECTORY "${WASM_NODE_DIR}")
 
-# tgf_wasm_reload_emcc - exercise tgf_repl.reload(file) in tgf_node.js
+# tgf_wasm_reload_emcc - exercise tgf_repl.reload(file) in tgf.js
 add_test(NAME tgf_wasm_reload_emcc
 	COMMAND ${NODE_EXECUTABLE}
 		"${CMAKE_CURRENT_SOURCE_DIR}/tests/parity/tgf_wasm_reload.js"
 		"${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/tiny.tgf"
 		"${CMAKE_CURRENT_SOURCE_DIR}/src/format/json/json.tgf")
 set_property(TEST tgf_wasm_reload_emcc
+	PROPERTY WORKING_DIRECTORY "${WASM_NODE_DIR}")
+
+# tgf_wasm_cli_paths_emcc - run the real tgf.js program (not require()) from
+# host paths under /tmp; pins the host /tmp mount and the /tmp cwd.
+add_test(NAME tgf_wasm_cli_paths_emcc
+	COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/tests/parity/tgf_wasm_cli_paths.sh"
+		"${NODE_EXECUTABLE}"
+		"${WASM_NODE_DIR}/tgf.js"
+		"${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/tiny.tgf")
+set_property(TEST tgf_wasm_cli_paths_emcc
 	PROPERTY WORKING_DIRECTORY "${WASM_NODE_DIR}")
 
 # embindings_api_emcc - exercise the tauparser embind class API directly

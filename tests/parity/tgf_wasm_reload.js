@@ -28,7 +28,7 @@ async function main() {
 
 	const buildDir = path.resolve(__dirname, '..', '..', 'build', 'release-wasm');
 	process.chdir(buildDir);
-	const createTGF = require(path.join(buildDir, 'tgf_node.js'));
+	const createTGF = require(path.join(buildDir, 'tgf.js'));
 	const TGF = await createTGF();
 
 	TGF.FS.mkdir('/host');

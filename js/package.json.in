@@ -1,0 +1,43 @@
+{
+	"name": "@idni/tauparser",
+	"version": "@TAU_PARSER_VERSION@",
+	"description": "WebAssembly build of IDNI's Tau Parser Library and its TGF tool.",
+	"license": "SEE LICENSE IN LICENSE.md",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/IDNI/parser.git",
+		"directory": "js"
+	},
+	"type": "commonjs",
+	"engines": {
+		"node": ">=18"
+	},
+	"main": "./tauparser.js",
+	"module": "./tauparser.esm.mjs",
+	"exports": {
+		".": {
+			"import": "./tauparser.esm.mjs",
+			"require": "./tauparser.js",
+			"default": "./tauparser.js"
+		}
+	},
+	"bin": {
+		"tgf": "tgf.js"
+	},
+	"files": [
+		"tauparser.js",
+		"tauparser.wasm",
+		"tauparser.esm.mjs",
+		"tauparser.esm.wasm",
+		"tauparser.node.js",
+		"tauparser.node.mjs",
+		"tgf.js",
+		"tgf.wasm",
+		"LICENSE.md"
+	],
+	"scripts": {
+		"test:smoke": "node tauparser.node.js",
+		"test:smoke:esm": "node tauparser.node.mjs",
+		"test": "npm run test:smoke && npm run test:smoke:esm"
+	}
+}

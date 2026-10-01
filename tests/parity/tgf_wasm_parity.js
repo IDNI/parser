@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * tgf_wasm_parity.js - Run TGF commands through the tgf_node WASM module
+ * tgf_wasm_parity.js - Run TGF commands through the tgf.js WASM module
  * and emit captured output to stdout.
  *
  * Usage:
@@ -26,7 +26,7 @@ async function main() {
 
 	const buildDir = path.resolve(__dirname, '..', '..', 'build', 'release-wasm');
 	process.chdir(buildDir);
-	const tgfNodePath = path.join(buildDir, 'tgf_node.js');
+	const tgfNodePath = path.join(buildDir, 'tgf.js');
 	const createTGF = require(tgfNodePath);
 	const TGF = await createTGF();
 

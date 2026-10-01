@@ -456,6 +456,34 @@ RUN echo "(BUILD) -- Running the wasm node tests" && \
 
 
 # ------------------------------------------------------------
+# WebAssembly npm package: the release-wasm build and npm pack. The wasm-npm
+# stage holds only the .tgz, for an --output type=local export.
+
+FROM wasm-resolve AS wasm-npm-build
+
+# The build context carries no .git, so the stamp arrives as a build argument.
+ARG TAU_PARSER_GIT_DESCRIBED=
+ARG TAU_PARSER_GIT_BRANCH=
+ARG TAU_PARSER_GIT_COMMIT_HASH=
+ENV TAU_PARSER_GIT_DESCRIBED=${TAU_PARSER_GIT_DESCRIBED} \
+	TAU_PARSER_GIT_BRANCH=${TAU_PARSER_GIT_BRANCH} \
+	TAU_PARSER_GIT_COMMIT_HASH=${TAU_PARSER_GIT_COMMIT_HASH}
+
+ARG BUILD_JOBS=1
+
+RUN --mount=type=secret,id=gh_token \
+	echo "(BUILD) -- Building the npm package: $(head -n 1 VERSION)" && \
+	scripts/with-gh-token ./dev preset release-wasm \
+		-DTAU_BUILD_JOBS=${BUILD_JOBS} -DTAU_PARSER_DEPS_FROM_STORE=ON && \
+	mkdir -p /npm && \
+	npm pack ./build/release-wasm --pack-destination /npm
+
+FROM scratch AS wasm-npm
+
+COPY --from=wasm-npm-build /npm/ /
+
+
+# ------------------------------------------------------------
 # WebAssembly browser dependencies: Chrome for Testing, puppeteer-core
 # and the xterm.js packages.
 

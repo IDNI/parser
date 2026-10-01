@@ -1,5 +1,5 @@
 #!/bin/sh
-# tgf_wasm_parity.sh - Compare native tgf output against tgf_node WASM output
+# tgf_wasm_parity.sh - Compare native tgf output against tgf.js WASM output
 # for a grammar file and a set of REPL commands.
 #
 # Usage:
@@ -7,7 +7,7 @@
 #
 # Returns 0 if outputs match, non-zero otherwise.
 #
-# Prerequisites: tgf_node.js must be built (./dev preset release-wasm).
+# Prerequisites: tgf.js must be built (./dev preset release-wasm).
 
 set -e
 
@@ -32,10 +32,10 @@ trap cleanup EXIT
 	done
 } | "$TGF_BIN" "$GRAMMAR" repl -X 2>&1 | sed 's/\x1b\[[0-9;]*m//g' > "$NATIVE_OUT" || true
 
-# --- WASM tgf_node ----------------------------------------------------------
+# --- WASM tgf.js ------------------------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 node "$SCRIPT_DIR/tgf_wasm_parity.js" "$GRAMMAR" "$@" > "$WASM_OUT" 2>/dev/null || {
-	echo "WASM parity test: tgf_node failed" >&2
+	echo "WASM parity test: tgf.js failed" >&2
 	cat "$WASM_OUT" >&2
 	exit 1
 }

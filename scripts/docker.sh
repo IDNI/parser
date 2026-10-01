@@ -43,6 +43,7 @@ case "${CMD}" in
 		echo "  wasm-publish       - publish the wasm store packages"
 		echo "  wasm-build         - build the wasm artifacts and produce parser-wasm"
 		echo "  wasm-node          - build the wasm-node image and run the node suite"
+		echo "  wasm-npm           - pack the npm package into \$PARSER_NPM_DIR (default build/npm)"
 		echo "  wasm-browser-deps  - build the wasm-browser-deps image (Chrome, npm packages)"
 		echo "  wasm-browser       - build the wasm-browser image and run the browser suite"
 		echo "  packages           - build the release packages"
@@ -95,6 +96,10 @@ case "${CMD}" in
 		;;
 	"wasm-node")
 		build --target wasm-node -t parser:wasm-node "${@:2}"
+		;;
+	"wasm-npm")
+		build --target wasm-npm \
+			--output "type=local,dest=${PARSER_NPM_DIR:-build/npm}" "${@:2}"
 		;;
 	"wasm-browser-deps")
 		build --target wasm-browser-deps -t parser:wasm-browser-deps "${@:2}"
