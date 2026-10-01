@@ -330,6 +330,40 @@ if(UNIX)
 	if(NOT IS_SYMLINK "${_chain_pfx}/lib/liby.so")
 		tau_fail("the published symlink chain was not preserved")
 	endif()
+	# files and symlinks interleaved with different modes round-trip through
+	# publish and lookup: the batched mode read must stay aligned past the links
+	tau_input_id(_mix_id "dep=demo\nsource=mix")
+	set(_mix_stage "${_dep_dir}/${_mix_id}.staging-${_token}-mix")
+	file(MAKE_DIRECTORY "${_mix_stage}/prefix")
+	file(WRITE "${_mix_stage}/prefix/00-plain" "plain")
+	file(WRITE "${_mix_stage}/prefix/10-exec" "exec")
+	file(CHMOD "${_mix_stage}/prefix/10-exec"
+		PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
+			GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+	file(CREATE_LINK "00-plain" "${_mix_stage}/prefix/05-link" SYMBOLIC)
+	tau_output_map(_mix_map "${_mix_stage}/prefix")
+	string(JSON _mix_mode GET "${_mix_map}" "10-exec" "mode")
+	if(NOT _mix_mode STREQUAL "755")
+		tau_fail("an interleaved package recorded mode ${_mix_mode} for "
+			"10-exec")
+	endif()
+	tau_manifest_write("${_mix_stage}/manifest.json" "${_mix_id}"
+		"dep=demo\nsource=mix" "${_mix_map}")
+	tau_store_publish(_mix_pub "${_prefix}" "demo" "${_mix_id}"
+		"${_mix_stage}")
+	tau_store_lookup("${_prefix}" "demo" "${_mix_id}" _mix_found _mix_pfx)
+	if(NOT _mix_found)
+		tau_fail("an interleaved package did not publish")
+	endif()
+	if(NOT IS_SYMLINK "${_mix_pfx}/05-link")
+		tau_fail("an interleaved package lost its symlink")
+	endif()
+	# a permission change on the published file is a hard error, not a miss
+	file(CHMOD "${_mix_pfx}/10-exec"
+		PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
+	tau_expect_fatal("${_root}" "a mode change in a published entry"
+		"${CMAKE_COMMAND}" -P "${_child}" lookup "${_prefix}" "demo"
+		"${_mix_id}")
 	# a staging root that is a symlink to outside the dependency directory
 	set(_outside "${_root}/outside-target")
 	file(MAKE_DIRECTORY "${_outside}/prefix")

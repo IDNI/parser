@@ -353,6 +353,19 @@ if(UNIX)
 	tau_expect_fatal("${_root}" "a non-string field"
 		"${CMAKE_COMMAND}" -P "${_verify_child}" "${_tapath}" "${_pkg}"
 		"${_pkg_id}")
+	# fields itself replaced by a scalar, and fields removed altogether
+	file(READ "${_mpath}" _j_scalar)
+	string(JSON _j_scalar SET "${_j_scalar}" "fields" "5")
+	file(WRITE "${_tapath}" "${_j_scalar}")
+	tau_expect_fatal("${_root}" "a fields value that is not an object"
+		"${CMAKE_COMMAND}" -P "${_verify_child}" "${_tapath}" "${_pkg}"
+		"${_pkg_id}")
+	file(READ "${_mpath}" _j_fields_gone)
+	string(JSON _j_fields_gone REMOVE "${_j_fields_gone}" "fields")
+	file(WRITE "${_tapath}" "${_j_fields_gone}")
+	tau_expect_fatal("${_root}" "a manifest without fields"
+		"${CMAKE_COMMAND}" -P "${_verify_child}" "${_tapath}" "${_pkg}"
+		"${_pkg_id}")
 
 	# a hand-crafted alternate field structure must not hash the same.
 	# {"a": "b=x"} and {"a=b": "x"} reconstruct to the same text; the
@@ -418,16 +431,81 @@ if(UNIX)
 		tau_fail("an in-prefix chain was not recorded")
 	endif()
 
-	# --- scale: several thousand outputs ------------------------------------
-	# The complete-output-set comparison must stay linear. One lookup per entry
-	# made an 8487-output package take about ten minutes. A synthetic package of
-	# this many tiny files must write and verify well inside the cap below; a
-	# return to per-entry lookups fails it.
+	# The mode list must match file order even when symlinks occur between files.
+	set(_mix_pkg "${_root}/mix-pkg")
+	file(MAKE_DIRECTORY "${_mix_pkg}")
+	file(WRITE "${_mix_pkg}/00-plain" "plain")
+	file(WRITE "${_mix_pkg}/10-exec" "exec")
+	file(WRITE "${_mix_pkg}/20-private" "private")
+	file(CHMOD "${_mix_pkg}/00-plain"
+		PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
+	file(CHMOD "${_mix_pkg}/10-exec"
+		PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
+			GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+	file(CHMOD "${_mix_pkg}/20-private"
+		PERMISSIONS OWNER_READ OWNER_WRITE)
+	file(CREATE_LINK "00-plain" "${_mix_pkg}/05-link" SYMBOLIC)
+	file(CREATE_LINK "20-private" "${_mix_pkg}/15-link" SYMBOLIC)
+	file(CREATE_LINK "10-exec" "${_mix_pkg}/25-link" SYMBOLIC)
+	tau_output_map(_mix_map "${_mix_pkg}")
+	set(_mix_files "00-plain;10-exec;20-private")
+	set(_mix_modes "644;755;600")
+	foreach(_rel _want IN ZIP_LISTS _mix_files _mix_modes)
+		string(JSON _got_mode GET "${_mix_map}" "${_rel}" "mode")
+		if(NOT _got_mode STREQUAL "${_want}")
+			tau_fail("${_rel} carries mode ${_got_mode}, expected ${_want}")
+		endif()
+	endforeach()
+	foreach(_rel IN ITEMS "05-link" "15-link" "25-link")
+		string(JSON _link_kind GET "${_mix_map}" "${_rel}" "type")
+		if(NOT _link_kind STREQUAL "symlink")
+			tau_fail("${_rel} is not recorded as a symlink")
+		endif()
+	endforeach()
+	tau_input_id(_mix_id "dep=mix\nkind=interleaved")
+	set(_mix_manifest "${_root}/mix-manifest.json")
+	tau_manifest_write("${_mix_manifest}" "${_mix_id}"
+		"dep=mix\nkind=interleaved" "${_mix_map}")
+	tau_manifest_verify("${_mix_manifest}" "${_mix_pkg}" "${_mix_id}")
+
+	# a mode that moved to another path is a different artifact
+	set(_swap_map "${_mix_map}")
+	string(JSON _swap_map SET "${_swap_map}" "00-plain" "mode" "\"600\"")
+	string(JSON _swap_map SET "${_swap_map}" "20-private" "mode" "\"644\"")
+	set(_swap_manifest "${_root}/mix-swap.json")
+	tau_manifest_write("${_swap_manifest}" "${_mix_id}"
+		"dep=mix\nkind=interleaved" "${_swap_map}")
+	tau_expect_fatal("${_root}" "a mode swapped between two files"
+		"${CMAKE_COMMAND}" -P "${_verify_child}" "${_swap_manifest}"
+		"${_mix_pkg}" "${_mix_id}")
+
+	# a permission change on one file of an interleaved package is rejected
+	file(CHMOD "${_mix_pkg}/10-exec"
+		PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
+	tau_expect_fatal("${_root}" "a changed mode in an interleaved package"
+		"${CMAKE_COMMAND}" -P "${_verify_child}" "${_mix_manifest}"
+		"${_mix_pkg}" "${_mix_id}")
+
+	# Mixed symlinks and file modes expose incorrect pairing at scale.
+	# The time cap detects expensive per-entry lookups.
 	set(_scale_n 4000)
 	set(_scale_pkg "${_root}/scale-pkg")
 	file(MAKE_DIRECTORY "${_scale_pkg}")
 	foreach(_i RANGE 1 ${_scale_n})
-		file(WRITE "${_scale_pkg}/f${_i}.txt" "x")
+		math(EXPR _rem "${_i} % 3")
+		if(_rem EQUAL 0)
+			math(EXPR _linked "${_i} - 1")
+			file(CREATE_LINK "f${_linked}.txt"
+				"${_scale_pkg}/f${_i}.txt" SYMBOLIC)
+		else()
+			file(WRITE "${_scale_pkg}/f${_i}.txt" "x")
+			math(EXPR _rem "${_i} % 2")
+			if(_rem EQUAL 0)
+				file(CHMOD "${_scale_pkg}/f${_i}.txt"
+					PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
+						GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+			endif()
+		endif()
 	endforeach()
 	string(TIMESTAMP _scale_t0 "%s")
 	tau_output_map(_scale_map "${_scale_pkg}")
@@ -435,6 +513,30 @@ if(UNIX)
 	if(NOT _scale_count EQUAL ${_scale_n})
 		tau_fail("scale map has ${_scale_count} entries, expected ${_scale_n}")
 	endif()
+	# each mode follows its own file through the batch
+	foreach(_i 2 4 5 7 8)
+		string(JSON _scale_type GET "${_scale_map}" "f${_i}.txt" "type")
+		if(NOT _scale_type STREQUAL "file")
+			tau_fail("scale entry f${_i}.txt is not a file")
+		endif()
+		math(EXPR _rem "${_i} % 2")
+		if(_rem EQUAL 0)
+			set(_want_mode "755")
+		else()
+			set(_want_mode "644")
+		endif()
+		string(JSON _scale_mode GET "${_scale_map}" "f${_i}.txt" "mode")
+		if(NOT _scale_mode STREQUAL "${_want_mode}")
+			tau_fail("scale entry f${_i}.txt has mode ${_scale_mode}, "
+				"expected ${_want_mode}")
+		endif()
+	endforeach()
+	foreach(_i 3 6 9)
+		string(JSON _scale_type GET "${_scale_map}" "f${_i}.txt" "type")
+		if(NOT _scale_type STREQUAL "symlink")
+			tau_fail("scale entry f${_i}.txt is not a symlink")
+		endif()
+	endforeach()
 	set(_scale_manifest "${_root}/scale-manifest.json")
 	tau_input_id(_scale_id "dep=scale\noutputs=${_scale_n}")
 	tau_manifest_write("${_scale_manifest}" "${_scale_id}"
@@ -446,8 +548,8 @@ if(UNIX)
 		tau_fail("scale verify took ${_scale_elapsed}s for ${_scale_n} outputs "
 			"(cap 60s)")
 	endif()
-	# one changed byte at scale is still rejected
-	file(WRITE "${_scale_pkg}/f2000.txt" "y")
+	# one changed byte at scale is still rejected (f1999.txt is a plain file)
+	file(WRITE "${_scale_pkg}/f1999.txt" "y")
 	tau_expect_fatal("${_root}" "a changed byte at scale"
 		"${CMAKE_COMMAND}" -P "${_verify_child}" "${_scale_manifest}"
 		"${_scale_pkg}" "${_scale_id}")
