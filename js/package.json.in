@@ -1,5 +1,6 @@
 {
 	"name": "@idni/tauparser",
+	"private": true,
 	"version": "@TAU_PARSER_VERSION@",
 	"description": "WebAssembly build of IDNI's Tau Parser Library and its TGF tool.",
 	"license": "SEE LICENSE IN LICENSE.md",
