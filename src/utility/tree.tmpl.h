@@ -60,7 +60,7 @@ const T& tree_range<T>::iterator::operator*() const {
 template <typename T>
 typename tree_range<T>::iterator& tree_range<T>::iterator::operator++() {
 	if (current != nullptr)
-		current = bintree<T>::get(current).r;
+		current = T::get(current).r;
 	return *this;
 }
 
