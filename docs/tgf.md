@@ -14,20 +14,28 @@ Library implements a TGF parser which parses TGF from a string or from a file an
 
 ```
 static idni::diagnostics::result<grammar<C, T>>
-from_string(nonterminals<C, T>& nts_,
-	const std::basic_string<C>& s)
+from_string(const std::basic_string<C>& s)
 ```
 
 ```
 static idni::diagnostics::result<grammar<C, T>>
-from_file(nonterminals<C, T>& nts_,
-	const std::string& filename)
+from_file(const std::string& filename)
 ```
+
+Both functions create the nonterminal symbol table. The grammar owns it.
+`grammar::nts_ptr()` returns the owning handle. A saved copy of the handle
+keeps the table alive after the grammar is gone.
+
+Each function has two more overloads. The first parameter selects the table:
+
+- `nonterminals<C, T>&` uses the caller's table. The grammar does not own
+  it, and `nts_ptr()` returns a handle that owns nothing.
+- `std::shared_ptr<nonterminals<C, T>>` shares the table with the caller. A
+  null pointer makes the grammar create and own a table.
 
 Usage:
 ```
-nonterminals nts;
-grammar g = diagnostics::exit_on_fail(tgf<char>::from_string(nts,
+grammar g = diagnostics::exit_on_fail(tgf<char>::from_string(
 		"greeting => \"hi\" | \"hello\"."));
 parser p(g);
 auto r = p.parse("hi");    // r.found == true

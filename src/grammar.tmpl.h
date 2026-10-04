@@ -65,6 +65,12 @@ size_t nonterminals<C, T>::get(const std::basic_string<C>& s) {
 	return m.emplace(s, this->size()), this->push_back(s), this->size() - 1;
 }
 template <typename C, typename T>
+std::optional<size_t> nonterminals<C, T>::find(
+	const std::basic_string<C>& s) const {
+	if (auto it = m.find(s); it != m.end()) return it->second;
+	return std::nullopt;
+}
+template <typename C, typename T>
 const std::basic_string<C>& nonterminals<C, T>::get(size_t n) const {
 	assert(n < this->size());
 	return this->at(n);
@@ -493,14 +499,35 @@ char_class_fns<T> predefined_char_classes(
 }
 //-----------------------------------------------------------------------------
 template <typename C, typename T>
-grammar<C, T>::grammar(nonterminals<C, T>& nts,
-	typename grammar<C, T>::options opt)
-	: opt(opt), nts(nts), start(nts.get("start"), &nts) { }
+std::shared_ptr<nonterminals<C, T>> grammar<C, T>::table_or_new(
+	std::shared_ptr<nonterminals<C, T>> nts_)
+{
+	if (nts_) return nts_;
+	return std::make_shared<nonterminals<C, T>>();
+}
 template <typename C, typename T>
-grammar<C, T>::grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
+grammar<C, T>::grammar(nonterminals<C, T>& nts_,
+	typename grammar<C, T>::options opt)
+	: grammar(std::shared_ptr<nonterminals<C, T>>(
+		std::shared_ptr<void>(), &nts_), opt) { }
+template <typename C, typename T>
+grammar<C, T>::grammar(std::shared_ptr<nonterminals<C, T>> nts_,
+	typename grammar<C, T>::options opt)
+	: opt(opt), nts_handle_(table_or_new(std::move(nts_))),
+	  nts(*nts_handle_), start(nts.get("start"), &nts) { }
+template <typename C, typename T>
+grammar<C, T>::grammar(nonterminals<C, T>& nts_, const prods<C, T>& ps,
 	const prods<C, T>& start, const char_class_fns<T>& cc_fns,
 	typename grammar<C, T>::options opt, idni::diagnostics::report* diag)
-	: opt(opt), nts(nts), start(start.to_lit()), cc_fns(cc_fns)
+	: grammar(std::shared_ptr<nonterminals<C, T>>(
+		std::shared_ptr<void>(), &nts_), ps, start, cc_fns, opt, diag) { }
+template <typename C, typename T>
+grammar<C, T>::grammar(std::shared_ptr<nonterminals<C, T>> nts_,
+	const prods<C, T>& ps, const prods<C, T>& start,
+	const char_class_fns<T>& cc_fns, typename grammar<C, T>::options opt,
+	idni::diagnostics::report* diag)
+	: opt(opt), nts_handle_(table_or_new(std::move(nts_))),
+	  nts(*nts_handle_), start(start.to_lit()), cc_fns(cc_fns)
 {
 	// a caller may pass a container another grammar already used
 	for (size_t nt : this->cc_fns.derived)

@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <initializer_list>
 #include <map>
+#include <memory>
 #include <optional>
 #include <set>
 
@@ -54,6 +55,9 @@ struct nonterminals : public std::vector<std::basic_string<C>> {
 	nonterminals(std::initializer_list<std::basic_string<C>> init_list);
 	/// Adds new name \p s of a non-terminal into the container and returns its id
 	size_t get(const std::basic_string<C>& s);
+	/// Returns the id of a named non-terminal, or nullopt when the name is
+	/// not in the container. Does not add the name.
+	std::optional<size_t> find(const std::basic_string<C>& s) const;
 	/// Returns a name of a non-terminal by a provided id \p nt
 	const std::basic_string<C>& get(size_t n) const;
 	/// Returns a non-terminal literal by it's name. If the name does not exist in the container yet it adds it.
@@ -477,7 +481,13 @@ struct grammar {
 		bool derive_char_classes = true;
 	} opt;
 	grammar(nonterminals<C, T>& nts, options opt = {});
+	/// A null @p nts makes the grammar create and own its table.
+	grammar(std::shared_ptr<nonterminals<C, T>> nts, options opt = {});
 	grammar(nonterminals<C, T>& nts, const prods<C, T>& ps,
+		const prods<C, T>& start, const char_class_fns<T>& cc_fns,
+		options opt = {}, idni::diagnostics::report* diag = nullptr);
+	/// A null @p nts makes the grammar create and own its table.
+	grammar(std::shared_ptr<nonterminals<C, T>> nts, const prods<C, T>& ps,
 		const prods<C, T>& start, const char_class_fns<T>& cc_fns,
 		options opt = {}, idni::diagnostics::report* diag = nullptr);
 	/// Sets guards of enabled productions
@@ -624,6 +634,9 @@ struct grammar {
 	const lit<C, T>& get_start() const;
 	/// Returns the nonterminal symbol table this grammar was built with.
 	const nonterminals<C, T>& get_nts() const { return nts; }
+	/// The table's handle. It owns the table only when the grammar created
+	/// it. A caller-provided table gives a handle that owns nothing.
+	std::shared_ptr<nonterminals<C, T>> nts_ptr() const { return nts_handle_; }
 	// Bottom-up derivation fixpoint.
 	// seeds: (nonterminal_literal, position) pairs representing known memberships.
 	// Returns: set of all derivable (literal, span) pairs via unit-rule closure.
@@ -670,6 +683,11 @@ private:
 	/// rollback_dynamic (a host or context value grown earlier this
 	/// parse, then claimed before the parse's own end decides it).
 	void unpend(size_t idx);
+	static std::shared_ptr<nonterminals<C, T>> table_or_new(
+		std::shared_ptr<nonterminals<C, T>> nts);
+	/// Owns the table when the grammar was built without a caller-provided
+	/// one. Aliases the caller's table otherwise.
+	std::shared_ptr<nonterminals<C, T>> nts_handle_;
 	nonterminals<C, T>& nts;
 	lit<C, T> start;
 	char_class_fns<T> cc_fns = {};
@@ -1423,6 +1441,7 @@ public:
 
 	// constructor
 	parser(grammar<C, T>& g, options o = {});
+	parser(std::shared_ptr<grammar<C, T>> g, options o = {});
 	virtual ~parser() {};
 
 	// parse call
@@ -1491,10 +1510,13 @@ public:
 private:
 	mutable idni::diagnostics::report report_;
 	MC(mutable counters cnt;)
+	/// Owns the grammar when the parser was constructed with one.
+	std::shared_ptr<grammar<C, T>> owned_grammar_;
 	grammar<C, T>& g;
 	options o;
 	parse_options po; /// current parse options
 	std::unique_ptr<input> in_ = 0;
+	void prepare();
 	bool found(size_t start = SIZE_MAX);
 	error get_error();
 	std::vector<container_t> S;

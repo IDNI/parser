@@ -4,6 +4,7 @@
 #ifndef __IDNI__PARSER__TGF_H__
 #define __IDNI__PARSER__TGF_H__
 #include <fstream>
+#include <memory>
 #include <streambuf>
 #include <optional>
 
@@ -64,13 +65,34 @@ struct tgf {
 	using messages = idni::parser_strings::messages;
 	using label    = idni::parser_strings::label;
 
-	/// Parse TGF from string. @p directives, when given, receives what
-	/// the file says in its @ directives.
+	/// Parse TGF from a string, creating and owning the symbol table.
+	/// @p directives, when given, receives what the file says in its
+	/// @ directives.
+	static result from_string(const std::basic_string<C>& s,
+				  bool measure = false,
+				  tgf_directives* directives = nullptr)
+	{
+		return from_string(std::shared_ptr<nonterminals<C, T>>{},
+			s, measure, directives);
+	}
+	/// Parse TGF from a string with a caller-provided symbol table.
 	static result from_string(nonterminals<C, T>& nts_,
 				  const std::basic_string<C>& s,
 				  bool measure = false,
 				  tgf_directives* directives = nullptr)
 	{
+		return from_string(
+			std::shared_ptr<nonterminals<C, T>>(
+				std::shared_ptr<void>(), &nts_), s, measure, directives);
+	}
+	/// Parse TGF from a string with a shared symbol table. A null @p nts_
+	/// makes the grammar create and own one.
+	static result from_string(std::shared_ptr<nonterminals<C, T>> nts_,
+				  const std::basic_string<C>& s,
+				  bool measure = false,
+				  tgf_directives* directives = nullptr)
+	{
+		if (!nts_) nts_ = std::make_shared<nonterminals<C, T>>();
 		auto& p = tgf_parser::instance();
 		tgf_parser::parse_options po{
 			.start = tgf_parser::start,
@@ -97,7 +119,7 @@ struct tgf {
 			}
 			{
 				auto _b = R.open_if(measure, label::tgf_build);
-				grammar_builder b(nts_);
+				grammar_builder b(std::move(nts_));
 				// build() / predefined_char_classes() take a raw
 				// report*, so errors written there do NOT trigger
 				// the result<> value-drop invariant. Gate emplace
@@ -110,9 +132,30 @@ struct tgf {
 		}
 		return R;
 	}
-	/// Parse TGF from a file. @p directives, when given, receives what
-	/// the file says in its @ directives.
+	/// Parse TGF from a file, creating and owning the symbol table.
+	/// @p directives, when given, receives what the file says in its
+	/// @ directives.
+	static result from_file(const std::string& filename,
+				bool measure = false,
+				tgf_directives* directives = nullptr)
+	{
+		return from_file(std::shared_ptr<nonterminals<C, T>>{},
+			filename, measure, directives);
+	}
+	/// Parse TGF from a file with a caller-provided symbol table.
 	static result from_file(nonterminals<C, T>& nts_,
+				const std::string& filename,
+				bool measure = false,
+				tgf_directives* directives = nullptr)
+	{
+		return from_file(
+			std::shared_ptr<nonterminals<C, T>>(
+				std::shared_ptr<void>(), &nts_), filename, measure,
+				directives);
+	}
+	/// Parse TGF from a file with a shared symbol table. A null @p nts_
+	/// makes the grammar create and own one.
+	static result from_file(std::shared_ptr<nonterminals<C, T>> nts_,
 				const std::string& filename,
 				bool measure = false,
 				tgf_directives* directives = nullptr)
@@ -125,7 +168,7 @@ struct tgf {
 				{{label::path, filename}});
 			return R;
 		}
-		return from_string(nts_,
+		return from_string(std::move(nts_),
 			std::string(std::istreambuf_iterator<C>(ifs),
 				std::istreambuf_iterator<C>()),
 			measure, directives);
@@ -211,6 +254,7 @@ private:
 		using messages = idni::parser_strings::messages;
 		prods_t ps, nul{ lit_t{} };
 		nonterminals<C, T>& nts;
+		std::shared_ptr<nonterminals<C, T>> nts_handle;
 		/// set by @start ...
 		prods_t start = nul;
 		/// char class names coming from @use char class ...
@@ -223,10 +267,17 @@ private:
 		idni::diagnostics::report* diag = nullptr;
 		tgf_directives* dirs = nullptr;
 		const char* source_ = nullptr;
-		grammar_builder(nonterminals<C, T>& nts) : nts(nts) {}
-		grammar_builder(nonterminals<C, T>& nts, const trv& t,
+		grammar_builder(nonterminals<C, T>& nts_)
+			: nts(nts_),
+			  nts_handle(std::shared_ptr<nonterminals<C, T>>(
+				std::shared_ptr<void>(), &nts_)) {}
+		grammar_builder(std::shared_ptr<nonterminals<C, T>> nts_)
+			: nts(*nts_), nts_handle(std::move(nts_)) {}
+		grammar_builder(nonterminals<C, T>& nts_, const trv& t,
 			idni::diagnostics::report* diag = nullptr)
-			: nts(nts) { build(t, diag); }
+			: nts(nts_),
+			  nts_handle(std::shared_ptr<nonterminals<C, T>>(
+				std::shared_ptr<void>(), &nts_)) { build(t, diag); }
 		void build(const trv& t,
 			idni::diagnostics::report* diag = nullptr,
 			const char* source = nullptr,
@@ -353,7 +404,7 @@ private:
 			//std::cout << "opt.to_inline: ";
 			//for (auto& n : opt.to_inline) std::cout << n << " ";
 			//std::cout << "\n";
-			return grammar<C, T>(nts, ps, start == nul
+			return grammar<C, T>(nts_handle, ps, start == nul
 				? prods_t(nts("start")) : start, cc, opt, diag);
 		}
 	private:

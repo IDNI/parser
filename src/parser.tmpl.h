@@ -207,6 +207,20 @@ void parser<C, T>::input::decode() {
 template <typename C, typename T>
 parser<C, T>::parser(grammar<C, T>& g, options o) : g(g), o(o), po(o.parse_opts)
 {
+	prepare();
+}
+
+template <typename C, typename T>
+parser<C, T>::parser(std::shared_ptr<grammar<C, T>> g_, options o)
+	: owned_grammar_(std::move(g_)), g(*owned_grammar_), o(o),
+	  po(o.parse_opts)
+{
+	prepare();
+}
+
+template <typename C, typename T>
+void parser<C, T>::prepare()
+{
 	// a pair rejected here would confirm on the child's own completion,
 	// confirming every prefix; a misused caller still hits the assert
 	for (auto it = this->o.dynamic_grow_nts.begin();
