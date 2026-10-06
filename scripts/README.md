@@ -155,6 +155,7 @@ Default preset name is `release` if omitted. Every build-type preset has
 | `release-arm64-tests` (+ `debug-`, `devel-`) | Linux arm64 cross-compile + tests under qemu | `build/release-arm64` |
 | `release-wasm`, `debug-wasm` (+ `devel-wasm`) | Emscripten (`EMSCRIPTEN_DIR` defaults via `TAU_SHARED_PREFIX`) | `build/release-wasm`, … |
 | `release-wasm-tests` (+ `debug-`, `devel-`) | Emscripten + tests, run under Node.js | `build/release-wasm` |
+| `release-wasm-tests-pthreads` (+ `debug-`, `devel-`) | the same tests with `TAU_PARSER_WASM_PTHREADS=ON`, so their thread cases run | `build/release-wasm` |
 | `release-wasm-tgf`, `debug-wasm-tgf` | Emscripten + the tgf FTXUI REPL, run by `./dev tgf-node` | `build/release-wasm`, … |
 | `release-wasm-tests-browser` | Emscripten tests + tgf, the browser REPL page and the headless Chrome tests | `build/release-wasm` |
 | `release-msvc`, `debug-msvc` | Native MSVC (static lib) | `build/release-msvc`, `build/debug-msvc` |
@@ -163,6 +164,11 @@ Default preset name is `release` if omitted. Every build-type preset has
 | `release-msvc-all`, `msvc-all` | everything (`TAU_PARSER_BUILD_ALL`) | `build/release-msvc` |
 | `release-msvc-packages`, `release-msvc-packages-zip` | TGF + examples + NSIS/ZIP | `build/release-msvc` |
 | `release-msvc-all-clang-cl` (+ `debug-`, `devel-`) | everything, clang-cl / Ninja / x64 | `build/release-msvc-clang-cl` |
+
+`TAU_PARSER_WASM_PTHREADS` (default `OFF`, Emscripten only) compiles and
+links the wasm test targets with `-pthread` and a pool of node workers. It
+does not change the library flags, so the store id of the parser package
+stays the same. `ON` in a native build is a configure error.
 
 Hidden building blocks (`_build-tests`, `_build-packages`, `_build-all`, …) are
 composed by the public presets above; see [`CMakePresets.json`](../CMakePresets.json).

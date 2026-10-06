@@ -68,6 +68,7 @@ set(TAU_BOOST_INCLUDE_DIR "" CACHE PATH
 option(TAU_RUN_GRAMMAR_TESTS           "Run the .tgf.test grammar suites"   OFF)
 option(TAU_PARSER_BUILD_BROWSER_TESTS  "Run WASM tests in headless Chrome (Emscripten only)" OFF)
 option(TAU_PARSER_BUILD_BROWSER_PAGE   "Build the browser page files (Emscripten only)" OFF)
+option(TAU_PARSER_WASM_PTHREADS        "Build the wasm tests with -pthread, so their thread cases run (Emscripten only)" OFF)
 option(TAU_PARSER_DONT_USE_FTXUI       "Disable FTXUI"                      OFF)
 option(TAU_PARSER_BUILD_PIC            "Build position independent code"    OFF)
 option(TAU_PARSER_WINDOWS_PACKAGE      "Build Windows package"              OFF)
@@ -116,6 +117,7 @@ set_property(CACHE TAU_PARSER_BUILD_SERVE           PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_RUN_GRAMMAR_TESTS            PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_BROWSER_TESTS   PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_BROWSER_PAGE    PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_PARSER_WASM_PTHREADS         PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_DONT_USE_FTXUI        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_WINDOWS_PACKAGE       PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_WINDOWS_ZIP_PACKAGE   PROPERTY STRINGS "OFF" "ON")
@@ -192,6 +194,15 @@ endif()
 
 if(NOT TAU_PARSER_BUILD_HEADER_ONLY AND NOT TAU_PARSER_BUILD_STATIC_LIBRARY AND NOT TAU_PARSER_BUILD_SHARED_LIBRARY)
 	set(TAU_PARSER_BUILD_HEADER_ONLY ON)
+endif()
+
+# Only the test targets get -pthread, so the library flags and the store id
+# of the parser package stay the same.
+if(TAU_PARSER_WASM_PTHREADS AND NOT EMSCRIPTEN)
+	message(FATAL_ERROR
+		"TAU_PARSER_WASM_PTHREADS=ON requires the Emscripten toolchain "
+		"(configure with -DTAU_PARSER_BUILD_EMSCRIPTEN=ON); it has no "
+		"meaning for a native build.")
 endif()
 
 if(TAU_PARSER_WINDOWS_PACKAGE AND TAU_PARSER_WINDOWS_ZIP_PACKAGE)
@@ -333,6 +344,7 @@ message(STATUS "TAU_PARSER_BUILD_TGF:            ${TAU_PARSER_BUILD_TGF}")
 message(STATUS "TAU_RUN_GRAMMAR_TESTS:           ${TAU_RUN_GRAMMAR_TESTS}")
 message(STATUS "TAU_PARSER_BUILD_BROWSER_TESTS:  ${TAU_PARSER_BUILD_BROWSER_TESTS}")
 message(STATUS "TAU_PARSER_BUILD_BROWSER_PAGE:   ${TAU_PARSER_BUILD_BROWSER_PAGE}")
+message(STATUS "TAU_PARSER_WASM_PTHREADS:        ${TAU_PARSER_WASM_PTHREADS}")
 message(STATUS "TAU_PARSER_DONT_USE_FTXUI:       ${TAU_PARSER_DONT_USE_FTXUI}")
 message(STATUS "TAU_PARSER_SPECIALIZE:           ${TAU_PARSER_SPECIALIZE}")
 message(STATUS "TAU_PARSER_BUILD_PIC:            ${TAU_PARSER_BUILD_PIC}")

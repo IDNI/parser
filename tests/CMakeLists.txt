@@ -28,6 +28,14 @@ if(EMSCRIPTEN)
 		endif()
 		target_link_options(${target} PRIVATE
 			"SHELL:-s ALLOW_MEMORY_GROWTH=1")
+		# node starts a worker only when the main thread yields, so a test
+		# that joins a new thread needs a worker from the pool.
+		if(TAU_PARSER_WASM_PTHREADS)
+			target_compile_options(${target} PRIVATE -pthread)
+			target_link_options(${target} PRIVATE
+				-pthread -Wno-pthreads-mem-growth
+				"SHELL:-s PTHREAD_POOL_SIZE=10")
+		endif()
 	endmacro()
 else()
 	set(TEST_RUNNER "")
@@ -247,8 +255,10 @@ foreach(X IN LISTS DOCTESTS)
 				PROPERTIES COMPILE_OPTIONS "-O0;-fno-lto")
 		endif()
 	endif()
-	# The options tests run a few threads.
-	if(${N} STREQUAL "doctest_options" AND NOT EMSCRIPTEN)
+	# The options tests run a few threads. A wasm build without
+	# TAU_PARSER_WASM_PTHREADS skips its thread cases instead.
+	if(${N} STREQUAL "doctest_options"
+			AND (NOT EMSCRIPTEN OR TAU_PARSER_WASM_PTHREADS))
 		find_package(Threads REQUIRED)
 		target_link_libraries(${N} PRIVATE Threads::Threads)
 	endif()

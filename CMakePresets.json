@@ -241,6 +241,13 @@
 			}
 		},
 		{
+			"name": "_wasm-pthreads",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_PARSER_WASM_PTHREADS": "ON"
+			}
+		},
+		{
 			"name": "_build-tgf",
 			"hidden": true,
 			"cacheVariables": {
@@ -1205,6 +1212,27 @@
 			]
 		},
 		{
+			"name": "release-wasm-tests-pthreads",
+			"inherits": [
+				"release-wasm-tests",
+				"_wasm-pthreads"
+			]
+		},
+		{
+			"name": "debug-wasm-tests-pthreads",
+			"inherits": [
+				"debug-wasm-tests",
+				"_wasm-pthreads"
+			]
+		},
+		{
+			"name": "devel-wasm-tests-pthreads",
+			"inherits": [
+				"devel-wasm-tests",
+				"_wasm-pthreads"
+			]
+		},
+		{
 			"name": "release-wasm-tgf",
 			"inherits": [
 				"release-wasm",
@@ -1657,6 +1685,18 @@
 			"configurePreset": "devel-wasm-tests"
 		},
 		{
+			"name": "release-wasm-tests-pthreads",
+			"configurePreset": "release-wasm-tests-pthreads"
+		},
+		{
+			"name": "debug-wasm-tests-pthreads",
+			"configurePreset": "debug-wasm-tests-pthreads"
+		},
+		{
+			"name": "devel-wasm-tests-pthreads",
+			"configurePreset": "devel-wasm-tests-pthreads"
+		},
+		{
 			"name": "release-wasm-tests-browser",
 			"configurePreset": "release-wasm-tests-browser"
 		},
@@ -1809,6 +1849,18 @@
 		{
 			"name": "devel-wasm-tests",
 			"configurePreset": "devel-wasm-tests"
+		},
+		{
+			"name": "release-wasm-tests-pthreads",
+			"configurePreset": "release-wasm-tests-pthreads"
+		},
+		{
+			"name": "debug-wasm-tests-pthreads",
+			"configurePreset": "debug-wasm-tests-pthreads"
+		},
+		{
+			"name": "devel-wasm-tests-pthreads",
+			"configurePreset": "devel-wasm-tests-pthreads"
 		},
 		{
 			"name": "release-wasm-all",

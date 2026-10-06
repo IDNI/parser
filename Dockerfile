@@ -454,6 +454,15 @@ ARG BUILD_JOBS=1
 RUN echo "(BUILD) -- Running the wasm node tests" && \
 	ctest --preset release-wasm-tests -j ${BUILD_JOBS} --output-on-failure
 
+# The same folder again, with the test targets built with -pthread.
+RUN --mount=type=secret,id=gh_token \
+	echo "(BUILD) -- Running the wasm node tests with threads" && \
+	scripts/with-gh-token ./dev preset release-wasm-tests-pthreads \
+		--keep-cache -DTAU_BUILD_JOBS=${BUILD_JOBS} \
+		-DTAU_PARSER_DEPS_FROM_STORE=ON && \
+	ctest --preset release-wasm-tests-pthreads -j ${BUILD_JOBS} \
+		--output-on-failure
+
 
 # ------------------------------------------------------------
 # WebAssembly npm package: the release-wasm build and npm pack. The wasm-npm
