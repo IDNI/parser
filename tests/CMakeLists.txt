@@ -147,7 +147,7 @@ set(DOCTESTS
 	treemr
 	tgf
 	tgf_cli
-	derived_char_classes
+	char_classes
 	tgf_json_api
 	grammar_ownership
 	options
@@ -160,10 +160,10 @@ if(TAU_PARSER_BUILD_SERVE AND NOT EMSCRIPTEN AND TARGET tgf)
 endif()
 
 foreach(X IN LISTS DOCTESTS)
-	# The highlight and derived-char-class tests read host grammar files
+	# The highlight and char class tests read host grammar files
 	# through PROJECT_SOURCE_DIR and are not WASM-runnable.
 	if(EMSCRIPTEN AND (X STREQUAL "highlight"
-			OR X STREQUAL "derived_char_classes"))
+			OR X STREQUAL "char_classes"))
 		continue()
 	endif()
 	# The JSON API test drives the evaluator, so it needs tgf_cli_core.
@@ -212,7 +212,7 @@ foreach(X IN LISTS DOCTESTS)
 		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
 	)
 	if((N STREQUAL "doctest_highlight"
-			OR N STREQUAL "doctest_derived_char_classes"
+			OR N STREQUAL "doctest_char_classes"
 			OR N STREQUAL "doctest_tgf_cli") AND NOT EMSCRIPTEN)
 		target_compile_definitions(${N} PRIVATE
 			PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
