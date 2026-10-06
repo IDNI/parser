@@ -271,7 +271,11 @@ bool node_to_inline(const typename parser<C, T>::pnode& n,
 		static const std::vector<std::string> list = {
 			"eof",  "alnum", "alpha", "blank",
 				"cntrl", "digit", "graph", "lower", "printable",
-				"punct", "space", "upper", "xdigit"
+				"punct", "space", "upper", "xdigit",
+				"unicode_alnum", "unicode_alpha", "unicode_blank",
+				"unicode_cntrl", "unicode_digit", "unicode_graph",
+				"unicode_lower", "unicode_printable", "unicode_punct",
+				"unicode_space", "unicode_upper", "unicode_xdigit"
 		};
 		return std::find(list.begin(), list.end(), name) != list.end();
 	};

@@ -217,6 +217,10 @@ Currently it takes comma separated list of predefined character class function n
 Usable names are the same names usable in `predefined_character_classes()` (see [character class functions](char_class_fns.md) for more information).
 
 It can be one of: `alnum`, `alpha`, `blank`, `cntrl`, `digit`, `graph`, `lower`, `printable`, `punct`, `space`, `upper`, `xdigit`, `eof`, `any` or `ascii`.
+These plain classes answer as `<cctype>` in the C locale, also for `char32_t` terminals.
+
+For Unicode classes, use the same names with the prefix `unicode_`: `unicode_alnum`, `unicode_alpha`, `unicode_blank`, `unicode_cntrl`, `unicode_digit`, `unicode_graph`, `unicode_lower`, `unicode_printable`, `unicode_punct`, `unicode_space`, `unicode_upper` or `unicode_xdigit`.
+For `char32_t` terminals they use the Unicode tables (see [charclasses](charclasses.md)).
 
 Usage:
 ```
@@ -251,6 +255,13 @@ The generated parser, `@inline char classes`, the syntax highlighting and the `t
 The generated parser gives the renames to `predefined_char_classes` as a map, see [character class functions](char_class_fns.md).
 The syntax highlighting reads the name in the grammar.
 So `digit as num` does not show as a number.
+
+A rename gives a Unicode class a short name:
+```
+@use char classes unicode_printable as printable, digit as ascii_digit, unicode_digit as digit.
+comment => '#' printable* '\n'.
+```
+Here `digit` is the Unicode class and `ascii_digit` is the `<cctype>` class.
 
 #### @start
 

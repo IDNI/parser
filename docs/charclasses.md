@@ -9,7 +9,9 @@ To use them without the rest of the library, include only `charclasses.h`.
 Each function is a template on the character type `C`.
 `C` is `char` or `char32_t`.
 
-Character class functions:
+There are two sets of the twelve character class functions.
+The plain set is in `idni::charclasses`.
+The Unicode set has the same names and is in `idni::charclasses::unicode`.
 ```
 template <typename C> bool isalnum(C c);
 template <typename C> bool isalpha(C c);
@@ -32,18 +34,25 @@ template <typename C> bool isany(C c);   // !iseof(c)
 template <typename C> bool isascii(C c); // c <= 0x7F
 ```
 
-## char
+## Plain classes
 
-The `char` functions call the `<cctype>` function of the same name.
-They cast the character to `unsigned char` before the call.
+The plain classes give the answer of `<cctype>` in the C locale.
 
-## char32_t
+- The `char` functions call the `<cctype>` function of the same name.
+  They cast the character to `unsigned char` before the call.
+- The `char32_t` functions give the same answer for ASCII.
+  A code point above U+007F is in no plain class.
+  For example, `isdigit<char32_t>(U'\u0663')` is false.
 
-The `char32_t` functions use real Unicode classes.
-Each function reads one bit from a lookup table in
-`charclasses_unicode.generated.h`.
-A code point above U+10FFFF has no class, so each function returns false.
-The end of file value is above U+10FFFF, so it also has no class.
+## Unicode classes
+
+The Unicode classes in `idni::charclasses::unicode` use real Unicode classes.
+
+- The `char` functions give the same answer as the plain `char` functions.
+- The `char32_t` functions read one bit from a lookup table in
+  `charclasses_unicode.generated.h`.
+  A code point above U+10FFFF has no class, so each function returns false.
+  The end of file value is above U+10FFFF, so it also has no class.
 
 The table uses these Unicode properties:
 
@@ -62,14 +71,20 @@ The table uses these Unicode properties:
 | `isgraph` | Not `iscntrl`, not `isspace`, not U+0000, and not in the categories Cn, Cs, Cf, Zl or Zp |
 | `isprint` | `isgraph` or General Category Zs |
 
-For ASCII, the `char32_t` functions give the same result as the `char`
-functions in the C locale.
+For ASCII, the table gives the same result as `<cctype>` in the C locale.
 The ASCII symbols in `ispunct` are ``$ + < = > ^ ` | ~``.
 TAB is blank, but it is not printable.
 
+## Names in a grammar
+
+A grammar names a plain class with its short name, for example `digit`.
+It names a Unicode class with the prefix `unicode_`, for example
+`unicode_digit`.
+See [character class functions](char_class_fns.md) for the full list.
+
 ## Unicode tables
 
-The `char32_t` functions read the tables in
+The Unicode classes read the tables in
 `src/utility/charclasses_unicode.generated.h`.
 The script `tools/unicode/gen_charclasses.py` writes this header from the
 Unicode Character Database.

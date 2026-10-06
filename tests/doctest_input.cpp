@@ -68,7 +68,8 @@ struct token {
 template <typename S>
 vector<token<S>> tokenize_(typename parser<S, token<S>>::input& in) {
 	using token_t = token<S>;
-	using namespace idni::charclasses;
+	// τ must tokenize as a word, so the Unicode classes decide.
+	using namespace idni::charclasses::unicode;
 	vector<token_t> r{ {} };
 	token_t& t = r.back();
 	S ch = in.cur();

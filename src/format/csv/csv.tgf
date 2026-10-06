@@ -12,7 +12,7 @@
 @highlight string : escaped, non_escaped.
 @highlight operator : SEP, DQUOTE.
 
-@use char class printable.
+@use char class unicode_printable as printable.
 
 @inline char classes, TEXTDATA, field, sep_char.
 @trim DQUOTE, SEP, EOL.

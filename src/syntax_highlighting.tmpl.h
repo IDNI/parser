@@ -350,10 +350,14 @@ inline void token_classifier::init(const grammar<char, char>& g,
 	static const std::set<std::string> cc_names = {
 		"alnum", "alpha", "blank", "cntrl", "digit", "graph",
 		"lower", "printable", "punct", "space", "upper", "xdigit",
-		"eof", "any", "ascii"
+		"eof", "any", "ascii",
+		"unicode_alnum", "unicode_alpha", "unicode_blank",
+		"unicode_cntrl", "unicode_digit", "unicode_graph",
+		"unicode_lower", "unicode_printable", "unicode_punct",
+		"unicode_space", "unicode_upper", "unicode_xdigit"
 	};
 	static const std::set<std::string> digit_cc_names = {
-		"digit", "xdigit"
+		"digit", "xdigit", "unicode_digit", "unicode_xdigit"
 	};
 
 	// Pass 1, structure, always: membership only, no types assigned.

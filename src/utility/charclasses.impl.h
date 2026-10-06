@@ -27,17 +27,52 @@ inline uint16_t char_props(char32_t cp) {
 	return stage2[static_cast<size_t>(stage1[cp >> 8]) * 256 + (cp & 0xFF)];
 }
 
-template<> inline bool isalpha<char32_t>(char32_t cp) { return char_props(cp) & UC_ALPHA;  }
-template<> inline bool isalnum<char32_t>(char32_t cp) { return char_props(cp) & UC_ALNUM;  }
-template<> inline bool isblank<char32_t>(char32_t cp) { return char_props(cp) & UC_BLANK;  }
-template<> inline bool iscntrl<char32_t>(char32_t cp) { return char_props(cp) & UC_CNTRL;  }
-template<> inline bool isdigit<char32_t>(char32_t cp) { return char_props(cp) & UC_DIGIT;  }
-template<> inline bool isgraph<char32_t>(char32_t cp) { return char_props(cp) & UC_GRAPH;  }
-template<> inline bool islower<char32_t>(char32_t cp) { return char_props(cp) & UC_LOWER;  }
-template<> inline bool isprint<char32_t>(char32_t cp) { return char_props(cp) & UC_PRINT;  }
-template<> inline bool ispunct<char32_t>(char32_t cp) { return char_props(cp) & UC_PUNCT;  }
-template<> inline bool isspace<char32_t>(char32_t cp) { return char_props(cp) & UC_SPACE;  }
-template<> inline bool isupper<char32_t>(char32_t cp) { return char_props(cp) & UC_UPPER;  }
-template<> inline bool isxdigit<char32_t>(char32_t cp){ return char_props(cp) & UC_XDIGIT; }
+// The table agrees with <cctype> in the C locale for ASCII.
+inline uint16_t ascii_props(char32_t cp) {
+	return cp <= 0x7F ? char_props(cp) : 0;
+}
+
+template<> inline bool isalnum<char32_t>(char32_t cp) { return ascii_props(cp) & UC_ALNUM; }
+template<> inline bool isalpha<char32_t>(char32_t cp) { return ascii_props(cp) & UC_ALPHA; }
+template<> inline bool isblank<char32_t>(char32_t cp) { return ascii_props(cp) & UC_BLANK; }
+template<> inline bool iscntrl<char32_t>(char32_t cp) { return ascii_props(cp) & UC_CNTRL; }
+template<> inline bool isdigit<char32_t>(char32_t cp) { return ascii_props(cp) & UC_DIGIT; }
+template<> inline bool isgraph<char32_t>(char32_t cp) { return ascii_props(cp) & UC_GRAPH; }
+template<> inline bool islower<char32_t>(char32_t cp) { return ascii_props(cp) & UC_LOWER; }
+template<> inline bool isprint<char32_t>(char32_t cp) { return ascii_props(cp) & UC_PRINT; }
+template<> inline bool ispunct<char32_t>(char32_t cp) { return ascii_props(cp) & UC_PUNCT; }
+template<> inline bool isspace<char32_t>(char32_t cp) { return ascii_props(cp) & UC_SPACE; }
+template<> inline bool isupper<char32_t>(char32_t cp) { return ascii_props(cp) & UC_UPPER; }
+template<> inline bool isxdigit<char32_t>(char32_t cp){ return ascii_props(cp) & UC_XDIGIT;}
+
+namespace unicode {
+
+template<> inline bool isalnum<char>(char c) { return charclasses::isalnum<char>(c); }
+template<> inline bool isalpha<char>(char c) { return charclasses::isalpha<char>(c); }
+template<> inline bool isblank<char>(char c) { return charclasses::isblank<char>(c); }
+template<> inline bool iscntrl<char>(char c) { return charclasses::iscntrl<char>(c); }
+template<> inline bool isdigit<char>(char c) { return charclasses::isdigit<char>(c); }
+template<> inline bool isgraph<char>(char c) { return charclasses::isgraph<char>(c); }
+template<> inline bool islower<char>(char c) { return charclasses::islower<char>(c); }
+template<> inline bool isprint<char>(char c) { return charclasses::isprint<char>(c); }
+template<> inline bool ispunct<char>(char c) { return charclasses::ispunct<char>(c); }
+template<> inline bool isspace<char>(char c) { return charclasses::isspace<char>(c); }
+template<> inline bool isupper<char>(char c) { return charclasses::isupper<char>(c); }
+template<> inline bool isxdigit<char>(char c){ return charclasses::isxdigit<char>(c);}
+
+template<> inline bool isalnum<char32_t>(char32_t cp) { return char_props(cp) & UC_ALNUM; }
+template<> inline bool isalpha<char32_t>(char32_t cp) { return char_props(cp) & UC_ALPHA; }
+template<> inline bool isblank<char32_t>(char32_t cp) { return char_props(cp) & UC_BLANK; }
+template<> inline bool iscntrl<char32_t>(char32_t cp) { return char_props(cp) & UC_CNTRL; }
+template<> inline bool isdigit<char32_t>(char32_t cp) { return char_props(cp) & UC_DIGIT; }
+template<> inline bool isgraph<char32_t>(char32_t cp) { return char_props(cp) & UC_GRAPH; }
+template<> inline bool islower<char32_t>(char32_t cp) { return char_props(cp) & UC_LOWER; }
+template<> inline bool isprint<char32_t>(char32_t cp) { return char_props(cp) & UC_PRINT; }
+template<> inline bool ispunct<char32_t>(char32_t cp) { return char_props(cp) & UC_PUNCT; }
+template<> inline bool isspace<char32_t>(char32_t cp) { return char_props(cp) & UC_SPACE; }
+template<> inline bool isupper<char32_t>(char32_t cp) { return char_props(cp) & UC_UPPER; }
+template<> inline bool isxdigit<char32_t>(char32_t cp){ return char_props(cp) & UC_XDIGIT;}
+
+} // idni::charclasses::unicode namespace
 
 } // idni::charclasses namespace

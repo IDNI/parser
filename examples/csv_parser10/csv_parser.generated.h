@@ -28,7 +28,8 @@ inline std::vector<terminal_type> terminals{
 inline ::idni::char_class_fns<terminal_type> char_classes =
 	::idni::predefined_char_classes<char_type, terminal_type>({
 		"digit",
-		"printable",
+	}, {
+		{ "unicode_printable", "printable" },
 	}, nts);
 
 inline struct ::idni::grammar<char_type, terminal_type>::options
@@ -64,8 +65,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(4), (nul));
 //G2:   __E_integer_1(5)     => digit(1).
 	p(NT(5), (NT(1)));
-//G3:   __E_integer_1(5)     => digit(1) __E_integer_1(5).
-	p(NT(5), (NT(1)+NT(5)));
+//G3:   __E_integer_1(5)     => __E_integer_1(5) digit(1).
+	p(NT(5), (NT(5)+NT(1)));
 //G4:   integer(3)           => __E_integer_0(4) __E_integer_1(5).
 	p(NT(3), (NT(4)+NT(5)));
 //G5:   quote(6)             => '"'.
@@ -88,8 +89,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(11), (NT(10)));
 //G14:  __E_str_2(13)        => null.
 	p(NT(13), (nul));
-//G15:  __E_str_2(13)        => strchar(11) __E_str_2(13).
-	p(NT(13), (NT(11)+NT(13)));
+//G15:  __E_str_2(13)        => __E_str_2(13) strchar(11).
+	p(NT(13), (NT(13)+NT(11)));
 //G16:  str(12)              => quote(6) __E_str_2(13) quote(6).
 	p(NT(12), (NT(6)+NT(13)+NT(6)));
 //G17:  nullvalue(14)        => null.
@@ -110,16 +111,16 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(19), (T(6)+NT(15)));
 //G25:  __E_row_5(20)        => null.
 	p(NT(20), (nul));
-//G26:  __E_row_5(20)        => __E_row_4(19) __E_row_5(20).
-	p(NT(20), (NT(19)+NT(20)));
+//G26:  __E_row_5(20)        => __E_row_5(20) __E_row_4(19).
+	p(NT(20), (NT(20)+NT(19)));
 //G27:  row(18)              => val(15) __E_row_5(20).
 	p(NT(18), (NT(15)+NT(20)));
 //G28:  __E_rows_6(22)       => eol(16) row(18).
 	p(NT(22), (NT(16)+NT(18)));
 //G29:  __E_rows_7(23)       => null.
 	p(NT(23), (nul));
-//G30:  __E_rows_7(23)       => __E_rows_6(22) __E_rows_7(23).
-	p(NT(23), (NT(22)+NT(23)));
+//G30:  __E_rows_7(23)       => __E_rows_7(23) __E_rows_6(22).
+	p(NT(23), (NT(23)+NT(22)));
 //G31:  rows(21)             => row(18) __E_rows_7(23).
 	p(NT(21), (NT(18)+NT(23)));
 //G32:  start(24)            => rows(21).

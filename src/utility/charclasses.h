@@ -27,6 +27,24 @@ template <typename C> bool isspace(C c);
 template <typename C> bool isupper(C c);
 template <typename C> bool isxdigit(C c);
 
+// Unicode classes: the plain classes above answer as <cctype> in the C locale.
+namespace unicode {
+
+template <typename C> bool isalnum(C c);
+template <typename C> bool isalpha(C c);
+template <typename C> bool isblank(C c);
+template <typename C> bool iscntrl(C c);
+template <typename C> bool isdigit(C c);
+template <typename C> bool isgraph(C c);
+template <typename C> bool islower(C c);
+template <typename C> bool isprint(C c);
+template <typename C> bool ispunct(C c);
+template <typename C> bool isspace(C c);
+template <typename C> bool isupper(C c);
+template <typename C> bool isxdigit(C c);
+
+} // idni::charclasses::unicode namespace
+
 } // idni::charclasses namespace
 
 #include "charclasses.impl.h"

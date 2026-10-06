@@ -39,8 +39,9 @@ inline ::idni::char_class_fns<terminal_type> char_classes =
 		"alpha",
 		"alnum",
 		"space",
-		"printable",
 		"xdigit",
+	}, {
+		{ "unicode_printable", "printable" },
 	}, nts);
 
 inline struct ::idni::grammar<char_type, terminal_type>::options

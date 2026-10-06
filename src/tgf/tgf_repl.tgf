@@ -1,4 +1,4 @@
-@use char class eof, alnum, alpha, space, printable, xdigit.
+@use char class eof, alnum, alpha, space, unicode_printable as printable, xdigit.
 
 @inline char classes.
 

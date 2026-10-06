@@ -1103,4 +1103,116 @@ TEST_CASE("the generated parser of a grammar without renames has no map") {
 	CHECK(call.find("}, {") == string::npos);
 }
 
+// ---------------------------------------------------------------------------
+// plain and unicode character classes
+// ---------------------------------------------------------------------------
+
+TEST_CASE("plain classes answer as cctype for char and char32_t") {
+	for (int c = 0; c < 0x80; ++c) {
+		auto ch = static_cast<char>(c);
+		auto cp = static_cast<char32_t>(c);
+		CHECK(charclasses::isalpha<char32_t>(cp) == charclasses::isalpha<char>(ch));
+		CHECK(charclasses::isdigit<char32_t>(cp) == charclasses::isdigit<char>(ch));
+		CHECK(charclasses::isspace<char32_t>(cp) == charclasses::isspace<char>(ch));
+		CHECK(charclasses::isprint<char32_t>(cp) == charclasses::isprint<char>(ch));
+		CHECK(charclasses::ispunct<char32_t>(cp) == charclasses::ispunct<char>(ch));
+		CHECK(charclasses::unicode::isalpha<char>(ch) == charclasses::isalpha<char>(ch));
+		CHECK(charclasses::unicode::isdigit<char>(ch) == charclasses::isdigit<char>(ch));
+		CHECK(charclasses::unicode::isprint<char>(ch) == charclasses::isprint<char>(ch));
+		CHECK(charclasses::unicode::ispunct<char32_t>(cp) == charclasses::ispunct<char>(ch));
+	}
+}
+
+TEST_CASE("a code point above U+007F is in no plain class") {
+	for (char32_t cp : { char32_t(0x0663), char32_t(0x00C0),
+		char32_t(0x3000), char32_t(0x4E00) })
+	{
+		CHECK_FALSE(charclasses::isalnum<char32_t>(cp));
+		CHECK_FALSE(charclasses::isalpha<char32_t>(cp));
+		CHECK_FALSE(charclasses::isdigit<char32_t>(cp));
+		CHECK_FALSE(charclasses::isspace<char32_t>(cp));
+		CHECK_FALSE(charclasses::isblank<char32_t>(cp));
+		CHECK_FALSE(charclasses::isupper<char32_t>(cp));
+		CHECK_FALSE(charclasses::isgraph<char32_t>(cp));
+		CHECK_FALSE(charclasses::isprint<char32_t>(cp));
+	}
+}
+
+TEST_CASE("unicode classes use the Unicode table for char32_t") {
+	using namespace charclasses;
+	CHECK(unicode::isdigit<char32_t>(0x0663));
+	CHECK(unicode::isxdigit<char32_t>(0x0663));
+	CHECK(unicode::isalnum<char32_t>(0x0663));
+	CHECK_FALSE(unicode::isalpha<char32_t>(0x0663));
+	CHECK(unicode::isalpha<char32_t>(0x00C0));
+	CHECK(unicode::isupper<char32_t>(0x00C0));
+	CHECK_FALSE(unicode::islower<char32_t>(0x00C0));
+	CHECK(unicode::isspace<char32_t>(0x3000));
+	CHECK(unicode::isblank<char32_t>(0x3000));
+	CHECK(unicode::isprint<char32_t>(0x3000));
+	CHECK_FALSE(unicode::isgraph<char32_t>(0x3000));
+	CHECK(unicode::isalpha<char32_t>(0x4E00));
+	CHECK(unicode::isgraph<char32_t>(0x4E00));
+	CHECK_FALSE(unicode::ispunct<char32_t>(0x4E00));
+	CHECK_FALSE(unicode::iscntrl<char32_t>(0x4E00));
+	CHECK_FALSE(unicode::isprint<char32_t>(0x110000));
+}
+
+TEST_CASE("a grammar uses unicode_digit and digit side by side") {
+	loaded32 L = load_tgf32(
+		"@use char class digit, unicode_digit, unicode_alpha, space.\n"
+		"start => plain | uni.\n"
+		"plain => 'p' space digit+.\n"
+		"uni   => 'u' space (unicode_digit | unicode_alpha)+.\n");
+	REQUIRE(L.g.has_value());
+	parser<char, char32_t> p(*L.g, default_parser_options<char, char32_t>());
+	CHECK(parses<char32_t>(p, "p 123"));
+	CHECK_FALSE(parses<char32_t>(p, "p ٣"));
+	CHECK(parses<char32_t>(p, "u 12٣"));
+	CHECK(parses<char32_t>(p, "u À一"));
+	CHECK_FALSE(parses<char32_t>(p, "u 　"));
+}
+
+TEST_CASE("a grammar with unicode_printable parses char input as printable") {
+	loaded L = load_tgf(
+		"@use char class unicode_printable.\n"
+		"start => unicode_printable+.\n");
+	REQUIRE(L.g.has_value());
+	parser<char> p(*L, default_parser_options<char, char>());
+	CHECK(parses<char>(p, "a b!"));
+	CHECK_FALSE(parses<char>(p, "a\tb"));
+}
+
+TEST_CASE("a rename gives a Unicode class a new name") {
+	loaded32 L = load_tgf32(
+		"@use char class unicode_alpha as letter, space.\n"
+		"start => letter+ (space letter+)*.\n");
+	REQUIRE(L.g.has_value());
+	parser<char, char32_t> p(*L.g, default_parser_options<char, char32_t>());
+	CHECK(parses<char32_t>(p, "aÀ 一"));
+	CHECK_FALSE(parses<char32_t>(p, "a1"));
+}
+
+TEST_CASE("a rename can take the name of a predefined class") {
+	loaded32 L = load_tgf32(
+		"@use char class unicode_digit as digit.\n"
+		"start => digit+.\n");
+	REQUIRE(L.g.has_value());
+	parser<char, char32_t> p(*L.g, default_parser_options<char, char32_t>());
+	CHECK(parses<char32_t>(p, "1٣"));
+	CHECK_FALSE(parses<char32_t>(p, "a"));
+}
+
+TEST_CASE("a Unicode class and a plain class swap their names") {
+	loaded32 L = load_tgf32(
+		"@use char classes digit as ascii_digit, unicode_digit as digit.\n"
+		"start => 'a' ascii_digit+ | 'u' digit+.\n");
+	REQUIRE(L.g.has_value());
+	parser<char, char32_t> p(*L.g, default_parser_options<char, char32_t>());
+	CHECK(parses<char32_t>(p, "a123"));
+	CHECK_FALSE(parses<char32_t>(p, "a1٣"));
+	CHECK(parses<char32_t>(p, "u1٣"));
+	CHECK_FALSE(parses<char32_t>(p, "ux"));
+}
+
 #endif // PROJECT_SOURCE_DIR

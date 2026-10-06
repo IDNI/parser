@@ -1,4 +1,4 @@
-@use char class eof, alpha, alnum, space, graph, printable, xdigit.
+@use char class eof, alpha, alnum, space, graph, unicode_printable as printable, xdigit.
 
 @trim __, _.
 @trim all terminals except children of name, m_char, m_space, quoted_string,

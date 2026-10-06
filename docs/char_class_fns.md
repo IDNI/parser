@@ -89,8 +89,26 @@ The library has common [character classes](charclasses.md). A helper function re
 { "punct",     charclasses::ispunct<T>  },
 { "space",     charclasses::isspace<T>  },
 { "upper",     charclasses::isupper<T>  },
-{ "xdigit",    charclasses::isxdigit<T> }
+{ "xdigit",    charclasses::isxdigit<T> },
+{ "unicode_alnum",     charclasses::unicode::isalnum<T>  },
+{ "unicode_alpha",     charclasses::unicode::isalpha<T>  },
+{ "unicode_blank",     charclasses::unicode::isblank<T>  },
+{ "unicode_cntrl",     charclasses::unicode::iscntrl<T>  },
+{ "unicode_digit",     charclasses::unicode::isdigit<T>  },
+{ "unicode_graph",     charclasses::unicode::isgraph<T>  },
+{ "unicode_lower",     charclasses::unicode::islower<T>  },
+{ "unicode_printable", charclasses::unicode::isprint<T>  },
+{ "unicode_punct",     charclasses::unicode::ispunct<T>  },
+{ "unicode_space",     charclasses::unicode::isspace<T>  },
+{ "unicode_upper",     charclasses::unicode::isupper<T>  },
+{ "unicode_xdigit",    charclasses::unicode::isxdigit<T> }
 ```
+
+The names without a prefix are the plain classes. They answer as `<cctype>`
+in the C locale, also for `char32_t`.
+The names with the prefix `unicode_` are the Unicode classes.
+For `char32_t` they use the Unicode tables.
+For `char` they give the same answer as the plain class.
 
 ### char_cc_fns\<T> predefined_char_classes(const std::vector\<std::string>& cc_fn_names, const std::map\<std::string, std::string>& renames, nonterminals<C, T>& nts);
 
