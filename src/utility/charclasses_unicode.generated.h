@@ -24,9 +24,9 @@ enum unicode_prop : uint16_t {
     UC_SPACE  = 1 << 6,   // isspace  (PropList: White_Space)
     UC_BLANK  = 1 << 7,   // isblank  (U+0009 | General_Category = Zs)
     UC_CNTRL  = 1 << 8,   // iscntrl  (General_Category = Cc)
-    UC_PUNCT  = 1 << 9,   // ispunct  (General_Category starts with 'P')
+    UC_PUNCT  = 1 << 9,   // ispunct  (General_Category P*, plus ASCII S* as in <cctype>)
     UC_GRAPH  = 1 << 10,  // isgraph  (visible glyph, not control/space/unassigned)
-    UC_PRINT  = 1 << 11,  // isprint  (isgraph | isblank)
+    UC_PRINT  = 1 << 11,  // isprint  (isgraph | General_Category = Zs)
 };
 
 // Stage 1: maps high 13 bits (cp >> 8) to a block index.
