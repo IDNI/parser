@@ -28,13 +28,13 @@ op           => '|'.
 
 ### terminals
 
-Terminal character is quoted in apostrophes: `'t'`, `'0'`, `'$'`.
+Put a terminal character in apostrophes: `'t'`, `'0'`, `'$'`.
 ```
 dot      => '.'.
 new_line => '\n'.
 ```
 
-Sequence of terminal characters can be provided as a quoted string: `"Hi"`, `"function"`, `"DEFINE"`.
+Put a sequence of terminal characters in double quotes: `"Hi"`, `"function"`, `"DEFINE"`.
 
 ```
 kw_function => "function".
@@ -90,9 +90,9 @@ letter => alnum & alpha.
 
 ### negation
 
-Negation of a literal sequence `~` makes the literal sequence to satisfy its rule only if it does not match the input. If it matches it won't satisfy it.
+Negation of a literal sequence `~` makes the literal sequence to satisfy its rule only if it does not match the input. If it matches, it does not satisfy the rule.
 
-Following example shows that `identifier` is satisfied if an input matches `chars` but not `keyword`. In other words if an input matches a `keyword` it isn't an `identifier`.
+Following example shows that `identifier` is satisfied if an input matches `chars` but not `keyword`. If an input matches a `keyword`, it is not an `identifier`.
 ```
 identifier => chars & ~keyword.
 ```
@@ -211,18 +211,46 @@ repeat_group   => '{' _ alternation _ '}'.
 
 #### @use
 
-This directive is supposed to load rules from other grammars or predefined rule lists.
+This directive loads rules from other grammars or predefined rule lists.
 Currently it takes comma separated list of predefined character class function names used after a keyword `char class` or `char classes`.
 
 Usable names are the same names usable in `predefined_character_classes()` (see [character class functions](char_class_fns.md) for more information).
 
-It can be one of: `alnum`, `alpha`, `blank`, `cntrl`, `digit`, `graph`, `lower`, `printable`, `punct`, `space`, `upper`, `xdigit` or `eof`.
+It can be one of: `alnum`, `alpha`, `blank`, `cntrl`, `digit`, `graph`, `lower`, `printable`, `punct`, `space`, `upper`, `xdigit`, `eof`, `any` or `ascii`.
 
 Usage:
 ```
 @use char class space.
 @use char classes alpha, digit, space.
 ```
+
+`<class> as <name>` renames a class in the grammar.
+The new name is the only name of the class in that grammar.
+```
+@use char classes alpha as letter, digit.
+word => letter+.
+```
+
+The new name can be the name of a predefined class.
+All renames of a grammar apply at the same time, so two classes can swap their names.
+The left side of `as` is always a predefined class.
+```
+@use char classes digit as d, alpha as digit.
+```
+Here `digit` is the class `alpha`, and `d` is the class `digit`.
+
+These are errors at grammar load:
+- A rule uses the old name of a renamed class, for example `alpha` after `alpha as letter`.
+- The old name occurs again in the list, for example `alpha as letter, alpha` or `alpha as a, alpha as b`.
+- Two classes get the same name, for example `digit, alpha as digit`.
+- One class occurs two times in the list, for example `digit, digit`.
+
+Each error names the class name.
+A rule that uses this name gets no other warning.
+The generated parser, `@inline char classes`, the syntax highlighting and the `tgf` tool use only the new name.
+The generated parser gives the renames to `predefined_char_classes` as a map, see [character class functions](char_class_fns.md).
+The syntax highlighting reads the name in the grammar.
+So `digit as num` does not show as a number.
 
 #### @start
 
@@ -321,7 +349,7 @@ Usage:
 
 #### @trim children terminals
 
-This directive removes terminal children from nonterminals provided as a comma separated list.
+This directive removes terminal children from the nonterminals in a comma separated list.
 
 Usage:
 ```

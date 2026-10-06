@@ -369,6 +369,55 @@ TEST_SUITE("tgf json api: hello") {
 		for (const auto& e : *en)
 			CHECK(e.as_string() != "disambiguation");
 	}
+
+	// The directives object of a load answer for src.
+	static json::value load_directives(const std::string& src) {
+		tgf_repl_evaluator re(json_options());
+		json::value req = json::value::object();
+		req.set("id", json::value::number(1))
+		   .set("cmd", json::value::string("load"))
+		   .set("name", json::value::string("g.tgf"))
+		   .set("source", json::value::string(src));
+		auto r = run_repl_re(re, { to_line(req) });
+		REQUIRE(r.responses.size() == 1);
+		const json::value* data = response_data(r.responses[0]);
+		REQUIRE(data != nullptr);
+		auto d = data->find("directives");
+		REQUIRE(d != nullptr);
+		REQUIRE(d->is_object());
+		return *d;
+	}
+
+	TEST_CASE("the directives give a rename in char_class_renames") {
+		auto d = load_directives(
+			"@use char classes alpha, digit as d.\n"
+			"start => alpha d.\n");
+		auto uc = d.find("use_char_classes");
+		REQUIRE(uc != nullptr);
+		REQUIRE(uc->size() == 2);
+		CHECK((*uc)[0].as_string() == "alpha");
+		CHECK((*uc)[1].as_string() == "digit");
+		auto rn = d.find("char_class_renames");
+		REQUIRE(rn != nullptr);
+		REQUIRE(rn->is_object());
+		CHECK(rn->size() == 1);
+		auto to = rn->find("digit");
+		REQUIRE(to != nullptr);
+		CHECK(to->as_string() == "d");
+	}
+
+	TEST_CASE("the directives without a rename give an empty object") {
+		auto d = load_directives(
+			"@use char classes alpha, digit.\n"
+			"start => alpha digit.\n");
+		auto uc = d.find("use_char_classes");
+		REQUIRE(uc != nullptr);
+		CHECK(uc->size() == 2);
+		auto rn = d.find("char_class_renames");
+		REQUIRE(rn != nullptr);
+		CHECK(rn->is_object());
+		CHECK(rn->size() == 0);
+	}
 }
 
 TEST_SUITE("tgf json api: eval form") {

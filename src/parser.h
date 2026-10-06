@@ -309,6 +309,9 @@ struct char_class_fns {
 	std::map<size_t, std::map<T, size_t>> ps = {};
 	/// Nonterminals that the analysis turned into a derived class.
 	std::set<size_t> derived = {};
+	/// Source class of a renamed class, by its new name. Only the parser
+	/// generator reads it, to write the renames of the grammar.
+	std::map<size_t, std::string> renamed = {};
 	/// Adds new char class function.
 	void operator()(size_t nt, const char_class_fn<T>& fn);
 	/// Returns true if a \p nt is a character class function.
@@ -331,6 +334,19 @@ template <typename C = char, typename T = C>
 char_class_fns<T> predefined_char_classes(
 	const std::vector<std::string>& cc_fn_names, nonterminals<C, T>& nts,
 	idni::diagnostics::report* diag = nullptr);
+
+/**
+ * @brief Return a char_class_fns container with specified functions and
+ * renamed functions.
+ *
+ * \p renames maps a predefined class to its new name. A renamed class loads
+ * only under its new name, also when \p cc_fn_names lists it.
+ */
+template <typename C = char, typename T = C>
+char_class_fns<T> predefined_char_classes(
+	const std::vector<std::string>& cc_fn_names,
+	const std::map<std::string, std::string>& renames,
+	nonterminals<C, T>& nts, idni::diagnostics::report* diag = nullptr);
 
 /// @brief Settings which are used to shape parsed trees when shaping is used.
 struct shaping_options {

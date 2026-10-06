@@ -112,14 +112,23 @@ std::vector<std::string> generate_parser_cpp(const std::string& tgf_filename,
 		os << "\n";
 		return os.str();
 	};
+	// the names, and the renames only when the grammar has one, so a
+	// grammar without renames keeps the two-argument call
 	auto gen_cc_fns = [&gi]() {
-		std::stringstream os;
+		std::stringstream os, renames;
 		auto& x = gi.nts();
+		const auto& renamed = gi.cc_fns().renamed;
 		for (const auto& fn : gi.cc_fns().fns) {
 			if (gi.cc_fns().is_derived(fn.first)) continue;
-			if (x[fn.first].size()) os << "\t\t\""
+			if (!x[fn.first].size()) continue;
+			auto it = renamed.find(fn.first);
+			if (it == renamed.end()) os << "\t\t\""
 				<< to_std_string(x[fn.first]) << "\",\n";
+			else renames << "\t\t{ \"" << it->second << "\", \""
+				<< to_std_string(x[fn.first]) << "\" },\n";
 		}
+		if (!renames.str().empty())
+			os << "\t}, {\n" << renames.str();
 		return os.str();
 	};
 	auto gen_grammar_opts = [&g, &opt]() {

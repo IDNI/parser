@@ -2,7 +2,7 @@
 
 # character class functions
 
-In a case you need a production rule with many single terminals you can specify them by a function which accepts a character and returns `true` if a terminal character satisfies the production rule.
+A production rule can have many single terminals. You can give them as one function. The function takes a character and returns `true` if the character satisfies the rule.
 
 For example, instead of a following rule:
 ```
@@ -32,7 +32,7 @@ Character class function takes a terminal character and returns `true` if a char
 
 `char_class_fns` is a container for character class functions.
 
-It can be passed to a `grammar` when instantiated.
+You give it to the constructor of a `grammar`.
 
 ## methods
 
@@ -66,7 +66,7 @@ cc.is_eof_fn(1);
 
 ## predefined character class functions
 
-Library provides common [character classes](charclasses.md) and it offers a helper function which can return a `char_class_fns` container with one or more of these predefined functions.
+The library has common [character classes](charclasses.md). A helper function returns a `char_class_fns` container with one or more of these predefined functions.
 
 ### char_cc_fns\<T> predefined_car_classes(const std::vector\<std::string>& cc_fn_names, nonterminals<C, T>& nts);
 
@@ -76,6 +76,8 @@ Library provides common [character classes](charclasses.md) and it offers a help
 // { function name, predefined function used }
 
 { "eof",       charclasses::iseof<T>    },
+{ "any",       charclasses::isany<T>    },
+{ "ascii",     charclasses::isascii<T>  },
 { "alnum",     charclasses::isalnum<T>  },
 { "alpha",     charclasses::isalpha<T>  },
 { "blank",     charclasses::isblank<T>  },
@@ -90,7 +92,27 @@ Library provides common [character classes](charclasses.md) and it offers a help
 { "xdigit",    charclasses::isxdigit<T> }
 ```
 
-It is used like this:
+### char_cc_fns\<T> predefined_char_classes(const std::vector\<std::string>& cc_fn_names, const std::map\<std::string, std::string>& renames, nonterminals<C, T>& nts);
+
+`renames` maps a predefined class to its new name.
+The grammar then uses only the nonterminal of the new name for the class.
+A renamed class loads also when `cc_fn_names` does not list it.
+A class in `cc_fn_names` and in `renames` loads only under its new name.
+All renames apply at the same time, so two classes can swap their names.
+```
+predefined_char_classes({ "space" }, { { "digit", "d" } }, nts);
+predefined_char_classes({}, { { "digit", "alpha" }, { "alpha", "digit" } }, nts);
+```
+These are errors, and each error names the name:
+- Two renames give the same new name.
+- A new name is the name of a class that keeps its own name, for example `{ "digit" }` with `{ { "alpha", "digit" } }`.
+- A name in `cc_fn_names` occurs two times.
+- A class is not a predefined class.
+
+`char_class_fns::renamed` keeps the source class of each renamed class, by its new name.
+Only the parser generator reads it.
+
+Example:
 ```
 nonterminals nts;
 char_cc_fns cc = predefined_char_classes({ "alpha", "digit", "space" }, nts);

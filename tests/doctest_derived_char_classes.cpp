@@ -893,4 +893,214 @@ TEST_CASE("a grammar built from copied cc_fns has no derived classes") {
 	CHECK_FALSE(parses<char>(p2, "b"));
 }
 
+// ---------------------------------------------------------------------------
+// character class renames
+// ---------------------------------------------------------------------------
+
+TEST_CASE("a rename gives a class a new name") {
+	loaded32 L = load_tgf32(
+		"@use char class alpha as letter, space.\n"
+		"start => letter+ (space letter+)*.\n");
+	REQUIRE(L.g.has_value());
+	parser<char, char32_t> p(*L.g, default_parser_options<char, char32_t>());
+	CHECK(parses<char32_t>(p, "ab cd"));
+	CHECK_FALSE(parses<char32_t>(p, "a1"));
+}
+
+TEST_CASE("a rename gives digit the name num") {
+	loaded32 L = load_tgf32(
+		"@use char class digit as num.\n"
+		"start => num+.\n");
+	REQUIRE(L.g.has_value());
+	parser<char, char32_t> p(*L.g, default_parser_options<char, char32_t>());
+	CHECK(parses<char32_t>(p, "123"));
+	CHECK_FALSE(parses<char32_t>(p, "a"));
+}
+
+TEST_CASE("two existing classes swap their names") {
+	loaded32 L = load_tgf32(
+		"@use char classes digit as d, alpha as digit.\n"
+		"start => 'x' d+ | 'y' digit+.\n");
+	REQUIRE(L.g.has_value());
+	parser<char, char32_t> p(*L.g, default_parser_options<char, char32_t>());
+	CHECK(parses<char32_t>(p, "x12"));
+	CHECK_FALSE(parses<char32_t>(p, "xa"));
+	CHECK(parses<char32_t>(p, "yab"));
+	CHECK_FALSE(parses<char32_t>(p, "y1"));
+}
+
+// True when a grammar load fails with an error whose message holds msg and
+// the name.
+static bool load_error(const string& src, const string& msg,
+	const string& name)
+{
+	nonterminals<char, char32_t> nts;
+	auto res = tgf<char, char32_t>::from_string(nts, src);
+	if (res.has_value()) return false;
+	const auto& r = res.report();
+	for (size_t i = 0; i < r.nodes().size(); ++i) {
+		if (!diagnostics::is_error(r.nodes()[i].tag)) continue;
+		auto m = r.format_message(i);
+		if (m.find(msg) != string::npos
+			&& m.find(name) != string::npos) return true;
+	}
+	return false;
+}
+
+TEST_CASE("the old name of a renamed class in a rule is an error") {
+	CHECK(load_error(
+		"@use char class alpha as letter.\n"
+		"start => alpha.\n",
+		"used by its old name", "alpha"));
+}
+
+TEST_CASE("the old name listed beside the rename is an error") {
+	CHECK(load_error(
+		"@use char class alpha as letter, alpha.\n"
+		"start => alpha letter.\n",
+		"listed again", "alpha"));
+}
+
+TEST_CASE("one new name used twice is an error that names it") {
+	CHECK(load_error(
+		"@use char class digit, alpha as digit.\n"
+		"start => digit.\n",
+		"used twice", "digit"));
+	CHECK(load_error(
+		"@use char class alpha as x, digit as x.\n"
+		"start => x.\n",
+		"used twice", "x"));
+}
+
+TEST_CASE("one class listed two times is an error") {
+	CHECK(load_error(
+		"@use char classes digit, digit.\n"
+		"start => digit.\n",
+		"used twice", "digit"));
+}
+
+// True when a grammar load reports a warning whose message holds msg.
+static bool load_warning(const string& src, const string& msg) {
+	nonterminals<char, char32_t> nts;
+	auto res = tgf<char, char32_t>::from_string(nts, src);
+	const auto& r = res.report();
+	for (size_t i = 0; i < r.nodes().size(); ++i)
+		if (diagnostics::is_warning(r.nodes()[i].tag)
+			&& r.format_message(i).find(msg) != string::npos)
+				return true;
+	return false;
+}
+
+TEST_CASE("a name used twice gets the error and no unproductive warning") {
+	const string src =
+		"@use char classes digit, alpha as digit.\n"
+		"start => digit+.\n";
+	CHECK(load_error(src, "used twice", "digit"));
+	CHECK_FALSE(load_warning(src, "Unproductive nonterminal"));
+}
+
+// True when a report holds an error whose message holds msg and the name.
+static bool report_error(const diagnostics::report& r, const string& msg,
+	const string& name)
+{
+	for (size_t i = 0; i < r.nodes().size(); ++i) {
+		if (!diagnostics::is_error(r.nodes()[i].tag)) continue;
+		auto m = r.format_message(i);
+		if (m.find(msg) != string::npos
+			&& m.find(name) != string::npos) return true;
+	}
+	return false;
+}
+
+// True when the class loaded under name accepts c.
+static bool accepts(const char_class_fns<char>& cc, nonterminals<char>& nts,
+	const string& name, char c)
+{
+	auto it = cc.fns.find(nts.get(name));
+	return it != cc.fns.end() && it->second(c);
+}
+
+TEST_CASE("a rename in the API loads its class under the new name") {
+	nonterminals<char> nts;
+	diagnostics::report rep;
+	auto cc = predefined_char_classes<char>({ "alpha" },
+		{ { "digit", "d" } }, nts, &rep);
+	CHECK_FALSE(rep.has_error());
+	CHECK(accepts(cc, nts, "alpha", 'a'));
+	CHECK(accepts(cc, nts, "d", '5'));
+	CHECK_FALSE(accepts(cc, nts, "d", 'a'));
+	CHECK_FALSE(cc.is_fn(nts.get("digit")));
+	CHECK(cc.renamed.at(nts.get("d")) == "digit");
+}
+
+TEST_CASE("a class in the names and in the renames loads only renamed") {
+	nonterminals<char> nts;
+	diagnostics::report rep;
+	auto cc = predefined_char_classes<char>({ "digit" },
+		{ { "digit", "d" } }, nts, &rep);
+	CHECK_FALSE(rep.has_error());
+	CHECK(accepts(cc, nts, "d", '5'));
+	CHECK_FALSE(cc.is_fn(nts.get("digit")));
+}
+
+TEST_CASE("two classes swap their names in the API") {
+	nonterminals<char> nts;
+	diagnostics::report rep;
+	auto cc = predefined_char_classes<char>({},
+		{ { "digit", "alpha" }, { "alpha", "digit" } }, nts, &rep);
+	CHECK_FALSE(rep.has_error());
+	CHECK(accepts(cc, nts, "alpha", '5'));
+	CHECK_FALSE(accepts(cc, nts, "alpha", 'a'));
+	CHECK(accepts(cc, nts, "digit", 'a'));
+	CHECK_FALSE(accepts(cc, nts, "digit", '5'));
+}
+
+TEST_CASE("two renames to one name are an error in the API") {
+	nonterminals<char> nts;
+	diagnostics::report rep;
+	auto cc = predefined_char_classes<char>({},
+		{ { "digit", "x" }, { "alpha", "x" } }, nts, &rep);
+	CHECK(report_error(rep, "used twice", "x"));
+	CHECK_FALSE(cc.is_fn(nts.get("x")));
+}
+
+TEST_CASE("a rename to the name of a kept class is an error in the API") {
+	nonterminals<char> nts;
+	diagnostics::report rep;
+	auto cc = predefined_char_classes<char>({ "digit" },
+		{ { "alpha", "digit" } }, nts, &rep);
+	CHECK(report_error(rep, "used twice", "digit"));
+	CHECK_FALSE(cc.is_fn(nts.get("digit")));
+}
+
+TEST_CASE("an unknown renamed class is an error in the API") {
+	nonterminals<char> nts;
+	diagnostics::report rep;
+	predefined_char_classes<char>({}, { { "nosuch", "x" } }, nts, &rep);
+	CHECK(report_error(rep, "unknown character class", "nosuch"));
+}
+
+TEST_CASE("the generated parser gives the renames as a map") {
+	loaded L = load_tgf(
+		"@use char classes alpha, digit as d.\n"
+		"start => alpha d.\n");
+	REQUIRE(L.g.has_value());
+	string text = generate_parser_text(*L.g);
+	CHECK(text.find("\t\t\"alpha\",\n\t}, {\n"
+		"\t\t{ \"digit\", \"d\" },\n\t}, nts);") != string::npos);
+}
+
+TEST_CASE("the generated parser of a grammar without renames has no map") {
+	loaded L = load_tgf(
+		"@use char classes alpha, digit.\n"
+		"start => alpha digit.\n");
+	REQUIRE(L.g.has_value());
+	string text = generate_parser_text(*L.g);
+	auto b = text.find("predefined_char_classes");
+	REQUIRE(b != string::npos);
+	auto call = text.substr(b, text.find("nts);", b) - b);
+	CHECK(call.find("\t\t\"digit\",\n\t}, ") != string::npos);
+	CHECK(call.find("}, {") == string::npos);
+}
+
 #endif // PROJECT_SOURCE_DIR

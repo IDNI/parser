@@ -214,7 +214,7 @@ object with what the grammar file says in its `@` directives. It is a
 read-only snapshot from load time, so a later `set` does not change it.
 The live values stay in `options`. With no grammar the value is `null`.
 
-    {"use_char_classes":["digit"],"start":"start",
+    {"use_char_classes":["digit"],"char_class_renames":{},"start":"start",
      "enable_productions":["comma","crlf"],
      "disable_productions":[],
      "enabled_productions":["comma","crlf","no_header"],
@@ -227,7 +227,11 @@ The live values stay in `options`. With no grammar the value is `null`.
      "highlight_auto":false,
      "dynamic":{"tok":["a","b"]}}
 
-- `use_char_classes`: the names of `@use char classes`.
+- `use_char_classes`: the class names of `@use char classes`, in the
+  order of the file. A renamed class gives its source name.
+- `char_class_renames`: the new name of each renamed class, by its source
+  name. `@use char classes digit as d.` gives `{"digit":"d"}`. A grammar
+  without a rename gives `{}`.
 - `start`: the symbol of `@start`, or `null`.
 - `enable_productions` and `disable_productions`: the guard names as
   written after `@enable` and `@disable`; the `productions` keyword is

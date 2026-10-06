@@ -19,8 +19,11 @@ namespace idni {
 /// What a grammar file says, as the builder read it. A client gets this
 /// read-only snapshot; the live option values stay in grammar::options.
 struct tgf_directives {
-	/// @use char class names.
+	/// @use char class names, in the order of the file. A renamed class
+	/// gives its source name.
 	std::vector<std::string> use_char_classes{};
+	/// @use char class <class> as <name>: the new name, by the class.
+	std::map<std::string, std::string> char_class_renames{};
 	/// @start symbol, empty when the file names none.
 	std::string start{};
 	/// @enable guard names, as written.
@@ -257,8 +260,15 @@ private:
 		std::shared_ptr<nonterminals<C, T>> nts_handle;
 		/// set by @start ...
 		prods_t start = nul;
-		/// char class names coming from @use char class ...
+		/// char class names coming from @use char class ..., in the order
+		/// of the file, so that the class nonterminals keep their ids
 		std::vector<std::string> cc_names{};
+		/// @use char class <class> as <name>, by the class
+		std::map<std::string, std::string> cc_renames{};
+		/// every <class> as <name> of @use, in the order of the file
+		std::vector<std::pair<std::string, std::string>> cc_aliases{};
+		/// a renamed class listed again, which has its load error
+		std::set<std::string> cc_again{};
 		/// plain (non-glob) @highlight pattern names seen so far.
 		std::set<std::string> highlight_plain_names{};
 		/// grammar options
@@ -288,7 +298,9 @@ private:
 			auto statements  = t || tgf_parser::statement;
 			auto directive_nodes = statements || tgf_parser::directive;
 			for (const auto& d : directive_nodes()) collect_cc_names(d);
-			cc = predefined_char_classes<C, T>(cc_names, nts, diag);
+			collect_cc_renames();
+			cc = predefined_char_classes<C, T>(cc_names, cc_renames,
+				nts, diag);
 			for (const auto& d : directive_nodes()) directive(d);
 			auto productions = statements || tgf_parser::production;
 			for (const auto& pr : productions()) production(pr);
@@ -302,10 +314,27 @@ private:
 				for (const auto& l : lt)
 					if (l.nt()) referenced.insert(l.n());
 			}
+			// a renamed class has only its new name in this grammar
+			std::set<std::string> old_names, cc_locals(cc_again);
+			for (const auto& cc_name : cc_names)
+				if (!cc_renames.count(cc_name)) cc_locals.insert(cc_name);
+				else if (!cc_again.count(cc_name))
+					old_names.insert(cc_name);
+			for (const auto& [cc_name, local] : cc_aliases)
+				cc_locals.insert(local);
 			for (auto nt : referenced) {
 				if (defined.count(nt)) continue;
 				if (cc.is_fn(nt)) continue;
 				auto name = nts.get(nt);
+				if (old_names.count(name)) {
+					diag->error(
+						idni::diagnostics::code::invalid_argument,
+						messages::char_class_old_name,
+						{{ label::name, name }});
+					continue;
+				}
+				// a @use name that is no class got its load error
+				if (cc_locals.count(name)) continue;
 				if (name.size() >= 2 && name[0] == '_'
 					&& name[1] == '_') continue;
 				// a @dynamic nonterminal has no alternatives yet
@@ -318,8 +347,7 @@ private:
 			for (auto nt : defined) defined_names.insert(nts.get(nt));
 			for (auto& name : highlight_plain_names) {
 				if (defined_names.count(name)) continue;
-				if (std::find(cc_names.begin(), cc_names.end(),
-					name) != cc_names.end()) continue;
+				if (cc_locals.count(name)) continue;
 				diag->warning(
 					messages::unproductive_nonterminal,
 					{{ label::name, name }});
@@ -329,6 +357,7 @@ private:
 		// reads what the file said, not what a later set changed.
 		void fill_directives() {
 			dirs->use_char_classes = cc_names;
+			dirs->char_class_renames = cc_renames;
 			dirs->start = (start == nul) ? std::string()
 				: start.to_lit().to_std_string();
 			dirs->enabled_productions.reserve(
@@ -458,7 +487,12 @@ private:
 	}
 
 	// Collect all sym args from cmd blocks and dir_pairs.
-	std::vector<std::string> dir_sym_args(const trv& t) {
+	/// An alias of a dir_list gives its class and goes to \p aliases, or
+	/// is skipped without it.
+	std::vector<std::string> dir_sym_args(const trv& t,
+		std::vector<std::pair<std::string, std::string>>* aliases
+			= nullptr)
+	{
 		std::vector<std::string> v;
 		// from directive_cmd blocks
 		for (auto& cmd : (t || tgf_parser::directive_cmd)())
@@ -473,7 +507,16 @@ private:
 			if (txt == "," || txt == ";") continue;
 			if ((c | trv::nonterminal)
 				!= tgf_parser::dir_arg) continue;
-			txt = dir_arg_text(c | trv::only_child);
+			auto a = c | trv::only_child;
+			if ((a | trv::nonterminal) == tgf_parser::dir_alias) {
+				auto syms = (a || tgf_parser::dir_sym)();
+				if (!aliases || syms.size() != 2) continue;
+				aliases->emplace_back(dir_arg_text(syms[0]),
+					dir_arg_text(syms[1]));
+				v.push_back(aliases->back().first);
+				continue;
+			}
+			txt = dir_arg_text(a);
 			if (!txt.empty()) v.push_back(txt);
 		}
 		return v;
@@ -485,7 +528,8 @@ private:
 	void collect_cc_names(const trv& t) {
 		std::string name = dir_name(t);
 		if (name.empty() || name != "use") return;
-		auto args = dir_sym_args(t);
+		std::vector<std::pair<std::string, std::string>> aliases;
+		auto args = dir_sym_args(t, &aliases);
 		// find "char class" or "char classes" and collect everything after
 		for (size_t i = 0; i + 1 < args.size(); ++i)
 			if (args[i] == "char"
@@ -496,8 +540,34 @@ private:
 					j < args.size(); ++j)
 					if (!args[j].empty())
 					    cc_names.push_back(args[j]);
+				cc_aliases.insert(cc_aliases.end(),
+					aliases.begin(), aliases.end());
 				return;
 			}
+	}
+
+	// A class renamed two times, or listed beside its rename, is an error.
+	// The class stays once in cc_names, at its first place.
+	void collect_cc_renames() {
+		for (const auto& [cc_name, local] : cc_aliases)
+			if (!cc_renames.emplace(cc_name, local).second)
+				cc_again.insert(cc_name);
+		std::set<std::string> seen;
+		std::vector<std::string> names;
+		for (const auto& cc_name : cc_names) {
+			if (!cc_renames.count(cc_name)) names.push_back(cc_name);
+			else if (seen.insert(cc_name).second)
+				names.push_back(cc_name);
+			else cc_again.insert(cc_name);
+		}
+		cc_names = std::move(names);
+		for (const auto& cc_name : cc_again)
+			if (diag) diag->error(
+				idni::diagnostics::code::invalid_argument,
+				messages::char_class_listed_again,
+				{{ label::name, cc_name }});
+			else std::cerr << messages::char_class_listed_again
+				<< ": " << cc_name << '\n';
 	}
 
 	void directive(const trv& t) {

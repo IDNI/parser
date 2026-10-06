@@ -735,6 +735,12 @@
 				"use_char_classes": {
 					"$ref": "#/$defs/string_list"
 				},
+				"char_class_renames": {
+					"type": "object",
+					"additionalProperties": {
+						"type": "string"
+					}
+				},
 				"start": {
 					"type": ["string", "null"]
 				},
@@ -799,6 +805,7 @@
 			},
 			"required": [
 				"use_char_classes",
+				"char_class_renames",
 				"start",
 				"enable_productions",
 				"disable_productions",

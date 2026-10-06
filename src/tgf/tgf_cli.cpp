@@ -481,6 +481,10 @@ static format::json::value directives_to_value(const tgf_directives& d) {
 	};
 	value v = value::object();
 	v.set("use_char_classes", str_array(d.use_char_classes));
+	value renames = value::object();
+	for (const auto& [cc_name, local] : d.char_class_renames)
+		renames.set(cc_name, value::string(local));
+	v.set("char_class_renames", std::move(renames));
 	v.set("start", d.start.empty() ? value::null()
 		: value::string(d.start));
 	v.set("enable_productions", str_array(d.enable_productions));

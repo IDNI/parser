@@ -201,6 +201,14 @@ struct messages {
 	static constexpr sv loading_grammars_unavailable =
 		"Loading grammars is not available in a specialized REPL";
 	static constexpr sv unproductive_nonterminal = "Unproductive nonterminal";
+	// character class load errors
+	static constexpr sv unknown_char_class     = "unknown character class";
+	static constexpr sv char_class_old_name    =
+		"renamed character class used by its old name";
+	static constexpr sv char_class_listed_again =
+		"renamed character class listed again";
+	static constexpr sv char_class_name_twice  =
+		"character class name used twice";
 	static constexpr sv preprocess               = "preprocess";
 	static constexpr sv unknown_directive        = "Unknown directive";
 	static constexpr sv unknown_directive_argument =

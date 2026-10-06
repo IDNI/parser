@@ -454,8 +454,9 @@ bool char_class_fns<T>::is_eof_fn(size_t nt) const {
 
 template <typename C, typename T>
 char_class_fns<T> predefined_char_classes(
-	const std::vector<std::string>& cc_fn_names, nonterminals<C, T>& nts,
-	idni::diagnostics::report* diag)
+	const std::vector<std::string>& cc_fn_names,
+	const std::map<std::string, std::string>& renames,
+	nonterminals<C, T>& nts, idni::diagnostics::report* diag)
 {
 	using namespace idni::parser_strings;
 	char_class_fns<T> r;
@@ -479,23 +480,55 @@ char_class_fns<T> predefined_char_classes(
 		{ "xdigit",    charclasses::isxdigit<T> }
 	};
 	r(nts.get(std::basic_string<C>{}), [](T) { return false; });
+	auto new_name = [&renames](const std::string& cc) {
+		auto it = renames.find(cc);
+		return it == renames.end() ? cc : it->second;
+	};
+	// the source class and the name of each class to load, in the order
+	// of cc_fn_names, so that a grammar without renames keeps its ids
+	std::vector<std::pair<std::string, std::string>> loads;
+	std::set<std::string> listed;
 	for (const auto& cc : cc_fn_names) {
+		listed.insert(cc);
+		loads.emplace_back(cc, new_name(cc));
+	}
+	for (const auto& [cc, name] : renames)
+		if (!listed.count(cc)) loads.emplace_back(cc, name);
+	std::map<std::string, size_t> uses;
+	for (const auto& [cc, name] : loads) ++uses[name];
+	auto error = [&diag](idni::diagnostics::code c, std::string_view msg,
+		const std::string& name)
+	{
+		if (diag) diag->error(c, msg, {{ label::name, name }});
+		else std::cerr << msg << ": " << to_string(name) << '\n';
+	};
+	for (const auto& [name, n] : uses)
+		if (n > 1) error(idni::diagnostics::code::invalid_argument,
+			messages::char_class_name_twice, name);
+	for (const auto& [cc, name] : loads) {
+		if (uses[name] > 1) continue;
 		auto it = predef.find(cc);
 		if (it == predef.end()) {
-			if (diag) {
-				diag->error(idni::diagnostics::code::unknown_char_class,
-					"unknown character class",
-					{{ label::name, cc }});
-			} else
-				std::cerr << "Unknown character class: "
-					<< to_string(cc) << '\n';
+			// a name used twice has its error already
+			if (auto u = uses.find(cc); u == uses.end() || u->second < 2)
+				error(idni::diagnostics::code::unknown_char_class,
+					messages::unknown_char_class, cc);
 			continue;
 		}
-		auto nt = nts.get(from_str<C>(it->first));
+		auto nt = nts.get(from_str<C>(name));
 		r(nt, it->second);
+		if (name != cc) r.renamed[nt] = cc;
 		if (cc == "eof") r.eof_fn = nt;
 	}
 	return r;
+}
+
+template <typename C, typename T>
+char_class_fns<T> predefined_char_classes(
+	const std::vector<std::string>& cc_fn_names, nonterminals<C, T>& nts,
+	idni::diagnostics::report* diag)
+{
+	return predefined_char_classes<C, T>(cc_fn_names, {}, nts, diag);
 }
 //-----------------------------------------------------------------------------
 template <typename C, typename T>

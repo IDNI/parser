@@ -14,7 +14,7 @@
 	string  : terminal_string, terminal_char;
 	comment : comment;
 	number  : escaped_s, escaped_c, terminal_hex;
-        keyword : dir_sym;
+        keyword : dir_sym, dir_alias > ("as");
 	variable: sym;
 	delimiter: production > ('.'), directive > ('.').
 
@@ -67,8 +67,10 @@ dir_pair               => dir_list [ _ ':' _ dir_list ].
 dir_list               => dir_arg (_ ',' _ dir_arg)*.
 # the negation keeps a run of words and strings out of dir_arg, so the words
 # stay directive_cmd and a string stays a separate argument
-dir_arg                => tree_path | dir_sym | terminal_string
+dir_arg                => dir_alias | tree_path | dir_sym | terminal_string
                         | treemr_pattern & ~(pat_word (pat_space+ pat_word)+).
+# a local name for a character class: @use char class unicode_alpha as alpha.
+dir_alias              => dir_sym __ "as" __ dir_sym.
 pat_word               => dir_sym | terminal_string.
 tree_path              => dir_sym _ '>' _ dir_sym (_ '>' _ dir_sym)*.
 dir_sym                => (alpha | '_' | '*') (alnum | '_' | '*')*.
