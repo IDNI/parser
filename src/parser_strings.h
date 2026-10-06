@@ -282,12 +282,24 @@ struct messages {
 	static constexpr sv escape_invalid_utf8     = "Invalid UTF-8.";
 	// options repository errors
 	static constexpr sv option_already_exists = "Option already exists";
+	static constexpr sv command_already_exists = "Command already exists";
+	static constexpr sv option_short_name_taken =
+		"Two options use the same short name on one command";
+	static constexpr sv option_command_default_kind =
+		"The default of a command has another kind than the option";
 	static constexpr sv option_not_found = "Unknown option";
 	static constexpr sv option_bad_value =
 		"The option does not take the value";
 	static constexpr sv option_env_bad_value =
 		"The option does not take the value of the environment variable, "
 		"so it is ignored";
+	static constexpr sv option_missing_argument =
+		"Missing argument for option";
+	static constexpr sv option_unknown_command = "Unknown command";
+	static constexpr sv option_second_command =
+		"Only one command is allowed";
+	static constexpr sv option_no_such_file =
+		"Invalid command or file does not exist";
 };
 
 struct counters {

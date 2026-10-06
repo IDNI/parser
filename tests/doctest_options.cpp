@@ -2,12 +2,14 @@
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 // Tests for the options repository: declare, typed access, sources and
-// precedence, text access and the environment.
+// precedence, text access, the environment and the command line.
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 
 #include <cstdlib>
+#include <initializer_list>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -30,17 +32,42 @@ bool contains(const string& text, const string& part) {
 	return text.find(part) != string::npos;
 }
 
+// A writable argv that lives as long as the object.
+struct argv_of {
+	vector<string> store;
+	vector<char*> ptrs;
+	argv_of(initializer_list<const char*> args)
+		: store(args.begin(), args.end())
+	{
+		for (auto& s : store) ptrs.push_back(s.data());
+	}
+	int argc() const { return static_cast<int>(ptrs.size()); }
+	char** argv() { return ptrs.data(); }
+};
+
 option_set tool_set() {
 	return option_set{
 		.options = {
-			{ "help", "cli", false, "show the help" },
-			{ "verbose", "cli", false, "print more" },
-			{ "count", "run", size_t{ 1 }, "how many times" },
-			{ "name", "run", string("x"), "a name" },
-			{ "tags", "run", option_list{}, "the tags" },
-			{ "force", "run", false, "force it" },
-			{ "quiet", "run", false, "print less" },
-			{ "input", "show", string(""), "the input", false },
+			{ "help", "cli", false, "show the help",
+				{ { "", 'h' } } },
+			{ "verbose", "cli", false, "print more",
+				{ { "", 'v' } } },
+			{ "count", "run", size_t{ 1 }, "how many times",
+				{ { "run", 'n' } } },
+			{ "name", "run", string("x"), "a name",
+				{ { "run", 's', string("none") } } },
+			{ "tags", "run", option_list{}, "the tags",
+				{ { "run", 't' } } },
+			{ "force", "run", false, "force it",
+				{ { "run", 'f' }, { "show", 'f' } } },
+			{ "quiet", "run", false, "print less",
+				{ { "run", 'q' } } },
+			{ "input", "show", string(""), "the input",
+				{ { "show" } }, false },
+		},
+		.commands = {
+			{ "run", "run the tool" },
+			{ "show", "show the state" },
 		},
 	};
 }
@@ -53,6 +80,13 @@ struct fixture {
 	size_t session = repo.source("session");
 	fixture() { REQUIRE(repo.declare(tool_set()).has_value()); }
 };
+
+args_config tool_config() {
+	args_config cfg;
+	cfg.name = "tool";
+	cfg.description = "a test tool";
+	return cfg;
+}
 
 } // namespace
 
@@ -90,6 +124,35 @@ TEST_CASE("a name twice in one set declares nothing") {
 	CHECK(r.has_error());
 	CHECK(contains(messages_of(r.report()), "Option already exists"));
 	CHECK(repo.names().empty());
+}
+
+TEST_CASE("a command twice is an error") {
+	options_repository repo;
+	auto r = repo.declare(option_set{ .commands = {
+		{ "run", "" }, { "run", "" } } });
+	CHECK(r.has_error());
+	CHECK(contains(messages_of(r.report()), "Command already exists"));
+}
+
+TEST_CASE("two options with one short letter on one command") {
+	options_repository repo;
+	auto r = repo.declare(option_set{ .options = {
+		{ "alpha", "", false, "", { { "run", 'x' } } },
+		{ "beta", "", false, "", { { "run", 'x' } } } } });
+	CHECK(r.has_error());
+	const string msg = messages_of(r.report());
+	CHECK(contains(msg, "alpha"));
+	CHECK(contains(msg, "beta"));
+	CHECK(repo.names().empty());
+	// the same letter on two commands is fine
+	auto ok = repo.declare(option_set{ .options = {
+		{ "alpha", "", false, "", { { "run", 'x' } } },
+		{ "beta", "", false, "", { { "show", 'x' } } } } });
+	CHECK(ok.has_value());
+	// a later set is checked against the declared options too
+	auto late = repo.declare(option_set{ .options = {
+		{ "gamma", "", false, "", { { "run", 'x' } } } } });
+	CHECK(late.has_error());
 }
 
 } // TEST_SUITE
@@ -151,6 +214,72 @@ TEST_CASE("version grows only when a value changes") {
 
 } // TEST_SUITE
 
+TEST_SUITE("options command defaults") {
+
+// An option with a default for the command "run" and none for "show".
+option_set echo_set() {
+	return option_set{
+		.options = {
+			{ "echo", "", false, "echo the input",
+				{ { "run", 'e', true }, { "show", 'e' } } },
+		},
+		.commands = { { "run", "" }, { "show", "" } },
+	};
+}
+
+TEST_CASE("a command default applies when its command runs") {
+	options_repository repo;
+	const size_t cli = repo.source("command-line");
+	REQUIRE(repo.declare(echo_set()).has_value());
+	CHECK(!repo.get<bool>("echo"));
+	argv_of run{ "tool", "run" };
+	REQUIRE(repo.parse_args(run.argc(), run.argv(), cli).has_value());
+	CHECK(repo.get<bool>("echo"));
+	auto text = repo.get_text("echo");
+	REQUIRE(text.has_value());
+	CHECK(text.value() == "true");
+	argv_of show{ "tool", "show" };
+	REQUIRE(repo.parse_args(show.argc(), show.argv(), cli).has_value());
+	CHECK(!repo.get<bool>("echo"));
+}
+
+TEST_CASE("a source value wins over the command default") {
+	options_repository repo;
+	const size_t cli = repo.source("command-line");
+	const size_t session = repo.source("session");
+	REQUIRE(repo.declare(echo_set()).has_value());
+	repo.set("echo", false, session);
+	argv_of run{ "tool", "run" };
+	REQUIRE(repo.parse_args(run.argc(), run.argv(), cli).has_value());
+	CHECK(!repo.get<bool>("echo"));
+	repo.clear("echo", session);
+	CHECK(repo.get<bool>("echo"));
+}
+
+TEST_CASE("the help of a command shows its default") {
+	options_repository repo;
+	repo.source("command-line");
+	REQUIRE(repo.declare(echo_set()).has_value());
+	ostringstream run, show;
+	repo.help(run, "run");
+	repo.help(show, "show");
+	CHECK(contains(run.str(), "echo the input (default: true)"));
+	CHECK(contains(show.str(), "echo the input (default: false)"));
+}
+
+TEST_CASE("a command default of another kind is an error") {
+	options_repository repo;
+	auto r = repo.declare(option_set{ .options = {
+		{ "echo", "", false, "", { { "run", 'e', size_t{ 1 } } } } } });
+	CHECK(r.has_error());
+	const string msg = messages_of(r.report());
+	CHECK(contains(msg, "echo"));
+	CHECK(contains(msg, "run"));
+	CHECK(repo.names().empty());
+}
+
+} // TEST_SUITE
+
 TEST_SUITE("options text") {
 
 TEST_CASE("set_text and get_text use the kind") {
@@ -205,6 +334,161 @@ TEST_CASE("load_env reads the variables and warns on a bad value") {
 	CHECK(!f.repo.get<bool>("force"));
 	CHECK(f.repo.get<size_t>("count") == 1u);
 	CHECK(!f.repo.is_set("input", f.env));
+}
+
+} // TEST_SUITE
+
+TEST_SUITE("options command line") {
+
+TEST_CASE("--name=value and --name value") {
+	fixture f;
+	argv_of a{ "tool", "run", "--count=3", "--name", "abc" };
+	auto r = f.repo.parse_args(a.argc(), a.argv(), f.cli, tool_config());
+	REQUIRE(r.has_value());
+	CHECK(r.value().command == "run");
+	CHECK(f.repo.get<size_t>("count") == 3u);
+	CHECK(f.repo.get<string>("name") == "abc");
+	CHECK(f.repo.is_set("count", f.cli));
+}
+
+TEST_CASE("-abc sets several short flags and -x takes a value") {
+	fixture f;
+	argv_of a{ "tool", "run", "-fq", "-n", "5" };
+	auto r = f.repo.parse_args(a.argc(), a.argv(), f.cli, tool_config());
+	REQUIRE(r.has_value());
+	CHECK(f.repo.get<bool>("force"));
+	CHECK(f.repo.get<bool>("quiet"));
+	CHECK(f.repo.get<size_t>("count") == 5u);
+}
+
+TEST_CASE("a flag with no value, and a flag with a value") {
+	fixture f;
+	argv_of a{ "tool", "-v", "run", "--force", "--quiet", "off" };
+	auto r = f.repo.parse_args(a.argc(), a.argv(), f.cli, tool_config());
+	REQUIRE(r.has_value());
+	CHECK(f.repo.get<bool>("verbose"));
+	CHECK(f.repo.get<bool>("force"));
+	CHECK(!f.repo.get<bool>("quiet"));
+}
+
+TEST_CASE("a repeated list appends and the last value wins otherwise") {
+	fixture f;
+	argv_of a{ "tool", "run", "-t", "a,b", "--tags", "c",
+		"--count", "1", "--count", "2" };
+	auto r = f.repo.parse_args(a.argc(), a.argv(), f.cli, tool_config());
+	REQUIRE(r.has_value());
+	CHECK(f.repo.get<option_list>("tags")
+		== option_list{ "a", "b", "c" });
+	CHECK(f.repo.get<size_t>("count") == 2u);
+}
+
+TEST_CASE("the default command takes the options after the global ones") {
+	fixture f;
+	args_config cfg = tool_config();
+	cfg.default_command = "run";
+	argv_of a{ "tool", "-v", "--count", "2" };
+	auto r = f.repo.parse_args(a.argc(), a.argv(), f.cli, cfg);
+	REQUIRE(r.has_value());
+	CHECK(r.value().command == "run");
+	CHECK(f.repo.get<bool>("verbose"));
+	CHECK(f.repo.get<size_t>("count") == 2u);
+}
+
+TEST_CASE("the file list and the default command when there are files") {
+	fixture f;
+	args_config cfg = tool_config();
+	cfg.default_command = "run";
+	cfg.default_command_when_files = "show";
+	argv_of a{ "tool", "-" };
+	auto r = f.repo.parse_args(a.argc(), a.argv(), f.cli, cfg);
+	REQUIRE(r.has_value());
+	CHECK(r.value().files == vector<string>{ "-" });
+	CHECK(r.value().command == "show");
+}
+
+TEST_CASE("--help sets the help field") {
+	fixture f;
+	argv_of a{ "tool", "-h" };
+	auto r = f.repo.parse_args(a.argc(), a.argv(), f.cli, tool_config());
+	REQUIRE(r.has_value());
+	CHECK(r.value().help);
+	CHECK(r.value().command.empty());
+}
+
+TEST_CASE("an unknown option is an error with the help text") {
+	fixture f;
+	argv_of a{ "tool", "run", "--count", "7", "--nope" };
+	auto r = f.repo.parse_args(a.argc(), a.argv(), f.cli, tool_config());
+	CHECK(r.has_error());
+	CHECK(contains(messages_of(r.report()), "Unknown option"));
+	ostringstream printed;
+	r.report().print(printed);
+	CHECK(contains(printed.str(), "Commands:"));
+	// nothing is stored on an error
+	CHECK(f.repo.get<size_t>("count") == 1u);
+}
+
+TEST_CASE("an unknown option before the command with no default") {
+	fixture f;
+	argv_of a{ "tool", "--count", "2" };
+	auto r = f.repo.parse_args(a.argc(), a.argv(), f.cli, tool_config());
+	CHECK(r.has_error());
+}
+
+TEST_CASE("an unknown command is an error") {
+	fixture f;
+	args_config cfg = tool_config();
+	cfg.default_command = "missing";
+	argv_of a{ "tool" };
+	auto r = f.repo.parse_args(a.argc(), a.argv(), f.cli, cfg);
+	CHECK(r.has_error());
+	CHECK(contains(messages_of(r.report()), "Unknown command"));
+}
+
+TEST_CASE("a missing argument and a bad value are errors") {
+	fixture f;
+	argv_of missing{ "tool", "run", "--count" };
+	CHECK(f.repo.parse_args(missing.argc(), missing.argv(), f.cli,
+		tool_config()).has_error());
+	argv_of inner{ "tool", "run", "-nf", "3" };
+	CHECK(f.repo.parse_args(inner.argc(), inner.argv(), f.cli,
+		tool_config()).has_error());
+	argv_of bad{ "tool", "run", "--count", "x" };
+	auto r = f.repo.parse_args(bad.argc(), bad.argv(), f.cli,
+		tool_config());
+	CHECK(r.has_error());
+	CHECK(contains(messages_of(r.report()), "count"));
+	argv_of second{ "tool", "run", "show" };
+	CHECK(f.repo.parse_args(second.argc(), second.argv(), f.cli,
+		tool_config()).has_error());
+	argv_of nofile{ "tool", "run", "no-such-file-here" };
+	CHECK(f.repo.parse_args(nofile.argc(), nofile.argv(), f.cli,
+		tool_config()).has_error());
+}
+
+TEST_CASE("the help text of the program and of a command") {
+	fixture f;
+	args_config cfg = tool_config();
+	cfg.help_header = "tool <file>";
+	argv_of a{ "tool" };
+	REQUIRE(f.repo.parse_args(a.argc(), a.argv(), f.cli, cfg).has_value());
+	ostringstream program;
+	f.repo.help(program);
+	const string p = program.str();
+	CHECK(contains(p, "tool <file> [ options ] <command>"));
+	CHECK(contains(p, "a test tool"));
+	CHECK(contains(p, "Options:"));
+	CHECK(contains(p, "--verbose\t-v\tprint more"));
+	CHECK(contains(p, "Commands:"));
+	CHECK(contains(p, "\trun\t\t\trun the tool"));
+	ostringstream run;
+	f.repo.help(run, "run");
+	const string c = run.str();
+	CHECK(contains(c, "tool <file> run [ options ]"));
+	CHECK(contains(c, "Command options:"));
+	CHECK(contains(c, "--count\t\t-n\thow many times (default: 1)"));
+	// the surface default text replaces the value in the help
+	CHECK(contains(c, "(default: none)"));
 }
 
 } // TEST_SUITE

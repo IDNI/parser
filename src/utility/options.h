@@ -7,6 +7,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
+#include <ostream>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -20,21 +22,55 @@ using option_list  = std::vector<std::string>;
 /// The index of the alternative is the kind of the option.
 using option_value = std::variant<bool, std::size_t, std::string, option_list>;
 
+/// Where an option shows on the command line: the command, a short letter,
+/// and an optional default of that command. The default has the kind of the
+/// option.
+struct option_surface {
+	std::string command;
+	char short_name = '\0';
+	std::optional<option_value> fallback = std::nullopt;
+};
+
 /// One option. The type of `fallback` gives the kind.
 struct option_spec {
 	std::string name;
 	std::string owner;
 	option_value fallback;
 	std::string help;
+	std::vector<option_surface> surfaces;
 	bool from_env = true;
+};
+
+struct command_spec {
+	std::string name;
+	std::string help;
 };
 
 /// Everything one program declares.
 struct option_set {
 	std::vector<option_spec> options = {};
+	std::vector<command_spec> commands = {};
 };
 
 namespace detail { struct options_snapshot; }
+
+/// What one command line gave.
+struct parsed_args {
+	std::string command;
+	std::vector<std::string> files;
+	bool help = false;
+};
+
+/// The program data that parse_args() and help() need.
+struct args_config {
+	std::string name;
+	std::string help_header;
+	std::string description;
+	std::string default_command;
+	std::string default_command_when_files;
+	/// The surface of the options given before the command.
+	std::string global_surface;
+};
 
 struct options_repository {
 	options_repository();
@@ -69,6 +105,13 @@ struct options_repository {
 	[[nodiscard]] diagnostics::result<void> load_env(std::string_view prefix,
 		std::size_t source);
 
+	/// Store the values of argv at `source`. Nothing is stored on an error.
+	[[nodiscard]] diagnostics::result<parsed_args> parse_args(int argc,
+		char** argv, std::size_t source, const args_config& cfg = {});
+	/// The help of `command`, or of the program when it is empty. It uses
+	/// the config of the last parse_args() call.
+	void help(std::ostream& os, std::string_view command = {}) const;
+
 	/// A number that grows with each write that changes a value.
 	std::size_t version() const;
 
@@ -79,6 +122,7 @@ private:
 	std::unique_ptr<detail::options_snapshot> snap_;
 	std::size_t version_ = 0;
 	std::vector<std::string> sources_;
+	args_config cfg_;
 };
 
 } // namespace idni
