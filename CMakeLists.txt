@@ -55,12 +55,22 @@ option(TAU_PARSER_BUILD_EMSCRIPTEN     "Build for Emscripten"               OFF)
 option(TAU_PARSER_BUILD_TESTS          "Build library tests"                OFF)
 option(TAU_PARSER_BUILD_EXAMPLES       "Build examples"                     OFF)
 option(TAU_PARSER_BUILD_TGF            "Build tgf tool"                     OFF)
-# Remember whether the user set the serve option, so TAU_PARSER_BUILD_ALL
-# turns it on only when the user did not choose a value.
-if(DEFINED TAU_PARSER_BUILD_SERVE)
-	set(_TAU_SERVE_USER_SET ON)
-else()
+# Remember whether the user set the serve option, so the rules below decide
+# it only when the user did not choose a value. A cached value that a rule or
+# the default wrote is no choice: _TAU_SERVE_AUTO keeps that value.
+if(NOT DEFINED TAU_PARSER_BUILD_SERVE)
 	set(_TAU_SERVE_USER_SET OFF)
+elseif(DEFINED CACHE{_TAU_SERVE_AUTO})
+	if("${TAU_PARSER_BUILD_SERVE}" STREQUAL "$CACHE{_TAU_SERVE_AUTO}")
+		set(_TAU_SERVE_USER_SET OFF)
+	else()
+		set(_TAU_SERVE_USER_SET ON)
+	endif()
+elseif(NOT TAU_PARSER_BUILD_SERVE)
+	# a cache without the marker holds the default
+	set(_TAU_SERVE_USER_SET OFF)
+else()
+	set(_TAU_SERVE_USER_SET ON)
 endif()
 option(TAU_PARSER_BUILD_SERVE          "Build tgf serve and tgf connect (needs the Boost headers)" OFF)
 set(TAU_BOOST_INCLUDE_DIR "" CACHE PATH
@@ -157,6 +167,12 @@ if(TAU_PARSER_BUILD_TESTS AND NOT TAU_PARSER_BUILD_EMSCRIPTEN)
 		CACHE BOOL "Build examples" FORCE)
 endif()
 
+# some library tests link tgf_cli_core, which Emscripten does not build
+if(TAU_PARSER_BUILD_TESTS AND NOT TAU_PARSER_BUILD_EMSCRIPTEN)
+	set(TAU_PARSER_BUILD_TGF ON
+		CACHE BOOL "Build tgf tool" FORCE)
+endif()
+
 # the browser tests run the tgf program in a page, so they need the page
 if(TAU_PARSER_BUILD_BROWSER_TESTS)
 	set(TAU_PARSER_BUILD_BROWSER_PAGE ON
@@ -177,8 +193,8 @@ if(TAU_PARSER_BUILD_TGF)
 endif()
 
 # tgf serve and tgf connect need the Boost headers; the core library never
-# does. BUILD_ALL turns them on unless the user set the option. This runs after
-# the final TAU_PARSER_BUILD_TGF value and before parser-deps.
+# does. BUILD_ALL and the tests turn them on unless the user set the option.
+# This runs after the final TAU_PARSER_BUILD_TGF value and before parser-deps.
 if(TAU_PARSER_BUILD_EMSCRIPTEN)
 	# Emscripten has no sockets or processes.
 	set(TAU_PARSER_BUILD_SERVE OFF
@@ -187,9 +203,20 @@ elseif(NOT TAU_PARSER_BUILD_TGF)
 	# Serve is part of tgf. A plain variable keeps the cached choice for a
 	# later configure that turns tgf on.
 	set(TAU_PARSER_BUILD_SERVE OFF)
-elseif(TAU_PARSER_BUILD_ALL AND NOT _TAU_SERVE_USER_SET)
+elseif(_TAU_SERVE_USER_SET)
+	# the value of the user stays
+elseif(TAU_PARSER_BUILD_ALL OR TAU_PARSER_BUILD_TESTS)
+	# the serve and connect tests need the server
 	set(TAU_PARSER_BUILD_SERVE ON
 		CACHE BOOL "Build tgf serve and tgf connect (needs the Boost headers)" FORCE)
+else()
+	set(TAU_PARSER_BUILD_SERVE OFF
+		CACHE BOOL "Build tgf serve and tgf connect (needs the Boost headers)" FORCE)
+endif()
+if(_TAU_SERVE_USER_SET)
+	unset(_TAU_SERVE_AUTO CACHE)
+else()
+	set(_TAU_SERVE_AUTO "$CACHE{TAU_PARSER_BUILD_SERVE}" CACHE INTERNAL "")
 endif()
 unset(_TAU_SERVE_USER_SET)
 message(STATUS "TAU_PARSER_BUILD_SERVE: ${TAU_PARSER_BUILD_SERVE}")
