@@ -166,6 +166,30 @@ inline bool starts_with_int(std::string_view s) {
 	return i < s.size() && std::isdigit(static_cast<unsigned char>(s[i]));
 }
 
+/// `<scheme>://<rest>`, or `<host>:<port>` with a numeric port.
+inline bool is_url(std::string_view s) {
+	auto alnum = [](char c) {
+		return std::isalnum(static_cast<unsigned char>(c)) != 0;
+	};
+	if (auto sep = s.find("://"); sep != std::string_view::npos) {
+		if (sep == 0 || sep + 3 == s.size()
+			|| !std::isalpha(static_cast<unsigned char>(s[0])))
+				return false;
+		for (char c : s.substr(0, sep))
+			if (!alnum(c) && c != '+' && c != '-' && c != '.')
+				return false;
+		return true;
+	}
+	const auto colon = s.rfind(':');
+	if (colon == std::string_view::npos || colon == 0
+		|| colon + 1 == s.size()) return false;
+	for (char c : s.substr(0, colon))
+		if (!alnum(c) && c != '.' && c != '-' && c != '_') return false;
+	for (char c : s.substr(colon + 1))
+		if (!std::isdigit(static_cast<unsigned char>(c))) return false;
+	return true;
+}
+
 inline bool is_option_prefix(std::string_view s) {
 	return s.size() >= 2 && s[0] == '-' && !starts_with_int(s);
 }
@@ -842,12 +866,14 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 		if (cat.command(opt)) return 2;
 		bool is_short = false;
 		if (!detail::option_prefix(opt, is_short)) {
-			if (opt == "-" || std::ifstream(opt).good()) {
-				out.files.push_back(opt);
+			if (opt == "-" || std::ifstream(opt).good()
+				|| detail::is_url(opt))
+			{
+				out.inputs.push_back(opt);
 				++arg;
 				return 0;
 			}
-			fail_with_help(ps::messages::option_no_such_file,
+			fail_with_help(ps::messages::option_no_such_input,
 				{ { ps::label::value, opt } });
 			return 1;
 		}
@@ -926,15 +952,15 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 			break;
 	if (status == 1) return r;
 	if (status == 3 && (cfg.default_command.empty()
-		|| (!out.files.empty() && cfg.default_command_when_files.empty())))
+		|| (!out.inputs.empty() && cfg.default_command_when_inputs.empty())))
 	{
 		fail_with_help(ps::messages::option_not_found,
 			{ { ps::label::name, args[arg] } });
 		return r;
 	}
 	const std::string cmd = status == 2 ? args[arg++]
-		: out.files.empty() ? cfg.default_command
-		: cfg.default_command_when_files;
+		: out.inputs.empty() ? cfg.default_command
+		: cfg.default_command_when_inputs;
 	if (!cmd.empty()) {
 		if (!cat.command(cmd)) {
 			fail_with_help(ps::messages::option_unknown_command,

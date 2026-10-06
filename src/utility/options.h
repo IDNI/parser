@@ -71,7 +71,8 @@ private:
 /// What one command line gave.
 struct parsed_args {
 	std::string command;
-	std::vector<std::string> files;
+	/// The positional arguments: `-`, the files and the URLs.
+	std::vector<std::string> inputs;
 	bool help = false;
 };
 
@@ -81,7 +82,8 @@ struct args_config {
 	std::string help_header;
 	std::string description;
 	std::string default_command;
-	std::string default_command_when_files;
+	/// The command when the arguments name inputs: files or URLs.
+	std::string default_command_when_inputs;
 	/// The surface of the options given before the command.
 	std::string global_surface;
 };

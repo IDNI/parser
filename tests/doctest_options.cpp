@@ -22,6 +22,7 @@
 #endif
 
 #include "../src/utility/options.h"
+#include "test_env.h"
 
 using namespace std;
 using namespace idni;
@@ -493,14 +494,14 @@ TEST_CASE("an unknown name is an error") {
 
 TEST_CASE("load_env reads the variables and warns on a bad value") {
 	fixture f;
-	setenv("OPTTEST_FORCE", "OFF", 1);
-	setenv("OPTTEST_COUNT", "x", 1);
-	setenv("OPTTEST_INPUT", "file", 1);
+	test_setenv("OPTTEST_FORCE", "OFF");
+	test_setenv("OPTTEST_COUNT", "x");
+	test_setenv("OPTTEST_INPUT", "file");
 	f.repo.set("force", true, f.cli);
 	auto r = f.repo.load_env("OPTTEST_", f.env);
-	unsetenv("OPTTEST_FORCE");
-	unsetenv("OPTTEST_COUNT");
-	unsetenv("OPTTEST_INPUT");
+	test_unsetenv("OPTTEST_FORCE");
+	test_unsetenv("OPTTEST_COUNT");
+	test_unsetenv("OPTTEST_INPUT");
 	CHECK(r.has_value());
 	CHECK(!r.has_error());
 	const string msg = messages_of(r.report());
@@ -572,16 +573,46 @@ TEST_CASE("the default command takes the options after the global ones") {
 	CHECK(f.repo.get<size_t>("count") == 2u);
 }
 
-TEST_CASE("the file list and the default command when there are files") {
+TEST_CASE("the input list and the default command when there are inputs") {
 	fixture f;
 	args_config cfg = tool_config();
 	cfg.default_command = "run";
-	cfg.default_command_when_files = "show";
+	cfg.default_command_when_inputs = "show";
 	argv_of a{ "tool", "-" };
 	auto r = f.repo.parse_args(a.argc(), a.argv(), f.cli, cfg);
 	REQUIRE(r.has_value());
-	CHECK(r.value().files == vector<string>{ "-" });
+	CHECK(r.value().inputs == vector<string>{ "-" });
 	CHECK(r.value().command == "show");
+}
+
+TEST_CASE("a URL is an input") {
+	for (const char* url : { "http://example.com/a?b=c", "tcp://127.0.0.1:5000",
+		"git+ssh://host/repo", "localhost:8080", "127.0.0.1:1" })
+	{
+		fixture f;
+		args_config cfg = tool_config();
+		cfg.default_command = "run";
+		cfg.default_command_when_inputs = "show";
+		argv_of a{ "tool", url };
+		auto r = f.repo.parse_args(a.argc(), a.argv(), f.cli, cfg);
+		REQUIRE(r.has_value());
+		CHECK(r.value().inputs == vector<string>{ url });
+		CHECK(r.value().command == "show");
+	}
+}
+
+TEST_CASE("a word that is no file and no URL is an error") {
+	for (const char* word : { "no-such-input", "host:port", "host:",
+		":80", "://x", "1http://x", "a b:80" })
+	{
+		fixture f;
+		argv_of a{ "tool", "run", word };
+		auto r = f.repo.parse_args(a.argc(), a.argv(), f.cli,
+			tool_config());
+		CHECK(r.has_error());
+		CHECK(contains(messages_of(r.report()),
+			"Invalid command, or no such file or URL"));
+	}
 }
 
 TEST_CASE("--help sets the help field") {
@@ -676,7 +707,7 @@ TEST_CASE("a flag does not take a file") {
 	REQUIRE(r.has_value());
 	CHECK(f.repo.get<bool>("force"));
 	CHECK(f.repo.get<bool>("quiet"));
-	CHECK(r.value().files == vector<string>{ "-", "-" });
+	CHECK(r.value().inputs == vector<string>{ "-", "-" });
 }
 
 TEST_CASE("false on the command line wins over a true default") {

@@ -298,8 +298,8 @@ struct messages {
 	static constexpr sv option_unknown_command = "Unknown command";
 	static constexpr sv option_second_command =
 		"Only one command is allowed";
-	static constexpr sv option_no_such_file =
-		"Invalid command or file does not exist";
+	static constexpr sv option_no_such_input =
+		"Invalid command, or no such file or URL";
 };
 
 struct counters {
