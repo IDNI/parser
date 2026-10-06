@@ -30,6 +30,8 @@ set(TAU_PARSER_HEADERS
 	utility/measure.h
 	utility/memory_map.h
 	utility/memory_map.tmpl.h
+	utility/options.h
+	utility/options.tmpl.h
 	utility/repl.h
 	utility/repl_ftxui.h
 	utility/repl_ftxui.tmpl.h

@@ -142,6 +142,7 @@ set(DOCTESTS
 	derived_char_classes
 	tgf_json_api
 	grammar_ownership
+	options
 )
 
 # The serve and connect tests need Boost.Asio. They run on every platform;

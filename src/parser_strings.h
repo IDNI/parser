@@ -280,6 +280,14 @@ struct messages {
 	static constexpr sv escape_octal_scalar     = "Octal value is not a valid Unicode scalar.";
 	static constexpr sv escape_octal_overflow   = "Octal byte value exceeds 0xFF.";
 	static constexpr sv escape_invalid_utf8     = "Invalid UTF-8.";
+	// options repository errors
+	static constexpr sv option_already_exists = "Option already exists";
+	static constexpr sv option_not_found = "Unknown option";
+	static constexpr sv option_bad_value =
+		"The option does not take the value";
+	static constexpr sv option_env_bad_value =
+		"The option does not take the value of the environment variable, "
+		"so it is ignored";
 };
 
 struct counters {
