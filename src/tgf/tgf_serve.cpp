@@ -1123,8 +1123,9 @@ void serve_server::shutdown_session(
 	s->shutting_down = true;
 	s->ended = true;
 	if (auto c = s->conn.lock()) c->close_after_flush();
+	// Some Boost versions have no cancel(ec), and a timer cancel reports no error.
+	s->end_timer.cancel();
 	error_code ec;
-	s->end_timer.cancel(ec);
 #ifdef _WIN32
 	if (s->process) {
 		DWORD code = 0;
@@ -1476,8 +1477,9 @@ void serve_connection::update_read_state() {
 void serve_connection::close() {
 	if (closed) return;
 	closed = true;
+	// Some Boost versions have no cancel(ec), and a timer cancel reports no error.
+	write_timer.cancel();
 	error_code ec;
-	write_timer.cancel(ec);
 #ifndef _WIN32
 	srv->untrack_fd(socket.native_handle());
 #endif
