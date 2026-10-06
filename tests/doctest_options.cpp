@@ -644,6 +644,72 @@ TEST_CASE("a missing argument and a bad value are errors") {
 		tool_config()).has_error());
 }
 
+TEST_CASE("a flag takes each true and false word") {
+	for (const char* w : { "1", "t", "on", "yes", "true", "TRUE" }) {
+		fixture f;
+		argv_of a{ "tool", "run", "--force", w };
+		REQUIRE(f.repo.parse_args(a.argc(), a.argv(), f.cli,
+			tool_config()).has_value());
+		CHECK(f.repo.get<bool>("force"));
+	}
+	for (const char* w : { "0", "f", "off", "no", "false", "False" }) {
+		fixture f;
+		f.repo.set("force", true, f.env);
+		argv_of a{ "tool", "run", "--force", w };
+		REQUIRE(f.repo.parse_args(a.argc(), a.argv(), f.cli,
+			tool_config()).has_value());
+		CHECK(!f.repo.get<bool>("force"));
+	}
+	fixture f;
+	argv_of a{ "tool", "run", "--force=true", "--quiet=false" };
+	REQUIRE(f.repo.parse_args(a.argc(), a.argv(), f.cli,
+		tool_config()).has_value());
+	CHECK(f.repo.get<bool>("force"));
+	CHECK(f.repo.is_set("quiet", f.cli));
+	CHECK(!f.repo.get<bool>("quiet"));
+}
+
+TEST_CASE("a flag does not take a file") {
+	fixture f;
+	argv_of a{ "tool", "run", "-f", "-", "--quiet", "-" };
+	auto r = f.repo.parse_args(a.argc(), a.argv(), f.cli, tool_config());
+	REQUIRE(r.has_value());
+	CHECK(f.repo.get<bool>("force"));
+	CHECK(f.repo.get<bool>("quiet"));
+	CHECK(r.value().files == vector<string>{ "-", "-" });
+}
+
+TEST_CASE("false on the command line wins over a true default") {
+	options_repository repo;
+	const size_t cli = repo.source("command-line");
+	REQUIRE(repo.declare(option_set{ .options = {
+		{ "color", "", true, "", { { "", 'c' } } } } }).has_value());
+	argv_of a{ "tool", "--color", "false" };
+	REQUIRE(repo.parse_args(a.argc(), a.argv(), cli).has_value());
+	CHECK(!repo.get<bool>("color"));
+}
+
+TEST_CASE("a text value") {
+	fixture f;
+	argv_of space{ "tool", "run", "--name", "hello world" };
+	REQUIRE(f.repo.parse_args(space.argc(), space.argv(), f.cli,
+		tool_config()).has_value());
+	CHECK(f.repo.get<string>("name") == "hello world");
+	argv_of missing{ "tool", "run", "--name" };
+	CHECK(f.repo.parse_args(missing.argc(), missing.argv(), f.cli,
+		tool_config()).has_error());
+}
+
+TEST_CASE("several options of several kinds") {
+	fixture f;
+	argv_of a{ "tool", "run", "--force", "--count", "2", "--name", "ok" };
+	REQUIRE(f.repo.parse_args(a.argc(), a.argv(), f.cli,
+		tool_config()).has_value());
+	CHECK(f.repo.get<bool>("force"));
+	CHECK(f.repo.get<size_t>("count") == 2u);
+	CHECK(f.repo.get<string>("name") == "ok");
+}
+
 TEST_CASE("the help text of the program and of a command") {
 	fixture f;
 	args_config cfg = tool_config();
