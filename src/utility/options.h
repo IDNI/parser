@@ -15,42 +15,9 @@
 #include <vector>
 
 #include "diagnostics.h"
+#include "options_types.h"
 
 namespace idni {
-
-using option_list  = std::vector<std::string>;
-/// The index of the alternative is the kind of the option.
-using option_value = std::variant<bool, std::size_t, std::string, option_list>;
-
-/// Where an option shows on the command line: the command, a short letter,
-/// and an optional default of that command. The default has the kind of the
-/// option.
-struct option_surface {
-	std::string command;
-	char short_name = '\0';
-	std::optional<option_value> fallback = std::nullopt;
-};
-
-/// One option. The type of `fallback` gives the kind.
-struct option_spec {
-	std::string name;
-	std::string owner;
-	option_value fallback;
-	std::string help;
-	std::vector<option_surface> surfaces;
-	bool from_env = true;
-};
-
-struct command_spec {
-	std::string name;
-	std::string help;
-};
-
-/// Everything one program declares.
-struct option_set {
-	std::vector<option_spec> options = {};
-	std::vector<command_spec> commands = {};
-};
 
 namespace detail {
 struct options_snapshot;
