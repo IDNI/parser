@@ -151,6 +151,12 @@ if(TAU_RUN_GRAMMAR_TESTS)
 		CACHE BOOL "Build tgf tool" FORCE)
 endif()
 
+# the tests run each example once
+if(TAU_PARSER_BUILD_TESTS AND NOT TAU_PARSER_BUILD_EMSCRIPTEN)
+	set(TAU_PARSER_BUILD_EXAMPLES ON
+		CACHE BOOL "Build examples" FORCE)
+endif()
+
 # the browser tests run the tgf program in a page, so they need the page
 if(TAU_PARSER_BUILD_BROWSER_TESTS)
 	set(TAU_PARSER_BUILD_BROWSER_PAGE ON
@@ -468,6 +474,9 @@ if(TAU_PARSER_BUILD_TESTS)
 		include("${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists_emcc.txt")
 	endif()
 	add_subdirectory(tests)
+	if(TAU_PARSER_BUILD_EXAMPLES AND NOT TAU_PARSER_BUILD_EMSCRIPTEN)
+		include(tests/examples/examples_tests.cmake)
+	endif()
 endif()
 
 if(TAU_PARSER_BUILD_TESTS OR (TAU_RUN_GRAMMAR_TESTS AND TARGET tgf))

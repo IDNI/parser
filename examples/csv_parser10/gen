@@ -1,3 +1,11 @@
 #!/bin/sh
-
-../../build-Release/tgf ./csv.tgf gen --utf8
+# Generate csv_parser.generated.h with the tgf tool of a preset build.
+# usage: examples/csv_parser10/gen [<tgf binary>]   (default build/release/tgf)
+# It runs from the parser root, because the header names the grammar by
+# its path from there.
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+TGF="${1:-$ROOT/build/release/tgf}"
+case "$TGF" in /*) ;; *) TGF="$PWD/$TGF" ;; esac
+cd "$ROOT" || exit 1
+exec "$TGF" examples/csv_parser10/csv.tgf gen --utf8 \
+	--output-dir examples/csv_parser10

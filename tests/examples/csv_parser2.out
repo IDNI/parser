@@ -1,0 +1,5 @@
+Validator for positive integers. Enter a positive integer per line or Ctrl-D to quit
+entered: `12`
+parsed integer: 12
+entered: `345`
+parsed integer: 345

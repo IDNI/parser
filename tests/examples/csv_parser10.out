@@ -1,0 +1,5 @@
+CSV parser. Use comma separated values of string, integer or NULL. Use a new line to separate rows. Enter a CSV and use Ctrl-D to start parsing
+entered: `1,"abc",,-5
+2,"Àé 一"`
+parsed row: 1, "abc", NULL, -5
+parsed row: 2, "Àé 一"

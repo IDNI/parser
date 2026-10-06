@@ -1,0 +1,11 @@
+Validator for JSON files.
+Parsed value: {
+  "a": [
+    1,
+    -2,
+    "s"
+  ],
+  "b": {
+    "c": "x"
+  }
+}

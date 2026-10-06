@@ -1,0 +1,5 @@
+Validator for integers. Enter an integer per line or Ctrl-D to quit
+entered: `12`
+parsed integer: 12
+entered: `-7`
+parsed integer: -7

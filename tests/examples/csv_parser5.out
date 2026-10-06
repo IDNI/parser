@@ -1,0 +1,9 @@
+Validator for values of string, integer or NULL. Enter a value per line or Ctrl-D to quit
+entered: `12`
+parsed value: 12
+entered: `-7`
+parsed value: -7
+entered: `"abc"`
+parsed value: "abc"
+entered: ``
+parsed value: NULL

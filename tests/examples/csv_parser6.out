@@ -1,0 +1,3 @@
+Validator for rows of comma separated values of string, integer or NULL. Enter a value per line or Ctrl-D to quit
+entered: `1,"a",,-2`
+parsed row: 1, "a", NULL, -2

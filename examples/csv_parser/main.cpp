@@ -10,7 +10,7 @@ using namespace idni::diagnostics;
 struct csv_parser {
 	const char* csv_tgf =
 	"	@use char classes space, digit.\n"
-	" 	el      => '\n'.\n"
+	" 	el      => '\\n'.\n"
 	"	_       => space*.\n"
 	"	integer => digit+.\n"
 	"	line    => _ integer ( _ ',' _ integer _ )*."

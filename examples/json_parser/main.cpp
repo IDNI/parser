@@ -120,8 +120,9 @@ private:
 
         // JSON elemen it is either a number, string, array, or an object
         r(element,    integer | str | array | object);
-        // start can be value
-        r(start,      element);
+        // start is a value with optional whitespace around it, so a file
+        // can end with a newline
+        r(start,      whitespace + element + whitespace);
         return r;
     }
 
