@@ -5,12 +5,12 @@
 #define __IDNI__PARSER__UTILITY__OPTIONS_H__
 
 #include <cstddef>
-#include <cstdint>
 #include <memory>
 #include <optional>
 #include <ostream>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -52,7 +52,21 @@ struct option_set {
 	std::vector<command_spec> commands = {};
 };
 
-namespace detail { struct options_snapshot; }
+namespace detail {
+struct options_snapshot;
+struct repository_state;
+}
+
+/// A consistent read of all values: the shared snapshot and the values of
+/// the calling thread, taken at one moment.
+struct options_view {
+	template <typename T> T get(std::string_view name) const;
+
+private:
+	friend struct options_repository;
+	std::shared_ptr<const detail::options_snapshot> snap_;
+	std::unordered_map<std::size_t, option_value> local_;
+};
 
 /// What one command line gave.
 struct parsed_args {
@@ -93,6 +107,14 @@ struct options_repository {
 	void clear(std::string_view name, std::size_t source);
 	bool is_set(std::string_view name, std::size_t source) const;
 
+	/// The source of the calling thread. It is above every other source,
+	/// and no other thread sees its values.
+	template <typename T> void set_local(std::string_view name, T value);
+	void clear_local(std::string_view name);
+
+	/// One consistent read for one operation, for example one solve.
+	options_view view() const;
+
 	/// Text access for a REPL, an api or a binding.
 	[[nodiscard]] diagnostics::result<void> set_text(std::string_view name,
 		std::string_view text, std::size_t source);
@@ -112,17 +134,13 @@ struct options_repository {
 	/// the config of the last parse_args() call.
 	void help(std::ostream& os, std::string_view command = {}) const;
 
-	/// A number that grows with each write that changes a value.
+	/// A number that grows with each write that changes a value: the
+	/// shared writes and the set_local() writes of the calling thread.
 	std::size_t version() const;
 
 private:
-	const detail::options_snapshot& current() const;
-	template <typename F> void modify(F&& f);
-
-	std::unique_ptr<detail::options_snapshot> snap_;
-	std::size_t version_ = 0;
-	std::vector<std::string> sources_;
-	args_config cfg_;
+	// The values and the thread records, out of the public header.
+	std::unique_ptr<detail::repository_state> state_;
 };
 
 } // namespace idni

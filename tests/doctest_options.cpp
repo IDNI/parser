@@ -2,16 +2,24 @@
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 // Tests for the options repository: declare, typed access, sources and
-// precedence, text access, the environment and the command line.
+// precedence, the thread source, views, text access, the environment and
+// the command line.
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 
+#include <atomic>
 #include <cstdlib>
 #include <initializer_list>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
+
+#if !defined(__EMSCRIPTEN__) || defined(__EMSCRIPTEN_PTHREADS__)
+#	define OPTIONS_TEST_THREADS 1
+#	include <thread>
+#endif
 
 #include "../src/utility/options.h"
 
@@ -212,6 +220,175 @@ TEST_CASE("version grows only when a value changes") {
 	CHECK(f.repo.version() > v1);
 }
 
+#ifdef OPTIONS_TEST_THREADS
+TEST_CASE("set_local is seen only by its own thread") {
+	fixture f;
+	f.repo.set("count", size_t{ 10 }, f.session);
+	size_t in_a = 0, in_b = 0, in_c = 0;
+	thread a([&] {
+		f.repo.set_local("count", size_t{ 1 });
+		in_a = f.repo.get<size_t>("count");
+	});
+	thread b([&] {
+		f.repo.set_local("count", size_t{ 2 });
+		in_b = f.repo.get<size_t>("count");
+	});
+	a.join();
+	b.join();
+	thread c([&] { in_c = f.repo.get<size_t>("count"); });
+	c.join();
+	CHECK(in_a == 1u);
+	CHECK(in_b == 2u);
+	CHECK(in_c == 10u);
+	CHECK(f.repo.get<size_t>("count") == 10u);
+}
+
+TEST_CASE("a view keeps its values while another thread writes") {
+	fixture f;
+	f.repo.set("count", size_t{ 3 }, f.session);
+	const options_view v = f.repo.view();
+	thread w([&] { f.repo.set("count", size_t{ 4 }, f.session); });
+	w.join();
+	CHECK(v.get<size_t>("count") == 3u);
+	CHECK(f.repo.get<size_t>("count") == 4u);
+}
+#endif
+
+TEST_CASE("the thread source is above every other source") {
+	fixture f;
+	f.repo.set("count", size_t{ 3 }, f.session);
+	f.repo.set_local("count", size_t{ 9 });
+	CHECK(f.repo.get<size_t>("count") == 9u);
+	const options_view v = f.repo.view();
+	f.repo.clear_local("count");
+	CHECK(f.repo.get<size_t>("count") == 3u);
+	CHECK(v.get<size_t>("count") == 9u);
+}
+
+TEST_CASE("thread values belong to one repository") {
+	fixture a;
+	fixture b;
+	a.repo.set_local("count", size_t{ 2 });
+	CHECK(a.repo.get<size_t>("count") == 2u);
+	CHECK(b.repo.get<size_t>("count") == 1u);
+}
+
+TEST_CASE("a new repository never sees the thread values of an old one") {
+	for (size_t n = 0; n < 1000; ++n) {
+		fixture f;
+		CHECK(f.repo.get<size_t>("count") == 1u);
+		f.repo.set_local("count", n + 2);
+		CHECK(f.repo.get<size_t>("count") == n + 2);
+	}
+}
+
+TEST_CASE("set_local changes the version of its own thread only") {
+	fixture f;
+	const size_t before = f.repo.version();
+	f.repo.set_local("count", size_t{ 5 });
+	const size_t after = f.repo.version();
+	CHECK(after > before);
+	f.repo.set_local("count", size_t{ 5 });
+	CHECK(f.repo.version() == after);
+	f.repo.clear_local("count");
+	CHECK(f.repo.version() > after);
+}
+
+#ifdef OPTIONS_TEST_THREADS
+TEST_CASE("repositories and threads leave no record behind") {
+	vector<thread> workers;
+	for (int t = 0; t < 4; ++t) workers.emplace_back([] {
+		for (size_t n = 0; n < 200; ++n) {
+			fixture f;
+			f.repo.set_local("count", n + 2);
+			CHECK(f.repo.get<size_t>("count") == n + 2);
+		}
+	});
+	{
+		fixture shared;
+		vector<thread> readers;
+		for (int t = 0; t < 4; ++t) readers.emplace_back([&shared] {
+			shared.repo.set_local("count", size_t{ 9 });
+			CHECK(shared.repo.get<size_t>("count") == 9u);
+		});
+		for (auto& t : readers) t.join();
+		// the readers ended, so their records left the shared repository
+		CHECK(detail::link_counts().records
+			<= workers.size());
+	}
+	for (auto& t : workers) t.join();
+	const auto c = detail::link_counts();
+	CHECK(c.entries == 0);
+	CHECK(c.records == 0);
+}
+
+TEST_CASE("a thread that ends leaves a live repository") {
+	fixture f;
+	const auto before = detail::link_counts();
+	thread t([&] { f.repo.set_local("count", size_t{ 3 }); });
+	t.join();
+	const auto after = detail::link_counts();
+	CHECK(after.records == before.records);
+	CHECK(after.entries == before.entries);
+	CHECK(after.threads == before.threads);
+	CHECK(f.repo.get<size_t>("count") == 1u);
+}
+
+TEST_CASE("a destroyed repository leaves a live thread") {
+	auto f = make_unique<fixture>();
+	atomic<int> step{ 0 };
+	size_t in_new = 0;
+	thread t([&] {
+		f->repo.set_local("count", size_t{ 3 });
+		step = 1;
+		while (step != 2) this_thread::yield();
+		fixture g;
+		in_new = g.repo.get<size_t>("count");
+		step = 3;
+		while (step != 4) this_thread::yield();
+	});
+	while (step != 1) this_thread::yield();
+	const auto with = detail::link_counts();
+	REQUIRE(with.records >= 1);
+	REQUIRE(with.entries >= 1);
+	f.reset();
+	const auto without = detail::link_counts();
+	CHECK(without.records == with.records - 1);
+	CHECK(without.entries == with.entries - 1);
+	step = 2;
+	while (step != 3) this_thread::yield();
+	CHECK(in_new == 1u);
+	step = 4;
+	t.join();
+	CHECK(detail::link_counts().records == without.records);
+}
+
+TEST_CASE("the version of a thread and a shared write") {
+	fixture f;
+	atomic<int> step{ 0 };
+	size_t a_before = 0, a_local = 0, a_shared = 0;
+	thread a([&] {
+		a_before = f.repo.version();
+		f.repo.set_local("count", size_t{ 5 });
+		a_local = f.repo.version();
+		step = 1;
+		while (step != 2) this_thread::yield();
+		a_shared = f.repo.version();
+	});
+	while (step != 1) this_thread::yield();
+	const size_t main_before = f.repo.version();
+	f.repo.set("count", size_t{ 6 }, f.session);
+	const size_t main_after = f.repo.version();
+	step = 2;
+	a.join();
+	CHECK(a_local > a_before);
+	CHECK(a_shared > a_local);
+	CHECK(main_after > main_before);
+	// the set_local of thread a is not in the version of this thread
+	CHECK(main_before == a_before);
+}
+#endif
+
 } // TEST_SUITE
 
 TEST_SUITE("options command defaults") {
@@ -235,6 +412,7 @@ TEST_CASE("a command default applies when its command runs") {
 	argv_of run{ "tool", "run" };
 	REQUIRE(repo.parse_args(run.argc(), run.argv(), cli).has_value());
 	CHECK(repo.get<bool>("echo"));
+	CHECK(repo.view().get<bool>("echo"));
 	auto text = repo.get_text("echo");
 	REQUIRE(text.has_value());
 	CHECK(text.value() == "true");

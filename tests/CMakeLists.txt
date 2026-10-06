@@ -247,6 +247,11 @@ foreach(X IN LISTS DOCTESTS)
 				PROPERTIES COMPILE_OPTIONS "-O0;-fno-lto")
 		endif()
 	endif()
+	# The options tests run a few threads.
+	if(${N} STREQUAL "doctest_options" AND NOT EMSCRIPTEN)
+		find_package(Threads REQUIRED)
+		target_link_libraries(${N} PRIVATE Threads::Threads)
+	endif()
 	add_test(NAME ${N} COMMAND ${TEST_RUNNER} ${N}${TEST_SUFFIX})
 	if(${N} STREQUAL "doctest_tgf_serve"
 			OR ${N} STREQUAL "doctest_tgf_connect")
