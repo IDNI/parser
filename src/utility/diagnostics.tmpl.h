@@ -212,8 +212,9 @@ inline report::key report::intern(std::string_view s) {
 	return k != none ? k : intern_dynamic(s);
 }
 
+// An empty string is a valid text, for example an empty attr value, so it
+// gets a key like any other string.
 inline report::key report::intern_dynamic(std::string_view s) {
-	if (s.empty()) return none;
 	std::string key_str(s);
 	auto it = dyn_strings_index_.find(key_str);
 	if (it != dyn_strings_index_.end()) return it->second;

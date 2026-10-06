@@ -661,6 +661,36 @@ TEST_SUITE("diagnostics: append() remaps a text attribute's value") {
 	}
 }
 
+TEST_SUITE("diagnostics: an empty text under a text label") {
+
+	TEST_CASE("an empty value is interned and rendered") {
+		using label = idni::parser_strings::label;
+		report r;
+		r.error(code::invalid_argument, "bad value",
+			{{label::name, std::string_view("count")},
+			 {label::value, std::string_view("")}});
+		REQUIRE(r.nodes().size() == 1);
+		const std::string msg = r.format_message(0);
+		CHECK(msg.find("name=count") != std::string::npos);
+		CHECK(msg.find("value=)") != std::string::npos);
+		std::ostringstream os;
+		r.print(os, idni::term::colors(false));
+		CHECK(os.str().find("value=)") != std::string::npos);
+	}
+
+	TEST_CASE("an empty value survives append()") {
+		using label = idni::parser_strings::label;
+		report dst;
+		dst.error(code::internal_error, "boom");
+		report src;
+		src.error(code::invalid_argument, "bad value",
+			{{label::value, std::string_view("")}});
+		dst.append(std::move(src));
+		REQUIRE(dst.nodes().size() == 2);
+		CHECK(dst.format_message(1).find("value=)") != std::string::npos);
+	}
+}
+
 TEST_SUITE("diagnostics: resolve() lets the label decide, not text.data()") {
 
 	TEST_CASE("a number under a text label renders the missing-text marker, "
