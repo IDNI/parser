@@ -1,7 +1,7 @@
 // To view the license please visit
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
-#include "../src/tgf/tgf_cli_options.h"
+#include "../src/utility/cli.h"
 
 #include "testing.h"
 
@@ -123,7 +123,6 @@ end:
 int main(int argc, char** argv) {
 	testing::process_args(argc, argv);
 
-	test_options o2{ "test", {}, tgf_commands(), "repl", tgf_options() };
 	test_options o { "test", {}, {}, "", {
 		{ "bool",   { "bool",   'b', false } },
 		{ "int",    { "int",    'i', -1 } },
@@ -194,75 +193,6 @@ int main(int argc, char** argv) {
 		{ "bool", true },
 		{ "int", -2 },
 		{ "string", "ok" }
-	}});
-
-	TEST("commands", "default")
-	o2.args = { "cmd" };
-	run_test(o2, { .status = 0, .cmd_name = "repl" });
-
-	TEST("commands", "invalid")
-	o2.args = { "cmd", "invalid" };
-	run_test(o2, { .status = 1 });
-
-	TEST("commands", "valid")
-	o2.args = { "cmd", "grammar" };
-	run_test(o2, { .status = 0, .cmd_name = "grammar" });
-	o2.args = { "cmd", "gen" };
-	run_test(o2, { .status = 0, .cmd_name = "gen" });
-	o2.args = { "cmd", "parse" };
-	run_test(o2, { .status = 0, .cmd_name = "parse" });
-	o2.args = { "cmd", "repl" };
-	run_test(o2, { .status = 0, .cmd_name = "repl" });
-
-	TEST("command options", "gen with default options")
-	o2.args = { "cmd", "gen" };
-	run_test(o2, { .status = 0, .cmd_name = "gen", .options = {
-		{ "help", false }
-	}, .cmd_options = {
-		{ "help", false },
-		{ "name", "my_parser" },
-		{ "decoder", "" },
-		{ "encoder", "" },
-		{ "output", "-" }
-	}});
-
-	TEST("command options", "gen command with dynamic option")
-	o2.args = { "cmd", "gen", "--dynamic", "ba_type=sbf,tau" };
-	run_test(o2, { .status = 0, .cmd_name = "gen", .options = {
-		{ "help", false }
-	}, .cmd_options = {
-		{ "help", false },
-		{ "name", "my_parser" },
-		{ "decoder", "" },
-		{ "encoder", "" },
-		{ "output", "-" },
-		{ "dynamic", "ba_type=sbf,tau" }
-	}});
-
-	TEST("command options", "gen command with invalid option")
-	o2.args = { "cmd", "gen", "--invalid" };
-	run_test(o2, { .status = 1, .cmd_name = "gen" });
-
-	TEST("command options", "default command bool does not consume file")
-	o2.args = { "cmd", "-X", __FILE__ };
-	run_test(o2, { .status = 0, .cmd_name = "repl", .cmd_options = {
-		{ "legacy-repl", true }
-	}, .files = { __FILE__ }});
-
-	TEST("command options", "default command with invalid option")
-	o2.args = { "cmd", "--invalid" };
-	run_test(o2, { .status = 1, .cmd_name = "show" });
-
-	TEST("command options", "gen command with name and help")
-	o2.args = { "cmd", "gen", "--name", "my_other_parser", "--help" };
-	run_test(o2, { .status = 0, .cmd_name = "gen", .options = {
-		{ "help", false }
-	}, .cmd_options = {
-		{ "help", true },
-		{ "name", "my_other_parser" },
-		{ "decoder", "" },
-		{ "encoder", "" },
-		{ "output", "-" }
 	}});
 
 	cout << "\n";

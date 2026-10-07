@@ -33,40 +33,75 @@ test       run tester (requires a .tgf.test file)
 Options for `repl` command:
 ```
 tgf <tgf file> [ repl ] [ <options> ]
-        --help             -h      detailed information about options
+        --auto-disambiguate
+                                   enables auto-disambiguation (default: true)
+        --colors           -c      use terminal colors (default: true)
+        --derive-char-classes
+                                   scan rules that match one character as character classes (default: true)
+        --dont-trim-terminals-of
+                                   nonterminals whose terminals are kept
+        --enabled-productions
+                           -G      comma-separated enabled productions
+        --error-verbosity  -v      parse error verbosity: basic, detailed, root-cause (default: detailed)
+        --evaluate         -e      run a REPL command and quit
+        --grammar          -g      print the grammar (default: false)
+        --help             -h      detailed information about options (default: false)
+        --init-stdin               read one init line before the first hello, used by tgf serve (default: false)
+        --inline                   tree paths to inline, each written as a > b
+        --inline-char-classes
+                                   inline character classes (default: false)
+        --json             -J      print and read JSON (default: false)
+        --legacy-repl      -X      use the legacy terminal REPL (default: false)
+        --measure          -m      measure parse time and counters, turns every measure flag on (default: false)
+        --nodisambig-list          nonterminals whose ambiguity is kept
+        --print-ambiguity  -a      print ambiguous nodes (default: true)
+        --print-graphs     -p      print the parsed graph (default: true)
+        --print-tml-facts          print the forest as TML facts (default: false)
+        --print-tml-rules          print the forest as TML rules (default: false)
+        --session                  session id of a tgf serve session
         --start            -s      starting literal
-        --grammar          -g      prints grammar
-        --json             -J      respond with JSON
-        --print-ambiguity  -a      prints ambiguity info (true by default)
-        --print-graphs     -p      prints parsed graph (true by default)
-        --error-verbosity  -v      parse error is more verbose
-        --measure          -m      benchmark: measure and emit diagnostics report
-        --colors           -c      enable terminal colors (default: on)
-        --tml-facts        -f      prints parsed graph in tml facts
-        --tml-rules        -r      prints parsed graph in tml rules
-        --evaluate         -e      run REPL command with input to evaluate and quit
+        --trim                     nonterminals to trim from the tree
+        --trim-children            nonterminals whose children are trimmed
+        --trim-children-terminals
+                                   nonterminals whose children and terminals are trimmed
+        --trim-terminals           trim all terminals (default: false)
 ```
 
 Options for `gen` command:
 ```
 tgf <tgf file> gen [ <options> ]
-        --help             -h      detailed information about options
-        --start            -s      starting literal
-        --json             -J      respond with JSON
-        --char-type        -C      input character type (default: char)
-        --terminal-type    -T      terminal character type (default: char)
-        --utf8             -U      shorthand: char/char32_t with utf8 recoders
-        --name             -n      name of the generated parser struct
-        --output-dir       -O      output directory for output files
-        --output           -o      output file for parser
         --auto-disambiguate
-                                   enables auto-disambiguation (default: on)
-        --nodisambig-list  -A      comma-separated list of non-disambiguation nodes
-        --dynamic          -D      default values for a @dynamic nonterminal, for
-                                   example ba_type=sbf,tau. Use ; between nonterminals.
-        --namespace        -N      namespace for the generated parser code
+                           -a      enables auto-disambiguation (default: true)
+        --char-type        -C      input character type (e.g. char, char32_t) (default: char)
         --decoder          -d      decoder function
+        --derive-char-classes
+                                   scan rules that match one character as character classes (default: true)
+        --dont-trim-terminals-of
+                                   nonterminals whose terminals are kept
+        --dynamic          -D      default values for a @dynamic nonterminal
+        --enabled-productions
+                           -G      comma-separated enabled productions
         --encoder          -e      encoder function
+        --header-only      -H      keep the parser in a single header (default: true)
+        --help             -h      detailed information about options (default: false)
+        --inline                   tree paths to inline, each written as a > b
+        --inline-char-classes
+                                   inline character classes (default: false)
+        --json             -J      print and read JSON (default: false)
+        --name             -n      name of the generated parser struct
+        --namespace        -N      namespace for the generated parser
+        --nodisambig-list  -A      nonterminals whose ambiguity is kept
+        --output           -o      output file for the parser
+        --output-dir       -O      output directory
+        --start            -s      starting literal
+        --terminal-type    -T      terminal character type (e.g. char, char32_t) (default: char)
+        --treemr                   add a matcher() member built on idni::treemr::matcher_for (default: false)
+        --trim                     nonterminals to trim from the tree
+        --trim-children            nonterminals whose children are trimmed
+        --trim-children-terminals
+                                   nonterminals whose children and terminals are trimmed
+        --trim-terminals           trim all terminals (default: false)
+        --utf8             -U      shorthand: --char-type char --terminal-type char32_t with utf8 recoders (default: false)
 ```
 For more information about decoder and encoder functions see [recoders](recoders.md)
 
@@ -74,43 +109,95 @@ For more information about decoder and encoder functions see [recoders](recoders
 Options for `parse` command:
 ```
 tgf <tgf file> parse [ <options> ]
-        --help             -h      detailed information about options
-        --input            -i      parse input from file or STDIN if -
-        --input-expression -e      parse input from a provided string
-        --start            -s      starting literal
-        --grammar          -g      prints grammar
-        --json             -J      respond with JSON
-        --measure          -m      benchmark: measure and emit diagnostics report
-        --colors           -c      enable terminal colors (default: on)
-        --print-ambiguity  -a      prints ambiguity info (true by default)
-        --print-input      -I      prints input
-        --terminals        -t      prints all parsed terminals serialized
-        --error-verbosity  -v      parse error is more verbose
-        --tree-path        -P      parse tree path: bintree or forest
         --auto-disambiguate
-                                   enables auto-disambiguation (default: on)
-        --print-graphs     -p      prints parsed graph (true by default)
-        --tml-facts        -f      prints parsed graph in tml facts
-        --tml-rules        -r      prints parsed graph in tml rules
+                                   enables auto-disambiguation (default: true)
+        --colors           -c      use terminal colors (default: true)
+        --derive-char-classes
+                           -d      scan rules that match one character as character classes (default: true)
+        --dont-trim-terminals-of
+                                   nonterminals whose terminals are kept
+        --enabled-productions
+                           -G      comma-separated enabled productions
+        --error-verbosity  -v      parse error verbosity: basic, detailed, root-cause (default: detailed)
+        --grammar          -g      print the grammar (default: false)
+        --help             -h      detailed information about options (default: false)
+        --inline                   tree paths to inline, each written as a > b
+        --inline-char-classes
+                                   inline character classes (default: false)
+        --input            -i      parse input from a file or STDIN if -
+        --input-expression -e      parse input from a provided string
+        --json             -J      print and read JSON (default: false)
+        --measure          -m      measure parse time and counters, turns every measure flag on (default: false)
+        --nodisambig-list          nonterminals whose ambiguity is kept
+        --print-ambiguity  -a      print ambiguous nodes (default: true)
+        --print-graphs     -p      print the parsed graph (default: true)
+        --print-input      -I      print the input (default: false)
+        --print-terminals  -t      print the parsed terminals (default: true)
+        --print-tml-facts          print the forest as TML facts (default: false)
+        --print-tml-rules          print the forest as TML rules (default: false)
+        --start            -s      starting literal
+        --tree-path        -P      parse tree path: bintree or forest (default: bintree)
+        --trim                     nonterminals to trim from the tree
+        --trim-children            nonterminals whose children are trimmed
+        --trim-children-terminals
+                                   nonterminals whose children and terminals are trimmed
+        --trim-terminals           trim all terminals (default: false)
 ```
+
+`parse -e` and `repl -e` take their value as typed: the tool does not trim it and does not read quotes or escapes in it.
 
 Options for `grammar` command:
 ```
 tgf <tgf file> grammar [ <options> ]
-        --help             -h      detailed information about options
+        --auto-disambiguate
+                                   enables auto-disambiguation (default: true)
+        --char-class-report
+                           -C      print the derived character class report (default: false)
+        --colors           -c      use terminal colors (default: true)
+        --derive-char-classes
+                                   scan rules that match one character as character classes (default: true)
+        --dont-trim-terminals-of
+                                   nonterminals whose terminals are kept
+        --enabled-productions
+                           -G      comma-separated enabled productions
+        --grammar          -g      print the grammar (default: true)
+        --help             -h      detailed information about options (default: false)
+        --inline                   tree paths to inline, each written as a > b
+        --inline-char-classes
+                                   inline character classes (default: false)
+        --json             -J      print and read JSON (default: false)
+        --measure          -m      measure parse time and counters, turns every measure flag on (default: false)
+        --nodisambig-list          nonterminals whose ambiguity is kept
+        --nullable         -N      report nullable recursive productions (default: false)
         --start            -s      starting literal
-        --grammar          -g      prints grammar (enabled by default)
-        --json             -J      respond with JSON
-        --measure          -m      benchmark: measure and emit diagnostics report
-        --colors           -c      enable terminal colors (default: on)
-        --nullable         -N      report nullable recursive productions
+        --trim                     nonterminals to trim from the tree
+        --trim-children            nonterminals whose children are trimmed
+        --trim-children-terminals
+                                   nonterminals whose children and terminals are trimmed
+        --trim-terminals           trim all terminals (default: false)
 ```
 
 Options for `test` command:
 ```
 tgf <tgf file> test [ <options> ]
-        --help             -h      detailed information about options
-        --productions      -G      comma-separated list of enabled productions
+        --auto-disambiguate
+                                   enables auto-disambiguation (default: true)
+        --derive-char-classes
+                                   scan rules that match one character as character classes (default: true)
+        --dont-trim-terminals-of
+                                   nonterminals whose terminals are kept
+        --enabled-productions
+                           -G      comma-separated enabled productions
+        --help             -h      detailed information about options (default: false)
+        --inline                   tree paths to inline, each written as a > b
+        --inline-char-classes
+                                   inline character classes (default: false)
+        --nodisambig-list          nonterminals whose ambiguity is kept
+        --trim                     nonterminals to trim from the tree
+        --trim-children            nonterminals whose children are trimmed
+        --trim-children-terminals
+                                   nonterminals whose children and terminals are trimmed
+        --trim-terminals           trim all terminals (default: false)
 ```
 
 See [`TGF test files`](tgf.test.md) for the `.tgf.test` file format that this command runs.

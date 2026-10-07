@@ -40,6 +40,8 @@ struct option_spec {
 	std::string help;
 	std::vector<option_surface> surfaces = {};
 	bool from_env = true;
+	/// The text as given: no quotes and no trim.
+	bool raw = false;
 	bool operator==(const option_spec&) const = default;
 };
 

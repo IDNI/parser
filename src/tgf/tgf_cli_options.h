@@ -4,241 +4,235 @@
 #ifndef __IDNI__PARSER__TGF__TGF_CLI_OPTIONS_H__
 #define __IDNI__PARSER__TGF__TGF_CLI_OPTIONS_H__
 
-// configure CLI options and descriptions
-//
+#include <cstddef>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
-#include "../utility/cli.h"
+#include "../utility/options.h"
 
 namespace idni {
 
-inline cli::options tgf_options() {
-	cli::options os;
-	os["help"] = cli::option("help", 'h', false)
-		.set_description("detailed information about options");
-	os["version"] = cli::option("version", 'v', false)
-		.set_description("print version and exit");
-	os["license"] = cli::option("license", 'L', false)
-		.set_description("print license and exit");
-	return os;
-}
+/// The commands of the tool and the options that only the tool declares.
+inline const option_set tgf_option_set = {
+	.options = {
+		{ "help", "global", false,
+			"detailed information about options",
+			{ { "", 'h' }, { "grammar", 'h' }, { "parse", 'h' },
+			  { "gen", 'h' }, { "repl", 'h' }, { "serve", 'h' },
+			  { "connect", 'h' }, { "test", 'h' } }, false },
+		{ "version", "global", false, "print version and exit",
+			{ { "", 'v' } }, false },
+		{ "license", "global", false, "print license and exit",
+			{ { "", 'L' } }, false },
 
-// configure CLI commands, their options and descriptions
-//
-inline cli::commands tgf_commands() {
-	cli::commands cs;
-	std::string lcmd = "", lopt = "";
-	auto CMD  = [&](const struct cli::command& cmd) {
-		lcmd = cmd.name(), cs[lcmd] = cmd; };
-	auto OPT  = [&](const cli::option& opt) {
-		lopt = opt.name(), cs[lcmd].add_option(opt);
-		return cs[lcmd][lopt]; };
-	auto DESC = [&](const std::string& d) {
-		cs[lcmd][lopt].set_description(d); };
+		{ "char-class-report", "cli", false,
+			"print the derived character class report",
+			{ { "grammar", 'C' } } },
+		{ "grammar", "cli", true, "print the grammar",
+			{ { "grammar", 'g', true }, { "parse", 'g', false },
+			  { "repl", 'g', false } } },
+		{ "nullable", "cli", false,
+			"report nullable recursive productions",
+			{ { "grammar", 'N' } } },
+		{ "input", "cli", std::string(),
+			"parse input from a file or STDIN if -",
+			{ { "parse", 'i' } } },
+		{ "input-expression", "cli", std::string(),
+			"parse input from a provided string",
+			{ { "parse", 'e' } }, true, true },
+		{ "evaluate", "cli", std::string(),
+			"run a REPL command and quit", { { "repl", 'e' } }, true,
+			true },
+		{ "legacy-repl", "cli", false, "use the legacy terminal REPL",
+			{ { "repl", 'X' }, { "connect", 'X' } } },
+		{ "session", "cli", std::string(),
+			"session id of a tgf serve session",
+			{ { "repl" }, { "connect" } }, false },
+		{ "init-stdin", "cli", false,
+			"read one init line before the first hello, used by "
+			"tgf serve", { { "repl" } }, false },
 
-	// ---------------------------------------------------------------------
+		{ "char-type", "generator", std::string("char"),
+			"input character type (e.g. char, char32_t)",
+			{ { "gen", 'C' } } },
+		{ "terminal-type", "generator", std::string("char"),
+			"terminal character type (e.g. char, char32_t)",
+			{ { "gen", 'T' } } },
+		{ "utf8", "generator", false,
+			"shorthand: --char-type char --terminal-type char32_t "
+			"with utf8 recoders", { { "gen", 'U' } } },
+		{ "name", "generator", std::string(),
+			"name of the generated parser struct",
+			{ { "gen", 'n' } } },
+		{ "output-dir", "generator", std::string(), "output directory",
+			{ { "gen", 'O' } } },
+		{ "output", "generator", std::string(),
+			"output file for the parser", { { "gen", 'o' } } },
+		{ "dynamic", "generator", option_list{},
+			"default values for a @dynamic nonterminal",
+			{ { "gen", 'D' } } },
+		{ "namespace", "generator", std::string(),
+			"namespace for the generated parser",
+			{ { "gen", 'N' } } },
+		{ "header-only", "generator", true,
+			"keep the parser in a single header",
+			{ { "gen", 'H' } } },
+		{ "treemr", "generator", false,
+			"add a matcher() member built on "
+			"idni::treemr::matcher_for", { { "gen" } } },
+		{ "decoder", "generator", std::string(), "decoder function",
+			{ { "gen", 'd' } } },
+		{ "encoder", "generator", std::string(), "encoder function",
+			{ { "gen", 'e' } } },
 
-	CMD(cli::command("grammar",  "show information about grammar"));
+		{ "port", "serve", std::size_t{ 0 },
+			"TCP port to listen on, 0 picks a free port",
+			{ { "serve", 'p' } } },
+		{ "max-sessions", "serve", std::size_t{ 16 },
+			"refuse a new session at this count", { { "serve" } } },
+		{ "idle-timeout", "serve", std::size_t{ 30 },
+			"end a session after this many minutes with no traffic",
+			{ { "serve" } } },
+		{ "session-memory", "serve", std::size_t{ 0 },
+			"address space limit of a session in MB, 0 means no "
+			"limit", { { "serve" } } },
+		{ "max-line", "serve", std::size_t{ 16777216 },
+			"largest request line in bytes, a longer line is an "
+			"error", { { "serve" } } },
+		{ "write-timeout", "serve", std::size_t{ 30 },
+			"close a connection that does not drain its output "
+			"within this many seconds, 0 disables",
+			{ { "serve" } } },
+		{ "log-dir", "serve", std::string(),
+			"directory of the session logs and server.log, empty "
+			"uses ~/.tau/tgf/logs", { { "serve" } } },
+		{ "no-log", "serve", false, "write no session logs",
+			{ { "serve" } } },
+	},
+	.commands = {
+		{ "grammar", "show information about grammar" },
+		{ "parse", "parse an input string, file or stdin" },
+		{ "gen", "generate a parser code" },
+		{ "repl", "run TGF repl" },
+		{ "serve", "serve TGF sessions on a TCP port" },
+		{ "connect", "run a text REPL in a tgf serve session" },
+		{ "test", "run tester (with provided tgf.test file)" },
+	},
+};
 
-	auto help = OPT(cli::option("help",   'h', false));
-		DESC("detailed information about command options");
-	auto start = OPT(cli::option("start", 's', ""));
-		DESC("starting literal");
-	auto print_grammar = OPT(cli::option("grammar", 'g', true));
-		DESC("prints grammar");
-	auto print_json = OPT(cli::option("json", 'J', false));
-		DESC("respond with JSON");
-	auto measure = OPT(cli::option("measure", 'm', false));
-		DESC("benchmark: measure parse time and emit the diagnostics "
-			"report");
-	auto colors = OPT(cli::option("colors", 'c', true));
-		DESC("enable terminal colors for output");
-	auto productions = cli::option("productions", 'G', "");
-		productions.set_description(
-			"comma-separated list of enabled productions");
-	OPT(productions);
-	OPT(cli::option("nullable", 'N', false));
-		DESC("report nullable recursive productions");
-	auto char_class_report = OPT(cli::option("char-class-report", 'C',
-		false));
-		DESC("prints the derived character class report");
-	OPT(print_json);
-	CMD(cli::command("parse", "parse an input string, file or stdin"));
+/// The command surfaces of the options that the grammar, the parser and the
+/// evaluator declare.
+inline const std::vector<std::pair<std::string_view, option_surface>>
+	tgf_surfaces = {
+	{ "auto-disambiguate", { "grammar" } },
+	{ "auto-disambiguate", { "parse" } },
+	{ "auto-disambiguate", { "gen", 'a' } },
+	{ "auto-disambiguate", { "repl" } },
+	{ "auto-disambiguate", { "serve" } },
+	{ "auto-disambiguate", { "test" } },
+	{ "nodisambig-list", { "grammar" } },
+	{ "nodisambig-list", { "parse" } },
+	{ "nodisambig-list", { "gen", 'A' } },
+	{ "nodisambig-list", { "repl" } },
+	{ "nodisambig-list", { "serve" } },
+	{ "nodisambig-list", { "test" } },
+	{ "trim-terminals", { "grammar" } },
+	{ "trim-terminals", { "parse" } },
+	{ "trim-terminals", { "gen" } },
+	{ "trim-terminals", { "repl" } },
+	{ "trim-terminals", { "serve" } },
+	{ "trim-terminals", { "test" } },
+	{ "inline-char-classes", { "grammar" } },
+	{ "inline-char-classes", { "parse" } },
+	{ "inline-char-classes", { "gen" } },
+	{ "inline-char-classes", { "repl" } },
+	{ "inline-char-classes", { "serve" } },
+	{ "inline-char-classes", { "test" } },
+	{ "derive-char-classes", { "grammar" } },
+	{ "derive-char-classes", { "parse", 'd' } },
+	{ "derive-char-classes", { "gen" } },
+	{ "derive-char-classes", { "repl" } },
+	{ "derive-char-classes", { "serve" } },
+	{ "derive-char-classes", { "test" } },
+	{ "trim", { "grammar" } },
+	{ "trim", { "parse" } },
+	{ "trim", { "gen" } },
+	{ "trim", { "repl" } },
+	{ "trim", { "serve" } },
+	{ "trim", { "test" } },
+	{ "trim-children", { "grammar" } },
+	{ "trim-children", { "parse" } },
+	{ "trim-children", { "gen" } },
+	{ "trim-children", { "repl" } },
+	{ "trim-children", { "serve" } },
+	{ "trim-children", { "test" } },
+	{ "trim-children-terminals", { "grammar" } },
+	{ "trim-children-terminals", { "parse" } },
+	{ "trim-children-terminals", { "gen" } },
+	{ "trim-children-terminals", { "repl" } },
+	{ "trim-children-terminals", { "serve" } },
+	{ "trim-children-terminals", { "test" } },
+	{ "dont-trim-terminals-of", { "grammar" } },
+	{ "dont-trim-terminals-of", { "parse" } },
+	{ "dont-trim-terminals-of", { "gen" } },
+	{ "dont-trim-terminals-of", { "repl" } },
+	{ "dont-trim-terminals-of", { "serve" } },
+	{ "dont-trim-terminals-of", { "test" } },
+	{ "inline", { "grammar" } },
+	{ "inline", { "parse" } },
+	{ "inline", { "gen" } },
+	{ "inline", { "repl" } },
+	{ "inline", { "serve" } },
+	{ "inline", { "test" } },
+	{ "enabled-productions", { "grammar", 'G' } },
+	{ "enabled-productions", { "parse", 'G' } },
+	{ "enabled-productions", { "gen", 'G' } },
+	{ "enabled-productions", { "repl", 'G' } },
+	{ "enabled-productions", { "serve", 'G' } },
+	{ "enabled-productions", { "test", 'G' } },
 
-	OPT(help);
-	OPT(start);
-	//OPT(char_type);
-	//OPT(terminal_type);
-	print_grammar.set(false);
-	OPT(print_grammar);
-	OPT(print_json);
-	OPT(measure);
-	OPT(colors);
-	OPT(productions);
-	OPT(cli::option("input", 'i',
-		"")),
-		DESC("parse input from file or STDIN if -");
-	OPT(cli::option("input-expression", 'e',
-		"")),
-		DESC("parse input from provided string");
-	auto print_ambiguity = OPT(cli::option("print-ambiguity", 'a',
-		true));
-		DESC("prints ambiguity info, incl. ambig. nodes");
-	OPT(cli::option("print-input", 'I',
-		false)),
-		DESC("prints input");
-	OPT(cli::option("terminals", 't',
-		true)),
-		DESC("prints all parsed terminals serialized");
-	auto error_verbosity = OPT(cli::option("error-verbosity", 'v',
-		"basic"));
-		DESC("error info verbosity: basic, detailed, root-cause");
-	auto tree_path_opt = OPT(cli::option("tree-path", 'P',
-		"bintree"));
-		DESC("parse tree path: bintree or forest");
-	auto derive_char_classes_opt = OPT(cli::option("derive-char-classes",
-		'd', true));
-		DESC("scans rules that match one character as character "
-			"classes");
-	auto auto_disam_opt = OPT(cli::option("auto-disambiguate", 'a',
-		true));
-		DESC("enables auto-disambiguation");
-	auto print_graphs = OPT(cli::option("print-graphs", 'p',
-		true));
-		DESC("prints parsed graph");
-	auto tml_rules = OPT(cli::option("tml-rules", 'r',
-		false));
-		DESC("prints parsed graph in tml rules");
-	auto tml_facts = OPT(cli::option("tml-facts", 'f',
-		false));
-		DESC("prints parsed graph in tml facts");
+	{ "measure", { "grammar", 'm' } },
+	{ "measure", { "parse", 'm' } },
+	{ "measure", { "repl", 'm' } },
+	{ "error-verbosity", { "parse", 'v' } },
+	{ "error-verbosity", { "repl", 'v' } },
+	{ "tree-path", { "parse", 'P' } },
+	{ "start", { "grammar", 's' } },
+	{ "start", { "parse", 's' } },
+	{ "start", { "gen", 's' } },
+	{ "start", { "repl", 's' } },
+	{ "start", { "serve", 's' } },
 
-	// ---------------------------------------------------------------------
+	{ "print-terminals", { "parse", 't' } },
+	{ "print-ambiguity", { "parse", 'a' } },
+	{ "print-ambiguity", { "repl", 'a' } },
+	{ "print-graphs", { "parse", 'p' } },
+	{ "print-graphs", { "repl", 'p' } },
+	{ "print-tml-rules", { "parse" } },
+	{ "print-tml-rules", { "repl" } },
+	{ "print-tml-facts", { "parse" } },
+	{ "print-tml-facts", { "repl" } },
+	{ "print-input", { "parse", 'I' } },
+	{ "colors", { "grammar", 'c' } },
+	{ "colors", { "parse", 'c' } },
+	{ "colors", { "repl", 'c' } },
+	{ "json", { "grammar", 'J' } },
+	{ "json", { "parse", 'J' } },
+	{ "json", { "gen", 'J' } },
+	{ "json", { "repl", 'J' } },
+};
 
-	CMD(cli::command("gen", "generate a parser code"));
-
-	OPT(help);
-	OPT(start);
-	OPT(print_json);
-	OPT(cli::option("char-type", 'C', "char")),
-		DESC("input character type (e.g. char, char32_t)");
-	OPT(cli::option("terminal-type", 'T', "char")),
-		DESC("terminal character type (e.g. char, char32_t)");
-	OPT(cli::option("utf8", 'U', false)),
-		DESC("shorthand: --char-type char --terminal-type char32_t "
-			"--decoder idni::utf8_to_u32_conv "
-			"--encoder idni::u32_to_utf8_conv");
-	OPT(cli::option("name", 'n',
-		"")),
-		DESC("name of the generated parser struct");
-	OPT(cli::option("output-dir", 'O',
-		"")),
-		DESC("output directory for output files");
-	OPT(cli::option("output", 'o',
-		"")),
-		DESC("output file for parser");
-	OPT(cli::option("auto-disambiguate", 'a',
-		true)),
-		DESC("enables auto-disambiguation");
-	OPT(cli::option("nodisambig-list", 'A',
-		"")),
-		DESC("comma separated list of non-disambiguation nodes");
-	OPT(cli::option("dynamic", 'D',
-		"")),
-		DESC("default values of @dynamic nonterminals, one name=value "
-			"per entry, for example ba_type=sbf,ba_type=tau");
-	OPT(cli::option("namespace", 'N',
-		"")),
-		DESC("namespace for the generated parser code");
-	OPT(cli::option("header-only", 'H',
-		true)),
-		DESC("keep the generated parser in a single header (default). "
-			"--header-only false emits productions() into a "
-			"companion .cpp so the grammar table is compiled once "
-			"instead of in every translation unit");
-	OPT(cli::option("treemr", '\0',
-		false)),
-		DESC("omit a matcher() member from the generated parser "
-			"struct (default). --treemr true adds the member, "
-			"built on idni::treemr::matcher_for");
-	OPT(cli::option("decoder", 'd',
-		"")),
-		DESC("decoder function");
-	OPT(cli::option("encoder", 'e',
-		"")),
-		DESC("encoder function");
-
-	// ---------------------------------------------------------------------
-
-	CMD(cli::command("repl", "run TGF repl"));
-
-	OPT(help);
-	OPT(start);
-	OPT(print_grammar);
-	OPT(print_json);
-	OPT(print_ambiguity);
-	OPT(print_graphs);
-	OPT(tml_rules);
-	OPT(tml_facts);
-	OPT(error_verbosity);
-	OPT(measure);
-	OPT(colors);
-	OPT(productions);
-	OPT(cli::option("evaluate", 'e', ""));
-		DESC("run repl command with input to evaluate and quit");
-	OPT(cli::option("legacy-repl", 'X', false));
-		DESC("use legacy terminal REPL instead of FTXUI");
-	OPT(cli::option("session", '\0', ""));
-		DESC("session id for the JSON API, used by tgf serve");
-	OPT(cli::option("init-stdin", '\0', false));
-		DESC("read one init line before the first hello, used by "
-			"tgf serve");
-	//OPT(char_type);
-	//OPT(terminal_type);
-
-	// ---------------------------------------------------------------------
-
-	CMD(cli::command("serve", "serve TGF sessions on a TCP port"));
-
-	OPT(help);
-	OPT(start);
-	OPT(productions);
-	OPT(cli::option("port", 'p', 0));
-		DESC("TCP port to listen on, 0 picks a free port");
-	OPT(cli::option("max-sessions", '\0', 16));
-		DESC("refuse a new session at this count");
-	OPT(cli::option("idle-timeout", '\0', 30));
-		DESC("end a session after this many minutes with no traffic");
-	OPT(cli::option("session-memory", '\0', 0));
-		DESC("address space limit of a session in MB, 0 means no limit");
-	OPT(cli::option("max-line", '\0', 16777216));
-		DESC("largest request line in bytes, a longer line is an error");
-	OPT(cli::option("write-timeout", '\0', 30));
-		DESC("close a connection that does not drain its output within "
-			"this many seconds, 0 disables");
-	OPT(cli::option("log-dir", '\0', ""));
-		DESC("directory of the session logs and server.log, empty "
-			"uses ~/.tau/tgf/logs");
-	OPT(cli::option("no-log", '\0', false));
-		DESC("write no session logs");
-
-	// ---------------------------------------------------------------------
-
-	CMD(cli::command("connect", "run a text REPL in a tgf serve session"));
-
-	OPT(help);
-	OPT(cli::option("session", '\0', ""));
-		DESC("session id to attach again");
-	OPT(cli::option("legacy-repl", 'X', false));
-		DESC("use legacy terminal REPL instead of FTXUI");
-
-	// ---------------------------------------------------------------------
-
-	CMD(cli::command("test", "run tester (with provided tgf.test file)"));
-	OPT(help);
-	OPT(productions);
-
-	return cs;
-}
+/// The program data of the command line of the tool.
+inline const args_config tgf_args_config = {
+	.name = "tgf",
+	.help_header = "tgf <TGF file>",
+	.description = "Tau Grammar Format (TGF) tool",
+	.default_command = "repl",
+	.default_command_when_inputs = "repl",
+	.global_surface = "",
+};
 
 } // namespace idni
 

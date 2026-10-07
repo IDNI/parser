@@ -26,7 +26,7 @@ Emscripten.
 
     tgf [<grammar>] serve [--port N] [--max-sessions N]
         [--idle-timeout N] [--session-memory N] [--max-line N]
-        [--write-timeout N] [--productions LIST] [--log-dir DIR]
+        [--write-timeout N] [--enabled-productions LIST] [--log-dir DIR]
         [--no-log]
 
 The grammar file is optional. Without it every session starts with no
@@ -43,7 +43,7 @@ grammar and a `load` command installs one.
 | `--log-dir DIR` | `~/.tau/tgf/logs` | Directory of the session logs and `server.log`. |
 | `--no-log` | off | Write no logs. |
 | `--start SYM`, `-s SYM` | none | Initial start symbol of each session. |
-| `--productions LIST`, `-G LIST` | none | Comma-separated production guards each session enables. |
+| `--enabled-productions LIST`, `-G LIST` | none | Comma-separated production guards each session enables. |
 
 The server binds `127.0.0.1` only. No host option exists. With `--port 0`
 the system picks a port and the server writes one line on stdout:

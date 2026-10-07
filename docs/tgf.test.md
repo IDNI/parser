@@ -7,10 +7,10 @@ A `.tgf.test` file lists inputs for a grammar and asserts the shape of each pars
 ## Running
 
 ```
-tgf <grammar.tgf> test [--productions a,b] <file.tgf.test>
+tgf <grammar.tgf> test [--enabled-productions a,b] <file.tgf.test>
 ```
 
-`--productions` sets the enabled guard set for the grammar, the same option the `parse`, `repl`, and `gen` commands accept.
+`--enabled-productions` sets the enabled guard set for the grammar, the same option the `parse`, `repl`, and `gen` commands accept.
 
 The tool prints one line per input, then a summary line for the file. Real output from `tests/ambig_bc.tgf.test` against `tests/fixtures/ambig_bc.tgf`:
 

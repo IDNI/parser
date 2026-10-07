@@ -1554,8 +1554,8 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 	TEST_CASE("JSON mode writes only JSON objects, one per line") {
 		int code = -1;
 		auto text = capture_run({ "tgf", grammar_path(), "parse",
-			"--json", "--print-input", "--tml-rules",
-			"--tml-facts", "--measure", "-e", "123" }, code);
+			"--json", "--print-input", "--print-tml-rules",
+			"--print-tml-facts", "--measure", "-e", "123" }, code);
 		std::istringstream ls(text);
 		std::string l;
 		size_t lines = 0;

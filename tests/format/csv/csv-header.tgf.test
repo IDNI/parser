@@ -6,7 +6,7 @@
 # instead of treating that line as an ordinary record.
 #
 # To run:
-#   tgf csv.tgf test --productions header,comma,crlf csv-header.tgf.test
+#   tgf csv.tgf test --enabled-productions header,comma,crlf csv-header.tgf.test
 
 # ===========================================================================
 # 1  HEADER PLUS RECORD

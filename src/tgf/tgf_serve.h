@@ -16,8 +16,8 @@ namespace idni {
 /// Options of the `tgf serve` subcommand. The server never sees a host
 /// option: it binds 127.0.0.1 only.
 struct serve_options {
-	/// TCP port. 0 lets the system pick a free port.
-	uint16_t port = 0;
+	/// TCP port, at most 65535. 0 lets the system pick a free port.
+	size_t port = 0;
 	/// Refuse a new session at this count.
 	size_t max_sessions = 16;
 	/// End a session after this many minutes with no traffic. 0 disables

@@ -622,7 +622,9 @@ void serve_server::untrack_fd(int fd) {
 
 bool serve_server::start() {
 	error_code ec;
-	tcp::endpoint ep(ba::ip::make_address("127.0.0.1", ec), opt.port);
+	// the caller checks the range of the port
+	tcp::endpoint ep(ba::ip::make_address("127.0.0.1", ec),
+		static_cast<uint16_t>(opt.port));
 	if (ec) {
 		report.error(diagnostics::code::invalid_argument,
 			parser_strings::messages::bad_address);

@@ -634,9 +634,9 @@ TEST_SUITE("tgf serve: init line") {
 }
 
 TEST_SUITE("tgf serve: options") {
-	TEST_CASE("serve forwards --productions to the session") {
+	TEST_CASE("serve forwards --enabled-productions to the session") {
 		serve_fixture f(16, 16777216, "", true, "",
-			{ "--productions", "guard1" });
+			{ "--enabled-productions", "guard1" });
 		serve_client c(f.bound_port());
 		c.send(R"({"cmd":"new"})");
 		auto hello = parse_line(c.read_line());

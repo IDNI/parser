@@ -134,7 +134,17 @@ inline bool same_spec_without_surfaces(const option_spec& a,
 {
 	return a.name == b.name && a.owner == b.owner
 		&& a.fallback == b.fallback && a.help == b.help
-		&& a.from_env == b.from_env;
+		&& a.from_env == b.from_env && a.raw == b.raw;
+}
+
+// A raw text keeps its bytes: no quotes, no escapes, no trim.
+inline diagnostics::result<option_value> parse_value(const option_spec& o,
+	std::string_view text)
+{
+	if (!o.raw || kind_of(o) != option_kind::text)
+		return parse_value(kind_of(o), text, o.name);
+	diagnostics::result<option_value> r;
+	return r.with_value(option_value(std::string(text)));
 }
 
 /// Report in @p r when @p sf does not fit the option @p o of @p cat: a
@@ -262,6 +272,8 @@ inline diagnostics::result<void> options_repository::add_surface(
 	const auto i = cat_->find(name);
 	if (!i) return r.with_error(diagnostics::code::not_found,
 		ps::messages::option_not_found, { { ps::label::name, name } });
+	if (std::ranges::find(cat_->specs[*i].surfaces, surface)
+		!= cat_->specs[*i].surfaces.end()) return r;
 	auto cat = std::make_shared<detail::options_catalog>(*cat_);
 	detail::check_surface(*cat, cat->specs[*i], surface, r);
 	if (r.has_error()) return r;
@@ -418,8 +430,7 @@ inline diagnostics::result<void> options_repository::set_text(
 	const auto i = cat_->find(name);
 	if (!i) return r.with_error(diagnostics::code::not_found,
 		ps::messages::option_not_found, { { ps::label::name, name } });
-	auto v = r.merge_take(detail::parse_value(
-		kind_of(cat_->specs[*i]), text, name));
+	auto v = r.merge_take(detail::parse_value(cat_->specs[*i], text));
 	if (!v) return r;
 	r.merge(store(*i, std::move(*v)));
 	return r;
@@ -433,7 +444,10 @@ inline diagnostics::result<std::string> options_repository::get_text(
 	const auto i = cat_->find(name);
 	if (!i) return r.with_error(diagnostics::code::not_found,
 		ps::messages::option_not_found, { { ps::label::name, name } });
-	auto text = r.merge_take(detail::format_option_value(effective(*i)));
+	const option_value v = effective(*i);
+	if (const auto* s = std::get_if<std::string>(&v);
+		s && cat_->specs[*i].raw) return r.with_value(std::string(*s));
+	auto text = r.merge_take(detail::format_option_value(v));
 	if (!text) return r;
 	return r.with_value(std::move(*text));
 }
@@ -464,7 +478,7 @@ inline diagnostics::result<void> options_repository::load_env(
 		const std::string var = detail::option_env_name(prefix, o.name);
 		const char* text = std::getenv(var.c_str());
 		if (!text) continue;
-		auto v = detail::parse_value(kind_of(o), text, o.name);
+		auto v = detail::parse_value(o, text);
 		if (!v.has_value()) {
 			r.error(diagnostics::code::invalid_argument,
 				ps::messages::option_env_bad_value,
@@ -534,8 +548,7 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 	// A list given again appends. Every other kind keeps the last value.
 	auto add_text = [&](std::size_t i, std::string_view text) {
 		const option_spec& o = cat.specs[i];
-		auto v = r.merge_take(detail::parse_value(
-			kind_of(o), text, o.name));
+		auto v = r.merge_take(detail::parse_value(o, text));
 		if (!v) return false;
 		if (const auto* add = std::get_if<option_list>(&*v))
 			if (option_value* have = pending_of(i)) {
@@ -648,6 +661,7 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 			{ { ps::label::name, args[arg] } });
 		return r;
 	}
+	out.command_given = status == 2;
 	const std::string cmd = status == 2 ? args[arg++]
 		: out.inputs.empty() ? cfg.default_command
 		: cfg.default_command_when_inputs;

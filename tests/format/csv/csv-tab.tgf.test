@@ -4,7 +4,7 @@
 # data, a bare CR is still rejected.
 #
 # To run:
-#   tgf csv.tgf test --productions tab,crlf,no_header csv-tab.tgf.test
+#   tgf csv.tgf test --enabled-productions tab,crlf,no_header csv-tab.tgf.test
 
 # ===========================================================================
 # 1  TAB-SEPARATED FIELDS

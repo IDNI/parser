@@ -53,6 +53,8 @@ struct option_binding {
 /// What one command line gave that is no option.
 struct parsed_args {
 	std::string command;
+	/// True when argv named the command.
+	bool command_given = false;
 	/// The positional arguments: `-`, the files and the URLs.
 	std::vector<std::string> inputs;
 	/// The options argv gave, with their values, in argv order. A program
@@ -84,6 +86,7 @@ struct options_repository {
 	[[nodiscard]] diagnostics::result<void> declare(const option_set& set);
 	/// Add a surface to a declared option. An unknown name is an error.
 	/// A short letter already used on that command is an error.
+	/// An equal surface that the option has already changes nothing.
 	[[nodiscard]] diagnostics::result<void> add_surface(
 		std::string_view name, option_surface surface);
 

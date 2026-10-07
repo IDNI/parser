@@ -8,6 +8,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 
+#include <algorithm>
 #include <charconv>
 #include <cstdlib>
 #include <initializer_list>
@@ -201,6 +202,11 @@ TEST_CASE("declare takes an equal spec again") {
 TEST_CASE("add_surface puts an option on a command") {
 	fixture f;
 	REQUIRE(f.repo.add_surface("count", { "run", 'c' }).has_value());
+	// an equal surface again changes nothing
+	REQUIRE(f.repo.add_surface("count", { "run", 'c' }).has_value());
+	auto spec = f.repo.find("count");
+	REQUIRE(spec);
+	CHECK(ranges::count(spec->surfaces, option_surface{ "run", 'c' }) == 1);
 	argv_of a{ "tool", "run", "-c", "3" };
 	REQUIRE(f.repo.parse_args(a.argc(), a.argv(), tool_config())
 		.has_value());
@@ -641,6 +647,24 @@ TEST_CASE("a quoted string is one entry or one text") {
 	CHECK(f.repo.get<option_list>("tags") == option_list{ "a,b", "c" });
 }
 
+TEST_CASE("a raw text option keeps the text as given") {
+	options_repository repo;
+	REQUIRE(repo.declare(option_set{
+		.options = { { "expr", "run", string(), "an expression",
+			{ { "run", 'e' } }, true, true } },
+		.commands = { { "run", "run the tool" } } }).has_value());
+	const string text = "  \"a\"  ";
+	REQUIRE(repo.set_text("expr", text).has_value());
+	CHECK(repo.get<string>("expr") == text);
+	auto back = repo.get_text("expr");
+	REQUIRE(back.has_value());
+	CHECK(back.value() == text);
+	argv_of a{ "tool", "run", "-e", "\"x\"" };
+	REQUIRE(repo.parse_args(a.argc(), a.argv(), tool_config())
+		.has_value());
+	CHECK(repo.get<string>("expr") == "\"x\"");
+}
+
 TEST_CASE("a bad quoted string is an error") {
 	fixture f;
 	CHECK(f.repo.set_text("name", "\"abc").has_error());
@@ -713,6 +737,7 @@ TEST_CASE("--name=value and --name value") {
 	auto r = f.repo.parse_args(a.argc(), a.argv(), tool_config());
 	REQUIRE(r.has_value());
 	CHECK(r.value().command == "run");
+	CHECK(r.value().command_given);
 	CHECK(f.repo.get<size_t>("count") == 3u);
 	CHECK(f.repo.get<string>("name") == "abc");
 }
@@ -831,6 +856,7 @@ TEST_CASE("--help sets the help option") {
 	REQUIRE(r.has_value());
 	CHECK(f.repo.get<bool>("help"));
 	CHECK(r.value().command.empty());
+	CHECK(!r.value().command_given);
 }
 
 TEST_CASE("an unknown option is an error with the help text") {

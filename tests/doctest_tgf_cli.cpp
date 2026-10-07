@@ -8,98 +8,37 @@
 #include "doctest.h"
 #include "../src/tgf/tgf_cli.h"
 
+#include <initializer_list>
 #include <sstream>
 
 using namespace std;
 using namespace idni;
 
 // ---------------------------------------------------------------------------
-// helpers (mirrored from tests/doctest_cli.cpp, plus cmd_options check)
+// helpers
 // ---------------------------------------------------------------------------
 
-struct test_options {
-	string name = "";
-	vector<string> args = {};
-	cli::commands cmds = {};
-	string dflt_cmd = "";
-	cli::options opts = {};
-	string desc = "";
-	string help_header = "";
+// A repository with the options of the tgf tool on their commands. A short
+// letter used twice on one command fails the fixture.
+struct tgf_options_fixture {
+	options_repository repo;
+	tgf_options_fixture() {
+		for (const auto* set : { &tgf_option_set, &grammar_option_set,
+			&parser_option_set, &tgf_repl_option_set })
+				REQUIRE(repo.declare(*set).has_value());
+		for (const auto& [name, surface] : tgf_surfaces)
+			REQUIRE(repo.add_surface(name, surface).has_value());
+	}
+	diagnostics::result<parsed_args> parse(
+		initializer_list<const char*> args)
+	{
+		vector<string> store(args.begin(), args.end());
+		vector<char*> argv;
+		for (auto& a : store) argv.push_back(a.data());
+		return repo.parse_args(static_cast<int>(argv.size()),
+			argv.data(), tgf_args_config);
+	}
 };
-
-struct test_expected {
-	int status = -1;
-	string cmd_name = "";
-	map<string, cli::option::value> options = {};
-	map<string, cli::option::value> cmd_options = {};
-};
-
-static ostream cnull(0);
-
-static string args_to_string(const vector<string>& args) {
-	string s;
-	for (auto& a : args) { s += a; s += ' '; }
-	return s;
-}
-
-static string value_to_string(const cli::option::value& v) {
-	if (holds_alternative<string>(v)) return "'" + get<string>(v) + "'";
-	if (holds_alternative<bool>(v))   return get<bool>(v) ? "true" : "false";
-	if (holds_alternative<int>(v))    return to_string(get<int>(v));
-	return "<unknown>";
-}
-
-// Run TGF CLI with given options, assert expected status / cmd / options /
-// cmd_options. On failure, FAIL_CHECK reports the args plus what mismatched.
-static void expect_cli(const test_options& o, const test_expected& exp) {
-	cli cl(o.name, o.args, o.cmds, o.dflt_cmd, o.opts);
-	if (o.desc.size())        cl.set_description(o.desc);
-	if (o.help_header.size()) cl.set_help_header(o.help_header);
-	cl.set_output_stream(cnull);
-	cl.set_error_stream(cnull);
-
-	cl.process_args();
-	auto opts = cl.get_processed_options();
-	auto cmd  = cl.get_processed_command();
-	string argstr = args_to_string(o.args);
-
-	if (exp.status != -1 && cl.status() != exp.status) {
-		FAIL_CHECK("args [" << argstr << "]: expected status="
-			<< exp.status << ", got status=" << cl.status());
-		return;
-	}
-	if (cl.status() == 1) return; // no further checks meaningful
-
-	for (auto& [name, value] : exp.options) {
-		if (opts.find(name) == opts.end()) {
-			FAIL_CHECK("args [" << argstr
-				<< "]: expected global option '" << name
-				<< "' not found");
-			continue;
-		}
-		if (opts[name].get() != value)
-			FAIL_CHECK("args [" << argstr << "]: global option '"
-				<< name << "' expected " << value_to_string(value)
-				<< ", got " << value_to_string(opts[name].get()));
-	}
-
-	for (auto& [name, value] : exp.cmd_options) {
-		if (!cmd.has(name)) {
-			FAIL_CHECK("args [" << argstr
-				<< "]: expected cmd option '" << name
-				<< "' not found");
-			continue;
-		}
-		if (cmd[name].get() != value)
-			FAIL_CHECK("args [" << argstr << "]: cmd option '"
-				<< name << "' expected " << value_to_string(value)
-				<< ", got " << value_to_string(cmd[name].get()));
-	}
-
-	if (exp.cmd_name.size() && cmd.name() != exp.cmd_name)
-		FAIL_CHECK("args [" << argstr << "]: expected cmd_name='"
-			<< exp.cmd_name << "', got '" << cmd.name() << "'");
-}
 
 // ---------------------------------------------------------------------------
 // TEST SUITE: subcommand routing
@@ -107,54 +46,45 @@ static void expect_cli(const test_options& o, const test_expected& exp) {
 
 TEST_SUITE("tgf cli: subcommands") {
 
-	test_options o { "tgf", {}, tgf_commands(), "repl", tgf_options() };
-
 	TEST_CASE("default command is repl") {
-		o.args = { "tgf" };
-		expect_cli(o, { .status = 0, .cmd_name = "repl" });
+		tgf_options_fixture f;
+		auto r = f.parse({ "tgf" });
+		REQUIRE(r.has_value());
+		CHECK(r.value().command == "repl");
 	}
 
 	TEST_CASE("invalid subcommand") {
-		o.args = { "tgf", "invalid" };
-		expect_cli(o, { .status = 1 });
+		tgf_options_fixture f;
+		CHECK(f.parse({ "tgf", "invalid" }).has_error());
 	}
 
-	TEST_CASE("grammar subcommand") {
-		o.args = { "tgf", "grammar" };
-		expect_cli(o, { .status = 0, .cmd_name = "grammar" });
-	}
-
-	TEST_CASE("gen subcommand") {
-		o.args = { "tgf", "gen" };
-		expect_cli(o, { .status = 0, .cmd_name = "gen" });
-	}
-
-	TEST_CASE("parse subcommand") {
-		o.args = { "tgf", "parse" };
-		expect_cli(o, { .status = 0, .cmd_name = "parse" });
-	}
-
-	TEST_CASE("repl subcommand") {
-		o.args = { "tgf", "repl" };
-		expect_cli(o, { .status = 0, .cmd_name = "repl" });
+	TEST_CASE("each command routes") {
+		for (const char* c : { "grammar", "gen", "parse", "repl",
+			"serve", "connect", "test" })
+		{
+			tgf_options_fixture f;
+			auto r = f.parse({ "tgf", c });
+			REQUIRE(r.has_value());
+			CHECK(r.value().command == c);
+		}
 	}
 
 	TEST_CASE("repl --legacy-repl defaults to false") {
-		o.args = { "tgf", "repl" };
-		expect_cli(o, { .status = 0, .cmd_name = "repl",
-			.cmd_options = { { "legacy-repl", false } } });
+		tgf_options_fixture f;
+		REQUIRE(f.parse({ "tgf", "repl" }).has_value());
+		CHECK(!f.repo.get<bool>("legacy-repl"));
 	}
 
 	TEST_CASE("repl -X enables legacy terminal REPL") {
-		o.args = { "tgf", "repl", "-X" };
-		expect_cli(o, { .status = 0, .cmd_name = "repl",
-			.cmd_options = { { "legacy-repl", true } } });
+		tgf_options_fixture f;
+		REQUIRE(f.parse({ "tgf", "repl", "-X" }).has_value());
+		CHECK(f.repo.get<bool>("legacy-repl"));
 	}
 
 	TEST_CASE("repl --legacy-repl long form") {
-		o.args = { "tgf", "repl", "--legacy-repl" };
-		expect_cli(o, { .status = 0, .cmd_name = "repl",
-			.cmd_options = { { "legacy-repl", true } } });
+		tgf_options_fixture f;
+		REQUIRE(f.parse({ "tgf", "repl", "--legacy-repl" }).has_value());
+		CHECK(f.repo.get<bool>("legacy-repl"));
 	}
 }
 
@@ -164,36 +94,40 @@ TEST_SUITE("tgf cli: subcommands") {
 
 TEST_SUITE("tgf cli: gen options") {
 
-	test_options o { "tgf", {}, tgf_commands(), "repl", tgf_options() };
-
 	TEST_CASE("gen default options") {
-		o.args = { "tgf", "gen" };
-		expect_cli(o, { .status = 0, .cmd_name = "gen",
-			.cmd_options = {
-				{ "help",    false },
-				{ "name",    "" },
-				{ "decoder", "" },
-				{ "encoder", "" },
-				{ "output",  "" },
-			} });
+		tgf_options_fixture f;
+		auto r = f.parse({ "tgf", "gen" });
+		REQUIRE(r.has_value());
+		CHECK(r.value().command == "gen");
+		CHECK(!f.repo.get<bool>("help"));
+		CHECK(f.repo.get<string>("name").empty());
+		CHECK(f.repo.get<string>("decoder").empty());
+		CHECK(f.repo.get<string>("encoder").empty());
+		CHECK(f.repo.get<string>("output").empty());
+		CHECK(f.repo.get<bool>("header-only"));
 	}
 
 	TEST_CASE("gen with --name and --help") {
-		o.args = { "tgf", "gen", "--name", "my_other_parser",
-			"--help" };
-		expect_cli(o, { .status = 0, .cmd_name = "gen",
-			.cmd_options = {
-				{ "help",    true },
-				{ "name",    "my_other_parser" },
-				{ "decoder", "" },
-				{ "encoder", "" },
-				{ "output",  "" },
-			} });
+		tgf_options_fixture f;
+		auto r = f.parse({ "tgf", "gen", "--name", "my_other_parser",
+			"--help" });
+		REQUIRE(r.has_value());
+		CHECK(r.value().command == "gen");
+		CHECK(f.repo.get<bool>("help"));
+		CHECK(f.repo.get<string>("name") == "my_other_parser");
+	}
+
+	TEST_CASE("gen --dynamic takes name=value entries") {
+		tgf_options_fixture f;
+		REQUIRE(f.parse({ "tgf", "gen", "-D",
+			"ba_type=sbf,ba_type=tau" }).has_value());
+		CHECK(f.repo.get<option_list>("dynamic")
+			== option_list{ "ba_type=sbf", "ba_type=tau" });
 	}
 
 	TEST_CASE("gen with invalid option") {
-		o.args = { "tgf", "gen", "--invalid" };
-		expect_cli(o, { .status = 1 });
+		tgf_options_fixture f;
+		CHECK(f.parse({ "tgf", "gen", "--invalid" }).has_error());
 	}
 }
 
@@ -203,19 +137,37 @@ TEST_SUITE("tgf cli: gen options") {
 
 TEST_SUITE("tgf cli: global options") {
 
-	test_options o { "tgf", {}, tgf_commands(), "repl", tgf_options() };
-
 	TEST_CASE("grammar command accepts -N for nullable") {
-		o.args = { "tgf", "grammar", "-N" };
-		expect_cli(o, { .status = 0, .cmd_name = "grammar",
-			.cmd_options = {
-				{ "nullable", true },
-			} });
+		tgf_options_fixture f;
+		auto r = f.parse({ "tgf", "grammar", "-N" });
+		REQUIRE(r.has_value());
+		CHECK(r.value().command == "grammar");
+		CHECK(f.repo.get<bool>("nullable"));
+	}
+
+	TEST_CASE("the grammar flag has a default per command") {
+		tgf_options_fixture f;
+		REQUIRE(f.parse({ "tgf", "grammar" }).has_value());
+		CHECK(f.repo.get<bool>("grammar"));
+		REQUIRE(f.parse({ "tgf", "parse" }).has_value());
+		CHECK(!f.repo.get<bool>("grammar"));
+	}
+
+	TEST_CASE("-G names the enabled productions on each command") {
+		for (const char* c : { "grammar", "parse", "gen", "repl",
+			"serve", "test" })
+		{
+			tgf_options_fixture f;
+			auto r = f.parse({ "tgf", c, "-G", "a,b" });
+			REQUIRE(r.has_value());
+			CHECK(f.repo.get<option_list>("enabled-productions")
+				== option_list{ "a", "b" });
+		}
 	}
 
 	TEST_CASE("invalid global option") {
-		o.args = { "tgf", "--invalid" };
-		expect_cli(o, { .status = 1 });
+		tgf_options_fixture f;
+		CHECK(f.parse({ "tgf", "--invalid" }).has_error());
 	}
 }
 
@@ -239,6 +191,20 @@ static string capture_tgf_run(const vector<string>& args) {
 	cout.rdbuf(old_out);
 	cerr.rdbuf(old_err);
 	return os.str();
+}
+
+TEST_SUITE("tgf cli: help") {
+
+	TEST_CASE("-h with no command prints the program help") {
+		string out = capture_tgf_run({ "tgf", "-h" });
+		CHECK(out.find("Commands:") != string::npos);
+	}
+
+	TEST_CASE("parse -h prints the help of the command") {
+		string out = capture_tgf_run({ "tgf", "parse", "-h" });
+		CHECK(out.find("Command options:") != string::npos);
+		CHECK(out.find("Commands:") == string::npos);
+	}
 }
 
 TEST_SUITE("tgf cli: derived character classes") {

@@ -643,6 +643,11 @@ void tgf_repl_evaluator::apply_auto_disambiguate() {
 				opt.auto_disambiguate);
 }
 
+void tgf_repl_evaluator::auto_disambiguate_from_command_line(bool on) {
+	opt.auto_disambiguate = on;
+	opt.auto_disambiguate_user_set = true;
+}
+
 void tgf_repl_evaluator::set_repl(repl<tgf_repl_evaluator>& r_) {
 	r = &r_;
 	reprompt();
@@ -1950,91 +1955,66 @@ static int run_tests(
 	return ret;
 }
 
-// cli::command::has() reports whether a command's schema declares an
-// option, not whether argv actually carried it (every command declares
-// auto-disambiguate with a default). Scan the raw args for the long
-// flag to tell an explicit user override from that default.
-static bool user_passed_long_flag(const vector<string>& argv,
-	const string& name)
-{
-	string flag = "--" + name;
-	for (auto& a : argv)
-		if (a == flag || a.rfind(flag + "=", 0) == 0) return true;
-	return false;
-}
+// The structs of the generator and of the server, with their fields bound
+// to the options of one run of the tool.
+struct tgf_tool {
+	parser_gen_options gen;
+#ifdef TAU_PARSER_BUILD_SERVE
+	serve_options serve;
+#endif
+	diagnostics::report report;
 
-static tgf_repl_evaluator::options
-	repl_options_from_cmd(const cli::command& cmd, const vector<string>& argv)
-{
-	tgf_repl_evaluator::options tgf_repl_opt;
-	if (cmd.has("status"))                  tgf_repl_opt.status =
-		cmd.get<bool>("status");
-	if (cmd.has("colors"))                  tgf_repl_opt.colors =
-		cmd.get<bool>("colors");
-	if (cmd.has("json"))                    tgf_repl_opt.json =
-		cmd.get<bool>("json");
-	if (cmd.has("print-input"))             tgf_repl_opt.print_input =
-		cmd.get<bool>("print-input");
-	if (cmd.has("print-ambiguity"))         tgf_repl_opt.print_ambiguity =
-		cmd.get<bool>("print-ambiguity");
-	if (cmd.has("print-graphs"))            tgf_repl_opt.print_graphs =
-		cmd.get<bool>("print-graphs");
-	if (cmd.has("tml-rules"))               tgf_repl_opt.tml_rules =
-		cmd.get<bool>("tml-rules");
-	if (cmd.has("tml-facts"))               tgf_repl_opt.tml_facts =
-		cmd.get<bool>("tml-facts");
-	if (user_passed_long_flag(argv, "auto-disambiguate")) {
-		tgf_repl_opt.auto_disambiguate =
-			cmd.get<bool>("auto-disambiguate");
-		tgf_repl_opt.auto_disambiguate_user_set = true;
-	}
-	return tgf_repl_opt;
-}
+	tgf_tool();
+	~tgf_tool();
+	tgf_tool(const tgf_tool&) = delete;
+	tgf_tool& operator=(const tgf_tool&) = delete;
 
-// The parser owns these options, so they go in by name once the evaluator
-// has its parser. An error goes to the report of @p re.
-static void parse_options_from_cmd(const cli::command& cmd,
-	tgf_repl_evaluator& re)
-{
-	if (cmd.has("measure"))
-		re.set_cmd("measure", cmd.get<bool>("measure") ? "true" : "false");
-	for (const char* name : { "error-verbosity", "start", "tree-path" })
-		if (cmd.has(name)) re.set_cmd(name, cmd.get<string>(name));
-}
+private:
+	vector<string_view> bound;
+};
 
-// A bad dynamic list is the error of the result.
-static diagnostics::result<parser_gen_options> gen_options_from_cmd(
-	const cli::command& cmd)
-{
-	diagnostics::result<parser_gen_options> r;
-	auto get_str = [&](const char* n) {
-		return cmd.has(n) ? cmd.get<string>(n) : "";
+tgf_tool::tgf_tool() {
+	// a run starts from the defaults, also after a run on the same thread
+	for (const auto& owner : { "global", "generator", "serve" })
+		idni::options().reset(owner);
+	auto bind = [this](string_view name, auto& field) {
+		report.append(idni::options().bind(name, field).report());
+		bound.push_back(name);
 	};
-	auto get_bool = [&](const char* n) {
-		return cmd.has(n) && cmd.get<bool>(n);
-	};
-	auto dynamic = r.merge_take(detail::parse_value(option_kind::list,
-		get_str("dynamic"), "dynamic"));
-	if (!dynamic) return r;
-	return r.with_value(parser_gen_options{
-		.output_dir          = get_str("output-dir"),
-		.output              = get_str("output"),
-		.name                = get_str("name"),
-		.ns                  = get_str("namespace"),
-		.char_type           = get_str("char-type"),
-		.terminal_type       = get_str("terminal-type"),
-		.decoder             = get_str("decoder"),
-		.encoder             = get_str("encoder"),
-		.utf8                = get_bool("utf8"),
-		.dynamic             = std::get<option_list>(std::move(*dynamic)),
-		.header_only         = get_bool("header-only"),
-		.treemr              = get_bool("treemr")
-	});
+	bind("char-type", gen.char_type);
+	bind("terminal-type", gen.terminal_type);
+	bind("utf8", gen.utf8);
+	bind("name", gen.name);
+	bind("output-dir", gen.output_dir);
+	bind("output", gen.output);
+	bind("dynamic", gen.dynamic);
+	bind("namespace", gen.ns);
+	bind("header-only", gen.header_only);
+	bind("treemr", gen.treemr);
+	bind("decoder", gen.decoder);
+	bind("encoder", gen.encoder);
+#ifdef TAU_PARSER_BUILD_SERVE
+	bind("port", serve.port);
+	bind("max-sessions", serve.max_sessions);
+	bind("idle-timeout", serve.idle_timeout_minutes);
+	bind("session-memory", serve.session_memory_mb);
+	bind("max-line", serve.max_line);
+	bind("write-timeout", serve.write_timeout_seconds);
+	bind("log-dir", serve.log_dir);
+	bind("no-log", serve.no_log);
+#endif
 }
 
-static int gen_command(const cli::command& cmd,
-	tgf_repl_evaluator& re)
-{
+tgf_tool::~tgf_tool() {
+	for (const auto& name : bound) idni::options().unbind(name);
+}
+
+static int command_line_error(string_view msg) {
+	cerr << msg << "\n";
+	return 1;
+}
+
+static int gen_command(tgf_tool& tool, tgf_repl_evaluator& re) {
 	using format::json::value;
 	const bool json = idni::options().get<bool>("json");
 	auto fail = [&](const diagnostics::report& rep) {
@@ -2045,13 +2025,11 @@ static int gen_command(const cli::command& cmd,
 		return 1;
 	};
 	if (!re.require_grammar()) return fail(re.take_report());
-	auto gen_opt = gen_options_from_cmd(cmd);
-	if (!gen_opt.has_value()) return fail(gen_opt.report());
 	auto gr = !re.has_fixed_grammar()
-		? generate_parser_cpp_from_file<char>(re.filename(),
-			gen_opt.value(), false)
+		? generate_parser_cpp_from_file<char>(re.filename(), tool.gen,
+			false)
 		: generate_parser_cpp_from_string<char>(re.filename(),
-			re.source(), gen_opt.value(), false);
+			re.source(), tool.gen, false);
 	if (json) {
 		auto data = value::object();
 		auto files = value::array();
@@ -2099,11 +2077,10 @@ static void print_char_class_report(tgf_repl_evaluator& re) {
 	print_group("rejected", state::rejected);
 }
 
-static int show_command(const cli::command& cmd,
-	tgf_repl_evaluator& re)
-{
+static int show_command(tgf_repl_evaluator& re) {
 	using format::json::value;
-	const bool json = idni::options().get<bool>("json");
+	auto& opts = idni::options();
+	const bool json = opts.get<bool>("json");
 	if (!re.require_grammar()) {
 		if (json) {
 			json_write_line(cout, json_result_response(
@@ -2114,8 +2091,7 @@ static int show_command(const cli::command& cmd,
 		re.flush_report();
 		return 1;
 	}
-	string start = cmd.get<string>("start");
-	if (start.empty()) start = re.g().start_literal().to_std_string();
+	const string start = re.start_symbol();
 	if (json) {
 		auto v = value::object();
 		v.set("start", value::string(start));
@@ -2128,7 +2104,7 @@ static int show_command(const cli::command& cmd,
 		}
 		v.set("productions", std::move(prods));
 		v.set("production_ids", std::move(pids));
-		if (cmd.get<bool>("nullable")) {
+		if (opts.get<bool>("nullable")) {
 			auto nl = value::array();
 			for (const auto& [head, p] :
 					re.g().nullable_recursive_productions()) {
@@ -2149,53 +2125,29 @@ static int show_command(const cli::command& cmd,
 			"grammar", v, state_value(re), re.take_report()));
 		return 0;
 	}
-	if (cmd.get<bool>("grammar")) re.g().print_internal_grammar_for(
+	if (opts.get<bool>("grammar")) re.g().print_internal_grammar_for(
 		cout, start, {}, true);
-	if (cmd.get<bool>("nullable"))
+	if (opts.get<bool>("nullable"))
 		re.g().check_nullable_recursive_production(cout);
-	if (cmd.has("char-class-report")
-		&& cmd.get<bool>("char-class-report"))
-			print_char_class_report(re);
+	if (opts.get<bool>("char-class-report")) print_char_class_report(re);
 	re.flush_report();
 	return 0;
 }
 
-static int serve_command(cli& cl, const cli::command& cmd,
-	tgf_repl_evaluator& re)
-{
+static int serve_command(tgf_tool& tool, tgf_repl_evaluator& re) {
 #ifndef TAU_PARSER_BUILD_SERVE
-	(void)cmd;
+	(void)tool;
 	(void)re;
-	return cl.error("tgf serve was not built: configure with "
+	return command_line_error("tgf serve was not built: configure with "
 		"-DTAU_PARSER_BUILD_SERVE=ON");
 #else
-	serve_options opt;
-	int port = cmd.get<int>("port");
-	if (port < 0 || port > 65535)
-		return cl.error("--port must be between 0 and 65535");
-	opt.port = static_cast<uint16_t>(port);
-	int max_sessions = cmd.get<int>("max-sessions");
-	if (max_sessions < 1)
-		return cl.error("--max-sessions must be at least 1");
-	opt.max_sessions = static_cast<size_t>(max_sessions);
-	int idle = cmd.get<int>("idle-timeout");
-	if (idle < 0)
-		return cl.error("--idle-timeout must not be negative");
-	opt.idle_timeout_minutes = static_cast<size_t>(idle);
-	int mem = cmd.get<int>("session-memory");
-	if (mem < 0)
-		return cl.error("--session-memory must not be negative");
-	opt.session_memory_mb = static_cast<size_t>(mem);
-	int max_line = cmd.get<int>("max-line");
-	if (max_line < 1)
-		return cl.error("--max-line must be at least 1");
-	opt.max_line = static_cast<size_t>(max_line);
-	int write_timeout = cmd.get<int>("write-timeout");
-	if (write_timeout < 0)
-		return cl.error("--write-timeout must not be negative");
-	opt.write_timeout_seconds = static_cast<size_t>(write_timeout);
-	opt.log_dir = cmd.get<string>("log-dir");
-	opt.no_log = cmd.get<bool>("no-log");
+	serve_options& opt = tool.serve;
+	if (opt.port > 65535)
+		return command_line_error("--port must be between 0 and 65535");
+	if (opt.max_sessions < 1)
+		return command_line_error("--max-sessions must be at least 1");
+	if (opt.max_line < 1)
+		return command_line_error("--max-line must be at least 1");
 	opt.evaluator = &re;
 	auto r = tgf_serve_run(opt);
 	// A warning (for example the Windows session memory note) is not an
@@ -2227,21 +2179,19 @@ static bool connect_parse_host_port(const string& s, string& host,
 }
 #endif
 
-static int connect_command(cli& cl, const cli::command& cmd) {
+static int connect_command(const vector<string>& inputs) {
 #ifndef TAU_PARSER_BUILD_SERVE
-	(void)cmd;
-	return cl.error("tgf connect was not built: configure with "
+	(void)inputs;
+	return command_line_error("tgf connect was not built: configure with "
 		"-DTAU_PARSER_BUILD_SERVE=ON");
 #else
-	auto files = cl.get_files();
-	if (files.size() != 1)
-		return cl.error("connect needs one <host>:<port> argument");
+	if (inputs.size() != 1) return command_line_error(
+		"connect needs one <host>:<port> argument");
 	connect_options opt;
-	if (!connect_parse_host_port(files.front(), opt.host, opt.port))
-		return cl.error("invalid <host>:<port> argument");
-	if (cmd.has("session")) opt.session = cmd.get<string>("session");
-	if (cmd.has("legacy-repl"))
-		opt.legacy_repl = cmd.get<bool>("legacy-repl");
+	if (!connect_parse_host_port(inputs.front(), opt.host, opt.port))
+		return command_line_error("invalid <host>:<port> argument");
+	opt.session = idni::options().get<string>("session");
+	opt.legacy_repl = idni::options().get<bool>("legacy-repl");
 	auto r = tgf_connect_run(opt);
 	if (!r.has_value()) {
 		print_diagnostics_report(r.report(), false);
@@ -2251,57 +2201,46 @@ static int connect_command(cli& cl, const cli::command& cmd) {
 #endif
 }
 
-static int run_command(cli& cl, const cli::command& cmd,
+// @p args holds the inputs without the grammar file.
+static int run_command(const parsed_args& args, tgf_tool& tool,
 	tgf_repl_evaluator& re)
 {
-	if (cmd.has("session")) {
-		std::string sid = cmd.get<string>("session");
-		// A session child runs the JSON API for `tgf serve`, so it sets
-		// no_server_paths itself and refuses a path a client sends.
-		if (!sid.empty()) re.begin_server_session(sid);
-	}
+	auto& opts = idni::options();
+	const string& command = args.command;
+	// A session child runs the JSON API for `tgf serve`, so it sets
+	// no_server_paths itself and refuses a path a client sends.
+	if (string sid = opts.get<string>("session"); !sid.empty())
+		re.begin_server_session(sid);
 
-	// apply --productions from command line
-	if (string prods = cmd.has("productions")
-			? cmd.get<string>("productions") : string{};
-		!prods.empty())
-	{
-		std::set<std::string> grds;
-		for (auto&& g : prods | views::split(','))
-			grds.emplace(g.begin(), g.end());
-		re.g().set_enabled_productions(grds);
-	}
+	if (command == "grammar") return show_command(re);
 
-	if (cmd.name() == "grammar") return show_command(cmd, re);
+	if (command == "serve") return serve_command(tool, re);
 
-	if (cmd.name() == "serve") return serve_command(cl, cmd, re);
+	if (command == "connect") return connect_command(args.inputs);
 
-	if (cmd.name() == "connect") return connect_command(cl, cmd);
+	if (command == "gen") return gen_command(tool, re);
 
-	if (cmd.name() == "gen") return gen_command(cmd, re);
-
-	if (cmd.name() == "test") {
-		auto files = cl.get_files();
-		if (!files.size()) return cl.error(
+	if (command == "test") {
+		if (args.inputs.empty()) return command_line_error(
 			"test command needs at least one file as an argument");
-		int ret = run_tests(re.p(), files);
+		int ret = run_tests(re.p(), args.inputs);
 		re.flush_report();
 		return ret;
 	}
 
-	if (cmd.name() == "repl") {
-		const bool json = idni::options().get<bool>("json");
+	if (command == "repl") {
+		const bool json = opts.get<bool>("json");
+		const string eval = opts.get<string>("evaluate");
 		if (json) {
-			if (auto ev = cmd.get<string>("evaluate"); ev.size()) {
-				auto er = re.run(ev);
+			if (eval.size()) {
+				auto er = re.run(eval);
 				json_write_line(cout, json_eval_response(
 					format::json::value::null(), er,
 					state_value(re)));
 				return er.status == cmd_status::error ? 1 : 0;
 			}
 			return tgf_json_loop(re, cin, cout, tgf_json_max_line,
-				cmd.has("init-stdin")
-					&& cmd.get<bool>("init-stdin"));
+				opts.get<bool>("init-stdin"));
 		}
 		auto with_report_flush = [&](auto run) {
 			re.flush_report();
@@ -2325,27 +2264,24 @@ static int run_command(cli& cl, const cli::command& cmd,
 #endif
 		};
 
-		if (auto eval = cmd.get<string>("evaluate"); eval.size())
+		if (eval.size())
 			return with_report_flush([&] {
 				return re.eval(eval).value_or(0);
 			});
-		if (cmd.get<bool>("legacy-repl"))
+		if (opts.get<bool>("legacy-repl"))
 			return with_report_flush(run_legacy);
 		return with_report_flush(run_default);
 	}
 
-	if (cmd.name() == "parse") {
-		// the classes are on by default; the option can turn them off
-		if (cmd.has("derive-char-classes")
-			&& !cmd.get<bool>("derive-char-classes"))
-				re.g().derive_char_classes(false);
+	if (command == "parse") {
 		using format::json::value;
-		const bool json = idni::options().get<bool>("json");
-		string infile = cmd.get<string>("input");
-		string inexp  = cmd.get<string>("input-expression");
+		const bool json = opts.get<bool>("json");
+		string infile = opts.get<string>("input");
+		string inexp  = opts.get<string>("input-expression");
 		if (infile.size() && inexp.size())
-			return cl.error("multiple inputs specified, use ei"
-				"ther --input or --input-expression, not both");
+			return command_line_error("multiple inputs specified, "
+				"use either --input or --input-expression, not "
+				"both");
 		if (json) {
 			value data = value::object();
 			string text;
@@ -2357,7 +2293,7 @@ static int run_command(cli& cl, const cli::command& cmd,
 			else
 				data = re.parse(inexp.c_str(), inexp.size(),
 					text);
-			if (cmd.get<bool>("grammar")) {
+			if (opts.get<bool>("grammar")) {
 				string start = re.start_symbol();
 				auto ig = value::object();
 				ig.set("start", value::string(start));
@@ -2373,7 +2309,7 @@ static int run_command(cli& cl, const cli::command& cmd,
 				ig.set("production_ids", std::move(pids));
 				data.set("internal_grammar", std::move(ig));
 			}
-			if (cmd.get<bool>("measure"))
+			if (opts.get<bool>("measure"))
 				data.set("bintree_totals",
 					bintree_process_totals_value());
 			auto rep = re.take_report();
@@ -2384,7 +2320,7 @@ static int run_command(cli& cl, const cli::command& cmd,
 					state_value(re), rep));
 			return st == cmd_status::error ? 1 : 0;
 		}
-		if (cmd.get<bool>("grammar")) re.eval("i");
+		if (opts.get<bool>("grammar")) re.eval("i");
 		string text;
 		if (infile.size())
 			if (infile == "-")
@@ -2395,27 +2331,63 @@ static int run_command(cli& cl, const cli::command& cmd,
 			re.parse(inexp.c_str(), inexp.size(), text);
 		cout << text;
 		re.flush_report();
-		if (cmd.get<bool>("measure")) print_bintree_process_totals();
+		if (opts.get<bool>("measure")) print_bintree_process_totals();
 		return re.has_grammar() ? 0 : 1;
 	}
 	return 0;
 }
 
-// Run universal CLI flags (version/license/help, cmd.ok, cmd help).
-// On exit-without-running returns the exit code; otherwise returns nullopt
-// and sets @p out_cmd to the parsed command.
-static optional<int> cli_universal(cli& cl, cli::command& out_cmd) {
-	if (cl.process_args() != 0) return cl.status();
-	auto opts = cl.get_processed_options();
+// Declare the options of the tool, the grammar, the parser and the
+// evaluator, and put each option on its commands.
+static diagnostics::result<void> declare_tgf_options(
+	options_repository& repo)
+{
+	diagnostics::result<void> r;
+	for (const auto* set : { &tgf_option_set, &grammar_option_set,
+		&parser_option_set, &tgf_repl_option_set })
+			if (!r.merge_ok(repo.declare(*set))) return r;
+	for (const auto& [name, surface] : tgf_surfaces)
+		r.merge(repo.add_surface(name, surface));
+	return r;
+}
+
+// Write the environment and the command line through the options, then
+// run the command. The grammar is loaded already, so the command line
+// writes after its directives. With @p grammar_input the first input is
+// the grammar file.
+static int run_tool(int argc, char** argv, const args_config& cfg,
+	tgf_tool& tool, tgf_repl_evaluator& re, bool grammar_input)
+{
+	if (!re.good()) return re.flush_report(), 1;
+	auto& opts = idni::options();
+	diagnostics::report rep;
+	auto env = opts.load_env("TGF");
+	const bool env_ok = !env.has_error();
+	rep.append(env.report());
+	auto parsed = env_ok ? opts.parse_args(argc, argv, cfg)
+		: diagnostics::result<parsed_args>{};
+	if (env_ok) rep.append(parsed.report());
+	if (!rep.nodes().empty()) print_diagnostics_report(rep, false);
+	if (!env_ok || !parsed.has_value()) return 1;
+	parsed_args args = std::move(parsed).value();
+
 	bool quit = false;
-	if (opts["version"].get<bool>()) { quit = true; print_version(); }
-	if (opts["license"].get<bool>()) { quit = true; print_license(); }
-	if (opts["help"]   .get<bool>()) { quit = true; cl.help(); }
+	if (opts.get<bool>("version")) quit = true, print_version();
+	if (opts.get<bool>("license")) quit = true, print_license();
+	if (opts.get<bool>("help")) quit = true, opts.help(cout,
+		args.command_given ? args.command : string());
 	if (quit) return 0;
-	out_cmd = cl.get_processed_command();
-	if (!out_cmd.ok()) return cl.error("invalid command", true);
-	if (out_cmd.get<bool>("help")) return cl.help(out_cmd), 0;
-	return nullopt;
+
+	for (const auto& [name, v] : args.values)
+		if (const bool* on = get_if<bool>(&v);
+			on && name == "auto-disambiguate")
+				re.auto_disambiguate_from_command_line(*on);
+	if (grammar_input && !args.inputs.empty())
+		args.inputs.erase(args.inputs.begin());
+	// A server keeps the bytes it loaded, so a session and a reload see
+	// the bytes of the load, not a later file change.
+	if (args.command == "serve") re.make_grammar_source_backed();
+	return run_command(args, tool, re);
 }
 
 int tgf_specialized_run(int argc, char** argv,
@@ -2425,77 +2397,45 @@ int tgf_specialized_run(int argc, char** argv,
 {
 	const string grammar_source = grammar_source_c ? grammar_source_c : "";
 	const string tgf_label = display_name ? display_name : "<compiled>";
-	auto cmds = tgf_commands();
-	auto options = tgf_options();
+	if (auto r = declare_tgf_options(idni::options()); r.has_error())
+		return print_diagnostics_report(r.report(), false), 1;
+	tgf_tool tool;
+	if (!tool.report.nodes().empty())
+		print_diagnostics_report(tool.report, false);
+	if (tool.report.has_error()) return 1;
 
-	vector<string> args;
-	for (int i = 0; i != argc; ++i) args.push_back(argv[i]);
-	if (args.empty()) args.push_back(tgf_label);
+	args_config cfg = tgf_args_config;
+	cfg.name = tgf_label;
+	cfg.help_header = tgf_label;
+	cfg.description = "Tau Grammar Format (TGF) specialized grammar tool";
 
-	cli cl(args[0], args, cmds, "repl", options);
-	cl.set_description("Tau Grammar Format (TGF) specialized grammar tool");
-	cl.set_help_header(tgf_label);
-
-	cli::command cmd;
-	if (auto code = cli_universal(cl, cmd)) return *code;
-
-	tgf_repl_evaluator re(parser, tgf_label, grammar_source,
-		repl_options_from_cmd(cmd, args));
-	if (!re.good()) return re.flush_report(), 1;
-	parse_options_from_cmd(cmd, re);
-
-	return run_command(cl, cmd, re);
+	tgf_repl_evaluator re(parser, tgf_label, grammar_source);
+	return run_tool(argc, argv, cfg, tool, re, false);
 }
 
 int tgf_run(int argc, char** argv) {
-	auto cmds = tgf_commands();
-	auto options = tgf_options();
+	if (auto r = declare_tgf_options(idni::options()); r.has_error())
+		return print_diagnostics_report(r.report(), false), 1;
+	tgf_tool tool;
+	if (!tool.report.nodes().empty())
+		print_diagnostics_report(tool.report, false);
+	if (tool.report.has_error()) return 1;
 
-	vector<string> args;
-	string tgf_file{};
-	bool provided = false;
-	bool exists = false;
-	for (int i = 0; i != argc; ++i)
-		if (i == 1 && argv[i][0] != '-') {
-			if (cmds.find(argv[i]) != cmds.end())
-				args.push_back(argv[i]);
-			else {
-				provided = true, tgf_file = argv[i];
-				if (std::ifstream f(tgf_file); f.good())
-					exists = true;
-			}
-		} else args.push_back(argv[i]);
-
-	cli cl("tgf", args, cmds, "repl", options);
-	cl.set_description("Tau Grammar Format (TGF) tool");
-	cl.set_help_header("tgf <TGF file>");
-
-	cli::command cmd;
-	if (auto code = cli_universal(cl, cmd)) return *code;
-
-	if (!provided) {
-		tgf_repl_evaluator re(repl_options_from_cmd(cmd, args));
-		if (!re.good()) return re.flush_report(), 1;
-		parse_options_from_cmd(cmd, re);
-		return run_command(cl, cmd, re);
+	// The first argument names the grammar file unless it is a command
+	// or an option.
+	string tgf_file;
+	if (argc > 1 && argv[1][0] != '-' && ranges::none_of(
+		tgf_option_set.commands, [&](const command_spec& c) {
+			return c.name == argv[1]; }))
+				tgf_file = argv[1];
+	if (tgf_file.empty()) {
+		tgf_repl_evaluator re(tgf_repl_evaluator::options{});
+		return run_tool(argc, argv, tgf_args_config, tool, re, false);
 	}
-	if (!exists) return cl.error("TGF file does not exist ", true);
-
-	// A server parses the bytes it read once and keeps them, so a session
-	// and a reload see the bytes of the load, not a later file change.
-	if (cmd.name() == "serve") {
-		tgf_repl_evaluator re(repl_options_from_cmd(cmd, args));
-		if (!re.load_file_source(tgf_file))
-			return re.flush_report(), 1;
-		parse_options_from_cmd(cmd, re);
-		return run_command(cl, cmd, re);
-	}
-
-	tgf_repl_evaluator re(tgf_file, repl_options_from_cmd(cmd, args));
-	if (!re.good()) return re.flush_report(), 1;
-	parse_options_from_cmd(cmd, re);
-
-	return run_command(cl, cmd, re);
+	if (!ifstream(tgf_file).good())
+		return command_line_error("TGF file does not exist");
+	tgf_repl_evaluator re(tgf_file);
+	return run_tool(argc, argv, tgf_args_config, tool, re, true);
 }
 
 #ifdef TAU_PARSER_HAS_FTXUI

@@ -11,7 +11,6 @@
 #include <string>
 #include <vector>
 
-#include "utility/cli.h"
 #include "utility/diagnostics.h"
 #include "utility/options.h"
 #include "utility/repl.h"
@@ -27,12 +26,6 @@ namespace idni {
 
 /// TGF entry point
 int tgf_run(int argc, char** argv);
-
-/// TGF options and descriptions
-cli::options tgf_options();
-
-/// TGF commands, their options and descriptions
-cli::commands tgf_commands();
 
 /// Status of one command, or of one request text as a whole.
 enum class cmd_status { ok, error, incomplete, quit };
@@ -246,6 +239,9 @@ struct tgf_repl_evaluator {
 	/// before the first parser of the evaluator binds.
 	void reset_parse_options();
 	void apply_auto_disambiguate();
+	/// Keep @p on as the auto-disambiguation of every grammar this
+	/// evaluator loads, over a directive of the grammar.
+	void auto_disambiguate_from_command_line(bool on);
 
 	std::ostream& pretty_print(std::ostream& os, tref n,
 		std::set<size_t> skip, bool nulls, size_t l);
