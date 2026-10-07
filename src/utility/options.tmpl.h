@@ -5,8 +5,6 @@
 #define __IDNI__PARSER__UTILITY__OPTIONS_TMPL_H__
 
 #include <algorithm>
-#include <array>
-#include <atomic>
 #include <cassert>
 #include <cctype>
 #include <charconv>
@@ -14,12 +12,10 @@
 #include <fstream>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <sstream>
 #include <system_error>
 #include <type_traits>
-#include <unordered_map>
 #include <utility>
 
 #include "../parser_strings.h"
@@ -145,118 +141,6 @@ struct options_catalog {
 	}
 };
 
-/// The shared values. A snapshot never changes after it is published.
-struct options_snapshot {
-	std::shared_ptr<const options_catalog> cat;
-	/// One row per option, one cell per source id.
-	std::vector<std::vector<std::optional<option_value>>> values;
-	/// The command of the last parse_args(), which selects the surface
-	/// defaults.
-	std::string command;
-};
-
-using local_values = std::unordered_map<std::size_t, option_value>;
-
-struct thread_slots;
-
-/// The state of one thread for one repository. Only that thread reads or
-/// writes its values. The repository owns it.
-struct thread_record {
-	std::shared_ptr<const options_snapshot> snap;
-	/// The shared version that `snap` belongs to.
-	std::size_t snap_version = 0;
-	/// Grows with each set_local() or clear_local() that changes a value.
-	std::size_t local_version = 0;
-	local_values local;
-	/// The index of the thread, and its slots.
-	std::size_t index = 0;
-	thread_slots* owner = nullptr;
-};
-
-/// A repository finds the record of a thread with no lock for this many
-/// threads at once. Further threads take the lock of the repository.
-inline constexpr std::size_t record_page_size = 32;
-inline constexpr std::size_t record_page_count = 256;
-
-struct record_page {
-	std::array<std::atomic<thread_record*>, record_page_size> slot{};
-};
-
-/// The links between the threads and the repositories. Its mutex is taken
-/// before the mutex of a repository, never after it.
-struct options_links {
-	std::mutex mutex;
-	std::vector<thread_slots*> threads;
-	/// The indices of ended threads, which a new thread takes first.
-	std::vector<std::size_t> free_indices;
-	std::size_t next_index = 0;
-	std::size_t records = 0;
-};
-
-// A repository and a thread_slots touch it in their constructors, so it is
-// destroyed after the last of them.
-inline options_links& links() {
-	static options_links l;
-	return l;
-}
-
-/// The part of one thread that the repositories see: its index and the
-/// repositories that hold a record of it.
-struct thread_slots {
-	std::size_t index = 0;
-	std::vector<repository_state*> repos;
-	thread_slots();
-	~thread_slots();
-	thread_slots(const thread_slots&) = delete;
-	thread_slots& operator=(const thread_slots&) = delete;
-};
-
-inline thread_slots& this_thread_slots() {
-	thread_local thread_slots me;
-	return me;
-}
-
-/// The numbers that a test checks after the threads and the repositories
-/// end.
-struct options_link_counts {
-	std::size_t threads = 0;
-	std::size_t entries = 0;
-	std::size_t records = 0;
-};
-
-inline options_link_counts link_counts() {
-	options_links& l = links();
-	std::lock_guard<std::mutex> lock(l.mutex);
-	options_link_counts c;
-	c.threads = l.threads.size();
-	for (const thread_slots* t : l.threads) c.entries += t->repos.size();
-	c.records = l.records;
-	return c;
-}
-
-/// The value of option @p i: the thread source, the sources from high to
-/// low, the default of @p command, the default of the option.
-inline const option_value& effective(const options_snapshot& s,
-	const local_values& local, std::size_t i, std::string_view command)
-{
-	if (auto it = local.find(i); it != local.end()) return it->second;
-	const auto& row = s.values[i];
-	for (auto it = row.rbegin(); it != row.rend(); ++it)
-		if (*it) return **it;
-	const option_spec& o = s.cat->specs[i];
-	if (!command.empty())
-		for (const auto& sf : o.surfaces)
-			if (sf.command == command && sf.fallback)
-				return *sf.fallback;
-	return o.fallback;
-}
-
-inline const option_value& effective(const options_snapshot& s,
-	const local_values& local, std::size_t i)
-{
-	return effective(s, local, i, s.command);
-}
-
 template <typename T>
 T typed(const option_value& v) {
 	if (const T* p = std::get_if<T>(&v)) return *p;
@@ -264,227 +148,26 @@ T typed(const option_value& v) {
 	return T{};
 }
 
-/// Store @p v at @p source. False when the cell holds it already.
-inline bool set_cell(options_snapshot& s, std::size_t i, std::size_t source,
-	option_value v)
-{
-	auto& row = s.values[i];
-	if (row.size() <= source) row.resize(source + 1);
-	auto& cell = row[source];
-	if (cell && *cell == v) return false;
-	cell = std::move(v);
-	return true;
-}
-
-inline bool clear_cell(options_snapshot& s, std::size_t i, std::size_t source)
-{
-	auto& row = s.values[i];
-	if (source >= row.size() || !row[source]) return false;
-	row[source].reset();
-	return true;
-}
-
-/// The hidden part of an options_repository.
-struct repository_state {
-	std::mutex mutex;
-	std::shared_ptr<const options_snapshot> snap;
-	std::atomic<std::size_t> version{0};
-	std::vector<std::string> sources;
-	args_config cfg;
-	/// One record per thread that uses the repository. A thread that ends
-	/// removes its record, and the repository frees the rest.
-	std::vector<std::unique_ptr<thread_record>> records;
-	/// The record of each thread by its index, read with no lock.
-	std::array<std::atomic<record_page*>, record_page_count> pages{};
-	/// The records of the threads whose index is above the pages.
-	std::unordered_map<std::size_t, thread_record*> overflow;
-
-	repository_state();
-	~repository_state();
-	repository_state(const repository_state&) = delete;
-	repository_state& operator=(const repository_state&) = delete;
-
-	thread_record& record();
-	thread_record& add_record(thread_slots& me);
-	void drop_record(std::size_t index);
-	const options_snapshot& current();
-	template <typename F> void modify(F&& f);
-};
-
-} // namespace detail
-
-template <typename T>
-T options_view::get(std::string_view name) const {
-	static_assert(detail::is_option_type_v<T>,
-		"an option value is bool, size_t, string or option_list");
-	if (!snap_) {
-		DBG(assert(false && "a view is read before view() gave it");)
-		return T{};
-	}
-	const auto i = snap_->cat->find(name);
-	if (!i) {
-		DBG(assert(false && "an unknown option is read");)
-		return T{};
-	}
-	return detail::typed<T>(detail::effective(*snap_, local_, *i));
-}
-
-namespace detail {
-
-inline thread_slots::thread_slots() {
-	options_links& l = links();
-	std::lock_guard<std::mutex> lock(l.mutex);
-	if (l.free_indices.empty()) index = l.next_index++;
-	else {
-		index = l.free_indices.back();
-		l.free_indices.pop_back();
-	}
-	l.threads.push_back(this);
-}
-
-// A thread that ends leaves every repository that holds a record of it, so
-// a new thread with the same index starts with no values.
-inline thread_slots::~thread_slots() {
-	options_links& l = links();
-	std::lock_guard<std::mutex> lock(l.mutex);
-	for (repository_state* r : repos) r->drop_record(index);
-	l.free_indices.push_back(index);
-	l.threads.erase(std::remove(l.threads.begin(), l.threads.end(), this),
-		l.threads.end());
-	if (l.threads.empty()) {
-		std::vector<thread_slots*>().swap(l.threads);
-		std::vector<std::size_t>().swap(l.free_indices);
-		l.next_index = 0;
-	}
-}
-
-
-inline repository_state::repository_state()
-	: snap(std::make_shared<const options_snapshot>(options_snapshot{
-		std::make_shared<const options_catalog>(), {}, {} }))
-{
-	links();
-}
-
-// Every thread that holds a record of this repository forgets it here, so
-// nothing of the repository stays in any thread.
-inline repository_state::~repository_state() {
-	options_links& l = links();
-	std::lock_guard<std::mutex> links_lock(l.mutex);
-	std::lock_guard<std::mutex> lock(mutex);
-	for (const auto& rec : records) {
-		auto& repos = rec->owner->repos;
-		repos.erase(std::remove(repos.begin(), repos.end(), this),
-			repos.end());
-		if (repos.empty()) std::vector<repository_state*>().swap(repos);
-		--l.records;
-	}
-	records.clear();
-	overflow.clear();
-	for (auto& page : pages) delete page.exchange(nullptr);
-}
-
-// The common case: the record of this thread exists, and no lock is taken.
-inline thread_record& repository_state::record() {
-	thread_slots& me = this_thread_slots();
-	const std::size_t i = me.index;
-	if (i < record_page_size * record_page_count) {
-		if (const record_page* page = pages[
-			i / record_page_size].load(
-				std::memory_order_acquire))
-			if (thread_record* r = page->slot[
-				i % record_page_size].load(
-					std::memory_order_acquire))
-				return *r;
-	} else {
-		std::lock_guard<std::mutex> lock(mutex);
-		if (auto it = overflow.find(i); it != overflow.end())
-			return *it->second;
-	}
-	return add_record(me);
-}
-
-inline thread_record& repository_state::add_record(thread_slots& me) {
-	options_links& l = links();
-	std::lock_guard<std::mutex> links_lock(l.mutex);
-	std::lock_guard<std::mutex> lock(mutex);
-	auto rec = std::make_unique<thread_record>();
-	rec->index = me.index;
-	rec->owner = &me;
-	thread_record* p = rec.get();
-	records.push_back(std::move(rec));
-	const std::size_t i = me.index;
-	if (i < record_page_size * record_page_count) {
-		auto& page = pages[i / record_page_size];
-		record_page* pg = page.load(std::memory_order_relaxed);
-		if (!pg) {
-			pg = new record_page{};
-			page.store(pg, std::memory_order_release);
-		}
-		pg->slot[i % record_page_size].store(p,
-			std::memory_order_release);
-	} else overflow[i] = p;
-	me.repos.push_back(this);
-	++l.records;
-	return *p;
-}
-
-// The thread of @p index ends. The caller holds the links mutex.
-inline void repository_state::drop_record(std::size_t index) {
-	std::lock_guard<std::mutex> lock(mutex);
-	if (index < record_page_size * record_page_count) {
-		if (record_page* page = pages[
-			index / record_page_size].load(
-				std::memory_order_relaxed))
-			page->slot[index % record_page_size].store(
-				nullptr, std::memory_order_release);
-	} else overflow.erase(index);
-	records.erase(std::remove_if(records.begin(), records.end(),
-		[&](const auto& rec) { return rec->index == index; }),
-		records.end());
-	if (records.empty())
-		std::vector<std::unique_ptr<thread_record>>().swap(records);
-	--links().records;
-}
-
-// A reader locks only when the shared version moved since its last read.
-inline const options_snapshot& repository_state::current() {
-	thread_record& t = record();
-	const std::size_t v = version.load(std::memory_order_acquire);
-	if (!t.snap || t.snap_version != v) {
-		std::lock_guard<std::mutex> lock(mutex);
-		t.snap = snap;
-		t.snap_version = version.load(std::memory_order_relaxed);
-	}
-	return *t.snap;
-}
-
-// @p f edits a copy and returns true when it changed a value. Only then the
-// copy is published, so a reader never sees a half-done write.
-template <typename F>
-void repository_state::modify(F&& f) {
-	std::lock_guard<std::mutex> lock(mutex);
-	auto next = std::make_shared<options_snapshot>(*snap);
-	if (!f(*next)) return;
-	snap = std::move(next);
-	version.fetch_add(1, std::memory_order_release);
-}
-
 } // namespace detail
 
 inline options_repository::options_repository()
-	: state_(std::make_unique<detail::repository_state>())
+	: cat_(std::make_shared<const detail::options_catalog>())
 {}
 
-// The state frees the records of every thread that used the repository.
-inline options_repository::~options_repository() = default;
+inline const option_value& options_repository::effective(std::size_t i,
+	std::string_view command) const
+{
+	if (values_[i]) return *values_[i];
+	const option_spec& o = cat_->specs[i];
+	if (!command.empty())
+		for (const auto& sf : o.surfaces)
+			if (sf.command == command && sf.fallback)
+				return *sf.fallback;
+	return o.fallback;
+}
 
-inline std::size_t options_repository::source(std::string_view name) {
-	std::lock_guard<std::mutex> lock(state_->mutex);
-	for (std::size_t i = 0; i < state_->sources.size(); ++i)
-		if (state_->sources[i] == name) return i;
-	state_->sources.emplace_back(name);
-	return state_->sources.size() - 1;
+inline const option_value& options_repository::effective(std::size_t i) const {
+	return effective(i, command_);
 }
 
 inline diagnostics::result<void> options_repository::declare(
@@ -493,54 +176,51 @@ inline diagnostics::result<void> options_repository::declare(
 	namespace ps = parser_strings;
 	using diagnostics::code;
 	diagnostics::result<void> r;
-	state_->modify([&](detail::options_snapshot& s) {
-		auto cat = std::make_shared<detail::options_catalog>(*s.cat);
-		std::map<std::pair<std::string, char>, std::string> shorts;
-		for (const auto& o : cat->specs)
-			for (const auto& sf : o.surfaces) if (sf.short_name)
-				shorts.emplace(std::make_pair(sf.command,
-					sf.short_name), o.name);
-		for (const auto& c : set.commands) {
-			if (cat->command(c.name)) {
-				r.error(code::invalid_argument,
-					ps::messages::command_already_exists,
-					{ { ps::label::name, c.name } });
-				continue;
-			}
-			cat->commands.push_back(c);
+	auto cat = std::make_shared<detail::options_catalog>(*cat_);
+	std::map<std::pair<std::string, char>, std::string> shorts;
+	for (const auto& o : cat->specs)
+		for (const auto& sf : o.surfaces) if (sf.short_name)
+			shorts.emplace(std::make_pair(sf.command,
+				sf.short_name), o.name);
+	for (const auto& c : set.commands) {
+		if (cat->command(c.name)) {
+			r.error(code::invalid_argument,
+				ps::messages::command_already_exists,
+				{ { ps::label::name, c.name } });
+			continue;
 		}
-		for (const auto& o : set.options) {
-			if (cat->find(o.name)) {
-				r.error(code::invalid_argument,
-					ps::messages::option_already_exists,
-					{ { ps::label::name, o.name } });
-				continue;
-			}
-			for (const auto& sf : o.surfaces) {
-				if (sf.fallback && sf.fallback->index()
-					!= o.fallback.index())
-					r.error(code::type_error, ps::messages::
-						option_command_default_kind,
-						{ { ps::label::name, o.name },
-						  { ps::label::value, sf.command } });
-				if (!sf.short_name) continue;
-				auto [it, fresh] = shorts.emplace(std::make_pair(
-					sf.command, sf.short_name), o.name);
-				if (!fresh) r.error(code::invalid_argument,
-					ps::messages::option_short_name_taken,
-					{ { ps::label::name, it->second },
-					  { ps::label::name, o.name },
-					  { ps::label::value,
-						std::string(1, sf.short_name) } });
-			}
-			cat->index.emplace(o.name, cat->specs.size());
-			cat->specs.push_back(o);
+		cat->commands.push_back(c);
+	}
+	for (const auto& o : set.options) {
+		if (cat->find(o.name)) {
+			r.error(code::invalid_argument,
+				ps::messages::option_already_exists,
+				{ { ps::label::name, o.name } });
+			continue;
 		}
-		if (r.has_error()) return false;
-		s.values.resize(cat->specs.size());
-		s.cat = std::move(cat);
-		return true;
-	});
+		for (const auto& sf : o.surfaces) {
+			if (sf.fallback && sf.fallback->index()
+				!= o.fallback.index())
+				r.error(code::type_error, ps::messages::
+					option_command_default_kind,
+					{ { ps::label::name, o.name },
+					  { ps::label::value, sf.command } });
+			if (!sf.short_name) continue;
+			auto [it, fresh] = shorts.emplace(std::make_pair(
+				sf.command, sf.short_name), o.name);
+			if (!fresh) r.error(code::invalid_argument,
+				ps::messages::option_short_name_taken,
+				{ { ps::label::name, it->second },
+				  { ps::label::name, o.name },
+				  { ps::label::value,
+					std::string(1, sf.short_name) } });
+		}
+		cat->index.emplace(o.name, cat->specs.size());
+		cat->specs.push_back(o);
+	}
+	if (r.has_error()) return r;
+	values_.resize(cat->specs.size());
+	cat_ = std::move(cat);
 	return r;
 }
 
@@ -548,120 +228,41 @@ template <typename T>
 T options_repository::get(std::string_view name) const {
 	static_assert(detail::is_option_type_v<T>,
 		"an option value is bool, size_t, string or option_list");
-	const detail::options_snapshot& s = state_->current();
-	const auto i = s.cat->find(name);
+	const auto i = cat_->find(name);
 	if (!i) {
 		DBG(assert(false && "an unknown option is read");)
 		return T{};
 	}
-	return detail::typed<T>(detail::effective(s,
-		state_->record().local, *i));
+	return detail::typed<T>(effective(*i));
 }
 
 template <typename T>
-void options_repository::set(std::string_view name, T value,
-	std::size_t source)
-{
+void options_repository::set(std::string_view name, T value) {
 	option_value v = detail::to_option_value(std::move(value));
-	state_->modify([&](detail::options_snapshot& s) {
-		DBG(assert(source < state_->sources.size() && "an unknown source");)
-		const auto i = s.cat->find(name);
-		if (!i) {
-			DBG(assert(false && "an unknown option is set");)
-			return false;
-		}
-		if (s.cat->specs[*i].fallback.index() != v.index()) {
-			DBG(assert(false && "an option is set with another type");)
-			return false;
-		}
-		return detail::set_cell(s, *i, source, std::move(v));
-	});
-}
-
-inline void options_repository::clear(std::string_view name,
-	std::size_t source)
-{
-	state_->modify([&](detail::options_snapshot& s) {
-		const auto i = s.cat->find(name);
-		if (!i) {
-			DBG(assert(false && "an unknown option is cleared");)
-			return false;
-		}
-		return detail::clear_cell(s, *i, source);
-	});
-}
-
-inline bool options_repository::is_set(std::string_view name,
-	std::size_t source) const
-{
-	const detail::options_snapshot& s = state_->current();
-	const auto i = s.cat->find(name);
-	if (!i) {
-		DBG(assert(false && "an unknown option is read");)
-		return false;
-	}
-	const auto& row = s.values[*i];
-	return source < row.size() && row[source].has_value();
-}
-
-template <typename T>
-void options_repository::set_local(std::string_view name, T value) {
-	option_value v = detail::to_option_value(std::move(value));
-	const detail::options_snapshot& s = state_->current();
-	const auto i = s.cat->find(name);
+	const auto i = cat_->find(name);
 	if (!i) {
 		DBG(assert(false && "an unknown option is set");)
 		return;
 	}
-	if (s.cat->specs[*i].fallback.index() != v.index()) {
+	if (cat_->specs[*i].fallback.index() != v.index()) {
 		DBG(assert(false && "an option is set with another type");)
 		return;
 	}
-	detail::thread_record& t = state_->record();
-	if (auto it = t.local.find(*i); it != t.local.end() && it->second == v)
-		return;
-	t.local[*i] = std::move(v);
-	++t.local_version;
-}
-
-inline void options_repository::clear_local(std::string_view name) {
-	const detail::options_snapshot& s = state_->current();
-	const auto i = s.cat->find(name);
-	if (!i) {
-		DBG(assert(false && "an unknown option is cleared");)
-		return;
-	}
-	detail::thread_record& t = state_->record();
-	if (t.local.erase(*i)) ++t.local_version;
-}
-
-inline options_view options_repository::view() const {
-	state_->current();
-	const auto& t = state_->record();
-	options_view v;
-	v.snap_ = t.snap;
-	v.local_ = t.local;
-	return v;
+	values_[*i] = std::move(v);
 }
 
 inline diagnostics::result<void> options_repository::set_text(
-	std::string_view name, std::string_view text, std::size_t source)
+	std::string_view name, std::string_view text)
 {
 	namespace ps = parser_strings;
 	diagnostics::result<void> r;
-	state_->modify([&](detail::options_snapshot& s) {
-		const auto i = s.cat->find(name);
-		if (!i) {
-			r.error(diagnostics::code::not_found,
-				ps::messages::option_not_found,
-				{ { ps::label::name, name } });
-			return false;
-		}
-		auto v = r.merge_take(detail::parse_option_value(
-			detail::kind_of(s.cat->specs[*i].fallback), text, name));
-		if (!v) return false;
-		return detail::set_cell(s, *i, source, std::move(*v));
-	});
+	const auto i = cat_->find(name);
+	if (!i) return r.with_error(diagnostics::code::not_found,
+		ps::messages::option_not_found, { { ps::label::name, name } });
+	auto v = r.merge_take(detail::parse_option_value(
+		detail::kind_of(cat_->specs[*i].fallback), text, name));
+	if (!v) return r;
+	values_[*i] = std::move(*v);
 	return r;
 }
 
@@ -670,82 +271,75 @@ inline diagnostics::result<std::string> options_repository::get_text(
 {
 	namespace ps = parser_strings;
 	diagnostics::result<std::string> r;
-	const detail::options_snapshot& s = state_->current();
-	const auto i = s.cat->find(name);
+	const auto i = cat_->find(name);
 	if (!i) return r.with_error(diagnostics::code::not_found,
 		ps::messages::option_not_found, { { ps::label::name, name } });
-	auto text = r.merge_take(detail::format_option_value(detail::effective(
-		s, state_->record().local, *i)));
+	auto text = r.merge_take(detail::format_option_value(effective(*i)));
 	if (!text) return r;
 	return r.with_value(std::move(*text));
 }
 
 inline std::vector<std::string> options_repository::names() const {
 	std::vector<std::string> out;
-	for (const auto& o : state_->current().cat->specs) out.push_back(o.name);
+	for (const auto& o : cat_->specs) out.push_back(o.name);
 	return out;
 }
 
 inline std::shared_ptr<const option_spec> options_repository::find(
 	std::string_view name) const
 {
-	const auto& cat = state_->current().cat;
-	const auto i = cat->find(name);
+	const auto i = cat_->find(name);
 	if (!i) return nullptr;
 	// shares the catalog, which a later declare() replaces
-	return std::shared_ptr<const option_spec>(cat, &cat->specs[*i]);
+	return std::shared_ptr<const option_spec>(cat_, &cat_->specs[*i]);
 }
 
 inline diagnostics::result<void> options_repository::load_env(
-	std::string_view prefix, std::size_t source)
+	std::string_view prefix)
 {
 	namespace ps = parser_strings;
 	diagnostics::result<void> r;
-	state_->modify([&](detail::options_snapshot& s) {
-		bool changed = false;
-		for (std::size_t i = 0; i < s.cat->specs.size(); ++i) {
-			const option_spec& o = s.cat->specs[i];
-			if (!o.from_env) continue;
-			const std::string var = detail::option_env_name(prefix,
-				o.name);
-			const char* text = std::getenv(var.c_str());
-			if (!text) continue;
-			auto v = detail::parse_value(detail::kind_of(o.fallback),
-				text);
-			if (!v) {
-				r.warning(ps::messages::option_env_bad_value,
-					{ { ps::label::name, var },
-					  { ps::label::value, text } });
-				continue;
-			}
-			changed = detail::set_cell(s, i, source, std::move(*v))
-				|| changed;
+	for (std::size_t i = 0; i < cat_->specs.size(); ++i) {
+		const option_spec& o = cat_->specs[i];
+		if (!o.from_env) continue;
+		const std::string var = detail::option_env_name(prefix, o.name);
+		const char* text = std::getenv(var.c_str());
+		if (!text) continue;
+		auto v = detail::parse_value(detail::kind_of(o.fallback), text);
+		if (!v) {
+			r.warning(ps::messages::option_env_bad_value,
+				{ { ps::label::name, var },
+				  { ps::label::value, text } });
+			continue;
 		}
-		return changed;
-	});
+		values_[i] = std::move(*v);
+	}
 	return r;
 }
 
 inline diagnostics::result<parsed_args> options_repository::parse_args(
-	int argc, char** argv, std::size_t source, const args_config& cfg)
+	int argc, char** argv, const args_config& cfg)
 {
 	namespace ps = parser_strings;
 	using diagnostics::code;
 	using diagnostics::attr_in;
-	{
-		std::lock_guard<std::mutex> lock(state_->mutex);
-		state_->cfg = cfg;
-	}
+	cfg_ = cfg;
 	diagnostics::result<parsed_args> r;
-	state_->current();
-	// A copy, so the help() of an error cannot drop the snapshot we read.
-	const auto snap = state_->record().snap;
-	const detail::options_catalog& cat = *snap->cat;
+	const detail::options_catalog& cat = *cat_;
 	std::vector<std::string> args;
 	for (int i = 0; i < argc; ++i) args.emplace_back(argv[i]);
 	parsed_args out;
-	// Stored only when the whole command line is valid.
-	std::map<std::size_t, option_value> pending;
+	// Stored only when the whole command line is valid. One entry per
+	// option, in the order of its first use in argv.
+	std::vector<std::pair<std::size_t, option_value>> pending;
+	auto pending_of = [&](std::size_t i) -> option_value* {
+		for (auto& [j, v] : pending) if (j == i) return &v;
+		return nullptr;
+	};
+	auto put = [&](std::size_t i, option_value v) {
+		if (option_value* have = pending_of(i)) *have = std::move(v);
+		else pending.emplace_back(i, std::move(v));
+	};
 
 	auto fail_with_help = [&](std::string_view msg,
 		std::initializer_list<attr_in> attrs)
@@ -784,12 +378,12 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 			detail::kind_of(o.fallback), text, o.name));
 		if (!v) return false;
 		if (const auto* add = std::get_if<option_list>(&*v))
-			if (auto it = pending.find(i); it != pending.end()) {
-				auto& have = std::get<option_list>(it->second);
-				have.insert(have.end(), add->begin(), add->end());
+			if (option_value* have = pending_of(i)) {
+				auto& list = std::get<option_list>(*have);
+				list.insert(list.end(), add->begin(), add->end());
 				return true;
 			}
-		pending[i] = std::move(*v);
+		put(i, std::move(*v));
 		return true;
 	};
 	// 0: done, 1: error, 2: a command, 3: an unknown option before the
@@ -833,7 +427,7 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 							+ std::string(1, opt[k]) } });
 					return 1;
 				}
-				if (is_flag(*cur)) pending[*cur] = true;
+				if (is_flag(*cur)) put(*cur, true);
 				else if (k + 1 < opt.size()) {
 					fail_with_help(
 					    ps::messages::option_missing_argument,
@@ -862,7 +456,7 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 					b = std::get<bool>(*v);
 					++arg;
 				}
-			pending[*cur] = b;
+			put(*cur, b);
 			return 0;
 		}
 		if (!has_value) {
@@ -914,32 +508,21 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 		out.command = cmd;
 	}
 	if (const auto h = cat.find("help"))
-		if (auto it = pending.find(*h); it != pending.end())
-			if (const bool* b = std::get_if<bool>(&it->second))
-				out.help = *b;
-	state_->modify([&](detail::options_snapshot& s) {
-		bool changed = s.command != out.command;
-		s.command = out.command;
-		for (auto& [i, v] : pending)
-			changed = detail::set_cell(s, i, source, std::move(v))
-				|| changed;
-		return changed;
-	});
+		if (const option_value* v = pending_of(*h))
+			if (const bool* b = std::get_if<bool>(v)) out.help = *b;
+	command_ = out.command;
+	for (auto& [i, v] : pending) {
+		values_[i] = v;
+		out.values.emplace_back(cat.specs[i].name, std::move(v));
+	}
 	return r.with_value(std::move(out));
 }
 
 inline void options_repository::help(std::ostream& os,
 	std::string_view command) const
 {
-	args_config cfg;
-	{
-		std::lock_guard<std::mutex> lock(state_->mutex);
-		cfg = state_->cfg;
-	}
-	state_->current();
-	const auto& t = state_->record();
-	const auto snap = t.snap;
-	const detail::options_catalog& cat = *snap->cat;
+	const args_config& cfg = cfg_;
+	const detail::options_catalog& cat = *cat_;
 	const std::string& header = cfg.help_header.empty() ? cfg.name
 		: cfg.help_header;
 
@@ -959,8 +542,6 @@ inline void options_repository::help(std::ostream& os,
 			});
 		return rows;
 	};
-	// A row shows the value that the command gets: a source value, else
-	// the default of the command, else the default of the option.
 	auto print_rows = [&](const std::vector<row_t>& rows,
 		std::string_view cmd)
 	{
@@ -971,7 +552,7 @@ inline void options_repository::help(std::ostream& os,
 			if (sf->short_name) os << '-' << sf->short_name;
 			os << "\t" << o.help;
 			const std::string def = detail::format_value(
-				detail::effective(*snap, t.local, i, cmd));
+				effective(i, cmd));
 			if (!def.empty()) os << " (default: " << def << ")";
 			os << "\n";
 		}
@@ -1002,7 +583,7 @@ inline void options_repository::help(std::ostream& os,
 	if (!cfg.description.empty()) os << cfg.description << "\n";
 	if (!rows.empty()) {
 		os << "\nOptions:\n";
-		print_rows(rows, snap->command);
+		print_rows(rows, command_);
 	}
 	if (!cat.commands.empty()) {
 		std::vector<const command_spec*> cmds;
@@ -1016,10 +597,6 @@ inline void options_repository::help(std::ostream& os,
 			os << "\t" << c->name << "\t\t\t" << c->help << "\n";
 	}
 	os << "\n";
-}
-
-inline std::size_t options_repository::version() const {
-	return state_->version.load(std::memory_order_acquire) + state_->record().local_version;
 }
 
 } // namespace idni
