@@ -156,6 +156,24 @@ private:
 #endif
 };
 
+/// The current repository of the calling thread. The first call on a
+/// thread creates one that lives as long as the thread.
+options_repository& options();
+
+/// Makes a repository current for a scope. Restores the previous one.
+struct options_scope {
+	explicit options_scope(options_repository& r);
+	~options_scope();
+	options_scope(const options_scope&) = delete;
+	options_scope& operator=(const options_scope&) = delete;
+
+private:
+	options_repository* previous_;
+#ifdef DEBUG
+	options_repository* current_;
+#endif
+};
+
 } // namespace idni
 
 #include "options.tmpl.h"

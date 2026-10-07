@@ -712,6 +712,38 @@ inline void options_repository::help(std::ostream& os,
 	os << "\n";
 }
 
+namespace detail {
+
+// null until the first options() call or scope of the thread
+inline options_repository*& current_options() {
+	thread_local options_repository* current = nullptr;
+	return current;
+}
+
+} // namespace detail
+
+inline options_repository& options() {
+	options_repository*& current = detail::current_options();
+	if (!current) {
+		thread_local options_repository own;
+		current = &own;
+	}
+	return *current;
+}
+
+inline options_scope::options_scope(options_repository& r)
+	: previous_(detail::current_options())
+{
+	DBG(current_ = &r;)
+	detail::current_options() = &r;
+}
+
+inline options_scope::~options_scope() {
+	DBG(assert(detail::current_options() == current_
+		&& "an options scope ends out of order");)
+	detail::current_options() = previous_;
+}
+
 } // namespace idni
 
 #endif // __IDNI__PARSER__UTILITY__OPTIONS_TMPL_H__

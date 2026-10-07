@@ -2,7 +2,8 @@
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 // Tests for the options repository: declare, typed access, last write wins,
-// bound fields, text access, the environment and the command line.
+// bound fields, the current repository, text access, the environment and the
+// command line.
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
@@ -15,6 +16,11 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+#if !defined(__EMSCRIPTEN__) || defined(__EMSCRIPTEN_PTHREADS__)
+#	define OPTIONS_TEST_THREADS 1
+#	include <thread>
+#endif
 
 #include "../src/utility/options.h"
 #include "test_env.h"
@@ -371,6 +377,63 @@ TEST_CASE("parse_args writes no field when a value does not fit") {
 	repo.unbind("flag");
 	repo.unbind("ids");
 }
+
+} // TEST_SUITE
+
+TEST_SUITE("options current repository") {
+
+TEST_CASE("options gives the same repository twice on one thread") {
+	options_repository& first = options();
+	CHECK(&options() == &first);
+}
+
+TEST_CASE("a value set through options is read through options") {
+	options_repository mine;
+	options_scope scope(mine);
+	REQUIRE(options().declare(option_set{ .options = {
+		{ "current-test", "test", size_t{ 0 }, "", {} } } }).has_value());
+	options().set("current-test", 5);
+	CHECK(options().get<size_t>("current-test") == 5u);
+	CHECK(mine.get<size_t>("current-test") == 5u);
+}
+
+TEST_CASE("a scope makes another repository current") {
+	options_repository& outer = options();
+	options_repository mine;
+	{
+		options_scope scope(mine);
+		CHECK(&options() == &mine);
+	}
+	CHECK(&options() == &outer);
+}
+
+TEST_CASE("scopes nest") {
+	options_repository& outer = options();
+	options_repository a, b;
+	{
+		options_scope sa(a);
+		{
+			options_scope sb(b);
+			CHECK(&options() == &b);
+		}
+		CHECK(&options() == &a);
+	}
+	CHECK(&options() == &outer);
+}
+
+#ifdef OPTIONS_TEST_THREADS
+TEST_CASE("another thread has its own repository") {
+	options_repository* here = &options();
+	options_repository* there = nullptr;
+	options_repository mine;
+	options_scope scope(mine);
+	thread t([&] { there = &options(); });
+	t.join();
+	CHECK(there != nullptr);
+	CHECK(there != here);
+	CHECK(there != &mine);
+}
+#endif
 
 } // TEST_SUITE
 
