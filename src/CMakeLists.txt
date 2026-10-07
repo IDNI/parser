@@ -15,6 +15,7 @@ set(TAU_PARSER_HEADERS
 	format/tgf/tgf.h
 	format/tgf/tgf_parser.generated.h
 	format/json/json.h
+	format/json/json.tmpl.h
 	format/json/json_parser.generated.h
 	version_license.h
 	utility/characters.h
