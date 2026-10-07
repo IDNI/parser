@@ -2,7 +2,7 @@
 
 @trim __, _, sep.
 @trim all terminals except children of
-	sym, dir_sym, cc_name, escaped_s, unescaped_s, escaped_c, unescaped_c,
+	sym, dir_sym, escaped_s, unescaped_s, escaped_c, unescaped_c,
 	terminal_hex, hex_bytes.
 @inline char classes, escape_char, esc_hex, esc_u4, esc_U8.
 

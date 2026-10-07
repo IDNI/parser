@@ -480,7 +480,9 @@ TEST_SUITE("tgf: char class nonterminal ordering") {
 		const char* g_tgf =
 			"@use char class digit, space.\n"
 			"@trim __, _.\n"
-			"start => digit.\n";
+			"start => digit _ __.\n"
+			"_ => space.\n"
+			"__ => space space.\n";
 		nonterminals<char> nts;
 		auto gr = tgf<char>::from_string(nts, string(g_tgf));
 		REQUIRE(gr.has_value());
@@ -491,7 +493,9 @@ TEST_SUITE("tgf: char class nonterminal ordering") {
 		const char* g_tgf =
 			"@use char class digit, space.\n"
 			"@trim __, _.\n"
-			"start => digit.\n";
+			"start => digit _ __.\n"
+			"_ => space.\n"
+			"__ => space space.\n";
 		nonterminals<char> nts;
 		auto gr = tgf<char>::from_string_presplit(nts, string(g_tgf));
 		REQUIRE(gr.has_value());
@@ -612,5 +616,53 @@ TEST_SUITE("grammar options") {
 			REQUIRE(repo.set_text("trim", "ws").has_value());
 		}
 		CHECK(text_of(repo, "trim") == "ws");
+	}
+
+	static diagnostics::result<grammar<char>> load(nonterminals<char>& nts,
+		const string& directives)
+	{
+		return tgf<char>::from_string(nts, directives + options_tgf);
+	}
+
+	TEST_CASE("the reader writes a directive into the grammar") {
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		auto gr = load(nts, "@trim ws.\n");
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		CHECK(g.opt().shaping.to_trim == set<size_t>{ id_of(nts, "ws") });
+		REQUIRE(g.bind_options().has_value());
+		CHECK(text_of(repo, "trim") == "ws");
+	}
+
+	TEST_CASE("a directive name the grammar does not have fails the load") {
+		nonterminals<char> nts;
+		auto gr = load(nts, "@trim nope.\n");
+		CHECK(!gr.has_value());
+		ostringstream printed;
+		gr.report().print(printed);
+		CHECK(printed.str().find("nope") != string::npos);
+	}
+
+	TEST_CASE("@enable and @disable edit the enabled productions in order") {
+		nonterminals<char> nts;
+		auto gr = load(nts, "@enable a.\n@disable a.\n");
+		REQUIRE(gr.has_value());
+		CHECK(gr.value().opt().enabled_guards.empty());
+	}
+
+	TEST_CASE("the bind pushes a value stored before it") {
+		options_repository repo;
+		options_scope scope(repo);
+		REQUIRE(repo.declare(grammar_option_set).has_value());
+		REQUIRE(repo.set_text("trim", "x").has_value());
+		nonterminals<char> nts;
+		auto gr = load(nts, "@trim ws.\n");
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		CHECK(g.opt().shaping.to_trim == set<size_t>{ id_of(nts, "ws") });
+		REQUIRE(g.bind_options().has_value());
+		CHECK(g.opt().shaping.to_trim == set<size_t>{ id_of(nts, "x") });
 	}
 }

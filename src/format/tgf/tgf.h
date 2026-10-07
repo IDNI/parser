@@ -3,10 +3,14 @@
 
 #ifndef __IDNI__PARSER__TGF_H__
 #define __IDNI__PARSER__TGF_H__
+#include <algorithm>
 #include <fstream>
 #include <memory>
 #include <streambuf>
 #include <optional>
+#include <set>
+#include <string_view>
+#include <vector>
 
 #include "tgf_parser.generated.h"
 #include "parser_strings.h"
@@ -130,7 +134,12 @@ struct tgf {
 				// see the comment on predefined_char_classes in
 				// src/grammar.tmpl.h.
 				b.build(trv(n), &R.report(), s.c_str(), directives);
-				if (!R.report().has_error()) R.emplace(b.g());
+				if (!R.report().has_error()) {
+					// a directive name the grammar lacks fails the load
+					auto gr = b.g();
+					if (!R.report().has_error())
+						R.emplace(std::move(gr));
+				}
 			}
 		}
 		return R;
@@ -273,6 +282,9 @@ private:
 		std::set<std::string> highlight_plain_names{};
 		/// grammar options
 		grammar<C, T>::options opt{};
+		/// The directives of this load, so a load never writes into the
+		/// repository of the thread.
+		idni::options_repository own_;
 		char_class_fns<T> cc;
 		idni::diagnostics::report* diag = nullptr;
 		tgf_directives* dirs = nullptr;
@@ -295,6 +307,9 @@ private:
 			this->diag = diag;
 			source_ = source;
 			dirs = directives;
+			// each directive writes its option into own_ at once, and the
+			// bind in g() pushes the values into the grammar
+			keep(own_.declare(grammar_option_set));
 			auto statements  = t || tgf_parser::statement;
 			auto directive_nodes = statements || tgf_parser::directive;
 			for (const auto& d : directive_nodes()) collect_cc_names(d);
@@ -360,37 +375,48 @@ private:
 			dirs->char_class_renames = cc_renames;
 			dirs->start = (start == nul) ? std::string()
 				: start.to_lit().to_std_string();
-			dirs->enabled_productions.reserve(
-				opt.enabled_guards.size());
-			for (const auto& g : opt.enabled_guards)
+			auto& opts = own_;
+			auto list = [&opts](std::string_view name) {
+				return opts.get<option_list>(name);
+			};
+			std::set<std::string> guards;
+			for (const auto& g : list("enabled-productions"))
+				guards.insert(g);
+			for (const auto& g : guards)
 				// @enable productions names the keyword, not a guard.
 				if (g != "productions")
 					dirs->enabled_productions.push_back(g);
-			auto add_ids = [this](const std::set<size_t>& ids,
+			auto add_names = [](const option_list& names,
 				std::vector<std::string>& out)
 			{
-				for (size_t id : ids)
-					out.push_back(idni::to_std_string(
-						nts.get(id)));
+				for (const auto& name : names)
+					if (std::find(out.begin(), out.end(), name)
+						== out.end()) out.push_back(name);
 			};
-			add_ids(opt.shaping.to_trim, dirs->trim);
-			add_ids(opt.shaping.to_trim_children,
-				dirs->trim_children);
-			add_ids(opt.shaping.to_trim_children_terminals,
+			add_names(list("trim"), dirs->trim);
+			add_names(list("trim-children"), dirs->trim_children);
+			add_names(list("trim-children-terminals"),
 				dirs->trim_children_terminals);
-			add_ids(opt.shaping.dont_trim_terminals_of,
+			add_names(list("dont-trim-terminals-of"),
 				dirs->trim_terminals);
-			dirs->trim_all_terminals = opt.shaping.trim_terminals;
+			dirs->trim_all_terminals = opts.get<bool>("trim-terminals");
 			dirs->inline_char_classes =
-				opt.shaping.inline_char_classes;
-			for (const auto& path : opt.shaping.to_inline) {
+				opts.get<bool>("inline-char-classes");
+			option_list entries;
+			add_names(list("inline"), entries);
+			for (const auto& entry : entries) {
 				std::vector<std::string> names;
-				for (size_t id : path)
-					names.push_back(idni::to_std_string(
-						nts.get(id)));
+				for (size_t b = 0;;) {
+					const size_t gt = entry.find('>', b);
+					names.push_back(detail::option_trim(
+						std::string_view(entry)
+							.substr(b, gt - b)));
+					if (gt == std::string::npos) break;
+					b = gt + 1;
+				}
 				dirs->inline_paths.push_back(std::move(names));
 			}
-			add_ids(opt.nodisambig_list, dirs->ambiguous);
+			add_names(list("nodisambig-list"), dirs->ambiguous);
 			dirs->highlights = opt.highlights;
 			dirs->highlight_auto = opt.highlight_heuristics;
 			for (const auto& kv : opt.dynamic) {
@@ -422,19 +448,37 @@ private:
 			return 0;
 		}
 		grammar<C, T> g() {
-			//std::cout << "opt.trim_terminals: " << opt.trim_terminals << "\n";
-			//std::cout << "opt.inline_char_classes: " << opt.inline_char_classes << "\n";
-			//std::cout << "opt.to_trim: ";
-			//for (auto& n : opt.to_trim) std::cout << n << " ";
-			//std::cout << "\n";
-			//std::cout << "opt.to_trim_children: ";
-			//for (auto& n : opt.to_trim_children) std::cout << n << " ";
-			//std::cout << "\n";
-			//std::cout << "opt.to_inline: ";
-			//for (auto& n : opt.to_inline) std::cout << n << " ";
-			//std::cout << "\n";
-			return grammar<C, T>(nts_handle, ps, start == nul
+			grammar<C, T> gr(nts_handle, ps, start == nul
 				? prods_t(nts("start")) : start, cc, opt, diag);
+			// the bind pushes the directives through the codec, which
+			// reports a name the grammar does not have
+			{
+				idni::options_scope scope(own_);
+				keep(gr.bind_options());
+				gr.unbind_options();
+			}
+			return gr;
+		}
+		/// Merge @p r into diag. True when it has no error.
+		bool keep(idni::diagnostics::result<void> r) {
+			const bool ok = !r.has_error();
+			if (diag) diag->append(std::move(r).report());
+			return ok;
+		}
+		void set_option(std::string_view name, option_value v) {
+			keep(own_.set(name, std::move(v)));
+		}
+		/// Add @p names to the list option @p name, or remove them.
+		void edit_list(std::string_view name,
+			const std::vector<std::string>& names, bool add = true)
+		{
+			if (!own_.find(name)) return;
+			auto list = own_.get<option_list>(name);
+			for (const auto& n : names) {
+				std::erase(list, n);
+				if (add) list.push_back(n);
+			}
+			set_option(name, std::move(list));
 		}
 	private:
 		size_t id = 0;
@@ -615,12 +659,11 @@ private:
 
 	void trim_simple(const trv& t) {
 		auto args = dir_sym_args(t);
-		for (auto& a : args)
-			opt.shaping.to_trim.insert(nts.get(a));
+		edit_list("trim", args);
 	}
 
 	void trim_all_terminals(const trv& t) {
-		opt.shaping.trim_terminals = true;
+		set_option("trim-terminals", true);
 		auto args = dir_sym_args(t);
 		// check for optional "except children of" keywords
 		bool has_except = false;
@@ -629,34 +672,32 @@ private:
 				&& args[i+1] == "children"
 				&& args[i+2] == "of")
 				has_except = true;
-		if (has_except)
-			for (auto& p :
-				(t || tgf_parser::dir_pair)())
-			for (auto& lst :
-				(p || tgf_parser::dir_list)())
-			for (auto& a :
-				(lst || tgf_parser::dir_arg)())
-			opt.shaping
-			 .dont_trim_terminals_of
-			 .insert(nts.get(
-				dir_arg_text(a | trv::only_child)));
-	}
-
-	void trim_children(const trv& t) {
-		auto args = dir_sym_args(t);
-		bool terminals = (args.size() >= 2
-			&& args[1] == "terminals");
-		auto& target = terminals
-			? opt.shaping.to_trim_children_terminals
-			: opt.shaping.to_trim_children;
+		if (!has_except) return;
+		std::vector<std::string> names;
 		for (auto& p :
 			(t || tgf_parser::dir_pair)())
 		for (auto& lst :
 			(p || tgf_parser::dir_list)())
 		for (auto& a :
 			(lst || tgf_parser::dir_arg)())
-			target.insert(nts.get(
-				dir_arg_text(a | trv::only_child)));
+			names.push_back(dir_arg_text(a | trv::only_child));
+		edit_list("dont-trim-terminals-of", names);
+	}
+
+	void trim_children(const trv& t) {
+		auto args = dir_sym_args(t);
+		bool terminals = (args.size() >= 2
+			&& args[1] == "terminals");
+		std::vector<std::string> names;
+		for (auto& p :
+			(t || tgf_parser::dir_pair)())
+		for (auto& lst :
+			(p || tgf_parser::dir_list)())
+		for (auto& a :
+			(lst || tgf_parser::dir_arg)())
+			names.push_back(dir_arg_text(a | trv::only_child));
+		edit_list(terminals ? "trim-children-terminals"
+			: "trim-children", names);
 	}
 
 	void inline_dir(const trv& t) {
@@ -666,9 +707,9 @@ private:
 				&& (args[i+1] == "class"
 					|| args[i+1] == "classes"))
 			{
-				opt.shaping.inline_char_classes
-					= true;
+				set_option("inline-char-classes", true);
 			}
+		std::vector<std::string> entries;
 		for (auto& p :
 			(t || tgf_parser::dir_pair)())
 		for (auto& lst :
@@ -682,25 +723,25 @@ private:
 				| trv::nonterminal)
 				== tgf_parser::tree_path)
 			{
-				std::vector<size_t> path;
+				std::string path;
 				for (auto& s :
 				 (child
 				  || tgf_parser::dir_sym)())
-				path.push_back(
-				  nts.get(dir_arg_text(s)));
+				{
+					if (!path.empty()) path += " > ";
+					path += dir_arg_text(s);
+				}
 				if (!path.empty())
-					opt.shaping.to_inline
-					   .insert(
-					    std::move(path));
+					entries.push_back(std::move(path));
 			}
 			else {
 				auto txt = dir_arg_text(child);
 				if (txt != "char" && txt != "class"
 					&& txt != "classes")
-				opt.shaping.to_inline
-					.insert({ nts.get(txt) });
+					entries.push_back(txt);
 			}
 		}
+		if (!entries.empty()) edit_list("inline", entries);
 	}
 
 	void disable_dir(const trv& t) {
@@ -716,20 +757,15 @@ private:
 		}
 		for (auto& a : args) {
 			if (a == "disambiguation") {
-				opt.auto_disambiguate = false;
+				set_option("auto-disambiguate", false);
 				opt.auto_disambiguate_set_by_grammar = true;
-			} else if (diag) diag->warning(
-				messages::unknown_directive_argument,
-				{{ label::name, a }});
+			} else edit_list("enabled-productions", { a }, false);
 		}
 	}
 
 	void ambiguous_dir(const trv& t) {
 		auto args = dir_sym_args(t);
-		for (auto& a : args) {
-			auto id = nts.get(a);
-			opt.nodisambig_list.insert(id);
-		}
+		edit_list("nodisambig-list", args);
 	}
 
 	void enable_dir(const trv& t) {
@@ -745,9 +781,9 @@ private:
 		}
 		for (auto& a : args) {
 			if (a == "disambiguation") {
-				opt.auto_disambiguate = true;
+				set_option("auto-disambiguate", true);
 				opt.auto_disambiguate_set_by_grammar = true;
-			} else opt.enabled_guards.insert(a);
+			} else edit_list("enabled-productions", { a });
 		}
 	}
 
