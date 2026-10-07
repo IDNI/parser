@@ -29,7 +29,7 @@ All of the following may appear **in any order** on the command line
 | `-D…` | CMake definition (via `DEV_CMAKE`) |
 | `Debug` / `Release` / `RelWithDebInfo` / `Coverage` | legacy build type |
 | `-v` | verbose build |
-| `--target NAME` | build only this target |
+| `--target NAME` | build only these targets: repeat the flag, or give several names separated by commas, for example `--target tgf,doctest_tgf` |
 | `--keep-cache` | preset only: keep the CMake cache of the build directory instead of a fresh configure |
 | `-G NAME` | sets `GENERATOR` (not `DEV_CMAKE`); legacy build defaults to Ninja; preset uses preset generator unless `-G` is passed |
 | preset name (e.g. `release-tests`) | preset to configure |

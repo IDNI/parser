@@ -12,12 +12,22 @@ is_cmake_def() {
 	esac
 }
 
+# Add the comma separated names of $1 to TARGETS.
+add_targets() {
+	local names name
+	IFS=',' read -ra names <<< "$1"
+	for name in ${names[@]+"${names[@]}"}; do
+		[[ -n $name ]] && TARGETS+=("$name")
+	done
+	return 0
+}
+
 normalize_args() {
 	DEV_POSITIONAL=()
 	DEV_CMAKE=()
 	DEV_PROGRAM=()
 	VERBOSE=""
-	TARGET=""
+	TARGETS=()
 	GENERATOR=""
 	GENERATOR_EXPLICIT=""
 	BUILD_TYPE=""
@@ -70,13 +80,18 @@ normalize_args() {
 				CONFIGURE_ONLY="1"
 				((i++)) || true
 				;;
-			--target)
-				((i++)) || true
-				if [[ $i -ge ${#args[@]} ]]; then
-					echo "Missing value for --target" >&2
-					exit 1
+			--target|--target=*)
+				if [[ $arg == --target ]]; then
+					((i++)) || true
+					if [[ $i -ge ${#args[@]} ]]; then
+						echo "Missing value for --target" >&2
+						exit 1
+					fi
+					next="${args[$i]}"
+				else
+					next="${arg#--target=}"
 				fi
-				TARGET="${args[$i]}"
+				add_targets "$next"
 				((i++)) || true
 				;;
 			run)
@@ -249,10 +264,10 @@ build_run() {
 
 	echo "Building with ${GENERATOR}"
 	echo "Parallel jobs: ${TAU_BUILD_JOBS}"
-	echo "Target: ${TARGET}"
+	echo "Target: ${TARGETS[*]+${TARGETS[*]}}"
 	local build_target=()
-	if [[ -n $TARGET ]]; then
-		build_target=(--target "$TARGET")
+	if [[ ${#TARGETS[@]} -gt 0 ]]; then
+		build_target=(--target "${TARGETS[@]}")
 	fi
 	cmake --build . ${build_target[@]+"${build_target[@]}"} -- -j "${TAU_BUILD_JOBS}" \
 		${verbose_flag}
@@ -407,9 +422,9 @@ preset_entry() {
 	echo "Building with preset ${PRESET}"
 	echo "Parallel jobs: ${TAU_BUILD_JOBS}"
 	local build_target=()
-	if [[ -n $TARGET ]]; then
-		echo "Target: ${TARGET}"
-		build_target=(--target "$TARGET")
+	if [[ ${#TARGETS[@]} -gt 0 ]]; then
+		echo "Target: ${TARGETS[*]}"
+		build_target=(--target "${TARGETS[@]}")
 	fi
 	cmake --build --preset "${PRESET}" ${build_target[@]+"${build_target[@]}"} \
 		-- -j "${TAU_BUILD_JOBS}"
