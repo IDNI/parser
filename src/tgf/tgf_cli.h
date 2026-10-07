@@ -69,6 +69,7 @@ inline const option_set tgf_repl_option_set = { .options = {
 		"print the forest as TML facts", {} },
 	{ "print-input", "repl", false, "print the input", {} },
 	{ "colors", "ui", true, "use terminal colors", {} },
+	{ "json", "cli", false, "print and read JSON", {} },
 } };
 
 struct tgf_repl_evaluator {
@@ -97,10 +98,8 @@ struct tgf_repl_evaluator {
 		bool print_ambiguity    = true;
 		bool tml_rules          = false;
 		bool tml_facts          = false;
-		bool print_json         = false;
-		/// True when the evaluator is driven as a JSON API: no colors,
-		/// no output on cout or cerr.
-		bool json_api           = false;
+		/// Print and read JSON: no colors, no output on cout or cerr.
+		bool json               = false;
 		/// True when the evaluator refuses commands that read a file path.
 		bool no_server_paths    = false;
 		bool auto_disambiguate = true;

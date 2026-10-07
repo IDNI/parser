@@ -438,7 +438,7 @@ bool tgf_repl_evaluator::paths_allowed() {
 void tgf_repl_evaluator::begin_server_session(const std::string& id) {
 	session_id = id;
 	opt.no_server_paths = true;
-	opt.json_api = true;
+	opt.json = true;
 	opt.colors = false;
 	TC.set(false);
 }
@@ -520,7 +520,7 @@ ostream& tgf_repl_evaluator::pretty_print(ostream& os, tref n,
 }
 
 void tgf_repl_evaluator::flush_report() {
-	print_diagnostics_report(report, opt.print_json);
+	print_diagnostics_report(report, opt.json);
 	report.clear();
 }
 
@@ -612,7 +612,7 @@ void tgf_repl_evaluator::bind_repl_options() {
 	repl_options_bound = true;
 	// a constructor input is the initial value, so no value that an
 	// evaluator before this one left in the repository reaches the field
-	for (const auto& owner : { "repl", "ui" }) opts.reset(owner);
+	for (const auto& owner : { "repl", "ui", "cli" }) opts.reset(owner);
 	auto bind = [&](auto r) { report.append(r.report()); };
 	bind(opts.bind("print-terminals", opt.print_terminals));
 	bind(opts.bind("status", opt.status));
@@ -621,9 +621,9 @@ void tgf_repl_evaluator::bind_repl_options() {
 	bind(opts.bind("print-tml-rules", opt.tml_rules));
 	bind(opts.bind("print-tml-facts", opt.tml_facts));
 	bind(opts.bind("print-input", opt.print_input));
-	bind(opts.bind("colors", opt.colors, [this] {
-		if (!opt.json_api) TC.set(opt.colors);
-	}));
+	auto set_colors = [this] { TC.set(!opt.json && opt.colors); };
+	bind(opts.bind("colors", opt.colors, set_colors));
+	bind(opts.bind("json", opt.json, set_colors));
 }
 
 void tgf_repl_evaluator::reset_parse_options() {
@@ -659,7 +659,7 @@ format::json::value tgf_repl_evaluator::parsed(parser_type::result& r,
 	auto f = r.get_forest();
 	using c_t = parser_type::char_type;
 	using t_t = parser_type::terminal_type;
-	if (!opt.json_api) {
+	if (!opt.json) {
 		stringstream ss;
 		if (opt.print_input) ss << "input: \"" << r.get_input() << "\"\n";
 		if (opt.print_ambiguity) r.print_ambiguous_nodes(ss);
@@ -1296,7 +1296,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			v.set("productions", std::move(prods));
 			v.set("production_ids", std::move(pids));
 			res.data = std::move(v);
-			if (!opt.json_api) {
+			if (!opt.json) {
 				ostringstream ts;
 				g().print_internal_grammar_for(ts
 					<< "\ninternal grammar for symbol "
@@ -1339,7 +1339,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			v.set("productions", std::move(prods));
 			v.set("production_ids", std::move(pids));
 			res.data = std::move(v);
-			if (!opt.json_api) {
+			if (!opt.json) {
 				ostringstream ts;
 				if (unreachable.size()) {
 					ts << "unreachable production rules for symbol: "
@@ -1403,7 +1403,7 @@ eval_result tgf_repl_evaluator::run(const std::string& src,
 		er.report.append(std::move(r.report()));
 		return er;
 	}
-	if (!opt.json_api) {
+	if (!opt.json) {
 		r.print_ambiguous_nodes(cout);
 		if (idni::options().get<bool>("debug"))
 			pretty_print(cout << "input command graph:\n",
@@ -1861,7 +1861,7 @@ tgf_repl_evaluator::tgf_repl_evaluator(std::string tgf_file)
 tgf_repl_evaluator::tgf_repl_evaluator(std::string tgf_file, options opt)
 	: opt(opt), tgf_filename(std::move(tgf_file))
 {
-	TC.set(opt.json_api ? false : opt.colors);
+	TC.set(!opt.json && opt.colors);
 	reset_parse_options();
 	const bool loaded = load_file(tgf_filename);
 	bind_repl_options();
@@ -1872,7 +1872,7 @@ tgf_repl_evaluator::tgf_repl_evaluator(std::string tgf_file, options opt)
 tgf_repl_evaluator::tgf_repl_evaluator(options opt)
 	: opt(opt)
 {
-	TC.set(opt.json_api ? false : opt.colors);
+	TC.set(!opt.json && opt.colors);
 	reset_parse_options();
 	owned_nts = make_unique<nonterminals_type>();
 	owned_g = make_unique<grammar_type>(*owned_nts);
@@ -1905,7 +1905,7 @@ tgf_repl_evaluator::tgf_repl_evaluator(
 	  grammar_source(std::move(grammar_source)),
 	  p_(&parser)
 {
-	TC.set(opt.json_api ? false : opt.colors);
+	TC.set(!opt.json && opt.colors);
 	// The directives snapshot is parsed lazily on the first
 	// directives_value() call, so a run that never asks for it pays
 	// nothing for the built-in grammar.
@@ -1971,10 +1971,8 @@ static tgf_repl_evaluator::options
 		cmd.get<bool>("status");
 	if (cmd.has("colors"))                  tgf_repl_opt.colors =
 		cmd.get<bool>("colors");
-	if (cmd.has("json")) {
-		tgf_repl_opt.print_json = cmd.get<bool>("json");
-		tgf_repl_opt.json_api  = tgf_repl_opt.print_json;
-	}
+	if (cmd.has("json"))                    tgf_repl_opt.json =
+		cmd.get<bool>("json");
 	if (cmd.has("print-input"))             tgf_repl_opt.print_input =
 		cmd.get<bool>("print-input");
 	if (cmd.has("print-ambiguity"))         tgf_repl_opt.print_ambiguity =
@@ -2064,9 +2062,9 @@ static int gen_command(const cli::command& cmd,
 	tgf_repl_evaluator& re)
 {
 	using format::json::value;
-	const bool print_json = cmd.has("json") && cmd.get<bool>("json");
+	const bool json = idni::options().get<bool>("json");
 	if (!re.require_grammar()) {
-		if (print_json) {
+		if (json) {
 			json_write_line(cout, json_result_response(
 				cmd_status::error, "gen", value::object(),
 				state_value(re), re.take_report()));
@@ -2081,7 +2079,7 @@ static int gen_command(const cli::command& cmd,
 			false)
 		: generate_parser_cpp_from_string<char>(re.filename(),
 			re.source(), gen_opt, false);
-	if (print_json) {
+	if (json) {
 		auto data = value::object();
 		auto files = value::array();
 		if (gr.has_value())
@@ -2132,7 +2130,7 @@ static int show_command(const cli::command& cmd,
 	tgf_repl_evaluator& re)
 {
 	using format::json::value;
-	const bool json = cmd.has("json") && cmd.get<bool>("json");
+	const bool json = idni::options().get<bool>("json");
 	if (!re.require_grammar()) {
 		if (json) {
 			json_write_line(cout, json_result_response(
@@ -2319,7 +2317,7 @@ static int run_command(cli& cl, const cli::command& cmd,
 	}
 
 	if (cmd.name() == "repl") {
-		const bool json = cmd.has("json") && cmd.get<bool>("json");
+		const bool json = idni::options().get<bool>("json");
 		if (json) {
 			if (auto ev = cmd.get<string>("evaluate"); ev.size()) {
 				auto er = re.run(ev);
@@ -2369,7 +2367,7 @@ static int run_command(cli& cl, const cli::command& cmd,
 			&& !cmd.get<bool>("derive-char-classes"))
 				re.g().derive_char_classes(false);
 		using format::json::value;
-		const bool json = cmd.has("json") && cmd.get<bool>("json");
+		const bool json = idni::options().get<bool>("json");
 		string infile = cmd.get<string>("input");
 		string inexp  = cmd.get<string>("input-expression");
 		if (infile.size() && inexp.size())

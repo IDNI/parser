@@ -70,7 +70,7 @@ static std::string local_repl_text(const std::string& grammar,
 	const std::vector<std::string>& srcs, bool colors)
 {
 	tgf_repl_evaluator::options opt;
-	opt.json_api = false;
+	opt.json = false;
 	opt.colors = colors;
 	tgf_repl_evaluator local(grammar, opt);
 	eval_result last;

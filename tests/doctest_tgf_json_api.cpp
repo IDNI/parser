@@ -39,8 +39,7 @@ static std::string ambig_bc_path() {
 
 static tgf_repl_evaluator::options json_options() {
 	tgf_repl_evaluator::options opt;
-	opt.json_api = true;
-	opt.print_json = true;
+	opt.json = true;
 	return opt;
 }
 

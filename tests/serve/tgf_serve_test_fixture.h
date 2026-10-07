@@ -33,8 +33,7 @@ inline std::string grammar_path() {
 
 inline idni::tgf_repl_evaluator::options json_options() {
 	idni::tgf_repl_evaluator::options opt;
-	opt.json_api = true;
-	opt.print_json = true;
+	opt.json = true;
 	return opt;
 }
 
