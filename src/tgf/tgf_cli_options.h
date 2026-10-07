@@ -144,9 +144,8 @@ inline cli::commands tgf_commands() {
 		DESC("comma separated list of non-disambiguation nodes");
 	OPT(cli::option("dynamic", 'D',
 		"")),
-		DESC("default values for a @dynamic nonterminal, "
-			"for example ba_type=sbf,tau. Use ; between "
-			"nonterminals.");
+		DESC("default values of @dynamic nonterminals, one name=value "
+			"per entry, for example ba_type=sbf,ba_type=tau");
 	OPT(cli::option("namespace", 'N',
 		"")),
 		DESC("namespace for the generated parser code");

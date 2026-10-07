@@ -265,8 +265,7 @@ int main(int argc, char **argv) {
 		gopt.name = "test_dynamic_gen_parser";
 		// "extra" plays the command line value, appended after the
 		// .tgf defaults; unknown_nt has no @dynamic in the grammar
-		gopt.dynamic["ba_type"] = { "extra" };
-		gopt.dynamic["unknown_nt"] = { "z" };
+		gopt.dynamic = { "ba_type=extra", "unknown_nt=z" };
 		auto gr = generate_parser_cpp_from_string<char>(
 			"test_dynamic_gen.tgf",
 			string(

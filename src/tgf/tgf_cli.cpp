@@ -2002,60 +2002,34 @@ static void parse_options_from_cmd(const cli::command& cmd,
 		if (cmd.has(name)) re.set_cmd(name, cmd.get<string>(name));
 }
 
-static parser_gen_options gen_options_from_cmd(const cli::command& cmd) {
-	vector<string> nodisambig_list;
-	if (cmd.has("nodisambig-list"))
-		for (auto&& s : cmd.get<string>("nodisambig-list")
-			| views::split(',')) nodisambig_list
-				.emplace_back(s.begin(), s.end());
+// A bad dynamic list is the error of the result.
+static diagnostics::result<parser_gen_options> gen_options_from_cmd(
+	const cli::command& cmd)
+{
+	diagnostics::result<parser_gen_options> r;
 	auto get_str = [&](const char* n) {
 		return cmd.has(n) ? cmd.get<string>(n) : "";
 	};
 	auto get_bool = [&](const char* n) {
 		return cmd.has(n) && cmd.get<bool>(n);
 	};
-	// several @dynamic nonterminals separated by ';', values by ','
-	map<string, vector<string>> dynamic;
-	for (auto&& e : get_str("dynamic") | views::split(';')) {
-		string entry(e.begin(), e.end());
-		if (entry.empty()) continue;
-		auto eq = entry.find('=');
-		if (eq == string::npos) {
-			cerr << "invalid --dynamic entry (missing '='): "
-				<< entry << '\n';
-			continue;
-		}
-		vector<string> values;
-		for (auto&& v : string_view(entry).substr(eq + 1)
-			| views::split(',')) values
-					.emplace_back(v.begin(), v.end());
-		dynamic[entry.substr(0, eq)] = values;
-	}
-	string char_type     = get_str("char-type");
-	string terminal_type = get_str("terminal-type");
-	string decoder       = get_str("decoder");
-	string encoder       = get_str("encoder");
-	if (get_bool("utf8")) {
-		char_type     = "char";
-		terminal_type = "char32_t";
-		if (decoder.empty()) decoder = "idni::utf8_to_u32_conv";
-		if (encoder.empty()) encoder = "idni::u32_to_utf8_conv";
-	}
-	return parser_gen_options{
+	auto dynamic = r.merge_take(detail::parse_value(option_kind::list,
+		get_str("dynamic"), "dynamic"));
+	if (!dynamic) return r;
+	return r.with_value(parser_gen_options{
 		.output_dir          = get_str("output-dir"),
 		.output              = get_str("output"),
 		.name                = get_str("name"),
 		.ns                  = get_str("namespace"),
-		.char_type           = char_type,
-		.terminal_type       = terminal_type,
-		.decoder             = decoder,
-		.encoder             = encoder,
-		.auto_disambiguate   = get_bool("auto-disambiguate"),
-		.nodisambig_list     = nodisambig_list,
-		.dynamic             = dynamic,
+		.char_type           = get_str("char-type"),
+		.terminal_type       = get_str("terminal-type"),
+		.decoder             = get_str("decoder"),
+		.encoder             = get_str("encoder"),
+		.utf8                = get_bool("utf8"),
+		.dynamic             = std::get<option_list>(std::move(*dynamic)),
 		.header_only         = get_bool("header-only"),
 		.treemr              = get_bool("treemr")
-	};
+	});
 }
 
 static int gen_command(const cli::command& cmd,
@@ -2063,22 +2037,21 @@ static int gen_command(const cli::command& cmd,
 {
 	using format::json::value;
 	const bool json = idni::options().get<bool>("json");
-	if (!re.require_grammar()) {
-		if (json) {
-			json_write_line(cout, json_result_response(
-				cmd_status::error, "gen", value::object(),
-				state_value(re), re.take_report()));
-			return 1;
-		}
-		re.flush_report();
+	auto fail = [&](const diagnostics::report& rep) {
+		if (json) json_write_line(cout, json_result_response(
+			cmd_status::error, "gen", value::object(),
+			state_value(re), rep));
+		else print_diagnostics_report(rep, false);
 		return 1;
-	}
+	};
+	if (!re.require_grammar()) return fail(re.take_report());
 	auto gen_opt = gen_options_from_cmd(cmd);
+	if (!gen_opt.has_value()) return fail(gen_opt.report());
 	auto gr = !re.has_fixed_grammar()
-		? generate_parser_cpp_from_file<char>(re.filename(), gen_opt,
-			false)
+		? generate_parser_cpp_from_file<char>(re.filename(),
+			gen_opt.value(), false)
 		: generate_parser_cpp_from_string<char>(re.filename(),
-			re.source(), gen_opt, false);
+			re.source(), gen_opt.value(), false);
 	if (json) {
 		auto data = value::object();
 		auto files = value::array();

@@ -8,6 +8,7 @@
 #include "parser.h"
 #include "grammar_inspector.h"
 #include "utility/escapes.h"
+#include "utility/options_types.h"
 
 namespace idni {
 
@@ -20,11 +21,12 @@ struct parser_gen_options {
 	std::string terminal_type                    = "char";
 	std::string decoder                          = "";
 	std::string encoder                          = "";
-	bool auto_disambiguate                       = true;
-	std::vector<std::string> nodisambig_list     = {};
-	// extra default values per @dynamic nonterminal, added after the ones
-	// the .tgf file declares
-	std::map<std::string, std::vector<std::string>> dynamic = {};
+	// true sets the char type char, the terminal type char32_t and an
+	// empty decoder and encoder to the utf8 recoders
+	bool utf8                                    = false;
+	// extra default values of @dynamic nonterminals, each entry
+	// name=value, added after the ones the .tgf file declares
+	option_list dynamic                          = {};
 	// false emits productions() into a companion .cpp instead of the header
 	bool header_only                             = true;
 	// true adds a matcher() member built on idni::treemr::matcher_for
@@ -64,6 +66,12 @@ std::vector<std::string> generate_parser_cpp(const std::string& tgf_filename,
 	if (opt.output_dir.size() && opt.output_dir.back() != '/')
 		opt.output_dir += '/';
 	if (opt.output.size() == 0) opt.output = opt.name + ".generated.h";
+	if (opt.utf8) {
+		opt.char_type = "char";
+		opt.terminal_type = "char32_t";
+		if (opt.decoder.empty()) opt.decoder = "idni::utf8_to_u32_conv";
+		if (opt.encoder.empty()) opt.encoder = "idni::u32_to_utf8_conv";
+	}
 
 	std::ofstream os(opt.output_dir + opt.output);
 
@@ -206,18 +214,23 @@ std::vector<std::string> generate_parser_cpp(const std::string& tgf_filename,
 			for (const auto& v : values)
 				vs.push_back(to_std_string(v));
 		}
-		for (const auto& [name, values] : opt.dynamic) {
+		for (const auto& entry : opt.dynamic) {
+			const auto eq = entry.find('=');
+			if (eq == std::string::npos) {
+				std::cerr << "Invalid @dynamic value (missing '='): "
+					<< entry << '\n';
+				continue;
+			}
+			const std::string name = entry.substr(0, eq);
+			const std::string v = entry.substr(eq + 1);
 			auto it = dyn.find(name);
 			if (it == dyn.end()) {
 				std::cerr << "Unknown @dynamic nonterminal: "
 					<< name << '\n';
 				continue;
 			}
-			for (const auto& v : values)
-				if (std::find(it->second.begin(),
-					it->second.end(), v)
-						== it->second.end())
-					it->second.push_back(v);
+			if (std::find(it->second.begin(), it->second.end(), v)
+				== it->second.end()) it->second.push_back(v);
 		}
 		if (dyn.size()) {
 			os << ",\n\t.dynamic = {";
