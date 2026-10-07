@@ -244,6 +244,39 @@ TEST_CASE("set takes a literal and an int") {
 	CHECK(f.repo.get<size_t>("count") == 3u);
 }
 
+TEST_CASE("set of an option_value checks the name and the kind") {
+	fixture f;
+	REQUIRE(f.repo.set("count", option_value(size_t{ 5 })).has_value());
+	CHECK(f.repo.get<size_t>("count") == 5u);
+	auto other = f.repo.set("count", option_value(true));
+	CHECK(other.has_error());
+	CHECK(contains(messages_of(other.report()),
+		"The value has another kind than the option"));
+	CHECK(f.repo.get<size_t>("count") == 5u);
+	auto unknown = f.repo.set("nope", option_value(true));
+	CHECK(unknown.has_error());
+	CHECK(contains(messages_of(unknown.report()), "Unknown option"));
+}
+
+TEST_CASE("set of an option_value goes through the codec and the hook") {
+	options_repository repo;
+	REQUIRE(repo.declare(ids_set()).has_value());
+	set<int> ids{ 7 };
+	size_t runs = 0;
+	REQUIRE(repo.bind("ids", ids, int_set_codec{}, [&] { ++runs; })
+		.has_value());
+	auto bad = repo.set("ids", option_value(option_list{ "x" }));
+	CHECK(bad.has_error());
+	CHECK(contains(messages_of(bad.report()), "not a number"));
+	CHECK(ids == set<int>{ 7 });
+	CHECK(runs == 0);
+	REQUIRE(repo.set("ids", option_value(option_list{ "1", "2" }))
+		.has_value());
+	CHECK(ids == set<int>{ 1, 2 });
+	CHECK(runs == 1);
+	repo.unbind("ids");
+}
+
 TEST_CASE("the last write wins") {
 	fixture f;
 	f.repo.set("count", size_t{ 5 });

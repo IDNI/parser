@@ -295,6 +295,8 @@ struct messages {
 		"Two options use the same short name on one command";
 	static constexpr sv option_command_default_kind =
 		"The default of a command has another kind than the option";
+	static constexpr sv option_value_kind =
+		"The value has another kind than the option";
 	static constexpr sv option_not_found = "Unknown option";
 	static constexpr sv option_bad_value =
 		"The option does not take the value";

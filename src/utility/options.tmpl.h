@@ -264,6 +264,22 @@ void options_repository::set(std::string_view name, T value) {
 	DBG(assert(!r.has_error() && "a typed write does not fit the field");)
 }
 
+inline diagnostics::result<void> options_repository::set(
+	std::string_view name, option_value value)
+{
+	namespace ps = parser_strings;
+	diagnostics::result<void> r;
+	const auto i = cat_->find(name);
+	if (!i) return r.with_error(diagnostics::code::not_found,
+		ps::messages::option_not_found, { { ps::label::name, name } });
+	if (kind_of(cat_->specs[*i]) != kind_of(value))
+		return r.with_error(diagnostics::code::type_error,
+			ps::messages::option_value_kind,
+			{ { ps::label::name, name } });
+	r.merge(store(*i, std::move(value)));
+	return r;
+}
+
 template <typename T>
 diagnostics::result<void> options_repository::bind(std::string_view name,
 	T& field, option_hook after)

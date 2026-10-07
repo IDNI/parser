@@ -86,6 +86,10 @@ struct options_repository {
 	/// caught by a DBG assert only.
 	template <typename T> T get(std::string_view name) const;
 	template <typename T> void set(std::string_view name, T value);
+	/// Store a value of the option's own kind. An unknown name, a value of
+	/// another kind and a codec failure are errors, and nothing changes.
+	[[nodiscard]] diagnostics::result<void> set(std::string_view name,
+		option_value value);
 
 	/// Bind a declared option to its field. The field type is the type
 	/// of the option. The hook runs after each write. A stored value goes
