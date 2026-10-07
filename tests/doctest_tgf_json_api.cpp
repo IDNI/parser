@@ -238,16 +238,12 @@ struct scratch_file {
 };
 
 // Compare a JSON array of tree paths with @p want.
-static bool treepaths_are(const json::value& v,
-	const std::vector<std::vector<std::string>>& want)
+static bool strings_are(const json::value* v,
+	const std::vector<std::string>& want)
 {
-	if (!v.is_array() || v.size() != want.size()) return false;
-	for (size_t i = 0; i != want.size(); ++i) {
-		const json::value& p = v[i];
-		if (!p.is_array() || p.size() != want[i].size()) return false;
-		for (size_t j = 0; j != want[i].size(); ++j)
-			if (p[j].as_string() != want[i][j]) return false;
-	}
+	if (!v || !v->is_array() || v->size() != want.size()) return false;
+	for (size_t i = 0; i != want.size(); ++i)
+		if ((*v)[i].as_string() != want[i]) return false;
 	return true;
 }
 
@@ -484,13 +480,13 @@ TEST_SUITE("tgf json api: invalid and unknown requests") {
 TEST_SUITE("tgf json api: options") {
 	TEST_CASE("set and get a list option") {
 		auto r = run_repl({
-			R"({"id":1,"cmd":"set","option":"trim","value":["a","b"]})",
+			R"({"id":1,"cmd":"set","option":"trim","value":["num","start"]})",
 			R"({"id":2,"cmd":"get","option":"trim"})"});
 		REQUIRE(r.responses.size() == 2);
 		auto v0 = result_of(r.responses[0])->find("value");
 		REQUIRE(v0 != nullptr);
 		REQUIRE(v0->size() == 2);
-		CHECK((*v0)[0].as_string() == "a");
+		CHECK((*v0)[0].as_string() == "start");
 		auto v1 = result_of(r.responses[1])->find("value");
 		REQUIRE(v1 != nullptr);
 		CHECK(v1->size() == 2);
@@ -498,7 +494,7 @@ TEST_SUITE("tgf json api: options") {
 
 	TEST_CASE("an empty value clears the list") {
 		auto r = run_repl({
-			R"({"id":1,"cmd":"set","option":"trim","value":["a","b"]})",
+			R"({"id":1,"cmd":"set","option":"trim","value":["num","start"]})",
 			R"({"id":2,"cmd":"set","option":"trim","value":[]})",
 			R"({"id":3,"cmd":"get","option":"trim"})"});
 		REQUIRE(r.responses.size() == 3);
@@ -512,9 +508,9 @@ TEST_SUITE("tgf json api: options") {
 
 	TEST_CASE("eval form set trim and set trim = clear the list") {
 		auto r = run_repl({
-			R"({"id":1,"cmd":"eval","src":"set trim a, b . get trim"})",
+			R"({"id":1,"cmd":"eval","src":"set trim num, start . get trim"})",
 			R"({"id":2,"cmd":"eval","src":"set trim . get trim"})",
-			R"({"id":3,"cmd":"eval","src":"set trim a . set trim = . get trim"})"});
+			R"({"id":3,"cmd":"eval","src":"set trim num . set trim = . get trim"})"});
 		REQUIRE(r.responses.size() == 3);
 		auto res0 = r.responses[0].find("results");
 		REQUIRE(res0 != nullptr);
@@ -541,9 +537,9 @@ TEST_SUITE("tgf json api: options") {
 
 	TEST_CASE("add and delete change a list") {
 		auto r = run_repl({
-			R"({"id":1,"cmd":"set","option":"trim","value":["a"]})",
-			R"({"id":2,"cmd":"add","option":"trim","value":["b"]})",
-			R"({"id":3,"cmd":"delete","option":"trim","value":["a"]})"});
+			R"({"id":1,"cmd":"set","option":"trim","value":["num"]})",
+			R"({"id":2,"cmd":"add","option":"trim","value":["start"]})",
+			R"({"id":3,"cmd":"delete","option":"trim","value":["num"]})"});
 		REQUIRE(r.responses.size() == 3);
 		REQUIRE(result_of(r.responses[1]) != nullptr);
 		REQUIRE(result_of(r.responses[1])->find("value") != nullptr);
@@ -551,12 +547,12 @@ TEST_SUITE("tgf json api: options") {
 		auto v = result_of(r.responses[2])->find("value");
 		REQUIRE(v != nullptr);
 		REQUIRE(v->size() == 1);
-		CHECK((*v)[0].as_string() == "b");
+		CHECK((*v)[0].as_string() == "start");
 	}
 
 	TEST_CASE("a second evaluator does not see the first one's options") {
 		auto a = run_repl({
-			R"({"id":1,"cmd":"set","option":"trim","value":["a"]})"});
+			R"({"id":1,"cmd":"set","option":"trim","value":["num"]})"});
 		REQUIRE(a.responses.size() == 1);
 		auto b = run_repl({
 			R"({"id":1,"cmd":"get","option":"trim"})"});
@@ -906,7 +902,8 @@ TEST_SUITE("tgf json api: option commands") {
 			R"({"id":1,"cmd":"get","option":"derive-char-classes"})",
 			R"({"id":2,"cmd":"set","option":"derive-char-classes","value":false})",
 			R"({"id":3,"cmd":"get","option":"derive-char-classes"})",
-			eval_request(4, "set dcc on . get dcc") });
+			eval_request(4,
+				"set derive-char-classes on . get derive-char-classes") });
 		REQUIRE(r.responses.size() == 4);
 		const json::value* v0 = result_of(r.responses[0])->find("value");
 		REQUIRE(v0 != nullptr);
@@ -978,25 +975,24 @@ TEST_SUITE("tgf json api: option commands") {
 
 	TEST_CASE("inline set, add and delete tree paths") {
 		auto r = run_repl({
-			R"({"id":1,"cmd":"set","option":"inline","value":[["a","b"]]})",
-			R"({"id":2,"cmd":"add","option":"inline","value":[["c","d"]]})",
-			R"({"id":3,"cmd":"delete","option":"inline","value":[["a","b"]]})",
-			eval_request(4, "set inline a > b"),
-			eval_request(5, "add inline c > d"),
-			eval_request(6, "delete inline a > b") });
+			R"({"id":1,"cmd":"set","option":"inline","value":["start > num"]})",
+			R"({"id":2,"cmd":"add","option":"inline","value":["num > digit"]})",
+			R"({"id":3,"cmd":"delete","option":"inline","value":["start > num"]})",
+			eval_request(4, "set inline start > num"),
+			eval_request(5, "add inline num > digit"),
+			eval_request(6, "delete inline start > num") });
 		REQUIRE(r.responses.size() == 6);
-		const std::vector<std::vector<std::string>> one = { { "a", "b" } };
-		const std::vector<std::vector<std::string>> two = {
-			{ "a", "b" }, { "c", "d" } };
-		const std::vector<std::vector<std::string>> c_only = {
-			{ "c", "d" } };
-		const std::vector<std::vector<std::string>> want[6] = {
-			one, two, c_only, one, two, c_only };
+		const std::vector<std::string> one = { "start > num" };
+		const std::vector<std::string> two = {
+			"start > num", "num > digit" };
+		const std::vector<std::string> second = { "num > digit" };
+		const std::vector<std::string> want[6] = {
+			one, two, second, one, two, second };
 		for (size_t i = 0; i != r.responses.size(); ++i) {
 			CHECK(r.responses[i].find("status")->as_string() == "ok");
 			const json::value* data = response_data(r.responses[i]);
 			REQUIRE(data != nullptr);
-			CHECK(treepaths_are(*data->find("value"), want[i]));
+			CHECK(strings_are(data->find("value"), want[i]));
 		}
 	}
 
@@ -1351,7 +1347,7 @@ TEST_SUITE("tgf json api: no grammar") {
 	TEST_CASE("options and simple commands work with no grammar") {
 		auto r = run_repl_no_grammar({
 			R"({"id":1,"cmd":"get","option":"status"})",
-			R"({"id":2,"cmd":"set","option":"trim","value":["a"]})",
+			R"({"id":2,"cmd":"set","option":"trim","value":[]})",
 			R"({"id":3,"cmd":"toggle","option":"print-ambiguity"})",
 			R"({"id":4,"cmd":"help","command":"load"})",
 			R"({"id":5,"cmd":"version"})",

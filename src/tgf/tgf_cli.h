@@ -13,6 +13,7 @@
 
 #include "utility/cli.h"
 #include "utility/diagnostics.h"
+#include "utility/options.h"
 #include "utility/repl.h"
 #include "utility/term_colors.h"
 #ifdef TAU_PARSER_HAS_FTXUI
@@ -56,18 +57,34 @@ struct eval_result {
 	diagnostics::report report;   // errors in the command text itself
 };
 
-/// One row for each REPL option, used by get_cmd() and render_text().
-enum class tgf_option_kind { boolean, string_value, symbol_value, list, treepaths };
-
-struct option_desc {
-	size_t nt;          // tgf_repl_parser nonterminal
-	const char* name;   // long name and JSON key: "print-graphs"
-	const char* label;  // text label get prints: "print-graphs:  "
-	tgf_option_kind kind;   // value shape of this option
-};
-
-/// The option row for @p name, or nullptr when no option has that name.
-const option_desc* option_desc_by_name(std::string_view name);
+/// The options of tgf_repl_evaluator::options. The fields of the owner
+/// parse copy the parse options of the parser.
+inline const option_set tgf_repl_option_set = { .options = {
+	{ "gc", "parse", true, "enable garbage collection", {} },
+	{ "debug", "parse", false, "print debug diagnostics", {} },
+	{ "measure", "parse", false, "measure parse time and counters", {} },
+	{ "measure-each-pos", "parse", false,
+		"measure parse time at each position", {} },
+	{ "measure-forest", "parse", false,
+		"measure forest building time", {} },
+	{ "measure-preprocess", "parse", false,
+		"measure forest preprocess time", {} },
+	{ "error-verbosity", "parse", std::string("basic"),
+		"parse error verbosity: basic, detailed, root-cause", {} },
+	{ "tree-path", "parse", std::string("bintree"),
+		"parse tree path: bintree or forest", {} },
+	{ "start", "parse", std::string(), "starting literal", {} },
+	{ "print-terminals", "repl", true, "print the parsed terminals", {} },
+	{ "status", "repl", true, "print status after each command", {} },
+	{ "print-ambiguity", "repl", true, "print ambiguous nodes", {} },
+	{ "print-graphs", "repl", true, "print the parsed graph", {} },
+	{ "print-tml-rules", "repl", false,
+		"print the forest as TML rules", {} },
+	{ "print-tml-facts", "repl", false,
+		"print the forest as TML facts", {} },
+	{ "print-input", "repl", false, "print the input", {} },
+	{ "colors", "ui", true, "use terminal colors", {} },
+} };
 
 struct tgf_repl_evaluator {
 	friend struct repl<tgf_repl_evaluator>;
@@ -119,11 +136,6 @@ struct tgf_repl_evaluator {
 		bool auto_disambiguate = true;
 		/// True when the user passed --auto-disambiguate on the command line.
 		bool auto_disambiguate_user_set = false;
-		std::set<std::string> to_trim{};
-		std::set<std::string> dont_trim_terminals_of{};
-		std::set<std::string> to_trim_children{};
-		std::set<std::string> to_trim_children_terminals{};
-		std::set<std::vector<std::string>> to_inline{};
 	};
 
 	explicit tgf_repl_evaluator(std::string tgf_file);
@@ -138,8 +150,11 @@ struct tgf_repl_evaluator {
 		std::string grammar_filename,
 		std::string grammar_source,
 		options opt);
-	/// Unbinds the grammar options, also of a grammar it does not own.
+	/// Unbinds the grammar options, also of a grammar it does not own,
+	/// and the options of tgf_repl_option_set.
 	~tgf_repl_evaluator();
+	tgf_repl_evaluator(const tgf_repl_evaluator&) = delete;
+	tgf_repl_evaluator& operator=(const tgf_repl_evaluator&) = delete;
 
 	[[nodiscard]] bool good() const noexcept { return p_ != nullptr; }
 	/// True when a grammar is loaded.
@@ -216,9 +231,8 @@ struct tgf_repl_evaluator {
 
 	idni::diagnostics::result<int> eval(const std::string& src);
 
-	/// Option value as JSON, by option nonterminal.
-	format::json::value option_value(size_t o) const;
-	/// All 23 REPL options as one object, in the order get prints them.
+	/// Every declared option and its value as one object, in the order
+	/// of the declaration.
 	format::json::value option_values() const;
 
 	format::json::value parsed(parser_type::result& r, std::string& text);
@@ -228,16 +242,26 @@ struct tgf_repl_evaluator {
 	format::json::value parse(const std::string& infile,
 		std::string& text);
 
-	format::json::value get_cmd(const trv& n);
-	format::json::value set_cmd(const trv& n);
-	format::json::value add_cmd(const trv& n);
-	format::json::value del_cmd(const trv& n);
-	format::json::value update_bool_opt_cmd(const trv& n,
-		const std::function<bool(bool&)>& update_fn);
+	/// Data of get: the option @p name, or every option when it is empty.
+	format::json::value get_cmd(std::string_view name);
+	/// Data of set: write the text @p text to the option @p name.
+	format::json::value set_cmd(std::string_view name,
+		std::string_view text);
+	/// Data of set: write @p v to the option @p name.
+	format::json::value set_option(std::string_view name,
+		idni::option_value v);
+	/// Data of add or delete: the entries of the list text @p text.
+	format::json::value list_cmd(std::string_view name,
+		std::string_view text, bool add);
+	/// Data of add or delete: add @p entries to the list option @p name,
+	/// or remove them.
+	format::json::value edit_option_list(std::string_view name,
+		const idni::option_list& entries, bool add);
+	/// Data of toggle, enable and disable: the flag @p name gets
+	/// @p update of its value.
+	format::json::value flag_cmd(std::string_view name,
+		const std::function<bool(bool)>& update);
 
-	std::vector<std::string> treepath(const trv& tp) const;
-	/// Shaping options from the REPL lists in opt. update_opts_by_grammar_opts()
-	/// fills them from the grammar lists.
 	shaping_options shaping();
 
 	/// Bind the loaded grammar to options(), with no value of the grammar
@@ -245,9 +269,8 @@ struct tgf_repl_evaluator {
 	void bind_grammar_options();
 	/// Write a grammar option through options(). An error goes to report.
 	void set_grammar_option(std::string_view name, idni::option_value v);
-	/// Add @p entries to the list option @p name, or remove them.
-	void edit_grammar_list(std::string_view name,
-		const std::vector<std::string>& entries, bool add);
+	/// Declare tgf_repl_option_set and bind it to the fields of opt.
+	void bind_repl_options();
 	void update_opts_by_grammar_opts();
 	void apply_auto_disambiguate();
 
@@ -270,6 +293,8 @@ private:
 	options opt;
 	bool fixed_grammar = false;
 	bool grammar_loaded = false;
+	/// True when the options of tgf_repl_option_set are bound to opt.
+	bool repl_options_bound = false;
 	/// True when the grammar came from stored text, not a file.
 	bool grammar_from_source = false;
 	std::string tgf_filename;

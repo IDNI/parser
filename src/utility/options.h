@@ -90,6 +90,9 @@ struct options_repository {
 	/// Typed access by name. A wrong name or type is a programming error,
 	/// caught by a DBG assert only.
 	template <typename T> T get(std::string_view name) const;
+	/// The value of @p name, of the option's own kind. A wrong name is a
+	/// programming error, caught by a DBG assert only.
+	option_value value(std::string_view name) const;
 	template <typename T> void set(std::string_view name, T value);
 	/// Store a value of the option's own kind. An unknown name, a value of
 	/// another kind and a codec failure are errors, and nothing changes.

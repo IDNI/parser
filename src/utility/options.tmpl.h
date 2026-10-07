@@ -282,6 +282,16 @@ T options_repository::get(std::string_view name) const {
 	return detail::typed<T>(effective(*i));
 }
 
+inline option_value options_repository::value(std::string_view name) const
+{
+	const auto i = cat_->find(name);
+	if (!i) {
+		DBG(assert(false && "an unknown option is read");)
+		return option_value{};
+	}
+	return effective(*i);
+}
+
 template <typename T>
 void options_repository::set(std::string_view name, T value) {
 	option_value v = detail::to_option_value(std::move(value));

@@ -5,9 +5,9 @@
 @trim _, __.
 @trim all terminals except children of
 	symbol, quoted_string, unescaped_s, escaped_s, parse_input_char_seq,
-	escape_char, esc_hex, esc_u4, esc_U8.
+	escape_char, esc_hex, esc_u4, esc_U8, option_name, option_char.
 
-@highlight keyword : *_cmd, *_sym, *_opt, statement, option, help_arg, bool_value.
+@highlight keyword : *_cmd, *_sym, statement, option_name, help_arg.
 @highlight string : quoted_string, unescaped_s, escaped_s, filename.
 
 # TGF grammar
@@ -35,22 +35,16 @@ version_cmd    => ("v" | "version")              :version_sym.
 license_cmd    => ("L" | "license")              :license_sym.
 quit_cmd       => ("q" | "quit" | "e" | "exit")  :quit_sym.
 clear_cmd      => ("cls" | "clear")              :clear_sym.
-get_cmd        => "get"                          :get_sym [ __ option ].
-add_cmd        => "add"                          :add_sym __
-        (list_option __ symbol_list | treepaths_option __ treepath_list).
-del_cmd        => ("del" | "delete" | "rm" | "rem" | "remove"):del_sym __
-        (list_option __ symbol_list | treepaths_option __ treepath_list).
-toggle_cmd     => ("tog" | "toggle")             :toggle_sym __ bool_option.
-enable_cmd     => ("en"  __ | "enable"  __)      :enable_sym  bool_option.
-disable_cmd    => ("dis" __ | "disable" __)      :disable_sym bool_option.
-set_cmd        => "set"                          :set_sym __ (
-                          bool_option (__ | _ '=' _) bool_value
-                        | list_option ( _ '=' _ [ symbol_list ]
-                                      | [ __ symbol_list ] )
-                        | treepaths_option ( _ '=' _ [ treepath_list ]
-                                      | [ __ treepath_list ] )
-                        | enum_ev_option (__ | _ '=' _) error_verbosity
-                        | symbol_option (__ | _ '=' _) symbol).
+get_cmd        => "get"                          :get_sym [ __ option_name ].
+set_cmd        => "set"                          :set_sym __ option_name
+                                                  (_ '=' _ | __) [ option_value ].
+add_cmd        => "add"                          :add_sym __ option_name
+                                                  __ option_value.
+del_cmd        => ("del" | "delete" | "rm" | "rem" | "remove"):del_sym
+                                                  __ option_name __ option_value.
+toggle_cmd     => ("tog" | "toggle")             :toggle_sym __ option_name.
+enable_cmd     => ("en" | "enable")              :enable_sym __ option_name.
+disable_cmd    => ("dis" | "disable")            :disable_sym __ option_name.
 
 parse_input            => quoted_string
                         | (printable | '\t')+:parse_input_char_seq.
@@ -63,53 +57,15 @@ help_arg               => grammar_sym | igrammar_sym | unreachable_sym
                         | toggle_sym | enable_sym | disable_sym.
 
 # options
-option                 => bool_option | enum_ev_option
-                        | list_option | treepaths_option | symbol_option.
-enum_ev_option         => ("e" | "error-verbosity"):error_verbosity_opt.
-symbol_option          => "start":start_opt.
-bool_option            => ("s" | "status"):status_opt
-                        | ("c" | "color" | "colors"):colors_opt
-                        | ("a" | "ambiguity" | "print-ambiguity")
-                                                        :print_ambiguity_opt
-                        | ("g" | "graphs" | "print-graphs"):print_graphs_opt
-                        | ("r" | "rules" | "print-rules"):print_rules_opt
-                        | ("f" | "facts" | "print-facts"):print_facts_opt
-                        | ("t" | "terminals" | "print-terminals")
-                                                        :print_terminals_opt
-                        | ("m" | "measure" | "measure-parsing")
-                                                        :measure_parsing_opt
-                        | ("me" | "measure-each" | "mep" | "measure-each-pos")
-                                                        :measure_each_pos_opt
-                        | ("mf" | "measure-forest"):measure_forest_opt
-                        | ("mp" | "measure-preprocess"):measure_preprocess_opt
-                        | ("gc"):gc_opt
-                        | ("d" | "debug"):debug_opt
-                        | ("ad" | "auto-disambiguate"):auto_disambiguate_opt
-                        | ("tt" | "trim-terminals"):trim_terminals_opt
-                        | ("icc" | "inline-cc" | "inline-char-classes")
-                                                        :inline_cc_opt
-                        | ("dcc" | "derive-char-classes")
-                                                        :derive_char_classes_opt.
-list_option            => ("nd" | "ndl" | "nodisambig-list"):nodisambig_list_opt
-                        | ("guards" | "enabled-productions"):enabled_prods_opt
-                        | "trim":trim_opt
-                        | ("tc" | "trim-children"):trim_children_opt
-                        | ("tct" | "trim-children-terminals")
-                                                :trim_children_terminals_opt.
-treepaths_option       => ("i" | "inline"):inline_opt.
-
-# boolean option values
-bool_value             => ("t" | "true"  | "on"  | "1" | "y" | "yes"):true_value
-                        | ("f" | "false" | "off" | "0" | "n" | "no"):false_value.
-error_verbosity        => ("b" | "basic"):basic_sym
-                        | ("d" | "detailed"):detailed_sym
-                        | ("r" | "rc" | "root-cause"):root_cause_sym.
+option_name            => (alpha | '_') (alnum | '_' | '-')*.
+# A '.' ends the statement, '=' follows the name and '#' starts a comment,
+# so a value that holds one of them is quoted.
+option_value           => option_word (__ option_word)*.
+option_word            => (quoted_string | option_char)+.
+option_char            => printable & ~(space | '.' | '=' | '#' | '"').
 
 # common rules
 symbol                 => (alpha | '_') (alnum | '_')*.
-symbol_list            => symbol (_ ',' _ symbol)*.
-treepath               => symbol (_ '>' _ symbol)*.
-treepath_list          => treepath (_ ',' _ treepath)*.
 
 filename               => quoted_string.
 

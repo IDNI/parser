@@ -84,76 +84,6 @@ static diagnostics::result<std::string> string_field(
 	return ok_result(std::string(f->as_string()));
 }
 
-// Render a request value as REPL text, checked against the option kind.
-// An empty list or tree path list renders nothing, which clears the
-// option.
-static diagnostics::result<std::string> value_to_src(
-	const option_desc& d, const value& v)
-{
-	auto type_error = [] {
-		return diagnostics::error<std::string>(
-			code::invalid_argument,
-			parser_strings::messages::invalid_field_type);
-	};
-	switch (d.kind) {
-	case tgf_option_kind::boolean:
-		if (!v.is_bool()) return type_error();
-		return ok_result(std::string(v.as_bool() ? "true" : "false"));
-	case tgf_option_kind::string_value: {
-		if (!v.is_string()) return type_error();
-		const std::string& s = v.as_string();
-		if (s != "basic" && s != "detailed" && s != "root-cause")
-			return diagnostics::error<std::string>(
-				code::invalid_argument,
-				parser_strings::messages::invalid_error_verbosity);
-		return ok_result(s);
-	}
-	case tgf_option_kind::symbol_value: {
-		if (!v.is_string()) return type_error();
-		if (!is_symbol(v.as_string()))
-			return diagnostics::error<std::string>(
-				code::invalid_argument,
-				parser_strings::messages::invalid_symbol);
-		return ok_result(std::string(v.as_string()));
-	}
-	case tgf_option_kind::list: {
-		if (!v.is_array()) return type_error();
-		std::string out;
-		bool first = true;
-		for (const auto& e : v) {
-			if (!e.is_string() || !is_symbol(e.as_string()))
-				return diagnostics::error<std::string>(
-					code::invalid_argument,
-					parser_strings::messages::invalid_symbol);
-			out += first ? first = false, "" : ", ";
-			out += e.as_string();
-		}
-		return ok_result(std::move(out));
-	}
-	case tgf_option_kind::treepaths: {
-		if (!v.is_array()) return type_error();
-		std::string out;
-		bool first = true;
-		for (const auto& tp : v) {
-			if (!tp.is_array()) return type_error();
-			out += first ? first = false, "" : ", ";
-			bool first_s = true;
-			for (const auto& s : tp) {
-				if (!s.is_string() || !is_symbol(s.as_string()))
-					return diagnostics::error<std::string>(
-						code::invalid_argument,
-						parser_strings::messages::
-							invalid_symbol);
-				out += first_s ? first_s = false, "" : " > ";
-				out += s.as_string();
-			}
-		}
-		return ok_result(std::move(out));
-	}
-	}
-	return type_error();
-}
-
 // Convert a structured request into the canonical REPL text. Every field
 // check runs before any text is built.
 static diagnostics::result<std::string> request_to_src(
@@ -168,11 +98,6 @@ static diagnostics::result<std::string> request_to_src(
 		return diagnostics::error<std::string>(
 			code::invalid_argument,
 			parser_strings::messages::unknown_option);
-	};
-	auto missing = [] {
-		return diagnostics::error<std::string>(
-			code::invalid_argument,
-			parser_strings::messages::missing_field);
 	};
 	auto bad_type = [] {
 		return diagnostics::error<std::string>(
@@ -219,6 +144,8 @@ static diagnostics::result<std::string> request_to_src(
 		return ok_result("help " + c);
 	}
 
+	// A declared name is the only text of the option that reaches the
+	// REPL text. set, add and delete run without REPL text.
 	if (cmd == "get") {
 		auto f = q.find("option");
 		std::string name;
@@ -227,48 +154,15 @@ static diagnostics::result<std::string> request_to_src(
 			name = f->as_string();
 		}
 		if (name.empty()) return ok_result(std::string("get"));
-		if (!option_desc_by_name(name)) return unknown_opt();
+		if (!options().find(name)) return unknown_opt();
 		return ok_result("get " + name);
-	}
-
-	if (cmd == "set") {
-		auto name = string_field(q, "option");
-		if (!name.has_value()) return name;
-		const option_desc* d = option_desc_by_name(name.value());
-		if (!d) return unknown_opt();
-		auto val = q.find("value");
-		if (!val) return missing();
-		auto rendered = value_to_src(*d, *val);
-		if (!rendered.has_value()) return rendered;
-		std::string src = "set " + name.value();
-		if (!rendered.value().empty()) src += " " + rendered.value();
-		return ok_result(std::move(src));
 	}
 
 	if (cmd == "toggle" || cmd == "enable" || cmd == "disable") {
 		auto name = string_field(q, "option");
 		if (!name.has_value()) return name;
-		const option_desc* d = option_desc_by_name(name.value());
-		if (!d) return unknown_opt();
-		if (d->kind != tgf_option_kind::boolean) return unknown_opt();
+		if (!options().find(name.value())) return unknown_opt();
 		return ok_result(cmd + " " + name.value());
-	}
-
-	if (cmd == "add" || cmd == "delete") {
-		auto name = string_field(q, "option");
-		if (!name.has_value()) return name;
-		const option_desc* d = option_desc_by_name(name.value());
-		if (!d) return unknown_opt();
-		if (d->kind != tgf_option_kind::list
-				&& d->kind != tgf_option_kind::treepaths)
-			return unknown_opt();
-		auto val = q.find("value");
-		if (!val) return missing();
-		auto rendered = value_to_src(*d, *val);
-		if (!rendered.has_value()) return rendered;
-		if (rendered.value().empty()) return missing();
-		return ok_result(cmd + " " + name.value() + " "
-			+ rendered.value());
 	}
 
 	// grammar, reload, version, license, quit, clear: no fields
@@ -412,6 +306,50 @@ static value hello(tgf_repl_evaluator& re,
 	return v;
 }
 
+// A set, add or delete request writes the option through the repository,
+// so no value text is parsed as REPL text. The field text holds the value
+// as the REPL writes it, the field value holds it as JSON.
+static std::pair<value, diagnostics::report> option_request(
+	tgf_repl_evaluator& re, const std::string& cmd, const value& q)
+{
+	diagnostics::report rep;
+	auto name = string_field(q, "option");
+	if (!name.has_value()) return { value::object(), name.report() };
+	const bool add = cmd == "add";
+	value data = value::object();
+	if (auto t = q.find("text"); t) {
+		if (!t->is_string()) {
+			rep.error(code::invalid_argument,
+				parser_strings::messages::invalid_field_type);
+			return { std::move(data), std::move(rep) };
+		}
+		data = cmd == "set" ? re.set_cmd(name.value(), t->as_string())
+			: re.list_cmd(name.value(), t->as_string(), add);
+		return { std::move(data), re.take_report() };
+	}
+	auto f = q.find("value");
+	if (!f) {
+		rep.error(code::invalid_argument,
+			parser_strings::messages::missing_field);
+		return { std::move(data), std::move(rep) };
+	}
+	auto v = format::json::from_json<option_value>(*f);
+	if (!v) {
+		rep.error(code::invalid_argument,
+			parser_strings::messages::invalid_field_type);
+		return { std::move(data), std::move(rep) };
+	}
+	if (cmd == "set") data = re.set_option(name.value(), std::move(*v));
+	else if (const auto* entries = std::get_if<option_list>(&*v))
+		data = re.edit_option_list(name.value(), *entries, add);
+	else {
+		rep.error(code::invalid_argument,
+			parser_strings::messages::invalid_field_type);
+		return { std::move(data), std::move(rep) };
+	}
+	return { std::move(data), re.take_report() };
+}
+
 static std::pair<value, cmd_status> handle_request(
 	tgf_repl_evaluator& re, const std::string& line)
 {
@@ -463,6 +401,15 @@ static std::pair<value, cmd_status> handle_request(
 		return { json_id_response(id, "load", st, data,
 			state_value(re), rep), st };
 	}
+	if (cmd.value() == "set" || cmd.value() == "add"
+		|| cmd.value() == "delete")
+	{
+		auto [data, rep] = option_request(re, cmd.value(), q);
+		cmd_status st = rep.has_error()
+			? cmd_status::error : cmd_status::ok;
+		return { json_id_response(id, cmd.value(), st, data,
+			state_value(re), rep), st };
+	}
 	auto src = request_to_src(cmd.value(), q);
 	if (!src.has_value())
 		return { error_response(id, state_value(re), src.report()),
@@ -481,27 +428,19 @@ static std::pair<value, cmd_status> handle_request(
 		state_value(re), r.report), st };
 }
 
-// Apply one element of the init option values as a `set` request. A bad
-// value reports an error; the rest of the init stays applied.
+// Apply one element of the init option values. A bad value reports an
+// error; the rest of the init stays applied.
 static void apply_init_option(tgf_repl_evaluator& re,
 	const std::string& name, const value& val, diagnostics::report& r)
 {
-	const option_desc* d = option_desc_by_name(name);
-	if (!d) {
+	auto v = format::json::from_json<option_value>(val);
+	if (!v) {
 		r.error(diagnostics::code::invalid_argument,
-			parser_strings::messages::unknown_option);
+			parser_strings::messages::invalid_field_type);
 		return;
 	}
-	// A null value names no setting, for example start with no symbol.
-	if (val.is_null()) return;
-	value q = value::object();
-	q.set("option", value::string(name));
-	q.set("value", val);
-	auto src = request_to_src("set", q);
-	if (!src.has_value()) { r.append(src.report()); return; }
-	auto er = re.run(src.value());
-	r.append(std::move(er.report));
-	for (auto& cr : er.results) r.append(std::move(cr.report));
+	re.set_option(name, std::move(*v));
+	r.append(re.take_report());
 }
 
 // Apply the init line of a session child: the grammar, the start symbol,
