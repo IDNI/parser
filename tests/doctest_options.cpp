@@ -2,13 +2,15 @@
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 // Tests for the options repository: declare, typed access, last write wins,
-// text access, the environment and the command line.
+// bound fields, text access, the environment and the command line.
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 
+#include <charconv>
 #include <cstdlib>
 #include <initializer_list>
+#include <set>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -80,6 +82,37 @@ struct fixture {
 	fixture() { REQUIRE(repo.declare(tool_set()).has_value()); }
 };
 
+// A set of numbers in a list option.
+struct int_set_codec {
+	option_value to_value(const set<int>& field) const {
+		option_list out;
+		for (int x : field) out.push_back(to_string(x));
+		return out;
+	}
+	diagnostics::result<set<int>> from_value(const option_value& v) const {
+		diagnostics::result<set<int>> r;
+		set<int> out;
+		if (const auto* list = get_if<option_list>(&v))
+			for (const auto& s : *list) {
+				int x = 0;
+				const char* end = s.data() + s.size();
+				auto [p, ec] = from_chars(s.data(), end, x);
+				if (ec != errc{} || p != end) return r.with_error(
+					diagnostics::code::invalid_argument,
+					"not a number");
+				out.insert(x);
+			}
+		return r.with_value(std::move(out));
+	}
+};
+
+// An "ids" list and a "flag" on the global surface.
+option_set ids_set() {
+	return option_set{ .options = {
+		{ "ids", "test", option_list{}, "", { { "" } } },
+		{ "flag", "test", false, "", { { "" } } } } };
+}
+
 args_config tool_config() {
 	args_config cfg;
 	cfg.name = "tool";
@@ -134,7 +167,7 @@ TEST_CASE("a name twice in one set declares nothing") {
 	auto r = repo.declare(option_set{ .options = {
 		{ "a", "", false, "", {} },
 		{ "b", "", false, "", {} },
-		{ "a", "", false, "", {} } } });
+		{ "a", "", true, "", {} } } });
 	CHECK(r.has_error());
 	CHECK(contains(messages_of(r.report()), "Option already exists"));
 	CHECK(repo.names().empty());
@@ -143,9 +176,20 @@ TEST_CASE("a name twice in one set declares nothing") {
 TEST_CASE("a command twice is an error") {
 	options_repository repo;
 	auto r = repo.declare(option_set{ .commands = {
-		{ "run", "" }, { "run", "" } } });
+		{ "run", "" }, { "run", "other" } } });
 	CHECK(r.has_error());
 	CHECK(contains(messages_of(r.report()), "Command already exists"));
+}
+
+TEST_CASE("declare takes an equal spec again") {
+	fixture f;
+	f.repo.set("count", 4);
+	REQUIRE(f.repo.declare(tool_set()).has_value());
+	CHECK(f.repo.names().size() == 8);
+	CHECK(f.repo.get<size_t>("count") == 4u);
+	auto other = f.repo.declare(option_set{ .options = {
+		{ "count", "run", size_t{ 1 }, "another help", {} } } });
+	CHECK(other.has_error());
 }
 
 TEST_CASE("two options with one short letter on one command") {
@@ -201,6 +245,131 @@ TEST_CASE("the last write wins") {
 	CHECK(f.repo.get<size_t>("count") == 9u);
 	REQUIRE(f.repo.set_text("count", "4").has_value());
 	CHECK(f.repo.get<size_t>("count") == 4u);
+}
+
+} // TEST_SUITE
+
+TEST_SUITE("options bind") {
+
+TEST_CASE("a bound option lives in its field") {
+	fixture f;
+	bool force = false;
+	size_t count = 0;
+	REQUIRE(f.repo.bind("force", force).has_value());
+	REQUIRE(f.repo.bind("count", count).has_value());
+	// with no stored value the field keeps what it holds
+	CHECK(f.repo.get<size_t>("count") == 0u);
+	f.repo.set("count", 5);
+	CHECK(count == 5u);
+	count = 6;
+	CHECK(f.repo.get<size_t>("count") == 6u);
+	REQUIRE(f.repo.set_text("force", "on").has_value());
+	CHECK(force);
+	argv_of a{ "tool", "run", "--count", "7", "--force", "false" };
+	REQUIRE(f.repo.parse_args(a.argc(), a.argv(), tool_config())
+		.has_value());
+	CHECK(count == 7u);
+	CHECK(!force);
+	test_setenv("OPTTEST_COUNT", "8");
+	auto env = f.repo.load_env("OPTTEST_");
+	test_unsetenv("OPTTEST_COUNT");
+	REQUIRE(env.has_value());
+	CHECK(count == 8u);
+	f.repo.unbind("count");
+	f.repo.unbind("force");
+}
+
+TEST_CASE("bind puts a stored value into the field") {
+	fixture f;
+	f.repo.set("count", 4);
+	size_t count = 0;
+	REQUIRE(f.repo.bind("count", count).has_value());
+	CHECK(count == 4u);
+	f.repo.unbind("count");
+}
+
+TEST_CASE("unbind keeps the value for the next bind") {
+	fixture f;
+	size_t first = 0, second = 0;
+	REQUIRE(f.repo.bind("count", first).has_value());
+	f.repo.set("count", 3);
+	f.repo.unbind("count");
+	first = 9;
+	CHECK(f.repo.get<size_t>("count") == 3u);
+	REQUIRE(f.repo.bind("count", second).has_value());
+	CHECK(second == 3u);
+	f.repo.unbind("count");
+}
+
+TEST_CASE("reset gives the default to the options of one owner") {
+	fixture f;
+	bool force = true;
+	REQUIRE(f.repo.bind("force", force).has_value());
+	f.repo.set("count", 5);
+	f.repo.set("verbose", true);
+	f.repo.reset("run");
+	CHECK(!force);
+	CHECK(f.repo.get<size_t>("count") == 1u);
+	CHECK(f.repo.get<bool>("verbose"));
+	f.repo.unbind("force");
+}
+
+TEST_CASE("a codec binds a field of another type") {
+	options_repository repo;
+	REQUIRE(repo.declare(ids_set()).has_value());
+	set<int> ids;
+	REQUIRE(repo.bind("ids", ids, int_set_codec{}).has_value());
+	REQUIRE(repo.set_text("ids", "1, 2").has_value());
+	CHECK(ids == set<int>{ 1, 2 });
+	auto text = repo.get_text("ids");
+	REQUIRE(text.has_value());
+	CHECK(text.value() == "1, 2");
+	auto bad = repo.set_text("ids", "x");
+	CHECK(bad.has_error());
+	CHECK(contains(messages_of(bad.report()), "not a number"));
+	CHECK(ids == set<int>{ 1, 2 });
+	repo.unbind("ids");
+	CHECK(repo.get<option_list>("ids") == option_list{ "1", "2" });
+}
+
+TEST_CASE("the hook runs once per write and not on a failed write") {
+	options_repository repo;
+	REQUIRE(repo.declare(ids_set()).has_value());
+	set<int> ids;
+	size_t runs = 0;
+	REQUIRE(repo.bind("ids", ids, int_set_codec{}, [&] { ++runs; })
+		.has_value());
+	CHECK(runs == 0);
+	repo.set("ids", option_list{ "3" });
+	CHECK(runs == 1);
+	REQUIRE(repo.set_text("ids", "4").has_value());
+	CHECK(runs == 2);
+	CHECK(repo.set_text("ids", "y").has_error());
+	CHECK(runs == 2);
+	argv_of a{ "tool", "--ids", "5", "--ids", "6" };
+	REQUIRE(repo.parse_args(a.argc(), a.argv()).has_value());
+	CHECK(runs == 3);
+	CHECK(ids == set<int>{ 5, 6 });
+	repo.reset("test");
+	CHECK(runs == 4);
+	CHECK(ids.empty());
+	repo.unbind("ids");
+}
+
+TEST_CASE("parse_args writes no field when a value does not fit") {
+	options_repository repo;
+	REQUIRE(repo.declare(ids_set()).has_value());
+	set<int> ids{ 1 };
+	bool flag = false;
+	REQUIRE(repo.bind("ids", ids, int_set_codec{}).has_value());
+	REQUIRE(repo.bind("flag", flag).has_value());
+	argv_of a{ "tool", "--flag", "--ids", "x" };
+	auto r = repo.parse_args(a.argc(), a.argv());
+	CHECK(r.has_error());
+	CHECK(!flag);
+	CHECK(ids == set<int>{ 1 });
+	repo.unbind("flag");
+	repo.unbind("ids");
 }
 
 } // TEST_SUITE

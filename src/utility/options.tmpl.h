@@ -154,9 +154,10 @@ inline options_repository::options_repository()
 	: cat_(std::make_shared<const detail::options_catalog>())
 {}
 
-inline const option_value& options_repository::effective(std::size_t i,
+inline option_value options_repository::effective(std::size_t i,
 	std::string_view command) const
 {
+	if (bindings_[i]) return bindings_[i]->read();
 	if (values_[i]) return *values_[i];
 	const option_spec& o = cat_->specs[i];
 	if (!command.empty())
@@ -166,8 +167,29 @@ inline const option_value& options_repository::effective(std::size_t i,
 	return o.fallback;
 }
 
-inline const option_value& options_repository::effective(std::size_t i) const {
+inline option_value options_repository::effective(std::size_t i) const {
 	return effective(i, command_);
+}
+
+#ifdef DEBUG
+inline void options_repository::assert_owner_thread() const {
+	assert(std::this_thread::get_id() == thread_
+		&& "an option is written on another thread");
+}
+#endif
+
+inline diagnostics::result<void> options_repository::store(std::size_t i,
+	option_value v)
+{
+	DBG(assert_owner_thread();)
+	diagnostics::result<void> r;
+	if (!bindings_[i]) {
+		values_[i] = std::move(v);
+		return r;
+	}
+	if (r.merge_ok(bindings_[i]->write(v, true)) && bindings_[i]->after)
+		bindings_[i]->after();
+	return r;
 }
 
 inline diagnostics::result<void> options_repository::declare(
@@ -183,7 +205,8 @@ inline diagnostics::result<void> options_repository::declare(
 			shorts.emplace(std::make_pair(sf.command,
 				sf.short_name), o.name);
 	for (const auto& c : set.commands) {
-		if (cat->command(c.name)) {
+		if (const command_spec* have = cat->command(c.name)) {
+			if (*have == c) continue;
 			r.error(code::invalid_argument,
 				ps::messages::command_already_exists,
 				{ { ps::label::name, c.name } });
@@ -192,7 +215,8 @@ inline diagnostics::result<void> options_repository::declare(
 		cat->commands.push_back(c);
 	}
 	for (const auto& o : set.options) {
-		if (cat->find(o.name)) {
+		if (const auto have = cat->find(o.name)) {
+			if (cat->specs[*have] == o) continue;
 			r.error(code::invalid_argument,
 				ps::messages::option_already_exists,
 				{ { ps::label::name, o.name } });
@@ -220,6 +244,7 @@ inline diagnostics::result<void> options_repository::declare(
 	}
 	if (r.has_error()) return r;
 	values_.resize(cat->specs.size());
+	bindings_.resize(cat->specs.size());
 	cat_ = std::move(cat);
 	return r;
 }
@@ -248,7 +273,94 @@ void options_repository::set(std::string_view name, T value) {
 		DBG(assert(false && "an option is set with another type");)
 		return;
 	}
-	values_[*i] = std::move(v);
+	// a typed write comes from the program, so a codec error is a bug
+	auto r = store(*i, std::move(v));
+	DBG(assert(!r.has_error() && "a typed write does not fit the field");)
+}
+
+template <typename T>
+diagnostics::result<void> options_repository::bind(std::string_view name,
+	T& field, option_hook after)
+{
+	static_assert(detail::is_option_type_v<T>,
+		"a field without a codec has the type of its option");
+	T* f = &field;
+	return bind_at(name, detail::option_binding{
+		[f] { return option_value(*f); },
+		[f](const option_value& v, bool assign) {
+			diagnostics::result<void> r;
+			const T* x = std::get_if<T>(&v);
+			DBG(assert(x
+				&& "a bound option is written with another type");)
+			if (x && assign) *f = *x;
+			return r;
+		},
+		std::move(after) });
+}
+
+template <typename T, typename Codec>
+	requires option_codec<Codec, T>
+diagnostics::result<void> options_repository::bind(std::string_view name,
+	T& field, Codec codec, option_hook after)
+{
+	T* f = &field;
+	return bind_at(name, detail::option_binding{
+		[f, codec] { return option_value(codec.to_value(*f)); },
+		[f, codec](const option_value& v, bool assign) {
+			diagnostics::result<void> r;
+			auto x = r.merge_take(codec.from_value(v));
+			if (x && assign) *f = std::move(*x);
+			return r;
+		},
+		std::move(after) });
+}
+
+inline diagnostics::result<void> options_repository::bind_at(
+	std::string_view name, detail::option_binding b)
+{
+	DBG(assert_owner_thread();)
+	diagnostics::result<void> r;
+	const auto i = cat_->find(name);
+	if (!i) {
+		DBG(assert(false && "an unknown option is bound");)
+		return r;
+	}
+	if (b.read().index() != cat_->specs[*i].fallback.index()) {
+		DBG(assert(false
+			&& "an option is bound to a field of another type");)
+		return r;
+	}
+	DBG(assert(!bindings_[*i] && "an option is bound twice");)
+	bindings_[*i] = std::move(b);
+	if (auto v = std::exchange(values_[*i], std::nullopt))
+		r.merge(store(*i, std::move(*v)));
+	return r;
+}
+
+inline void options_repository::unbind(std::string_view name) {
+	DBG(assert_owner_thread();)
+	const auto i = cat_->find(name);
+	if (!i || !bindings_[*i]) {
+		DBG(assert(false && "an option is unbound that is not bound");)
+		return;
+	}
+	values_[*i] = bindings_[*i]->read();
+	bindings_[*i].reset();
+}
+
+inline void options_repository::reset(std::string_view owner) {
+	for (std::size_t i = 0; i < cat_->specs.size(); ++i) {
+		const option_spec& o = cat_->specs[i];
+		if (o.owner != owner) continue;
+		if (!bindings_[i]) {
+			DBG(assert_owner_thread();)
+			values_[i].reset();
+			continue;
+		}
+		auto r = store(i, o.fallback);
+		DBG(assert(!r.has_error()
+			&& "the default of an option does not fit its field");)
+	}
 }
 
 inline diagnostics::result<void> options_repository::set_text(
@@ -262,7 +374,7 @@ inline diagnostics::result<void> options_repository::set_text(
 	auto v = r.merge_take(detail::parse_option_value(
 		detail::kind_of(cat_->specs[*i].fallback), text, name));
 	if (!v) return r;
-	values_[*i] = std::move(*v);
+	r.merge(store(*i, std::move(*v)));
 	return r;
 }
 
@@ -312,7 +424,7 @@ inline diagnostics::result<void> options_repository::load_env(
 				  { ps::label::value, text } });
 			continue;
 		}
-		values_[i] = std::move(*v);
+		r.merge(store(i, std::move(*v)));
 	}
 	return r;
 }
@@ -372,7 +484,7 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 			== detail::option_kind::flag;
 	};
 	// A list given again appends. Every other kind keeps the last value.
-	auto store = [&](std::size_t i, std::string_view text) {
+	auto add_text = [&](std::size_t i, std::string_view text) {
 		const option_spec& o = cat.specs[i];
 		auto v = r.merge_take(detail::parse_option_value(
 			detail::kind_of(o.fallback), text, o.name));
@@ -447,7 +559,7 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 		}
 		++arg;
 		if (is_flag(*cur)) {
-			if (has_value) return store(*cur, value) ? 0 : 1;
+			if (has_value) return add_text(*cur, value) ? 0 : 1;
 			bool b = true;
 			if (arg < args.size())
 				if (auto v = detail::parse_value(
@@ -471,7 +583,7 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 			}
 			value = args[arg++];
 		}
-		return store(*cur, value) ? 0 : 1;
+		return add_text(*cur, value) ? 0 : 1;
 	};
 
 	std::size_t arg = 1;
@@ -507,9 +619,13 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 		}
 		out.command = cmd;
 	}
+	// a field takes no value until every value of argv fits its field
+	for (const auto& [i, v] : pending)
+		if (bindings_[i]) r.merge(bindings_[i]->write(v, false));
+	if (r.has_error()) return r;
 	command_ = out.command;
 	for (auto& [i, v] : pending) {
-		values_[i] = v;
+		r.merge(store(i, v));
 		out.values.emplace_back(cat.specs[i].name, std::move(v));
 	}
 	return r.with_value(std::move(out));

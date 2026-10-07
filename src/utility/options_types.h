@@ -28,7 +28,9 @@ using option_value = std::variant<bool, std::size_t, std::string, option_list>;
 struct option_surface {
 	std::string command;
 	char short_name = '\0';
+	/// The default applies only to an option that no field binds.
 	std::optional<option_value> fallback = std::nullopt;
+	bool operator==(const option_surface&) const = default;
 };
 
 /// One option. The type of `fallback` gives the kind.
@@ -39,11 +41,13 @@ struct option_spec {
 	std::string help;
 	std::vector<option_surface> surfaces;
 	bool from_env = true;
+	bool operator==(const option_spec&) const = default;
 };
 
 struct command_spec {
 	std::string name;
 	std::string help;
+	bool operator==(const command_spec&) const = default;
 };
 
 /// Everything one program declares.

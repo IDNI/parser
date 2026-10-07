@@ -4,7 +4,9 @@
 #ifndef __IDNI__PARSER__UTILITY__OPTIONS_H__
 #define __IDNI__PARSER__UTILITY__OPTIONS_H__
 
+#include <concepts>
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <ostream>
@@ -12,14 +14,40 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+#ifdef DEBUG
+#	include <thread>
+#endif
 
 #include "diagnostics.h"
 #include "options_types.h"
 
 namespace idni {
 
+/// Runs after each write of a bound option.
+using option_hook = std::function<void()>;
+
+/// Converts between a field and the value of its option. from_value
+/// reports a bad value, for example a name that the grammar does not have.
+template <typename C, typename T>
+concept option_codec = requires(const C& c, const T& field,
+	const option_value& v)
+{
+	{ c.to_value(field) } -> std::convertible_to<option_value>;
+	{ c.from_value(v) } -> std::same_as<diagnostics::result<T>>;
+};
+
 namespace detail {
 struct options_catalog;
+
+/// One bound option: its field, seen through the codec.
+struct option_binding {
+	std::function<option_value()> read;
+	/// Converts @p v for the field. It assigns the field only when
+	/// @p assign is true, so a caller can check a value first.
+	std::function<diagnostics::result<void>(const option_value& v,
+		bool assign)> write;
+	option_hook after;
+};
 }
 
 /// What one command line gave that is no option.
@@ -50,13 +78,32 @@ struct options_repository {
 	options_repository(const options_repository&) = delete;
 	options_repository& operator=(const options_repository&) = delete;
 
-	/// Every name of the set is new, or the call fails and declares nothing.
+	/// A name that is new or declared with an equal spec is fine. A
+	/// different spec under a declared name fails, and nothing is declared.
 	[[nodiscard]] diagnostics::result<void> declare(const option_set& set);
 
 	/// Typed access by name. A wrong name or type is a programming error,
 	/// caught by a DBG assert only.
 	template <typename T> T get(std::string_view name) const;
 	template <typename T> void set(std::string_view name, T value);
+
+	/// Bind a declared option to its field. The field type is the type
+	/// of the option. The hook runs after each write. A stored value goes
+	/// into the field. The owner unbinds before the field ends.
+	template <typename T>
+	[[nodiscard]] diagnostics::result<void> bind(std::string_view name,
+		T& field, option_hook after = {});
+	/// Bind with a codec, when the field type is not the option type.
+	template <typename T, typename Codec>
+		requires option_codec<Codec, T>
+	[[nodiscard]] diagnostics::result<void> bind(std::string_view name,
+		T& field, Codec codec, option_hook after = {});
+	/// The owner calls it in its destructor. The last value of the field
+	/// stays in the repository.
+	void unbind(std::string_view name);
+	/// Give every option of @p owner its default value: the fallback of
+	/// the spec. A bound field gets it written, an unbound slot is cleared.
+	void reset(std::string_view owner);
 
 	/// Text access for a REPL, an api or a binding.
 	[[nodiscard]] diagnostics::result<void> set_text(std::string_view name,
@@ -81,19 +128,32 @@ struct options_repository {
 	void help(std::ostream& os, std::string_view command = {}) const;
 
 private:
-	/// The stored value, else the default of @p command, else the default
-	/// of the option.
-	const option_value& effective(std::size_t i, std::string_view command)
-		const;
-	const option_value& effective(std::size_t i) const;
+	/// The field of a bound option, else the stored value, else the
+	/// default of @p command, else the default of the option.
+	option_value effective(std::size_t i, std::string_view command) const;
+	option_value effective(std::size_t i) const;
+	/// Write @p v into the field and run the hook, or store it when the
+	/// option is not bound.
+	[[nodiscard]] diagnostics::result<void> store(std::size_t i,
+		option_value v);
+	[[nodiscard]] diagnostics::result<void> bind_at(std::string_view name,
+		detail::option_binding b);
+#ifdef DEBUG
+	void assert_owner_thread() const;
+#endif
 
 	// find() shares it, so declare() replaces it and never edits it.
 	std::shared_ptr<const detail::options_catalog> cat_;
 	std::vector<std::optional<option_value>> values_;
+	std::vector<std::optional<detail::option_binding>> bindings_;
 	/// The command of the last parse_args(), which selects the surface
 	/// defaults.
 	std::string command_;
 	args_config cfg_;
+#ifdef DEBUG
+	// A repository and the fields it binds belong to one thread.
+	std::thread::id thread_ = std::this_thread::get_id();
+#endif
 };
 
 } // namespace idni
