@@ -29,8 +29,8 @@ TEST_CASE("directive: @trim simple") {
 		"start => digit.\n"
 		"_ => __ | null.\n"
 		"__ => space | __ space.\n");
-	REQUIRE(g.opt.shaping.to_trim.count(g.nt("_").n()) == 1);
-	REQUIRE(g.opt.shaping.to_trim.count(g.nt("__").n()) == 1);
+	REQUIRE(g.opt().shaping.to_trim.count(g.nt("_").n()) == 1);
+	REQUIRE(g.opt().shaping.to_trim.count(g.nt("__").n()) == 1);
 }
 
 TEST_CASE("directive: @trim single nonterminal") {
@@ -40,7 +40,7 @@ TEST_CASE("directive: @trim single nonterminal") {
 		"@trim ws.\n"
 		"start => digit.\n"
 		"ws => ' ' ws | null.\n");
-	REQUIRE(g.opt.shaping.to_trim.count(g.nt("ws").n()) == 1);
+	REQUIRE(g.opt().shaping.to_trim.count(g.nt("ws").n()) == 1);
 }
 
 // ============================================================
@@ -53,7 +53,7 @@ TEST_CASE("directive: @trim all terminals") {
 		"@use char class digit.\n"
 		"@trim all terminals.\n"
 		"start => digit.\n");
-	REQUIRE(g.opt.shaping.trim_terminals == true);
+	REQUIRE(g.opt().shaping.trim_terminals == true);
 }
 
 TEST_CASE("directive: @trim all terminals except children of") {
@@ -64,10 +64,10 @@ TEST_CASE("directive: @trim all terminals except children of") {
 		"start => digit.\n"
 		"X => alpha.\n"
 		"Y => alpha.\n");
-	REQUIRE(g.opt.shaping.trim_terminals == true);
-	REQUIRE(g.opt.shaping.dont_trim_terminals_of.count(
+	REQUIRE(g.opt().shaping.trim_terminals == true);
+	REQUIRE(g.opt().shaping.dont_trim_terminals_of.count(
 		g.nt("X").n()) == 1);
-	REQUIRE(g.opt.shaping.dont_trim_terminals_of.count(
+	REQUIRE(g.opt().shaping.dont_trim_terminals_of.count(
 		g.nt("Y").n()) == 1);
 }
 
@@ -83,9 +83,9 @@ TEST_CASE("directive: @trim children") {
 		"start => digit.\n"
 		"X => 'a'.\n"
 		"Y => 'b'.\n");
-	REQUIRE(g.opt.shaping.to_trim_children.count(
+	REQUIRE(g.opt().shaping.to_trim_children.count(
 		g.nt("X").n()) == 1);
-	REQUIRE(g.opt.shaping.to_trim_children.count(
+	REQUIRE(g.opt().shaping.to_trim_children.count(
 		g.nt("Y").n()) == 1);
 }
 
@@ -97,9 +97,9 @@ TEST_CASE("directive: @trim children terminals") {
 		"start => digit.\n"
 		"X => 'a'.\n"
 		"Y => 'b'.\n");
-	REQUIRE(g.opt.shaping.to_trim_children_terminals.count(
+	REQUIRE(g.opt().shaping.to_trim_children_terminals.count(
 		g.nt("X").n()) == 1);
-	REQUIRE(g.opt.shaping.to_trim_children_terminals.count(
+	REQUIRE(g.opt().shaping.to_trim_children_terminals.count(
 		g.nt("Y").n()) == 1);
 }
 
@@ -113,7 +113,7 @@ TEST_CASE("directive: @inline char classes") {
 		"@use char class digit.\n"
 		"@inline char classes.\n"
 		"start => digit.\n");
-	REQUIRE(g.opt.shaping.inline_char_classes == true);
+	REQUIRE(g.opt().shaping.inline_char_classes == true);
 }
 
 TEST_CASE("directive: @inline char class (singular)") {
@@ -122,7 +122,7 @@ TEST_CASE("directive: @inline char class (singular)") {
 		"@use char class digit.\n"
 		"@inline char class.\n"
 		"start => digit.\n");
-	REQUIRE(g.opt.shaping.inline_char_classes == true);
+	REQUIRE(g.opt().shaping.inline_char_classes == true);
 }
 
 TEST_CASE("directive: @inline nonterminals") {
@@ -134,7 +134,7 @@ TEST_CASE("directive: @inline nonterminals") {
 		"A => 'a'.\n"
 		"B => 'b'.\n");
 	// Each dir_arg produces one entry: {A} and {B} -> 2 entries
-	REQUIRE(g.opt.shaping.to_inline.size() >= 2);
+	REQUIRE(g.opt().shaping.to_inline.size() >= 2);
 }
 
 TEST_CASE("directive: @inline tree path a > b stores the full path") {
@@ -146,7 +146,7 @@ TEST_CASE("directive: @inline tree path a > b stores the full path") {
 		"a => b.\n"
 		"b => 'x'.\n");
 	std::vector<size_t> path{ g.nt("a").n(), g.nt("b").n() };
-	CHECK(g.opt.shaping.to_inline.count(path) == 1);
+	CHECK(g.opt().shaping.to_inline.count(path) == 1);
 }
 
 // ============================================================
@@ -159,7 +159,7 @@ TEST_CASE("directive: @disable auto disambiguation") {
 		"@use char class digit.\n"
 		"@disable auto disambiguation.\n"
 		"start => digit.\n");
-	REQUIRE(g.opt.auto_disambiguate == false);
+	REQUIRE(g.opt().auto_disambiguate == false);
 }
 
 // ============================================================
@@ -174,8 +174,8 @@ TEST_CASE("directive: @ambiguous") {
 		"start => digit.\n"
 		"expr => term '+' term.\n"
 		"term => digit.\n");
-	REQUIRE(g.opt.nodisambig_list.count(g.nt("expr").n()) == 1);
-	REQUIRE(g.opt.nodisambig_list.count(g.nt("term").n()) == 1);
+	REQUIRE(g.opt().nodisambig_list.count(g.nt("expr").n()) == 1);
+	REQUIRE(g.opt().nodisambig_list.count(g.nt("term").n()) == 1);
 }
 
 // ============================================================
@@ -188,8 +188,8 @@ TEST_CASE("directive: @enable") {
 		"@use char class digit.\n"
 		"@enable guard1, guard2.\n"
 		"start => digit.\n");
-	REQUIRE(g.opt.enabled_guards.count("guard1") == 1);
-	REQUIRE(g.opt.enabled_guards.count("guard2") == 1);
+	REQUIRE(g.opt().enabled_guards.count("guard1") == 1);
+	REQUIRE(g.opt().enabled_guards.count("guard2") == 1);
 }
 
 // ============================================================
@@ -204,15 +204,15 @@ TEST_CASE("directive: @highlight populates highlights option") {
 		"           comment : comment.\n"
 		"start => digit.\n"
 		"comment => '#' printable | null.\n");
-	REQUIRE(g.opt.highlights.size() == 2);
+	REQUIRE(g.opt().highlights.size() == 2);
 	// first entry: keyword -> [start]
-	REQUIRE(g.opt.highlights[0].first == "keyword");
-	REQUIRE(g.opt.highlights[0].second.size() == 1);
-	REQUIRE(g.opt.highlights[0].second[0] == "start");
+	REQUIRE(g.opt().highlights[0].first == "keyword");
+	REQUIRE(g.opt().highlights[0].second.size() == 1);
+	REQUIRE(g.opt().highlights[0].second[0] == "start");
 	// second entry: comment -> [comment]
-	REQUIRE(g.opt.highlights[1].first == "comment");
-	REQUIRE(g.opt.highlights[1].second.size() == 1);
-	REQUIRE(g.opt.highlights[1].second[0] == "comment");
+	REQUIRE(g.opt().highlights[1].first == "comment");
+	REQUIRE(g.opt().highlights[1].second.size() == 1);
+	REQUIRE(g.opt().highlights[1].second[0] == "comment");
 }
 
 TEST_CASE("directive: @highlight treemr pattern with an edge and a "
@@ -223,10 +223,10 @@ TEST_CASE("directive: @highlight treemr pattern with an edge and a "
 		"@use char class digit.\n"
 		"@highlight operator : production > \"=>\".\n"
 		"start => digit.\n");
-	REQUIRE(g.opt.highlights.size() == 1);
-	REQUIRE(g.opt.highlights[0].first == "operator");
-	REQUIRE(g.opt.highlights[0].second.size() == 1);
-	CHECK(g.opt.highlights[0].second[0] == "production > \"=>\"");
+	REQUIRE(g.opt().highlights.size() == 1);
+	REQUIRE(g.opt().highlights[0].first == "operator");
+	REQUIRE(g.opt().highlights[0].second.size() == 1);
+	CHECK(g.opt().highlights[0].second[0] == "production > \"=>\"");
 }
 
 TEST_CASE("directive: @highlight pattern with a quoted comma or period "
@@ -237,11 +237,11 @@ TEST_CASE("directive: @highlight pattern with a quoted comma or period "
 		"@use char class digit.\n"
 		"@highlight delimiter : production > \",\", production > \".\".\n"
 		"start => digit.\n");
-	REQUIRE(g.opt.highlights.size() == 1);
-	REQUIRE(g.opt.highlights[0].first == "delimiter");
-	REQUIRE(g.opt.highlights[0].second.size() == 2);
-	CHECK(g.opt.highlights[0].second[0] == "production > \",\"");
-	CHECK(g.opt.highlights[0].second[1] == "production > \".\"");
+	REQUIRE(g.opt().highlights.size() == 1);
+	REQUIRE(g.opt().highlights[0].first == "delimiter");
+	REQUIRE(g.opt().highlights[0].second.size() == 2);
+	CHECK(g.opt().highlights[0].second[0] == "production > \",\"");
+	CHECK(g.opt().highlights[0].second[1] == "production > \".\"");
 }
 
 TEST_CASE("directive: @highlight stores two treemr patterns, a "
@@ -252,10 +252,10 @@ TEST_CASE("directive: @highlight stores two treemr patterns, a "
 		"@use char class digit.\n"
 		"@highlight delimiter : (sym), directive > ('.').\n"
 		"start => digit.\n");
-	REQUIRE(g.opt.highlights.size() == 1);
-	REQUIRE(g.opt.highlights[0].second.size() == 2);
-	CHECK(g.opt.highlights[0].second[0] == "(sym)");
-	CHECK(g.opt.highlights[0].second[1] == "directive > ('.')");
+	REQUIRE(g.opt().highlights.size() == 1);
+	REQUIRE(g.opt().highlights[0].second.size() == 2);
+	CHECK(g.opt().highlights[0].second[0] == "(sym)");
+	CHECK(g.opt().highlights[0].second[1] == "directive > ('.')");
 }
 
 TEST_CASE("directive: @highlight keeps a plain name and a glob "
@@ -266,11 +266,11 @@ TEST_CASE("directive: @highlight keeps a plain name and a glob "
 		"@use char class digit.\n"
 		"@highlight keyword : dir_sym, *_cmd, sym > (%).\n"
 		"start => digit.\n");
-	REQUIRE(g.opt.highlights.size() == 1);
-	REQUIRE(g.opt.highlights[0].second.size() == 3);
-	CHECK(g.opt.highlights[0].second[0] == "dir_sym");
-	CHECK(g.opt.highlights[0].second[1] == "*_cmd");
-	CHECK(g.opt.highlights[0].second[2] == "sym > (%)");
+	REQUIRE(g.opt().highlights.size() == 1);
+	REQUIRE(g.opt().highlights[0].second.size() == 3);
+	CHECK(g.opt().highlights[0].second[0] == "dir_sym");
+	CHECK(g.opt().highlights[0].second[1] == "*_cmd");
+	CHECK(g.opt().highlights[0].second[2] == "sym > (%)");
 }
 
 TEST_CASE("directive: @highlight string pattern keeps its quotes") {
@@ -279,9 +279,9 @@ TEST_CASE("directive: @highlight string pattern keeps its quotes") {
 		"@use char class digit.\n"
 		"@highlight string : \"=>\".\n"
 		"start => digit.\n");
-	REQUIRE(g.opt.highlights.size() == 1);
-	REQUIRE(g.opt.highlights[0].second.size() == 1);
-	CHECK(g.opt.highlights[0].second[0] == "\"=>\"");
+	REQUIRE(g.opt().highlights.size() == 1);
+	REQUIRE(g.opt().highlights[0].second.size() == 1);
+	CHECK(g.opt().highlights[0].second[0] == "\"=>\"");
 }
 
 TEST_CASE("directive: @highlight with multiple nonterminals") {
@@ -291,11 +291,11 @@ TEST_CASE("directive: @highlight with multiple nonterminals") {
 		"@highlight number : digit, hex.\n"
 		"start => digit.\n"
 		"hex => 'a' | 'b'.\n");
-	REQUIRE(g.opt.highlights.size() == 1);
-	REQUIRE(g.opt.highlights[0].first == "number");
-	REQUIRE(g.opt.highlights[0].second.size() == 2);
-	REQUIRE(g.opt.highlights[0].second[0] == "digit");
-	REQUIRE(g.opt.highlights[0].second[1] == "hex");
+	REQUIRE(g.opt().highlights.size() == 1);
+	REQUIRE(g.opt().highlights[0].first == "number");
+	REQUIRE(g.opt().highlights[0].second.size() == 2);
+	REQUIRE(g.opt().highlights[0].second[0] == "digit");
+	REQUIRE(g.opt().highlights[0].second[1] == "hex");
 }
 
 TEST_CASE("directive: @highlight auto sets the heuristics flag") {
@@ -304,7 +304,7 @@ TEST_CASE("directive: @highlight auto sets the heuristics flag") {
 		"@use char class digit.\n"
 		"@highlight auto.\n"
 		"start => digit.\n");
-	REQUIRE(g.opt.highlight_heuristics == true);
+	REQUIRE(g.opt().highlight_heuristics == true);
 }
 
 TEST_CASE("directive: no @highlight leaves heuristics off") {
@@ -312,7 +312,7 @@ TEST_CASE("directive: no @highlight leaves heuristics off") {
 	auto g = build_grammar(nts,
 		"@use char class digit.\n"
 		"start => digit.\n");
-	REQUIRE(g.opt.highlight_heuristics == false);
+	REQUIRE(g.opt().highlight_heuristics == false);
 }
 
 // True if the report holds a warning whose message text is msg.
@@ -335,7 +335,7 @@ TEST_CASE("directive: @highlight with an unknown type warns and is skipped") {
 	auto& rep = res.report();
 	CHECK(has_warning(rep, messages::unknown_highlight_type));
 	auto g = std::move(res).value();
-	REQUIRE(g.opt.highlights.empty());
+	REQUIRE(g.opt().highlights.empty());
 }
 
 TEST_CASE("directive: @highlight of an undefined name warns unproductive") {
@@ -348,7 +348,7 @@ TEST_CASE("directive: @highlight of an undefined name warns unproductive") {
 	auto& rep = res.report();
 	CHECK(has_warning(rep, messages::unproductive_nonterminal));
 	auto g = std::move(res).value();
-	REQUIRE(g.opt.highlights.size() == 1);
+	REQUIRE(g.opt().highlights.size() == 1);
 }
 
 TEST_CASE("directive: @highlight glob pattern does not warn unproductive") {
@@ -361,7 +361,7 @@ TEST_CASE("directive: @highlight glob pattern does not warn unproductive") {
 	auto& rep = res.report();
 	CHECK_FALSE(has_warning(rep, messages::unproductive_nonterminal));
 	auto g = std::move(res).value();
-	REQUIRE(g.opt.highlights.size() == 1);
+	REQUIRE(g.opt().highlights.size() == 1);
 }
 
 TEST_CASE("directive: @highlight multi-pair directive stores both pairs "
@@ -374,9 +374,9 @@ TEST_CASE("directive: @highlight multi-pair directive stores both pairs "
 		"start => digit.\n"
 		"a => digit.\n"
 		"b => digit.\n");
-	REQUIRE(g.opt.highlights.size() == 2);
-	REQUIRE(g.opt.highlights[0].first == "keyword");
-	REQUIRE(g.opt.highlights[0].second == std::vector<std::string>{"a"});
-	REQUIRE(g.opt.highlights[1].first == "comment");
-	REQUIRE(g.opt.highlights[1].second == std::vector<std::string>{"b"});
+	REQUIRE(g.opt().highlights.size() == 2);
+	REQUIRE(g.opt().highlights[0].first == "keyword");
+	REQUIRE(g.opt().highlights[0].second == std::vector<std::string>{"a"});
+	REQUIRE(g.opt().highlights[1].first == "comment");
+	REQUIRE(g.opt().highlights[1].second == std::vector<std::string>{"b"});
 }

@@ -496,7 +496,12 @@ struct grammar {
 		 * default.
 		 */
 		bool derive_char_classes = true;
-	} opt;
+	};
+private:
+	// private, so a write runs the codec and the hook of its option
+	options opt_;
+public:
+	const options& opt() const;
 	grammar(nonterminals<C, T>& nts, options opt = {});
 	/// A null @p nts makes the grammar create and own its table.
 	grammar(std::shared_ptr<nonterminals<C, T>> nts, options opt = {});
@@ -601,7 +606,7 @@ struct grammar {
 	 * commit or rollback: a confirmed one moves to the committed state and
 	 * is written into ctx's values, staying linked in ntsm; an unconfirmed
 	 * one is retired the same way rollback_dynamic retires it. Never
-	 * writes into opt.dynamic, which holds @dynamic host values only.
+	 * writes into opt_.dynamic, which holds @dynamic host values only.
 	 * Returns true if anything was confirmed.
 	 */
 	bool commit_dynamic(dynamic_context<C>& ctx);
@@ -679,7 +684,7 @@ private:
 	/// Adds each value as a host value for l: a brand new production, or
 	/// an existing pending/committed/retired one promoted to host so
 	/// sync_dynamic_context never retires it. Shared by the
-	/// constructor's opt.dynamic loop and add_dynamic.
+	/// constructor's opt_.dynamic loop and add_dynamic.
 	void host_dynamic_values(const lit<C, T>& l,
 		const std::vector<std::basic_string<C>>& values);
 	void compute_nullables();
@@ -786,7 +791,7 @@ private:
 	/// Marks a rule rejected with first reason kept and returns nullopt.
 	std::optional<cc_expr<T>> cc_reject(size_t nt, cc_walk& w,
 		const char* reason) const;
-	/// A dynamic production's full lifecycle state. host: from opt.dynamic
+	/// A dynamic production's full lifecycle state. host: from opt_.dynamic
 	/// or add_dynamic, never retired by sync_dynamic_context. committed:
 	/// confirmed by a parse, or supplied by sync_dynamic_context's ctx.
 	/// pending: grown by add_dynamic_production_from this parse, not yet

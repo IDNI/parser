@@ -138,6 +138,8 @@ struct tgf_repl_evaluator {
 		std::string grammar_filename,
 		std::string grammar_source,
 		options opt);
+	/// Unbinds the grammar options, also of a grammar it does not own.
+	~tgf_repl_evaluator();
 
 	[[nodiscard]] bool good() const noexcept { return p_ != nullptr; }
 	/// True when a grammar is loaded.
@@ -238,6 +240,14 @@ struct tgf_repl_evaluator {
 	/// fills them from the grammar lists.
 	shaping_options shaping();
 
+	/// Bind the loaded grammar to options(), with no value of the grammar
+	/// loaded before it.
+	void bind_grammar_options();
+	/// Write a grammar option through options(). An error goes to report.
+	void set_grammar_option(std::string_view name, idni::option_value v);
+	/// Add @p entries to the list option @p name, or remove them.
+	void edit_grammar_list(std::string_view name,
+		const std::vector<std::string>& entries, bool add);
 	void update_opts_by_grammar_opts();
 	void apply_auto_disambiguate();
 

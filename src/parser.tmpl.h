@@ -1651,8 +1651,8 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 	}
 
 	auto check_allowed = [this](const pnode& n) {
-		if (!g.opt.auto_disambiguate) return false;
-		for (auto& nt : g.opt.nodisambig_list)
+		if (!g.opt().auto_disambiguate) return false;
+		for (auto& nt : g.opt().nodisambig_list)
 			if (n.first.nt() && n.first.n() == nt) return false;
 		return true;
 	};
@@ -2017,8 +2017,8 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root0) {
 		std::set<pnode> snodes;
 		size_t last_p = SIZE_MAX;
 		auto check_allowed = [this](const pnode &cnode) {
-			if (g.opt.auto_disambiguate == false) return false;
-			for (auto &nt : g.opt.nodisambig_list)
+			if (g.opt().auto_disambiguate == false) return false;
+			for (auto &nt : g.opt().nodisambig_list)
 				if (cnode.first.nt() && cnode.first.n() == nt)
 					return false;
 			return true;

@@ -12,6 +12,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 #include "parser.h"
+#include "testing.h"
 #include "grammar_inspector.h"
 #include "format/json/json.h"
 #include "tgf/parser_gen.h"
@@ -517,7 +518,7 @@ template <typename T>
 static void check_tree_equiv(grammar<char, T>& g,
 	const vector<string>& inputs, bool ad, bool bin, parse_tree_path tp)
 {
-	g.opt.auto_disambiguate = ad;
+	set_grammar_option(g, "auto-disambiguate", ad);
 	typename parser<char, T>::options o =
 		default_parser_options<char, T>();
 	o.binarize = bin;
@@ -554,7 +555,7 @@ template <typename T>
 static void check_cp_equiv(grammar<char, T>& g,
 	const string& prefix, const string& suffix)
 {
-	g.opt.auto_disambiguate = true;
+	set_grammar_option(g, "auto-disambiguate", true);
 	typename parser<char, T>::options o =
 		default_parser_options<char, T>();
 	parser<char, T> p(g, o);
@@ -779,9 +780,9 @@ TEST_CASE("an ambiguous derived rule keeps the same trees off and on") {
 		"left => 'a'.\n"
 		"right => 'a'.\n");
 	REQUIRE(L.g.has_value());
-	L.g->opt.nodisambig_list.clear();
+	set_grammar_option(*L.g, "nodisambig-list", option_list{});
 	check_all_modes<char>(*L.g, { "a" });
-	L.g->opt.nodisambig_list = { L.g->nt("A").n() };
+	set_grammar_option(*L.g, "nodisambig-list", option_list{ "A" });
 	check_all_modes<char>(*L.g, { "a" });
 }
 
@@ -828,16 +829,18 @@ TEST_CASE("generated parser code is the same before and after a parse") {
 
 TEST_CASE("the generated JSON grammar keeps the same trees off and on") {
 	auto& g = json_parser_data::grammar;
-	bool ad = g.opt.auto_disambiguate;
-	auto nd = g.opt.nodisambig_list;
-	g.opt.nodisambig_list.clear();
+	bool ad = g.opt().auto_disambiguate;
+	option_list nd;
+	for (size_t id : g.opt().nodisambig_list)
+		nd.push_back(g.nt(id).to_std_string());
+	set_grammar_option(g, "nodisambig-list", option_list{});
 	check_all_modes<char32_t>(g, {
 		"\"a\"", "\"\\n\\t\\\"\\\\/\"", "0", "-12.5e3",
 		"true", "null", "[]", "{}", "{\"a\":[1,2.5,true,null]}",
 		"\"a", "[1,]", "",
 	});
-	g.opt.auto_disambiguate = ad;
-	g.opt.nodisambig_list = nd;
+	set_grammar_option(g, "auto-disambiguate", ad);
+	set_grammar_option(g, "nodisambig-list", nd);
 	g.derive_char_classes(true);
 }
 

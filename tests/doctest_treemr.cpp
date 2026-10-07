@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "parser.h"
+#include "testing.h"
 #include "format/tgf/tgf.h"
 #include "format/treemr/treemr.h"
 #include "tgf/parser_gen.h"
@@ -903,7 +904,7 @@ struct ambig_parsed {
 			auto gr = tgf<char>::from_string(nts, string(tgf_src));
 			REQUIRE(gr.has_value());
 			auto built = std::move(gr).value();
-			built.opt.auto_disambiguate = false;
+			set_grammar_option(built, "auto-disambiguate", false);
 			return built;
 		}() }
 		, r{ [&]() {

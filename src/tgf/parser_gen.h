@@ -157,51 +157,51 @@ std::vector<std::string> generate_parser_cpp(const std::string& tgf_filename,
 			return os;
 		};
 		os << "\t.auto_disambiguate = "
-			<< pbool[g.opt.auto_disambiguate] << ",\n";
-		if (g.opt.nodisambig_list.size()) {
+			<< pbool[g.opt().auto_disambiguate] << ",\n";
+		if (g.opt().nodisambig_list.size()) {
 			os << "\t.nodisambig_list = {";
-			plist(os, g.opt.nodisambig_list) << "\n\t},\n";
+			plist(os, g.opt().nodisambig_list) << "\n\t},\n";
 		}
 		os << "\t.shaping = {\n";
-		if (g.opt.shaping.to_trim.size()) {
+		if (g.opt().shaping.to_trim.size()) {
 			os << "\t\t.to_trim = {";
-			plist(os, g.opt.shaping.to_trim) << "\n\t\t},\n";
+			plist(os, g.opt().shaping.to_trim) << "\n\t\t},\n";
 		}
-		if (g.opt.shaping.to_trim_children.size()) {
+		if (g.opt().shaping.to_trim_children.size()) {
 			os << "\t\t.to_trim_children = {";
-			plist(os, g.opt.shaping.to_trim_children)<<"\n\t\t},\n";
+			plist(os, g.opt().shaping.to_trim_children)<<"\n\t\t},\n";
 		}
-		if (g.opt.shaping.to_trim_children_terminals.size()) {
+		if (g.opt().shaping.to_trim_children_terminals.size()) {
 			os << "\t\t.to_trim_children_terminals = {";
-			plist(os, g.opt.shaping.to_trim_children_terminals)
+			plist(os, g.opt().shaping.to_trim_children_terminals)
 								<< "\n\t\t},\n";
 		}
 		os << "\t\t.trim_terminals = "
-			<< pbool[g.opt.shaping.trim_terminals] << ",\n";
-		if (g.opt.shaping.dont_trim_terminals_of.size()) {
+			<< pbool[g.opt().shaping.trim_terminals] << ",\n";
+		if (g.opt().shaping.dont_trim_terminals_of.size()) {
 			os << "\t\t.dont_trim_terminals_of = {";
-			plist(os, g.opt.shaping.dont_trim_terminals_of)
+			plist(os, g.opt().shaping.dont_trim_terminals_of)
 				<< "\n\t\t},\n";
 		}
-		if (g.opt.shaping.to_inline.size()) {
+		if (g.opt().shaping.to_inline.size()) {
 			os << "\t\t.to_inline = {";
-			pvlist(os, g.opt.shaping.to_inline) << "\n\t\t},\n";
+			pvlist(os, g.opt().shaping.to_inline) << "\n\t\t},\n";
 		}
 		os << "\t\t.inline_char_classes = "
-			<< pbool[g.opt.shaping.inline_char_classes] << "\n";
+			<< pbool[g.opt().shaping.inline_char_classes] << "\n";
 		os << "\t}";
-		if (g.opt.enabled_guards.size()) {
+		if (g.opt().enabled_guards.size()) {
 			os << ",\n\t.enabled_guards = {";
 			size_t i = 0;
-			for (const auto& s : g.opt.enabled_guards) os << (i ? "," : "")
+			for (const auto& s : g.opt().enabled_guards) os << (i ? "," : "")
 				<< (i % 10 == 0 ? "\n\t\t" : " ")
 				<< "\"" << s << "\"", i++;
 			os << "\n\t}";
 		}
-		// g.opt.dynamic keeps the .tgf file's names and default
+		// g.opt().dynamic keeps the .tgf file's names and default
 		// values; opt.dynamic (the command line) only adds values
 		std::map<std::string, std::vector<std::string>> dyn;
-		for (const auto& [name, values] : g.opt.dynamic) {
+		for (const auto& [name, values] : g.opt().dynamic) {
 			auto& vs = dyn[to_std_string(name)];
 			for (const auto& v : values)
 				vs.push_back(to_std_string(v));

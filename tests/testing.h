@@ -414,15 +414,20 @@ namespace idni::testing
 		}
 		if (g.size() == 0)
 			return std::cout << "\t# FAILED\n", failed = true, false;
-		auto str2ntids = [&nts](const std::set<std::string> &list)
-		{
-			std::set<size_t> r;
-			for (const auto &s : list)
-				r.insert(nts.get(s));
-			return r;
-		};
 		if (nodisambig_list.size())
-			g.opt.nodisambig_list = str2ntids(nodisambig_list);
+		{
+			g.unbind_options();
+			options_repository repo;
+			options_scope scope(repo);
+			auto bound = g.bind_options();
+			if (bound.has_value())
+				repo.set("nodisambig-list", option_list(
+					nodisambig_list.begin(),
+					nodisambig_list.end()));
+			g.unbind_options();
+			if (!bound.print_and_ok(std::cout << "\t# FAILED\n"))
+				return failed = true, false;
+		}
 		parser<T> p(g, options<T>);
 		bool success = run_test_<T>(g, p, input, opts);
 		if (!print_only_failed || !success)
@@ -631,4 +636,20 @@ namespace idni::testing
 	}
 
 } // namespace idni::testing
+
+// One write of a grammar option, in a repository of its own. The grammar
+// unbinds first, so a grammar that a reader bound works too. CHECK, not
+// REQUIRE, so the grammar always unbinds before the repository ends.
+template <typename C, typename T, typename V>
+void set_grammar_option(idni::grammar<C, T>& g, std::string_view name,
+	V value)
+{
+	g.unbind_options();
+	idni::options_repository repo;
+	idni::options_scope scope(repo);
+	CHECK(g.bind_options().has_value());
+	repo.set(name, std::move(value));
+	g.unbind_options();
+}
+
 #endif // __IDNI__PARSER__TESTING_H__

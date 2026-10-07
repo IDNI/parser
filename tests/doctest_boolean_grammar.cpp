@@ -7,6 +7,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 #include "parser.h"
+#include "testing.h"
 #include "recoders.h"
 
 using namespace std;
@@ -65,11 +66,11 @@ static void expect_parses(grammar<char>& g, const string& input,
 #if !defined(TAU_TEST_NO_AUTODISAMBG)
 	if (allow_ambiguity) continue;
 	// Shadow check: temporarily disable auto_disambiguate, verify no ambiguity.
-	bool saved_ad = g.opt.auto_disambiguate;
-	g.opt.auto_disambiguate = false;
+	bool saved_ad = g.opt().auto_disambiguate;
+	set_grammar_option(g, "auto-disambiguate", false);
 	parser<char>::options po_shadow{};
 	parser<char> p_shadow(g, po_shadow);
-	g.opt.auto_disambiguate = saved_ad;
+	set_grammar_option(g, "auto-disambiguate", saved_ad);
 	auto r_shadow = p_shadow.parse(input.c_str(), input.size(),
 		{ .tree_path = tree_path, .enable_gc = false, .gc_lag = 1 });
 	if (r_shadow.found && r_shadow.is_ambiguous())
@@ -1103,13 +1104,13 @@ static bool c32_parses(c32_grammar& g, const string& input,
 	if (!r.found || allow_ambiguity) return r.found;
 #if !defined(TAU_TEST_NO_AUTODISAMBG)
 	// Shadow check: temporarily disable auto_disambiguate.
-	bool saved_ad = g.opt.auto_disambiguate;
-	g.opt.auto_disambiguate = false;
+	bool saved_ad = g.opt().auto_disambiguate;
+	set_grammar_option(g, "auto-disambiguate", false);
 	parser<char, char32_t>::options po_shadow{};
 	po_shadow.codec.decode = idni::utf8_to_u32_conv;
 	po_shadow.codec.encode = idni::u32_to_utf8_conv;
 	parser<char, char32_t> p_shadow(g, po_shadow);
-	g.opt.auto_disambiguate = saved_ad;
+	set_grammar_option(g, "auto-disambiguate", saved_ad);
 	auto r_shadow = p_shadow.parse(input.c_str(), input.size());
 	if (r_shadow.found && r_shadow.is_ambiguous()) return false;
 #endif
@@ -1283,7 +1284,7 @@ TEST_SUITE("regression: cascade-uncomplete count guard") {
 		ps(sum_lit, expression + '+' + expression);
 		ps(mul_lit, expression + '*' + expression);
 		grammar<char> g(nts, ps, start, cc, make_grammar_options());
-		g.opt.auto_disambiguate = false;
+		set_grammar_option(g, "auto-disambiguate", false);
 		parser<char> p(g);
 		auto r = p.parse("1+2*3", 5);
 		REQUIRE(r.found);

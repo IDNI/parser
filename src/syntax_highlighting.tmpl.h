@@ -400,7 +400,7 @@ inline void token_classifier::init(const grammar<char, char>& g,
 				return false;
 		return true;
 	};
-	for (auto& hl : g.opt.highlights) {
+	for (auto& hl : g.opt().highlights) {
 		uint32_t ti = type_index(hl.first);
 		if (ti == no_type) continue;
 		for (auto& pat : hl.second) {
@@ -461,11 +461,11 @@ inline syntax_highlighting::syntax_highlighting(const std::string& grammar_src,
 		default_parser_options<char, char>());
 
 	heuristics_ = heuristics.has_value()
-		? *heuristics : g_->opt.highlight_heuristics;
+		? *heuristics : g_->opt().highlight_heuristics;
 	classifier_.init(*g_, *nts_, heuristics_, diagnostics_);
 
 	// Highlighting shaping disables all trimming and all user inlining.
-	highlight_shaping_ = g_->opt.shaping;
+	highlight_shaping_ = g_->opt().shaping;
 	highlight_shaping_.trim_terminals = false;
 	highlight_shaping_.to_trim.clear();
 	highlight_shaping_.to_trim_children.clear();

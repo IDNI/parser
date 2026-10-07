@@ -7,6 +7,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 #include "parser.h"
+#include "testing.h"
 #include "format/json/json.h"
 
 #include <sstream>
@@ -57,7 +58,7 @@ static void expect_parses(grammar<T>& g, const basic_string<T>& input,
 	for (auto tree_path : {parse_tree_path::bintree_path,
 			parse_tree_path::forest_path}) {
 	parser<T> p(g, make_parser_options<T>());
-	g.opt.auto_disambiguate = true;
+	set_grammar_option(g, "auto-disambiguate", true);
 	auto r = p.parse(input.c_str(), input.size(),
 		{ .start = custom_start, .tree_path = tree_path, .enable_gc = false, .gc_lag = 1 });
 	if (!r.found) {
@@ -69,10 +70,10 @@ static void expect_parses(grammar<T>& g, const basic_string<T>& input,
 	}
 #if !defined(TAU_TEST_NO_AUTODISAMBG)
 	if (allow_ambiguity) continue;
-	g.opt.auto_disambiguate = false;
+	set_grammar_option(g, "auto-disambiguate", false);
 	auto r_shadow = p.parse(input.c_str(), input.size(),
 		{ .start = custom_start, .tree_path = tree_path, .enable_gc = false, .gc_lag = 1 });
-	g.opt.auto_disambiguate = true;
+	set_grammar_option(g, "auto-disambiguate", true);
 	if (r_shadow.found && r_shadow.is_ambiguous())
 		FAIL_CHECK("expected unambiguous parse for '"
 			<< to_std_string(input)
@@ -670,7 +671,7 @@ TEST_SUITE("regression: binarize_comb dot==1") {
 		                           //  A completions at [k, N] for all k
 		ps(Y_lit, x);
 		grammar<char> g(nts, ps, start_lit, {}, make_grammar_options());
-		g.opt.auto_disambiguate = false;
+		set_grammar_option(g, "auto-disambiguate", false);
 		parser<char>::options o;
 		o.binarize = true;
 		parser<char> p(g, o);
@@ -689,7 +690,7 @@ TEST_SUITE("regression: binarize_comb dot==1") {
 		ps(A_lit, Y | (Y + A));
 		ps(Y_lit, x);
 		grammar<char> g(nts, ps, start_lit, {}, make_grammar_options());
-		g.opt.auto_disambiguate = false;
+		set_grammar_option(g, "auto-disambiguate", false);
 		parser<char>::options o;
 		o.binarize = true;
 		parser<char> p(g, o);
@@ -733,7 +734,7 @@ TEST_SUITE("AMB wrapping") {
 		prods<char> ps, start(start_lit), a('a');
 		ps(start_lit, a | (start + start));
 		grammar<char> g(nts, ps, start_lit, {}, make_grammar_options());
-		g.opt.auto_disambiguate = false;
+		set_grammar_option(g, "auto-disambiguate", false);
 		parser<char> p(g);
 		auto r = p.parse("aaa", 3);
 		REQUIRE(r.found);
@@ -773,7 +774,7 @@ TEST_SUITE("AMB wrapping") {
 		prods<char> ps, a('a'), b('b');
 		ps(start_lit, a + b);
 		grammar<char> g(nts, ps, start_lit, {}, make_grammar_options());
-		g.opt.auto_disambiguate = false;
+		set_grammar_option(g, "auto-disambiguate", false);
 		parser<char> p(g);
 		auto r = p.parse("ab", 2);
 		REQUIRE(r.found);
@@ -791,7 +792,7 @@ TEST_SUITE("AMB wrapping") {
 		prods<char> ps, start(start_lit), a('a');
 		ps(start_lit, a | (start + start));
 		grammar<char> g(nts, ps, start_lit, {}, make_grammar_options());
-		g.opt.auto_disambiguate = false;
+		set_grammar_option(g, "auto-disambiguate", false);
 		parser<char> p(g);
 		auto r = p.parse("aaa", 3);
 		REQUIRE(r.found);
@@ -850,7 +851,7 @@ TEST_SUITE("AMB wrapping with TGF shaping") {
 		REQUIRE(gr.has_value());
 		grammar<char> g = std::move(gr).value();
 		REQUIRE(g.size() > 0);
-		g.opt.auto_disambiguate = false;
+		set_grammar_option(g, "auto-disambiguate", false);
 		parser<char> p(g);
 		auto r = p.parse("1+2+3", 5);
 		REQUIRE(r.found);
@@ -884,7 +885,7 @@ TEST_SUITE("AMB wrapping with TGF shaping") {
 		REQUIRE(gr.has_value());
 		grammar<char> g = std::move(gr).value();
 		REQUIRE(g.size() > 0);
-		g.opt.auto_disambiguate = false;
+		set_grammar_option(g, "auto-disambiguate", false);
 		parser<char> p(g);
 		auto r = p.parse("0|1+2+3", 7);
 		REQUIRE(r.found);
@@ -916,7 +917,7 @@ TEST_SUITE("AMB wrapping with TGF shaping") {
 		REQUIRE(gr.has_value());
 		grammar<char> g = std::move(gr).value();
 		REQUIRE(g.size() > 0);
-		g.opt.auto_disambiguate = false;
+		set_grammar_option(g, "auto-disambiguate", false);
 		parser<char> p(g);
 		auto r = p.parse("1 + 2 + 3", 9);
 		REQUIRE(r.found);
@@ -944,7 +945,7 @@ TEST_SUITE("AMB wrapping with TGF shaping") {
 		REQUIRE(gr.has_value());
 		grammar<char> g = std::move(gr).value();
 		REQUIRE(g.size() > 0);
-		g.opt.auto_disambiguate = false;
+		set_grammar_option(g, "auto-disambiguate", false);
 		parser<char> p(g);
 		auto r = p.parse("1+2+3", 5);
 		REQUIRE(r.found);
@@ -1072,7 +1073,7 @@ TEST_SUITE("parse_tree_path") {
 		prods<char> ps, start(start_lit), a('a');
 		ps(start_lit, a | (start + start));
 		grammar<char> g(nts, ps, start_lit, {}, make_grammar_options());
-		g.opt.auto_disambiguate = false;
+		set_grammar_option(g, "auto-disambiguate", false);
 
 		// forest_path
 		{
@@ -1141,7 +1142,7 @@ TEST_SUITE("parse_tree_path") {
 			prods<char> ps, start(start_lit), a('a');
 			ps(start_lit, a | (start + start));
 			grammar<char> g(nts, ps, start_lit, {}, make_grammar_options());
-			g.opt.auto_disambiguate = false;
+			set_grammar_option(g, "auto-disambiguate", false);
 			parser<char> p(g);
 			auto r = p.parse("aaa", 3,
 				{ .tree_path = parse_tree_path::bintree_path, .enable_gc = false, .gc_lag = 1 });
@@ -1162,7 +1163,7 @@ TEST_SUITE("parse_tree_path") {
 			prods<char> ps, start(start_lit), a('a');
 			ps(start_lit, a | (start + start));
 			grammar<char> g(nts, ps, start_lit, {}, make_grammar_options());
-			g.opt.auto_disambiguate = false;
+			set_grammar_option(g, "auto-disambiguate", false);
 			parser<char> p(g);
 			auto r = p.parse("aaa", 3,
 				{ .tree_path = parse_tree_path::bintree_path, .enable_gc = false, .gc_lag = 1 });
@@ -1196,7 +1197,7 @@ TEST_SUITE("parse_tree_path") {
 			auto gr = tgf<char>::from_string(nts, string(tgf_src));
 			REQUIRE(gr.has_value());
 			grammar<char> g = std::move(gr).value();
-			g.opt.auto_disambiguate = false;
+			set_grammar_option(g, "auto-disambiguate", false);
 			parser<char> p(g);
 			auto r = p.parse("1+2+3|4+5+6", 11,
 				{ .tree_path = parse_tree_path::bintree_path, .enable_gc = false, .gc_lag = 1 });
@@ -1212,7 +1213,7 @@ TEST_SUITE("parse_tree_path") {
 		prods<char> ps, start(start_lit), a('a');
 		ps(start_lit, a | (start + start));
 		grammar<char> g(nts, ps, start_lit, {}, make_grammar_options());
-		g.opt.auto_disambiguate = false;
+		set_grammar_option(g, "auto-disambiguate", false);
 
 		parser<char> p1(g);
 		auto r1 = p1.parse("aaa", 3,
@@ -1522,7 +1523,7 @@ TEST_SUITE("auto-disambiguation") {
 		auto gr = tgf<char>::from_string(nts, string(g_tgf));
 		REQUIRE(gr.has_value());
 		auto g = std::move(gr).value();
-		REQUIRE(g.opt.nodisambig_list.count(g.nt("expr").n()) == 1);
+		REQUIRE(g.opt().nodisambig_list.count(g.nt("expr").n()) == 1);
 		parser<char> p(g);
 		auto r = p.parse("x+x", 3);
 		REQUIRE(r.found);
@@ -1540,7 +1541,7 @@ TEST_SUITE("auto-disambiguation") {
 		auto gr = tgf<char>::from_string(nts, string(g_tgf));
 		REQUIRE(gr.has_value());
 		auto g = std::move(gr).value();
-		REQUIRE(g.opt.auto_disambiguate == false);
+		REQUIRE(g.opt().auto_disambiguate == false);
 		parser<char> p(g);
 		auto r = p.parse("x", 1);
 		REQUIRE(r.found);

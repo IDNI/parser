@@ -847,14 +847,21 @@ TEST_SUITE("tgf json api: CRLF text") {
 		scratch_file lf("tgf_json_api_text_lf.tgf", "start => 'a'.\n");
 		scratch_file crlf("tgf_json_api_text_crlf.tgf",
 			"start => 'a'.\r\n");
-		tgf_repl_evaluator lfe(lf.path), ce(crlf.path);
 		std::ostringstream lfos, cos;
 		std::streambuf* old = std::cout.rdbuf();
-		std::cout.rdbuf(lfos.rdbuf());
-		lfe.eval("grammar");
-		std::cout.rdbuf(cos.rdbuf());
-		ce.eval("grammar");
-		std::cout.rdbuf(old);
+		// one evaluator at a time: a thread binds one grammar at a time
+		{
+			tgf_repl_evaluator lfe(lf.path);
+			std::cout.rdbuf(lfos.rdbuf());
+			lfe.eval("grammar");
+			std::cout.rdbuf(old);
+		}
+		{
+			tgf_repl_evaluator ce(crlf.path);
+			std::cout.rdbuf(cos.rdbuf());
+			ce.eval("grammar");
+			std::cout.rdbuf(old);
+		}
 		CHECK(cos.str().find('\r') == std::string::npos);
 		CHECK(cos.str() == lfos.str());
 	}

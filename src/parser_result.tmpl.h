@@ -42,7 +42,7 @@ template <typename C, typename T>
 parser<C, T>::result::result(parser<C, T>& p, std::unique_ptr<input> in_,
 	tref f, bool fnd, error err) :
 		found(fnd), parse_error(err),
-		shaping(p.get_grammar().opt.shaping),
+		shaping(p.get_grammar().opt().shaping),
 		measure_scopes(p.po.measure_scopes),
 		measure_counters(p.po.measure_counters),
 		diag_report(std::move(p.report_)),
@@ -69,7 +69,7 @@ template <typename C, typename T>
 parser<C, T>::result::result(parser<C, T>& p, std::unique_ptr<input> in_,
 	std::unique_ptr<pforest> f, bool fnd, error err) :
 		found(fnd), parse_error(err),
-		shaping(p.get_grammar().opt.shaping),
+		shaping(p.get_grammar().opt().shaping),
 		measure_scopes(p.po.measure_scopes),
 		measure_counters(p.po.measure_counters),
 		diag_report(std::move(p.report_)),

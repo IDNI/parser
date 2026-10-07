@@ -849,7 +849,7 @@ TEST_CASE("every @highlight pair in the five repository grammars has an effect")
 		nonterminals<char, char> nts;
 		auto gr = tgf<char, char>::from_string(nts, g_src);
 		REQUIRE(gr.has_value());
-		auto& highlights = gr.value().opt.highlights;
+		auto& highlights = gr.value().opt().highlights;
 		REQUIRE_FALSE(highlights.empty());
 
 		syntax_highlighting hl(g_src, false);

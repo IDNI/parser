@@ -558,7 +558,7 @@ grammar<C, T>::grammar(nonterminals<C, T>& nts_,
 template <typename C, typename T>
 grammar<C, T>::grammar(std::shared_ptr<nonterminals<C, T>> nts_,
 	typename grammar<C, T>::options opt)
-	: opt(opt), nts_handle_(table_or_new(std::move(nts_))),
+	: opt_(opt), nts_handle_(table_or_new(std::move(nts_))),
 	  nts(*nts_handle_), start(nts.get("start"), &nts) { }
 template <typename C, typename T>
 grammar<C, T>::grammar(nonterminals<C, T>& nts_, const prods<C, T>& ps,
@@ -571,7 +571,7 @@ grammar<C, T>::grammar(std::shared_ptr<nonterminals<C, T>> nts_,
 	const prods<C, T>& ps, const prods<C, T>& start,
 	const char_class_fns<T>& cc_fns, typename grammar<C, T>::options opt,
 	idni::diagnostics::report* diag)
-	: opt(opt), nts_handle_(table_or_new(std::move(nts_))),
+	: opt_(opt), nts_handle_(table_or_new(std::move(nts_))),
 	  nts(*nts_handle_), start(start.to_lit()), cc_fns(cc_fns)
 {
 	// a caller may pass a container another grammar already used
@@ -584,7 +584,7 @@ grammar<C, T>::grammar(std::shared_ptr<nonterminals<C, T>> nts_,
 	for (const prod<C, T>& p : ps) for (const conjs<C, T>& c : p.second) {
 		std::vector<lits<C, T>> new_conjs;
 		for (const lits<C, T>& l : c)
-			if (opt.transform_negation && l.neg)
+			if (opt_.transform_negation && l.neg)
 		{
 			// create a negative rule for a negative conjunction
 			auto l_nt = nts(from_cstr<C>("__N_")
@@ -642,11 +642,11 @@ grammar<C, T>::grammar(std::shared_ptr<nonterminals<C, T>> nts_,
 		}
 		if (over) return;
 	}
-	for (const auto& [name, values] : opt.dynamic)
+	for (const auto& [name, values] : opt_.dynamic)
 		host_dynamic_values(nt(name), values);
 	compute_nullables();
 	// set guards to create ntsm: nt -> prod rule map
-	set_enabled_productions(opt.enabled_guards);
+	set_enabled_productions(opt_.enabled_guards);
 	//DBG(print_data(std::cout << "\n", "\t") << "\n\n";)
 }
 // The source unbinds before its fields move, so the repository keeps their
@@ -656,7 +656,7 @@ grammar<C, T>::grammar(grammar&& o) : grammar(std::move(o), o.release_options())
 {}
 template <typename C, typename T>
 grammar<C, T>::grammar(grammar&& o, options_repository* repo)
-	: opt(std::move(o.opt)), nts_handle_(std::move(o.nts_handle_)),
+	: opt_(std::move(o.opt_)), nts_handle_(std::move(o.nts_handle_)),
 	  nts(o.nts), start(std::move(o.start)), cc_fns(std::move(o.cc_fns)),
 	  ntsm(std::move(o.ntsm)), ntsm_by_nt(std::move(o.ntsm_by_nt)),
 	  grdm(std::move(o.grdm)), guards(std::move(o.guards)),
@@ -682,6 +682,10 @@ grammar<C, T>::grammar(grammar&& o, options_repository* repo)
 template <typename C, typename T>
 grammar<C, T>::~grammar() { unbind_options(); }
 template <typename C, typename T>
+const typename grammar<C, T>::options& grammar<C, T>::opt() const {
+	return opt_;
+}
+template <typename C, typename T>
 idni::diagnostics::result<void> grammar<C, T>::bind_options() {
 	idni::diagnostics::result<void> r;
 	if (options_repo_) return r;
@@ -701,13 +705,13 @@ idni::diagnostics::result<void> grammar<C, T>::bind_to(
 	options_repo_ = &repo;
 	const ids_codec ids{ &nts };
 	const paths_codec paths{ &nts };
-	auto rebuild = [this] { set_enabled_productions(opt.enabled_guards); };
-	auto& sh = opt.shaping;
-	r.merge(repo.bind("auto-disambiguate", opt.auto_disambiguate));
-	r.merge(repo.bind("nodisambig-list", opt.nodisambig_list, ids));
+	auto rebuild = [this] { set_enabled_productions(opt_.enabled_guards); };
+	auto& sh = opt_.shaping;
+	r.merge(repo.bind("auto-disambiguate", opt_.auto_disambiguate));
+	r.merge(repo.bind("nodisambig-list", opt_.nodisambig_list, ids));
 	r.merge(repo.bind("trim-terminals", sh.trim_terminals));
 	r.merge(repo.bind("inline-char-classes", sh.inline_char_classes));
-	r.merge(repo.bind("derive-char-classes", opt.derive_char_classes,
+	r.merge(repo.bind("derive-char-classes", opt_.derive_char_classes,
 		rebuild));
 	r.merge(repo.bind("trim", sh.to_trim, ids));
 	r.merge(repo.bind("trim-children", sh.to_trim_children, ids));
@@ -716,7 +720,7 @@ idni::diagnostics::result<void> grammar<C, T>::bind_to(
 	r.merge(repo.bind("dont-trim-terminals-of", sh.dont_trim_terminals_of,
 		ids));
 	r.merge(repo.bind("inline", sh.to_inline, paths));
-	r.merge(repo.bind("enabled-productions", opt.enabled_guards,
+	r.merge(repo.bind("enabled-productions", opt_.enabled_guards,
 		detail::string_set_codec{}, rebuild));
 	return r;
 }
@@ -735,10 +739,10 @@ options_repository* grammar<C, T>::release_options() {
 }
 template <typename C, typename T>
 void grammar<C, T>::set_enabled_productions(const std::set<std::string>& grds) {
-	opt.enabled_guards = grds;
+	opt_.enabled_guards = grds;
 	std::set<size_t> gids; // ids of enabled guards
 	for (size_t gid = 0; gid != guards.size(); ++gid)
-		if (opt.enabled_guards.count(guards[gid]))
+		if (opt_.enabled_guards.count(guards[gid]))
 			gids.insert(gid);
 	ntsm.clear(), ntsm_by_nt.assign(nts.size(), {});
 	for (size_t n = 0; n != G.size(); ++n) {
@@ -753,15 +757,15 @@ void grammar<C, T>::set_enabled_productions(const std::set<std::string>& grds) {
 }
 template <typename C, typename T>
 void grammar<C, T>::derive_char_classes(bool on) {
-	opt.derive_char_classes = on;
-	set_enabled_productions(opt.enabled_guards);
+	opt_.derive_char_classes = on;
+	set_enabled_productions(opt_.enabled_guards);
 }
 template <typename C, typename T>
 void grammar<C, T>::exclude_from_char_classes(
 	const std::set<size_t>& nts)
 {
 	cc_excluded_nts_ = nts;
-	set_enabled_productions(opt.enabled_guards);
+	set_enabled_productions(opt_.enabled_guards);
 }
 template <typename C, typename T>
 void grammar<C, T>::apply_derived_char_classes() {
@@ -775,11 +779,11 @@ void grammar<C, T>::apply_derived_char_classes() {
 	for (size_t p = 0; p < source_productions_; ++p) {
 		if (!G[p].first.nt()) continue;
 		if (auto it = grdm.find(p); it != grdm.end()
-			&& !opt.enabled_guards.count(guards[it->second]))
+			&& !opt_.enabled_guards.count(guards[it->second]))
 				continue;
 		cc_source_prods_[G[p].first.n()].push_back(p);
 	}
-	if (!opt.derive_char_classes) {
+	if (!opt_.derive_char_classes) {
 		for (size_t nt : cc_fns.derived) cc_fns.fns.erase(nt);
 		cc_fns.derived.clear(), cc_active_guards_.clear();
 		return;
@@ -820,13 +824,13 @@ void grammar<C, T>::apply_derived_char_classes() {
 }
 template <typename C, typename T>
 void grammar<C, T>::productions_enable(const std::string& guard) {
-	opt.enabled_guards.insert(guard);
-	set_enabled_productions(opt.enabled_guards);
+	opt_.enabled_guards.insert(guard);
+	set_enabled_productions(opt_.enabled_guards);
 }
 template <typename C, typename T>
 void grammar<C, T>::productions_disable(const std::string& guard) {
-	opt.enabled_guards.erase(guard);
-	set_enabled_productions(opt.enabled_guards);
+	opt_.enabled_guards.erase(guard);
+	set_enabled_productions(opt_.enabled_guards);
 }
 template <typename C, typename T>
 void grammar<C, T>::add_dynamic(const std::basic_string<C>& nt_name,
@@ -834,7 +838,7 @@ void grammar<C, T>::add_dynamic(const std::basic_string<C>& nt_name,
 {
 	auto l = nt(nt_name);
 	auto& idx_for_l = dynamic_idx_[l];
-	auto& kept = opt.dynamic[nt_name];
+	auto& kept = opt_.dynamic[nt_name];
 	std::set<std::basic_string<C>> seen;
 	for (const auto& v : values) {
 		auto it = idx_for_l.find(v);
@@ -845,7 +849,7 @@ void grammar<C, T>::add_dynamic(const std::basic_string<C>& nt_name,
 	}
 	host_dynamic_values(l, values);
 	compute_nullables();
-	set_enabled_productions(opt.enabled_guards);
+	set_enabled_productions(opt_.enabled_guards);
 }
 template <typename C, typename T>
 void grammar<C, T>::host_dynamic_values(const lit<C, T>& l,
@@ -999,7 +1003,7 @@ std::optional<cc_expr<T>> grammar<C, T>::single_char_rule(size_t nt,
 	// A guard-hidden nullable rule is rejected too: a false rejection only.
 	if (nullables.find(nt) != nullables.end())
 		return cc_reject(nt, w, "nullable");
-	if (opt.dynamic.find(nts.get(nt)) != opt.dynamic.end())
+	if (opt_.dynamic.find(nts.get(nt)) != opt_.dynamic.end())
 		return cc_reject(nt, w, "dynamic");
 	for (const auto& [dl, m] : dynamic_idx_)
 		if (dl.nt() && dl.n() == nt)
@@ -1082,7 +1086,7 @@ std::vector<cc_rule_info<T>> grammar<C, T>::classify_cc_walk(
 	for (size_t p = 0; p < source_productions_; ++p) {
 		if (!G[p].first.nt()) continue;
 		if (auto git = grdm.find(p); git != grdm.end()
-			&& !opt.enabled_guards.count(guards[git->second]))
+			&& !opt_.enabled_guards.count(guards[git->second]))
 				continue;
 		size_t head = G[p].first.n();
 		for (const lits<C, T>& cj : G[p].second)
@@ -1140,7 +1144,7 @@ std::vector<size_t> grammar<C, T>::enabled_source_prods(size_t nt) const {
 }
 template <typename C, typename T>
 bool grammar<C, T>::uses_derived_recipe(size_t nt) const {
-	return opt.derive_char_classes
+	return opt_.derive_char_classes
 		&& (cc_fns.is_derived(nt) || cc_inner_nts_.count(nt));
 }
 template <typename C, typename T>
@@ -1155,7 +1159,7 @@ bool grammar<C, T>::cc_lit_accepts(const lit<C, T>& l, T ch) const {
 }
 template <typename C, typename T>
 bool grammar<C, T>::cc_rejects_by_negation(size_t nt, T ch) const {
-	if (!opt.derive_char_classes) return false;
+	if (!opt_.derive_char_classes) return false;
 	if (!cc_fns.is_derived(nt) && !cc_inner_nts_.count(nt)) return false;
 	for (size_t p : enabled_source_prods(nt)) {
 		bool pos_ok = true, neg_accepts = false, pos_inner_neg = false;

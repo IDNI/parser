@@ -104,17 +104,17 @@ struct grammar_wrap {
 	// an explicit setter call always wins, whether it came before the
 	// grammar existed or after a TGF directive already set its own value
 	bool get_auto_disambiguate() const {
-		return g ? g->opt.auto_disambiguate : auto_disambiguate_;
+		return g ? g->opt().auto_disambiguate : auto_disambiguate_;
 	}
 	void set_auto_disambiguate(bool v) {
 		auto_disambiguate_ = v;
 		auto_disambiguate_set_ = true;
-		if (g) g->opt.auto_disambiguate = v;
+		if (g) set_option("auto-disambiguate", v);
 	}
 	void add_nodisambig(const std::string& name) {
 		size_t id = nts->get(idni::from_str<char>(name));
 		nodisambig_.insert(id);
-		if (g) g->opt.nodisambig_list.insert(id);
+		if (g) add_nodisambig_id(id);
 	}
 
 	bool from_tgf_string(const std::string& src) {
@@ -212,8 +212,26 @@ private:
 	prods_t ps;
 
 	void apply_pending_options() {
-		if (auto_disambiguate_set_) g->opt.auto_disambiguate = auto_disambiguate_;
-		for (size_t id : nodisambig_) g->opt.nodisambig_list.insert(id);
+		if (auto_disambiguate_set_)
+			set_option("auto-disambiguate", auto_disambiguate_);
+		for (size_t id : nodisambig_) add_nodisambig_id(id);
+	}
+	// One write in a repository of its own. The grammar unbinds first, so
+	// a grammar that the reader bound works too.
+	template <typename V>
+	void set_option(std::string_view name, V v) {
+		g->unbind_options();
+		idni::options_repository repo;
+		idni::options_scope scope(repo);
+		if (g->bind_options().has_value()) repo.set(name, std::move(v));
+		g->unbind_options();
+	}
+	void add_nodisambig_id(size_t id) {
+		idni::option_list names;
+		for (size_t have : g->opt().nodisambig_list)
+			names.push_back(nt_name(have));
+		names.push_back(nt_name(id));
+		set_option("nodisambig-list", std::move(names));
 	}
 };
 

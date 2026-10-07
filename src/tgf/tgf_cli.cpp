@@ -698,6 +698,7 @@ bool tgf_repl_evaluator::load_file(const std::string& filename) {
 	owned_g       = std::move(next_grammar);
 	owned_p       = std::move(next_parser);
 	p_            = owned_p.get();
+	bind_grammar_options();
 	tgf_filename = filename;
 	grammar_source.clear();
 	grammar_from_source = false;
@@ -727,6 +728,7 @@ bool tgf_repl_evaluator::load_source(const std::string& name,
 	owned_g             = std::move(next_grammar);
 	owned_p             = std::move(next_parser);
 	p_                  = owned_p.get();
+	bind_grammar_options();
 	tgf_filename        = name;
 	grammar_source      = text;
 	grammar_from_source = true;
@@ -746,20 +748,44 @@ std::string tgf_repl_evaluator::nt_name(size_t id) const {
 	return g().nt(id).to_std_string();
 }
 
+void tgf_repl_evaluator::bind_grammar_options() {
+	// the old grammar left its values in the repository when it unbound
+	idni::options().reset("grammar");
+	report.append(g().bind_options().report());
+}
+
+void tgf_repl_evaluator::set_grammar_option(std::string_view name,
+	idni::option_value v)
+{
+	report.append(idni::options().set(name, std::move(v)).report());
+}
+
+void tgf_repl_evaluator::edit_grammar_list(std::string_view name,
+	const std::vector<std::string>& entries, bool add)
+{
+	auto& opts = idni::options();
+	auto list = opts.find(name) ? opts.get<option_list>(name)
+		: option_list{};
+	for (const auto& e : entries)
+		if (add) list.push_back(e);
+		else std::erase(list, e);
+	set_grammar_option(name, std::move(list));
+}
+
 void tgf_repl_evaluator::update_opts_by_grammar_opts() {
 	auto ntids2strs = [this] (const set<size_t>& ntids) {
 		set<string> r;
 		for (const auto& id : ntids) r.insert(nt_name(id));
 		return r;
 	};
-	opt.to_trim          = ntids2strs(g().opt.shaping.to_trim);
-	opt.to_trim_children = ntids2strs(g().opt.shaping.to_trim_children);
+	opt.to_trim          = ntids2strs(g().opt().shaping.to_trim);
+	opt.to_trim_children = ntids2strs(g().opt().shaping.to_trim_children);
 	opt.dont_trim_terminals_of =
-		ntids2strs(g().opt.shaping.dont_trim_terminals_of);
+		ntids2strs(g().opt().shaping.dont_trim_terminals_of);
 	opt.to_trim_children_terminals =
-		ntids2strs(g().opt.shaping.to_trim_children_terminals);
+		ntids2strs(g().opt().shaping.to_trim_children_terminals);
 	opt.to_inline.clear();
-	for (const auto& tp : g().opt.shaping.to_inline) {
+	for (const auto& tp : g().opt().shaping.to_inline) {
 		vector<string> v;
 		for (const auto& s : tp) v.push_back(nt_name(s));
 		opt.to_inline.insert(std::move(v));
@@ -771,10 +797,10 @@ void tgf_repl_evaluator::update_opts_by_grammar_opts() {
 // TODO (HIGH) replace by generic option origin tracking: every option
 // resolves default < grammar directive < CLI, not one flag per field.
 void tgf_repl_evaluator::apply_auto_disambiguate() {
-	if (opt.auto_disambiguate_user_set)
-		g().opt.auto_disambiguate = opt.auto_disambiguate;
-	else if (!g().opt.auto_disambiguate_set_by_grammar)
-		g().opt.auto_disambiguate = opt.auto_disambiguate;
+	if (opt.auto_disambiguate_user_set
+		|| !g().opt().auto_disambiguate_set_by_grammar)
+			set_grammar_option("auto-disambiguate",
+				opt.auto_disambiguate);
 }
 
 void tgf_repl_evaluator::set_repl(repl<tgf_repl_evaluator>& r_) {
@@ -934,8 +960,8 @@ shaping_options tgf_repl_evaluator::shaping() {
 		return r;
 	};
 	shaping_options sopt;
-	sopt.trim_terminals = g().opt.shaping.trim_terminals;
-	sopt.inline_char_classes = g().opt.shaping.inline_char_classes;
+	sopt.trim_terminals = g().opt().shaping.trim_terminals;
+	sopt.inline_char_classes = g().opt().shaping.inline_char_classes;
 	sopt.to_trim = str2ntids(opt.to_trim);
 	sopt.to_trim_children = str2ntids(opt.to_trim_children);
 	sopt.dont_trim_terminals_of = str2ntids(opt.dont_trim_terminals_of);
@@ -1132,21 +1158,21 @@ format::json::value tgf_repl_evaluator::option_value(size_t o) const {
 	case tgf_repl_parser::debug_opt:
 		return value::boolean(opt.debug);
 	case tgf_repl_parser::auto_disambiguate_opt:
-		return value::boolean(g().opt.auto_disambiguate);
+		return value::boolean(g().opt().auto_disambiguate);
 	case tgf_repl_parser::trim_terminals_opt:
-		return value::boolean(g().opt.shaping.trim_terminals);
+		return value::boolean(g().opt().shaping.trim_terminals);
 	case tgf_repl_parser::inline_cc_opt:
-		return value::boolean(g().opt.shaping.inline_char_classes);
+		return value::boolean(g().opt().shaping.inline_char_classes);
 	case tgf_repl_parser::derive_char_classes_opt:
-		return value::boolean(g().opt.derive_char_classes);
+		return value::boolean(g().opt().derive_char_classes);
 	case tgf_repl_parser::nodisambig_list_opt: {
 		value v = value::array();
-		for (size_t id : g().opt.nodisambig_list)
+		for (size_t id : g().opt().nodisambig_list)
 			v.push_back(value::string(nt_name(id)));
 		return v;
 	}
 	case tgf_repl_parser::enabled_prods_opt:
-		return strings_value(g().opt.enabled_guards);
+		return strings_value(g().opt().enabled_guards);
 	case tgf_repl_parser::trim_opt:
 		return strings_value(opt.to_trim);
 	case tgf_repl_parser::trim_children_opt:
@@ -1213,9 +1239,10 @@ format::json::value tgf_repl_evaluator::set_cmd(const tt& n) {
 		opt.measure_preprocess = get_bool_value(v); break;
 	case p::gc_opt: opt.gc = get_bool_value(v); break;
 	case p::trim_terminals_opt:
-		g().opt.shaping.trim_terminals = get_bool_value(v); break;
+		set_grammar_option("trim-terminals", get_bool_value(v)); break;
 	case p::inline_cc_opt:
-		g().opt.shaping.inline_char_classes = get_bool_value(v); break;
+		set_grammar_option("inline-char-classes", get_bool_value(v));
+		break;
 	case p::trim_opt:
 		opt.to_trim.clear();
 		for (const auto& s : (v || p::symbol)())
@@ -1225,8 +1252,9 @@ format::json::value tgf_repl_evaluator::set_cmd(const tt& n) {
 		std::set<std::string> grds;
 		for (const auto& s : (v || p::symbol)())
 			grds.insert(s | tt::terminals);
-		if (grds != g().opt.enabled_guards)
-			g().set_enabled_productions(grds);
+		if (grds != g().opt().enabled_guards)
+			set_grammar_option("enabled-productions",
+				option_list(grds.begin(), grds.end()));
 		break;
 	}
 	case p::trim_children_opt:
@@ -1245,17 +1273,20 @@ format::json::value tgf_repl_evaluator::set_cmd(const tt& n) {
 			opt.to_inline.insert(treepath(tp));
 		break;
 	case p::auto_disambiguate_opt:
-		g().opt.auto_disambiguate = get_bool_value(v); break;
+		set_grammar_option("auto-disambiguate", get_bool_value(v));
+		break;
 	case p::derive_char_classes_opt:
 		g().derive_char_classes(get_bool_value(v)); break;
 	case p::start_opt:
 		opt.start = v | tt::terminals;
 		break;
-	case p::nodisambig_list_opt:
-		g().opt.nodisambig_list.clear();
+	case p::nodisambig_list_opt: {
+		option_list names;
 		for (const auto& s : (v || p::symbol)())
-			g().opt.nodisambig_list.insert(nt_id(s | tt::terminals));
+			names.push_back(s | tt::terminals);
+		set_grammar_option("nodisambig-list", std::move(names));
 		break;
+	}
 	case p::error_verbosity_opt: {
 		auto vrb = v;
 		if (!vrb.has_value()) {
@@ -1296,15 +1327,12 @@ format::json::value tgf_repl_evaluator::add_cmd(const tt& n) {
 			opt.to_inline.insert(treepath(tp));
 		return get_cmd(n);
 	}
-	if (o == p::enabled_prods_opt) {
+	if (o == p::enabled_prods_opt || o == p::nodisambig_list_opt) {
+		std::vector<std::string> entries;
 		for (const auto& s : (v || p::symbol)())
-			g().opt.enabled_guards.insert(s | tt::terminals);
-		g().set_enabled_productions(g().opt.enabled_guards);
-		return get_cmd(n);
-	}
-	if (o == p::nodisambig_list_opt) {
-		for (const auto& s : (v || p::symbol)())
-			g().opt.nodisambig_list.insert(nt_id(s | tt::terminals));
+			entries.push_back(s | tt::terminals);
+		edit_grammar_list(o == p::enabled_prods_opt
+			? "enabled-productions" : "nodisambig-list", entries, true);
 		return get_cmd(n);
 	}
 	if (o == p::trim_opt) {
@@ -1336,15 +1364,12 @@ format::json::value tgf_repl_evaluator::del_cmd(const tt& n) {
 			opt.to_inline.erase(treepath(tp));
 		return get_cmd(n);
 	}
-	if (o == p::enabled_prods_opt) {
+	if (o == p::enabled_prods_opt || o == p::nodisambig_list_opt) {
+		std::vector<std::string> entries;
 		for (const auto& s : (v || p::symbol)())
-			g().opt.enabled_guards.erase(s | tt::terminals);
-		g().set_enabled_productions(g().opt.enabled_guards);
-		return get_cmd(n);
-	}
-	if (o == p::nodisambig_list_opt) {
-		for (const auto& s : (v || p::symbol)())
-			g().opt.nodisambig_list.erase(nt_id(s | tt::terminals));
+			entries.push_back(s | tt::terminals);
+		edit_grammar_list(o == p::enabled_prods_opt
+			? "enabled-productions" : "nodisambig-list", entries, false);
 		return get_cmd(n);
 	}
 	if (o == p::trim_opt) {
@@ -1393,14 +1418,26 @@ format::json::value tgf_repl_evaluator::update_bool_opt_cmd(
 	case p::measure_forest_opt:    update_fn(opt.measure_forest); break;
 	case p::measure_preprocess_opt:update_fn(opt.measure_preprocess); break;
 	case p::gc_opt:                update_fn(opt.gc); break;
-	case p::auto_disambiguate_opt: update_fn(g().opt.auto_disambiguate); break;
-	case p::derive_char_classes_opt: {
-		bool on = update_fn(g().opt.derive_char_classes);
-		g().derive_char_classes(on);
+	case p::auto_disambiguate_opt: {
+		bool b = g().opt().auto_disambiguate;
+		set_grammar_option("auto-disambiguate", update_fn(b));
 		break;
 	}
-	case p::trim_terminals_opt:    update_fn(g().opt.shaping.trim_terminals); break;
-	case p::inline_cc_opt:         update_fn(g().opt.shaping.inline_char_classes); break;
+	case p::derive_char_classes_opt: {
+		bool on = g().opt().derive_char_classes;
+		g().derive_char_classes(update_fn(on));
+		break;
+	}
+	case p::trim_terminals_opt: {
+		bool b = g().opt().shaping.trim_terminals;
+		set_grammar_option("trim-terminals", update_fn(b));
+		break;
+	}
+	case p::inline_cc_opt: {
+		bool b = g().opt().shaping.inline_char_classes;
+		set_grammar_option("inline-char-classes", update_fn(b));
+		break;
+	}
 	default:
 		report.error(diagnostics::code::invalid_argument,
 			parser_strings::messages::unknown_bool_option);
@@ -2337,6 +2374,7 @@ tgf_repl_evaluator::tgf_repl_evaluator(options opt)
 	owned_p = make_unique<parser_type>(*owned_g,
 		default_parser_options<char_type, terminal_type>());
 	p_ = owned_p.get();
+	bind_grammar_options();
 }
 
 tgf_repl_evaluator::tgf_repl_evaluator(
@@ -2364,8 +2402,15 @@ tgf_repl_evaluator::tgf_repl_evaluator(
 	// The directives snapshot is parsed lazily on the first
 	// directives_value() call, so a run that never asks for it pays
 	// nothing for the built-in grammar.
+	bind_grammar_options();
 	update_opts_by_grammar_opts();
 	apply_auto_disambiguate();
+}
+
+// A fixed grammar usually outlives the evaluator, and the repository of
+// the thread can end before it.
+tgf_repl_evaluator::~tgf_repl_evaluator() {
+	if (p_) g().unbind_options();
 }
 
 static tgf_repl_evaluator::parser_type::error::info_lvl
