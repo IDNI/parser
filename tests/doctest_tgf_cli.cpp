@@ -207,6 +207,48 @@ TEST_SUITE("tgf cli: help") {
 	}
 }
 
+// The last line of @p out that starts with @p prefix.
+static string last_line_with(const string& out, const string& prefix) {
+	string last, line;
+	istringstream is(out);
+	while (getline(is, line))
+		if (line.rfind(prefix, 0) == 0) last = line;
+	return last;
+}
+
+TEST_SUITE("tgf cli: a load writes the command line again") {
+
+	static string csv_path() {
+		return string(PROJECT_SOURCE_DIR) + "/src/format/csv/csv.tgf";
+	}
+
+	TEST_CASE("-G holds over the directives of a loaded grammar") {
+		// csv.tgf enables comma, crlf and no_header itself
+		string out = capture_tgf_run({ "tgf", csv_path(), "repl",
+			"-c", "false", "-G", "tab", "-e",
+			"load \"" + csv_path() + "\" . get enabled-productions" });
+		string ep = last_line_with(out, "enabled-productions:");
+		CHECK(ep.find("tab") != string::npos);
+		CHECK(ep.find("comma") == string::npos);
+	}
+
+	TEST_CASE("a parse option survives a load and a grammar option not") {
+		// -p false is not written again: print-graphs is no grammar option
+		string out = capture_tgf_run({ "tgf", csv_path(), "repl",
+			"-c", "false", "-p", "false", "-e",
+			"set gc false . set trim record . set print-graphs true . "
+			"load \"" + csv_path() + "\" . get gc . get trim . "
+			"get print-graphs" });
+		CHECK(last_line_with(out, "gc:").find("off") != string::npos);
+		// csv.tgf trims EOL, SEP and DQUOTE itself
+		string trim = last_line_with(out, "trim:");
+		CHECK(trim.find("record") == string::npos);
+		CHECK(trim.find("EOL") != string::npos);
+		CHECK(last_line_with(out, "print-graphs:").find("on")
+			!= string::npos);
+	}
+}
+
 TEST_SUITE("tgf cli: derived character classes") {
 
 	TEST_CASE("grammar --char-class-report lists unescaped as derived") {

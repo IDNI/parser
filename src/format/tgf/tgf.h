@@ -758,7 +758,6 @@ private:
 		for (auto& a : args) {
 			if (a == "disambiguation") {
 				set_option("auto-disambiguate", false);
-				opt.auto_disambiguate_set_by_grammar = true;
 			} else edit_list("enabled-productions", { a }, false);
 		}
 	}
@@ -782,7 +781,6 @@ private:
 		for (auto& a : args) {
 			if (a == "disambiguation") {
 				set_option("auto-disambiguate", true);
-				opt.auto_disambiguate_set_by_grammar = true;
 			} else edit_list("enabled-productions", { a });
 		}
 	}

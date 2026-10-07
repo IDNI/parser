@@ -9,6 +9,7 @@
 #include <ostream>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "utility/diagnostics.h"
@@ -95,9 +96,6 @@ struct tgf_repl_evaluator {
 		bool json               = false;
 		/// True when the evaluator refuses commands that read a file path.
 		bool no_server_paths    = false;
-		bool auto_disambiguate = true;
-		/// True when the user passed --auto-disambiguate on the command line.
-		bool auto_disambiguate_user_set = false;
 	};
 
 	explicit tgf_repl_evaluator(std::string tgf_file);
@@ -137,9 +135,9 @@ struct tgf_repl_evaluator {
 	/// the grammar file. Empty when no grammar is loaded. A server sends
 	/// it to a session child so the child starts with the same grammar.
 	[[nodiscard]] std::string grammar_text() const;
-	/// Keep the loaded grammar but mark it as loaded from text, so a later
-	/// reload uses the stored text and needs no path. A built-in grammar
-	/// keeps its own source. The grammar name stays.
+	/// Mark the stored text of the loaded grammar as the source of a
+	/// reload, so a reload reads no file. A built-in grammar keeps its own
+	/// source. The grammar name stays.
 	void make_grammar_source_backed();
 	/// The start option, or the start literal of the grammar when the
 	/// option is empty. Empty with no grammar.
@@ -238,10 +236,9 @@ struct tgf_repl_evaluator {
 	/// Declare parser_option_set and give each parse option its default,
 	/// before the first parser of the evaluator binds.
 	void reset_parse_options();
-	void apply_auto_disambiguate();
-	/// Keep @p on as the auto-disambiguation of every grammar this
-	/// evaluator loads, over a directive of the grammar.
-	void auto_disambiguate_from_command_line(bool on);
+	/// The option values that argv gave, written again after each load.
+	void set_argv_values(
+		std::vector<std::pair<std::string, option_value>> values);
 
 	std::ostream& pretty_print(std::ostream& os, tref n,
 		std::set<size_t> skip, bool nulls, size_t l);
@@ -283,13 +280,16 @@ private:
 	std::unique_ptr<grammar_type> owned_g;
 	std::unique_ptr<parser_type> owned_p;
 	parser_type* p_ = nullptr;
+	/// The option values that argv gave, in argv order.
+	std::vector<std::pair<std::string, option_value>> argv_values;
 
+	/// Load a grammar file and adopt it, without printing. On success
+	/// tgf_filename names @p filename.
 	bool load_file(const std::string& filename);
+	/// Write argv_values to the options of the loaded grammar and parser.
+	void write_argv_values();
 	/// Report "server path" and return false when paths are forbidden.
 	bool paths_allowed();
-	/// Load a grammar file and adopt it, without printing. @p new_tgf_file
-	/// is the file to load; on success tgf_filename names it.
-	bool load_grammar(const std::string& new_tgf_file);
 	/// Data of the load and reload commands: {"grammar", "loaded"}.
 	format::json::value reload_data(const std::string& new_tgf_file);
 	void print_source(std::ostream& os) const;

@@ -380,20 +380,13 @@ const std::string& tgf_repl_evaluator::source() const noexcept {
 
 std::string tgf_repl_evaluator::grammar_text() const {
 	if (!grammar_loaded) return {};
-	if (!grammar_source.empty() || grammar_from_source)
-		return grammar_source;
-	if (tgf_filename.empty()) return {};
-	ifstream f(tgf_filename, ios::binary);
-	if (!f) return {};
-	return std::string(istreambuf_iterator<char>(f),
-		istreambuf_iterator<char>());
+	return grammar_source;
 }
 
 void tgf_repl_evaluator::make_grammar_source_backed() {
 	// A built-in grammar cannot reload; a grammar that already came from
 	// text needs no change.
 	if (!grammar_loaded || fixed_grammar || grammar_from_source) return;
-	grammar_source = grammar_text();
 	grammar_from_source = true;
 }
 
@@ -459,22 +452,20 @@ static void print_text_source(ostream& os, const string& src) {
 	}
 }
 
-void tgf_repl_evaluator::print_source(ostream& os) const {
+// The text of the grammar command, with one blank line after the last line.
+// The local REPL and the client of `tgf serve` both print it.
+static void print_grammar_source(ostream& os, const string& src) {
 	os << "grammar:\n";
-	if (!grammar_source.empty() || grammar_from_source) {
-		print_text_source(os, grammar_source);
-		os << "\n\n";
-		return;
-	}
+	std::ostringstream norm;
+	print_text_source(norm, src);
+	std::string s = norm.str();
+	if (s.empty()) { os << "\n"; return; }
+	if (s.back() == '\n') s.pop_back();
+	os << s << "\n\n";
+}
 
-	ifstream f(tgf_filename);
-	if (!f) {
-		os << "error: could not open file: " << tgf_filename << "\n";
-		return;
-	}
-	string line;
-	while (getline(f, line)) print_text_source(os, line + "\n");
-	os << "\n";
+void tgf_repl_evaluator::print_source(ostream& os) const {
+	print_grammar_source(os, grammar_source);
 }
 
 void tgf_repl_evaluator::reprompt() {
@@ -524,10 +515,21 @@ void tgf_repl_evaluator::flush_report() {
 	report.clear();
 }
 
+// The text stays, so a session and a source-backed reload use the bytes of
+// this load. A file-backed reload reads the file again.
 bool tgf_repl_evaluator::load_file(const std::string& filename) {
+	ifstream f(filename, ios::binary);
+	if (!f) {
+		report.error(diagnostics::code::io_error,
+			parser_strings::messages::cannot_open_file,
+			{ { parser_strings::label::path, filename } });
+		return false;
+	}
+	std::string text((istreambuf_iterator<char>(f)),
+		istreambuf_iterator<char>());
 	auto next_nts = make_unique<nonterminals_type>();
 	tgf_directives dirs;
-	auto gr = tgf<char_type, terminal_type>::from_file(*next_nts, filename,
+	auto gr = tgf<char_type, terminal_type>::from_string(*next_nts, text,
 		idni::options().get<bool>("measure"), &dirs);
 	if (!gr.has_value()) {
 		report.append(std::move(gr).report());
@@ -545,8 +547,9 @@ bool tgf_repl_evaluator::load_file(const std::string& filename) {
 	p_            = owned_p.get();
 	bind_grammar_options();
 	report.append(p().bind_options().report());
+	write_argv_values();
 	tgf_filename = filename;
-	grammar_source.clear();
+	grammar_source = std::move(text);
 	grammar_from_source = false;
 	grammar_loaded = true;
 	directives_ = directives_to_value(dirs);
@@ -577,13 +580,13 @@ bool tgf_repl_evaluator::load_source(const std::string& name,
 	p_                  = owned_p.get();
 	bind_grammar_options();
 	report.append(p().bind_options().report());
+	write_argv_values();
 	tgf_filename        = name;
 	grammar_source      = text;
 	grammar_from_source = true;
 	grammar_loaded      = true;
 	directives_ = directives_to_value(dirs);
 	directives_cached = true;
-	apply_auto_disambiguate();
 	return true;
 }
 
@@ -595,6 +598,20 @@ void tgf_repl_evaluator::bind_grammar_options() {
 	// the old grammar left its values in the repository when it unbound
 	idni::options().reset("grammar");
 	report.append(g().bind_options().report());
+}
+
+// A load resets only the owner grammar, so only its options lose a flag.
+void tgf_repl_evaluator::write_argv_values() {
+	auto& opts = idni::options();
+	for (const auto& [name, v] : argv_values)
+		if (auto spec = opts.find(name); spec && spec->owner == "grammar")
+			report.append(opts.set(name, v).report());
+}
+
+void tgf_repl_evaluator::set_argv_values(
+	std::vector<std::pair<std::string, option_value>> values)
+{
+	argv_values = std::move(values);
 }
 
 void tgf_repl_evaluator::set_grammar_option(std::string_view name,
@@ -632,20 +649,6 @@ void tgf_repl_evaluator::reset_parse_options() {
 	// a load keeps the parse options, a new evaluator starts from the
 	// defaults
 	opts.reset("parse");
-}
-
-// TODO (HIGH) replace by generic option origin tracking: every option
-// resolves default < grammar directive < CLI, not one flag per field.
-void tgf_repl_evaluator::apply_auto_disambiguate() {
-	if (opt.auto_disambiguate_user_set
-		|| !g().opt().auto_disambiguate_set_by_grammar)
-			set_grammar_option("auto-disambiguate",
-				opt.auto_disambiguate);
-}
-
-void tgf_repl_evaluator::auto_disambiguate_from_command_line(bool on) {
-	opt.auto_disambiguate = on;
-	opt.auto_disambiguate_user_set = true;
 }
 
 void tgf_repl_evaluator::set_repl(repl<tgf_repl_evaluator>& r_) {
@@ -820,12 +823,6 @@ format::json::value tgf_repl_evaluator::production_id_entry(
 	return v;
 }
 
-bool tgf_repl_evaluator::load_grammar(const std::string& new_tgf_file) {
-	if (!load_file(new_tgf_file)) return false;
-	apply_auto_disambiguate();
-	return true;
-}
-
 bool tgf_repl_evaluator::reload(const string& new_tgf_file) {
 	if (fixed_grammar) {
 		report.warning(parser_strings::messages::loading_grammars_unavailable);
@@ -847,7 +844,7 @@ bool tgf_repl_evaluator::reload(const string& new_tgf_file) {
 			{{parser_strings::label::path, tgf_filename}});
 		return true;
 	}
-	if (!load_grammar(new_tgf_file)) {
+	if (!load_file(new_tgf_file)) {
 		report.error(diagnostics::code::io_error,
 			parser_strings::messages::reload_failed,
 			{{parser_strings::label::path, new_tgf_file}});
@@ -865,7 +862,7 @@ format::json::value tgf_repl_evaluator::reload_data(
 {
 	using value = format::json::value;
 	auto v = value::object();
-	if (!load_grammar(new_tgf_file))
+	if (!load_file(new_tgf_file))
 		return v.set("grammar", value::string(new_tgf_file))
 			.set("loaded", value::boolean(false))
 			.set("directives", directives_value());
@@ -1315,14 +1312,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			if (!require_grammar()) break;
 			auto v = value::object();
 			v.set("file", value::string(tgf_filename));
-			string src = grammar_source;
-			if (src.empty() && !grammar_from_source) {
-				// The exact bytes of the file, so no line translation.
-				ifstream f(tgf_filename, ios::binary);
-				src.assign(istreambuf_iterator<char>(f),
-					istreambuf_iterator<char>());
-			}
-			v.set("source", value::string(std::move(src)));
+			v.set("source", value::string(grammar_source));
 			res.data = std::move(v);
 			break;
 		}
@@ -1526,20 +1516,12 @@ static void render_data_parse(const cmd_result& r, std::ostream& os,
 	}
 }
 
-// The grammar source text from the response data. The text printer of a
-// file-backed grammar drops the CR of a CRLF and prints one blank line
-// after the last line.
+// The grammar source text from the response data.
 static void render_data_grammar(const cmd_result& r, std::ostream& os) {
-	os << "grammar:\n";
 	std::string src;
 	if (auto v = r.data.find("source"); v && v->is_string())
 		src = v->as_string();
-	std::ostringstream norm;
-	print_text_source(norm, src);
-	std::string s = norm.str();
-	if (s.empty()) { os << "\n"; return; }
-	if (s.back() == '\n') s.pop_back();
-	os << s << "\n\n";
+	print_grammar_source(os, src);
 }
 
 // The production list of internal-grammar and unreachable, from data.
@@ -1868,10 +1850,8 @@ tgf_repl_evaluator::tgf_repl_evaluator(std::string tgf_file, options opt)
 {
 	TC.set(!opt.json && opt.colors);
 	reset_parse_options();
-	const bool loaded = load_file(tgf_filename);
+	load_file(tgf_filename);
 	bind_repl_options();
-	if (!loaded) return;
-	apply_auto_disambiguate();
 }
 
 tgf_repl_evaluator::tgf_repl_evaluator(options opt)
@@ -1918,7 +1898,6 @@ tgf_repl_evaluator::tgf_repl_evaluator(
 	bind_grammar_options();
 	report.append(p().bind_options().report());
 	bind_repl_options();
-	apply_auto_disambiguate();
 }
 
 // A fixed grammar usually outlives the evaluator, and the repository of
@@ -2378,10 +2357,7 @@ static int run_tool(int argc, char** argv, const args_config& cfg,
 		args.command_given ? args.command : string());
 	if (quit) return 0;
 
-	for (const auto& [name, v] : args.values)
-		if (const bool* on = get_if<bool>(&v);
-			on && name == "auto-disambiguate")
-				re.auto_disambiguate_from_command_line(*on);
+	re.set_argv_values(args.values);
 	if (grammar_input && !args.inputs.empty())
 		args.inputs.erase(args.inputs.begin());
 	// A server keeps the bytes it loaded, so a session and a reload see
