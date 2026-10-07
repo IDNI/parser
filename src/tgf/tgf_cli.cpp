@@ -280,87 +280,6 @@ static void print_license() {
 	std::cout << tauparser::license << "\n";
 }
 
-namespace {
-
-/// The text of @p v, or an error in @p rep when the value is no text.
-const std::string* option_text_of(const idni::option_value& v,
-	diagnostics::report& rep)
-{
-	if (const auto* s = std::get_if<std::string>(&v)) return s;
-	rep.error(diagnostics::code::type_error,
-		parser_strings::messages::option_value_kind);
-	return nullptr;
-}
-
-/// The value that the text @p v names in @p names, or an error that
-/// names the text.
-template <typename E, size_t N>
-diagnostics::result<E> option_enum_of(
-	const std::array<std::pair<std::string_view, E>, N>& names,
-	const idni::option_value& v, std::string_view option)
-{
-	namespace ps = parser_strings;
-	diagnostics::result<E> r;
-	const std::string* text = option_text_of(v, r.report());
-	if (!text) return r;
-	for (const auto& [name, e] : names)
-		if (name == *text) return r.with_value(e);
-	return r.with_error(diagnostics::code::invalid_argument,
-		ps::messages::option_bad_value,
-		{ { ps::label::name, option }, { ps::label::value, *text } });
-}
-
-template <typename E, size_t N>
-std::string option_enum_name(
-	const std::array<std::pair<std::string_view, E>, N>& names, E e)
-{
-	for (const auto& [name, x] : names)
-		if (x == e) return std::string(name);
-	return {};
-}
-
-using error_level = tgf_repl_evaluator::parser_type::error::info_lvl;
-
-constexpr std::array<std::pair<std::string_view, error_level>, 3>
-	error_verbosity_names{ {
-		{ "basic", error_level::INFO_BASIC },
-		{ "detailed", error_level::INFO_DETAILED },
-		{ "root-cause", error_level::INFO_ROOT_CAUSE },
-	} };
-
-/// The parse error verbosity, as basic, detailed or root-cause.
-struct error_verbosity_codec {
-	idni::option_value to_value(const error_level& l) const {
-		return option_enum_name(error_verbosity_names, l);
-	}
-	diagnostics::result<error_level> from_value(
-		const idni::option_value& v) const
-	{
-		return option_enum_of(error_verbosity_names, v,
-			"error-verbosity");
-	}
-};
-
-constexpr std::array<std::pair<std::string_view, parse_tree_path>, 2>
-	tree_path_names{ {
-		{ "bintree", parse_tree_path::bintree_path },
-		{ "forest", parse_tree_path::forest_path },
-	} };
-
-/// The parse tree path, as bintree or forest.
-struct tree_path_codec {
-	idni::option_value to_value(const parse_tree_path& p) const {
-		return option_enum_name(tree_path_names, p);
-	}
-	diagnostics::result<parse_tree_path> from_value(
-		const idni::option_value& v) const
-	{
-		return option_enum_of(tree_path_names, v, "tree-path");
-	}
-};
-
-} // namespace
-
 static string statement_option_name(const tt& s) {
 	auto n = s | tgf_repl_parser::option_name;
 	return n.has_value() ? n | tt::terminals : string();
@@ -699,8 +618,9 @@ void tgf_repl_evaluator::bind_repl_options() {
 	bind(opts.bind("measure-forest", opt.measure_forest));
 	bind(opts.bind("measure-preprocess", opt.measure_preprocess));
 	bind(opts.bind("error-verbosity", opt.error_verbosity,
-		error_verbosity_codec{}));
-	bind(opts.bind("tree-path", opt.tree_path, tree_path_codec{}));
+		detail::error_verbosity_codec<char_type, terminal_type>{}));
+	bind(opts.bind("tree-path", opt.tree_path,
+		detail::tree_path_codec{}));
 	bind(opts.bind("start", opt.start));
 	bind(opts.bind("print-terminals", opt.print_terminals));
 	bind(opts.bind("status", opt.status));
@@ -2034,11 +1954,13 @@ tgf_repl_evaluator::~tgf_repl_evaluator() {
 static tgf_repl_evaluator::parser_type::error::info_lvl
 str2error_verbosity(const string& str)
 {
-	auto l = error_verbosity_codec{}.from_value(str);
+	using evaluator = tgf_repl_evaluator;
+	auto l = detail::error_verbosity_codec<evaluator::char_type,
+		evaluator::terminal_type>{}.from_value(str);
 	if (l.has_value()) return l.value();
 	cerr << "error: invalid error-verbosity: "
 		"\"" << str << "\". setting to \"basic\"\n";
-	return error_level::INFO_BASIC;
+	return evaluator::parser_type::error::info_lvl::INFO_BASIC;
 }
 
 static int run_tests(

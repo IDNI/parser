@@ -1482,7 +1482,15 @@ public:
 	// constructor
 	parser(grammar<C, T>& g, options o = {});
 	parser(std::shared_ptr<grammar<C, T>> g, options o = {});
-	virtual ~parser() {};
+	/// The options of @p other stay bound, now to the fields of this parser.
+	parser(parser&& other);
+	parser(const parser&) = delete;
+	parser& operator=(const parser&) = delete;
+	virtual ~parser();
+	/// Declare the parser options in options() and bind each to its field.
+	[[nodiscard]] idni::diagnostics::result<void> bind_options();
+	/// Unbind every option that bind_options() bound.
+	void unbind_options();
 
 	// parse call
 	result parse(const C* data, size_t size);
@@ -1519,9 +1527,16 @@ public:
 		if (!children.empty()) g.exclude_from_char_classes(children);
 		return true;
 	}
+	// the move constructor lists every data member: a new member goes there
 	bool debug = false;
 	std::pair<size_t, size_t> debug_at = { DEBUG_POS_FROM, DEBUG_POS_TO };
 private:
+	/// Moves @p other, whose options @p repo held, and binds them here.
+	parser(parser&& other, options_repository* repo);
+	/// Unbind the options and give the repository that held them.
+	options_repository* release_options();
+	[[nodiscard]] idni::diagnostics::result<void> bind_to(
+		options_repository& repo);
 	/// True unless some pair has an equal parent and child. Such a pair
 	/// would confirm on the child's own completion, confirming every
 	/// prefix: exactly the defect dynamic_grow_nts's split design removes.
@@ -1691,6 +1706,8 @@ private:
 	/// binarized temporary intermediate non-terminals
 	std::map<std::vector<lit<C, T>>, lit<C, T>> bin_tnt;
 	size_t tid; /// id for temporary non-terminals
+	/// The repository of the bound options, or null when none is bound.
+	options_repository* options_repo_ = nullptr;
 
 	// helpers
 	// Shared body of the preprocess step in build_bintree() and
@@ -1839,6 +1856,7 @@ struct std::hash<idni::pnode_type<C,T>> {
 
 // template definitions
 #include "grammar.tmpl.h"       // for grammar and related
+#include "parser_options.h"
 #include "parser.tmpl.h"        // for parser
 #include "parser_tree.tmpl.h" // for parser::tree
 #include "parser_result.tmpl.h" // for parser::result

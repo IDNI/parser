@@ -218,6 +218,101 @@ parser<C, T>::parser(std::shared_ptr<grammar<C, T>> g_, options o)
 	prepare();
 }
 
+// The source unbinds before its fields move, so the repository keeps their
+// values for the bind of this parser.
+template <typename C, typename T>
+parser<C, T>::parser(parser&& other)
+	: parser(std::move(other), other.release_options())
+{}
+
+template <typename C, typename T>
+parser<C, T>::parser(parser&& other, options_repository* repo)
+	: debug(other.debug), debug_at(other.debug_at),
+	  report_(std::move(other.report_)),
+	  owned_grammar_(std::move(other.owned_grammar_)), g(other.g),
+	  o(std::move(other.o)), po(std::move(other.po)),
+	  in_(std::move(other.in_)), S(std::move(other.S)),
+	  U(std::move(other.U)), snapshot_(std::move(other.snapshot_)),
+	  revisit_(std::move(other.revisit_)),
+	  reprocess_epoch_(other.reprocess_epoch_),
+	  fromS(std::move(other.fromS)), need_fromS(other.need_fromS),
+	  cache(std::move(other.cache)), refi(std::move(other.refi)),
+	  gcready(std::move(other.gcready)),
+	  sorted_citem(std::move(other.sorted_citem)),
+	  rsorted_citem(std::move(other.rsorted_citem)),
+	  completion_deps(std::move(other.completion_deps)),
+	  use_citem_index(other.use_citem_index),
+	  completion_count(std::move(other.completion_count)),
+	  counted_completions(std::move(other.counted_completions)),
+	  forward_deps(std::move(other.forward_deps)),
+	  any_conj(other.any_conj),
+	  complete_memo(std::move(other.complete_memo)),
+	  dyn_child_span(std::move(other.dyn_child_span)),
+	  dyn_child_ids(std::move(other.dyn_child_ids)),
+	  internal_dynamic_ctx(std::move(other.internal_dynamic_ctx)),
+	  bin_tnt(std::move(other.bin_tnt)), tid(other.tid)
+{
+	MC(cnt = std::move(other.cnt);)
+	if (!repo) return;
+	auto r = bind_to(*repo);
+	DBG(assert(!r.has_error() && "a moved parser binds its options");)
+}
+
+template <typename C, typename T>
+parser<C, T>::~parser() { unbind_options(); }
+
+template <typename C, typename T>
+idni::diagnostics::result<void> parser<C, T>::bind_options() {
+	idni::diagnostics::result<void> r;
+	if (options_repo_) return r;
+	// qualified, because parser::options names the struct of the fields
+	options_repository& repo = idni::options();
+	if (!r.merge_ok(repo.declare(parser_option_set))) return r;
+	r.merge(bind_to(repo));
+	return r;
+}
+
+template <typename C, typename T>
+idni::diagnostics::result<void> parser<C, T>::bind_to(
+	options_repository& repo)
+{
+	idni::diagnostics::result<void> r;
+	options_repo_ = &repo;
+	auto& f = o.parse_opts;
+	// parse() reads po, and po holds o.parse_opts between parses
+	auto sync = [this] { po = o.parse_opts; };
+	r.merge(repo.bind("gc", f.enable_gc, sync));
+	r.merge(repo.bind("gc-lag", f.gc_lag, sync));
+	r.merge(repo.bind("max-length", f.max_length, sync));
+	r.merge(repo.bind("measure", f.measure, sync));
+	r.merge(repo.bind("measure-each-pos", f.measure_each_pos, sync));
+	r.merge(repo.bind("measure-forest", f.measure_forest, sync));
+	r.merge(repo.bind("measure-preprocess", f.measure_preprocess, sync));
+	r.merge(repo.bind("debug", f.debug, sync));
+	r.merge(repo.bind("error-verbosity", f.error_verbosity,
+		detail::error_verbosity_codec<C, T>{}, sync));
+	r.merge(repo.bind("tree-path", f.tree_path, detail::tree_path_codec{},
+		sync));
+	r.merge(repo.bind("start", f.start,
+		detail::nonterminal_id_codec<C, T>{ &g.get_nts() }, sync));
+	return r;
+}
+
+template <typename C, typename T>
+void parser<C, T>::unbind_options() {
+	if (!options_repo_) return;
+	for (const auto& opt : parser_option_set.options)
+		options_repo_->unbind(opt.name);
+	options_repo_ = nullptr;
+}
+
+template <typename C, typename T>
+options_repository* parser<C, T>::release_options() {
+	options_repository* repo = options_repo_;
+	unbind_options();
+	return repo;
+}
+
 template <typename C, typename T>
 void parser<C, T>::prepare()
 {

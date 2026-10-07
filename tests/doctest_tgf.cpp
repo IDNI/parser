@@ -507,30 +507,30 @@ TEST_SUITE("tgf: char class nonterminal ordering") {
 // TEST SUITE: grammar options
 // ---------------------------------------------------------------------------
 
+static const char* options_tgf =
+	"start => x ws x.\n"
+	"x => 'x'.\n"
+	"ws => ' '.\n";
+
+static grammar<char> options_grammar(nonterminals<char>& nts) {
+	auto gr = tgf<char>::from_string(nts, string(options_tgf));
+	REQUIRE(gr.has_value());
+	return std::move(gr).value();
+}
+
+static string text_of(options_repository& repo, string_view name) {
+	auto t = repo.get_text(name);
+	REQUIRE(t.has_value());
+	return t.value();
+}
+
+static size_t id_of(const nonterminals<char>& nts, const string& name) {
+	auto id = nts.find(name);
+	REQUIRE(id.has_value());
+	return *id;
+}
+
 TEST_SUITE("grammar options") {
-
-	static const char* options_tgf =
-		"start => x ws x.\n"
-		"x => 'x'.\n"
-		"ws => ' '.\n";
-
-	static grammar<char> options_grammar(nonterminals<char>& nts) {
-		auto gr = tgf<char>::from_string(nts, string(options_tgf));
-		REQUIRE(gr.has_value());
-		return std::move(gr).value();
-	}
-
-	static string text_of(options_repository& repo, string_view name) {
-		auto t = repo.get_text(name);
-		REQUIRE(t.has_value());
-		return t.value();
-	}
-
-	static size_t id_of(const nonterminals<char>& nts, const string& name) {
-		auto id = nts.find(name);
-		REQUIRE(id.has_value());
-		return *id;
-	}
 
 	TEST_CASE("bind_options binds the grammar fields") {
 		options_repository repo;
@@ -664,5 +664,87 @@ TEST_SUITE("grammar options") {
 		CHECK(g.opt().shaping.to_trim == set<size_t>{ id_of(nts, "ws") });
 		REQUIRE(g.bind_options().has_value());
 		CHECK(g.opt().shaping.to_trim == set<size_t>{ id_of(nts, "x") });
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TEST SUITE: parser options
+// ---------------------------------------------------------------------------
+
+TEST_SUITE("parser options") {
+
+	static bool parses(parser<char>& p, const string& in) {
+		return p.parse(in.c_str(), in.size()).found;
+	}
+
+	TEST_CASE("bind_options binds the parse options") {
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		grammar<char> g = options_grammar(nts);
+		parser<char> p(g);
+		REQUIRE(p.bind_options().has_value());
+		CHECK(text_of(repo, "gc") == (parser<char>::parse_options{}
+			.enable_gc ? "true" : "false"));
+		REQUIRE(repo.set_text("gc", "false").has_value());
+		CHECK(text_of(repo, "gc") == "false");
+		REQUIRE(repo.set_text("gc-lag", "3").has_value());
+		CHECK(text_of(repo, "gc-lag") == "3");
+		CHECK(parses(p, "x x"));
+	}
+
+	TEST_CASE("start is a nonterminal name") {
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		grammar<char> g = options_grammar(nts);
+		parser<char> p(g);
+		REQUIRE(p.bind_options().has_value());
+		CHECK(text_of(repo, "start") == "");
+		REQUIRE(repo.set_text("start", "x").has_value());
+		CHECK(text_of(repo, "start") == "x");
+		CHECK(parses(p, "x"));
+		auto r = repo.set_text("start", "nope");
+		CHECK(r.has_error());
+		ostringstream printed;
+		r.report().print(printed);
+		CHECK(printed.str().find("nope") != string::npos);
+		CHECK(text_of(repo, "start") == "x");
+		REQUIRE(repo.set_text("start", "").has_value());
+		CHECK(text_of(repo, "start") == "");
+		CHECK(parses(p, "x x"));
+	}
+
+	TEST_CASE("error-verbosity and tree-path are texts") {
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		grammar<char> g = options_grammar(nts);
+		parser<char> p(g);
+		REQUIRE(p.bind_options().has_value());
+		CHECK(text_of(repo, "error-verbosity") == "detailed");
+		REQUIRE(repo.set_text("error-verbosity", "root-cause")
+			.has_value());
+		CHECK(text_of(repo, "error-verbosity") == "root-cause");
+		CHECK(repo.set_text("error-verbosity", "loud").has_error());
+		CHECK(text_of(repo, "error-verbosity") == "root-cause");
+		CHECK(text_of(repo, "tree-path") == "bintree");
+		REQUIRE(repo.set_text("tree-path", "forest").has_value());
+		CHECK(text_of(repo, "tree-path") == "forest");
+		CHECK(parses(p, "x x"));
+	}
+
+	TEST_CASE("a moved parser keeps its options bound") {
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		grammar<char> g = options_grammar(nts);
+		parser<char> p(g);
+		REQUIRE(p.bind_options().has_value());
+		parser<char> p2 = std::move(p);
+		REQUIRE(repo.set_text("gc-lag", "5").has_value());
+		CHECK(text_of(repo, "gc-lag") == "5");
+		REQUIRE(repo.set_text("start", "x").has_value());
+		CHECK(parses(p2, "x"));
 	}
 }

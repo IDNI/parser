@@ -38,7 +38,7 @@ struct option_spec {
 	std::string owner;
 	option_value fallback;
 	std::string help;
-	std::vector<option_surface> surfaces;
+	std::vector<option_surface> surfaces = {};
 	bool from_env = true;
 	bool operator==(const option_spec&) const = default;
 };
