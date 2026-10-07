@@ -241,13 +241,14 @@ foreach(X IN LISTS DOCTESTS)
 			"${PROJECT_SOURCE_DIR}/src/format/treemr/treemr_parser.generated.cpp"
 			PROPERTIES COMPILE_OPTIONS "-O0;-fno-lto")
 	endif()
-	if(${N} STREQUAL "doctest_tgf_cli" AND NOT EMSCRIPTEN AND NOT TAU_PARSER_BUILD_HEADER_ONLY)
+	if(${N} STREQUAL "doctest_tgf_cli" AND NOT EMSCRIPTEN)
 		if(TARGET tgf_cli_core)
 			# the core library owns the generated parsers
 			target_link_libraries(${N} PRIVATE tgf_cli_core)
 			# tgf_run() is defined by the core library only
 			target_compile_definitions(${N} PRIVATE TAU_TEST_HAS_TGF_CLI)
-		else()
+		elseif(NOT TAU_PARSER_BUILD_HEADER_ONLY)
+			# a header-only build resolves productions() inline instead
 			target_sources(${N} PRIVATE
 				"${PROJECT_SOURCE_DIR}/src/tgf/tgf_repl_parser.generated.cpp")
 			set_source_files_properties(
