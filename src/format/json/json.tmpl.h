@@ -6,8 +6,13 @@
 
 #include <cassert>
 #include <charconv>
+#include <cmath>
+#include <concepts>
 #include <cstdint>
+#include <limits>
 #include <system_error>
+#include <type_traits>
+#include <variant>
 #include <version>
 #if !defined(__cpp_lib_to_chars) || __cpp_lib_to_chars < 201611L
 #include <locale>
@@ -83,6 +88,91 @@ inline value& value::set(std::string key, value v) {
 		if (kv.first == key) { kv.second = std::move(v); return *this; }
 	obj_.emplace_back(std::move(key), std::move(v));
 	return *this;
+}
+
+namespace detail {
+
+template <typename T> inline constexpr bool is_vector_v = false;
+template <typename T, typename A>
+inline constexpr bool is_vector_v<std::vector<T, A>> = true;
+
+template <typename T> inline constexpr bool is_variant_v = false;
+template <typename... Ts>
+inline constexpr bool is_variant_v<std::variant<Ts...>> = true;
+
+template <typename T>
+inline constexpr bool is_json_type_v = std::is_same_v<T, bool>
+	|| std::unsigned_integral<T> || std::is_same_v<T, std::string>
+	|| is_vector_v<T> || is_variant_v<T>;
+
+// A valueless variant has no alternative to print, so it is null.
+template <std::size_t I = 0, typename V>
+value variant_to_json(const V& v) {
+	if constexpr (I < std::variant_size_v<V>) {
+		if (const auto* x = std::get_if<I>(&v)) return to_json(*x);
+		return variant_to_json<I + 1>(v);
+	} else return value::null();
+}
+
+template <typename V, std::size_t I = 0>
+std::optional<V> variant_from_json(const value& v) {
+	if constexpr (I < std::variant_size_v<V>) {
+		using A = std::variant_alternative_t<I, V>;
+		if (auto x = from_json<A>(v))
+			return V(std::in_place_index<I>, std::move(*x));
+		return variant_from_json<V, I + 1>(v);
+	} else return std::nullopt;
+}
+
+} // namespace detail
+
+template <typename T>
+value to_json(const T& v) {
+	static_assert(detail::is_json_type_v<T>, "to_json converts a bool, "
+		"an unsigned integer, a std::string, or a std::vector or a "
+		"std::variant of these types");
+	if constexpr (std::is_same_v<T, bool>) return value::boolean(v);
+	else if constexpr (std::unsigned_integral<T>)
+		return value::number(static_cast<double>(v));
+	else if constexpr (std::is_same_v<T, std::string>)
+		return value::string(v);
+	else if constexpr (detail::is_vector_v<T>) {
+		auto a = value::array();
+		for (const auto& e : v) a.push_back(to_json(e));
+		return a;
+	} else return detail::variant_to_json(v);
+}
+
+template <typename T>
+std::optional<T> from_json(const value& v) {
+	static_assert(detail::is_json_type_v<T>, "from_json converts a bool, "
+		"an unsigned integer, a std::string, or a std::vector or a "
+		"std::variant of these types");
+	if constexpr (std::is_same_v<T, bool>) {
+		if (!v.is_bool()) return std::nullopt;
+		return v.as_bool();
+	} else if constexpr (std::unsigned_integral<T>) {
+		if (!v.is_number()) return std::nullopt;
+		const double d = v.as_number();
+		// a double holds every whole number up to 2^53 exactly
+		constexpr double exact = 9007199254740992.0;
+		if (!(d >= 0) || d > exact || d != std::trunc(d)
+			|| d > static_cast<double>(std::numeric_limits<T>::max()))
+				return std::nullopt;
+		return static_cast<T>(d);
+	} else if constexpr (std::is_same_v<T, std::string>) {
+		if (!v.is_string()) return std::nullopt;
+		return v.as_string();
+	} else if constexpr (detail::is_vector_v<T>) {
+		if (!v.is_array()) return std::nullopt;
+		T out;
+		for (const auto& e : v) {
+			auto x = from_json<typename T::value_type>(e);
+			if (!x) return std::nullopt;
+			out.push_back(std::move(*x));
+		}
+		return out;
+	} else return detail::variant_from_json<T>(v);
 }
 
 inline value build_string(const trv& t, result& R) {

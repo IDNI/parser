@@ -6,6 +6,7 @@
 #include "format/json/json.h"
 #include "format/ast.json/ast_json.h"
 #include "parser.h"
+#include "utility/options_types.h"
 
 #include <sstream>
 #include <string>
@@ -352,5 +353,74 @@ TEST_SUITE("ast_json: parser tree to AST JSON") {
 		REQUIRE(range->size() == 2);
 		CHECK((*range)[0].as_number() == 2);
 		CHECK((*range)[1].as_number() == 3);
+	}
+}
+
+namespace {
+
+// The value of a JSON text that the test knows to be valid.
+value json_of(std::string_view text) {
+	auto r = parse(text);
+	REQUIRE(r.has_value());
+	return std::move(r).value();
+}
+
+std::string printed(const value& v) {
+	std::ostringstream os;
+	print(v, os);
+	return os.str();
+}
+
+template <typename T>
+bool round_trips(const T& x) {
+	auto back = from_json<T>(to_json(x));
+	return back.has_value() && *back == x;
+}
+
+} // namespace
+
+TEST_SUITE("json: standard types") {
+
+	TEST_CASE("a standard value reads back as itself") {
+		CHECK(round_trips(true));
+		CHECK(round_trips(size_t{ 7 }));
+		CHECK(round_trips(std::string("a\"b")));
+		CHECK(round_trips(std::vector<std::string>{ "a", "" }));
+		CHECK(round_trips(std::vector<size_t>{ 1, 2 }));
+	}
+
+	TEST_CASE("the printed form of a standard value") {
+		CHECK(printed(to_json(size_t{ 7 })) == "7");
+		CHECK(printed(to_json(std::vector<std::string>{ "a", "b" }))
+			== "[\"a\",\"b\"]");
+	}
+
+	TEST_CASE("a JSON value of another shape gives nothing") {
+		CHECK(!from_json<size_t>(json_of("-1")).has_value());
+		CHECK(!from_json<size_t>(json_of("1.5")).has_value());
+		CHECK(!from_json<size_t>(json_of("\"7\"")).has_value());
+		CHECK(!from_json<size_t>(json_of("null")).has_value());
+		CHECK(!from_json<bool>(json_of("1")).has_value());
+		CHECK(!from_json<std::vector<std::string>>(
+			json_of("[\"a\", 1]")).has_value());
+	}
+
+	TEST_CASE("an option value converts by its alternative") {
+		CHECK(to_json(option_value(true)).is_bool());
+		CHECK(printed(to_json(option_value(option_list{ "a > b" })))
+			== "[\"a > b\"]");
+		auto flag = from_json<option_value>(json_of("true"));
+		REQUIRE(flag.has_value());
+		CHECK(*flag == option_value(true));
+		auto number = from_json<option_value>(json_of("7"));
+		REQUIRE(number.has_value());
+		CHECK(*number == option_value(size_t{ 7 }));
+		auto text = from_json<option_value>(json_of("\"x\""));
+		REQUIRE(text.has_value());
+		CHECK(*text == option_value(std::string("x")));
+		auto list = from_json<option_value>(json_of("[\"a\"]"));
+		REQUIRE(list.has_value());
+		CHECK(*list == option_value(option_list{ "a" }));
+		CHECK(!from_json<option_value>(json_of("null")).has_value());
 	}
 }

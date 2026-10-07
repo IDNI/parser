@@ -4,6 +4,7 @@
 #ifndef __IDNI__PARSER__FORMAT__JSON_H__
 #define __IDNI__PARSER__FORMAT__JSON_H__
 
+#include <optional>
 #include <ostream>
 #include <string>
 #include <string_view>
@@ -80,6 +81,12 @@ using label  = idni::parser_strings::label;
 
 using tree = json_parser::tree;
 using trv  = tree::traverser;
+
+/// The JSON value of @p v: a bool, an unsigned integer, a std::string, or
+/// a std::vector or a std::variant of these types.
+template <typename T> value to_json(const T& v);
+/// The value of @p v as a T, or nothing when the JSON has another shape.
+template <typename T> std::optional<T> from_json(const value& v);
 
 value build_string(const trv& t, result& R);
 
