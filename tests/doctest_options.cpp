@@ -198,6 +198,30 @@ TEST_CASE("declare takes an equal spec again") {
 	CHECK(other.has_error());
 }
 
+TEST_CASE("add_surface puts an option on a command") {
+	fixture f;
+	REQUIRE(f.repo.add_surface("count", { "run", 'c' }).has_value());
+	argv_of a{ "tool", "run", "-c", "3" };
+	REQUIRE(f.repo.parse_args(a.argc(), a.argv(), tool_config())
+		.has_value());
+	CHECK(f.repo.get<size_t>("count") == 3u);
+	auto unknown = f.repo.add_surface("nope", { "run", 'z' });
+	CHECK(unknown.has_error());
+	CHECK(contains(messages_of(unknown.report()), "Unknown option"));
+	// count has the letter n on run
+	CHECK(f.repo.add_surface("name", { "run", 'n' }).has_error());
+}
+
+TEST_CASE("declare keeps a surface that add_surface added") {
+	fixture f;
+	REQUIRE(f.repo.add_surface("count", { "run", 'c' }).has_value());
+	REQUIRE(f.repo.declare(tool_set()).has_value());
+	argv_of a{ "tool", "run", "-c", "4" };
+	REQUIRE(f.repo.parse_args(a.argc(), a.argv(), tool_config())
+		.has_value());
+	CHECK(f.repo.get<size_t>("count") == 4u);
+}
+
 TEST_CASE("two options with one short letter on one command") {
 	options_repository repo;
 	auto r = repo.declare(option_set{ .options = {

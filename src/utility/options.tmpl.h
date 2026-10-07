@@ -127,6 +127,44 @@ struct options_catalog {
 	}
 };
 
+// The surfaces are left out: a tool adds them after a library declared
+// the option, and the library may declare the option again.
+inline bool same_spec_without_surfaces(const option_spec& a,
+	const option_spec& b)
+{
+	return a.name == b.name && a.owner == b.owner
+		&& a.fallback == b.fallback && a.help == b.help
+		&& a.from_env == b.from_env;
+}
+
+/// Report in @p r when @p sf does not fit the option @p o of @p cat: a
+/// default of another kind, or a short letter that another option uses on
+/// the same command.
+inline void check_surface(const options_catalog& cat, const option_spec& o,
+	const option_surface& sf, diagnostics::result<void>& r)
+{
+	namespace ps = parser_strings;
+	using diagnostics::code;
+	if (sf.fallback && sf.fallback->index() != o.fallback.index())
+		r.error(code::type_error, ps::messages::option_command_default_kind,
+			{ { ps::label::name, o.name },
+			  { ps::label::value, sf.command } });
+	if (!sf.short_name) return;
+	for (const auto& other : cat.specs)
+		for (const auto& have : other.surfaces)
+			if (have.command == sf.command
+				&& have.short_name == sf.short_name)
+			{
+				r.error(code::invalid_argument,
+					ps::messages::option_short_name_taken,
+					{ { ps::label::name, other.name },
+					  { ps::label::name, o.name },
+					  { ps::label::value,
+						std::string(1, sf.short_name) } });
+				return;
+			}
+}
+
 template <typename T>
 T typed(const option_value& v) {
 	if (const T* p = std::get_if<T>(&v)) return *p;
@@ -185,11 +223,6 @@ inline diagnostics::result<void> options_repository::declare(
 	using diagnostics::code;
 	diagnostics::result<void> r;
 	auto cat = std::make_shared<detail::options_catalog>(*cat_);
-	std::map<std::pair<std::string, char>, std::string> shorts;
-	for (const auto& o : cat->specs)
-		for (const auto& sf : o.surfaces) if (sf.short_name)
-			shorts.emplace(std::make_pair(sf.command,
-				sf.short_name), o.name);
 	for (const auto& c : set.commands) {
 		if (const command_spec* have = cat->command(c.name)) {
 			if (*have == c) continue;
@@ -202,35 +235,37 @@ inline diagnostics::result<void> options_repository::declare(
 	}
 	for (const auto& o : set.options) {
 		if (const auto have = cat->find(o.name)) {
-			if (cat->specs[*have] == o) continue;
+			if (detail::same_spec_without_surfaces(
+				cat->specs[*have], o)) continue;
 			r.error(code::invalid_argument,
 				ps::messages::option_already_exists,
 				{ { ps::label::name, o.name } });
 			continue;
 		}
-		for (const auto& sf : o.surfaces) {
-			if (sf.fallback && sf.fallback->index()
-				!= o.fallback.index())
-				r.error(code::type_error, ps::messages::
-					option_command_default_kind,
-					{ { ps::label::name, o.name },
-					  { ps::label::value, sf.command } });
-			if (!sf.short_name) continue;
-			auto [it, fresh] = shorts.emplace(std::make_pair(
-				sf.command, sf.short_name), o.name);
-			if (!fresh) r.error(code::invalid_argument,
-				ps::messages::option_short_name_taken,
-				{ { ps::label::name, it->second },
-				  { ps::label::name, o.name },
-				  { ps::label::value,
-					std::string(1, sf.short_name) } });
-		}
+		for (const auto& sf : o.surfaces)
+			detail::check_surface(*cat, o, sf, r);
 		cat->index.emplace(o.name, cat->specs.size());
 		cat->specs.push_back(o);
 	}
 	if (r.has_error()) return r;
 	values_.resize(cat->specs.size());
 	bindings_.resize(cat->specs.size());
+	cat_ = std::move(cat);
+	return r;
+}
+
+inline diagnostics::result<void> options_repository::add_surface(
+	std::string_view name, option_surface surface)
+{
+	namespace ps = parser_strings;
+	diagnostics::result<void> r;
+	const auto i = cat_->find(name);
+	if (!i) return r.with_error(diagnostics::code::not_found,
+		ps::messages::option_not_found, { { ps::label::name, name } });
+	auto cat = std::make_shared<detail::options_catalog>(*cat_);
+	detail::check_surface(*cat, cat->specs[*i], surface, r);
+	if (r.has_error()) return r;
+	cat->specs[*i].surfaces.push_back(std::move(surface));
 	cat_ = std::move(cat);
 	return r;
 }

@@ -78,9 +78,14 @@ struct options_repository {
 	options_repository(const options_repository&) = delete;
 	options_repository& operator=(const options_repository&) = delete;
 
-	/// A name that is new or declared with an equal spec is fine. A
-	/// different spec under a declared name fails, and nothing is declared.
+	/// A name that is new or declared with an equal spec is fine. The
+	/// surfaces are not compared, and the declared ones stay. A different
+	/// spec under a declared name fails, and nothing is declared.
 	[[nodiscard]] diagnostics::result<void> declare(const option_set& set);
+	/// Add a surface to a declared option. An unknown name is an error.
+	/// A short letter already used on that command is an error.
+	[[nodiscard]] diagnostics::result<void> add_surface(
+		std::string_view name, option_surface surface);
 
 	/// Typed access by name. A wrong name or type is a programming error,
 	/// caught by a DBG assert only.
