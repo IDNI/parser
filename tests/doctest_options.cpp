@@ -221,6 +221,19 @@ TEST_CASE("two options with one short letter on one command") {
 
 } // TEST_SUITE
 
+TEST_SUITE("options kind") {
+
+TEST_CASE("kind_of gives the kind of a value and of a spec") {
+	CHECK(kind_of(option_value(true)) == option_kind::flag);
+	CHECK(kind_of(option_value(size_t{ 1 })) == option_kind::numeric);
+	CHECK(kind_of(option_value(string("x"))) == option_kind::text);
+	CHECK(kind_of(option_value(option_list{})) == option_kind::list);
+	for (const auto& spec : tool_set().options)
+		CHECK(kind_of(spec) == kind_of(spec.fallback));
+}
+
+} // TEST_SUITE
+
 TEST_SUITE("options values") {
 
 TEST_CASE("set takes a literal and an int") {

@@ -56,14 +56,19 @@ struct option_set {
 	std::vector<command_spec> commands = {};
 };
 
-namespace detail {
-
 /// The kind of an option is the index of its alternative in option_value.
 enum class option_kind : std::size_t { flag, numeric, text, list };
 
 inline option_kind kind_of(const option_value& v) {
 	return static_cast<option_kind>(v.index());
 }
+
+/// The kind of the fallback of @p s.
+inline option_kind kind_of(const option_spec& s) {
+	return kind_of(s.fallback);
+}
+
+namespace detail {
 
 inline std::string option_trim(std::string_view s) {
 	std::size_t b = 0, e = s.size();

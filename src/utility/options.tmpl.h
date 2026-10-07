@@ -372,7 +372,7 @@ inline diagnostics::result<void> options_repository::set_text(
 	if (!i) return r.with_error(diagnostics::code::not_found,
 		ps::messages::option_not_found, { { ps::label::name, name } });
 	auto v = r.merge_take(detail::parse_option_value(
-		detail::kind_of(cat_->specs[*i].fallback), text, name));
+		kind_of(cat_->specs[*i]), text, name));
 	if (!v) return r;
 	r.merge(store(*i, std::move(*v)));
 	return r;
@@ -417,7 +417,7 @@ inline diagnostics::result<void> options_repository::load_env(
 		const std::string var = detail::option_env_name(prefix, o.name);
 		const char* text = std::getenv(var.c_str());
 		if (!text) continue;
-		auto v = detail::parse_value(detail::kind_of(o.fallback), text);
+		auto v = detail::parse_value(kind_of(o), text);
 		if (!v) {
 			r.warning(ps::messages::option_env_bad_value,
 				{ { ps::label::name, var },
@@ -480,14 +480,13 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 		return std::nullopt;
 	};
 	auto is_flag = [&](std::size_t i) {
-		return detail::kind_of(cat.specs[i].fallback)
-			== detail::option_kind::flag;
+		return kind_of(cat.specs[i]) == option_kind::flag;
 	};
 	// A list given again appends. Every other kind keeps the last value.
 	auto add_text = [&](std::size_t i, std::string_view text) {
 		const option_spec& o = cat.specs[i];
 		auto v = r.merge_take(detail::parse_option_value(
-			detail::kind_of(o.fallback), text, o.name));
+			kind_of(o), text, o.name));
 		if (!v) return false;
 		if (const auto* add = std::get_if<option_list>(&*v))
 			if (option_value* have = pending_of(i)) {
@@ -563,7 +562,7 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 			bool b = true;
 			if (arg < args.size())
 				if (auto v = detail::parse_value(
-					detail::option_kind::flag, args[arg]))
+					option_kind::flag, args[arg]))
 				{
 					b = std::get<bool>(*v);
 					++arg;
