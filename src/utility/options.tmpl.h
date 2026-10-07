@@ -48,21 +48,7 @@ option_value to_option_value(T&& v) {
 	} else return option_value(S(std::forward<T>(v)));
 }
 
-/// Parse @p text as a value of @p kind. A flag takes 1 t true on yes y and
-/// 0 f false off no n in any case. A list is comma separated.
-inline diagnostics::result<option_value> parse_option_value(option_kind kind,
-	std::string_view text, std::string_view name = {})
-{
-	diagnostics::result<option_value> r;
-	auto v = parse_value(kind, text);
-	if (!v) return r.with_error(diagnostics::code::invalid_argument,
-		parser_strings::messages::option_bad_value,
-		{ { parser_strings::label::name, name },
-		  { parser_strings::label::value, text } });
-	return r.with_value(std::move(*v));
-}
-
-/// The text form of @p v, which parse_option_value() reads back.
+/// The text form of @p v, which parse_value() reads back.
 inline diagnostics::result<std::string> format_option_value(
 	const option_value& v)
 {
@@ -371,7 +357,7 @@ inline diagnostics::result<void> options_repository::set_text(
 	const auto i = cat_->find(name);
 	if (!i) return r.with_error(diagnostics::code::not_found,
 		ps::messages::option_not_found, { { ps::label::name, name } });
-	auto v = r.merge_take(detail::parse_option_value(
+	auto v = r.merge_take(detail::parse_value(
 		kind_of(cat_->specs[*i]), text, name));
 	if (!v) return r;
 	r.merge(store(*i, std::move(*v)));
@@ -417,14 +403,16 @@ inline diagnostics::result<void> options_repository::load_env(
 		const std::string var = detail::option_env_name(prefix, o.name);
 		const char* text = std::getenv(var.c_str());
 		if (!text) continue;
-		auto v = detail::parse_value(kind_of(o), text);
-		if (!v) {
-			r.warning(ps::messages::option_env_bad_value,
+		auto v = detail::parse_value(kind_of(o), text, o.name);
+		if (!v.has_value()) {
+			r.error(diagnostics::code::invalid_argument,
+				ps::messages::option_env_bad_value,
 				{ { ps::label::name, var },
 				  { ps::label::value, text } });
+			r.merge(std::move(v));
 			continue;
 		}
-		r.merge(store(i, std::move(*v)));
+		r.merge(store(i, std::move(v.value())));
 	}
 	return r;
 }
@@ -485,7 +473,7 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 	// A list given again appends. Every other kind keeps the last value.
 	auto add_text = [&](std::size_t i, std::string_view text) {
 		const option_spec& o = cat.specs[i];
-		auto v = r.merge_take(detail::parse_option_value(
+		auto v = r.merge_take(detail::parse_value(
 			kind_of(o), text, o.name));
 		if (!v) return false;
 		if (const auto* add = std::get_if<option_list>(&*v))
@@ -560,11 +548,12 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 		if (is_flag(*cur)) {
 			if (has_value) return add_text(*cur, value) ? 0 : 1;
 			bool b = true;
+			// a word that is no flag text is the next argument
 			if (arg < args.size())
 				if (auto v = detail::parse_value(
-					option_kind::flag, args[arg]))
+					option_kind::flag, args[arg]); v.has_value())
 				{
-					b = std::get<bool>(*v);
+					b = std::get<bool>(v.value());
 					++arg;
 				}
 			put(*cur, b);

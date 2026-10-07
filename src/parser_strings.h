@@ -299,8 +299,7 @@ struct messages {
 	static constexpr sv option_bad_value =
 		"The option does not take the value";
 	static constexpr sv option_env_bad_value =
-		"The option does not take the value of the environment variable, "
-		"so it is ignored";
+		"The option does not take the value of the environment variable";
 	static constexpr sv option_missing_argument =
 		"Missing argument for option";
 	static constexpr sv option_unknown_command = "Unknown command";

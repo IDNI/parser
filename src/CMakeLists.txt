@@ -31,6 +31,7 @@ set(TAU_PARSER_HEADERS
 	utility/memory_map.h
 	utility/memory_map.tmpl.h
 	utility/options_types.h
+	utility/options_types.tmpl.h
 	utility/options.h
 	utility/options.tmpl.h
 	utility/repl.h

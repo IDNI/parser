@@ -525,6 +525,77 @@ TEST_CASE("set_text and get_text use the kind") {
 	CHECK(text.value() == "a, b, c > d");
 }
 
+TEST_CASE("set_text trims the text of every kind") {
+	fixture f;
+	REQUIRE(f.repo.set_text("force", " true ").has_value());
+	CHECK(f.repo.get<bool>("force"));
+	REQUIRE(f.repo.set_text("count", " 7 ").has_value());
+	CHECK(f.repo.get<size_t>("count") == 7u);
+	REQUIRE(f.repo.set_text("name", "  abc ").has_value());
+	CHECK(f.repo.get<string>("name") == "abc");
+	REQUIRE(f.repo.set_text("tags", "  a ,b ,  c  ").has_value());
+	CHECK(f.repo.get<option_list>("tags") == option_list{ "a", "b", "c" });
+	REQUIRE(f.repo.set_text("name", "   ").has_value());
+	CHECK(f.repo.get<string>("name").empty());
+	CHECK(f.repo.set_text("count", "   ").has_error());
+	CHECK(f.repo.set_text("force", "   ").has_error());
+}
+
+TEST_CASE("the environment and the command line trim a value") {
+	fixture f;
+	test_setenv("OPTTEST_COUNT", " 3 ");
+	auto env = f.repo.load_env("OPTTEST_");
+	test_unsetenv("OPTTEST_COUNT");
+	REQUIRE(env.has_value());
+	CHECK(!env.has_error());
+	CHECK(f.repo.get<size_t>("count") == 3u);
+	argv_of a{ "tool", "run", "--count", " 4 " };
+	REQUIRE(f.repo.parse_args(a.argc(), a.argv(), tool_config())
+		.has_value());
+	CHECK(f.repo.get<size_t>("count") == 4u);
+}
+
+TEST_CASE("the text of a list reads back as the list") {
+	const option_list tags{ "a,b", "", " c ", "d\"e", "f\\g", "h\n",
+		"plain" };
+	fixture f;
+	f.repo.set("tags", tags);
+	auto text = f.repo.get_text("tags");
+	REQUIRE(text.has_value());
+	fixture g;
+	REQUIRE(g.repo.set_text("tags", text.value()).has_value());
+	CHECK(g.repo.get<option_list>("tags") == tags);
+}
+
+TEST_CASE("a quoted string is one entry or one text") {
+	fixture f;
+	REQUIRE(f.repo.set_text("tags", "\"a, b\", c").has_value());
+	CHECK(f.repo.get<option_list>("tags") == option_list{ "a, b", "c" });
+	REQUIRE(f.repo.set_text("name", "\"  abc \"").has_value());
+	CHECK(f.repo.get<string>("name") == "  abc ");
+	auto text = f.repo.get_text("name");
+	REQUIRE(text.has_value());
+	CHECK(text.value() == "\"  abc \"");
+	REQUIRE(f.repo.set_text("name", "\"x\"").has_value());
+	CHECK(f.repo.get<string>("name") == "x");
+	argv_of a{ "tool", "run", "--tags", "\"a,b\", c" };
+	REQUIRE(f.repo.parse_args(a.argc(), a.argv(), tool_config())
+		.has_value());
+	CHECK(f.repo.get<option_list>("tags") == option_list{ "a,b", "c" });
+}
+
+TEST_CASE("a bad quoted string is an error") {
+	fixture f;
+	CHECK(f.repo.set_text("name", "\"abc").has_error());
+	CHECK(f.repo.set_text("tags", "\"a\" b").has_error());
+	auto r = f.repo.set_text("name", "\"\\q\"");
+	CHECK(r.has_error());
+	const string msg = messages_of(r.report());
+	CHECK(contains(msg, "The option does not take the value"));
+	CHECK(contains(msg, "Unknown escape"));
+	CHECK(f.repo.get<string>("name") == "x");
+}
+
 TEST_CASE("set_text with a bad value is an error") {
 	fixture f;
 	auto r = f.repo.set_text("count", "4x");
@@ -543,7 +614,7 @@ TEST_CASE("an unknown name is an error") {
 	CHECK(f.repo.get_text("nope").has_error());
 }
 
-TEST_CASE("load_env reads the variables and warns on a bad value") {
+TEST_CASE("load_env reads the variables and reports a bad value") {
 	fixture f;
 	test_setenv("OPTTEST_FORCE", "OFF");
 	test_setenv("OPTTEST_COUNT", "x");
@@ -553,8 +624,7 @@ TEST_CASE("load_env reads the variables and warns on a bad value") {
 	test_unsetenv("OPTTEST_FORCE");
 	test_unsetenv("OPTTEST_COUNT");
 	test_unsetenv("OPTTEST_INPUT");
-	CHECK(r.has_value());
-	CHECK(!r.has_error());
+	CHECK(r.has_error());
 	const string msg = messages_of(r.report());
 	CHECK(contains(msg, "OPTTEST_COUNT"));
 	CHECK(contains(msg, "x"));
@@ -562,6 +632,18 @@ TEST_CASE("load_env reads the variables and warns on a bad value") {
 	CHECK(f.repo.get<size_t>("count") == 1u);
 	// input does not read the environment
 	CHECK(f.repo.get<string>("input").empty());
+}
+
+TEST_CASE("load_env reports a bad quoted string with its detail") {
+	fixture f;
+	test_setenv("OPTTEST_NAME", "\"\\q\"");
+	auto r = f.repo.load_env("OPTTEST_");
+	test_unsetenv("OPTTEST_NAME");
+	CHECK(r.has_error());
+	const string msg = messages_of(r.report());
+	CHECK(contains(msg, "OPTTEST_NAME"));
+	CHECK(contains(msg, "Unknown escape"));
+	CHECK(f.repo.get<string>("name") == "x");
 }
 
 } // TEST_SUITE

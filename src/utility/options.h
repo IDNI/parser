@@ -116,7 +116,7 @@ struct options_repository {
 	std::shared_ptr<const option_spec> find(std::string_view name) const;
 
 	/// The prefix and the name in upper case, with '-' as '_'. A bad value
-	/// is a warning.
+	/// is an error.
 	[[nodiscard]] diagnostics::result<void> load_env(std::string_view prefix);
 
 	/// Store the values of argv. Nothing is stored on an error.
