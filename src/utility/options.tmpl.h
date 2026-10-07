@@ -507,9 +507,6 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 		}
 		out.command = cmd;
 	}
-	if (const auto h = cat.find("help"))
-		if (const option_value* v = pending_of(*h))
-			if (const bool* b = std::get_if<bool>(v)) out.help = *b;
 	command_ = out.command;
 	for (auto& [i, v] : pending) {
 		values_[i] = v;

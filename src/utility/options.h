@@ -22,12 +22,11 @@ namespace detail {
 struct options_catalog;
 }
 
-/// What one command line gave.
+/// What one command line gave that is no option.
 struct parsed_args {
 	std::string command;
 	/// The positional arguments: `-`, the files and the URLs.
 	std::vector<std::string> inputs;
-	bool help = false;
 	/// The options argv gave, with their values, in argv order. A program
 	/// writes them again after it loads a grammar.
 	std::vector<std::pair<std::string, option_value>> values;
@@ -74,6 +73,7 @@ struct options_repository {
 	[[nodiscard]] diagnostics::result<void> load_env(std::string_view prefix);
 
 	/// Store the values of argv. Nothing is stored on an error.
+	/// A program reads get<bool>("help") after it and calls help() itself.
 	[[nodiscard]] diagnostics::result<parsed_args> parse_args(int argc,
 		char** argv, const args_config& cfg = {});
 	/// The help of `command`, or of the program when it is empty. It uses

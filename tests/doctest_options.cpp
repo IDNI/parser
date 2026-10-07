@@ -440,12 +440,12 @@ TEST_CASE("a word that is no file and no URL is an error") {
 	}
 }
 
-TEST_CASE("--help sets the help field") {
+TEST_CASE("--help sets the help option") {
 	fixture f;
 	argv_of a{ "tool", "-h" };
 	auto r = f.repo.parse_args(a.argc(), a.argv(), tool_config());
 	REQUIRE(r.has_value());
-	CHECK(r.value().help);
+	CHECK(f.repo.get<bool>("help"));
 	CHECK(r.value().command.empty());
 }
 
