@@ -90,6 +90,9 @@ struct options_repository {
 	[[nodiscard]] diagnostics::result<std::string> get_text(
 		std::string_view name) const;
 	std::vector<std::string> names() const;
+	/// The declared option @p name, or null when no option has the name.
+	/// The spec stays valid after a later declare().
+	std::shared_ptr<const option_spec> find(std::string_view name) const;
 
 	/// The prefix and the name in upper case, with '-' as '_'. A bad value
 	/// is a warning.

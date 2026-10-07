@@ -686,6 +686,16 @@ inline std::vector<std::string> options_repository::names() const {
 	return out;
 }
 
+inline std::shared_ptr<const option_spec> options_repository::find(
+	std::string_view name) const
+{
+	const auto& cat = state_->current().cat;
+	const auto i = cat->find(name);
+	if (!i) return nullptr;
+	// shares the catalog, which a later declare() replaces
+	return std::shared_ptr<const option_spec>(cat, &cat->specs[*i]);
+}
+
 inline diagnostics::result<void> options_repository::load_env(
 	std::string_view prefix, std::size_t source)
 {

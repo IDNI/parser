@@ -111,6 +111,21 @@ TEST_CASE("declare gives the fallback") {
 		"name", "tags", "force", "quiet", "input" });
 }
 
+TEST_CASE("find gives a declared option by name") {
+	fixture f;
+	auto count = f.repo.find("count");
+	REQUIRE(count != nullptr);
+	CHECK(count->name == "count");
+	CHECK(count->owner == "run");
+	CHECK(count->fallback == option_value(size_t{ 1 }));
+	CHECK(f.repo.find("no-such-option") == nullptr);
+	// a later declare keeps the spec valid
+	REQUIRE(f.repo.declare(option_set{ .options = {
+		{ "extra", "run", false, "", {} } } }).has_value());
+	CHECK(count->help == "how many times");
+	CHECK(f.repo.find("extra") != nullptr);
+}
+
 TEST_CASE("a second declare of a name is an error") {
 	fixture f;
 	auto same = f.repo.declare(option_set{ .options = {
