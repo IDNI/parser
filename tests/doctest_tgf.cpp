@@ -734,6 +734,21 @@ TEST_SUITE("parser options") {
 		CHECK(parses(p, "x x"));
 	}
 
+	TEST_CASE("measure turns the other measure flags on") {
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		grammar<char> g = options_grammar(nts);
+		parser<char> p(g);
+		REQUIRE(p.bind_options().has_value());
+		const char* flags[] = { "measure-scopes", "measure-counters",
+			"measure-forest", "measure-preprocess" };
+		REQUIRE(repo.set_text("measure", "true").has_value());
+		for (const char* f : flags) CHECK(text_of(repo, f) == "true");
+		REQUIRE(repo.set_text("measure", "false").has_value());
+		for (const char* f : flags) CHECK(text_of(repo, f) == "true");
+	}
+
 	TEST_CASE("a moved parser keeps its options bound") {
 		options_repository repo;
 		options_scope scope(repo);

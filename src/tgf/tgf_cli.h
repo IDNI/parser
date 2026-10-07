@@ -57,23 +57,8 @@ struct eval_result {
 	diagnostics::report report;   // errors in the command text itself
 };
 
-/// The options of tgf_repl_evaluator::options. The fields of the owner
-/// parse copy the parse options of the parser.
+/// The options of tgf_repl_evaluator::options.
 inline const option_set tgf_repl_option_set = { .options = {
-	{ "gc", "parse", true, "enable garbage collection", {} },
-	{ "debug", "parse", false, "print debug diagnostics", {} },
-	{ "measure", "parse", false, "measure parse time and counters", {} },
-	{ "measure-each-pos", "parse", false,
-		"measure parse time at each position", {} },
-	{ "measure-forest", "parse", false,
-		"measure forest building time", {} },
-	{ "measure-preprocess", "parse", false,
-		"measure forest preprocess time", {} },
-	{ "error-verbosity", "parse", std::string("basic"),
-		"parse error verbosity: basic, detailed, root-cause", {} },
-	{ "tree-path", "parse", std::string("bintree"),
-		"parse tree path: bintree or forest", {} },
-	{ "start", "parse", std::string(), "starting literal", {} },
 	{ "print-terminals", "repl", true, "print the parsed terminals", {} },
 	{ "status", "repl", true, "print status after each command", {} },
 	{ "print-ambiguity", "repl", true, "print ambiguous nodes", {} },
@@ -103,8 +88,6 @@ struct tgf_repl_evaluator {
 	struct options {
 		options() = default;
 
-		bool gc                 = true;
-		bool debug              = false;
 		bool status             = true;
 		bool continue_on_eof    = true;
 		bool colors             = true;
@@ -120,19 +103,6 @@ struct tgf_repl_evaluator {
 		bool json_api           = false;
 		/// True when the evaluator refuses commands that read a file path.
 		bool no_server_paths    = false;
-		bool measure            = false;
-		bool measure_each_pos   = false;
-#ifdef TAU_PARSER_MEASURE_SCOPES
-		bool measure_forest     = true;
-		bool measure_preprocess = true;
-#else
-		bool measure_forest     = false;
-		bool measure_preprocess = false;
-#endif
-		std::string start{};
-		parser_type::error::info_lvl error_verbosity =
-			parser_type::error::info_lvl::INFO_BASIC;
-		parse_tree_path tree_path = parse_tree_path::bintree_path;
 		bool auto_disambiguate = true;
 		/// True when the user passed --auto-disambiguate on the command line.
 		bool auto_disambiguate_user_set = false;
@@ -179,7 +149,9 @@ struct tgf_repl_evaluator {
 	/// reload uses the stored text and needs no path. A built-in grammar
 	/// keeps its own source. The grammar name stays.
 	void make_grammar_source_backed();
-	[[nodiscard]] const std::string& start_symbol() const noexcept;
+	/// The start option, or the start literal of the grammar when the
+	/// option is empty. Empty with no grammar.
+	[[nodiscard]] std::string start_symbol() const;
 	[[nodiscard]] bool has_fixed_grammar() const noexcept;
 
 	/// Random id of the server session, empty in a standalone run. A
@@ -271,14 +243,14 @@ struct tgf_repl_evaluator {
 	void set_grammar_option(std::string_view name, idni::option_value v);
 	/// Declare tgf_repl_option_set and bind it to the fields of opt.
 	void bind_repl_options();
-	void update_opts_by_grammar_opts();
+	/// Declare parser_option_set and give each parse option its default,
+	/// before the first parser of the evaluator binds.
+	void reset_parse_options();
 	void apply_auto_disambiguate();
 
-	parser_type::parse_options get_parse_options();
 	std::ostream& pretty_print(std::ostream& os, tref n,
 		std::set<size_t> skip, bool nulls, size_t l);
 
-	size_t nt_id(const std::string& s);
 	std::string nt_name(size_t id) const;
 
 	/// One string for the production at index @p p, with no colors and

@@ -409,8 +409,12 @@ bool tgf_repl_evaluator::load_file_source(const std::string& filename) {
 	return load_source(filename, text);
 }
 
-const std::string& tgf_repl_evaluator::start_symbol() const noexcept {
-	return opt.start;
+std::string tgf_repl_evaluator::start_symbol() const {
+	if (!has_grammar()) return {};
+	auto start = idni::options().get_text("start");
+	if (start.has_value() && !start.value().empty())
+		return start.value();
+	return g().start_literal().to_std_string();
 }
 
 bool tgf_repl_evaluator::has_fixed_grammar() const noexcept {
@@ -480,8 +484,8 @@ void tgf_repl_evaluator::reprompt() {
 		if (has_grammar())
 			ss << TC_STATUS_FILE << "\"" << tgf_filename
 				<< "\"" << TC.CLEAR() << TC_STATUS << " ";
-		if (has_grammar() || !opt.start.empty())
-			ss << TC_STATUS_START << opt.start
+		if (has_grammar())
+			ss << TC_STATUS_START << start_symbol()
 				<< TC.CLEAR() << TC_STATUS << " ]"
 				<< TC.CLEAR() << " ";
 		else
@@ -524,7 +528,7 @@ bool tgf_repl_evaluator::load_file(const std::string& filename) {
 	auto next_nts = make_unique<nonterminals_type>();
 	tgf_directives dirs;
 	auto gr = tgf<char_type, terminal_type>::from_file(*next_nts, filename,
-		opt.measure, &dirs);
+		idni::options().get<bool>("measure"), &dirs);
 	if (!gr.has_value()) {
 		report.append(std::move(gr).report());
 		return false;
@@ -534,11 +538,13 @@ bool tgf_repl_evaluator::load_file(const std::string& filename) {
 		default_parser_options<char_type, terminal_type>());
 	report.append(std::move(gr).report());
 
-	owned_nts     = std::move(next_nts);
-	owned_g       = std::move(next_grammar);
+	// the unbind of the old parser and grammar reads the old nonterminals
 	owned_p       = std::move(next_parser);
+	owned_g       = std::move(next_grammar);
+	owned_nts     = std::move(next_nts);
 	p_            = owned_p.get();
 	bind_grammar_options();
+	report.append(p().bind_options().report());
 	tgf_filename = filename;
 	grammar_source.clear();
 	grammar_from_source = false;
@@ -554,7 +560,7 @@ bool tgf_repl_evaluator::load_source(const std::string& name,
 	auto next_nts = make_unique<nonterminals_type>();
 	tgf_directives dirs;
 	auto gr = tgf<char_type, terminal_type>::from_string(*next_nts, text,
-		opt.measure, &dirs);
+		idni::options().get<bool>("measure"), &dirs);
 	if (!gr.has_value()) {
 		report.append(std::move(gr).report());
 		return false;
@@ -564,24 +570,21 @@ bool tgf_repl_evaluator::load_source(const std::string& name,
 		default_parser_options<char_type, terminal_type>());
 	report.append(std::move(gr).report());
 
-	owned_nts           = std::move(next_nts);
-	owned_g             = std::move(next_grammar);
+	// the unbind of the old parser and grammar reads the old nonterminals
 	owned_p             = std::move(next_parser);
+	owned_g             = std::move(next_grammar);
+	owned_nts           = std::move(next_nts);
 	p_                  = owned_p.get();
 	bind_grammar_options();
+	report.append(p().bind_options().report());
 	tgf_filename        = name;
 	grammar_source      = text;
 	grammar_from_source = true;
 	grammar_loaded      = true;
 	directives_ = directives_to_value(dirs);
 	directives_cached = true;
-	update_opts_by_grammar_opts();
 	apply_auto_disambiguate();
 	return true;
-}
-
-size_t tgf_repl_evaluator::nt_id(const std::string& s) {
-	return g().nt(from_str<char_type>(s)).n();
 }
 
 std::string tgf_repl_evaluator::nt_name(size_t id) const {
@@ -609,19 +612,8 @@ void tgf_repl_evaluator::bind_repl_options() {
 	repl_options_bound = true;
 	// a constructor input is the initial value, so no value that an
 	// evaluator before this one left in the repository reaches the field
-	for (const auto& owner : { "parse", "repl", "ui" }) opts.reset(owner);
+	for (const auto& owner : { "repl", "ui" }) opts.reset(owner);
 	auto bind = [&](auto r) { report.append(r.report()); };
-	bind(opts.bind("gc", opt.gc));
-	bind(opts.bind("debug", opt.debug));
-	bind(opts.bind("measure", opt.measure));
-	bind(opts.bind("measure-each-pos", opt.measure_each_pos));
-	bind(opts.bind("measure-forest", opt.measure_forest));
-	bind(opts.bind("measure-preprocess", opt.measure_preprocess));
-	bind(opts.bind("error-verbosity", opt.error_verbosity,
-		detail::error_verbosity_codec<char_type, terminal_type>{}));
-	bind(opts.bind("tree-path", opt.tree_path,
-		detail::tree_path_codec{}));
-	bind(opts.bind("start", opt.start));
 	bind(opts.bind("print-terminals", opt.print_terminals));
 	bind(opts.bind("status", opt.status));
 	bind(opts.bind("print-ambiguity", opt.print_ambiguity));
@@ -634,9 +626,12 @@ void tgf_repl_evaluator::bind_repl_options() {
 	}));
 }
 
-void tgf_repl_evaluator::update_opts_by_grammar_opts() {
-	if (opt.start.size() == 0)
-		opt.start = g().start_literal().to_std_string();
+void tgf_repl_evaluator::reset_parse_options() {
+	auto& opts = idni::options();
+	report.append(opts.declare(parser_option_set).report());
+	// a load keeps the parse options, a new evaluator starts from the
+	// defaults
+	opts.reset("parse");
 }
 
 // TODO (HIGH) replace by generic option origin tracking: every option
@@ -745,36 +740,12 @@ format::json::value tgf_repl_evaluator::parsed(parser_type::result& r,
 	return v;
 }
 
-tgf_repl_evaluator::parser_type::parse_options
-	tgf_repl_evaluator::get_parse_options()
-{
-	parser_type::parse_options po{
-		.start              = nt_id(opt.start),
-		.measure            = opt.measure,
-		.measure_each_pos   = opt.measure_each_pos,
-		.measure_forest     = opt.measure_forest,
-		.measure_preprocess = opt.measure_preprocess,
-		.debug              = opt.debug,
-		.error_verbosity    = opt.error_verbosity,
-		.tree_path          = opt.tree_path,
-		.enable_gc          = opt.gc
-	};
-	if (opt.measure) { /// `opt.measure` is a master ENABLE for now
-		po.measure_scopes       = true;
-		po.measure_counters     = true;
-		po.measure_forest       = true;
-		po.measure_preprocess   = true;
-	}
-	return po;
-}
-
 format::json::value tgf_repl_evaluator::parse(const char* input, size_t size,
 	std::string& text)
 {
 	if (!require_grammar()) return format::json::value::object();
 	if (!good()) return format::json::value::object();
-	auto po = get_parse_options();
-	auto r = p().parse(input, size, po);
+	auto r = p().parse(input, size);
 	return parsed(r, text);
 }
 
@@ -783,8 +754,7 @@ format::json::value tgf_repl_evaluator::parse(istream& instream,
 {
 	if (!require_grammar()) return format::json::value::object();
 	if (!good()) return format::json::value::object();
-	auto po = get_parse_options();
-	auto r = p().parse(instream, po);
+	auto r = p().parse(instream);
 	return parsed(r, text);
 }
 
@@ -793,8 +763,7 @@ format::json::value tgf_repl_evaluator::parse(const string& infile,
 {
 	if (!require_grammar()) return format::json::value::object();
 	if (!good()) return format::json::value::object();
-	auto po = get_parse_options();
-	auto r = p().parse(infile, po);
+	auto r = p().parse(infile);
 	return parsed(r, text);
 }
 
@@ -848,7 +817,6 @@ format::json::value tgf_repl_evaluator::production_id_entry(
 
 bool tgf_repl_evaluator::load_grammar(const std::string& new_tgf_file) {
 	if (!load_file(new_tgf_file)) return false;
-	update_opts_by_grammar_opts();
 	apply_auto_disambiguate();
 	return true;
 }
@@ -1203,7 +1171,8 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 	cmd_result res;
 	res.cmd = command_name(nt);
 	{
-		auto _ = report.open_if(opt.measure || nt == p::parse_cmd,
+		auto _ = report.open_if(
+			idni::options().get<bool>("measure") || nt == p::parse_cmd,
 			tgf_repl_parser::instance().name(nt),
 			idni::diagnostics::code::info_micros);
 		switch (nt) {
@@ -1296,16 +1265,17 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 		}
 		case p::start_cmd: {
 			auto n = s | p::symbol;
-			string start;
 			bool changed = false;
-			if (n.has_value()
-				&& (start = n | tt::terminals).size()) {
-				opt.start = start;
-				changed = true;
+			if (n.has_value()) {
+				auto r = idni::options().set_text("start",
+					n | tt::terminals);
+				changed = !r.has_error();
+				report.append(r.report());
 			}
+			const string start = start_symbol();
 			auto v = value::object();
-			v.set("start", opt.start.empty() ? value::null()
-				: value::string(opt.start))
+			v.set("start", start.empty() ? value::null()
+				: value::string(start))
 			 .set("changed", value::boolean(changed));
 			res.data = std::move(v);
 			break;
@@ -1314,7 +1284,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			if (!require_grammar()) break;
 			auto n = s | p::symbol;
 			string start = n.has_value()
-				? n | tt::terminals : opt.start;
+				? n | tt::terminals : start_symbol();
 			auto v = value::object();
 			v.set("start", value::string(start));
 			auto prods = value::array();
@@ -1355,7 +1325,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			if (!require_grammar()) break;
 			auto n = s | p::symbol;
 			string start = n.has_value()
-				? n | tt::terminals : opt.start;
+				? n | tt::terminals : start_symbol();
 			auto unreachable = g().unreachable_productions(
 				g().nt(start));
 			auto v = value::object();
@@ -1435,8 +1405,9 @@ eval_result tgf_repl_evaluator::run(const std::string& src,
 	}
 	if (!opt.json_api) {
 		r.print_ambiguous_nodes(cout);
-		if (opt.debug) pretty_print(cout << "input command graph:\n",
-			r.get_shaped_tree2(), {}, false, 1);
+		if (idni::options().get<bool>("debug"))
+			pretty_print(cout << "input command graph:\n",
+				r.get_shaped_tree2(), {}, false, 1);
 	}
 	tref ref = r.get_shaped_tree2();
 	auto t = tt(ref);
@@ -1891,10 +1862,10 @@ tgf_repl_evaluator::tgf_repl_evaluator(std::string tgf_file, options opt)
 	: opt(opt), tgf_filename(std::move(tgf_file))
 {
 	TC.set(opt.json_api ? false : opt.colors);
+	reset_parse_options();
 	const bool loaded = load_file(tgf_filename);
 	bind_repl_options();
 	if (!loaded) return;
-	update_opts_by_grammar_opts();
 	apply_auto_disambiguate();
 }
 
@@ -1902,12 +1873,14 @@ tgf_repl_evaluator::tgf_repl_evaluator(options opt)
 	: opt(opt)
 {
 	TC.set(opt.json_api ? false : opt.colors);
+	reset_parse_options();
 	owned_nts = make_unique<nonterminals_type>();
 	owned_g = make_unique<grammar_type>(*owned_nts);
 	owned_p = make_unique<parser_type>(*owned_g,
 		default_parser_options<char_type, terminal_type>());
 	p_ = owned_p.get();
 	bind_grammar_options();
+	report.append(p().bind_options().report());
 	bind_repl_options();
 }
 
@@ -1936,31 +1909,23 @@ tgf_repl_evaluator::tgf_repl_evaluator(
 	// The directives snapshot is parsed lazily on the first
 	// directives_value() call, so a run that never asks for it pays
 	// nothing for the built-in grammar.
+	reset_parse_options();
 	bind_grammar_options();
+	report.append(p().bind_options().report());
 	bind_repl_options();
-	update_opts_by_grammar_opts();
 	apply_auto_disambiguate();
 }
 
 // A fixed grammar usually outlives the evaluator, and the repository of
 // the thread can end before it.
 tgf_repl_evaluator::~tgf_repl_evaluator() {
-	if (p_) g().unbind_options();
+	if (p_) {
+		g().unbind_options();
+		p().unbind_options();
+	}
 	if (repl_options_bound)
 		for (const auto& o : tgf_repl_option_set.options)
 			idni::options().unbind(o.name);
-}
-
-static tgf_repl_evaluator::parser_type::error::info_lvl
-str2error_verbosity(const string& str)
-{
-	using evaluator = tgf_repl_evaluator;
-	auto l = detail::error_verbosity_codec<evaluator::char_type,
-		evaluator::terminal_type>{}.from_value(str);
-	if (l.has_value()) return l.value();
-	cerr << "error: invalid error-verbosity: "
-		"\"" << str << "\". setting to \"basic\"\n";
-	return evaluator::parser_type::error::info_lvl::INFO_BASIC;
 }
 
 static int run_tests(
@@ -2006,8 +1971,6 @@ static tgf_repl_evaluator::options
 		cmd.get<bool>("status");
 	if (cmd.has("colors"))                  tgf_repl_opt.colors =
 		cmd.get<bool>("colors");
-	if (cmd.has("measure"))                 tgf_repl_opt.measure =
-		cmd.get<bool>("measure");
 	if (cmd.has("json")) {
 		tgf_repl_opt.print_json = cmd.get<bool>("json");
 		tgf_repl_opt.json_api  = tgf_repl_opt.print_json;
@@ -2022,21 +1985,23 @@ static tgf_repl_evaluator::options
 		cmd.get<bool>("tml-rules");
 	if (cmd.has("tml-facts"))               tgf_repl_opt.tml_facts =
 		cmd.get<bool>("tml-facts");
-	if (cmd.has("error-verbosity"))         tgf_repl_opt.error_verbosity =
-		str2error_verbosity(cmd.get<string>("error-verbosity"));
-	if (cmd.has("start"))
-		tgf_repl_opt.start = cmd.get<string>("start");
-	if (cmd.has("tree-path"))
-		tgf_repl_opt.tree_path =
-			cmd.get<string>("tree-path") == "forest"
-				? parse_tree_path::forest_path
-				: parse_tree_path::bintree_path;
 	if (user_passed_long_flag(argv, "auto-disambiguate")) {
 		tgf_repl_opt.auto_disambiguate =
 			cmd.get<bool>("auto-disambiguate");
 		tgf_repl_opt.auto_disambiguate_user_set = true;
 	}
 	return tgf_repl_opt;
+}
+
+// The parser owns these options, so they go in by name once the evaluator
+// has its parser. An error goes to the report of @p re.
+static void parse_options_from_cmd(const cli::command& cmd,
+	tgf_repl_evaluator& re)
+{
+	if (cmd.has("measure"))
+		re.set_cmd("measure", cmd.get<bool>("measure") ? "true" : "false");
+	for (const char* name : { "error-verbosity", "start", "tree-path" })
+		if (cmd.has(name)) re.set_cmd(name, cmd.get<string>(name));
 }
 
 static parser_gen_options gen_options_from_cmd(const cli::command& cmd) {
@@ -2506,6 +2471,7 @@ int tgf_specialized_run(int argc, char** argv,
 	tgf_repl_evaluator re(parser, tgf_label, grammar_source,
 		repl_options_from_cmd(cmd, args));
 	if (!re.good()) return re.flush_report(), 1;
+	parse_options_from_cmd(cmd, re);
 
 	return run_command(cl, cmd, re);
 }
@@ -2539,6 +2505,7 @@ int tgf_run(int argc, char** argv) {
 	if (!provided) {
 		tgf_repl_evaluator re(repl_options_from_cmd(cmd, args));
 		if (!re.good()) return re.flush_report(), 1;
+		parse_options_from_cmd(cmd, re);
 		return run_command(cl, cmd, re);
 	}
 	if (!exists) return cl.error("TGF file does not exist ", true);
@@ -2549,11 +2516,13 @@ int tgf_run(int argc, char** argv) {
 		tgf_repl_evaluator re(repl_options_from_cmd(cmd, args));
 		if (!re.load_file_source(tgf_file))
 			return re.flush_report(), 1;
+		parse_options_from_cmd(cmd, re);
 		return run_command(cl, cmd, re);
 	}
 
 	tgf_repl_evaluator re(tgf_file, repl_options_from_cmd(cmd, args));
 	if (!re.good()) return re.flush_report(), 1;
+	parse_options_from_cmd(cmd, re);
 
 	return run_command(cl, cmd, re);
 }

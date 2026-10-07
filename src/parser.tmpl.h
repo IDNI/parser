@@ -284,10 +284,18 @@ idni::diagnostics::result<void> parser<C, T>::bind_to(
 	r.merge(repo.bind("gc", f.enable_gc, sync));
 	r.merge(repo.bind("gc-lag", f.gc_lag, sync));
 	r.merge(repo.bind("max-length", f.max_length, sync));
-	r.merge(repo.bind("measure", f.measure, sync));
+	// measure is the switch of every measurement
+	r.merge(repo.bind("measure", f.measure, [this] {
+		auto& m = o.parse_opts;
+		if (m.measure) m.measure_scopes = m.measure_counters
+			= m.measure_forest = m.measure_preprocess = true;
+		po = o.parse_opts;
+	}));
 	r.merge(repo.bind("measure-each-pos", f.measure_each_pos, sync));
 	r.merge(repo.bind("measure-forest", f.measure_forest, sync));
 	r.merge(repo.bind("measure-preprocess", f.measure_preprocess, sync));
+	r.merge(repo.bind("measure-scopes", f.measure_scopes, sync));
+	r.merge(repo.bind("measure-counters", f.measure_counters, sync));
 	r.merge(repo.bind("debug", f.debug, sync));
 	r.merge(repo.bind("error-verbosity", f.error_verbosity,
 		detail::error_verbosity_codec<C, T>{}, sync));

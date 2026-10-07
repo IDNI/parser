@@ -1022,7 +1022,7 @@ TEST_SUITE("tgf json api: option commands") {
 			REQUIRE(data->find("value") != nullptr);
 			CHECK(data->find("value")->as_bool() == want[i]);
 		}
-		CHECK(!re.get_parse_options().enable_gc);
+		CHECK(!idni::options().get<bool>("gc"));
 	}
 }
 
@@ -1284,36 +1284,27 @@ TEST_SUITE("tgf json api: no grammar") {
 		CHECK(s->find("char_classes")->size() == 0);
 	}
 
-	TEST_CASE("set start and get start in eval and structured form") {
+	TEST_CASE("set start with no grammar is an error") {
 		auto r = run_repl_no_grammar({
 			eval_request(1, "set start foo"),
 			R"({"id":2,"cmd":"get","option":"start"})",
-			eval_request(3, "get start"),
-			R"({"id":4,"cmd":"set","option":"start","value":"bar"})",
-			R"({"id":5,"cmd":"get","option":"start"})" });
-		REQUIRE(r.responses.size() == 5);
+			R"({"id":3,"cmd":"set","option":"start","value":"bar"})",
+			eval_request(4, "get start") });
+		REQUIRE(r.responses.size() == 4);
 		auto res1 = r.responses[0].find("results");
 		REQUIRE(res1 != nullptr);
 		REQUIRE(res1->size() == 1);
-		CHECK((*res1)[0].find("result")->find("option")
-			->as_string() == "start");
-		CHECK((*res1)[0].find("result")->find("value")
-			->as_string() == "foo");
-		CHECK(r.responses[0].find("state")->find("start")
-			->as_string() == "foo");
-		CHECK(result_of(r.responses[1])->find("value")
-			->as_string() == "foo");
-		CHECK(r.responses[1].find("state")->find("start")
-			->as_string() == "foo");
-		auto res3 = r.responses[2].find("results");
-		REQUIRE(res3 != nullptr);
-		REQUIRE(res3->size() == 1);
-		CHECK((*res3)[0].find("result")->find("value")
-			->as_string() == "foo");
-		CHECK(result_of(r.responses[3])->find("value")
-			->as_string() == "bar");
-		CHECK(result_of(r.responses[4])->find("value")
-			->as_string() == "bar");
+		CHECK((*res1)[0].find("status")->as_string() == "error");
+		CHECK(r.responses[0].find("state")->find("start")->is_null());
+		REQUIRE(result_of(r.responses[1]) != nullptr);
+		REQUIRE(result_of(r.responses[1])->find("value") != nullptr);
+		CHECK(result_of(r.responses[1])->find("value")->as_string()
+			== "");
+		CHECK(r.responses[2].find("status")->as_string() == "error");
+		const json::value* data = response_data(r.responses[3]);
+		REQUIRE(data != nullptr);
+		REQUIRE(data->find("value") != nullptr);
+		CHECK(data->find("value")->as_string() == "");
 	}
 
 	TEST_CASE("the start command gives null with no start symbol") {
@@ -1358,22 +1349,22 @@ TEST_SUITE("tgf json api: no grammar") {
 			CHECK(resp.find("status")->as_string() == "ok");
 	}
 
-	TEST_CASE("start before load is kept and load then parses") {
+	TEST_CASE("start before load is an error and load then parses") {
 		auto r = run_repl_no_grammar({
 			R"({"id":1,"cmd":"start","symbol":"num"})",
 			file_request(2, "load", grammar_path()),
 			R"({"id":3,"cmd":"start"})",
 			R"({"id":4,"cmd":"parse","input":"123"})" });
 		REQUIRE(r.responses.size() == 4);
-		CHECK(r.responses[0].find("status")->as_string() == "ok");
+		CHECK(r.responses[0].find("status")->as_string() == "error");
 		REQUIRE(r.responses[0].find("result")->find("changed")
 			!= nullptr);
-		CHECK(r.responses[0].find("result")->find("changed")
+		CHECK(!r.responses[0].find("result")->find("changed")
 			->as_bool());
 		CHECK(r.responses[1].find("result")->find("loaded")
 			->as_bool());
 		CHECK(r.responses[2].find("result")->find("start")
-			->as_string() == "num");
+			->as_string() == "start");
 		CHECK(r.responses[3].find("status")->as_string() == "ok");
 		CHECK(r.responses[3].find("result")->find("tree")
 			!= nullptr);
