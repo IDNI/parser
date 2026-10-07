@@ -649,6 +649,90 @@ grammar<C, T>::grammar(std::shared_ptr<nonterminals<C, T>> nts_,
 	set_enabled_productions(opt.enabled_guards);
 	//DBG(print_data(std::cout << "\n", "\t") << "\n\n";)
 }
+// The source unbinds before its fields move, so the repository keeps their
+// values for the bind of this grammar.
+template <typename C, typename T>
+grammar<C, T>::grammar(grammar&& o) : grammar(std::move(o), o.release_options())
+{}
+template <typename C, typename T>
+grammar<C, T>::grammar(grammar&& o, options_repository* repo)
+	: opt(std::move(o.opt)), nts_handle_(std::move(o.nts_handle_)),
+	  nts(o.nts), start(std::move(o.start)), cc_fns(std::move(o.cc_fns)),
+	  ntsm(std::move(o.ntsm)), ntsm_by_nt(std::move(o.ntsm_by_nt)),
+	  grdm(std::move(o.grdm)), guards(std::move(o.guards)),
+	  nullables(std::move(o.nullables)),
+	  conjunctives(std::move(o.conjunctives)), G(std::move(o.G)),
+	  source_productions_(o.source_productions_),
+	  cc_char_prods_(std::move(o.cc_char_prods_)),
+	  cc_char_prod_ids_(std::move(o.cc_char_prod_ids_)),
+	  cc_ps_states_(std::move(o.cc_ps_states_)),
+	  cc_active_guards_(std::move(o.cc_active_guards_)),
+	  cc_prod_exprs_(std::move(o.cc_prod_exprs_)),
+	  cc_inner_nts_(std::move(o.cc_inner_nts_)),
+	  cc_excluded_nts_(std::move(o.cc_excluded_nts_)),
+	  cc_source_prods_(std::move(o.cc_source_prods_)),
+	  dynamic_(std::move(o.dynamic_)),
+	  dynamic_idx_(std::move(o.dynamic_idx_)),
+	  pending_(std::move(o.pending_)), active_grow_(o.active_grow_)
+{
+	if (!repo) return;
+	auto r = bind_to(*repo);
+	DBG(assert(!r.has_error() && "a moved grammar binds its options");)
+}
+template <typename C, typename T>
+grammar<C, T>::~grammar() { unbind_options(); }
+template <typename C, typename T>
+idni::diagnostics::result<void> grammar<C, T>::bind_options() {
+	idni::diagnostics::result<void> r;
+	if (options_repo_) return r;
+	// qualified, because grammar::options names the struct of the fields
+	options_repository& repo = idni::options();
+	if (!r.merge_ok(repo.declare(grammar_option_set))) return r;
+	r.merge(bind_to(repo));
+	return r;
+}
+template <typename C, typename T>
+idni::diagnostics::result<void> grammar<C, T>::bind_to(
+	options_repository& repo)
+{
+	using ids_codec   = detail::nonterminal_ids_codec<C, T>;
+	using paths_codec = detail::nonterminal_paths_codec<C, T>;
+	idni::diagnostics::result<void> r;
+	options_repo_ = &repo;
+	const ids_codec ids{ &nts };
+	const paths_codec paths{ &nts };
+	auto rebuild = [this] { set_enabled_productions(opt.enabled_guards); };
+	auto& sh = opt.shaping;
+	r.merge(repo.bind("auto-disambiguate", opt.auto_disambiguate));
+	r.merge(repo.bind("nodisambig-list", opt.nodisambig_list, ids));
+	r.merge(repo.bind("trim-terminals", sh.trim_terminals));
+	r.merge(repo.bind("inline-char-classes", sh.inline_char_classes));
+	r.merge(repo.bind("derive-char-classes", opt.derive_char_classes,
+		rebuild));
+	r.merge(repo.bind("trim", sh.to_trim, ids));
+	r.merge(repo.bind("trim-children", sh.to_trim_children, ids));
+	r.merge(repo.bind("trim-children-terminals",
+		sh.to_trim_children_terminals, ids));
+	r.merge(repo.bind("dont-trim-terminals-of", sh.dont_trim_terminals_of,
+		ids));
+	r.merge(repo.bind("inline", sh.to_inline, paths));
+	r.merge(repo.bind("enabled-productions", opt.enabled_guards,
+		detail::string_set_codec{}, rebuild));
+	return r;
+}
+template <typename C, typename T>
+void grammar<C, T>::unbind_options() {
+	if (!options_repo_) return;
+	for (const auto& o : grammar_option_set.options)
+		options_repo_->unbind(o.name);
+	options_repo_ = nullptr;
+}
+template <typename C, typename T>
+options_repository* grammar<C, T>::release_options() {
+	options_repository* repo = options_repo_;
+	unbind_options();
+	return repo;
+}
 template <typename C, typename T>
 void grammar<C, T>::set_enabled_productions(const std::set<std::string>& grds) {
 	opt.enabled_guards = grds;

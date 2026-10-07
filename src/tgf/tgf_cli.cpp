@@ -44,103 +44,103 @@ static const map<size_t, option_desc> option_table = {
 { tgf_repl_parser::error_verbosity_opt, {
 	tgf_repl_parser::error_verbosity_opt,
 	"error-verbosity", "error-verbosity:        ",
-	option_kind::string_value } },
+	tgf_option_kind::string_value } },
 { tgf_repl_parser::status_opt, {
 	tgf_repl_parser::status_opt,
 	"status", "show status:            ",
-	option_kind::boolean } },
+	tgf_option_kind::boolean } },
 { tgf_repl_parser::colors_opt, {
 	tgf_repl_parser::colors_opt,
 	"colors", "colors:                 ",
-	option_kind::boolean } },
+	tgf_option_kind::boolean } },
 { tgf_repl_parser::print_ambiguity_opt, {
 	tgf_repl_parser::print_ambiguity_opt,
 	"print-ambiguity", "print-ambiguity:        ",
-	option_kind::boolean } },
+	tgf_option_kind::boolean } },
 { tgf_repl_parser::print_graphs_opt, {
 	tgf_repl_parser::print_graphs_opt,
 	"print-graphs", "print-graphs:           ",
-	option_kind::boolean } },
+	tgf_option_kind::boolean } },
 { tgf_repl_parser::print_rules_opt, {
 	tgf_repl_parser::print_rules_opt,
 	"print-rules", "print-rules:            ",
-	option_kind::boolean } },
+	tgf_option_kind::boolean } },
 { tgf_repl_parser::print_facts_opt, {
 	tgf_repl_parser::print_facts_opt,
 	"print-facts", "print-facts:            ",
-	option_kind::boolean } },
+	tgf_option_kind::boolean } },
 { tgf_repl_parser::print_terminals_opt, {
 	tgf_repl_parser::print_terminals_opt,
 	"print-terminals", "print-terminals:        ",
-	option_kind::boolean } },
+	tgf_option_kind::boolean } },
 { tgf_repl_parser::measure_parsing_opt, {
 	tgf_repl_parser::measure_parsing_opt,
 	"measure-parsing", "measure-parsing:        ",
-	option_kind::boolean } },
+	tgf_option_kind::boolean } },
 { tgf_repl_parser::measure_each_pos_opt, {
 	tgf_repl_parser::measure_each_pos_opt,
 	"measure-each-pos", "measure-each:           ",
-	option_kind::boolean } },
+	tgf_option_kind::boolean } },
 { tgf_repl_parser::measure_forest_opt, {
 	tgf_repl_parser::measure_forest_opt,
 	"measure-forest", "measure-forest:         ",
-	option_kind::boolean } },
+	tgf_option_kind::boolean } },
 { tgf_repl_parser::measure_preprocess_opt, {
 	tgf_repl_parser::measure_preprocess_opt,
 	"measure-preprocess", "measure-preprocess:     ",
-	option_kind::boolean } },
+	tgf_option_kind::boolean } },
 { tgf_repl_parser::gc_opt, {
 	tgf_repl_parser::gc_opt,
 	"gc", "gc:                     ",
-	option_kind::boolean } },
+	tgf_option_kind::boolean } },
 { tgf_repl_parser::debug_opt, {
 	tgf_repl_parser::debug_opt,
 	"debug", "show debug:             ",
-	option_kind::boolean } },
+	tgf_option_kind::boolean } },
 { tgf_repl_parser::auto_disambiguate_opt, {
 	tgf_repl_parser::auto_disambiguate_opt,
 	"auto-disambiguate", "auto-disambiguate:      ",
-	option_kind::boolean } },
+	tgf_option_kind::boolean } },
 { tgf_repl_parser::trim_terminals_opt, {
 	tgf_repl_parser::trim_terminals_opt,
 	"trim-terminals", "trim-terminals:         ",
-	option_kind::boolean } },
+	tgf_option_kind::boolean } },
 { tgf_repl_parser::inline_cc_opt, {
 	tgf_repl_parser::inline_cc_opt,
 	"inline-char-classes", "inline-char-classes:    ",
-	option_kind::boolean } },
+	tgf_option_kind::boolean } },
 { tgf_repl_parser::derive_char_classes_opt, {
 	tgf_repl_parser::derive_char_classes_opt,
 	"derive-char-classes", "derive-char-classes:    ",
-	option_kind::boolean } },
+	tgf_option_kind::boolean } },
 { tgf_repl_parser::nodisambig_list_opt, {
 	tgf_repl_parser::nodisambig_list_opt,
 	"nodisambig-list", "nodisambig-list:        ",
-	option_kind::list } },
+	tgf_option_kind::list } },
 { tgf_repl_parser::enabled_prods_opt, {
 	tgf_repl_parser::enabled_prods_opt,
 	"enabled-productions", "enabled_productions:    ",
-	option_kind::list } },
+	tgf_option_kind::list } },
 { tgf_repl_parser::trim_opt, {
 	tgf_repl_parser::trim_opt,
 	"trim", "trim:                   ",
-	option_kind::list } },
+	tgf_option_kind::list } },
 { tgf_repl_parser::trim_children_opt, {
 	tgf_repl_parser::trim_children_opt,
 	"trim-children", "trim-children:          ",
-	option_kind::list } },
+	tgf_option_kind::list } },
 { tgf_repl_parser::trim_children_terminals_opt, {
 	tgf_repl_parser::trim_children_terminals_opt,
 	"trim-children-terminals", "trim-children-terminals:",
-	option_kind::list } },
+	tgf_option_kind::list } },
 { tgf_repl_parser::inline_opt, {
 	tgf_repl_parser::inline_opt,
 	"inline", "inline:                 ",
-	option_kind::treepaths } },
+	tgf_option_kind::treepaths } },
 { tgf_repl_parser::start_opt, {
 	tgf_repl_parser::start_opt,
 	"start", "start:                  ",
-	option_kind::symbol_value } },
+	tgf_option_kind::symbol_value } },
 };
 
 static const option_desc* find_option(size_t nt) {
@@ -2182,24 +2182,24 @@ static format::json::value option_request_value(size_t o, const tt& v) {
 	const option_desc* d = find_option(o);
 	if (!d) return value::null();
 	switch (d->kind) {
-	case option_kind::boolean:
+	case tgf_option_kind::boolean:
 		return value::boolean(get_bool_value(v));
-	case option_kind::string_value: {
+	case tgf_option_kind::string_value: {
 		auto t = v | tt::only_child | tt::nonterminal;
 		if (t == p::detailed_sym) return value::string("detailed");
 		if (t == p::root_cause_sym)
 			return value::string("root-cause");
 		return value::string("basic");
 	}
-	case option_kind::symbol_value:
+	case tgf_option_kind::symbol_value:
 		return value::string(v | tt::terminals);
-	case option_kind::list: {
+	case tgf_option_kind::list: {
 		value arr = value::array();
 		for (const auto& s : (v || p::symbol)())
 			arr.push_back(value::string(s | tt::terminals));
 		return arr;
 	}
-	case option_kind::treepaths: {
+	case tgf_option_kind::treepaths: {
 		value arr = value::array();
 		for (const auto& tp : (v || p::treepath)()) {
 			value path = value::array();

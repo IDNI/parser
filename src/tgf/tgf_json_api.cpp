@@ -96,10 +96,10 @@ static diagnostics::result<std::string> value_to_src(
 			parser_strings::messages::invalid_field_type);
 	};
 	switch (d.kind) {
-	case option_kind::boolean:
+	case tgf_option_kind::boolean:
 		if (!v.is_bool()) return type_error();
 		return ok_result(std::string(v.as_bool() ? "true" : "false"));
-	case option_kind::string_value: {
+	case tgf_option_kind::string_value: {
 		if (!v.is_string()) return type_error();
 		const std::string& s = v.as_string();
 		if (s != "basic" && s != "detailed" && s != "root-cause")
@@ -108,7 +108,7 @@ static diagnostics::result<std::string> value_to_src(
 				parser_strings::messages::invalid_error_verbosity);
 		return ok_result(s);
 	}
-	case option_kind::symbol_value: {
+	case tgf_option_kind::symbol_value: {
 		if (!v.is_string()) return type_error();
 		if (!is_symbol(v.as_string()))
 			return diagnostics::error<std::string>(
@@ -116,7 +116,7 @@ static diagnostics::result<std::string> value_to_src(
 				parser_strings::messages::invalid_symbol);
 		return ok_result(std::string(v.as_string()));
 	}
-	case option_kind::list: {
+	case tgf_option_kind::list: {
 		if (!v.is_array()) return type_error();
 		std::string out;
 		bool first = true;
@@ -130,7 +130,7 @@ static diagnostics::result<std::string> value_to_src(
 		}
 		return ok_result(std::move(out));
 	}
-	case option_kind::treepaths: {
+	case tgf_option_kind::treepaths: {
 		if (!v.is_array()) return type_error();
 		std::string out;
 		bool first = true;
@@ -250,7 +250,7 @@ static diagnostics::result<std::string> request_to_src(
 		if (!name.has_value()) return name;
 		const option_desc* d = option_desc_by_name(name.value());
 		if (!d) return unknown_opt();
-		if (d->kind != option_kind::boolean) return unknown_opt();
+		if (d->kind != tgf_option_kind::boolean) return unknown_opt();
 		return ok_result(cmd + " " + name.value());
 	}
 
@@ -259,8 +259,8 @@ static diagnostics::result<std::string> request_to_src(
 		if (!name.has_value()) return name;
 		const option_desc* d = option_desc_by_name(name.value());
 		if (!d) return unknown_opt();
-		if (d->kind != option_kind::list
-				&& d->kind != option_kind::treepaths)
+		if (d->kind != tgf_option_kind::list
+				&& d->kind != tgf_option_kind::treepaths)
 			return unknown_opt();
 		auto val = q.find("value");
 		if (!val) return missing();

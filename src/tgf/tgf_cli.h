@@ -57,13 +57,13 @@ struct eval_result {
 };
 
 /// One row for each REPL option, used by get_cmd() and render_text().
-enum class option_kind { boolean, string_value, symbol_value, list, treepaths };
+enum class tgf_option_kind { boolean, string_value, symbol_value, list, treepaths };
 
 struct option_desc {
 	size_t nt;          // tgf_repl_parser nonterminal
 	const char* name;   // long name and JSON key: "print-graphs"
 	const char* label;  // text label get prints: "print-graphs:  "
-	option_kind kind;   // value shape of this option
+	tgf_option_kind kind;   // value shape of this option
 };
 
 /// The option row for @p name, or nullptr when no option has that name.

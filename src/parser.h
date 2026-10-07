@@ -27,6 +27,7 @@
 #include "utility/forest.h"
 
 #include "parser_strings.h"
+#include "grammar_options.h"
 
 #define DEFAULT_BINARIZE false
 #define DEFAULT_INCR_GEN_FOREST false
@@ -506,6 +507,15 @@ struct grammar {
 	grammar(std::shared_ptr<nonterminals<C, T>> nts, const prods<C, T>& ps,
 		const prods<C, T>& start, const char_class_fns<T>& cc_fns,
 		options opt = {}, idni::diagnostics::report* diag = nullptr);
+	/// The options of @p o stay bound, now to the fields of this grammar.
+	grammar(grammar&& o);
+	grammar(const grammar&) = delete;
+	grammar& operator=(const grammar&) = delete;
+	~grammar();
+	/// Declare the grammar options in options() and bind each to its field.
+	[[nodiscard]] idni::diagnostics::result<void> bind_options();
+	/// Unbind every option that bind_options() bound.
+	void unbind_options();
 	/// Sets guards of enabled productions
 	void set_enabled_productions(const std::set<std::string>&);
 	/**
@@ -659,6 +669,12 @@ struct grammar {
 	std::set<std::pair<lit<C,T>, std::array<size_t,2>>>
 	derive_all(const std::vector<std::pair<lit<C,T>, size_t>>& seeds) const;
 private:
+	/// Moves @p o, whose options @p repo held, and binds them here.
+	grammar(grammar&& o, options_repository* repo);
+	/// Unbind the options and give the repository that held them.
+	options_repository* release_options();
+	[[nodiscard]] idni::diagnostics::result<void> bind_to(
+		options_repository& repo);
 	bool all_nulls(const lits<C, T>& a) const;
 	/// Adds each value as a host value for l: a brand new production, or
 	/// an existing pending/committed/retired one promoted to host so
@@ -701,6 +717,7 @@ private:
 	void unpend(size_t idx);
 	static std::shared_ptr<nonterminals<C, T>> table_or_new(
 		std::shared_ptr<nonterminals<C, T>> nts);
+	// a new data member is also moved in the private move constructor
 	/// Owns the table when the grammar was built without a caller-provided
 	/// one. Aliases the caller's table otherwise.
 	std::shared_ptr<nonterminals<C, T>> nts_handle_;
@@ -812,6 +829,8 @@ private:
 	/// ((size_t)-1, (size_t)-1) outside a firing.
 	std::pair<size_t, size_t> active_grow_ =
 		{ static_cast<size_t>(-1), static_cast<size_t>(-1) };
+	/// The repository of the bound options, or null when none is bound.
+	options_repository* options_repo_ = nullptr;
 };
 
 /**

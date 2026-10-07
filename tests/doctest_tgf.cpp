@@ -3,7 +3,7 @@
 
 // Tests for TGF grammar parsing - char terminals, literals, comments,
 // EBNF (optional, zero-or-any, plus, asterisk, group), directives,
-// and TGF-syntax boolean operators (&, ~).
+// TGF-syntax boolean operators (&, ~) and the bound grammar options.
 //
 // Stress tests live in doctest_stress.cpp.
 
@@ -11,6 +11,8 @@
 #include "doctest.h"
 #include "parser.h"
 #include "grammar_inspector.h"
+
+#include <sstream>
 
 using namespace std;
 using namespace idni;
@@ -493,5 +495,121 @@ TEST_SUITE("tgf: char class nonterminal ordering") {
 		auto gr = tgf<char>::from_string_presplit(nts, string(g_tgf));
 		REQUIRE(gr.has_value());
 		check_cc_nt_ordering(gr.value(), nts);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TEST SUITE: grammar options
+// ---------------------------------------------------------------------------
+
+TEST_SUITE("grammar options") {
+
+	static const char* options_tgf =
+		"start => x ws x.\n"
+		"x => 'x'.\n"
+		"ws => ' '.\n";
+
+	static grammar<char> options_grammar(nonterminals<char>& nts) {
+		auto gr = tgf<char>::from_string(nts, string(options_tgf));
+		REQUIRE(gr.has_value());
+		return std::move(gr).value();
+	}
+
+	static string text_of(options_repository& repo, string_view name) {
+		auto t = repo.get_text(name);
+		REQUIRE(t.has_value());
+		return t.value();
+	}
+
+	static size_t id_of(const nonterminals<char>& nts, const string& name) {
+		auto id = nts.find(name);
+		REQUIRE(id.has_value());
+		return *id;
+	}
+
+	TEST_CASE("bind_options binds the grammar fields") {
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		grammar<char> g = options_grammar(nts);
+		REQUIRE(g.bind_options().has_value());
+		CHECK(text_of(repo, "trim") == "");
+		REQUIRE(repo.set_text("trim", "ws").has_value());
+		CHECK(g.opt.shaping.to_trim == set<size_t>{ id_of(nts, "ws") });
+		CHECK(text_of(repo, "trim") == "ws");
+		REQUIRE(repo.set_text("inline", "start > x").has_value());
+		CHECK(g.opt.shaping.to_inline == set<vector<size_t>>{
+			{ id_of(nts, "start"), id_of(nts, "x") } });
+		CHECK(text_of(repo, "inline") == "start > x");
+		repo.set("auto-disambiguate", false);
+		CHECK(!g.opt.auto_disambiguate);
+		REQUIRE(repo.set_text("enabled-productions", "a, b").has_value());
+		CHECK(g.opt.enabled_guards == set<string>{ "a", "b" });
+		REQUIRE(repo.set_text("derive-char-classes", "false").has_value());
+		CHECK(!g.opt.derive_char_classes);
+	}
+
+	TEST_CASE("a name the grammar does not have is an error") {
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		grammar<char> g = options_grammar(nts);
+		REQUIRE(g.bind_options().has_value());
+		const size_t size = nts.size();
+		auto r = repo.set_text("trim", "nope");
+		CHECK(r.has_error());
+		ostringstream printed;
+		r.report().print(printed);
+		CHECK(printed.str().find("nope") != string::npos);
+		CHECK(g.opt.shaping.to_trim.empty());
+		CHECK(nts.size() == size);
+	}
+
+	TEST_CASE("a write before the bind goes into the field") {
+		options_repository repo;
+		options_scope scope(repo);
+		REQUIRE(repo.declare(grammar_option_set).has_value());
+		REQUIRE(repo.set_text("trim", "ws").has_value());
+		nonterminals<char> nts;
+		grammar<char> g = options_grammar(nts);
+		REQUIRE(g.bind_options().has_value());
+		CHECK(g.opt.shaping.to_trim == set<size_t>{ id_of(nts, "ws") });
+	}
+
+	TEST_CASE("a moved grammar keeps its options bound") {
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		grammar<char> g = options_grammar(nts);
+		REQUIRE(g.bind_options().has_value());
+		grammar<char> g2 = std::move(g);
+		REQUIRE(repo.set_text("trim", "x").has_value());
+		CHECK(g2.opt.shaping.to_trim == set<size_t>{ id_of(nts, "x") });
+	}
+
+	TEST_CASE("a surface of the tool stays for the next grammar") {
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		{
+			grammar<char> g = options_grammar(nts);
+			REQUIRE(g.bind_options().has_value());
+			REQUIRE(repo.add_surface("trim", { "parse", 't' })
+				.has_value());
+		}
+		grammar<char> g2 = options_grammar(nts);
+		CHECK(g2.bind_options().has_value());
+	}
+
+	TEST_CASE("the last value stays after the grammar ends") {
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		{
+			grammar<char> g = options_grammar(nts);
+			REQUIRE(g.bind_options().has_value());
+			REQUIRE(repo.set_text("trim", "ws").has_value());
+		}
+		CHECK(text_of(repo, "trim") == "ws");
 	}
 }

@@ -5,6 +5,8 @@ set(TAU_PARSER_HEADERS
 	forest.h
 	forest.tmpl.h
 	grammar.tmpl.h
+	grammar_options.h
+	grammar_options.tmpl.h
 	parser.h
 	parser.tmpl.h
 	parser_result.tmpl.h
