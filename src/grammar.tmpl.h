@@ -732,6 +732,16 @@ idni::diagnostics::result<void> grammar<C, T>::bind_to(
 	// the class analysis rejects the start rule
 	r.merge(repo.bind("start", start, detail::start_codec<C, T>{ &nts },
 		rebuild));
+	r.merge(repo.bind("char-classes", cc_fns,
+		detail::char_classes_codec<C, T>{ &nts }, [this] {
+			drop_char_class_caches();
+			set_enabled_productions(opt_.enabled_guards);
+		}));
+	r.merge(repo.bind("highlight-auto", opt_.highlight_heuristics));
+	r.merge(repo.bind("highlight", opt_.highlights,
+		detail::highlights_codec{}));
+	r.merge(repo.bind("dynamic", opt_.dynamic, detail::dynamic_codec<C>{},
+		[this] { apply_dynamic_values(); }));
 	return r;
 }
 template <typename C, typename T>
@@ -869,6 +879,28 @@ idni::diagnostics::result<void> grammar<C, T>::add_dynamic(
 	compute_nullables();
 	set_enabled_productions(opt_.enabled_guards);
 	return r;
+}
+// The option holds every host value, so a host value it lacks retires.
+template <typename C, typename T>
+void grammar<C, T>::apply_dynamic_values() {
+	for (auto& [idx, e] : dynamic_) {
+		if (e.st != dynamic_entry::state::host) continue;
+		auto it = opt_.dynamic.find(nts.get(e.l.n()));
+		if (it == opt_.dynamic.end() || std::find(it->second.begin(),
+			it->second.end(), e.value) == it->second.end())
+				retire(idx);
+	}
+	for (const auto& [name, values] : opt_.dynamic)
+		host_dynamic_values(nt(name), values);
+	compute_nullables();
+	set_enabled_productions(opt_.enabled_guards);
+}
+template <typename C, typename T>
+void grammar<C, T>::drop_char_class_caches() {
+	// a production after the source that is not dynamic is a class one
+	for (size_t p = source_productions_; p != G.size(); ++p)
+		if (!dynamic_.contains(p)) cc_char_prod_ids_.insert(p);
+	cc_ps_states_.clear(), cc_active_guards_.clear();
 }
 template <typename C, typename T>
 void grammar<C, T>::host_dynamic_values(const lit<C, T>& l,

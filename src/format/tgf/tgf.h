@@ -278,8 +278,8 @@ private:
 		std::set<std::string> cc_again{};
 		/// plain (non-glob) @highlight pattern names seen so far.
 		std::set<std::string> highlight_plain_names{};
-		/// grammar options
-		grammar<C, T>::options opt{};
+		/// @dynamic names seen so far, which have no production yet
+		std::set<std::string> dynamic_names{};
 		/// The directives of this load, so a load never writes into the
 		/// repository of the thread.
 		idni::options_repository own_;
@@ -314,6 +314,15 @@ private:
 			collect_cc_renames();
 			cc = predefined_char_classes<C, T>(cc_names, cc_renames,
 				nts, diag);
+			std::vector<std::string> cc_entries;
+			for (const auto& cc_name : cc_names)
+				if (auto it = cc_renames.find(cc_name);
+					it != cc_renames.end())
+						cc_entries.push_back(cc_name + std::string(
+							detail::char_class_as) + it->second);
+				else cc_entries.push_back(cc_name);
+			if (!cc_entries.empty())
+				edit_list("char-classes", cc_entries);
 			for (const auto& d : directive_nodes()) directive(d);
 			auto productions = statements || tgf_parser::production;
 			for (const auto& pr : productions()) production(pr);
@@ -351,7 +360,7 @@ private:
 				if (name.size() >= 2 && name[0] == '_'
 					&& name[1] == '_') continue;
 				// a @dynamic nonterminal has no alternatives yet
-				if (opt.dynamic.count(name)) continue;
+				if (dynamic_names.count(name)) continue;
 				diag->warning(
 					messages::unproductive_nonterminal,
 					{{ label::name, name }});
@@ -416,9 +425,15 @@ private:
 				dirs->inline_paths.push_back(std::move(names));
 			}
 			add_names(list("nodisambig-list"), dirs->ambiguous);
-			dirs->highlights = opt.highlights;
-			dirs->highlight_auto = opt.highlight_heuristics;
-			for (const auto& kv : opt.dynamic) {
+			// the builder writes the options only, and the bind in g()
+			// reports a bad entry
+			auto hl = detail::highlights_codec{}.from_value(
+				opts.value("highlight"));
+			if (hl.has_value()) dirs->highlights = hl.value();
+			dirs->highlight_auto = opts.get<bool>("highlight-auto");
+			auto dyn = detail::dynamic_codec<C>{}.from_value(
+				opts.value("dynamic"));
+			if (dyn.has_value()) for (const auto& kv : dyn.value()) {
 				std::vector<std::string> vals;
 				for (const auto& v : kv.second)
 					vals.push_back(
@@ -450,7 +465,7 @@ private:
 			// a presplit load of no statement never runs build()
 			keep(own_.declare(grammar_option_set));
 			grammar<C, T> gr(nts_handle, ps,
-				prods_t(nts(own_.get<std::string>("start"))), cc, opt,
+				prods_t(nts(own_.get<std::string>("start"))), cc, {},
 				diag);
 			// the bind pushes the directives through the codec, which
 			// reports a name the grammar does not have
@@ -636,7 +651,7 @@ private:
 	// ---- per-directive handlers ----
 
 	void use_dir(const trv& /*t*/) {
-		// cc_names already collected by collect_cc_names pre-pass
+		// the pre-pass collects the classes and writes char-classes
 	}
 
 	void start_dir(const trv& t) {
@@ -800,7 +815,7 @@ private:
 					args.push_back(dir_arg_text(
 						a | trv::only_child));
 				if (args.size() == 1 && args[0] == "auto") {
-					opt.highlight_heuristics = true;
+					set_option("highlight-auto", true);
 					continue;
 				}
 				if (diag) for (auto& a : args)
@@ -821,7 +836,7 @@ private:
 					{{ label::type_name, type_name }});
 				continue;
 			}
-			std::vector<std::string> patterns;
+			std::vector<std::string> entries;
 			for (auto& a :
 				(lists[1] || tgf_parser::dir_arg)()) {
 				auto child = a | trv::only_child;
@@ -835,15 +850,12 @@ private:
 						dynamic_value(a)) + '"';
 				else n = dir_arg_text(child);
 				if (n.empty()) continue;
-				patterns.push_back(n);
+				entries.push_back(type_name + ": " + n);
 				if (nt == tgf_parser::dir_sym
 					&& n.find('*') == std::string::npos)
 					highlight_plain_names.insert(n);
 			}
-			if (!patterns.empty())
-				opt.highlights.emplace_back(
-					std::move(type_name),
-					std::move(patterns));
+			if (!entries.empty()) edit_list("highlight", entries);
 		}
 	}
 
@@ -916,15 +928,17 @@ private:
 		}
 
 		auto declare = [&](const std::basic_string<C>& name) {
-			if (!name.empty()) opt.dynamic[name];
+			if (name.empty()) return;
+			dynamic_names.insert(idni::to_std_string(name));
+			edit_list("dynamic", { idni::to_std_string(name) + "=" });
 		};
 		auto add_values = [&](const std::basic_string<C>& name,
 			const std::vector<trv>& args)
 		{
 			if (name.empty()) return;
-			auto& kept = opt.dynamic[name];
-			std::set<std::basic_string<C>> seen(
-				kept.begin(), kept.end());
+			const std::string head = idni::to_std_string(name) + "=";
+			dynamic_names.insert(idni::to_std_string(name));
+			std::vector<std::string> entries;
 			for (auto& a : args) {
 				auto v = dynamic_value(a);
 				// an empty value would make the nonterminal nullable
@@ -935,8 +949,9 @@ private:
 							idni::to_std_string(name) }});
 					continue;
 				}
-				if (seen.insert(v).second) kept.push_back(v);
+				entries.push_back(head + idni::to_std_string(v));
 			}
+			edit_list("dynamic", entries);
 		};
 		auto pair_name = [&](const std::vector<trv>& args) {
 			if (args.empty()) return std::basic_string<C>{};

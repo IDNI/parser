@@ -213,6 +213,7 @@ repeat_group   => '{' _ alternation _ '}'.
 
 This directive loads rules from other grammars or predefined rule lists.
 Currently it takes comma separated list of predefined character class function names used after a keyword `char class` or `char classes`.
+It writes the grammar option `char-classes`, with one entry `class` or `class as name` for each class.
 
 Usable names are the same names usable in `predefined_character_classes()` (see [character class functions](char_class_fns.md) for more information).
 
@@ -279,6 +280,7 @@ S => S S | S | '1'.
 Disable directive can disable a grammar option.
 
 Currently, only `auto_disambiguate` is available for disabling.
+`@disable disambiguation` writes the grammar option `auto-disambiguate`. `@disable x` removes the guard `x` from the grammar option `enabled-productions`, and `@enable x` adds it.
 
 Usage:
 ```
@@ -289,6 +291,7 @@ Usage:
 #### @ambiguous
 
 Accepts a comma separated list of symbols which are not disambiguated according to production rule order of grammar appearance.
+It writes the grammar option `nodisambig-list`.
 
 `@ambiguous symbol1, symbol2.`
 
@@ -296,6 +299,7 @@ Accepts a comma separated list of symbols which are not disambiguated according 
 #### @dynamic
 
 A `@dynamic` nonterminal takes its alternatives from the host program at run time, not from the grammar file. Each alternative is a plain terminal string.
+The directive writes the grammar option `dynamic`, with one entry `name=value` for each value, or `name=` for a name with no value.
 
 A `defaults` clause after the nonterminal name sets initial values. `,` separates the values inside one `defaults` clause. `;` separates several `@dynamic` declarations on one line. A value is a symbol or a quoted string, and a quoted string may hold an escape.
 A default value has one character or more. An empty value, for example `""`, is a load error.
@@ -318,6 +322,7 @@ Usage:
 #### @inline
 
 Inlining is a parsed tree shaping action which takes a node and replaces it with children or with a child from its subtree.
+It writes the grammar options `inline` and `inline-char-classes`.
 
 It accepts comma separated arguments which can be one of:
 - single symbol name which is to be replaced with all of its children
@@ -333,6 +338,7 @@ Usage:
 #### @trim
 
 Trim is a parsed tree shaping action which removes a node and its subtree from the parsed tree.
+It writes the grammar option `trim`.
 
 Usage:
 ```
@@ -343,6 +349,7 @@ Usage:
 #### @trim children
 
 Trim children removes children and its subtrees from a node.
+It writes the grammar option `trim-children`.
 
 Usage:
 ```
@@ -353,6 +360,7 @@ Usage:
 #### @trim all terminals
 
 This directive removes all terminals from the parsed tree.
+It writes the grammar option `trim-terminals`. The names after `except children of` go to the grammar option `dont-trim-terminals-of`.
 
 Usage:
 ```
@@ -363,6 +371,7 @@ Usage:
 #### @trim children terminals
 
 This directive removes terminal children from the nonterminals in a comma separated list.
+It writes the grammar option `trim-children-terminals`.
 
 Usage:
 ```

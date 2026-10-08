@@ -4,6 +4,8 @@
 #ifndef __IDNI__PARSER__GRAMMAR_OPTIONS_TMPL_H__
 #define __IDNI__PARSER__GRAMMAR_OPTIONS_TMPL_H__
 
+#include <algorithm>
+#include <iterator>
 #include <optional>
 #include <string_view>
 
@@ -23,6 +25,26 @@ inline const std::string* option_text_of(const option_value& v,
 	rep.error(diagnostics::code::type_error,
 		parser_strings::messages::option_value_kind);
 	return nullptr;
+}
+
+/// The entries of @p v, or an error in @p rep when the value is no list.
+inline const option_list* option_list_of(const option_value& v,
+	diagnostics::report& rep)
+{
+	if (const auto* l = std::get_if<option_list>(&v)) return l;
+	rep.error(diagnostics::code::type_error,
+		parser_strings::messages::option_value_kind);
+	return nullptr;
+}
+
+/// An error in @p rep that names the option and the entry it rejects.
+inline void option_bad_entry(diagnostics::report& rep,
+	std::string_view option, const std::string& entry)
+{
+	namespace ps = parser_strings;
+	rep.error(diagnostics::code::invalid_argument,
+		ps::messages::option_bad_value,
+		{ { ps::label::name, option }, { ps::label::value, entry } });
 }
 
 // find() and never get(), so a name the grammar lacks adds no nonterminal
@@ -144,6 +166,138 @@ diagnostics::result<lit<C, T>> start_codec<C, T>::from_value(
 	if (auto id = nonterminal_id(*nts, *name, r.report()))
 		return r.with_value(lit<C, T>(*id, nts));
 	return r;
+}
+
+inline constexpr std::string_view char_class_as = " as ";
+
+template <typename C, typename T>
+option_value char_classes_codec<C, T>::to_value(
+	const char_class_fns<T>& cc) const
+{
+	option_list out;
+	for (const auto& [id, fn] : cc.fns) {
+		if (cc.is_derived(id)) continue;
+		std::string name = to_std_string(nts->get(id));
+		// the empty nonterminal holds the class that matches nothing
+		if (name.empty()) continue;
+		if (auto it = cc.renamed.find(id); it != cc.renamed.end())
+			name = it->second + std::string(char_class_as) + name;
+		out.push_back(std::move(name));
+	}
+	return out;
+}
+
+template <typename C, typename T>
+diagnostics::result<char_class_fns<T>> char_classes_codec<C, T>::from_value(
+	const option_value& v) const
+{
+	diagnostics::result<char_class_fns<T>> r;
+	const option_list* entries = option_list_of(v, r.report());
+	if (!entries) return r;
+	std::vector<std::string> names;
+	std::map<std::string, std::string> renames;
+	for (const std::string& entry : *entries) {
+		const size_t as = entry.find(char_class_as);
+		if (as == std::string::npos) {
+			names.push_back(entry);
+			continue;
+		}
+		const std::string_view e(entry);
+		std::string cc = option_trim(e.substr(0, as));
+		std::string name = option_trim(
+			e.substr(as + char_class_as.size()));
+		if (cc.empty() || name.empty()
+			|| !renames.emplace(cc, std::move(name)).second)
+		{
+			option_bad_entry(r.report(), "char-classes", entry);
+			continue;
+		}
+		names.push_back(std::move(cc));
+	}
+	if (r.has_error()) return r;
+	auto cc = predefined_char_classes<C, T>(names, renames, *nts,
+		&r.report());
+	if (r.has_error()) return r;
+	return r.with_value(std::move(cc));
+}
+
+inline option_value highlights_codec::to_value(const pairs& hs) const {
+	option_list out;
+	for (const auto& [type, names] : hs)
+		for (const auto& name : names) out.push_back(type + ": " + name);
+	return out;
+}
+
+inline diagnostics::result<highlights_codec::pairs>
+	highlights_codec::from_value(const option_value& v) const
+{
+	diagnostics::result<pairs> r;
+	const option_list* entries = option_list_of(v, r.report());
+	if (!entries) return r;
+	pairs out;
+	for (const std::string& entry : *entries) {
+		// a pattern may hold a colon, a type never does
+		const size_t colon = entry.find(':');
+		std::string type = option_trim(
+			std::string_view(entry).substr(0, colon));
+		std::string name = colon == std::string::npos ? std::string()
+			: option_trim(std::string_view(entry).substr(colon + 1));
+		if (name.empty() || std::find(highlight_token_types.begin(),
+			highlight_token_types.end(), type)
+				== highlight_token_types.end())
+		{
+			option_bad_entry(r.report(), "highlight", entry);
+			continue;
+		}
+		auto it = std::find_if(out.begin(), out.end(),
+			[&type](const auto& p) { return p.first == type; });
+		if (it == out.end()) {
+			out.emplace_back(std::move(type), option_list{});
+			it = std::prev(out.end());
+		}
+		it->second.push_back(std::move(name));
+	}
+	if (r.has_error()) return r;
+	return r.with_value(std::move(out));
+}
+
+template <typename C>
+option_value dynamic_codec<C>::to_value(const values& m) const {
+	option_list out;
+	for (const auto& [name, vals] : m) {
+		const std::string head = to_std_string(name) + "=";
+		if (vals.empty()) out.push_back(head);
+		for (const auto& val : vals)
+			out.push_back(head + to_std_string(val));
+	}
+	return out;
+}
+
+template <typename C>
+diagnostics::result<typename dynamic_codec<C>::values>
+	dynamic_codec<C>::from_value(const option_value& v) const
+{
+	diagnostics::result<values> r;
+	const option_list* entries = option_list_of(v, r.report());
+	if (!entries) return r;
+	values out;
+	for (const std::string& entry : *entries) {
+		const size_t eq = entry.find('=');
+		std::string name = option_trim(
+			std::string_view(entry).substr(0, eq));
+		if (eq == std::string::npos || name.empty()) {
+			option_bad_entry(r.report(), "dynamic", entry);
+			continue;
+		}
+		auto& vals = out[from_str<C>(name)];
+		// `name=` declares the name and gives it no value
+		if (eq + 1 == entry.size()) continue;
+		auto val = from_str<C>(entry.substr(eq + 1));
+		if (std::find(vals.begin(), vals.end(), val) == vals.end())
+			vals.push_back(std::move(val));
+	}
+	if (r.has_error()) return r;
+	return r.with_value(std::move(out));
 }
 
 } // namespace detail

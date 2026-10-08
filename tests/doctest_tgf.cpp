@@ -693,6 +693,84 @@ TEST_SUITE("grammar options") {
 		CHECK(text_of(repo, "start") == "start");
 	}
 
+	TEST_CASE("char-classes loads the classes and a rename") {
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		auto gr = tgf<char>::from_string(nts,
+			string("@use char class alpha.\nstart => alpha | d.\n"));
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		REQUIRE(g.bind_options().has_value());
+		parser<char> p(g);
+		CHECK(text_of(repo, "char-classes") == "alpha");
+		CHECK(!parses(p, "5"));
+		REQUIRE(repo.set_text("char-classes", "alpha, digit as d")
+			.has_value());
+		CHECK(text_of(repo, "char-classes") == "alpha, digit as d");
+		CHECK(parses(p, "5"));
+		CHECK(parses(p, "a"));
+		CHECK(repo.set_text("char-classes", "nosuch").has_error());
+		CHECK(text_of(repo, "char-classes") == "alpha, digit as d");
+	}
+
+	TEST_CASE("highlight holds one entry per name") {
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		auto gr = load(nts, "@highlight keyword : x, ws.\n");
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		REQUIRE(g.bind_options().has_value());
+		CHECK(text_of(repo, "highlight") == "keyword: x, keyword: ws");
+		REQUIRE(repo.set_text("highlight", "keyword: x, operator: ws")
+			.has_value());
+		using pairs = vector<pair<string, vector<string>>>;
+		CHECK(g.opt().highlights == pairs{ { "keyword", { "x" } },
+			{ "operator", { "ws" } } });
+		CHECK(text_of(repo, "highlight") == "keyword: x, operator: ws");
+		CHECK(repo.set_text("highlight", "nosuch: x").has_error());
+	}
+
+	TEST_CASE("highlight-auto is the flag of @highlight auto") {
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		auto gr = load(nts, "@highlight auto.\n");
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		CHECK(g.opt().highlight_heuristics);
+		REQUIRE(g.bind_options().has_value());
+		repo.set("highlight-auto", false);
+		CHECK(!g.opt().highlight_heuristics);
+		CHECK(text_of(repo, "highlight-auto") == "false");
+	}
+
+	TEST_CASE("dynamic holds one entry per value") {
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		auto gr = tgf<char>::from_string(nts, string(
+			"@dynamic tn defaults a.\n@dynamic other.\n"
+			"start => tn | other.\n"));
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		REQUIRE(g.bind_options().has_value());
+		parser<char> p(g);
+		CHECK(text_of(repo, "dynamic") == "other=, tn=a");
+		CHECK(parses(p, "a"));
+		CHECK(!parses(p, "b"));
+		REQUIRE(repo.set_text("dynamic", "other=, tn=a, tn=b")
+			.has_value());
+		CHECK(text_of(repo, "dynamic") == "other=, tn=a, tn=b");
+		CHECK(parses(p, "b"));
+		REQUIRE(repo.set_text("dynamic", "tn=b").has_value());
+		CHECK(text_of(repo, "dynamic") == "tn=b");
+		CHECK(!parses(p, "a"));
+		CHECK(parses(p, "b"));
+		CHECK(repo.set_text("dynamic", "noeq").has_error());
+	}
+
 	TEST_CASE("an empty @dynamic value is a load error that names it") {
 		nonterminals<char> nts;
 		auto gr = tgf<char>::from_string(nts, string(

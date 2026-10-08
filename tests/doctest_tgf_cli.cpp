@@ -8,6 +8,8 @@
 #include "doctest.h"
 #include "../src/tgf/tgf_cli.h"
 
+#include <filesystem>
+#include <fstream>
 #include <initializer_list>
 #include <sstream>
 
@@ -246,6 +248,26 @@ TEST_SUITE("tgf cli: a load writes the command line again") {
 		CHECK(trim.find("EOL") != string::npos);
 		CHECK(last_line_with(out, "print-graphs:").find("on")
 			!= string::npos);
+	}
+}
+
+TEST_SUITE("tgf cli: grammar options") {
+
+	TEST_CASE("--char-classes adds a class to the loaded grammar") {
+		namespace fs = std::filesystem;
+		const string path = (fs::temp_directory_path()
+			/ "tgf_cli_char_classes.tgf").string();
+		{
+			ofstream f(path);
+			f << "start => alpha+.\n";
+		}
+		string without = capture_tgf_run({ "tgf", path, "parse",
+			"-e", "ab", "-c", "false" });
+		string with = capture_tgf_run({ "tgf", path, "parse",
+			"-e", "ab", "-c", "false", "--char-classes", "alpha" });
+		CHECK(without.find("parsed terminals: ab") == string::npos);
+		CHECK(with.find("parsed terminals: ab") != string::npos);
+		fs::remove(path);
 	}
 }
 

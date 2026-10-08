@@ -429,12 +429,6 @@ struct dynamic_context {
 template <typename C, typename T> struct grammar_inspector;
 template <typename C, typename T> class parser;
 
-/// @highlight token type legend, in index order.
-constexpr std::array<std::string_view, 8> highlight_token_types = {
-	"keyword", "operator", "string", "comment",
-	"number", "type", "variable", "delimiter",
-};
-
 /**
  * @brief Grammar struct required by parser.
  *
@@ -687,6 +681,12 @@ private:
 	/// constructor's opt_.dynamic loop and add_dynamic.
 	void host_dynamic_values(const lit<C, T>& l,
 		const std::vector<std::basic_string<C>>& values);
+	/// Hosts the values of opt_.dynamic and retires a host value that it
+	/// does not list. The hook of the option dynamic.
+	void apply_dynamic_values();
+	/// Unlinks the `A => ch` productions and drops the accept caches of
+	/// the old classes after a write of cc_fns. The hook of char-classes.
+	void drop_char_class_caches();
 	void compute_nullables();
 	/**
 	 * Relinks every nonterminal dynamic_idx_ or ctx has an opinion about
@@ -744,8 +744,9 @@ private:
 	/// One cached `A => ch` production per derived class and character,
 	/// shared by every guard state. Keyed by nonterminal then character.
 	std::map<size_t, std::map<T, size_t>> cc_char_prods_ = {};
-	/// Production indices of the derived class `A => ch` productions, so
-	/// the enabled-production index never links them.
+	/// Production indices of the derived class `A => ch` productions, and
+	/// of the class productions that a write of cc_fns made stale, so the
+	/// enabled-production index never links them.
 	std::set<size_t> cc_char_prod_ids_ = {};
 	/// Accept caches of a derived class per guard state, kept aside while
 	/// another guard state is active.

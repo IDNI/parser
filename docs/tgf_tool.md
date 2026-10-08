@@ -35,17 +35,21 @@ Options for `repl` command:
 tgf <tgf file> [ repl ] [ <options> ]
         --auto-disambiguate
                                    enables auto-disambiguation (default: true)
+        --char-classes             character classes of the grammar, an entry is a class or class as name
         --colors           -c      use terminal colors (default: true)
         --derive-char-classes
                                    scan rules that match one character as character classes (default: true)
         --dont-trim-terminals-of
                                    nonterminals whose terminals are kept
+        --dynamic                  default values for a @dynamic nonterminal, each entry written as name=value
         --enabled-productions
                            -G      comma-separated enabled productions
         --error-verbosity  -v      parse error verbosity: basic, detailed, root-cause (default: detailed)
         --evaluate         -e      run a REPL command and quit
         --grammar          -g      print the grammar (default: false)
         --help             -h      detailed information about options (default: false)
+        --highlight                highlight types, each entry written as type: nonterminal
+        --highlight-auto           highlight by name and content heuristics (default: false)
         --init-stdin               read one init line before the first hello, used by tgf serve (default: false)
         --inline                   tree paths to inline, each written as a > b
         --inline-char-classes
@@ -72,18 +76,21 @@ Options for `gen` command:
 tgf <tgf file> gen [ <options> ]
         --auto-disambiguate
                            -a      enables auto-disambiguation (default: true)
+        --char-classes             character classes of the grammar, an entry is a class or class as name
         --char-type        -C      input character type (e.g. char, char32_t) (default: char)
         --decoder          -d      decoder function
         --derive-char-classes
                                    scan rules that match one character as character classes (default: true)
         --dont-trim-terminals-of
                                    nonterminals whose terminals are kept
-        --dynamic          -D      default values for a @dynamic nonterminal
+        --dynamic          -D      default values for a @dynamic nonterminal, each entry written as name=value
         --enabled-productions
                            -G      comma-separated enabled productions
         --encoder          -e      encoder function
         --header-only      -H      keep the parser in a single header (default: true)
         --help             -h      detailed information about options (default: false)
+        --highlight                highlight types, each entry written as type: nonterminal
+        --highlight-auto           highlight by name and content heuristics (default: false)
         --inline                   tree paths to inline, each written as a > b
         --inline-char-classes
                                    inline character classes (default: false)
@@ -111,16 +118,20 @@ Options for `parse` command:
 tgf <tgf file> parse [ <options> ]
         --auto-disambiguate
                                    enables auto-disambiguation (default: true)
+        --char-classes             character classes of the grammar, an entry is a class or class as name
         --colors           -c      use terminal colors (default: true)
         --derive-char-classes
                            -d      scan rules that match one character as character classes (default: true)
         --dont-trim-terminals-of
                                    nonterminals whose terminals are kept
+        --dynamic                  default values for a @dynamic nonterminal, each entry written as name=value
         --enabled-productions
                            -G      comma-separated enabled productions
         --error-verbosity  -v      parse error verbosity: basic, detailed, root-cause (default: detailed)
         --grammar          -g      print the grammar (default: false)
         --help             -h      detailed information about options (default: false)
+        --highlight                highlight types, each entry written as type: nonterminal
+        --highlight-auto           highlight by name and content heuristics (default: false)
         --inline                   tree paths to inline, each written as a > b
         --inline-char-classes
                                    inline character classes (default: false)
@@ -153,15 +164,19 @@ tgf <tgf file> grammar [ <options> ]
                                    enables auto-disambiguation (default: true)
         --char-class-report
                            -C      print the derived character class report (default: false)
+        --char-classes             character classes of the grammar, an entry is a class or class as name
         --colors           -c      use terminal colors (default: true)
         --derive-char-classes
                                    scan rules that match one character as character classes (default: true)
         --dont-trim-terminals-of
                                    nonterminals whose terminals are kept
+        --dynamic                  default values for a @dynamic nonterminal, each entry written as name=value
         --enabled-productions
                            -G      comma-separated enabled productions
         --grammar          -g      print the grammar (default: true)
         --help             -h      detailed information about options (default: false)
+        --highlight                highlight types, each entry written as type: nonterminal
+        --highlight-auto           highlight by name and content heuristics (default: false)
         --inline                   tree paths to inline, each written as a > b
         --inline-char-classes
                                    inline character classes (default: false)
@@ -182,13 +197,17 @@ Options for `test` command:
 tgf <tgf file> test [ <options> ]
         --auto-disambiguate
                                    enables auto-disambiguation (default: true)
+        --char-classes             character classes of the grammar, an entry is a class or class as name
         --derive-char-classes
                                    scan rules that match one character as character classes (default: true)
         --dont-trim-terminals-of
                                    nonterminals whose terminals are kept
+        --dynamic                  default values for a @dynamic nonterminal, each entry written as name=value
         --enabled-productions
                            -G      comma-separated enabled productions
         --help             -h      detailed information about options (default: false)
+        --highlight                highlight types, each entry written as type: nonterminal
+        --highlight-auto           highlight by name and content heuristics (default: false)
         --inline                   tree paths to inline, each written as a > b
         --inline-char-classes
                                    inline character classes (default: false)

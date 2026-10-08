@@ -1964,7 +1964,6 @@ tgf_tool::tgf_tool() {
 	bind("name", gen.name);
 	bind("output-dir", gen.output_dir);
 	bind("output", gen.output);
-	bind("dynamic", gen.dynamic);
 	bind("namespace", gen.ns);
 	bind("header-only", gen.header_only);
 	bind("treemr", gen.treemr);
