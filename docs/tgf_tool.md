@@ -69,6 +69,8 @@ tgf <tgf file> [ repl ] [ <options> ]
         --trim-children-terminals
                                    nonterminals whose children and terminals are trimmed
         --trim-terminals           trim all terminals (default: false)
+        --variant                  the selected profile of enabled productions
+        --variants                 profiles of enabled productions, each entry written as name=guard
 ```
 
 Options for `gen` command:
@@ -109,6 +111,8 @@ tgf <tgf file> gen [ <options> ]
                                    nonterminals whose children and terminals are trimmed
         --trim-terminals           trim all terminals (default: false)
         --utf8             -U      shorthand: --char-type char --terminal-type char32_t with utf8 recoders (default: false)
+        --variant                  the selected profile of enabled productions
+        --variants                 profiles of enabled productions, each entry written as name=guard
 ```
 For more information about decoder and encoder functions see [recoders](recoders.md)
 
@@ -153,6 +157,8 @@ tgf <tgf file> parse [ <options> ]
         --trim-children-terminals
                                    nonterminals whose children and terminals are trimmed
         --trim-terminals           trim all terminals (default: false)
+        --variant                  the selected profile of enabled productions
+        --variants                 profiles of enabled productions, each entry written as name=guard
 ```
 
 `parse -e` and `repl -e` take their value as typed: the tool does not trim it and does not read quotes or escapes in it.
@@ -190,6 +196,8 @@ tgf <tgf file> grammar [ <options> ]
         --trim-children-terminals
                                    nonterminals whose children and terminals are trimmed
         --trim-terminals           trim all terminals (default: false)
+        --variant                  the selected profile of enabled productions
+        --variants                 profiles of enabled productions, each entry written as name=guard
 ```
 
 Options for `test` command:
@@ -218,6 +226,8 @@ tgf <tgf file> test [ <options> ]
         --trim-children-terminals
                                    nonterminals whose children and terminals are trimmed
         --trim-terminals           trim all terminals (default: false)
+        --variant                  the selected profile of enabled productions
+        --variants                 profiles of enabled productions, each entry written as name=guard
 ```
 
 See [`TGF test files`](tgf.test.md) for the `.tgf.test` file format that this command runs.
@@ -430,6 +440,8 @@ A list option can be additionally updated by `add` and `del` commands.
   highlight-auto            highlight by name and content heuristics                                      flag
   highlight                 highlight types, each entry written as type: nonterminal                      list
   dynamic                   default values for a @dynamic nonterminal, each entry written as name=value   list
+  variants                  profiles of enabled productions, each entry written as name=guard             list
+  variant                   the selected profile of enabled productions                                   text
 ```
 
 ### parse options

@@ -481,6 +481,10 @@ struct grammar {
 			highlights = {};
 		/// @highlight auto: enable name and content heuristics.
 		bool highlight_heuristics = false;
+		/// @variant: the production guards of each profile.
+		std::map<std::string, std::set<std::string>> variants = {};
+		/// The selected profile, empty when no profile has the guards.
+		std::string variant = {};
 		/**
 		 * @brief Scan a rule that always matches one character as a class.
 		 *

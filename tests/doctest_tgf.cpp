@@ -792,6 +792,147 @@ TEST_SUITE("grammar options") {
 		REQUIRE(repo.declare(grammar_option_set).has_value());
 		CHECK(text_of(repo, "start") == "start");
 	}
+
+	static const string variant_productions =
+		"start[a] => 'a'.\nstart[b] => 'b'.\n";
+	static const string variants_tgf =
+		"@variants va: a; vb: b.\n" + variant_productions;
+
+	// A grammar of variants_tgf with @p directives before it, bound to
+	// the current repository.
+	static grammar<char> variant_grammar(nonterminals<char>& nts,
+		const string& directives = {})
+	{
+		auto gr = tgf<char>::from_string(nts, directives + variants_tgf);
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		REQUIRE(g.bind_options().has_value());
+		return g;
+	}
+
+	TEST_CASE("the first profile is the default") {
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		grammar<char> g = variant_grammar(nts);
+		parser<char> p(g);
+		CHECK(text_of(repo, "variants") == "va=a, vb=b");
+		CHECK(text_of(repo, "variant") == "va");
+		CHECK(g.opt().enabled_guards == set<string>{ "a" });
+		CHECK(parses(p, "a"));
+		CHECK(!parses(p, "b"));
+	}
+
+	TEST_CASE("@variant selects a profile of guards") {
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		grammar<char> g = variant_grammar(nts, "@variant vb.\n");
+		parser<char> p(g);
+		CHECK(text_of(repo, "variant") == "vb");
+		CHECK(g.opt().enabled_guards == set<string>{ "b" });
+		CHECK(parses(p, "b"));
+		CHECK(!parses(p, "a"));
+		REQUIRE(repo.set_text("variant", "va").has_value());
+		CHECK(g.opt().enabled_guards == set<string>{ "a" });
+		CHECK(parses(p, "a"));
+		CHECK(!parses(p, "b"));
+	}
+
+	TEST_CASE("@variant takes a name with an underscore") {
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		auto gr = tgf<char>::from_string(nts, string(
+			"@variants a: x; b_c: y.\n@variant b_c.\n"
+			"start[x] => 'x'.\nstart[y] => 'y'.\n"));
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		REQUIRE(g.bind_options().has_value());
+		CHECK(text_of(repo, "variant") == "b_c");
+		CHECK(g.opt().enabled_guards == set<string>{ "y" });
+	}
+
+	TEST_CASE("a second @variants adds a profile") {
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		auto gr = tgf<char>::from_string(nts, "@variants va: a; vb: b.\n"
+			"@variants vc: a, b.\n" + variant_productions);
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		REQUIRE(g.bind_options().has_value());
+		CHECK(text_of(repo, "variants") == "va=a, vb=b, vc=a, vc=b");
+		CHECK(text_of(repo, "variant") == "va");
+		REQUIRE(repo.set_text("variant", "vc").has_value());
+		CHECK(g.opt().enabled_guards == set<string>{ "a", "b" });
+	}
+
+	TEST_CASE("a write of enabled-productions names its profile or none") {
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		grammar<char> g = variant_grammar(nts);
+		REQUIRE(repo.set_text("enabled-productions", "b").has_value());
+		CHECK(text_of(repo, "variant") == "vb");
+		REQUIRE(repo.set_text("enabled-productions", "a, b")
+			.has_value());
+		CHECK(text_of(repo, "variant") == "");
+	}
+
+	TEST_CASE("an unknown variant is an error that changes nothing") {
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		grammar<char> g = variant_grammar(nts);
+		auto r = repo.set_text("variant", "nope");
+		CHECK(r.has_error());
+		ostringstream printed;
+		r.report().print(printed);
+		CHECK(printed.str().find("nope") != string::npos);
+		CHECK(text_of(repo, "variant") == "va");
+		CHECK(g.opt().enabled_guards == set<string>{ "a" });
+	}
+
+	TEST_CASE("a profile named twice is a load error") {
+		nonterminals<char> nts;
+		auto gr = tgf<char>::from_string(nts,
+			"@variants va: b.\n" + variants_tgf);
+		CHECK(!gr.has_value());
+		ostringstream printed;
+		gr.report().print(printed);
+		CHECK(printed.str().find(
+			parser_strings::messages::variant_defined_twice)
+				!= string::npos);
+		CHECK(printed.str().find("va") != string::npos);
+	}
+
+	TEST_CASE("@variants without a colon is a load error") {
+		nonterminals<char> nts;
+		auto gr = tgf<char>::from_string(nts,
+			"@variants a b.\n" + variant_productions);
+		CHECK(!gr.has_value());
+		ostringstream printed;
+		gr.report().print(printed);
+		CHECK(printed.str().find(
+			parser_strings::messages::invalid_variant_profile)
+				!= string::npos);
+	}
+
+	TEST_CASE("two profiles with one set of guards are an error") {
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		grammar<char> g = variant_grammar(nts);
+		auto r = repo.set_text("variants", "va=a, vc=a");
+		CHECK(r.has_error());
+		ostringstream printed;
+		r.report().print(printed);
+		CHECK(printed.str().find(
+			parser_strings::messages::variant_same_guards)
+				!= string::npos);
+		CHECK(text_of(repo, "variants") == "va=a, vb=b");
+	}
 }
 
 // ---------------------------------------------------------------------------

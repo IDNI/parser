@@ -15,16 +15,16 @@ add_test(NAME csv_rfc4180.tgf.test COMMAND tgf
 	"${CSV_TEST_DIR}/csv.tgf.test")
 add_test(NAME csv_tab.tgf.test COMMAND tgf
 	"${PROJECT_SOURCE_DIR}/src/format/csv/csv.tgf" test
-	--enabled-productions tab,crlf,no_header "${CSV_TEST_DIR}/csv-tab.tgf.test")
+	--variant tab "${CSV_TEST_DIR}/csv-tab.tgf.test")
 add_test(NAME csv_lf.tgf.test COMMAND tgf
 	"${PROJECT_SOURCE_DIR}/src/format/csv/csv.tgf" test
-	--enabled-productions comma,lf,no_header "${CSV_TEST_DIR}/csv-lf.tgf.test")
+	--variant lf "${CSV_TEST_DIR}/csv-lf.tgf.test")
 add_test(NAME csv_tab_lf.tgf.test COMMAND tgf
 	"${PROJECT_SOURCE_DIR}/src/format/csv/csv.tgf" test
-	--enabled-productions tab,lf,no_header "${CSV_TEST_DIR}/csv-tab-lf.tgf.test")
+	--variant tab_lf "${CSV_TEST_DIR}/csv-tab-lf.tgf.test")
 add_test(NAME csv_header.tgf.test COMMAND tgf
 	"${PROJECT_SOURCE_DIR}/src/format/csv/csv.tgf" test
-	--enabled-productions header,comma,crlf "${CSV_TEST_DIR}/csv-header.tgf.test")
+	--variant header "${CSV_TEST_DIR}/csv-header.tgf.test")
 add_test(NAME json.tgf.test COMMAND tgf
 	"${PROJECT_SOURCE_DIR}/src/format/json/json.tgf" test
 	"${PROJECT_SOURCE_DIR}/tests/format/json/json.tgf.test")

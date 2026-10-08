@@ -235,6 +235,31 @@ TEST_SUITE("tgf cli: a load writes the command line again") {
 		CHECK(ep.find("comma") == string::npos);
 	}
 
+	TEST_CASE("--variant wins over the default profile of a loaded grammar") {
+		// rfc4180 is the first profile of csv.tgf, so it is the default
+		string out = capture_tgf_run({ "tgf", csv_path(), "repl",
+			"-c", "false", "--variant", "tab", "-e",
+			"get variant . get enabled-productions . load \""
+			+ csv_path() + "\" . get variant" });
+		string first = last_line_with(out, "enabled-productions:");
+		CHECK(first.find("tab") != string::npos);
+		CHECK(first.find("comma") == string::npos);
+		string v = last_line_with(out, "variant:");
+		CHECK(v.find("tab") != string::npos);
+		CHECK(v.find("rfc4180") == string::npos);
+	}
+
+	TEST_CASE("set variant in the REPL selects a profile of csv.tgf") {
+		string out = capture_tgf_run({ "tgf", csv_path(), "repl",
+			"-c", "false", "-e",
+			"set variant tab_lf . get enabled-productions" });
+		string ep = last_line_with(out, "enabled-productions:");
+		CHECK(ep.find("tab") != string::npos);
+		CHECK(ep.find("lf") != string::npos);
+		CHECK(ep.find("crlf") == string::npos);
+		CHECK(ep.find("comma") == string::npos);
+	}
+
 	TEST_CASE("a parse option survives a load and a grammar option not") {
 		// -p false is not written again: print-graphs is no grammar option
 		string out = capture_tgf_run({ "tgf", csv_path(), "repl",

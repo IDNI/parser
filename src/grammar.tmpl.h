@@ -713,6 +713,12 @@ idni::diagnostics::result<void> grammar<C, T>::bind_to(
 	const ids_codec ids{ &nts };
 	const paths_codec paths{ &nts };
 	auto rebuild = [this] { set_enabled_productions(opt_.enabled_guards); };
+	// variant is written through its field, so its hook does not run again
+	auto match_variant = [this] {
+		opt_.variant.clear();
+		for (const auto& [name, guards] : opt_.variants)
+			if (guards == opt_.enabled_guards) opt_.variant = name;
+	};
 	auto& sh = opt_.shaping;
 	r.merge(repo.bind("auto-disambiguate", opt_.auto_disambiguate));
 	r.merge(repo.bind("nodisambig-list", opt_.nodisambig_list, ids));
@@ -728,7 +734,10 @@ idni::diagnostics::result<void> grammar<C, T>::bind_to(
 		ids));
 	r.merge(repo.bind("inline", sh.to_inline, paths));
 	r.merge(repo.bind("enabled-productions", opt_.enabled_guards,
-		detail::string_set_codec{}, rebuild));
+		detail::string_set_codec{}, [rebuild, match_variant] {
+			rebuild();
+			match_variant();
+		}));
 	// the class analysis rejects the start rule
 	r.merge(repo.bind("start", start, detail::start_codec<C, T>{ &nts },
 		rebuild));
@@ -742,6 +751,16 @@ idni::diagnostics::result<void> grammar<C, T>::bind_to(
 		detail::highlights_codec{}));
 	r.merge(repo.bind("dynamic", opt_.dynamic, detail::dynamic_codec<C>{},
 		[this] { apply_dynamic_values(); }));
+	// variants binds first, so the codec of variant sees the profiles
+	r.merge(repo.bind("variants", opt_.variants,
+		detail::variants_codec{}, match_variant));
+	r.merge(repo.bind("variant", opt_.variant,
+		detail::variant_codec{ &opt_.variants }, [this] {
+			auto it = opt_.variants.find(opt_.variant);
+			if (it == opt_.variants.end()) return;
+			options_repo_->set<option_list>("enabled-productions",
+				option_list(it->second.begin(), it->second.end()));
+		}));
 	return r;
 }
 template <typename C, typename T>

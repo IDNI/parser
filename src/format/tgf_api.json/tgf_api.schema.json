@@ -102,6 +102,8 @@
 				"highlight-auto",
 				"highlight",
 				"dynamic",
+				"variants",
+				"variant",
 				"gc",
 				"gc-lag",
 				"max-length",
@@ -160,7 +162,8 @@
 				"enabled-productions",
 				"char-classes",
 				"highlight",
-				"dynamic"
+				"dynamic",
+				"variants"
 			]
 		},
 		"options": {
@@ -213,6 +216,12 @@
 				},
 				"dynamic": {
 					"$ref": "#/$defs/string_list"
+				},
+				"variants": {
+					"$ref": "#/$defs/string_list"
+				},
+				"variant": {
+					"type": "string"
 				},
 				"gc": {
 					"type": "boolean"
@@ -299,6 +308,8 @@
 				"highlight-auto",
 				"highlight",
 				"dynamic",
+				"variants",
+				"variant",
 				"gc",
 				"gc-lag",
 				"max-length",
@@ -950,7 +961,10 @@
 					"if": {
 						"properties": {
 							"option": {
-								"const": "start"
+								"enum": [
+									"start",
+									"variant"
+								]
 							}
 						},
 						"required": [

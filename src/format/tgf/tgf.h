@@ -228,6 +228,8 @@ private:
 		std::set<std::string> highlight_plain_names{};
 		/// @dynamic names seen so far, which have no production yet
 		std::set<std::string> dynamic_names{};
+		/// The name of the first @variants profile of the file.
+		std::string first_variant{};
 		/// The directives of this load, so a load never writes into the
 		/// repository of the thread.
 		idni::options_repository own_;
@@ -269,6 +271,10 @@ private:
 			if (!cc_entries.empty())
 				edit_list("char-classes", cc_entries);
 			for (const auto& d : directive_nodes()) directive(d);
+			// the first profile is the default when no @variant selects one
+			if (!first_variant.empty()
+				&& own_.get<std::string>("variant").empty())
+					set_option("variant", first_variant);
 			auto productions = statements || tgf_parser::production;
 			for (const auto& pr : productions()) production(pr);
 			if (!diag) return;
@@ -521,11 +527,74 @@ private:
 		else if (name == "enable")     enable_dir(t);
 		else if (name == "highlight")  highlight_dir(t);
 		else if (name == "dynamic")    dynamic_dir(t);
+		else if (name == "variants")   variants_dir(t);
+		else if (name == "variant")    variant_dir(t);
 		else if (diag) diag->warning(messages::unknown_directive,
 			{{ label::name, name }});
 	}
 
 	// ---- per-directive handlers ----
+
+	// @variants name: g1, g2; other: g3. defines one profile per pair
+	void variants_dir(const trv& t) {
+		auto bad_form = [this](const std::string& text) {
+			if (diag) diag->error(code::invalid_argument,
+				messages::invalid_variant_profile,
+				{{ label::name, text }});
+		};
+		// a word before the first pair has no colon
+		auto cmds = (t || tgf_parser::directive_cmd)();
+		if (!cmds.empty()) return bad_form(span_text(cmds.front()));
+		auto pairs = (t || tgf_parser::dir_pair)();
+		if (pairs.empty()) return bad_form(span_text(t));
+		for (auto& p : pairs) {
+			auto lists = (p || tgf_parser::dir_list)();
+			std::vector<std::string> names, guards;
+			if (lists.size() == 2) {
+				for (auto& a : (lists[0] || tgf_parser::dir_arg)())
+					names.push_back(dir_arg_text(
+						a | trv::only_child));
+				for (auto& a : (lists[1] || tgf_parser::dir_arg)())
+					guards.push_back(dir_arg_text(
+						a | trv::only_child));
+			}
+			if (names.size() != 1 || guards.empty()) {
+				bad_form(span_text(p));
+				continue;
+			}
+			const std::string& name = names.front();
+			const std::string head = name + "=";
+			if (std::ranges::any_of(own_.get<option_list>("variants"),
+				[&head](const std::string& e) {
+					return e.starts_with(head); }))
+			{
+				if (diag) diag->error(code::invalid_argument,
+					messages::variant_defined_twice,
+					{{ label::name, name }});
+				continue;
+			}
+			std::vector<std::string> entries;
+			for (const auto& g : guards) entries.push_back(head + g);
+			edit_list("variants", entries);
+			if (first_variant.empty()) first_variant = name;
+		}
+	}
+
+	// @variant name. selects a profile
+	void variant_dir(const trv& t) {
+		std::vector<std::string> args = dynamic_cmd_words(t);
+		for (auto& p : (t || tgf_parser::dir_pair)())
+		for (auto& lst : (p || tgf_parser::dir_list)())
+		for (auto& a : (lst || tgf_parser::dir_arg)())
+			args.push_back(dir_arg_text(a | trv::only_child));
+		if (args.size() != 1) {
+			if (diag) diag->error(code::invalid_argument,
+				messages::invalid_variant_profile,
+				{{ label::name, span_text(t) }});
+			return;
+		}
+		set_option("variant", args.front());
+	}
 
 	void use_dir(const trv& /*t*/) {
 		// the pre-pass collects the classes and writes char-classes

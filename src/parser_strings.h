@@ -221,6 +221,14 @@ struct messages {
 		"Dynamic directive names must be separated by ';', not ','.";
 	static constexpr sv dynamic_empty_value =
 		"A value of a dynamic nonterminal is empty";
+	static constexpr sv invalid_variant_profile =
+		"A variant profile is name : guards";
+	static constexpr sv variant_defined_twice =
+		"The variant is defined twice";
+	static constexpr sv unknown_variant =
+		"The grammar defines no such variant";
+	static constexpr sv variant_same_guards =
+		"Two variants have the same guards";
 	// chart field limits
 	static constexpr sv input_too_long =
 		"Input is longer than the largest parse position";

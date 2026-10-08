@@ -7,9 +7,9 @@
 # A record ends with CRLF; a bare LF also ends a record and gives the
 # same fields, so an LF file and a CRLF file parse alike.
 #
-# Grammar defaults (comma, crlf) are used, dialect variants live in the
+# The grammar default variant rfc4180 is used. The other variants live in the
 # sibling csv-lf.tgf.test, csv-tab.tgf.test, csv-tab-lf.tgf.test files
-# and require --enabled-productions.
+# and select one with --variant.
 #
 # @inline field folds a field node into its escaped or non_escaped child,
 # @trim DQUOTE, SEP, EOL removes those nodes from the shaped tree, so a

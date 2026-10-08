@@ -4,7 +4,7 @@
 # LF, comma is plain data, CRLF and a bare CR are both rejected.
 #
 # To run:
-#   tgf csv.tgf test --enabled-productions tab,lf,no_header csv-tab-lf.tgf.test
+#   tgf csv.tgf test --variant tab_lf csv-tab-lf.tgf.test
 
 # ===========================================================================
 # 1  TAB-SEPARATED FIELDS (LF rows)

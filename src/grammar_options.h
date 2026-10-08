@@ -56,6 +56,11 @@ inline const option_set grammar_option_set = { .options = {
 	{ "dynamic", "grammar", option_list{},
 		"default values for a @dynamic nonterminal, each entry written "
 		"as name=value" },
+	{ "variants", "grammar", option_list{},
+		"profiles of enabled productions, each entry written as "
+		"name=guard" },
+	{ "variant", "grammar", std::string(),
+		"the selected profile of enabled productions" },
 } };
 
 /// @highlight token type legend, in index order.
@@ -132,6 +137,21 @@ struct dynamic_codec {
 		std::vector<std::basic_string<C>>>;
 	option_value to_value(const values& m) const;
 	diagnostics::result<values> from_value(const option_value& v) const;
+};
+
+/// The guards of each profile, as entries `name=guard`, one per guard. Two
+/// profiles with one set of guards are an error.
+struct variants_codec {
+	using profiles = std::map<std::string, std::set<std::string>>;
+	option_value to_value(const profiles& m) const;
+	diagnostics::result<profiles> from_value(const option_value& v) const;
+};
+
+/// The selected profile, a name that @p variants holds, or empty.
+struct variant_codec {
+	const variants_codec::profiles* variants;
+	option_value to_value(const std::string& name) const;
+	diagnostics::result<std::string> from_value(const option_value& v) const;
 };
 
 } // namespace detail

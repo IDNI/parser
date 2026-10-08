@@ -222,7 +222,9 @@ Each `@` directive of the grammar file writes a grammar option, so
      "trim":["DQUOTE","SEP"],"inline":["TEXTDATA","a > b"],
      "inline-char-classes":true,"nodisambig-list":["expr","term"],
      "highlight":["string: escaped"],"highlight-auto":false,
-     "dynamic":["name=","tok=a","tok=b"]}
+     "dynamic":["name=","tok=a","tok=b"],
+     "variants":["rfc4180=comma","rfc4180=crlf","rfc4180=no_header"],
+     "variant":"rfc4180"}
 
 - `char-classes`: an entry `class` or `class as name` for each class of
   `@use char classes`.
@@ -233,6 +235,13 @@ Each `@` directive of the grammar file writes a grammar option, so
 - `highlight-auto`: true for `@highlight auto`.
 - `dynamic`: an entry `name=value` for each value of `@dynamic`. A name
   with no value has the entry `name=`.
+- `variants`: an entry `name=guard` for each guard of a
+  `@variants name: g1, g2.` profile. A list option.
+- `variant`: the name of `@variant name.`, else the first profile of
+  the file, or empty. A text option. A
+  write of `variant` sets `enabled-productions` to the guards of the
+  profile, and a write of `enabled-productions` sets `variant` to the
+  profile with the same guards, or to empty.
 
 ## The tree
 

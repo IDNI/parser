@@ -7,7 +7,11 @@
 #   eol: crlf (CRLF or LF) or lf (LF only)
 #   header: header or no_header
 
-@enable productions comma, crlf, no_header.
+@variants rfc4180: comma, crlf, no_header;
+	tab: tab, crlf, no_header;
+	lf: comma, lf, no_header;
+	tab_lf: tab, lf, no_header;
+	header: header, comma, crlf.
 
 @highlight string : escaped, non_escaped.
 @highlight operator : SEP, DQUOTE.

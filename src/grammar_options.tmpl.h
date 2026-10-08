@@ -300,6 +300,63 @@ diagnostics::result<typename dynamic_codec<C>::values>
 	return r.with_value(std::move(out));
 }
 
+inline option_value variants_codec::to_value(const profiles& m) const {
+	option_list out;
+	for (const auto& [name, guards] : m)
+		for (const auto& guard : guards) out.push_back(name + "=" + guard);
+	return out;
+}
+
+inline diagnostics::result<variants_codec::profiles>
+	variants_codec::from_value(const option_value& v) const
+{
+	namespace ps = parser_strings;
+	diagnostics::result<profiles> r;
+	const option_list* entries = option_list_of(v, r.report());
+	if (!entries) return r;
+	profiles out;
+	for (const std::string& entry : *entries) {
+		const size_t eq = entry.find('=');
+		std::string name = option_trim(
+			std::string_view(entry).substr(0, eq));
+		std::string guard = eq == std::string::npos ? std::string()
+			: option_trim(std::string_view(entry).substr(eq + 1));
+		if (name.empty() || guard.empty()) {
+			option_bad_entry(r.report(), "variants", entry);
+			continue;
+		}
+		out[name].insert(std::move(guard));
+	}
+	// a set of guards names one profile, so a write of the guards finds it
+	for (auto a = out.begin(); a != out.end(); ++a)
+		for (auto b = std::next(a); b != out.end(); ++b)
+			if (a->second == b->second)
+				r.error(diagnostics::code::invalid_argument,
+					ps::messages::variant_same_guards,
+					{ { ps::label::name, a->first },
+					  { ps::label::value, b->first } });
+	if (r.has_error()) return r;
+	return r.with_value(std::move(out));
+}
+
+inline option_value variant_codec::to_value(const std::string& name) const {
+	return name;
+}
+
+inline diagnostics::result<std::string> variant_codec::from_value(
+	const option_value& v) const
+{
+	namespace ps = parser_strings;
+	diagnostics::result<std::string> r;
+	const std::string* name = option_text_of(v, r.report());
+	if (!name) return r;
+	if (!name->empty() && !variants->contains(*name))
+		return r.with_error(diagnostics::code::not_found,
+			ps::messages::unknown_variant,
+			{ { ps::label::name, *name } });
+	return r.with_value(*name);
+}
+
 } // namespace detail
 
 } // namespace idni
