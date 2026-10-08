@@ -404,8 +404,8 @@ namespace idni::testing
 		emeasure_time_start(start_tgf, end_tgf);
 		nonterminals<T> nts;
 		auto gr = tgf<T>::from_string(nts, g_tgf);
-		if (!gr.print_and_ok(std::cout << "\t# FAILED\n"))
-			return failed = true, false;
+		if (!gr.print_and_ok(std::cout))
+			return std::cout << "\t# FAILED\n", failed = true, false;
 		grammar<T> g = std::move(gr).value();
 		if (measure)
 		{
@@ -425,8 +425,9 @@ namespace idni::testing
 					nodisambig_list.begin(),
 					nodisambig_list.end()));
 			g.unbind_options();
-			if (!bound.print_and_ok(std::cout << "\t# FAILED\n"))
-				return failed = true, false;
+			if (!bound.print_and_ok(std::cout))
+				return std::cout << "\t# FAILED\n", failed = true,
+					false;
 		}
 		parser<T> p(g, options<T>);
 		bool success = run_test_<T>(g, p, input, opts);

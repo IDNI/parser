@@ -22,7 +22,8 @@ int main(int argc, char **argv) {
 	nonterminals<char> nts;
 	auto gr = tgf<char>::from_string(nts,
 		"	# TGF only with ws and ws_comment \n");
-	if (!gr.print_and_ok(cerr << "comment-only TGF should load\n")) return 1;
+	if (!gr.print_and_ok(cerr))
+		return cerr << "comment-only TGF should load\n", 1;
 
 	TEST("basic", "char terminals")
 	run_test_tgf(" start => 'a'. ", "a");

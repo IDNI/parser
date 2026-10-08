@@ -231,9 +231,6 @@ struct messages {
 	static constexpr sv too_many_literals =
 		"Conjunct has too many literals";
 	// REPL command errors
-	static constexpr sv unknown_bool_option    = "Unknown bool option";
-	static constexpr sv invalid_error_verbosity =
-		"Invalid error verbosity value";
 	static constexpr sv unknown_command        = "Unknown command";
 	static constexpr sv no_grammar_loaded      =
 		"no grammar loaded, use load";
