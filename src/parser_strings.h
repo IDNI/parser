@@ -198,9 +198,11 @@ inline id_t label_of(std::string_view sv) {
 struct messages {
 	using sv = std::string_view;
 	static constexpr sv cannot_open_file            = "Cannot open file";
+	static constexpr sv cannot_write_file           = "Cannot write file";
 	static constexpr sv loading_grammars_unavailable =
 		"Loading grammars is not available in a specialized REPL";
 	static constexpr sv unproductive_nonterminal = "Unproductive nonterminal";
+	static constexpr sv empty_grammar = "The grammar has no production";
 	// character class load errors
 	static constexpr sv unknown_char_class     = "unknown character class";
 	static constexpr sv char_class_old_name    =

@@ -1936,11 +1936,13 @@ static int gen_command(tgf_tool& tool, tgf_repl_evaluator& re) {
 		options_repository own;
 		options_scope scope(own);
 		grammar<char> g = std::move(lg).value();
+		if (g.size() == 0)
+			rep.warning(parser_strings::messages::empty_grammar);
 		rep.append(g.bind_options().report());
 		re.write_argv_values();
 		rep.append(re.take_report());
-		if (!rep.has_error()) gr.emplace(
-			generate_parser_cpp(re.filename(), g, tool.gen));
+		if (!rep.has_error())
+			gr = generate_parser_cpp(re.filename(), g, tool.gen);
 	}
 	rep.append(gr.report());
 	if (json) {

@@ -4,6 +4,7 @@
 #ifndef __IDNI__PARSER__TGF__PARSER_GEN_H__
 #define __IDNI__PARSER__TGF__PARSER_GEN_H__
 #include <filesystem>
+#include <string_view>
 #include <cmath>
 #include "parser.h"
 #include "grammar_inspector.h"
@@ -29,11 +30,23 @@ struct parser_gen_options {
 	bool treemr                                  = false;
 };
 
+/// Write the parser of @p g. The value lists the files it wrote. A file
+/// that does not open or write is an error, and no later file is written.
 template <typename C = char, typename T = C>
-std::vector<std::string> generate_parser_cpp(const std::string& tgf_filename,
-	const grammar<C, T>& g, parser_gen_options opt = {})
+idni::diagnostics::result<std::vector<std::string>> generate_parser_cpp(
+	const std::string& tgf_filename, const grammar<C, T>& g,
+	parser_gen_options opt = {})
 {
-	if (g.size() == 0) return {};
+	using idni::parser_strings::label;
+	using idni::parser_strings::messages;
+	idni::diagnostics::result<std::vector<std::string>> r;
+	if (g.size() == 0) return r.with_value(std::vector<std::string>{});
+	auto file_error = [&r](std::string_view msg, const std::string& path)
+		-> idni::diagnostics::result<std::vector<std::string>>
+	{
+		return r.with_error(idni::diagnostics::code::io_error, msg,
+			{{ label::path, path }});
+	};
 
 	auto strip_pwd = [](const std::string& p) {
 		auto pwd = std::filesystem::current_path().string();
@@ -69,7 +82,9 @@ std::vector<std::string> generate_parser_cpp(const std::string& tgf_filename,
 		if (opt.encoder.empty()) opt.encoder = "idni::u32_to_utf8_conv";
 	}
 
-	std::ofstream os(opt.output_dir + opt.output);
+	const std::string header = opt.output_dir + opt.output;
+	std::ofstream os(header);
+	if (!os) return file_error(messages::cannot_open_file, header);
 
 	// convert name to upper case and append __PARSER_GEN_H__ as a guard at the begining
 	std::string guard = opt.name;
@@ -399,12 +414,18 @@ std::vector<std::string> generate_parser_cpp(const std::string& tgf_filename,
 		"\n";
 	if (opt.ns.size()) os << "\n} // " <<opt.ns<< " namespace\n";
 	os <<	"#endif // __" << guard << "_H__\n";
+	// a full disk or a lost device shows only when the buffer goes out
+	os.close();
+	if (!os) return file_error(messages::cannot_write_file, header);
 
-	if (opt.header_only) return { opt.output_dir + opt.output };
+	if (opt.header_only) return r.with_value(
+		std::vector<std::string>{ header });
 
 	// companion translation unit holding the grammar table, compiled once
 	const std::string cpp_name = opt.name + ".generated.cpp";
-	std::ofstream cs(opt.output_dir + cpp_name);
+	const std::string source = opt.output_dir + cpp_name;
+	std::ofstream cs(source);
+	if (!cs) return file_error(messages::cannot_open_file, source);
 	cs <<	"// This file is generated from a file " <<
 					tgf_filename_stripped << " by\n"
 		"//       https://github.com/IDNI/parser/src/tgf\n"
@@ -429,13 +450,16 @@ std::vector<std::string> generate_parser_cpp(const std::string& tgf_filename,
 		"\n"
 		"} // namespace " << opt.name << "_data\n";
 	if (opt.ns.size()) cs << "\n} // " << opt.ns << " namespace\n";
-	return { opt.output_dir + opt.output, opt.output_dir + cpp_name };
+	cs.close();
+	if (!cs) return file_error(messages::cannot_write_file, source);
+	return r.with_value(std::vector<std::string>{ header, source });
 }
 
 // generate_parser_cpp_from_* returns a result<vector<string>> whose report
-// is the grammar's parse report (forwarded). On success the value lists the
-// files it wrote; on failure the value is absent and the report carries the
-// errors. Caller prints the report once at the end via print_and_ok().
+// holds the report of the load and of the generator. On success the value
+// lists the files it wrote. On failure the value is absent and the report
+// carries the errors. Caller prints the report once at the end via
+// print_and_ok().
 template <typename C = char, typename T = C>
 idni::diagnostics::result<std::vector<std::string>>
 generate_parser_cpp_from_string(
@@ -446,12 +470,12 @@ generate_parser_cpp_from_string(
 {
 	nonterminals<C, T> nts;
 	auto gr = tgf<C, T>::from_string(nts, grammar_tgf, measure);
-	if (gr.has_value())
-		return idni::diagnostics::forward_as<std::vector<std::string>>(
-			std::move(gr), generate_parser_cpp(tgf_filename,
-				std::move(gr).value(), opt));
-	return idni::diagnostics::forward_as<std::vector<std::string>>(
-		std::move(gr), std::vector<std::string>{});
+	idni::diagnostics::result<std::vector<std::string>> r;
+	auto g = r.merge_take(std::move(gr));
+	if (!g) return r;
+	auto files = r.merge_take(generate_parser_cpp(tgf_filename, *g, opt));
+	if (files) r.emplace(std::move(*files));
+	return r;
 }
 
 template <typename C = char, typename T = C>
@@ -463,12 +487,12 @@ generate_parser_cpp_from_file(
 {
 	nonterminals<C, T> nts;
 	auto gr = tgf<C, T>::from_file(nts, tgf_filename, measure);
-	if (gr.has_value())
-		return idni::diagnostics::forward_as<std::vector<std::string>>(
-			std::move(gr), generate_parser_cpp(tgf_filename,
-				std::move(gr).value(), opt));
-	return idni::diagnostics::forward_as<std::vector<std::string>>(
-		std::move(gr), std::vector<std::string>{});
+	idni::diagnostics::result<std::vector<std::string>> r;
+	auto g = r.merge_take(std::move(gr));
+	if (!g) return r;
+	auto files = r.merge_take(generate_parser_cpp(tgf_filename, *g, opt));
+	if (files) r.emplace(std::move(*files));
+	return r;
 }
 
 } // idni namespace

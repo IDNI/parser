@@ -793,7 +793,8 @@ static string generate_parser_text(const grammar<char>& g) {
 	gopt.output_dir = fs::temp_directory_path().string() + "/";
 	gopt.output = "derived_class_gen_test.generated.h";
 	gopt.name = "derived_class_gen_test_parser";
-	generate_parser_cpp<char>("derived_class_gen_test.tgf", g, gopt);
+	REQUIRE(generate_parser_cpp<char>("derived_class_gen_test.tgf", g, gopt)
+		.has_value());
 	ifstream in(gopt.output_dir + gopt.output);
 	REQUIRE(in.is_open());
 	ostringstream ss;

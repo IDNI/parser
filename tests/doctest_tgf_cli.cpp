@@ -312,7 +312,8 @@ TEST_SUITE("tgf cli: grammar options") {
 		gopt.output_dir = dir;
 		gopt.output = "tgf_cli_gen_direct.generated.h";
 		gopt.name = "tgf_cli_gen_direct_parser";
-		generate_parser_cpp<char>(path, gr.value(), gopt);
+		REQUIRE(generate_parser_cpp<char>(path, gr.value(), gopt)
+			.has_value());
 		const string direct_header = dir + gopt.output;
 		CHECK(terminals_block(tool_header)
 			== terminals_block(direct_header));
@@ -320,6 +321,25 @@ TEST_SUITE("tgf cli: grammar options") {
 		fs::remove(path);
 		fs::remove(tool_header);
 		fs::remove(direct_header);
+	}
+
+	TEST_CASE("gen on a grammar with no production warns") {
+		namespace fs = std::filesystem;
+		const string dir = fs::temp_directory_path().string() + "/";
+		const string path = dir + "tgf_cli_gen_empty.tgf";
+		const string header = dir + "tgf_cli_gen_empty.generated.h";
+		{
+			ofstream f(path);
+			f << "# a comment only\n";
+		}
+		fs::remove(header);
+		string out = capture_tgf_run({ "tgf", path, "gen", "-O", dir,
+			"-o", "tgf_cli_gen_empty.generated.h",
+			"-n", "tgf_cli_gen_empty_parser" });
+		CHECK(out.find(parser_strings::messages::empty_grammar)
+			!= string::npos);
+		CHECK_FALSE(fs::exists(header));
+		fs::remove(path);
 	}
 }
 

@@ -12,7 +12,9 @@
 #include "parser.h"
 #include "testing.h"
 #include "grammar_inspector.h"
+#include "tgf/parser_gen.h"
 
+#include <filesystem>
 #include <sstream>
 
 using namespace std;
@@ -866,5 +868,31 @@ TEST_SUITE("parser options") {
 		REQUIRE(repo.set_text("measure", "true").has_value());
 		CHECK(text_of(repo, "measure-scopes") == "true");
 		CHECK(parses(p2, "x x"));
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TEST SUITE: parser generator
+// ---------------------------------------------------------------------------
+
+TEST_SUITE("parser generator") {
+
+	TEST_CASE("an output directory that does not exist is an error") {
+		nonterminals<char> nts;
+		grammar<char> g = options_grammar(nts);
+		const string dir = (std::filesystem::temp_directory_path()
+			/ "tgf-no-such-dir").string() + "/";
+		REQUIRE(!std::filesystem::exists(dir));
+		parser_gen_options gopt;
+		gopt.output_dir = dir;
+		gopt.name = "missing_dir_parser";
+		auto r = generate_parser_cpp<char>("missing_dir.tgf", g, gopt);
+		CHECK(!r.has_value());
+		CHECK(r.has_error());
+		ostringstream printed;
+		r.report().print(printed);
+		CHECK(printed.str().find(
+			parser_strings::messages::cannot_open_file) != string::npos);
+		CHECK(printed.str().find(dir) != string::npos);
 	}
 }

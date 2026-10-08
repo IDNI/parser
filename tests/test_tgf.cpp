@@ -283,7 +283,8 @@ int main(int argc, char **argv) {
 		dyn.push_back("ba_type=extra");
 		check(!repo.set("dynamic", option_value(dyn)).has_error(),
 			"dynamic takes the extra value");
-		generate_parser_cpp<char>("test_dynamic_gen.tgf", g, gopt);
+		check(generate_parser_cpp<char>("test_dynamic_gen.tgf", g, gopt)
+			.has_value(), "generator writes the header");
 		fs::path out = dir / gopt.output;
 		ifstream in(out);
 		stringstream ss; ss << in.rdbuf();
