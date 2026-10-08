@@ -32,5 +32,5 @@ foreach(X IN LISTS EXAMPLE_TESTS)
 			-DEXPECTED=${_dir}/${X}.out
 			-DARG=${_arg}
 			-P ${_dir}/run_example.cmake)
-	set_tests_properties(example_${X} PROPERTIES TIMEOUT 120)
+	set_tests_properties(example_${X} PROPERTIES TIMEOUT 120 LABELS examples)
 endforeach()

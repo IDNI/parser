@@ -181,6 +181,9 @@ composed by the public presets above; see [`CMakePresets.json`](../CMakePresets.
   `all` (not used on packaging presets); otherwise runs `tgf` (args after `--`).
   `run` builds the preset and then runs ctest. A direct `ctest` call runs the
   binaries that the build tree holds.
+- A test build also builds the examples. `-DTAU_PARSER_BUILD_EXAMPLES=OFF`
+  builds a test tree without the examples, and `ctest -LE examples` runs
+  every case except the example cases.
 
 ```bash
 ./dev preset release-packages

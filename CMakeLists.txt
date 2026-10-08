@@ -53,6 +53,11 @@ option(TAU_PARSER_BUILD_STATIC_LIBRARY "Build static library"               OFF)
 option(TAU_PARSER_BUILD_SHARED_LIBRARY "Build shared library"               OFF)
 option(TAU_PARSER_BUILD_EMSCRIPTEN     "Build for Emscripten"               OFF)
 option(TAU_PARSER_BUILD_TESTS          "Build library tests"                OFF)
+# the tests run each example once; a value of the user wins
+if(NOT DEFINED CACHE{TAU_PARSER_BUILD_EXAMPLES}
+		AND TAU_PARSER_BUILD_TESTS AND NOT TAU_PARSER_BUILD_EMSCRIPTEN)
+	set(TAU_PARSER_BUILD_EXAMPLES ON CACHE BOOL "Build examples")
+endif()
 option(TAU_PARSER_BUILD_EXAMPLES       "Build examples"                     OFF)
 option(TAU_PARSER_BUILD_TGF            "Build tgf tool"                     OFF)
 # Remember whether the user set the serve option, so the rules below decide
@@ -159,12 +164,6 @@ endif()
 if(TAU_RUN_GRAMMAR_TESTS)
 	set(TAU_PARSER_BUILD_TGF ON
 		CACHE BOOL "Build tgf tool" FORCE)
-endif()
-
-# the tests run each example once
-if(TAU_PARSER_BUILD_TESTS AND NOT TAU_PARSER_BUILD_EMSCRIPTEN)
-	set(TAU_PARSER_BUILD_EXAMPLES ON
-		CACHE BOOL "Build examples" FORCE)
 endif()
 
 # some library tests link tgf_cli_core, which Emscripten does not build
