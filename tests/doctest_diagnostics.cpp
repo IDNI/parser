@@ -567,7 +567,7 @@ TEST_SUITE("diagnostics: print() colouring") {
 		{ auto g = r.open("work"); }
 		bands plain, coloured;
 		r.print(plain.as_sinks(), idni::term::colors(false));
-		r.print(coloured.as_sinks(), idni::term::colors(true));
+		r.reprint(coloured.as_sinks(), idni::term::colors(true));
 		REQUIRE(plain.warnings.size() == 1);
 		REQUIRE(plain.infos.size() == 1);
 		CHECK(!has_ansi(plain.warnings[0]));
@@ -589,7 +589,7 @@ TEST_SUITE("diagnostics: print() colouring") {
 
 		idni::TC.enable();
 		bands on;
-		r.print(on.as_sinks());
+		r.reprint(on.as_sinks());
 		REQUIRE(on.errors.size() == 1);
 		CHECK(has_ansi(on.errors[0]));
 
@@ -624,6 +624,93 @@ TEST_SUITE("diagnostics: print() colouring") {
 		CHECK(!has_ansi(b.errors[0]));    // but this render stayed plain
 
 		idni::TC.set(saved);
+	}
+
+	TEST_CASE("print_pending writes the errors and warnings once") {
+		report r;
+		r.error(code::parse_error, "boom");
+		r.warning("careful");
+		r.info("note");
+		const idni::term::colors plain(false);
+
+		bands first;
+		r.print_pending(first.as_sinks(), plain);
+		REQUIRE(first.errors.size() == 1);
+		REQUIRE(first.warnings.size() == 1);
+		CHECK(first.errors[0].find("boom") != std::string::npos);
+		CHECK(first.warnings[0].find("careful") != std::string::npos);
+		CHECK(first.infos.empty());
+
+		bands second;
+		r.print_pending(second.as_sinks(), plain);
+		CHECK(second.errors.empty());
+		CHECK(second.warnings.empty());
+		CHECK(second.infos.empty());
+
+		bands third;
+		r.print(third.as_sinks(), plain);
+		CHECK(third.errors.empty());
+		CHECK(third.warnings.empty());
+		CHECK(third.infos.size() == 1);
+
+		bands all;
+		r.reprint(all.as_sinks(), plain);
+		CHECK(all.errors.size() == 1);
+		CHECK(all.warnings.size() == 1);
+		CHECK(all.infos.size() == 1);
+	}
+
+	TEST_CASE("print_pending skips a printed warning of an appended child") {
+		const idni::term::colors plain(false);
+		report child;
+		child.warning("from child");
+		bands c;
+		child.print_pending(c.as_sinks(), plain);
+		REQUIRE(c.warnings.size() == 1);
+
+		report parent;
+		parent.append(child);
+		parent.warning("from parent");
+		bands p;
+		parent.print_pending(p.as_sinks(), plain);
+		REQUIRE(p.warnings.size() == 1);
+		CHECK(p.warnings[0].find("from parent") != std::string::npos);
+	}
+
+	TEST_CASE("print_pending runs while a scope is open") {
+		report r;
+		auto g = r.open("work");
+		r.warning("inside");
+		bands b;
+		r.print_pending(b.as_sinks(), idni::term::colors(false));
+		CHECK(b.warnings.size() == 1);
+	}
+
+	TEST_CASE("demote_errors_to_warnings keeps the printed mark") {
+		report r;
+		r.error(code::parse_error, "boom");
+		bands first;
+		r.print_pending(first.as_sinks(), idni::term::colors(false));
+		REQUIRE(first.errors.size() == 1);
+		r.demote_errors_to_warnings();
+		bands second;
+		r.print_pending(second.as_sinks(), idni::term::colors(false));
+		CHECK(second.errors.empty());
+		CHECK(second.warnings.empty());
+	}
+
+	TEST_CASE("result<T> forwards print_pending and reprint") {
+		result<int> res;
+		res.warning("careful");
+		bands first;
+		res.print_pending(first.as_sinks());
+		CHECK(first.warnings.size() == 1);
+		bands second;
+		res.print_pending(second.as_sinks());
+		CHECK(second.warnings.empty());
+		bands again;
+		res.reprint(again.as_sinks());
+		CHECK(again.warnings.size() == 1);
 	}
 }
 

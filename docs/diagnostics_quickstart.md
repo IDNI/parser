@@ -328,6 +328,18 @@ std::cout << r;
 r.to_json(std::cout);
 ```
 
+Each print marks the error and warning lines it writes, so a line
+prints once. `print_pending()` prints only the error and warning
+nodes that no print wrote yet. Call it during a long run to show a
+warning when it happens. The final `print()` then skips that line.
+`reprint()` prints the full report again.
+
+```cpp
+r.print_pending();    // new errors and warnings → std::cerr
+r.print();            // the rest of the report, without those lines
+r.reprint(std::cout); // every line again
+```
+
 Color is on by default: error lines are red, warnings yellow, info-band
 lines use a zebra pattern. The global `idni::TC` (term_colors) gates the
 escape sequences — call `TC.set(false)` to suppress them, e.g. for stable

@@ -413,7 +413,7 @@ struct parse_result_wrap {
 	std::string report_string() const {
 		if (!r) return "";
 		std::ostringstream os;
-		r->report().print(os);
+		r->report().reprint(os);
 		return os.str();
 	}
 	bool has_diagnostics() const {
@@ -760,7 +760,7 @@ EMSCRIPTEN_BINDINGS(tauparser) {
 		std::ostringstream cap;
 		auto* old_out = std::cout.rdbuf(cap.rdbuf());
 		auto* old_err = std::cerr.rdbuf(cap.rdbuf());
-		r.report().print();
+		r.report().reprint();
 		std::cout.rdbuf(old_out);
 		std::cerr.rdbuf(old_err);
 		return std::to_string(r.has_value()) + "\n" + cap.str();

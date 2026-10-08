@@ -124,6 +124,22 @@ build.
 Emit diagnostics when `nodes()` is non-empty. Unified overloads route **all bands** to one stream or sink; `print(sinks)` keeps per-band routing.
 
 
+### void print_pending(std::ostream& os) const;
+### void print_pending(const sink& s) const;
+### void print_pending(const sinks& s) const;
+### void print_pending() const;
+
+Forward to `report::print_pending`. Print the error and warning nodes that no print wrote yet, and mark them. A later `print` skips them.
+
+
+### void reprint(std::ostream& os) const;
+### void reprint(const sink& s) const;
+### void reprint(const sinks& s) const;
+### void reprint() const;
+
+Forward to `report::reprint`. Print every node again, also the nodes that a print already wrote.
+
+
 ### bool print_and_ok() const;
 ### bool print_and_ok(std::ostream& os) const;
 ### bool print_and_ok(const sink& s) const;
@@ -368,7 +384,24 @@ Output the report.
 * `print(const sinks&)` — per-band routing (errors/warnings flat, info tab-indented). Partial literals are fine; empty sinks drop their band.
 * `print()` — `{ .error = &std::cerr, .warning = &std::cerr, .info = &std::cout }`.
 * `to_json(ostream&, print_names=false)` — full tree as JSON for tooling. With `print_names=true` each node carries an extra `"tag_name"` field with the symbolic `code` label (e.g. `"parse_error"`).
-* `operator<<` — plain `print(os)` on one stream (no color).
+* `operator<<` — every node on one stream, like `reprint(os)`.
+* `print` marks each error and warning node it writes. A node that a print already wrote does not print again. `operator<<` prints every node again like `reprint`.
+
+
+### void print_pending(const sinks& s, const term::colors& tc = TC) const;
+### void print_pending(std::ostream& os, const term::colors& tc = TC) const;
+### void print_pending(const sink& s, const term::colors& tc = TC) const;
+### void print_pending() const;
+
+Print the error and warning nodes that no print wrote yet, in tree order, and mark them. A later `print` skips them, and a second `print_pending` writes nothing. Info nodes are not printed, so the call is safe while scopes are open. `append` and `demote_errors_to_warnings` keep the mark.
+
+
+### void reprint(const sinks& s, const term::colors& tc = TC) const;
+### void reprint(std::ostream& os, const term::colors& tc = TC) const;
+### void reprint(const sink& s, const term::colors& tc = TC) const;
+### void reprint() const;
+
+Print every node like `print`, also the nodes that a print already wrote. Use it to show the full report a second time.
 
 
 ### void set_node_value(int32_t idx, int64_t v);

@@ -161,6 +161,8 @@ struct node {
 	int64_t   value    = 0;
 	uint32_t  attr_off = 0;
 	uint8_t   attr_cnt = 0;
+	// Every print is const and marks the error and warning lines it wrote.
+	mutable bool printed = false;
 };
 
 struct report {
@@ -319,6 +321,27 @@ struct report {
 	void print(const sink& s, const term::colors& tc = TC) const;
 	/// Default routing: errors/warnings → std::cerr, info → std::cout.
 	void print() const;
+
+	/// Print the error and warning nodes that no print wrote yet, in
+	/// pre-order and flat at indent 0, and mark them. A later @ref print
+	/// skips them. Info nodes are not printed. Open scopes are allowed.
+	void print_pending(const sinks&, const term::colors& tc = TC) const;
+	/// Route both bands to @p os.
+	void print_pending(std::ostream& os, const term::colors& tc = TC) const;
+	/// Route both bands to @p s.
+	void print_pending(const sink& s, const term::colors& tc = TC) const;
+	/// Default routing: errors/warnings → std::cerr.
+	void print_pending() const;
+
+	/// Print every node again like @ref print, also the nodes that a
+	/// print already wrote, and mark the error and warning nodes.
+	void reprint(const sinks&, const term::colors& tc = TC) const;
+	/// Route all bands to @p os.
+	void reprint(std::ostream& os, const term::colors& tc = TC) const;
+	/// Route all bands to @p s.
+	void reprint(const sink& s, const term::colors& tc = TC) const;
+	/// Default routing: errors/warnings → std::cerr, info → std::cout.
+	void reprint() const;
 	[[nodiscard]] const std::vector<node>& nodes() const;
 	[[nodiscard]] const std::vector<attr>& attrs() const;
 
@@ -410,9 +433,18 @@ private:
 
 	mutable size_t info_row_ = 0;
 
+	// The walk of print() and reprint(). With @p again a node that a
+	// print already wrote prints once more.
+	void print_tree(const sinks& s, const term::colors& tc,
+		bool again) const;
+
 	void print_node(const sinks& s,
 		const std::vector<std::vector<size_t>>& children, size_t idx,
 		size_t level, size_t label_w, value_columns cols,
+		const term::colors& tc, bool again) const;
+
+	// Write the line of the error or warning node @p idx and mark it.
+	void print_message(const sinks& s, size_t idx,
 		const term::colors& tc) const;
 
 	std::string color_info_line(const node& n, size_t level,
@@ -570,6 +602,18 @@ struct result {
 	void print(const sink& s) const;
 	void print(const sinks& s) const;
 	void print() const;
+
+	/// Forward to @ref report::print_pending of the report.
+	void print_pending(std::ostream& os) const;
+	void print_pending(const sink& s) const;
+	void print_pending(const sinks& s) const;
+	void print_pending() const;
+
+	/// Forward to @ref report::reprint of the report.
+	void reprint(std::ostream& os) const;
+	void reprint(const sink& s) const;
+	void reprint(const sinks& s) const;
+	void reprint() const;
 
 	/// @ref print then return @ref has_value(). Default routing:
 	/// errors/warnings → @c std::cerr, info → @c std::cout.

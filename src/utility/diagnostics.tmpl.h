@@ -503,7 +503,9 @@ inline std::string report::format_message(size_t node_idx) const {
 	return out;
 }
 
-inline void report::print(const sinks& s, const term::colors& tc) const {
+inline void report::print_tree(const sinks& s, const term::colors& tc,
+	bool again) const
+{
 	// An open scope has not yet had its elapsed time written by
 	// scope_guard::close(), so its printed value would be stale.
 	DBG(assert(scope_stack_.empty()
@@ -518,7 +520,11 @@ inline void report::print(const sinks& s, const term::colors& tc) const {
 	info_row_ = 0;
 	for (size_t i = 0; i < nodes_.size(); ++i)
 		if (nodes_[i].parent < 0)
-			print_node(s, children, i, 0, label_w, cols, tc);
+			print_node(s, children, i, 0, label_w, cols, tc, again);
+}
+
+inline void report::print(const sinks& s, const term::colors& tc) const {
+	print_tree(s, tc, false);
 }
 
 inline void report::print(std::ostream& os, const term::colors& tc) const {
@@ -534,6 +540,50 @@ inline void report::print() const {
 		.info = &std::cout });
 }
 
+inline void report::print_pending(const sinks& s,
+	const term::colors& tc) const
+{
+	// nodes_ order is the pre-order of the tree.
+	for (size_t i = 0; i < nodes_.size(); ++i) {
+		const auto& n = nodes_[i];
+		if (!n.printed && (is_error(n.tag) || is_warning(n.tag)))
+			print_message(s, i, tc);
+	}
+}
+
+inline void report::print_pending(std::ostream& os,
+	const term::colors& tc) const
+{
+	print_pending({ .error = &os, .warning = &os, .info = &os }, tc);
+}
+
+inline void report::print_pending(const sink& s,
+	const term::colors& tc) const
+{
+	print_pending({ s, s, s }, tc);
+}
+
+inline void report::print_pending() const {
+	print_pending({ .error = &std::cerr, .warning = &std::cerr,
+		.info = &std::cout });
+}
+
+inline void report::reprint(const sinks& s, const term::colors& tc) const {
+	print_tree(s, tc, true);
+}
+
+inline void report::reprint(std::ostream& os, const term::colors& tc) const {
+	reprint({ .error = &os, .warning = &os, .info = &os }, tc);
+}
+
+inline void report::reprint(const sink& s, const term::colors& tc) const {
+	reprint({ s, s, s }, tc);
+}
+
+inline void report::reprint() const {
+	reprint({ .error = &std::cerr, .warning = &std::cerr,
+		.info = &std::cout });
+}
 
 inline const std::vector<node>& report::nodes() const {
 	return nodes_;
@@ -791,16 +841,25 @@ inline std::string report::color_info_line(const node& n, size_t level,
 	return line;
 }
 
-inline void report::print_node(const sinks& s,
-	const std::vector<std::vector<size_t>>& children, size_t idx,
-	size_t level, size_t label_w, value_columns cols,
+inline void report::print_message(const sinks& s, size_t idx,
 	const term::colors& tc) const
 {
 	const auto& n = nodes_[idx];
-	if (is_error(n.tag)) {
+	if (is_error(n.tag))
 		s.error(tc.RED() + format_message(idx) + tc.CLEAR());
-	} else if (is_warning(n.tag)) {
+	else
 		s.warning(tc.YELLOW() + format_message(idx) + tc.CLEAR());
+	n.printed = true;
+}
+
+inline void report::print_node(const sinks& s,
+	const std::vector<std::vector<size_t>>& children, size_t idx,
+	size_t level, size_t label_w, value_columns cols,
+	const term::colors& tc, bool again) const
+{
+	const auto& n = nodes_[idx];
+	if (is_error(n.tag) || is_warning(n.tag)) {
+		if (again || !n.printed) print_message(s, idx, tc);
 	} else if (n.tag == code::info_scope
 		&& children[idx].empty()) {
 		// silent container with nothing to show — skip
@@ -808,11 +867,11 @@ inline void report::print_node(const sinks& s,
 		s.info(color_info_line(n, level, label_w, cols, tc));
 	}
 	for (size_t i : children[idx])
-		print_node(s, children, i, level + 1, label_w, cols, tc);
+		print_node(s, children, i, level + 1, label_w, cols, tc, again);
 }
 
 inline std::ostream& operator<<(std::ostream& os, const report& r) {
-	r.print(os);
+	r.reprint(os);
 	return os;
 }
 
@@ -1130,6 +1189,46 @@ void result<T>::print(const sinks& s) const {
 template <typename T>
 void result<T>::print() const {
 	if (!diag_rep_.nodes().empty()) diag_rep_.print();
+}
+
+template <typename T>
+void result<T>::print_pending(std::ostream& os) const {
+	diag_rep_.print_pending(os);
+}
+
+template <typename T>
+void result<T>::print_pending(const sink& s) const {
+	diag_rep_.print_pending(s);
+}
+
+template <typename T>
+void result<T>::print_pending(const sinks& s) const {
+	diag_rep_.print_pending(s);
+}
+
+template <typename T>
+void result<T>::print_pending() const {
+	diag_rep_.print_pending();
+}
+
+template <typename T>
+void result<T>::reprint(std::ostream& os) const {
+	if (!diag_rep_.nodes().empty()) diag_rep_.reprint(os);
+}
+
+template <typename T>
+void result<T>::reprint(const sink& s) const {
+	if (!diag_rep_.nodes().empty()) diag_rep_.reprint(s);
+}
+
+template <typename T>
+void result<T>::reprint(const sinks& s) const {
+	if (!diag_rep_.nodes().empty()) diag_rep_.reprint(s);
+}
+
+template <typename T>
+void result<T>::reprint() const {
+	if (!diag_rep_.nodes().empty()) diag_rep_.reprint();
 }
 
 template <typename T>
