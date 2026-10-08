@@ -164,8 +164,8 @@ Option values are a bool, an array of strings, an array of string arrays
 Option names are the long names from `tgf_repl.tgf`.
 `derive-char-classes` (`dcc`) is a bool option: true scans one-character
 rules as character classes. `start` is the start symbol; `set start foo`
-does the same as the `start foo` command. `start` is `null` when no
-start symbol is set.
+does the same as the `start foo` command. The default of `start` is
+`start`.
 
 `input` is present when `print-input` is on. `terminals` is present
 when `print-terminals` is on. `tml_rules` and `tml_facts` carry text when

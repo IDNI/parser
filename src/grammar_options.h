@@ -15,6 +15,7 @@
 namespace idni {
 
 template <typename C, typename T> struct nonterminals;
+template <typename C, typename T> struct lit;
 
 /// The options of a grammar. The directive names are the option names.
 inline const option_set grammar_option_set = { .options = {
@@ -39,6 +40,7 @@ inline const option_set grammar_option_set = { .options = {
 		"tree paths to inline, each written as a > b", {} },
 	{ "enabled-productions", "grammar", option_list{},
 		"comma-separated enabled productions", {} },
+	{ "start", "grammar", std::string("start"), "starting literal", {} },
 } };
 
 namespace detail {
@@ -72,6 +74,14 @@ struct string_set_codec {
 	option_value to_value(const std::set<std::string>& s) const;
 	diagnostics::result<std::set<std::string>> from_value(
 		const option_value& v) const;
+};
+
+/// The start literal, as the name of its nonterminal.
+template <typename C, typename T>
+struct start_codec {
+	const nonterminals<C, T>* nts;
+	option_value to_value(const lit<C, T>& start) const;
+	diagnostics::result<lit<C, T>> from_value(const option_value& v) const;
 };
 
 } // namespace detail

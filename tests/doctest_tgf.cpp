@@ -666,6 +666,33 @@ TEST_SUITE("grammar options") {
 		CHECK(g.opt().shaping.to_trim == set<size_t>{ id_of(nts, "x") });
 	}
 
+	static bool parses(parser<char>& p, const string& in) {
+		return p.parse(in.c_str(), in.size()).found;
+	}
+
+	TEST_CASE("start is a grammar option") {
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		auto gr = load(nts, "@start x.\n");
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		REQUIRE(g.bind_options().has_value());
+		parser<char> p(g);
+		CHECK(text_of(repo, "start") == "x");
+		CHECK(parses(p, "x"));
+		REQUIRE(repo.set_text("start", "start").has_value());
+		CHECK(text_of(repo, "start") == "start");
+		CHECK(parses(p, "x x"));
+		auto r = repo.set_text("start", "nope");
+		CHECK(r.has_error());
+		ostringstream printed;
+		r.report().print(printed);
+		CHECK(printed.str().find("nope") != string::npos);
+		CHECK(repo.set_text("start", "").has_error());
+		CHECK(text_of(repo, "start") == "start");
+	}
+
 	TEST_CASE("an empty @dynamic value is a load error that names it") {
 		nonterminals<char> nts;
 		auto gr = tgf<char>::from_string(nts, string(
@@ -677,6 +704,13 @@ TEST_SUITE("grammar options") {
 			parser_strings::messages::dynamic_empty_value)
 				!= string::npos);
 		CHECK(printed.str().find("empty_tn") != string::npos);
+	}
+
+	TEST_CASE("the default of start is start") {
+		options_repository repo;
+		options_scope scope(repo);
+		REQUIRE(repo.declare(grammar_option_set).has_value());
+		CHECK(text_of(repo, "start") == "start");
 	}
 }
 
@@ -703,28 +737,6 @@ TEST_SUITE("parser options") {
 		CHECK(text_of(repo, "gc") == "false");
 		REQUIRE(repo.set_text("gc-lag", "3").has_value());
 		CHECK(text_of(repo, "gc-lag") == "3");
-		CHECK(parses(p, "x x"));
-	}
-
-	TEST_CASE("start is a nonterminal name") {
-		options_repository repo;
-		options_scope scope(repo);
-		nonterminals<char> nts;
-		grammar<char> g = options_grammar(nts);
-		parser<char> p(g);
-		REQUIRE(p.bind_options().has_value());
-		CHECK(text_of(repo, "start") == "");
-		REQUIRE(repo.set_text("start", "x").has_value());
-		CHECK(text_of(repo, "start") == "x");
-		CHECK(parses(p, "x"));
-		auto r = repo.set_text("start", "nope");
-		CHECK(r.has_error());
-		ostringstream printed;
-		r.report().print(printed);
-		CHECK(printed.str().find("nope") != string::npos);
-		CHECK(text_of(repo, "start") == "x");
-		REQUIRE(repo.set_text("start", "").has_value());
-		CHECK(text_of(repo, "start") == "");
 		CHECK(parses(p, "x x"));
 	}
 
@@ -772,7 +784,9 @@ TEST_SUITE("parser options") {
 		parser<char> p2 = std::move(p);
 		REQUIRE(repo.set_text("gc-lag", "5").has_value());
 		CHECK(text_of(repo, "gc-lag") == "5");
-		REQUIRE(repo.set_text("start", "x").has_value());
-		CHECK(parses(p2, "x"));
+		// the hook of measure runs only for a bound parser
+		REQUIRE(repo.set_text("measure", "true").has_value());
+		CHECK(text_of(repo, "measure-scopes") == "true");
+		CHECK(parses(p2, "x x"));
 	}
 }

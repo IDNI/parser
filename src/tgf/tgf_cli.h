@@ -139,8 +139,7 @@ struct tgf_repl_evaluator {
 	/// reload, so a reload reads no file. A built-in grammar keeps its own
 	/// source. The grammar name stays.
 	void make_grammar_source_backed();
-	/// The start option, or the start literal of the grammar when the
-	/// option is empty. Empty with no grammar.
+	/// The start option of the grammar. Empty with no grammar.
 	[[nodiscard]] std::string start_symbol() const;
 	[[nodiscard]] bool has_fixed_grammar() const noexcept;
 

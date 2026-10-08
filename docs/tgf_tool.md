@@ -59,7 +59,7 @@ tgf <tgf file> [ repl ] [ <options> ]
         --print-tml-facts          print the forest as TML facts (default: false)
         --print-tml-rules          print the forest as TML rules (default: false)
         --session                  session id of a tgf serve session
-        --start            -s      starting literal
+        --start            -s      starting literal (default: start)
         --trim                     nonterminals to trim from the tree
         --trim-children            nonterminals whose children are trimmed
         --trim-children-terminals
@@ -93,7 +93,7 @@ tgf <tgf file> gen [ <options> ]
         --nodisambig-list  -A      nonterminals whose ambiguity is kept
         --output           -o      output file for the parser
         --output-dir       -O      output directory
-        --start            -s      starting literal
+        --start            -s      starting literal (default: start)
         --terminal-type    -T      terminal character type (e.g. char, char32_t) (default: char)
         --treemr                   add a matcher() member built on idni::treemr::matcher_for (default: false)
         --trim                     nonterminals to trim from the tree
@@ -135,7 +135,7 @@ tgf <tgf file> parse [ <options> ]
         --print-terminals  -t      print the parsed terminals (default: true)
         --print-tml-facts          print the forest as TML facts (default: false)
         --print-tml-rules          print the forest as TML rules (default: false)
-        --start            -s      starting literal
+        --start            -s      starting literal (default: start)
         --tree-path        -P      parse tree path: bintree or forest (default: bintree)
         --trim                     nonterminals to trim from the tree
         --trim-children            nonterminals whose children are trimmed
@@ -169,7 +169,7 @@ tgf <tgf file> grammar [ <options> ]
         --measure          -m      measure parse time and counters, turns every measure flag on (default: false)
         --nodisambig-list          nonterminals whose ambiguity is kept
         --nullable         -N      report nullable recursive productions (default: false)
-        --start            -s      starting literal
+        --start            -s      starting literal (default: start)
         --trim                     nonterminals to trim from the tree
         --trim-children            nonterminals whose children are trimmed
         --trim-children-terminals
@@ -193,6 +193,7 @@ tgf <tgf file> test [ <options> ]
         --inline-char-classes
                                    inline character classes (default: false)
         --nodisambig-list          nonterminals whose ambiguity is kept
+        --start                    starting literal (default: start)
         --trim                     nonterminals to trim from the tree
         --trim-children            nonterminals whose children are trimmed
         --trim-children-terminals

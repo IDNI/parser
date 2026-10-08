@@ -266,6 +266,7 @@ Here `digit` is the Unicode class and `ascii_digit` is the `<cctype>` class.
 #### @start
 
 Start directives tells parser what is the starting symbol. Allows to pick another symbol as a starting one instead of a default `start`.
+It writes the grammar option `start`. The default of the option is `start`.
 
 Usage:
 ```

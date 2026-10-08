@@ -405,9 +405,7 @@ bool tgf_repl_evaluator::load_file_source(const std::string& filename) {
 std::string tgf_repl_evaluator::start_symbol() const {
 	if (!has_grammar()) return {};
 	auto start = idni::options().get_text("start");
-	if (start.has_value() && !start.value().empty())
-		return start.value();
-	return g().start_literal().to_std_string();
+	return start.has_value() ? start.value() : std::string();
 }
 
 bool tgf_repl_evaluator::has_fixed_grammar() const noexcept {

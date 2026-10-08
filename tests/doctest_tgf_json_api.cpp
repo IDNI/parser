@@ -1298,12 +1298,12 @@ TEST_SUITE("tgf json api: no grammar") {
 		REQUIRE(result_of(r.responses[1]) != nullptr);
 		REQUIRE(result_of(r.responses[1])->find("value") != nullptr);
 		CHECK(result_of(r.responses[1])->find("value")->as_string()
-			== "");
+			== "start");
 		CHECK(r.responses[2].find("status")->as_string() == "error");
 		const json::value* data = response_data(r.responses[3]);
 		REQUIRE(data != nullptr);
 		REQUIRE(data->find("value") != nullptr);
-		CHECK(data->find("value")->as_string() == "");
+		CHECK(data->find("value")->as_string() == "start");
 	}
 
 	TEST_CASE("the start command gives null with no start symbol") {

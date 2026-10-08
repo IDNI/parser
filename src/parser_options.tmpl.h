@@ -17,16 +17,6 @@ namespace idni {
 
 namespace detail {
 
-/// The text of @p v, or an error in @p rep when the value is no text.
-inline const std::string* option_text_of(const option_value& v,
-	diagnostics::report& rep)
-{
-	if (const auto* s = std::get_if<std::string>(&v)) return s;
-	rep.error(diagnostics::code::type_error,
-		parser_strings::messages::option_value_kind);
-	return nullptr;
-}
-
 /// The value that the text @p v names in @p names, or an error that
 /// names the text.
 template <typename E, size_t N>
@@ -52,25 +42,6 @@ std::string option_enum_name(
 	for (const auto& [name, x] : names)
 		if (x == e) return std::string(name);
 	return {};
-}
-
-template <typename C, typename T>
-option_value nonterminal_id_codec<C, T>::to_value(const size_t& id) const {
-	if (id == SIZE_MAX) return std::string();
-	return to_std_string(nts->get(id));
-}
-
-template <typename C, typename T>
-diagnostics::result<size_t> nonterminal_id_codec<C, T>::from_value(
-	const option_value& v) const
-{
-	diagnostics::result<size_t> r;
-	const std::string* name = option_text_of(v, r.report());
-	if (!name) return r;
-	if (name->empty()) return r.with_value(SIZE_MAX);
-	if (auto id = nonterminal_id(*nts, *name, r.report()))
-		return r.with_value(*id);
-	return r;
 }
 
 template <typename C, typename T>

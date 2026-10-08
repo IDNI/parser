@@ -15,6 +15,16 @@ namespace idni {
 
 namespace detail {
 
+/// The text of @p v, or an error in @p rep when the value is no text.
+inline const std::string* option_text_of(const option_value& v,
+	diagnostics::report& rep)
+{
+	if (const auto* s = std::get_if<std::string>(&v)) return s;
+	rep.error(diagnostics::code::type_error,
+		parser_strings::messages::option_value_kind);
+	return nullptr;
+}
+
 // find() and never get(), so a name the grammar lacks adds no nonterminal
 template <typename C, typename T>
 std::optional<size_t> nonterminal_id(const nonterminals<C, T>& nts,
@@ -112,6 +122,28 @@ inline diagnostics::result<std::set<std::string>> string_set_codec::from_value(
 	if (!list) return r.with_error(diagnostics::code::type_error,
 		parser_strings::messages::option_value_kind);
 	return r.with_value(std::set<std::string>(list->begin(), list->end()));
+}
+
+template <typename C, typename T>
+option_value start_codec<C, T>::to_value(const lit<C, T>& start) const {
+	return to_std_string(nts->get(start.n()));
+}
+
+template <typename C, typename T>
+diagnostics::result<lit<C, T>> start_codec<C, T>::from_value(
+	const option_value& v) const
+{
+	diagnostics::result<lit<C, T>> r;
+	const std::string* name = option_text_of(v, r.report());
+	if (!name) return r;
+	// the empty nonterminal holds the class that matches nothing
+	if (name->empty())
+		return r.with_error(diagnostics::code::invalid_argument,
+			parser_strings::messages::invalid_symbol,
+			{ { parser_strings::label::name, *name } });
+	if (auto id = nonterminal_id(*nts, *name, r.report()))
+		return r.with_value(lit<C, T>(*id, nts));
+	return r;
 }
 
 } // namespace detail

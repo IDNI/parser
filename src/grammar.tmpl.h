@@ -729,6 +729,9 @@ idni::diagnostics::result<void> grammar<C, T>::bind_to(
 	r.merge(repo.bind("inline", sh.to_inline, paths));
 	r.merge(repo.bind("enabled-productions", opt_.enabled_guards,
 		detail::string_set_codec{}, rebuild));
+	// the class analysis rejects the start rule
+	r.merge(repo.bind("start", start, detail::start_codec<C, T>{ &nts },
+		rebuild));
 	return r;
 }
 template <typename C, typename T>

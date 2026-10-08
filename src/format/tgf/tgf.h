@@ -267,8 +267,6 @@ private:
 		prods_t ps, nul{ lit_t{} };
 		nonterminals<C, T>& nts;
 		std::shared_ptr<nonterminals<C, T>> nts_handle;
-		/// set by @start ...
-		prods_t start = nul;
 		/// char class names coming from @use char class ..., in the order
 		/// of the file, so that the class nonterminals keep their ids
 		std::vector<std::string> cc_names{};
@@ -373,8 +371,9 @@ private:
 		void fill_directives() {
 			dirs->use_char_classes = cc_names;
 			dirs->char_class_renames = cc_renames;
-			dirs->start = (start == nul) ? std::string()
-				: start.to_lit().to_std_string();
+			// a file with no @start gives the default start
+			const auto start = own_.get<std::string>("start");
+			dirs->start = start == "start" ? std::string() : start;
 			auto& opts = own_;
 			auto list = [&opts](std::string_view name) {
 				return opts.get<option_list>(name);
@@ -448,8 +447,11 @@ private:
 			return 0;
 		}
 		grammar<C, T> g() {
-			grammar<C, T> gr(nts_handle, ps, start == nul
-				? prods_t(nts("start")) : start, cc, opt, diag);
+			// a presplit load of no statement never runs build()
+			keep(own_.declare(grammar_option_set));
+			grammar<C, T> gr(nts_handle, ps,
+				prods_t(nts(own_.get<std::string>("start"))), cc, opt,
+				diag);
 			// the bind pushes the directives through the codec, which
 			// reports a name the grammar does not have
 			{
@@ -643,7 +645,7 @@ private:
 		if (!a.has_value()) return;
 		auto s = dir_arg_text(a | trv::only_child);
 		if (s.empty()) return;
-		start = prods_t(nts(s));
+		set_option("start", s);
 	}
 
 	void trim_dir(const trv& t) {

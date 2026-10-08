@@ -301,8 +301,6 @@ idni::diagnostics::result<void> parser<C, T>::bind_to(
 		detail::error_verbosity_codec<C, T>{}, sync));
 	r.merge(repo.bind("tree-path", f.tree_path, detail::tree_path_codec{},
 		sync));
-	r.merge(repo.bind("start", f.start,
-		detail::nonterminal_id_codec<C, T>{ &g.get_nts() }, sync));
 	return r;
 }
 

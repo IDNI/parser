@@ -11,7 +11,6 @@
 
 namespace idni {
 
-template <typename C, typename T> struct nonterminals;
 template <typename C, typename T> class parser;
 
 /// The options of a parse. The defaults are those of parse_options.
@@ -39,19 +38,9 @@ inline const option_set parser_option_set = { .options = {
 		"parse error verbosity: basic, detailed, root-cause" },
 	{ "tree-path", "parse", std::string("bintree"),
 		"parse tree path: bintree or forest" },
-	{ "start", "parse", std::string(), "starting literal" },
 } };
 
 namespace detail {
-
-/// A nonterminal id, as its name in the option. SIZE_MAX is the empty
-/// text.
-template <typename C, typename T>
-struct nonterminal_id_codec {
-	const nonterminals<C, T>* nts;
-	option_value to_value(const size_t& id) const;
-	diagnostics::result<size_t> from_value(const option_value& v) const;
-};
 
 /// The parse error verbosity, as basic, detailed or root-cause.
 template <typename C, typename T>
