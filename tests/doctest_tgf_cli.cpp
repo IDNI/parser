@@ -7,6 +7,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 #include "../src/tgf/tgf_cli.h"
+#include "../src/tgf/parser_gen.h"
 
 #include <filesystem>
 #include <fstream>
@@ -268,6 +269,57 @@ TEST_SUITE("tgf cli: grammar options") {
 		CHECK(without.find("parsed terminals: ab") == string::npos);
 		CHECK(with.find("parsed terminals: ab") != string::npos);
 		fs::remove(path);
+	}
+
+	// The terminals block of a generated header.
+	static string terminals_block(const string& header) {
+		ifstream in(header);
+		REQUIRE(in.is_open());
+		ostringstream ss;
+		ss << in.rdbuf();
+		const string text = ss.str();
+		const auto b = text.find("terminals{");
+		REQUIRE(b != string::npos);
+		return text.substr(b, text.find("};", b) - b);
+	}
+
+	TEST_CASE("gen -D writes a dynamic value and keeps UTF-8 terminals") {
+		namespace fs = std::filesystem;
+		const string dir = fs::temp_directory_path().string() + "/";
+		const string path = dir + "tgf_cli_gen.tgf";
+		// U+00E9 is above 0x7F, so its UTF-8 bytes show a truncation
+		const string src = "@dynamic tn.\nstart => tn | \"\\u00e9\".\n";
+		{
+			ofstream f(path);
+			f << src;
+		}
+		capture_tgf_run({ "tgf", path, "gen", "-D", "tn=v", "-O", dir,
+			"-o", "tgf_cli_gen.generated.h",
+			"-n", "tgf_cli_gen_parser" });
+		const string tool_header = dir + "tgf_cli_gen.generated.h";
+		ifstream in(tool_header);
+		REQUIRE(in.is_open());
+		ostringstream text;
+		text << in.rdbuf();
+		CHECK(text.str().find("{ \"tn\", { \"v\" } }") != string::npos);
+
+		// the direct load gives tn the value of -D as its default
+		nonterminals<char> nts;
+		auto gr = tgf<char>::from_string(nts, string(
+			"@dynamic tn defaults v.\nstart => tn | \"\\u00e9\".\n"));
+		REQUIRE(gr.has_value());
+		parser_gen_options gopt;
+		gopt.output_dir = dir;
+		gopt.output = "tgf_cli_gen_direct.generated.h";
+		gopt.name = "tgf_cli_gen_direct_parser";
+		generate_parser_cpp<char>(path, gr.value(), gopt);
+		const string direct_header = dir + gopt.output;
+		CHECK(terminals_block(tool_header)
+			== terminals_block(direct_header));
+		in.close();
+		fs::remove(path);
+		fs::remove(tool_header);
+		fs::remove(direct_header);
 	}
 }
 

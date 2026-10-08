@@ -2001,11 +2001,27 @@ static int gen_command(tgf_tool& tool, tgf_repl_evaluator& re) {
 		return 1;
 	};
 	if (!re.require_grammar()) return fail(re.take_report());
-	auto gr = !re.has_fixed_grammar()
-		? generate_parser_cpp_from_file<char>(re.filename(), tool.gen,
-			false)
-		: generate_parser_cpp_from_string<char>(re.filename(),
-			re.source(), tool.gen, false);
+	// the warnings of the load stay in the evaluator until here
+	diagnostics::report rep = re.take_report();
+	// the generator needs char terminals, and the evaluator grammar has
+	// char32_t ones, so gen loads the source again
+	nonterminals<char> nts;
+	auto lg = tgf<char>::from_string(nts, re.source());
+	// a loaded file reports the same diagnostics the second time
+	if (re.has_fixed_grammar() || !lg.has_value()) rep.append(lg.report());
+	if (!lg.has_value()) return fail(rep);
+	diagnostics::result<vector<string>> gr;
+	{
+		options_repository own;
+		options_scope scope(own);
+		grammar<char> g = std::move(lg).value();
+		rep.append(g.bind_options().report());
+		re.write_argv_values();
+		rep.append(re.take_report());
+		if (!rep.has_error()) gr.emplace(
+			generate_parser_cpp(re.filename(), g, tool.gen));
+	}
+	rep.append(gr.report());
 	if (json) {
 		auto data = value::object();
 		auto files = value::array();
@@ -2016,10 +2032,10 @@ static int gen_command(tgf_tool& tool, tgf_repl_evaluator& re) {
 		cmd_status st = gr.has_value()
 			? cmd_status::ok : cmd_status::error;
 		json_write_line(cout, json_result_response(st, "gen", data,
-			state_value(re), gr.report()));
+			state_value(re), rep));
 		return st == cmd_status::error ? 1 : 0;
 	}
-	print_diagnostics_report(gr.report(), false);
+	print_diagnostics_report(rep, false);
 	return gr.has_value() ? 0 : 1;
 }
 

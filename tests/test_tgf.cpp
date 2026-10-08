@@ -267,17 +267,23 @@ int main(int argc, char **argv) {
 		gopt.output_dir = dir.string() + "/";
 		gopt.output = "test_dynamic_gen.generated.h";
 		gopt.name = "test_dynamic_gen_parser";
-		// "extra" plays the command line value, appended after the
-		// .tgf defaults; unknown_nt has no @dynamic in the grammar
-		gopt.dynamic = { "ba_type=extra", "unknown_nt=z" };
-		auto gr = generate_parser_cpp_from_string<char>(
-			"test_dynamic_gen.tgf",
-			string(
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		auto gr = tgf<char>::from_string(nts, string(
 			"@dynamic ba_type defaults sbf, tau.\n"
 			"@dynamic type_name.\n"
-			"start => ba_type | type_name.\n"),
-			gopt);
-		check(gr.print_and_ok(cerr), "generator runs");
+			"start => ba_type | type_name.\n"));
+		if (!check(gr.print_and_ok(cerr), "grammar loads")) return 1;
+		grammar<char> g = std::move(gr).value();
+		check(!g.bind_options().has_error(), "grammar binds");
+		// "extra" plays the command line value, appended after the
+		// .tgf defaults
+		auto dyn = repo.get<option_list>("dynamic");
+		dyn.push_back("ba_type=extra");
+		check(!repo.set("dynamic", option_value(dyn)).has_error(),
+			"dynamic takes the extra value");
+		generate_parser_cpp<char>("test_dynamic_gen.tgf", g, gopt);
 		fs::path out = dir / gopt.output;
 		ifstream in(out);
 		stringstream ss; ss << in.rdbuf();
@@ -296,8 +302,6 @@ int main(int argc, char **argv) {
 			"order is: .tgf defaults, then command line values");
 		check(block.find("\"type_name\", {}") != string::npos,
 			"type_name has an empty list");
-		check(block.find("unknown_nt") == string::npos,
-			"a name not declared in the grammar has no entry");
 		in.close();
 		fs::remove(out);
 	}

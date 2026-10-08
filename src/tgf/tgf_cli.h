@@ -238,6 +238,9 @@ struct tgf_repl_evaluator {
 	/// The option values that argv gave, written again after each load.
 	void set_argv_values(
 		std::vector<std::pair<std::string, option_value>> values);
+	/// Write the argv values of the owner grammar to the current
+	/// repository. An error goes to report.
+	void write_argv_values();
 
 	std::ostream& pretty_print(std::ostream& os, tref n,
 		std::set<size_t> skip, bool nulls, size_t l);
@@ -285,8 +288,6 @@ private:
 	/// Load a grammar file and adopt it, without printing. On success
 	/// tgf_filename names @p filename.
 	bool load_file(const std::string& filename);
-	/// Write argv_values to the options of the loaded grammar and parser.
-	void write_argv_values();
 	/// Report "server path" and return false when paths are forbidden.
 	bool paths_allowed();
 	/// Data of the load and reload commands: {"grammar", "loaded"}.

@@ -8,7 +8,6 @@
 #include "parser.h"
 #include "grammar_inspector.h"
 #include "utility/escapes.h"
-#include "utility/options_types.h"
 
 namespace idni {
 
@@ -24,9 +23,6 @@ struct parser_gen_options {
 	// true sets the char type char, the terminal type char32_t and an
 	// empty decoder and encoder to the utf8 recoders
 	bool utf8                                    = false;
-	// extra default values of @dynamic nonterminals, each entry
-	// name=value, added after the ones the .tgf file declares
-	option_list dynamic                          = {};
 	// false emits productions() into a companion .cpp instead of the header
 	bool header_only                             = true;
 	// true adds a matcher() member built on idni::treemr::matcher_for
@@ -139,7 +135,7 @@ std::vector<std::string> generate_parser_cpp(const std::string& tgf_filename,
 			os << "\t}, {\n" << renames.str();
 		return os.str();
 	};
-	auto gen_grammar_opts = [&g, &opt]() {
+	auto gen_grammar_opts = [&g]() {
 		std::stringstream os;
 		std::array<const char*, 2> pbool = { "false", "true" };
 		auto plist = [](std::ostream& os,
@@ -206,38 +202,12 @@ std::vector<std::string> generate_parser_cpp(const std::string& tgf_filename,
 				<< "\"" << s << "\"", i++;
 			os << "\n\t}";
 		}
-		// g.opt().dynamic keeps the .tgf file's names and default
-		// values; opt.dynamic (the command line) only adds values
-		std::map<std::string, std::vector<std::string>> dyn;
-		for (const auto& [name, values] : g.opt().dynamic) {
-			auto& vs = dyn[to_std_string(name)];
-			for (const auto& v : values)
-				vs.push_back(to_std_string(v));
-		}
-		for (const auto& entry : opt.dynamic) {
-			const auto eq = entry.find('=');
-			if (eq == std::string::npos) {
-				std::cerr << "Invalid @dynamic value (missing '='): "
-					<< entry << '\n';
-				continue;
-			}
-			const std::string name = entry.substr(0, eq);
-			const std::string v = entry.substr(eq + 1);
-			auto it = dyn.find(name);
-			if (it == dyn.end()) {
-				std::cerr << "Unknown @dynamic nonterminal: "
-					<< name << '\n';
-				continue;
-			}
-			if (std::find(it->second.begin(), it->second.end(), v)
-				== it->second.end()) it->second.push_back(v);
-		}
-		if (dyn.size()) {
+		if (g.opt().dynamic.size()) {
 			os << ",\n\t.dynamic = {";
 			size_t i = 0;
-			for (const auto& [name, values] : dyn) {
+			for (const auto& [name, values] : g.opt().dynamic) {
 				os << (i++ ? "," : "") << "\n\t\t{ \""
-					<< escapes::encode(name,
+					<< escapes::encode(to_std_string(name),
 						escapes::c_like)
 					<< "\", ";
 				if (values.empty()) os << "{}";
@@ -247,7 +217,8 @@ std::vector<std::string> generate_parser_cpp(const std::string& tgf_filename,
 					for (const auto& v : values)
 						os << (j++ ? ", " : "")
 							<< "\""
-							<< escapes::encode(v,
+							<< escapes::encode(
+								to_std_string(v),
 								escapes::c_like)
 							<< "\"";
 					os << " }";
