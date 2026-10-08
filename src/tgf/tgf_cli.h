@@ -155,11 +155,6 @@ struct tgf_repl_evaluator {
 	/// it for the hello line, which carries the grammar-load report.
 	diagnostics::report take_report();
 
-	/// The directives the loaded grammar file carries, as read at load
-	/// time; null with no grammar. The JSON front end sends it in hello
-	/// and in the load and reload answers.
-	[[nodiscard]] format::json::value directives_value() const;
-
 	bool reload(const std::string& new_tgf_file);
 
 	/// Load a grammar from text and adopt it. @p name is a label for the
@@ -272,11 +267,6 @@ private:
 #endif
 	term::colors TC;
 	idni::diagnostics::report report;
-	/// Snapshot of the loaded grammar directives, taken when the grammar
-	/// is installed or on the first read; null with no grammar.
-	mutable format::json::value directives_{};
-	/// True once directives_ holds the value for the loaded grammar.
-	mutable bool directives_cached = false;
 
 	std::unique_ptr<nonterminals_type> owned_nts;
 	std::unique_ptr<grammar_type> owned_g;

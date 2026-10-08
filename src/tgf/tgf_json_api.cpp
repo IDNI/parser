@@ -290,7 +290,6 @@ static value hello_object(tgf_repl_evaluator& re,
 	h.set("start", re.start_symbol().empty() ? value::null()
 		: value::string(re.start_symbol()));
 	h.set("options", re.option_values());
-	h.set("directives", re.directives_value());
 	diagnostics::report r = re.take_report();
 	r.append(extra);
 	h.set("report", report_value(r));

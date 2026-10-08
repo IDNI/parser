@@ -311,69 +311,6 @@ const std::string& tgf_repl_evaluator::filename() const noexcept {
 	return tgf_filename;
 }
 
-// One JSON object for the directives of a loaded grammar.
-static format::json::value directives_to_value(const tgf_directives& d) {
-	using value = format::json::value;
-	auto str_array = [](const std::vector<std::string>& xs) {
-		value a = value::array();
-		for (const auto& s : xs) a.push_back(value::string(s));
-		return a;
-	};
-	value v = value::object();
-	v.set("use_char_classes", str_array(d.use_char_classes));
-	value renames = value::object();
-	for (const auto& [cc_name, local] : d.char_class_renames)
-		renames.set(cc_name, value::string(local));
-	v.set("char_class_renames", std::move(renames));
-	v.set("start", d.start.empty() ? value::null()
-		: value::string(d.start));
-	v.set("enable_productions", str_array(d.enable_productions));
-	v.set("disable_productions", str_array(d.disable_productions));
-	v.set("enabled_productions", str_array(d.enabled_productions));
-	v.set("trim", str_array(d.trim));
-	v.set("trim_children", str_array(d.trim_children));
-	v.set("trim_children_terminals",
-		str_array(d.trim_children_terminals));
-	v.set("trim_terminals", str_array(d.trim_terminals));
-	v.set("trim_all_terminals", value::boolean(d.trim_all_terminals));
-	value paths = value::array();
-	for (const auto& p : d.inline_paths) paths.push_back(str_array(p));
-	v.set("inline", std::move(paths));
-	v.set("inline_char_classes", value::boolean(d.inline_char_classes));
-	v.set("ambiguous", str_array(d.ambiguous));
-	value hl = value::array();
-	for (const auto& h : d.highlights) {
-		value e = value::object();
-		e.set("type", value::string(h.first));
-		e.set("patterns", str_array(h.second));
-		hl.push_back(std::move(e));
-	}
-	v.set("highlight", std::move(hl));
-	v.set("highlight_auto", value::boolean(d.highlight_auto));
-	value dyn = value::object();
-	for (const auto& kv : d.dynamic)
-		dyn.set(kv.first, str_array(kv.second));
-	v.set("dynamic", std::move(dyn));
-	return v;
-}
-
-format::json::value tgf_repl_evaluator::directives_value() const {
-	if (!grammar_loaded) return format::json::value::null();
-	if (!directives_cached) {
-		// A built-in grammar has no load-time snapshot, so parse it
-		// here once on the first read.
-		if (fixed_grammar) {
-			tgf_directives dirs;
-			nonterminals_type tmp;
-			tgf<char_type, terminal_type>::from_string(tmp,
-				grammar_source, false, &dirs);
-			directives_ = directives_to_value(dirs);
-		}
-		directives_cached = true;
-	}
-	return directives_;
-}
-
 const std::string& tgf_repl_evaluator::source() const noexcept {
 	return grammar_source;
 }
@@ -526,9 +463,8 @@ bool tgf_repl_evaluator::load_file(const std::string& filename) {
 	std::string text((istreambuf_iterator<char>(f)),
 		istreambuf_iterator<char>());
 	auto next_nts = make_unique<nonterminals_type>();
-	tgf_directives dirs;
 	auto gr = tgf<char_type, terminal_type>::from_string(*next_nts, text,
-		idni::options().get<bool>("measure"), &dirs);
+		idni::options().get<bool>("measure"));
 	if (!gr.has_value()) {
 		report.append(std::move(gr).report());
 		return false;
@@ -550,8 +486,6 @@ bool tgf_repl_evaluator::load_file(const std::string& filename) {
 	grammar_source = std::move(text);
 	grammar_from_source = false;
 	grammar_loaded = true;
-	directives_ = directives_to_value(dirs);
-	directives_cached = true;
 	return true;
 }
 
@@ -559,9 +493,8 @@ bool tgf_repl_evaluator::load_source(const std::string& name,
 	const std::string& text)
 {
 	auto next_nts = make_unique<nonterminals_type>();
-	tgf_directives dirs;
 	auto gr = tgf<char_type, terminal_type>::from_string(*next_nts, text,
-		idni::options().get<bool>("measure"), &dirs);
+		idni::options().get<bool>("measure"));
 	if (!gr.has_value()) {
 		report.append(std::move(gr).report());
 		return false;
@@ -583,8 +516,6 @@ bool tgf_repl_evaluator::load_source(const std::string& name,
 	grammar_source      = text;
 	grammar_from_source = true;
 	grammar_loaded      = true;
-	directives_ = directives_to_value(dirs);
-	directives_cached = true;
 	return true;
 }
 
@@ -862,11 +793,9 @@ format::json::value tgf_repl_evaluator::reload_data(
 	auto v = value::object();
 	if (!load_file(new_tgf_file))
 		return v.set("grammar", value::string(new_tgf_file))
-			.set("loaded", value::boolean(false))
-			.set("directives", directives_value());
+			.set("loaded", value::boolean(false));
 	return v.set("grammar", value::string(tgf_filename))
-		.set("loaded", value::boolean(true))
-		.set("directives", directives_value());
+		.set("loaded", value::boolean(true));
 }
 
 format::json::value tgf_repl_evaluator::load_source_data(
@@ -877,16 +806,13 @@ format::json::value tgf_repl_evaluator::load_source_data(
 	if (fixed_grammar) {
 		report.warning(parser_strings::messages::loading_grammars_unavailable);
 		return v.set("grammar", value::string(name))
-			.set("loaded", value::boolean(false))
-			.set("directives", directives_value());
+			.set("loaded", value::boolean(false));
 	}
 	if (!load_source(name, text))
 		return v.set("grammar", value::string(name))
-			.set("loaded", value::boolean(false))
-			.set("directives", directives_value());
+			.set("loaded", value::boolean(false));
 	return v.set("grammar", value::string(tgf_filename))
-		.set("loaded", value::boolean(true))
-		.set("directives", directives_value());
+		.set("loaded", value::boolean(true));
 }
 
 format::json::value tgf_repl_evaluator::reload_source_data() {
@@ -896,11 +822,9 @@ format::json::value tgf_repl_evaluator::reload_source_data() {
 	std::string text = grammar_source;
 	if (!load_source(name, text))
 		return v.set("grammar", value::string(name))
-			.set("loaded", value::boolean(false))
-			.set("directives", directives_value());
+			.set("loaded", value::boolean(false));
 	return v.set("grammar", value::string(tgf_filename))
-		.set("loaded", value::boolean(true))
-		.set("directives", directives_value());
+		.set("loaded", value::boolean(true));
 }
 
 format::json::value tgf_repl_evaluator::get_cmd(std::string_view name) {
@@ -1889,9 +1813,6 @@ tgf_repl_evaluator::tgf_repl_evaluator(
 	  p_(&parser)
 {
 	TC.set(!opt.json && opt.colors);
-	// The directives snapshot is parsed lazily on the first
-	// directives_value() call, so a run that never asks for it pays
-	// nothing for the built-in grammar.
 	reset_parse_options();
 	bind_grammar_options();
 	report.append(p().bind_options().report());

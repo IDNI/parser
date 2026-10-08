@@ -20,47 +20,6 @@
 
 namespace idni {
 
-/// What a grammar file says, as the builder read it. A client gets this
-/// read-only snapshot; the live option values stay in grammar::options.
-struct tgf_directives {
-	/// @use char class names, in the order of the file. A renamed class
-	/// gives its source name.
-	std::vector<std::string> use_char_classes{};
-	/// @use char class <class> as <name>: the new name, by the class.
-	std::map<std::string, std::string> char_class_renames{};
-	/// @start symbol, empty when the file names none.
-	std::string start{};
-	/// @enable guard names, as written.
-	std::vector<std::string> enable_productions{};
-	/// @disable guard names, as written.
-	std::vector<std::string> disable_productions{};
-	/// Guard names that are on after the load.
-	std::vector<std::string> enabled_productions{};
-	/// @trim names.
-	std::vector<std::string> trim{};
-	/// @trim children names.
-	std::vector<std::string> trim_children{};
-	/// @trim children terminals names.
-	std::vector<std::string> trim_children_terminals{};
-	/// @trim all terminals: names after "except children of".
-	std::vector<std::string> trim_terminals{};
-	/// True when the file says @trim all terminals.
-	bool trim_all_terminals = false;
-	/// @inline tree paths, each a list of names.
-	std::vector<std::vector<std::string>> inline_paths{};
-	/// True when the file says @inline char classes.
-	bool inline_char_classes = false;
-	/// @ambiguous symbol names.
-	std::vector<std::string> ambiguous{};
-	/// @highlight entries: the type name and its patterns.
-	std::vector<std::pair<std::string, std::vector<std::string>>>
-		highlights{};
-	/// True when the file says @highlight auto.
-	bool highlight_auto = false;
-	/// @dynamic names and their default values.
-	std::map<std::string, std::vector<std::string>> dynamic{};
-};
-
 template <typename C = char, typename T = C>
 struct tgf {
 	using tree     = tgf_parser::tree;
@@ -73,31 +32,26 @@ struct tgf {
 	using label    = idni::parser_strings::label;
 
 	/// Parse TGF from a string, creating and owning the symbol table.
-	/// @p directives, when given, receives what the file says in its
-	/// @ directives.
 	static result from_string(const std::basic_string<C>& s,
-				  bool measure = false,
-				  tgf_directives* directives = nullptr)
+				  bool measure = false)
 	{
 		return from_string(std::shared_ptr<nonterminals<C, T>>{},
-			s, measure, directives);
+			s, measure);
 	}
 	/// Parse TGF from a string with a caller-provided symbol table.
 	static result from_string(nonterminals<C, T>& nts_,
 				  const std::basic_string<C>& s,
-				  bool measure = false,
-				  tgf_directives* directives = nullptr)
+				  bool measure = false)
 	{
 		return from_string(
 			std::shared_ptr<nonterminals<C, T>>(
-				std::shared_ptr<void>(), &nts_), s, measure, directives);
+				std::shared_ptr<void>(), &nts_), s, measure);
 	}
 	/// Parse TGF from a string with a shared symbol table. A null @p nts_
 	/// makes the grammar create and own one.
 	static result from_string(std::shared_ptr<nonterminals<C, T>> nts_,
 				  const std::basic_string<C>& s,
-				  bool measure = false,
-				  tgf_directives* directives = nullptr)
+				  bool measure = false)
 	{
 		if (!nts_) nts_ = std::make_shared<nonterminals<C, T>>();
 		auto& p = tgf_parser::instance();
@@ -133,7 +87,7 @@ struct tgf {
 				// on has_error() — this is the canonical pattern;
 				// see the comment on predefined_char_classes in
 				// src/grammar.tmpl.h.
-				b.build(trv(n), &R.report(), s.c_str(), directives);
+				b.build(trv(n), &R.report(), s.c_str());
 				if (!R.report().has_error()) {
 					// a directive name the grammar lacks fails the load
 					auto gr = b.g();
@@ -145,32 +99,26 @@ struct tgf {
 		return R;
 	}
 	/// Parse TGF from a file, creating and owning the symbol table.
-	/// @p directives, when given, receives what the file says in its
-	/// @ directives.
 	static result from_file(const std::string& filename,
-				bool measure = false,
-				tgf_directives* directives = nullptr)
+				bool measure = false)
 	{
 		return from_file(std::shared_ptr<nonterminals<C, T>>{},
-			filename, measure, directives);
+			filename, measure);
 	}
 	/// Parse TGF from a file with a caller-provided symbol table.
 	static result from_file(nonterminals<C, T>& nts_,
 				const std::string& filename,
-				bool measure = false,
-				tgf_directives* directives = nullptr)
+				bool measure = false)
 	{
 		return from_file(
 			std::shared_ptr<nonterminals<C, T>>(
-				std::shared_ptr<void>(), &nts_), filename, measure,
-				directives);
+				std::shared_ptr<void>(), &nts_), filename, measure);
 	}
 	/// Parse TGF from a file with a shared symbol table. A null @p nts_
 	/// makes the grammar create and own one.
 	static result from_file(std::shared_ptr<nonterminals<C, T>> nts_,
 				const std::string& filename,
-				bool measure = false,
-				tgf_directives* directives = nullptr)
+				bool measure = false)
 	{
 		std::ifstream ifs(filename);
 		if (!ifs) {
@@ -183,7 +131,7 @@ struct tgf {
 		return from_string(std::move(nts_),
 			std::string(std::istreambuf_iterator<C>(ifs),
 				std::istreambuf_iterator<C>()),
-			measure, directives);
+			measure);
 	}
 
 	/// Parse TGF from a string but split it to statements first
@@ -285,7 +233,6 @@ private:
 		idni::options_repository own_;
 		char_class_fns<T> cc;
 		idni::diagnostics::report* diag = nullptr;
-		tgf_directives* dirs = nullptr;
 		const char* source_ = nullptr;
 		grammar_builder(nonterminals<C, T>& nts_)
 			: nts(nts_),
@@ -300,11 +247,9 @@ private:
 				std::shared_ptr<void>(), &nts_)) { build(t, diag); }
 		void build(const trv& t,
 			idni::diagnostics::report* diag = nullptr,
-			const char* source = nullptr,
-			tgf_directives* directives = nullptr) {
+			const char* source = nullptr) {
 			this->diag = diag;
 			source_ = source;
-			dirs = directives;
 			// each directive writes its option into own_ at once, and the
 			// bind in g() pushes the values into the grammar
 			keep(own_.declare(grammar_option_set));
@@ -326,7 +271,6 @@ private:
 			for (const auto& d : directive_nodes()) directive(d);
 			auto productions = statements || tgf_parser::production;
 			for (const auto& pr : productions()) production(pr);
-			if (dirs) fill_directives();
 			if (!diag) return;
 			std::set<size_t> defined, referenced;
 			for (const auto& p : ps) {
@@ -373,73 +317,6 @@ private:
 				diag->warning(
 					messages::unproductive_nonterminal,
 					{{ label::name, name }});
-			}
-		}
-		// Snapshot the directives and the options they set, so a client
-		// reads what the file said, not what a later set changed.
-		void fill_directives() {
-			dirs->use_char_classes = cc_names;
-			dirs->char_class_renames = cc_renames;
-			// a file with no @start gives the default start
-			const auto start = own_.get<std::string>("start");
-			dirs->start = start == "start" ? std::string() : start;
-			auto& opts = own_;
-			auto list = [&opts](std::string_view name) {
-				return opts.get<option_list>(name);
-			};
-			std::set<std::string> guards;
-			for (const auto& g : list("enabled-productions"))
-				guards.insert(g);
-			for (const auto& g : guards)
-				// @enable productions names the keyword, not a guard.
-				if (g != "productions")
-					dirs->enabled_productions.push_back(g);
-			auto add_names = [](const option_list& names,
-				std::vector<std::string>& out)
-			{
-				for (const auto& name : names)
-					if (std::find(out.begin(), out.end(), name)
-						== out.end()) out.push_back(name);
-			};
-			add_names(list("trim"), dirs->trim);
-			add_names(list("trim-children"), dirs->trim_children);
-			add_names(list("trim-children-terminals"),
-				dirs->trim_children_terminals);
-			add_names(list("dont-trim-terminals-of"),
-				dirs->trim_terminals);
-			dirs->trim_all_terminals = opts.get<bool>("trim-terminals");
-			dirs->inline_char_classes =
-				opts.get<bool>("inline-char-classes");
-			option_list entries;
-			add_names(list("inline"), entries);
-			for (const auto& entry : entries) {
-				std::vector<std::string> names;
-				for (size_t b = 0;;) {
-					const size_t gt = entry.find('>', b);
-					names.push_back(detail::option_trim(
-						std::string_view(entry)
-							.substr(b, gt - b)));
-					if (gt == std::string::npos) break;
-					b = gt + 1;
-				}
-				dirs->inline_paths.push_back(std::move(names));
-			}
-			add_names(list("nodisambig-list"), dirs->ambiguous);
-			// the builder writes the options only, and the bind in g()
-			// reports a bad entry
-			auto hl = detail::highlights_codec{}.from_value(
-				opts.value("highlight"));
-			if (hl.has_value()) dirs->highlights = hl.value();
-			dirs->highlight_auto = opts.get<bool>("highlight-auto");
-			auto dyn = detail::dynamic_codec<C>{}.from_value(
-				opts.value("dynamic"));
-			if (dyn.has_value()) for (const auto& kv : dyn.value()) {
-				std::vector<std::string> vals;
-				for (const auto& v : kv.second)
-					vals.push_back(
-						idni::to_std_string(v));
-				dirs->dynamic[idni::to_std_string(kv.first)]
-					= std::move(vals);
 			}
 		}
 		int parse(const char* s, size_t l, size_t line,
@@ -762,17 +639,9 @@ private:
 	}
 
 	void disable_dir(const trv& t) {
-		auto args = dir_sym_args(t);
-		if (dirs) {
-			for (auto& a : args) {
-				// @disable productions and @disable disambiguation
-				// name keywords, not guards.
-				if (a != "productions" && a != "disambiguation")
-					dirs->disable_productions
-						.push_back(a);
-			}
-		}
-		for (auto& a : args) {
+		for (auto& a : dir_sym_args(t)) {
+			// productions is a keyword, not a guard
+			if (a == "productions") continue;
 			if (a == "disambiguation") {
 				set_option("auto-disambiguate", false);
 			} else edit_list("enabled-productions", { a }, false);
@@ -785,17 +654,9 @@ private:
 	}
 
 	void enable_dir(const trv& t) {
-		auto args = dir_sym_args(t);
-		if (dirs) {
-			for (auto& a : args) {
-				// @enable productions and @enable disambiguation
-				// name keywords, not guards.
-				if (a != "productions" && a != "disambiguation")
-					dirs->enable_productions
-						.push_back(a);
-			}
-		}
-		for (auto& a : args) {
+		for (auto& a : dir_sym_args(t)) {
+			// productions is a keyword, not a guard
+			if (a == "productions") continue;
 			if (a == "disambiguation") {
 				set_option("auto-disambiguate", true);
 			} else edit_list("enabled-productions", { a });

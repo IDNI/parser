@@ -282,136 +282,94 @@ TEST_SUITE("tgf json api: hello") {
 		REQUIRE(s->find("char_classes") != nullptr);
 		CHECK(s->find("char_classes")->is_array());
 		CHECK(s->find("char_classes")->size() >= 1);
-		// hello carries the directives of the grammar file.
-		auto d = h->find("directives");
-		REQUIRE(d != nullptr);
-		REQUIRE(d->is_object());
-		auto uc = d->find("use_char_classes");
-		REQUIRE(uc != nullptr);
-		REQUIRE(uc->is_array());
-		REQUIRE(uc->size() == 1);
-		CHECK((*uc)[0].as_string() == "digit");
-		REQUIRE(d->find("start") != nullptr);
-		CHECK(d->find("start")->is_null());
+		// the options carry the directives of the grammar file
+		auto cc = opts->find("char-classes");
+		REQUIRE(cc != nullptr);
+		REQUIRE(cc->is_array());
+		REQUIRE(cc->size() == 1);
+		CHECK((*cc)[0].as_string() == "digit");
+		REQUIRE(opts->find("start") != nullptr);
+		CHECK(opts->find("start")->as_string() == "start");
+		CHECK(h->find("directives") == nullptr);
 	}
 
-	TEST_CASE("the load and reload answers carry the directives") {
-		tgf_repl_evaluator re(json_options());
-		std::string src = "@start num.\n"
-			"@use char classes digit, alpha.\n"
-			"@enable productions comma, crlf.\n"
-			"num => digit+.\n";
+	// The options after a load of src, read from the evaluator.
+	static json::value load_options(tgf_repl_evaluator& re,
+		const std::string& src, bool reload = false)
+	{
 		json::value req = json::value::object();
 		req.set("id", json::value::number(1))
 		   .set("cmd", json::value::string("load"))
 		   .set("name", json::value::string("g.tgf"))
 		   .set("source", json::value::string(src));
-		auto r = run_repl_re(re, { to_line(req),
-			R"({"id":2,"cmd":"reload"})" });
-		REQUIRE(r.responses.size() == 2);
+		std::vector<std::string> lines = { to_line(req) };
+		if (reload) lines.push_back(R"({"id":2,"cmd":"reload"})");
+		auto r = run_repl_re(re, lines);
+		REQUIRE(r.responses.size() == lines.size());
 		for (const auto& resp : r.responses) {
 			const json::value* data = response_data(resp);
 			REQUIRE(data != nullptr);
-			auto d = data->find("directives");
-			REQUIRE(d != nullptr);
-			REQUIRE(d->is_object());
-			auto st = d->find("start");
-			REQUIRE(st != nullptr);
-			REQUIRE(st->is_string());
-			CHECK(st->as_string() == "num");
-			auto uc = d->find("use_char_classes");
-			REQUIRE(uc != nullptr);
-			REQUIRE(uc->size() == 2);
-			CHECK((*uc)[1].as_string() == "alpha");
-			auto ep = d->find("enabled_productions");
-			REQUIRE(ep != nullptr);
-			CHECK(ep->size() >= 2);
+			REQUIRE(data->find("loaded") != nullptr);
+			CHECK(data->find("loaded")->as_bool());
+			CHECK(data->find("directives") == nullptr);
 		}
+		return re.option_values();
 	}
 
-	TEST_CASE("the guard lists hold only guard names") {
+	// The entries of the list option @p name in @p o.
+	static std::vector<std::string> entries(const json::value& o,
+		const std::string& name)
+	{
+		auto l = o.find(name);
+		REQUIRE(l != nullptr);
+		REQUIRE(l->is_array());
+		std::vector<std::string> out;
+		for (const auto& e : *l) out.push_back(e.as_string());
+		return out;
+	}
+
+	TEST_CASE("a load and a reload give the directives as options") {
 		tgf_repl_evaluator re(json_options());
-		std::string src = "@enable productions guard1.\n"
+		auto o = load_options(re, "@start num.\n"
+			"@use char classes digit, alpha.\n"
+			"@enable productions comma, crlf.\n"
+			"num => digit+.\n", true);
+		REQUIRE(o.find("start") != nullptr);
+		CHECK(o.find("start")->as_string() == "num");
+		CHECK(entries(o, "char-classes")
+			== std::vector<std::string>{ "digit", "alpha" });
+		CHECK(entries(o, "enabled-productions")
+			== std::vector<std::string>{ "comma", "crlf" });
+	}
+
+	TEST_CASE("the enabled productions hold only guard names") {
+		tgf_repl_evaluator re(json_options());
+		auto o = load_options(re, "@enable productions guard1.\n"
 			"@enable disambiguation.\n"
 			"@disable disambiguation.\n"
-			"start => 'a'.\n";
-		json::value req = json::value::object();
-		req.set("id", json::value::number(1))
-		   .set("cmd", json::value::string("load"))
-		   .set("name", json::value::string("g.tgf"))
-		   .set("source", json::value::string(src));
-		auto r = run_repl_re(re, { to_line(req) });
-		REQUIRE(r.responses.size() == 1);
-		const json::value* data = response_data(r.responses[0]);
-		REQUIRE(data != nullptr);
-		auto d = data->find("directives");
-		REQUIRE(d != nullptr);
-		REQUIRE(d->is_object());
-		auto ep = d->find("enable_productions");
-		REQUIRE(ep != nullptr);
-		bool has_guard1 = false;
-		for (const auto& e : *ep) {
-			CHECK(e.as_string() != "disambiguation");
-			if (e.as_string() == "guard1") has_guard1 = true;
-		}
-		CHECK(has_guard1);
-		auto dp = d->find("disable_productions");
-		REQUIRE(dp != nullptr);
-		for (const auto& e : *dp)
-			CHECK(e.as_string() != "disambiguation");
-		auto en = d->find("enabled_productions");
-		REQUIRE(en != nullptr);
-		for (const auto& e : *en)
-			CHECK(e.as_string() != "disambiguation");
+			"start => 'a'.\n");
+		CHECK(entries(o, "enabled-productions")
+			== std::vector<std::string>{ "guard1" });
+		REQUIRE(o.find("auto-disambiguate") != nullptr);
+		CHECK_FALSE(o.find("auto-disambiguate")->as_bool());
 	}
 
-	// The directives object of a load answer for src.
-	static json::value load_directives(const std::string& src) {
+	TEST_CASE("a renamed class is the entry class as name") {
 		tgf_repl_evaluator re(json_options());
-		json::value req = json::value::object();
-		req.set("id", json::value::number(1))
-		   .set("cmd", json::value::string("load"))
-		   .set("name", json::value::string("g.tgf"))
-		   .set("source", json::value::string(src));
-		auto r = run_repl_re(re, { to_line(req) });
-		REQUIRE(r.responses.size() == 1);
-		const json::value* data = response_data(r.responses[0]);
-		REQUIRE(data != nullptr);
-		auto d = data->find("directives");
-		REQUIRE(d != nullptr);
-		REQUIRE(d->is_object());
-		return *d;
-	}
-
-	TEST_CASE("the directives give a rename in char_class_renames") {
-		auto d = load_directives(
+		auto o = load_options(re,
 			"@use char classes alpha, digit as d.\n"
 			"start => alpha d.\n");
-		auto uc = d.find("use_char_classes");
-		REQUIRE(uc != nullptr);
-		REQUIRE(uc->size() == 2);
-		CHECK((*uc)[0].as_string() == "alpha");
-		CHECK((*uc)[1].as_string() == "digit");
-		auto rn = d.find("char_class_renames");
-		REQUIRE(rn != nullptr);
-		REQUIRE(rn->is_object());
-		CHECK(rn->size() == 1);
-		auto to = rn->find("digit");
-		REQUIRE(to != nullptr);
-		CHECK(to->as_string() == "d");
+		CHECK(entries(o, "char-classes")
+			== std::vector<std::string>{ "alpha", "digit as d" });
 	}
 
-	TEST_CASE("the directives without a rename give an empty object") {
-		auto d = load_directives(
+	TEST_CASE("the classes without a rename are plain entries") {
+		tgf_repl_evaluator re(json_options());
+		auto o = load_options(re,
 			"@use char classes alpha, digit.\n"
 			"start => alpha digit.\n");
-		auto uc = d.find("use_char_classes");
-		REQUIRE(uc != nullptr);
-		CHECK(uc->size() == 2);
-		auto rn = d.find("char_class_renames");
-		REQUIRE(rn != nullptr);
-		CHECK(rn->is_object());
-		CHECK(rn->size() == 0);
+		CHECK(entries(o, "char-classes")
+			== std::vector<std::string>{ "alpha", "digit" });
 	}
 }
 
@@ -1270,8 +1228,7 @@ TEST_SUITE("tgf json api: no grammar") {
 		CHECK(!h->find("fixed_grammar")->as_bool());
 		REQUIRE(h->find("start") != nullptr);
 		CHECK(h->find("start")->is_null());
-		REQUIRE(h->find("directives") != nullptr);
-		CHECK(h->find("directives")->is_null());
+		CHECK(h->find("directives") == nullptr);
 		auto s = p.find("state");
 		REQUIRE(s != nullptr);
 		REQUIRE(s->find("grammar") != nullptr);

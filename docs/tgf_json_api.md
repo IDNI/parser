@@ -85,12 +85,12 @@ At start the server writes one `hello` line:
 
     {"hello":{"protocol":1,"version":"...","grammar":"g.tgf",
       "fixed_grammar":false,"start":"start","options":{...},
-      "directives":{...},"report":{...}},
+      "report":{...}},
      "state":{"grammar":"g.tgf","start":"start","char_classes":[7]}}
 
-`options` holds all 24 REPL option values. `directives` holds what the
-grammar file says in its `@` directives, or `null` with no grammar. Its
-shape is below. `report` holds the diagnostic
+`options` holds all 24 REPL option values. The `@` directives of the
+grammar file are grammar options, so `options` holds them too, see
+below. `report` holds the diagnostic
 report of the grammar load. When the evaluator has a session id (set by
 `--session <id>`), `hello` also carries `session`, the id a client uses
 to attach again. The request `{"cmd":"hello"}` answers with a fresh
@@ -150,7 +150,7 @@ number. `message` is the code name and is present in API output.
 | `internal-grammar` | `{"start":"...","productions":["..."],"production_ids":[{...}]}` |
 | `start` | `{"start":"..." or null,"changed":true}` |
 | `unreachable` | `{"symbol":"...","productions":["..."],"production_ids":[{...}]}` |
-| `load`, `reload` | `{"grammar":"...","loaded":true,"directives":{...}}` |
+| `load`, `reload` | `{"grammar":"...","loaded":true}` |
 | `help` | `{"command":"...","text":"..."}` |
 | `version` | `{"version":"..."}` |
 | `license` | `{"license":"..."}` |
@@ -207,47 +207,27 @@ The arrays appear on `internal-grammar`, `unreachable`,
 `grammar --json` and the `internal_grammar` of
 `parse --json --grammar`.
 
-### `directives`
+### Directives
 
-`hello`, and the `result` of `load` and `reload`, carry a `directives`
-object with what the grammar file says in its `@` directives. It is a
-read-only snapshot from load time, so a later `set` does not change it.
-The live values stay in `options`. With no grammar the value is `null`.
+Each `@` directive of the grammar file writes a grammar option, so
+`options` holds what the file says. A later `set` changes the value.
 
-    {"use_char_classes":["digit"],"char_class_renames":{},"start":"start",
-     "enable_productions":["comma","crlf"],
-     "disable_productions":[],
-     "enabled_productions":["comma","crlf","no_header"],
-     "trim":["DQUOTE","SEP"],"trim_children":[],
-     "trim_children_terminals":[],"trim_terminals":[],
-     "trim_all_terminals":false,
-     "inline":[["TEXTDATA"]],"inline_char_classes":true,
-     "ambiguous":["expr","term"],
-     "highlight":[{"type":"string","patterns":["escaped"]}],
-     "highlight_auto":false,
-     "dynamic":{"tok":["a","b"]}}
+    {"start":"start","char-classes":["digit","alpha as letter"],
+     "enabled-productions":["comma","crlf","no_header"],
+     "trim":["DQUOTE","SEP"],"inline":["TEXTDATA","a > b"],
+     "inline-char-classes":true,"nodisambig-list":["expr","term"],
+     "highlight":["string: escaped"],"highlight-auto":false,
+     "dynamic":["name=","tok=a","tok=b"]}
 
-- `use_char_classes`: the class names of `@use char classes`, in the
-  order of the file. A renamed class gives its source name.
-- `char_class_renames`: the new name of each renamed class, by its source
-  name. `@use char classes digit as d.` gives `{"digit":"d"}`. A grammar
-  without a rename gives `{}`.
-- `start`: the symbol of `@start`, or `null`.
-- `enable_productions` and `disable_productions`: the guard names as
-  written after `@enable` and `@disable`; the `productions` keyword is
-  not a guard name.
-- `enabled_productions`: the production guard names that are on after
-  the load.
-- `trim`, `trim_children`, `trim_children_terminals`: the names of the
-  matching `@trim` lists.
-- `trim_terminals`: the names after `except children of`.
-- `trim_all_terminals`: true for `@trim all terminals`.
-- `inline`: the tree paths of `@inline`, each a list of names.
-- `inline_char_classes`: true for `@inline char classes`.
-- `ambiguous`: the names of `@ambiguous`.
-- `highlight`: the type and patterns of each `@highlight` entry.
-- `highlight_auto`: true for `@highlight auto`.
-- `dynamic`: the default values of each `@dynamic` nonterminal.
+- `char-classes`: an entry `class` or `class as name` for each class of
+  `@use char classes`.
+- `start`: the symbol of `@start`, else `start`.
+- `enabled-productions`: the guard names that are on. `@enable` adds a
+  name and `@disable` removes it.
+- `highlight`: an entry `type: pattern` for each pattern of `@highlight`.
+- `highlight-auto`: true for `@highlight auto`.
+- `dynamic`: an entry `name=value` for each value of `@dynamic`. A name
+  with no value has the entry `name=`.
 
 ## The tree
 
@@ -317,8 +297,8 @@ The exit code is `1` when the status is `error`, else `0`.
 
 `tgf`, `tgf repl` and `tgf repl --json` start with an empty grammar
 when no file is given. `hello.grammar`, `state.grammar`, `hello.start`
-and `state.start` are `null`, `state.char_classes` is an empty list and
-`hello.directives` is `null`; the other hello fields stay. Once a start
+and `state.start` are `null` and `state.char_classes` is an empty list.
+The other hello fields stay. Once a start
 symbol is set, `hello.start`, `state.start`, the `start` option and the
 `start` command give it, also with no grammar.
 
