@@ -449,6 +449,23 @@ preset_entry() {
 	elif [[ $RUN == "run" ]]; then
 		if [[ $PRESET == *test* ]] || [[ $PRESET == *-all ]] \
 				|| [[ $PRESET == *-all-* ]] || [[ $PRESET == "all" ]]; then
+			# the wasm tests of every build type run the tgf.js of the
+			# release wasm tree, which this preset does not build
+			local wasm_dir
+			wasm_dir="$(preset_binary_dir "release-wasm")"
+			# the tau root sources this file and has a wasm tree of its own
+			if [[ -f "${wasm_dir}/CMakeCache.txt" ]] \
+					&& grep -q '^CMAKE_PROJECT_NAME:STATIC=tauparser$' \
+						"${wasm_dir}/CMakeCache.txt"; then
+				echo "Building tgf.js in ${wasm_dir}"
+				cmake --build "${wasm_dir}" --target tgf_node \
+					-- -j "${TAU_BUILD_JOBS}"
+				status=$?
+				if [[ $status -ne 0 ]]; then
+					echo "Build failed"
+					exit $status
+				fi
+			fi
 			echo "Running tests"
 			ctest --preset "${PRESET}" -j "${TAU_BUILD_JOBS}" \
 				--output-on-failure

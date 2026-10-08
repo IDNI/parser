@@ -293,10 +293,11 @@ endif()
 
 # WASM parity test - compare native tgf output against tgf.js (Node.js)
 # for a grammar file and REPL commands. Requires the tgf tool, Node.js and
-# a built tgf.js (the Emscripten node target).
+# a configured wasm tree, whose tgf.js the dev run builds before ctest.
 if(TARGET tgf AND NOT WIN32)
 	find_program(NODE_EXECUTABLE node)
-	if(NODE_EXECUTABLE AND EXISTS "${PROJECT_SOURCE_DIR}/build/release-wasm/tgf.js")
+	if(NODE_EXECUTABLE
+		AND EXISTS "${PROJECT_SOURCE_DIR}/build/release-wasm/CMakeCache.txt")
 		add_test(NAME tgf_wasm_parity
 			COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/parity/tgf_wasm_parity.sh"
 				$<TARGET_FILE:tgf>

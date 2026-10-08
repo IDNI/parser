@@ -253,6 +253,10 @@ The producers are `dep-ftxui`, `dep-unordered-dense`, `dep-boost-headers`,
 - Presets: `./dev preset release-wasm` (Release, `build/release-wasm`) and
   `./dev preset debug-wasm` (`build/debug-wasm`). Each places
   `tauparser.html` / `tauparser.node.js` beside the built `tauparser.js`.
+  `./dev preset <x> run` of a test preset builds `tgf.js` in
+  `build/release-wasm` first when that tree is configured, for the wasm
+  parity tests of every build type. Configure that tree once with
+  `./dev preset release-wasm`.
 - `EMSCRIPTEN_DIR` is not set by the preset; it defaults to
   `<TAU_SHARED_PREFIX>/emsdk/upstream/emscripten` (same resolution as
   `dep-emsdk`: `-DTAU_SHARED_PREFIX=`, else `$TAU_SHARED_PREFIX`, else
