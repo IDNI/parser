@@ -179,6 +179,8 @@ composed by the public presets above; see [`CMakePresets.json`](../CMakePresets.
   (`release-packages`, `release-w64-packages`, `release-w64-packages-zip`).
 - **`run`** — `ctest` when the name contains `test`, ends with `-all`, or is
   `all` (not used on packaging presets); otherwise runs `tgf` (args after `--`).
+  `run` builds the preset and then runs ctest. A direct `ctest` call runs the
+  binaries that the build tree holds.
 
 ```bash
 ./dev preset release-packages

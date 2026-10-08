@@ -507,8 +507,6 @@ if(TAU_PARSER_BUILD_TESTS)
 endif()
 
 if(TAU_PARSER_BUILD_TESTS OR (TAU_RUN_GRAMMAR_TESTS AND TARGET tgf))
-	include(ctest-build-tree)
-	tau_require_build_tree()
 	include(ctest-test-defaults)
 	tau_set_test_defaults()
 endif()
