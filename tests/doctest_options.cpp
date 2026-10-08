@@ -396,6 +396,34 @@ TEST_CASE("reset gives the default to the options of one owner") {
 	f.repo.unbind("force");
 }
 
+TEST_CASE("reset_option gives the default to one option") {
+	fixture f;
+	f.repo.set("count", size_t{ 5 });
+	f.repo.set("quiet", true);
+	REQUIRE(f.repo.reset_option("count").has_value());
+	CHECK(f.repo.get<size_t>("count") == 1u);
+	CHECK(f.repo.get<bool>("quiet"));
+}
+
+TEST_CASE("reset_option writes the default into a bound field") {
+	fixture f;
+	bool force = true;
+	size_t runs = 0;
+	REQUIRE(f.repo.bind("force", force, [&] { ++runs; }).has_value());
+	REQUIRE(f.repo.reset_option("force").has_value());
+	CHECK(!force);
+	CHECK(runs == 1);
+	f.repo.unbind("force");
+}
+
+TEST_CASE("reset_option of an unknown name is an error") {
+	fixture f;
+	auto r = f.repo.reset_option("nope");
+	CHECK(r.has_error());
+	CHECK(contains(messages_of(r.report()), "Unknown option"));
+	CHECK(contains(messages_of(r.report()), "nope"));
+}
+
 TEST_CASE("a codec binds a field of another type") {
 	options_repository repo;
 	REQUIRE(repo.declare(ids_set()).has_value());

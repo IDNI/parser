@@ -119,6 +119,10 @@ struct options_repository {
 	/// Give every option of @p owner its default value: the fallback of
 	/// the spec. A bound field gets it written, an unbound slot is cleared.
 	void reset(std::string_view owner);
+	/// Give the option @p name its default, as reset() does for each option
+	/// of an owner. An unknown name is an error.
+	[[nodiscard]] diagnostics::result<void> reset_option(
+		std::string_view name);
 
 	/// Text access for a REPL, an api or a binding.
 	[[nodiscard]] diagnostics::result<void> set_text(std::string_view name,
@@ -154,6 +158,9 @@ private:
 		option_value v);
 	[[nodiscard]] diagnostics::result<void> bind_at(std::string_view name,
 		detail::option_binding b);
+	/// Write the fallback of the spec into a bound field, or clear the
+	/// stored value of an unbound option.
+	void reset_at(std::size_t i);
 #ifdef DEBUG
 	void assert_owner_thread() const;
 #endif

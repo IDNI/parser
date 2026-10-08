@@ -407,19 +407,32 @@ inline void options_repository::unbind(std::string_view name) {
 	bindings_[*i].reset();
 }
 
-inline void options_repository::reset(std::string_view owner) {
-	for (std::size_t i = 0; i < cat_->specs.size(); ++i) {
-		const option_spec& o = cat_->specs[i];
-		if (o.owner != owner) continue;
-		if (!bindings_[i]) {
-			DBG(assert_owner_thread();)
-			values_[i].reset();
-			continue;
-		}
-		auto r = store(i, o.fallback);
-		DBG(assert(!r.has_error()
-			&& "the default of an option does not fit its field");)
+inline void options_repository::reset_at(std::size_t i) {
+	if (!bindings_[i]) {
+		DBG(assert_owner_thread();)
+		values_[i].reset();
+		return;
 	}
+	auto r = store(i, cat_->specs[i].fallback);
+	DBG(assert(!r.has_error()
+		&& "the default of an option does not fit its field");)
+}
+
+inline void options_repository::reset(std::string_view owner) {
+	for (std::size_t i = 0; i < cat_->specs.size(); ++i)
+		if (cat_->specs[i].owner == owner) reset_at(i);
+}
+
+inline diagnostics::result<void> options_repository::reset_option(
+	std::string_view name)
+{
+	namespace ps = parser_strings;
+	diagnostics::result<void> r;
+	const auto i = cat_->find(name);
+	if (!i) return r.with_error(diagnostics::code::not_found,
+		ps::messages::option_not_found, { { ps::label::name, name } });
+	reset_at(*i);
+	return r;
 }
 
 inline diagnostics::result<void> options_repository::set_text(
