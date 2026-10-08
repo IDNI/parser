@@ -2291,7 +2291,7 @@ static int run_tool(int argc, char** argv, const args_config& cfg,
 	if (!re.good()) return re.flush_report(), 1;
 	auto& opts = idni::options();
 	diagnostics::report rep;
-	auto env = opts.load_env("TGF");
+	auto env = opts.load_env("TGF_");
 	const bool env_ok = !env.has_error();
 	rep.append(env.report());
 	auto parsed = env_ok ? opts.parse_args(argc, argv, cfg)

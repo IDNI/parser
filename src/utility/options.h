@@ -130,8 +130,9 @@ struct options_repository {
 	/// The spec stays valid after a later declare().
 	std::shared_ptr<const option_spec> find(std::string_view name) const;
 
-	/// The prefix and the name in upper case, with '-' as '_'. A bad value
-	/// is an error.
+	/// The variable is the prefix as given plus the name in upper case,
+	/// with '-' as '_', so a caller passes a prefix such as `TGF_`. A bad
+	/// value is an error.
 	[[nodiscard]] diagnostics::result<void> load_env(std::string_view prefix);
 
 	/// Store the values of argv. Nothing is stored on an error.

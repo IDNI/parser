@@ -8,6 +8,7 @@
 #include "doctest.h"
 #include "../src/tgf/tgf_cli.h"
 #include "../src/tgf/parser_gen.h"
+#include "test_env.h"
 
 #include <filesystem>
 #include <fstream>
@@ -273,6 +274,20 @@ TEST_SUITE("tgf cli: a load writes the command line again") {
 		CHECK(trim.find("record") == string::npos);
 		CHECK(trim.find("EOL") != string::npos);
 		CHECK(last_line_with(out, "print-graphs:").find("on")
+			!= string::npos);
+	}
+}
+
+TEST_SUITE("tgf cli: environment") {
+
+	TEST_CASE("TGF_MAX_LENGTH sets max-length") {
+		const string csv = string(PROJECT_SOURCE_DIR)
+			+ "/src/format/csv/csv.tgf";
+		test_setenv("TGF_MAX_LENGTH", "7");
+		string out = capture_tgf_run({ "tgf", csv, "repl",
+			"-c", "false", "-e", "get max-length" });
+		test_unsetenv("TGF_MAX_LENGTH");
+		CHECK(last_line_with(out, "max-length:").find("7")
 			!= string::npos);
 	}
 }
