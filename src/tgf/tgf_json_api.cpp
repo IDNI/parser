@@ -87,17 +87,18 @@ static diagnostics::result<std::string> string_field(
 // Convert a structured request into the canonical REPL text. Every field
 // check runs before any text is built.
 static diagnostics::result<std::string> request_to_src(
-	const std::string& cmd, const value& q)
+	const tgf_repl_evaluator& re, const std::string& cmd, const value& q)
 {
 	auto unknown = [] {
 		return diagnostics::error<std::string>(
 			code::invalid_argument,
 			parser_strings::messages::unknown_command);
 	};
-	auto unknown_opt = [] {
-		return diagnostics::error<std::string>(
-			code::invalid_argument,
-			parser_strings::messages::unknown_option);
+	auto unknown_opt = [](std::string_view name) {
+		diagnostics::result<std::string> r;
+		return r.with_error(code::not_found,
+			parser_strings::messages::option_not_found,
+			{ { parser_strings::label::name, name } });
 	};
 	auto bad_type = [] {
 		return diagnostics::error<std::string>(
@@ -154,14 +155,15 @@ static diagnostics::result<std::string> request_to_src(
 			name = f->as_string();
 		}
 		if (name.empty()) return ok_result(std::string("get"));
-		if (!options().find(name)) return unknown_opt();
+		if (!re.session_option(name)) return unknown_opt(name);
 		return ok_result("get " + name);
 	}
 
 	if (cmd == "toggle" || cmd == "enable" || cmd == "disable") {
 		auto name = string_field(q, "option");
 		if (!name.has_value()) return name;
-		if (!options().find(name.value())) return unknown_opt();
+		if (!re.session_option(name.value()))
+			return unknown_opt(name.value());
 		return ok_result(cmd + " " + name.value());
 	}
 
@@ -316,6 +318,11 @@ static std::pair<value, diagnostics::report> option_request(
 	if (!name.has_value()) return { value::object(), name.report() };
 	const bool add = cmd == "add";
 	value data = value::object();
+	if (q.find("text") && q.find("value")) {
+		rep.error(code::invalid_argument,
+			parser_strings::messages::invalid_field_type);
+		return { std::move(data), std::move(rep) };
+	}
 	if (auto t = q.find("text"); t) {
 		if (!t->is_string()) {
 			rep.error(code::invalid_argument,
@@ -409,7 +416,7 @@ static std::pair<value, cmd_status> handle_request(
 		return { json_id_response(id, cmd.value(), st, data,
 			state_value(re), rep), st };
 	}
-	auto src = request_to_src(cmd.value(), q);
+	auto src = request_to_src(re, cmd.value(), q);
 	if (!src.has_value())
 		return { error_response(id, state_value(re), src.report()),
 			cmd_status::error };

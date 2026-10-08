@@ -68,16 +68,17 @@ Structured fields:
 | `start`, `internal-grammar`, `unreachable` | `symbol` (string, optional) |
 | `help` | `command` (string, optional) |
 | `get` | `option` (string, optional) |
-| `set` | `option`, `value` (bool, string, string array, or array of string arrays) |
+| `set` | `option`, and `value` (bool, number, string or string array) or `text` (string) |
 | `toggle`, `enable`, `disable` | `option` |
-| `add`, `delete` | `option`, `value` (array) |
+| `add`, `delete` | `option`, and `value` (string array) or `text` (string) |
 | `grammar`, `reload`, `version`, `license`, `quit`, `clear`, `hello` | none |
 
-An empty array for `set` becomes `set <option>`, which clears a list or
-tree path option. Every option name is checked against the
-option table, every symbol against `[A-Za-z_][A-Za-z0-9_]*`, every
-`help` argument against the command names, and `error-verbosity` against
-its three values.
+`set`, `add` and `delete` take the value as JSON in `value`, or as the
+REPL writes it in `text`, for example `"a > b"` for `inline`. A request
+has one of the two fields. An empty array for `set` clears a list option.
+Every option name is checked against the session options, every symbol
+against `[A-Za-z_][A-Za-z0-9_]*`, and every `help` argument against the
+command names. The repository checks the value of the option.
 
 ## Response shape
 
@@ -88,9 +89,11 @@ At start the server writes one `hello` line:
       "report":{...}},
      "state":{"grammar":"g.tgf","start":"start","char_classes":[7]}}
 
-`options` holds all 24 REPL option values. The `@` directives of the
-grammar file are grammar options, so `options` holds them too, see
-below. `report` holds the diagnostic
+`options` holds the values of the session options: the options of the
+owners `grammar`, `parse`, `repl` and `ui`. An option of the tool, for
+example `port` or `json`, is not in it, and a request that names one is
+an error. The `@` directives of the grammar file are grammar options, so
+`options` holds them too, see below. `report` holds the diagnostic
 report of the grammar load. When the evaluator has a session id (set by
 `--session <id>`), `hello` also carries `session`, the id a client uses
 to attach again. The request `{"cmd":"hello"}` answers with a fresh
@@ -159,11 +162,13 @@ number. `message` is the code name and is present in API output.
 | `get` | `{"options":{"name":value,...}}` or `{"option":"name","value":v}` |
 | `set`, `toggle`, `enable`, `disable`, `add`, `delete` | same as `get` for that option |
 
-Option values are a bool, an array of strings, an array of string arrays
-(tree paths), a string for `error-verbosity`, or a symbol for `start`.
-Option names are the long names from `tgf_repl.tgf`.
-`derive-char-classes` (`dcc`) is a bool option: true scans one-character
-rules as character classes. `start` is the start symbol; `set start foo`
+An option value is a bool for a flag, a number for a numeric option, a
+string for a text option, and an array of strings for a list option. An
+entry of `inline` is a tree path, written `a > b`. `error-verbosity` is
+`basic`, `detailed` or `root-cause`, and `tree-path` is `bintree` or
+`forest`. Option names are the names of the command line.
+`derive-char-classes` is a flag: true scans one-character rules as
+character classes. `start` is the start symbol; `set start foo`
 does the same as the `start foo` command. The default of `start` is
 `start`.
 

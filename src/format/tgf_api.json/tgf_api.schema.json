@@ -74,148 +74,156 @@
 					"type": "boolean"
 				},
 				{
-					"enum": [
-						"basic",
-						"detailed",
-						"root-cause"
-					]
+					"type": "number"
 				},
 				{
-					"$ref": "#/$defs/symbol"
+					"type": "string"
 				},
 				{
-					"type": "array",
-					"items": {
-						"$ref": "#/$defs/symbol"
-					}
-				},
-				{
-					"type": "array",
-					"items": {
-						"type": "array",
-						"items": {
-							"$ref": "#/$defs/symbol"
-						}
-					}
+					"$ref": "#/$defs/string_list"
 				}
 			]
 		},
 		"option_name": {
 			"enum": [
-				"error-verbosity",
-				"status",
-				"colors",
-				"print-ambiguity",
-				"print-graphs",
-				"print-rules",
-				"print-facts",
-				"print-terminals",
-				"measure-parsing",
-				"measure-each-pos",
-				"measure-forest",
-				"measure-preprocess",
-				"gc",
-				"debug",
 				"auto-disambiguate",
+				"nodisambig-list",
 				"trim-terminals",
 				"inline-char-classes",
 				"derive-char-classes",
-				"nodisambig-list",
-				"enabled-productions",
 				"trim",
 				"trim-children",
 				"trim-children-terminals",
+				"dont-trim-terminals-of",
+				"inline",
+				"enabled-productions",
 				"start",
-				"inline"
+				"char-classes",
+				"highlight-auto",
+				"highlight",
+				"dynamic",
+				"gc",
+				"gc-lag",
+				"max-length",
+				"measure",
+				"measure-each-pos",
+				"measure-forest",
+				"measure-preprocess",
+				"measure-scopes",
+				"measure-counters",
+				"debug",
+				"error-verbosity",
+				"tree-path",
+				"print-terminals",
+				"status",
+				"print-ambiguity",
+				"print-graphs",
+				"print-tml-rules",
+				"print-tml-facts",
+				"print-input",
+				"colors"
 			]
 		},
 		"bool_option_name": {
 			"enum": [
-				"status",
-				"colors",
-				"print-ambiguity",
-				"print-graphs",
-				"print-rules",
-				"print-facts",
-				"print-terminals",
-				"measure-parsing",
-				"measure-each-pos",
-				"measure-forest",
-				"measure-preprocess",
-				"gc",
-				"debug",
 				"auto-disambiguate",
 				"trim-terminals",
 				"inline-char-classes",
-				"derive-char-classes"
+				"derive-char-classes",
+				"highlight-auto",
+				"gc",
+				"measure",
+				"measure-each-pos",
+				"measure-forest",
+				"measure-preprocess",
+				"measure-scopes",
+				"measure-counters",
+				"debug",
+				"print-terminals",
+				"status",
+				"print-ambiguity",
+				"print-graphs",
+				"print-tml-rules",
+				"print-tml-facts",
+				"print-input",
+				"colors"
 			]
 		},
 		"list_option_name": {
 			"enum": [
 				"nodisambig-list",
-				"enabled-productions",
-				"trim",
-				"trim-children",
-				"trim-children-terminals"
-			]
-		},
-		"action_option_name": {
-			"enum": [
-				"nodisambig-list",
-				"enabled-productions",
 				"trim",
 				"trim-children",
 				"trim-children-terminals",
-				"inline"
+				"dont-trim-terminals-of",
+				"inline",
+				"enabled-productions",
+				"char-classes",
+				"highlight",
+				"dynamic"
 			]
-		},
-		"symbol_list": {
-			"type": "array",
-			"items": {
-				"$ref": "#/$defs/symbol"
-			}
-		},
-		"treepath_list": {
-			"type": "array",
-			"items": {
-				"type": "array",
-				"items": {
-					"$ref": "#/$defs/symbol"
-				}
-			}
 		},
 		"options": {
 			"type": "object",
 			"properties": {
-				"error-verbosity": {
-					"enum": [
-						"basic",
-						"detailed",
-						"root-cause"
-					]
-				},
-				"status": {
+				"auto-disambiguate": {
 					"type": "boolean"
 				},
-				"colors": {
+				"nodisambig-list": {
+					"$ref": "#/$defs/string_list"
+				},
+				"trim-terminals": {
 					"type": "boolean"
 				},
-				"print-ambiguity": {
+				"inline-char-classes": {
 					"type": "boolean"
 				},
-				"print-graphs": {
+				"derive-char-classes": {
 					"type": "boolean"
 				},
-				"print-rules": {
+				"trim": {
+					"$ref": "#/$defs/string_list"
+				},
+				"trim-children": {
+					"$ref": "#/$defs/string_list"
+				},
+				"trim-children-terminals": {
+					"$ref": "#/$defs/string_list"
+				},
+				"dont-trim-terminals-of": {
+					"$ref": "#/$defs/string_list"
+				},
+				"inline": {
+					"$ref": "#/$defs/string_list"
+				},
+				"enabled-productions": {
+					"$ref": "#/$defs/string_list"
+				},
+				"start": {
+					"type": "string"
+				},
+				"char-classes": {
+					"$ref": "#/$defs/string_list"
+				},
+				"highlight-auto": {
 					"type": "boolean"
 				},
-				"print-facts": {
+				"highlight": {
+					"$ref": "#/$defs/string_list"
+				},
+				"dynamic": {
+					"$ref": "#/$defs/string_list"
+				},
+				"gc": {
 					"type": "boolean"
 				},
-				"print-terminals": {
-					"type": "boolean"
+				"gc-lag": {
+					"type": "number"
 				},
-				"measure-parsing": {
+				"max-length": {
+					"type": "number"
+				},
+				"measure": {
 					"type": "boolean"
 				},
 				"measure-each-pos": {
@@ -227,72 +235,90 @@
 				"measure-preprocess": {
 					"type": "boolean"
 				},
-				"gc": {
+				"measure-scopes": {
+					"type": "boolean"
+				},
+				"measure-counters": {
 					"type": "boolean"
 				},
 				"debug": {
 					"type": "boolean"
 				},
-				"auto-disambiguate": {
+				"error-verbosity": {
+					"enum": [
+						"basic",
+						"detailed",
+						"root-cause"
+					]
+				},
+				"tree-path": {
+					"enum": [
+						"bintree",
+						"forest"
+					]
+				},
+				"print-terminals": {
 					"type": "boolean"
 				},
-				"trim-terminals": {
+				"status": {
 					"type": "boolean"
 				},
-				"inline-char-classes": {
+				"print-ambiguity": {
 					"type": "boolean"
 				},
-				"derive-char-classes": {
+				"print-graphs": {
 					"type": "boolean"
 				},
-				"start": {
-					"type": ["string", "null"]
+				"print-tml-rules": {
+					"type": "boolean"
 				},
-				"nodisambig-list": {
-					"$ref": "#/$defs/symbol_list"
+				"print-tml-facts": {
+					"type": "boolean"
 				},
-				"enabled-productions": {
-					"$ref": "#/$defs/symbol_list"
+				"print-input": {
+					"type": "boolean"
 				},
-				"trim": {
-					"$ref": "#/$defs/symbol_list"
-				},
-				"trim-children": {
-					"$ref": "#/$defs/symbol_list"
-				},
-				"trim-children-terminals": {
-					"$ref": "#/$defs/symbol_list"
-				},
-				"inline": {
-					"$ref": "#/$defs/treepath_list"
+				"colors": {
+					"type": "boolean"
 				}
 			},
 			"required": [
-				"error-verbosity",
-				"status",
-				"colors",
-				"print-ambiguity",
-				"print-graphs",
-				"print-rules",
-				"print-facts",
-				"print-terminals",
-				"measure-parsing",
-				"measure-each-pos",
-				"measure-forest",
-				"measure-preprocess",
-				"gc",
-				"debug",
 				"auto-disambiguate",
+				"nodisambig-list",
 				"trim-terminals",
 				"inline-char-classes",
 				"derive-char-classes",
-				"start",
-				"nodisambig-list",
-				"enabled-productions",
 				"trim",
 				"trim-children",
 				"trim-children-terminals",
-				"inline"
+				"dont-trim-terminals-of",
+				"inline",
+				"enabled-productions",
+				"start",
+				"char-classes",
+				"highlight-auto",
+				"highlight",
+				"dynamic",
+				"gc",
+				"gc-lag",
+				"max-length",
+				"measure",
+				"measure-each-pos",
+				"measure-forest",
+				"measure-preprocess",
+				"measure-scopes",
+				"measure-counters",
+				"debug",
+				"error-verbosity",
+				"tree-path",
+				"print-terminals",
+				"status",
+				"print-ambiguity",
+				"print-graphs",
+				"print-tml-rules",
+				"print-tml-facts",
+				"print-input",
+				"colors"
 			],
 			"additionalProperties": false
 		},
@@ -729,101 +755,6 @@
 				"type": "string"
 			}
 		},
-		"directives": {
-			"type": ["object", "null"],
-			"properties": {
-				"use_char_classes": {
-					"$ref": "#/$defs/string_list"
-				},
-				"char_class_renames": {
-					"type": "object",
-					"additionalProperties": {
-						"type": "string"
-					}
-				},
-				"start": {
-					"type": ["string", "null"]
-				},
-				"enable_productions": {
-					"$ref": "#/$defs/string_list"
-				},
-				"disable_productions": {
-					"$ref": "#/$defs/string_list"
-				},
-				"enabled_productions": {
-					"$ref": "#/$defs/string_list"
-				},
-				"trim": {
-					"$ref": "#/$defs/string_list"
-				},
-				"trim_children": {
-					"$ref": "#/$defs/string_list"
-				},
-				"trim_children_terminals": {
-					"$ref": "#/$defs/string_list"
-				},
-				"trim_terminals": {
-					"$ref": "#/$defs/string_list"
-				},
-				"trim_all_terminals": {
-					"type": "boolean"
-				},
-				"inline": {
-					"$ref": "#/$defs/treepath_list"
-				},
-				"inline_char_classes": {
-					"type": "boolean"
-				},
-				"ambiguous": {
-					"$ref": "#/$defs/string_list"
-				},
-				"highlight": {
-					"type": "array",
-					"items": {
-						"type": "object",
-						"properties": {
-							"type": {
-								"type": "string"
-							},
-							"patterns": {
-								"$ref": "#/$defs/string_list"
-							}
-						},
-						"required": ["type", "patterns"],
-						"additionalProperties": false
-					}
-				},
-				"highlight_auto": {
-					"type": "boolean"
-				},
-				"dynamic": {
-					"type": "object",
-					"additionalProperties": {
-						"$ref": "#/$defs/string_list"
-					}
-				}
-			},
-			"required": [
-				"use_char_classes",
-				"char_class_renames",
-				"start",
-				"enable_productions",
-				"disable_productions",
-				"enabled_productions",
-				"trim",
-				"trim_children",
-				"trim_children_terminals",
-				"trim_terminals",
-				"trim_all_terminals",
-				"inline",
-				"inline_char_classes",
-				"ambiguous",
-				"highlight",
-				"highlight_auto",
-				"dynamic"
-			],
-			"additionalProperties": false
-		},
 		"load_result": {
 			"type": "object",
 			"properties": {
@@ -832,15 +763,11 @@
 				},
 				"loaded": {
 					"type": "boolean"
-				},
-				"directives": {
-					"$ref": "#/$defs/directives"
 				}
 			},
 			"required": [
 				"grammar",
-				"loaded",
-				"directives"
+				"loaded"
 			],
 			"additionalProperties": false
 		},
@@ -937,6 +864,28 @@
 					"if": {
 						"properties": {
 							"option": {
+								"enum": [
+									"gc-lag",
+									"max-length"
+								]
+							}
+						},
+						"required": [
+							"option"
+						]
+					},
+					"then": {
+						"properties": {
+							"value": {
+								"type": "number"
+							}
+						}
+					}
+				},
+				{
+					"if": {
+						"properties": {
+							"option": {
 								"const": "error-verbosity"
 							}
 						},
@@ -960,6 +909,28 @@
 					"if": {
 						"properties": {
 							"option": {
+								"const": "tree-path"
+							}
+						},
+						"required": [
+							"option"
+						]
+					},
+					"then": {
+						"properties": {
+							"value": {
+								"enum": [
+									"bintree",
+									"forest"
+								]
+							}
+						}
+					}
+				},
+				{
+					"if": {
+						"properties": {
+							"option": {
 								"$ref": "#/$defs/list_option_name"
 							}
 						},
@@ -970,26 +941,7 @@
 					"then": {
 						"properties": {
 							"value": {
-								"$ref": "#/$defs/symbol_list"
-							}
-						}
-					}
-				},
-				{
-					"if": {
-						"properties": {
-							"option": {
-								"const": "inline"
-							}
-						},
-						"required": [
-							"option"
-						]
-					},
-					"then": {
-						"properties": {
-							"value": {
-								"$ref": "#/$defs/treepath_list"
+								"$ref": "#/$defs/string_list"
 							}
 						}
 					}
@@ -1008,7 +960,7 @@
 					"then": {
 						"properties": {
 							"value": {
-								"type": ["string", "null"]
+								"type": "string"
 							}
 						}
 					}
@@ -1159,9 +1111,6 @@
 				"options": {
 					"$ref": "#/$defs/options"
 				},
-				"directives": {
-					"$ref": "#/$defs/directives"
-				},
 				"report": {
 					"$ref": "#/$defs/report"
 				}
@@ -1173,7 +1122,6 @@
 				"fixed_grammar",
 				"start",
 				"options",
-				"directives",
 				"report"
 			],
 			"additionalProperties": false
@@ -1509,12 +1457,26 @@
 				},
 				"value": {
 					"$ref": "#/$defs/option_value"
+				},
+				"text": {
+					"type": "string"
 				}
 			},
 			"required": [
 				"cmd",
-				"option",
-				"value"
+				"option"
+			],
+			"oneOf": [
+				{
+					"required": [
+						"value"
+					]
+				},
+				{
+					"required": [
+						"text"
+					]
+				}
 			],
 			"additionalProperties": false
 		},
@@ -1554,29 +1516,30 @@
 					]
 				},
 				"option": {
-					"$ref": "#/$defs/action_option_name"
+					"$ref": "#/$defs/list_option_name"
 				},
 				"value": {
-					"type": "array",
-					"items": {
-						"anyOf": [
-							{
-								"$ref": "#/$defs/symbol"
-							},
-							{
-								"type": "array",
-								"items": {
-									"$ref": "#/$defs/symbol"
-								}
-							}
-						]
-					}
+					"$ref": "#/$defs/string_list"
+				},
+				"text": {
+					"type": "string"
 				}
 			},
 			"required": [
 				"cmd",
-				"option",
-				"value"
+				"option"
+			],
+			"oneOf": [
+				{
+					"required": [
+						"value"
+					]
+				},
+				{
+					"required": [
+						"text"
+					]
+				}
 			],
 			"additionalProperties": false
 		},

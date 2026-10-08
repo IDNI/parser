@@ -293,6 +293,28 @@ TEST_SUITE("tgf json api: hello") {
 		CHECK(h->find("directives") == nullptr);
 	}
 
+	TEST_CASE("a session sees no option of the tool") {
+		options_repository mine;
+		options_scope scope(mine);
+		// the tool declares port; the evaluator declares json
+		REQUIRE(idni::options().declare(tgf_option_set).has_value());
+		auto r = run_repl({
+			R"({"id":1,"cmd":"set","option":"port","value":80})" });
+		std::istringstream ls(r.raw);
+		std::string line;
+		REQUIRE(static_cast<bool>(std::getline(ls, line)));
+		auto p = parse_line(line);
+		auto h = p.find("hello");
+		REQUIRE(h != nullptr);
+		auto opts = h->find("options");
+		REQUIRE(opts != nullptr);
+		CHECK(opts->find("port") == nullptr);
+		CHECK(opts->find("json") == nullptr);
+		CHECK(opts->find("trim") != nullptr);
+		REQUIRE(r.responses.size() == 1);
+		CHECK(r.responses[0].find("status")->as_string() == "error");
+	}
+
 	// The options after a load of src, read from the evaluator.
 	static json::value load_options(tgf_repl_evaluator& re,
 		const std::string& src, bool reload = false)
@@ -1010,6 +1032,19 @@ TEST_SUITE("tgf json api: request safety") {
 		REQUIRE(r.responses.size() == 4);
 		for (const auto& resp : r.responses)
 			CHECK(resp.find("status")->as_string() == "error");
+	}
+
+	TEST_CASE("a set with both value and text is an error") {
+		auto r = run_repl({
+			R"({"id":1,"cmd":"set","option":"trim","value":["num"]})",
+			R"({"id":2,"cmd":"set","option":"trim","value":["start"],"text":"start"})",
+			R"({"id":3,"cmd":"get","option":"trim"})" });
+		REQUIRE(r.responses.size() == 3);
+		CHECK(r.responses[0].find("status")->as_string() == "ok");
+		CHECK(r.responses[1].find("status")->as_string() == "error");
+		const json::value* data = response_data(r.responses[2]);
+		REQUIRE(data != nullptr);
+		CHECK(strings_are(data->find("value"), { "num" }));
 	}
 }
 

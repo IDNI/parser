@@ -835,7 +835,7 @@ format::json::value tgf_repl_evaluator::get_cmd(std::string_view name) {
 		v.set("options", option_values());
 		return v;
 	}
-	if (!idni::options().find(name)) {
+	if (!session_option(name)) {
 		report.error(diagnostics::code::not_found,
 			ps::messages::option_not_found,
 			{ { ps::label::name, name } });
@@ -852,13 +852,22 @@ format::json::value tgf_repl_evaluator::option_values() const {
 	const auto& opts = idni::options();
 	auto v = value::object();
 	for (const auto& name : opts.names())
-		v.set(name, format::json::to_json(opts.value(name)));
+		if (session_option(name))
+			v.set(name, format::json::to_json(opts.value(name)));
 	return v;
+}
+
+bool tgf_repl_evaluator::session_option(std::string_view name) const {
+	auto spec = idni::options().find(name);
+	return spec && std::ranges::find(tgf_session_owners, spec->owner)
+		!= tgf_session_owners.end();
 }
 
 format::json::value tgf_repl_evaluator::set_cmd(std::string_view name,
 	std::string_view text)
 {
+	if (!option_of_kind(name, std::nullopt))
+		return format::json::value::object();
 	auto r = idni::options().set_text(name, text);
 	const bool ok = !r.has_error();
 	report.append(r.report());
@@ -869,6 +878,8 @@ format::json::value tgf_repl_evaluator::set_cmd(std::string_view name,
 format::json::value tgf_repl_evaluator::set_option(std::string_view name,
 	idni::option_value v)
 {
+	if (!option_of_kind(name, std::nullopt))
+		return format::json::value::object();
 	auto r = idni::options().set(name, std::move(v));
 	const bool ok = !r.has_error();
 	report.append(r.report());
@@ -876,19 +887,18 @@ format::json::value tgf_repl_evaluator::set_option(std::string_view name,
 	return get_cmd(name);
 }
 
-// An unknown name or a spec of another kind is an error in @p report.
-static bool option_of_kind(std::string_view name, option_kind kind,
-	diagnostics::report& report)
+bool tgf_repl_evaluator::option_of_kind(std::string_view name,
+	std::optional<option_kind> kind)
 {
 	namespace ps = parser_strings;
-	auto spec = idni::options().find(name);
-	if (!spec) {
+	if (!session_option(name)) {
 		report.error(diagnostics::code::not_found,
 			ps::messages::option_not_found,
 			{ { ps::label::name, name } });
 		return false;
 	}
-	if (kind_of(*spec) == kind) return true;
+	if (!kind || kind_of(*idni::options().find(name)) == *kind)
+		return true;
 	report.error(diagnostics::code::type_error,
 		ps::messages::option_value_kind,
 		{ { ps::label::name, name } });
@@ -898,6 +908,8 @@ static bool option_of_kind(std::string_view name, option_kind kind,
 format::json::value tgf_repl_evaluator::list_cmd(std::string_view name,
 	std::string_view text, bool add)
 {
+	if (!option_of_kind(name, option_kind::list))
+		return format::json::value::object();
 	auto entries = idni::detail::parse_value(option_kind::list, text,
 		name);
 	if (!entries.has_value()) {
@@ -911,7 +923,7 @@ format::json::value tgf_repl_evaluator::list_cmd(std::string_view name,
 format::json::value tgf_repl_evaluator::edit_option_list(
 	std::string_view name, const option_list& entries, bool add)
 {
-	if (!option_of_kind(name, option_kind::list, report))
+	if (!option_of_kind(name, option_kind::list))
 		return format::json::value::object();
 	auto list = idni::options().get<option_list>(name);
 	for (const auto& e : entries) {
@@ -925,7 +937,7 @@ format::json::value tgf_repl_evaluator::edit_option_list(
 format::json::value tgf_repl_evaluator::flag_cmd(std::string_view name,
 	const function<bool(bool)>& update)
 {
-	if (!option_of_kind(name, option_kind::flag, report))
+	if (!option_of_kind(name, option_kind::flag))
 		return format::json::value::object();
 	auto& opts = idni::options();
 	opts.set(name, update(opts.get<bool>(name)));
@@ -933,15 +945,18 @@ format::json::value tgf_repl_evaluator::flag_cmd(std::string_view name,
 }
 
 // TODO (LOW) write proper help messages
-static std::string help_text(size_t nt, bool show_load_reload) {
+static std::string help_text(const tgf_repl_evaluator& re, size_t nt,
+	bool show_load_reload)
+{
 	using p = tgf_repl_parser;
 	std::ostringstream os;
-	// the declared options of a kind, or all of them
-	auto available = [](std::optional<option_kind> kind) {
+	// the session options of a kind, or all of them
+	auto available = [&re](std::optional<option_kind> kind) {
 		std::ostringstream os;
 		os << "Available options:\n";
 		const auto& opts = idni::options();
 		for (const auto& name : opts.names()) {
+			if (!re.session_option(name)) continue;
 			auto spec = opts.find(name);
 			if (kind && kind_of(*spec) != *kind) continue;
 			std::string col = "  " + name;
@@ -1118,7 +1133,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			auto v = value::object();
 			v.set("command", value::string(help_arg_name(target)))
 			 .set("text", value::string(
-				help_text(target, !fixed_grammar)));
+				help_text(*this, target, !fixed_grammar)));
 			res.data = std::move(v);
 			break;
 		}

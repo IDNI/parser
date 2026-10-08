@@ -360,7 +360,7 @@ set error-verbosity = detailed
 
 ### add
 
-`add option value` adds a value into a list of values (symbol list, treepath list).
+`add option value` adds a value into a list option.
 
 Usage:
 ```
@@ -370,7 +370,7 @@ add inline expr > block > expr.
 
 ### del
 
-`del option value` deletes a value from a list of values (symbol list, treepath list).
+`del option value` deletes a value from a list option.
 
 Usage:
 ```
@@ -393,7 +393,7 @@ toggle status
 
 Usage:
 ```
-enable measure-parsing
+enable measure
 ```
 
 ### disable
@@ -408,50 +408,61 @@ disable colors
 ## REPL options
 
 All options can be accessed by `get` and `set` commands.
+A flag option can be additionally changed by `enable`, `disable` and `toggle` commands.
+A list option can be additionally updated by `add` and `del` commands.
 
-### boolean options
-
-These options can be additionally changed by `enable`, `disable` and `toggle` commands.
-
-```
-  status                 show status                        on/off
-  colors                 use term colors                    on/off
-  print-ambiguity        prints ambiguous nodes             on/off
-  print-terminals        prints parsed terminals            on/off
-  print-graphs           prints parsed graphs               on/off
-  print-rules            prints parsed forest as TML rules  on/off
-  print-facts            prints parsed forest as TML facts  on/off
-  measure-parsing        measures parsing time              on/off
-  measure-each-pos       measures parsing time of each pos  on/off
-  measure-forest         measures forest building time      on/off
-  measure-preprocess     measures forest preprocess time    on/off
-  gc                     Earley chart garbage collection    on/off
-  debug                  show debug information             on/off
-  auto-disambiguate      auto-disambiguation                on/off
-  trim-terminals         trim terminals                     on/off
-  inline-char-classes    inline character classes           on/off
-```
-
-### symbol list options
-
-These options can be additionally updated by `add` and `del` commands.
+### grammar options
 
 ```
-  nodisambig-list        list of nodes to keep ambiguous    symbol1, symbol2...
-  trim                   list of nodes to trim              symbol1, symbol2...
-  trim-children          list of nodes to trim children     symbol1, symbol2...
+  auto-disambiguate         enables auto-disambiguation                                                   flag
+  nodisambig-list           nonterminals whose ambiguity is kept                                          list
+  trim-terminals            trim all terminals                                                            flag
+  inline-char-classes       inline character classes                                                      flag
+  derive-char-classes       scan rules that match one character as character classes                      flag
+  trim                      nonterminals to trim from the tree                                            list
+  trim-children             nonterminals whose children are trimmed                                       list
+  trim-children-terminals   nonterminals whose children and terminals are trimmed                         list
+  dont-trim-terminals-of    nonterminals whose terminals are kept                                         list
+  inline                    tree paths to inline, each written as a > b                                   list
+  enabled-productions       comma-separated enabled productions                                           list
+  start                     starting literal                                                              text
+  char-classes              character classes of the grammar, an entry is a class or class as name        list
+  highlight-auto            highlight by name and content heuristics                                      flag
+  highlight                 highlight types, each entry written as type: nonterminal                      list
+  dynamic                   default values for a @dynamic nonterminal, each entry written as name=value   list
 ```
 
-### treepaths list option
-
-This option can be additionally updated by `add` and `del` commands.
+### parse options
 
 ```
-  inline                 list of tree paths to inline       symbol1 > symbol2.
+  gc                        enable garbage collection                                                     flag
+  gc-lag                    garbage collection lag                                                        number
+  max-length                maximum input length (0 = unlimited)                                          number
+  measure                   measure parse time and counters, turns every measure flag on                  flag
+  measure-each-pos          measure parse time at each position                                           flag
+  measure-forest            measure forest building time                                                  flag
+  measure-preprocess        measure forest preprocess time                                                flag
+  measure-scopes            record timed scopes in the report                                             flag
+  measure-counters          record parse counters and memory in the report                                flag
+  debug                     print debug diagnostics                                                       flag
+  error-verbosity           parse error verbosity: basic, detailed, root-cause                            text
+  tree-path                 parse tree path: bintree or forest                                            text
 ```
 
-### error verbosity option
+### repl options
 
 ```
-  error-verbosity        parse errors verbosity             basic/detailed/root-cause
+  print-terminals           print the parsed terminals                                                    flag
+  status                    print status after each command                                               flag
+  print-ambiguity           print ambiguous nodes                                                         flag
+  print-graphs              print the parsed graph                                                        flag
+  print-tml-rules           print the forest as TML rules                                                 flag
+  print-tml-facts           print the forest as TML facts                                                 flag
+  print-input               print the input                                                               flag
+```
+
+### ui options
+
+```
+  colors                    use terminal colors                                                           flag
 ```

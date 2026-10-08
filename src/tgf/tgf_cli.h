@@ -6,6 +6,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <ostream>
 #include <set>
 #include <string>
@@ -155,6 +156,10 @@ struct tgf_repl_evaluator {
 	/// it for the hello line, which carries the grammar-load report.
 	diagnostics::report take_report();
 
+	/// True when the option @p name exists and a REPL and a session see
+	/// it: its owner is one of tgf_session_owners.
+	[[nodiscard]] bool session_option(std::string_view name) const;
+
 	bool reload(const std::string& new_tgf_file);
 
 	/// Load a grammar from text and adopt it. @p name is a label for the
@@ -187,7 +192,7 @@ struct tgf_repl_evaluator {
 
 	idni::diagnostics::result<int> eval(const std::string& src);
 
-	/// Every declared option and its value as one object, in the order
+	/// Every session option and its value as one object, in the order
 	/// of the declaration.
 	format::json::value option_values() const;
 
@@ -217,6 +222,10 @@ struct tgf_repl_evaluator {
 	/// @p update of its value.
 	format::json::value flag_cmd(std::string_view name,
 		const std::function<bool(bool)>& update);
+	/// True when @p name is a session option of the kind @p kind, or of
+	/// any kind without one. Else an error goes to report.
+	bool option_of_kind(std::string_view name,
+		std::optional<option_kind> kind);
 
 	shaping_options shaping();
 

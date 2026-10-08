@@ -4,6 +4,7 @@
 #ifndef __IDNI__PARSER__TGF__TGF_CLI_OPTIONS_H__
 #define __IDNI__PARSER__TGF__TGF_CLI_OPTIONS_H__
 
+#include <array>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -118,6 +119,10 @@ inline const option_set tgf_option_set = {
 		{ "test", "run tester (with provided tgf.test file)" },
 	},
 };
+
+/// The owners whose options a REPL and a session see.
+inline const std::array<std::string_view, 4> tgf_session_owners = {
+	"grammar", "parse", "repl", "ui" };
 
 /// The command surfaces of the options that the grammar, the parser and the
 /// evaluator declare.
