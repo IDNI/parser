@@ -539,11 +539,13 @@ public:
 	/**
 	 * Adds an alternative for every value of a @dynamic nonterminal nt.
 	 * Every value becomes a terminal string production. A value added
-	 * already is skipped. The grammar object is shared by every parser
+	 * already is skipped. An empty value is an error, and nothing is
+	 * added. The grammar object is shared by every parser
 	 * using it, so this affects all of them and it must not run while a
 	 * parse is running.
 	 */
-	void add_dynamic(const std::basic_string<C>& nt,
+	[[nodiscard]] idni::diagnostics::result<void> add_dynamic(
+		const std::basic_string<C>& nt,
 		const std::vector<std::basic_string<C>>& values);
 	/// Returns number of productions (every disjunction has a prod rule)
 	size_t size() const;

@@ -150,7 +150,7 @@ A repeat of a value still pending in the current parse does not add a second pro
 
 If `value` was added and later retired, the method reuses that production's original index instead of appending a new one. The grammar holds at most one production per distinct `(l, value)` pair for the life of the process.
 
-`compute_nullables()` is not called, so `l`'s nullability is not recomputed. An empty `value` would make `l` nullable, so this method refuses it and returns `std::nullopt` without adding anything. Use `add_dynamic` instead for a `@dynamic` nonterminal that must accept the empty string.
+`compute_nullables()` is not called, so `l`'s nullability is not recomputed. An empty `value` would make `l` nullable, so this method refuses it and returns `std::nullopt` without adding anything. `add_dynamic` refuses an empty value too.
 
 A value this method adds stays pending until the parse ends. `commit_dynamic` and `rollback_dynamic` then decide what happens to it. See below, and see [parser::options::dynamic_grow_nts](parser_options.md) for how a value gets confirmed in the first place.
 
@@ -224,9 +224,11 @@ p.parse(next_input.c_str(), next_input.size());
 `has_pending_dynamic` returns `true` while at least one added value is still undecided. Undecided means neither `commit_dynamic` nor `rollback_dynamic` has run for it. Every `parser::parse` call decides all of them by its own end. So this method normally reports `false` once a `parse` call ends.
 
 
-### void add_dynamic(const std::basic_string<C>& nt, const std::vector<std::basic_string<C>>& values);
+### result<void> add_dynamic(const std::basic_string<C>& nt, const std::vector<std::basic_string<C>>& values);
 
 Adds a production rule for every value in `values` that a nonterminal named `nt` does not have yet. Each value becomes one terminal string alternative. `add_dynamic` skips a value already added and never removes a production.
+
+An empty value is an error in the returned `result`, and `add_dynamic` adds nothing. An empty value would make `nt` nullable.
 
 One grammar object serves every parser that holds a reference to it. So `add_dynamic` changes the grammar for all of them. It is not per parser.
 
@@ -241,7 +243,8 @@ nonterminals<char> nts;
 prods<char> ps, start(nts("start")), type_name(nts("type_name"));
 ps(start, type_name);
 grammar<char> g(nts, ps, start, {});
-g.add_dynamic("type_name", { "u8", "u16" });
+auto r = g.add_dynamic("type_name", { "u8", "u16" });
+// r.has_error() == false
 parser<char> p(g);
 // p.parse("u8", 2).found == true
 ```

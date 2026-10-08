@@ -217,6 +217,8 @@ struct messages {
 		"Unknown highlight type";
 	static constexpr sv dynamic_names_need_semicolon =
 		"Dynamic directive names must be separated by ';', not ','.";
+	static constexpr sv dynamic_empty_value =
+		"A value of a dynamic nonterminal is empty";
 	// chart field limits
 	static constexpr sv input_too_long =
 		"Input is longer than the largest parse position";

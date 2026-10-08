@@ -763,7 +763,7 @@ TEST_CASE("add_dynamic on a derived rule is rejected as dynamic") {
 	REQUIRE(L.g.has_value());
 	size_t a = L.g->nt("A").n();
 	CHECK(grammar_inspector<char, char>(*L.g).cc_fns().is_derived(a));
-	L.g->add_dynamic("A", { "bb" });
+	REQUIRE(L.g->add_dynamic("A", { "bb" }).has_value());
 	auto e = rule_of<char>(*L.g, "A");
 	REQUIRE(e.has_value());
 	CHECK(e->st == cc_rule_info<char>::state::rejected);

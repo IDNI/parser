@@ -297,6 +297,7 @@ Accepts a comma separated list of symbols which are not disambiguated according 
 A `@dynamic` nonterminal takes its alternatives from the host program at run time, not from the grammar file. Each alternative is a plain terminal string.
 
 A `defaults` clause after the nonterminal name sets initial values. `,` separates the values inside one `defaults` clause. `;` separates several `@dynamic` declarations on one line. A value is a symbol or a quoted string, and a quoted string may hold an escape.
+A default value has one character or more. An empty value, for example `""`, is a load error.
 
 A `@dynamic` nonterminal with no values matches nothing. This is not an error and produces no warning.
 

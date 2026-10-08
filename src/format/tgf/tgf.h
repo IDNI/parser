@@ -923,10 +923,18 @@ private:
 			auto& kept = opt.dynamic[name];
 			std::set<std::basic_string<C>> seen(
 				kept.begin(), kept.end());
-			for (auto& a : args)
-				if (auto v = dynamic_value(a);
-					seen.insert(v).second)
-						kept.push_back(v);
+			for (auto& a : args) {
+				auto v = dynamic_value(a);
+				// an empty value would make the nonterminal nullable
+				if (v.empty()) {
+					if (diag) diag->error(code::invalid_argument,
+						messages::dynamic_empty_value,
+						{{ label::name,
+							idni::to_std_string(name) }});
+					continue;
+				}
+				if (seen.insert(v).second) kept.push_back(v);
+			}
 		};
 		auto pair_name = [&](const std::vector<trv>& args) {
 			if (args.empty()) return std::basic_string<C>{};

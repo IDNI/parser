@@ -868,7 +868,8 @@ TEST_SUITE("dynamic grow: add_dynamic dedupe") {
 		ps(start, type_name);
 		grammar<char> g(nts, ps, start, cc);
 
-		g.add_dynamic("type_name", { "Point", "Point" });
+		REQUIRE(g.add_dynamic("type_name", { "Point", "Point" })
+			.has_value());
 		auto it = g.opt().dynamic.find("type_name");
 		REQUIRE(it != g.opt().dynamic.end());
 		CHECK(it->second.size() == 1);

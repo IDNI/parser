@@ -665,6 +665,19 @@ TEST_SUITE("grammar options") {
 		REQUIRE(g.bind_options().has_value());
 		CHECK(g.opt().shaping.to_trim == set<size_t>{ id_of(nts, "x") });
 	}
+
+	TEST_CASE("an empty @dynamic value is a load error that names it") {
+		nonterminals<char> nts;
+		auto gr = tgf<char>::from_string(nts, string(
+			"@dynamic empty_tn defaults \"\".\nstart => empty_tn.\n"));
+		CHECK(!gr.has_value());
+		ostringstream printed;
+		gr.report().print(printed);
+		CHECK(printed.str().find(
+			parser_strings::messages::dynamic_empty_value)
+				!= string::npos);
+		CHECK(printed.str().find("empty_tn") != string::npos);
+	}
 }
 
 // ---------------------------------------------------------------------------

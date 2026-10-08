@@ -163,7 +163,8 @@ int main(int argc, char **argv) {
 		if (!check(gr.print_and_ok(cerr), "grammar loads")) return 1;
 		grammar<char> g = std::move(gr).value();
 		parser<char> p(g);
-		g.add_dynamic("type_name", { "u8", "u16" });
+		check(!g.add_dynamic("type_name", { "u8", "u16" }).has_error(),
+			"add_dynamic takes the values");
 		check(parse_ok(p, "u8"),  "u8 accepted after add_dynamic");
 		check(parse_ok(p, "u16"), "u16 accepted after add_dynamic");
 		check(!parse_ok(p, "i32"), "i32 still rejected");
@@ -192,7 +193,8 @@ int main(int argc, char **argv) {
 			"cast does not parse before add_dynamic");
 		check(parse_ok(p, "(x[4])"),
 			"indexed variable parses before add_dynamic");
-		g.add_dynamic("type_name", { "u8" });
+		check(!g.add_dynamic("type_name", { "u8" }).has_error(),
+			"add_dynamic takes the values");
 		check(parse_ok(p, "(u8[4])x"),
 			"cast parses after add_dynamic");
 		check(parse_ok(p, "(x[4])"),
@@ -222,7 +224,8 @@ int main(int argc, char **argv) {
 		if (!check(gr.print_and_ok(cerr), "grammar loads")) return 1;
 		grammar<char> g = std::move(gr).value();
 		parser<char> p(g);
-		g.add_dynamic("type_name", { "i32" });
+		check(!g.add_dynamic("type_name", { "i32" }).has_error(),
+			"add_dynamic takes the values");
 		check(parse_ok(p, "u8"),  "u8 from defaults still parses");
 		check(parse_ok(p, "u16"), "u16 from defaults still parses");
 		check(parse_ok(p, "i32"), "i32 added by host parses");
@@ -251,7 +254,8 @@ int main(int argc, char **argv) {
 		grammar<char> g = std::move(gr).value();
 		parser<char> p(g);
 		check(!parse_ok(p, "x"), "separate decls declare no values");
-		g.add_dynamic("a", { "x" });
+		check(!g.add_dynamic("a", { "x" }).has_error(),
+			"add_dynamic takes the values");
 		check(parse_ok(p, "x"), "x parses after add_dynamic");
 	}
 
@@ -310,7 +314,8 @@ int main(int argc, char **argv) {
 		check(parse_ok(p, "tau"), "tau from defaults parses");
 		check(parse_ok(p, "sbf"), "sbf from defaults parses");
 		check(!parse_ok(p, "x"), "x not declared anywhere rejected");
-		g.add_dynamic("a", { "x" });
+		check(!g.add_dynamic("a", { "x" }).has_error(),
+			"add_dynamic takes the values");
 		check(parse_ok(p, "x"), "x parses through a after add_dynamic");
 	}
 

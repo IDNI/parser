@@ -642,6 +642,13 @@ grammar<C, T>::grammar(std::shared_ptr<nonterminals<C, T>> nts_,
 		}
 		if (over) return;
 	}
+	// an empty value would make the nonterminal nullable
+	for (auto& [name, values] : opt_.dynamic)
+		if (std::erase(values, std::basic_string<C>{}) && diag)
+			diag->error(idni::diagnostics::code::invalid_argument,
+				idni::parser_strings::messages::dynamic_empty_value,
+				{{ idni::parser_strings::label::name,
+					to_std_string(name) }});
 	for (const auto& [name, values] : opt_.dynamic)
 		host_dynamic_values(nt(name), values);
 	compute_nullables();
@@ -833,9 +840,17 @@ void grammar<C, T>::productions_disable(const std::string& guard) {
 	set_enabled_productions(opt_.enabled_guards);
 }
 template <typename C, typename T>
-void grammar<C, T>::add_dynamic(const std::basic_string<C>& nt_name,
+idni::diagnostics::result<void> grammar<C, T>::add_dynamic(
+	const std::basic_string<C>& nt_name,
 	const std::vector<std::basic_string<C>>& values)
 {
+	idni::diagnostics::result<void> r;
+	// an empty value would make the nonterminal nullable
+	for (const auto& v : values) if (v.empty())
+		return r.with_error(idni::diagnostics::code::invalid_argument,
+			idni::parser_strings::messages::dynamic_empty_value,
+			{{ idni::parser_strings::label::name,
+				to_std_string(nt_name) }});
 	auto l = nt(nt_name);
 	auto& idx_for_l = dynamic_idx_[l];
 	auto& kept = opt_.dynamic[nt_name];
@@ -850,6 +865,7 @@ void grammar<C, T>::add_dynamic(const std::basic_string<C>& nt_name,
 	host_dynamic_values(l, values);
 	compute_nullables();
 	set_enabled_productions(opt_.enabled_guards);
+	return r;
 }
 template <typename C, typename T>
 void grammar<C, T>::host_dynamic_values(const lit<C, T>& l,
@@ -868,10 +884,9 @@ void grammar<C, T>::host_dynamic_values(const lit<C, T>& l,
 			if (need_link) link(it->second);
 			continue;
 		}
+		DBG(assert(!v.empty() && "a dynamic value is never empty");)
 		lits<C, T> a;
-		// an empty value is the null literal, the same as nul in a prod
-		if (v.empty()) a.emplace_back();
-		else for (const C& c : v) a.emplace_back(c);
+		for (const C& c : v) a.emplace_back(c);
 		G.emplace_back(l, std::vector<lits<C, T>>{ a });
 		size_t idx = G.size() - 1;
 		std::basic_string<T> value_t;

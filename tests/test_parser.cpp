@@ -516,15 +516,18 @@ int main(int argc, char **argv)
 		dps(dtype, dtype_name);
 		grammar<> dg(dnt, dps, dstart, {});
 		parser<> dp(dg);
-		dg.add_dynamic("type_name", { "u8", "u16" });
+		check(!dg.add_dynamic("type_name", { "u8", "u16" }).has_error(),
+			"add_dynamic takes the values");
 		check(parse_ok(dp, "u8"),  "add_dynamic first values: u8 accepted");
 		check(parse_ok(dp, "u16"), "add_dynamic first values: u16 accepted");
-		dg.add_dynamic("type_name", { "i32" });
+		check(!dg.add_dynamic("type_name", { "i32" }).has_error(),
+			"add_dynamic takes the values");
 		check(parse_ok(dp, "i32"), "add_dynamic adds: i32 accepted");
 		check(parse_ok(dp, "u8"),  "add_dynamic adds: u8 still accepted");
 		check(parse_ok(dp, "u16"), "add_dynamic adds: u16 still accepted");
 		size_t before = dg.size();
-		dg.add_dynamic("type_name", { "u8" });
+		check(!dg.add_dynamic("type_name", { "u8" }).has_error(),
+			"add_dynamic takes the values");
 		check(dg.size() == before,
 			"repeated value adds no production");
 		string in = "u8";
@@ -546,7 +549,8 @@ int main(int argc, char **argv)
 		dopt.enabled_guards = {};
 		grammar<> dg(dnt, dps, dstart, {}, dopt);
 		parser<> dp(dg);
-		dg.add_dynamic("type_name", { "u8" });
+		check(!dg.add_dynamic("type_name", { "u8" }).has_error(),
+			"add_dynamic takes the values");
 		check(parse_ok(dp, "u8"),  "dynamic value accepted, guard e disabled");
 		check(!parse_ok(dp, "zz"), "guarded production stays off");
 		dg.productions_enable("e");
