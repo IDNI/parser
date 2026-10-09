@@ -1,4 +1,8 @@
 cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
+# without it cl gets the default /W3 next to the /W4 of target_setup
+if(POLICY CMP0092)
+	cmake_policy(SET CMP0092 NEW)
+endif()
 
 message(STATUS "Adding ${CMAKE_CURRENT_SOURCE_DIR}/cmake to CMAKE_MODULE_PATH")
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
