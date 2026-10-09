@@ -6,7 +6,7 @@
 // table, and any lit that points into it, alive after the grammar is gone.
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include "doctest.h"
+#include "quiet_doctest.h"
 
 #include <memory>
 #include <string>

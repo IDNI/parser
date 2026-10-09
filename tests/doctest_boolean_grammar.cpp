@@ -5,7 +5,7 @@
 // cascading uncomplete, and fixpoint resolution.
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include "doctest.h"
+#include "quiet_doctest.h"
 #include "parser.h"
 #include "testing.h"
 #include "recoders.h"

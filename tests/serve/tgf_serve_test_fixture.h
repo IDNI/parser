@@ -8,7 +8,7 @@
 #ifndef __IDNI__PARSER__TESTS__TGF_SERVE_TEST_FIXTURE_H__
 #define __IDNI__PARSER__TESTS__TGF_SERVE_TEST_FIXTURE_H__
 
-#include "doctest.h"
+#include "../quiet_doctest.h"
 #include "tgf/tgf_cli.h"
 #include "format/json/json.h"
 #include "tgf_serve_process.h"

@@ -5,7 +5,7 @@
 //
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include "doctest.h"
+#include "quiet_doctest.h"
 #include "../src/tgf/tgf_cli.h"
 #include "../src/tgf/parser_gen.h"
 #include "test_env.h"

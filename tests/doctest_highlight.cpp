@@ -4,7 +4,7 @@
 // Native verification of syntax_highlighting token extraction.
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include "doctest.h"
+#include "quiet_doctest.h"
 #include "parser.h"
 #include "syntax_highlighting.h"
 

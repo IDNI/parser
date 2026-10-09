@@ -5,7 +5,7 @@
 #define __IDNI__PARSER__TESTS__INIT_TEST_H__
 
 #include <cassert>
-#include "doctest.h"
+#include "quiet_doctest.h"
 
 // namespace testing = doctest;
 

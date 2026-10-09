@@ -9,7 +9,7 @@
 // and the expected-style chain: and_then(), transform(), or_else(), value_or().
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include "doctest.h"
+#include "quiet_doctest.h"
 #include "debug_skip.h"
 #include "utility/diagnostics.h"
 

@@ -5,7 +5,7 @@
 // --json forms of the parse, grammar and gen commands.
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include "doctest.h"
+#include "quiet_doctest.h"
 #include "../src/tgf/tgf_cli.h"
 #include "format/json/json.h"
 

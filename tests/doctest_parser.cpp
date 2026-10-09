@@ -5,7 +5,7 @@
 // encoding (including char32_t Unicode), and bug regression tests.
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include "doctest.h"
+#include "quiet_doctest.h"
 #include "parser.h"
 #include "testing.h"
 #include "format/json/json.h"

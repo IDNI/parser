@@ -9,7 +9,7 @@
 // so case order is irrelevant.
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include "doctest.h"
+#include "quiet_doctest.h"
 #include "utility/measure.h"
 
 #include <atomic>

@@ -4,7 +4,7 @@
 // Tests for parser input/decoder pipelines (char, char32_t, bool, token)
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include "doctest.h"
+#include "quiet_doctest.h"
 #include "parser.h"
 
 #include <filesystem>

@@ -5,7 +5,7 @@
 // output is compared with the local REPL renderer.
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include "doctest.h"
+#include "quiet_doctest.h"
 #include "serve/tgf_serve_test_fixture.h"
 #include "../src/tgf/tgf_cli.h"
 #include "../src/tgf/tgf_connect.h"

@@ -2,7 +2,7 @@
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include "doctest.h"
+#include "quiet_doctest.h"
 #include "format/json/json.h"
 #include "format/ast.json/ast_json.h"
 #include "parser.h"

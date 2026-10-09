@@ -19,7 +19,7 @@
 // promote it to a normal assert (as was done for both classes above).
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include "doctest.h"
+#include "quiet_doctest.h"
 #include "parser.h"
 
 #include <string>

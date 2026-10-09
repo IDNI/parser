@@ -19,7 +19,7 @@
 // confirmed values on success and retires everything pending on failure.
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include "doctest.h"
+#include "quiet_doctest.h"
 #include "debug_skip.h"
 #include "parser.h"
 
