@@ -621,6 +621,30 @@ TEST_CASE("a command default of another kind is an error") {
 	CHECK(repo.names().empty());
 }
 
+TEST_CASE("a default on the global surface is an error of declare") {
+	options_repository repo;
+	auto r = repo.declare(option_set{ .options = {
+		{ "echo", "", false, "", { { "", 'e', true } } } } });
+	CHECK(r.has_error());
+	const string msg = messages_of(r.report());
+	CHECK(contains(msg, "A default on the global surface does not apply"));
+	CHECK(contains(msg, "echo"));
+	CHECK(repo.names().empty());
+}
+
+TEST_CASE("a default on the global surface is an error of add_surface") {
+	options_repository repo;
+	REQUIRE(repo.declare(option_set{ .options = {
+		{ "echo", "", false, "", {} } } }).has_value());
+	auto r = repo.add_surface("echo", { "", 'e', true });
+	CHECK(r.has_error());
+	CHECK(contains(messages_of(r.report()),
+		"A default on the global surface does not apply"));
+	auto spec = repo.find("echo");
+	REQUIRE(spec);
+	CHECK(spec->surfaces.empty());
+}
+
 } // TEST_SUITE
 
 TEST_SUITE("options text") {

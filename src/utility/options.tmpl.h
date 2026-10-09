@@ -148,8 +148,8 @@ inline diagnostics::result<option_value> parse_value(const option_spec& o,
 }
 
 /// Report in @p r when @p sf does not fit the option @p o of @p cat: a
-/// default of another kind, or a short letter that another option uses on
-/// the same command.
+/// default of another kind, a default on the global surface, or a short
+/// letter that another option uses on the same command.
 inline void check_surface(const options_catalog& cat, const option_spec& o,
 	const option_surface& sf, diagnostics::result<void>& r)
 {
@@ -159,6 +159,9 @@ inline void check_surface(const options_catalog& cat, const option_spec& o,
 		r.error(code::type_error, ps::messages::option_command_default_kind,
 			{ { ps::label::name, o.name },
 			  { ps::label::value, sf.command } });
+	if (sf.fallback && sf.command.empty())
+		r.error(code::invalid_argument, ps::messages::option_global_default,
+			{ { ps::label::name, o.name } });
 	if (!sf.short_name) return;
 	for (const auto& other : cat.specs)
 		for (const auto& have : other.surfaces)
