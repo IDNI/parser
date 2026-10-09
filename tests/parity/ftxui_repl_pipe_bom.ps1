@@ -31,6 +31,7 @@ function Check([string]$Name, [string[]]$Lines, [string]$Expected) {
 
 # Without the mark in the pipe the checks below prove nothing.
 $hex = @("hello" | & $Fixture --hex) -join " "
+Write-Host "piped bytes: $hex"
 if (-not $hex.StartsWith("ef bb bf")) {
 	Write-Host "FAIL: PowerShell wrote no byte order mark before the piped text: $hex"
 	$status = 1
