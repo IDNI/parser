@@ -887,6 +887,11 @@ public:
 /// - bintree_path: build a binary tree (tref) directly from S-items via build_bintree, reconstruct forest later if needed.
 enum class parse_tree_path { forest_path, bintree_path };
 
+#ifdef _MSC_VER
+// the chart indexes start on a cache line on purpose, so the padding is wanted
+#	pragma warning(push)
+#	pragma warning(disable : 4324)
+#endif
 template <typename C = char, typename T = C>
 class parser {
 public:
@@ -1793,6 +1798,9 @@ private:
 		const std::vector<lit<C, T>>& v);
 #endif
 };
+#ifdef _MSC_VER
+#	pragma warning(pop)
+#endif
 
 template <typename C, typename T>
 bool operator==(const lit<C, T>& l, const prods<C, T>& p);
