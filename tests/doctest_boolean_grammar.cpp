@@ -1852,7 +1852,7 @@ TEST_SUITE("boolean grammar: fuzz") {
 		grammar<char> g(nts, ps, start, {}, make_grammar_options());
 		size_t mismatches = 0;
 		for (size_t len = 0; len <= 8; len++) {
-			size_t total = 1u << len;
+			size_t total = size_t{ 1 } << len;
 			for (size_t idx = 0; idx < total; idx++) {
 				std::string s = nth_string(idx, len, "ab", 2);
 				bool expected = ref_not_ab(s);
@@ -1881,7 +1881,7 @@ TEST_SUITE("boolean grammar: fuzz") {
 		grammar<char> g(nts, ps, start, {}, make_grammar_options());
 		size_t mismatches = 0;
 		for (size_t len = 0; len <= 8; len++) {
-			size_t total = 1u << len;
+			size_t total = size_t{ 1 } << len;
 			for (size_t idx = 0; idx < total; idx++) {
 				std::string s = nth_string(idx, len, "ab", 2);
 				bool expected = ref_no_ab_substring(s);

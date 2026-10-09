@@ -570,9 +570,9 @@ TEST_SUITE("parser: disambig") {
 // TEST SUITE: encoding - char32_t terminals with Unicode
 // ---------------------------------------------------------------------------
 
+#if !defined(WIN32) && !defined(__EMSCRIPTEN__)
 TEST_SUITE("parser: encoding") {
 
-#if !defined(WIN32) && !defined(__EMSCRIPTEN__)
 	TEST_CASE("char32_t unicode terminals") {
 		nonterminals<char32_t> nts32;
 		auto start = nts32(std::u32string(U"start"));
@@ -593,8 +593,8 @@ TEST_SUITE("parser: encoding") {
 			U"τξεσκεπάζωτ"),
 			SIZE_MAX, true);
 	}
-#endif
 }
+#endif
 
 // ---------------------------------------------------------------------------
 // TEST SUITE: bug regression tests
