@@ -228,11 +228,16 @@ void post_order<node>::const_traverse(tref n, auto& visitor,
 			if constexpr (
 				bool_accepts_tref_tref<decltype(cb)>::value)
 							return cb(x, parent);
-			else cb(x, parent);
+			else {
+				cb(x, parent);
+				return true;
+			}
 		} else if constexpr (bool_accepts_tref<decltype(cb)>::value) {
 			return cb(x);
-		} else cb(x);
-		return true;
+		} else {
+			cb(x);
+			return true;
+		}
 	};
 	stack.push_back(n);
 	upos.push_back(0);

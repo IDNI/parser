@@ -455,13 +455,19 @@ void pre_order<node>::const_traverse(tref n, auto& visitor,
 			if constexpr (bool_accepts_tref_tref<decltype(cb)>
 									::value)
 				return lg(cb(x, parent));
-			else cb(x, parent);
+			else {
+				cb(x, parent);
+				DBGT(std::cerr << " N/A\n";)
+				return true;
+			}
 		} else
 			if constexpr (bool_accepts_tref<decltype(cb)>::value) {
 				return lg(cb(x));
-			} else cb(x);
-		DBGT(std::cerr << " N/A\n";)
-		return true;
+			} else {
+				cb(x);
+				DBGT(std::cerr << " N/A\n";)
+				return true;
+			}
 	};
 	// visit n and save on stack
 	if (!call(visit_subtree, n, nullptr, "visit_subtree"))
