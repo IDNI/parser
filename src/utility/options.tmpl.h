@@ -500,7 +500,14 @@ inline diagnostics::result<void> options_repository::load_env(
 			r.merge(std::move(v));
 			continue;
 		}
-		r.merge(store(i, std::move(v.value())));
+		// a codec error names only the option, so the variable goes first
+		auto stored = store(i, std::move(v.value()));
+		if (stored.has_error())
+			r.error(diagnostics::code::invalid_argument,
+				ps::messages::option_env_bad_value,
+				{ { ps::label::name, var },
+				  { ps::label::value, text } });
+		r.merge(std::move(stored));
 	}
 	return r;
 }

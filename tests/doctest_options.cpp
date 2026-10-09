@@ -120,6 +120,28 @@ option_set ids_set() {
 		{ "flag", "test", false, "", { { "" } } } } };
 }
 
+// An even count. Its error names the option, as the codec of a program does.
+struct even_count_codec {
+	option_value to_value(const size_t& field) const { return field; }
+	diagnostics::result<size_t> from_value(const option_value& v) const {
+		diagnostics::result<size_t> r;
+		const size_t n = get<size_t>(v);
+		if (n % 2) return r.with_error(diagnostics::code::invalid_argument,
+			parser_strings::messages::option_bad_value,
+			{ { parser_strings::label::name, "count" },
+			  { parser_strings::label::value, to_string(n) } });
+		return r.with_value(n);
+	}
+};
+
+// The lines of messages_of(), in order.
+vector<string> message_lines(const diagnostics::report& rep) {
+	vector<string> out;
+	istringstream is(messages_of(rep));
+	for (string line; getline(is, line);) out.push_back(line);
+	return out;
+}
+
 args_config tool_config() {
 	args_config cfg;
 	cfg.name = "tool";
@@ -741,6 +763,36 @@ TEST_CASE("load_env reads the variables and reports a bad value") {
 	CHECK(f.repo.get<size_t>("count") == 1u);
 	// input does not read the environment
 	CHECK(f.repo.get<string>("input").empty());
+}
+
+TEST_CASE("load_env names the variable before a codec error") {
+	fixture f;
+	size_t even = 0;
+	REQUIRE(f.repo.bind("count", even, even_count_codec{}).has_value());
+	test_setenv("OPTTEST_COUNT", "3");
+	auto r = f.repo.load_env("OPTTEST_");
+	test_unsetenv("OPTTEST_COUNT");
+	f.repo.unbind("count");
+	CHECK(r.has_error());
+	const auto lines = message_lines(r.report());
+	REQUIRE(lines.size() == 2);
+	CHECK(contains(lines[0], "environment variable"));
+	CHECK(contains(lines[0], "name=OPTTEST_COUNT"));
+	CHECK(contains(lines[1], "name=count"));
+	CHECK(even == 0u);
+}
+
+TEST_CASE("load_env names the variable before a kind error") {
+	fixture f;
+	test_setenv("OPTTEST_COUNT", "x");
+	auto r = f.repo.load_env("OPTTEST_");
+	test_unsetenv("OPTTEST_COUNT");
+	CHECK(r.has_error());
+	const auto lines = message_lines(r.report());
+	REQUIRE(lines.size() == 2);
+	CHECK(contains(lines[0], "environment variable"));
+	CHECK(contains(lines[0], "name=OPTTEST_COUNT"));
+	CHECK(contains(lines[1], "name=count"));
 }
 
 TEST_CASE("load_env reports a bad quoted string with its detail") {
