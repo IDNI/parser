@@ -647,8 +647,8 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 			bool b = true;
 			// a word that is no flag text is the next argument
 			if (arg < args.size())
-				if (auto v = detail::parse_value(
-					option_kind::flag, args[arg]); v.has_value())
+				if (auto v = detail::parse_value(option_kind::flag,
+					args[arg], cat.specs[*cur].name); v.has_value())
 				{
 					b = std::get<bool>(v.value());
 					++arg;
