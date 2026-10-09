@@ -196,6 +196,8 @@ Click on the type name in the following list to see more detailed documentation 
 - [`grammar::options`](docs/grammar_options.md) - options for grammar
 - [`grammar`](docs/grammar.md) - represents a grammar created from production rules `prods` and character class functions `char_class_fns`.
 - [`parser::options`](docs/parser_options.md) - plain struct of options changing behavior of the parser
+- [`options_repository`](docs/options.md) - one catalog of declared options, read and written by name from the command line, the environment, a REPL or an api
+- [options quick start](docs/options_quickstart.md) - the steps to declare, bind, parse and print options, and a table to switch from `cli`
 - [`parser`](docs/parser.md) - uses a `grammar` for parsing an input and produces a `result`
 - [`parser::result`](docs/parser_result.md) - result of parsing containing the parsed forest
 - [`parser::error`](docs/parser_error.md) - detailed information about a parse error
