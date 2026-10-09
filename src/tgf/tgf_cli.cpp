@@ -1393,6 +1393,11 @@ static void render_data_ambiguous_node(std::ostream& os,
 		}
 }
 
+#ifdef _MSC_VER
+// the color macros need the parameter TC, which hides the global idni::TC
+#	pragma warning(push)
+#	pragma warning(disable : 4459)
+#endif
 // One AST JSON node in the shape of the text tree printer.
 static void render_data_tree(std::ostream& os,
 	const format::json::value& node, size_t l,
@@ -1676,6 +1681,9 @@ void render_command_text(const cmd_result& r, std::ostream& os,
 		return;
 	}
 }
+#ifdef _MSC_VER
+#	pragma warning(pop)
+#endif
 
 void tgf_repl_evaluator::render_text(const cmd_result& res,
 	std::ostream& os) const

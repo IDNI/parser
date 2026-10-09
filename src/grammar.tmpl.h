@@ -1523,6 +1523,11 @@ const std::string* grammar<C, T>::production_guard(size_t p) const {
 }
 
 #include "parser_term_color_macros.h" // load color macros
+#ifdef _MSC_VER
+// the color macros need the parameter TC, which hides the global idni::TC
+#	pragma warning(push)
+#	pragma warning(disable : 4459)
+#endif
 template <typename C, typename T>
 std::ostream& grammar<C, T>::print_production(std::ostream& os,
 	const size_t p, bool print_ids, const term::colors& TC) const
@@ -1588,6 +1593,9 @@ std::ostream& grammar<C, T>::print_internal_grammar_for(std::ostream& os,
 		print_production(os << prep, i, print_ids, TC) << "\n";
 	return os;
 }
+#ifdef _MSC_VER
+#	pragma warning(pop)
+#endif
 #include "parser_term_color_macros.h" // undef color macros
 
 template <typename C, typename T>
