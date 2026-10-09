@@ -9,6 +9,7 @@
 #include "utility/characters.h"
 #include "parser.h"
 #include "recoders.h"
+#include "utility/term.h"
 
 #include <initializer_list>
 #include <algorithm>
@@ -266,5 +267,15 @@ TEST_SUITE("UTF-8 ↔ UTF-16 conversions") {
 		std::u32string u32 = U"a©€\U0001F600";
 		auto u16 = idni::to_u16string(u32);
 		CHECK(idni::to_u32string(u16) == u32);
+	}
+}
+
+TEST_SUITE("term::drop_utf8_bom") {
+	TEST_CASE("a first command on one line") {
+		std::string s = "\xEF\xBB\xBF" "a = b.";
+		idni::term::drop_utf8_bom(s);
+		CHECK(s == "a = b.");
+		idni::term::drop_utf8_bom(s);
+		CHECK(s == "a = b.");
 	}
 }

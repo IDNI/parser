@@ -5,6 +5,7 @@
 #define __IDNI__PARSER__UTILITY__TERM_H__
 
 #include <cstddef>
+#include <string>
 
 // #define TERM_DEBUG 1
 #ifdef TERM_DEBUG
@@ -14,6 +15,12 @@
 #endif // TERM_DEBUG
 
 namespace idni::term {
+
+/// Drops a UTF-8 byte order mark at the start of @p s. PowerShell writes one
+/// before the text it pipes into a program.
+inline void drop_utf8_bom(std::string& s) {
+	if (s.starts_with("\xEF\xBB\xBF")) s.erase(0, 3);
+}
 
 bool open();
 void close();

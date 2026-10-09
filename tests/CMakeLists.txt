@@ -269,10 +269,10 @@ foreach(X IN LISTS DOCTESTS)
 	# add_dependencies(${N} ${TAU_PARSER_STATIC_LIB_NAME})
 endforeach()
 
-# FTXUI REPL pipe-mode parity (only when the tgf tool is built with FTXUI).
-# Runs `tgf repl` vs `tgf repl -x` over identical scripted input and asserts
-# identical .tgf_history.  See ftxui_repl_parity.sh.
-if(TARGET tgf AND TAU_PARSER_HAS_FTXUI_DEP AND NOT WIN32)
+# The FTXUI REPL fixture and its pipe-mode tests (only when the tgf tool is
+# built with FTXUI). The fixture builds on every platform, because Windows
+# PowerShell puts the byte order mark before piped text.
+if(TARGET tgf AND TAU_PARSER_HAS_FTXUI_DEP)
 	find_package(Threads REQUIRED)
 	add_executable(repl_ftxui_async_fixture repl_ftxui_async_fixture.cpp)
 	tauparser_setup(repl_ftxui_async_fixture PRIVATE tauparser)
@@ -280,10 +280,28 @@ if(TARGET tgf AND TAU_PARSER_HAS_FTXUI_DEP AND NOT WIN32)
 		"${PROJECT_SOURCE_DIR}/src")
 	target_link_libraries(repl_ftxui_async_fixture PRIVATE
 		ftxui::screen ftxui::dom ftxui::component Threads::Threads)
-	add_test(NAME ftxui_repl_parity
-		COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/parity/ftxui_repl_parity.sh"
-			$<TARGET_FILE:tgf>
-			"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/ambig.tgf")
+	# A Windows host pipes through PowerShell, which writes the mark itself.
+	# Elsewhere the script writes it, and a cross build runs the fixture
+	# through its emulator.
+	if(CMAKE_HOST_WIN32)
+		add_test(NAME ftxui_repl_pipe_bom
+			COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File
+				"${CMAKE_CURRENT_SOURCE_DIR}/parity/ftxui_repl_pipe_bom.ps1"
+				$<TARGET_FILE:repl_ftxui_async_fixture>)
+	else()
+		add_test(NAME ftxui_repl_pipe_bom
+			COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/parity/ftxui_repl_pipe_bom.sh"
+				${CMAKE_CROSSCOMPILING_EMULATOR}
+				$<TARGET_FILE:repl_ftxui_async_fixture>)
+	endif()
+	# Runs `tgf repl` vs `tgf repl -x` over identical scripted input and
+	# asserts identical .tgf_history. See ftxui_repl_parity.sh.
+	if(NOT WIN32)
+		add_test(NAME ftxui_repl_parity
+			COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/parity/ftxui_repl_parity.sh"
+				$<TARGET_FILE:tgf>
+				"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/ambig.tgf")
+	endif()
 endif()
 
 # WASM parity test - compare native tgf output against tgf.js (Node.js)

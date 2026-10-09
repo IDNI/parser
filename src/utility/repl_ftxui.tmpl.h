@@ -278,6 +278,7 @@ int repl_ftxui<evaluator_t>::run_pipe() {
 	using namespace std;
 	re_.reprompt(); // populate prompt_
 	string acc, line;
+	bool first_line = true;
 	cout << prompt_;
 	cout.flush();
 	while (true) {
@@ -285,6 +286,8 @@ int repl_ftxui<evaluator_t>::run_pipe() {
 			cout << "\n";
 			break;
 		}
+		// only the first line starts the input; acc keeps it without the mark
+		if (first_line) term::drop_utf8_bom(line), first_line = false;
 		cout << line << "\n";
 		string full = acc.empty() ? line : acc + "\n" + line;
 		if (full.empty()) continue;

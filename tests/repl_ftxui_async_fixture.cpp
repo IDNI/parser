@@ -2,9 +2,14 @@
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #include <chrono>
+#include <cstdio>
 #include <iostream>
 #include <string>
 #include <thread>
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#endif
 
 #include "utility/diagnostics.h"
 #include "utility/repl_ftxui.h"
@@ -36,7 +41,27 @@ struct slow_evaluator {
 	}
 };
 
-int main() {
+// Prints every byte of stdin as two hex digits, so a test sees what a pipe
+// delivers, a byte order mark included.
+int print_stdin_hex() {
+#ifdef _WIN32
+	// text mode would turn CR LF into LF and stop at a Ctrl-Z byte
+	_setmode(_fileno(stdin), _O_BINARY);
+#endif
+	const char* digits = "0123456789abcdef";
+	std::string out;
+	for (int c; (c = std::getchar()) != EOF; ) {
+		if (!out.empty()) out += ' ';
+		out += digits[(c >> 4) & 0xf];
+		out += digits[c & 0xf];
+	}
+	std::cout << out << "\n";
+	return 0;
+}
+
+int main(int argc, char** argv) {
+	if (argc > 1 && std::string(argv[1]) == "--hex")
+		return print_stdin_hex();
 	slow_evaluator evaluator;
 	idni::repl_ftxui repl(evaluator, "test> ", "");
 	return repl.run();

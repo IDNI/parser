@@ -117,8 +117,12 @@ struct repl {
 		input_.insert(it_at(pos_ - 1), '\n');
 		print_input(), go(r, 0);
 	}
-	int evaluate(const std::string& s) {
+	int evaluate(const std::string& line) {
+		std::string s = line;
+		// only the first command, maybe over several lines, starts the input
+		if (!input_started_) term::drop_utf8_bom(s);
 		auto ret = re_.eval(s).value_or(0);
+		if (ret != 2) input_started_ = true;
 		TDBG(std::cerr << " <EVAL: " << ret << ">";)
 		if (ret == 2) { // Unexpected end of file, continue
 			input_.insert(it_at(pos_ - 1), '\n');
@@ -391,6 +395,7 @@ private:
 	size_t r_ = 0, c_ = 0; /// current cursor's row and column
 	std::vector<size_t> lws_{ 0 }; /// input line widths
 	bool is_pipe_ = !term::is_tty();
+	bool input_started_ = false;
 };
 
 } // idni namespace
