@@ -101,8 +101,10 @@ _dep_ftxui_producer() {
 	_dep_ftxui_target_patch "$work" || { rm -rf "$work"; return 1; }
 	# The recorded flags travel in the configure arguments. Clear the ambient
 	# ones so the environment cannot add a second, unrecorded value.
+	# A producer passes a shared set of variables, and a project reads only some.
 	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS \
 		"$DEP_FTXUI_CMAKE" -S "$work" -B "$build" \
+		--no-warn-unused-cli \
 		"${_DEP_FTXUI_CONFIGURE_ARGS[@]}" \
 		${_DEP_FTXUI_TOOLCHAIN_ARGS[@]+"${_DEP_FTXUI_TOOLCHAIN_ARGS[@]}"} \
 		-DCMAKE_C_COMPILER="$DEP_FTXUI_CC" \

@@ -100,8 +100,10 @@ _dep_unordered_dense_producer() {
 	fi
 	# The recorded flags travel in the configure arguments. Clear the ambient
 	# ones so the environment cannot add a second, unrecorded value.
+	# A producer passes a shared set of variables, and a project reads only some.
 	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS \
 		"$DEP_UNORDERED_DENSE_CMAKE" -S "$work" -B "$build" \
+		--no-warn-unused-cli \
 		"${_DEP_UNORDERED_DENSE_CONFIGURE_ARGS[@]}" \
 		${_DEP_UNORDERED_DENSE_TOOLCHAIN_ARGS[@]+"${_DEP_UNORDERED_DENSE_TOOLCHAIN_ARGS[@]}"} \
 		-DCMAKE_C_COMPILER="$DEP_UNORDERED_DENSE_CC" \

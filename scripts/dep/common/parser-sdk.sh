@@ -179,8 +179,10 @@ _dep_parser_producer() {
 		target=tauparser_static
 		component=""
 	fi
+	# A producer passes a shared set of variables, and a project reads only some.
 	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS \
 		"$DEP_PARSER_CMAKE" -S "$PARSER_SOURCE" -B "$build" \
+		--no-warn-unused-cli \
 		"${_DEP_PARSER_CONFIGURE_ARGS[@]}" \
 		${_DEP_PARSER_HOST_ARGS[@]+"${_DEP_PARSER_HOST_ARGS[@]}"} \
 		"-DCMAKE_C_COMPILER=$DEP_PARSER_CC" \
