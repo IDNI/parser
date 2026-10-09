@@ -315,8 +315,13 @@ preset_binary_dir() {
 		*-arm64*)
 			echo "build/${type}-arm64"
 			;;
-		*-clang-cl)
-			echo "build/${type}-msvc-clang-cl"
+		# clang-cl is the default MSVC toolchain: it takes the plain -msvc
+		# folder. Its case comes first, as it also matches *-msvc-cl*.
+		*-msvc-clang-cl*)
+			echo "build/${type}-msvc"
+			;;
+		*-msvc-cl*)
+			echo "build/${type}-msvc-cl"
 			;;
 		*-msvc*)
 			echo "build/${type}-msvc"
