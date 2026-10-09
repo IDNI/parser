@@ -128,7 +128,13 @@ static std::string log_timestamp() {
 	auto now = system_clock::now();
 	auto ms = duration_cast<milliseconds>(now.time_since_epoch()) % 1000;
 	std::time_t secs = system_clock::to_time_t(now);
+#ifdef _MSC_VER
+	// the MSVC CRT marks gmtime unsafe and asks for gmtime_s
+	std::tm tm_buf{};
+	std::tm* tmv = gmtime_s(&tm_buf, &secs) == 0 ? &tm_buf : nullptr;
+#else
 	std::tm* tmv = std::gmtime(&secs);
+#endif
 	char buf[32] = {};
 	if (tmv) std::strftime(buf, sizeof buf, "%Y-%m-%dT%H:%M:%S", tmv);
 	char msbuf[8] = {};
@@ -206,7 +212,13 @@ static void make_dirs(const std::string& dir) {
 // The start time in a file name: local time, no separators but one dash.
 static std::string log_start_time() {
 	std::time_t now = std::time(nullptr);
+#ifdef _MSC_VER
+	// the MSVC CRT marks localtime unsafe and asks for localtime_s
+	std::tm tm_buf{};
+	std::tm* tmv = localtime_s(&tm_buf, &now) == 0 ? &tm_buf : nullptr;
+#else
 	std::tm* tmv = std::localtime(&now);
+#endif
 	char buf[32] = {};
 	if (tmv) std::strftime(buf, sizeof buf, "%Y%m%d-%H%M%S", tmv);
 	return buf;

@@ -40,8 +40,18 @@ inline idni::tgf_repl_evaluator::options json_options() {
 // The path of the tgf binary. ctest passes it through the environment so
 // a Windows backslash needs no escaping; the build path is the fallback.
 inline std::string tgf_binary_path() {
+#ifdef _MSC_VER
+	// the MSVC CRT marks getenv unsafe and asks for _dupenv_s
+	char* raw = nullptr;
+	std::size_t raw_size = 0;
+	const bool read = _dupenv_s(&raw, &raw_size, "TGF_BINARY_PATH") == 0;
+	const std::string p = read && raw ? raw : "";
+	std::free(raw);
+	if (!p.empty()) return p;
+#else
 	const char* p = std::getenv("TGF_BINARY_PATH");
 	if (p && *p) return p;
+#endif
 #ifdef _WIN32
 	return std::string(PROJECT_BINARY_DIR) + "/tgf.exe";
 #else
