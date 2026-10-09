@@ -37,8 +37,14 @@ function(generate_parser tgf_filename)
 		VERBATIM)
 
 	add_library(${_stem}_parser STATIC EXCLUDE_FROM_ALL "${_source}")
-	# grammar tables are data; optimizing them wastes build time
-	set_source_files_properties("${_source}"
-		PROPERTIES COMPILE_OPTIONS "-O0;-fno-lto")
+	# grammar tables are data; optimizing them wastes build time. cl keeps its
+	# /O2: a /Od of one source over it is a D9025 warning.
+	if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT MSVC)
+		set_source_files_properties("${_source}"
+			PROPERTIES COMPILE_OPTIONS "-O0;-fno-lto")
+	elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+		set_source_files_properties("${_source}"
+			PROPERTIES COMPILE_OPTIONS "/Od")
+	endif()
 	target_include_directories(${_stem}_parser PUBLIC "${_out_dir}")
 endfunction(generate_parser)

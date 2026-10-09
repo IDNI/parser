@@ -222,7 +222,7 @@ foreach(X IN LISTS DOCTESTS)
 			"${PROJECT_SOURCE_DIR}/src/format/treemr/treemr_parser.generated.cpp")
 		set_source_files_properties(
 			"${PROJECT_SOURCE_DIR}/src/format/treemr/treemr_parser.generated.cpp"
-			PROPERTIES COMPILE_OPTIONS "-O0;-fno-lto")
+			PROPERTIES COMPILE_OPTIONS "${TAU_PARSER_DATA_SOURCE_OPTIONS}")
 	endif()
 	# these tests include a generated header directly, without linking
 	# tgf_cli_core; a header-only build resolves productions() inline instead
@@ -231,7 +231,7 @@ foreach(X IN LISTS DOCTESTS)
 			"${PROJECT_SOURCE_DIR}/src/format/treemr/treemr_parser.generated.cpp")
 		set_source_files_properties(
 			"${PROJECT_SOURCE_DIR}/src/format/treemr/treemr_parser.generated.cpp"
-			PROPERTIES COMPILE_OPTIONS "-O0;-fno-lto")
+			PROPERTIES COMPILE_OPTIONS "${TAU_PARSER_DATA_SOURCE_OPTIONS}")
 	endif()
 	if(${N} STREQUAL "doctest_tgf_cli" AND NOT EMSCRIPTEN)
 		if(TARGET tgf_cli_core)
@@ -245,7 +245,7 @@ foreach(X IN LISTS DOCTESTS)
 				"${PROJECT_SOURCE_DIR}/src/tgf/tgf_repl_parser.generated.cpp")
 			set_source_files_properties(
 				"${PROJECT_SOURCE_DIR}/src/tgf/tgf_repl_parser.generated.cpp"
-				PROPERTIES COMPILE_OPTIONS "-O0;-fno-lto")
+				PROPERTIES COMPILE_OPTIONS "${TAU_PARSER_DATA_SOURCE_OPTIONS}")
 		endif()
 	endif()
 	# The options tests run a few threads. A wasm build without

@@ -18,9 +18,8 @@ if(NOT TAU_PARSER_BUILD_HEADER_ONLY)
 		"${CMAKE_CURRENT_SOURCE_DIR}/../format/tgf.test/tgf_test_parser.generated.cpp"
 	)
 	target_sources(tgf_cli_core PRIVATE ${TGF_CLI_CORE_GENERATED_SOURCES})
-	# grammar tables are data; optimizing them wastes build time
 	set_source_files_properties(${TGF_CLI_CORE_GENERATED_SOURCES}
-		PROPERTIES COMPILE_OPTIONS "-O0;-fno-lto")
+		PROPERTIES COMPILE_OPTIONS "${TAU_PARSER_DATA_SOURCE_OPTIONS}")
 endif()
 
 if(NOT WIN32)

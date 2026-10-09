@@ -255,6 +255,14 @@ set(TAU_PARSER_IS_GNU_OR_CLANG OFF)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT MSVC)
 	set(TAU_PARSER_IS_GNU_OR_CLANG ON)
 endif()
+# Grammar tables are data, so their sources build without optimization. cl
+# keeps its /O2: a /Od of one source over it is a D9025 warning.
+set(TAU_PARSER_DATA_SOURCE_OPTIONS "")
+if(TAU_PARSER_IS_GNU_OR_CLANG)
+	set(TAU_PARSER_DATA_SOURCE_OPTIONS -O0 -fno-lto)
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+	set(TAU_PARSER_DATA_SOURCE_OPTIONS /Od)
+endif()
 
 set(TAU_PARSER_IS_WINDOWS_GNU OFF)
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows"
