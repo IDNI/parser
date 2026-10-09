@@ -999,12 +999,14 @@ _tau_dep_ensure_run() {
 	fi
 	# Fail closed: a package carrying a build, staging, store, or home path is not
 	# publishable, so no consumer ever resolves one.
+	dep_note "${_tau_dep_ensure_tag}: auditing the package paths"
 	if ! "${__devrc_dir}/audit-store-paths.sh" \
 			"$_tau_dep_ensure_staging/prefix" >&2; then
 		echo "dep_ensure: producer left an absolute build, staging, store, or home path in ${_tau_dep_ensure_dep} ${_tau_dep_ensure_id}" >&2
 		_tau_dep_ensure_cleanup
 		return 1
 	fi
+	dep_note "${_tau_dep_ensure_tag}: writing the manifest"
 	if ! cmake -P "$_tau_dep_ensure_manifest_cmake" manifest \
 			"$_tau_dep_ensure_staging/manifest.json" "$_tau_dep_ensure_id" \
 			"$_tau_dep_ensure_block_file" "$_tau_dep_ensure_staging/prefix" >/dev/null; then
@@ -1012,6 +1014,7 @@ _tau_dep_ensure_run() {
 		_tau_dep_ensure_cleanup
 		return 1
 	fi
+	dep_note "${_tau_dep_ensure_tag}: publishing to the local store"
 	if ! _tau_dep_ensure_published="$(cmake -P "$_tau_dep_ensure_store_cmake" publish \
 			"$_tau_dep_ensure_prefix" "$_tau_dep_ensure_dep" "$_tau_dep_ensure_id" \
 			"$_tau_dep_ensure_staging")"; then
@@ -1022,6 +1025,7 @@ _tau_dep_ensure_run() {
 	# Push at once, so a later failure of the same job cannot hold back an entry
 	# it built. A hit or a pull is on the remote already.
 	if [ "${TAU_STORE_PUBLISH:-}" = "ON" ] && [ -n "${TAU_STORE_REMOTE:-}" ]; then
+		dep_note "${_tau_dep_ensure_tag}: pushing to ${TAU_STORE_REMOTE}"
 		_tau_dep_ensure_group_open "${_tau_dep_ensure_tag} push"
 		"${__devrc_dir}/store-remote.sh" push "$_tau_dep_ensure_prefix" \
 			"${_tau_dep_ensure_dep}/${_tau_dep_ensure_id}" 2>&1 \

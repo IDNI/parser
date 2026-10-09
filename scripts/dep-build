@@ -300,6 +300,27 @@ dep_sed_inplace() {
 	return 0
 }
 
+# One time-stamped progress line. A silent step of several minutes looks like a
+# hang in a CI log.
+dep_note() {
+	printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*" >&2
+}
+
+# Remove directory trees. On Windows, rd of cmd.exe removes a large tree much
+# faster than rm of Git Bash. rm -rf removes what rd leaves, as a path too long.
+dep_rm_tree() {
+	local dir
+	for dir in "$@"; do
+		[ -e "$dir" ] || continue
+		case "$(uname -s)" in
+			MINGW*|MSYS*|CYGWIN*)
+				cmd.exe //c "rd /s /q \"$(cygpath -w "$dir")\"" > /dev/null 2>&1
+				;;
+		esac
+		rm -rf "$dir"
+	done
+}
+
 # Derive a unique sibling staging entry path for a dependency and input id.
 dep_build_staging() {
 	local prefix="$1" dep="$2" id="$3"
