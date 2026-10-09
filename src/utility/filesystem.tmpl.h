@@ -5,6 +5,7 @@
 #define __IDNI__PARSER__UTILITY__FILESYSTEM_TMPL_H__
 
 #include <cerrno>
+#include <cstdint>
 #include <cstdio>
 #include <filesystem>
 #include <system_error>
@@ -307,8 +308,11 @@ inline result<size_t> write(file_handle f, std::string_view content) {
 inline result<mapping> map(file_handle f, size_t n, mmap_mode m) {
 	using label = idni::parser_strings::label;
 	result<mapping> r;
+	// the size is two DWORDs, so a file over 4 GB keeps its high bits
+	const std::uint64_t size = n;
 	HANDLE mh = ::CreateFileMappingW(f, 0, m == MMAP_READ ?
-		PAGE_READONLY : PAGE_READWRITE, 0, n, 0);
+		PAGE_READONLY : PAGE_READWRITE, static_cast<DWORD>(size >> 32),
+		static_cast<DWORD>(size & 0xFFFFFFFFu), 0);
 	if (mh == nullptr) // CreateFileMappingW fails with NULL, not INVALID_HANDLE_VALUE
 		return r.with_error(diagnostics::code::io_error,
 			"failed to create file mapping",
