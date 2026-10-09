@@ -195,14 +195,17 @@ _dep_parser_producer() {
 	fi
 	# GCC's LTO metadata keeps a byte-length-prefixed copy of the build tree,
 	# and lib.exe records each member under the full object path it was handed.
-	# Rewrite both spellings to an equal-length placeholder in the archive, the
-	# only installed file that can carry them.
+	# MSVC also keeps the path of each header an object reads, so the store
+	# prefixes of the two header packages are in the archive too. Rewrite both
+	# spellings to an equal-length placeholder in the archive, the only
+	# installed file that can carry them.
 	local archive
 	for archive in "$staging_prefix/lib/libtauparser.a" \
-			"$staging_prefix/lib/tauparser.lib"; do
+			"$staging_prefix/lib/tauparser.lib" \
+			"$staging_prefix/lib/tauparser_static.lib"; do
 		[ -f "$archive" ] || continue
 		if ! python3 - "$archive" "$build" "$staging_prefix" "$PARSER_SOURCE" \
-			"$work" "$staging" <<'PY'
+			"$work" "$staging" "$ftxui_prefix" "$unordered_dense_prefix" <<'PY'
 import sys
 path, *olds = sys.argv[1:]
 data = open(path, 'rb').read()
