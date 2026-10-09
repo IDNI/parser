@@ -278,4 +278,9 @@ TEST_SUITE("term::drop_utf8_bom") {
 		idni::term::drop_utf8_bom(s);
 		CHECK(s == "a = b.");
 	}
+	TEST_CASE("two marks before the first command") {
+		std::string s = "\xEF\xBB\xBF" "\xEF\xBB\xBF" "a = b.";
+		idni::term::drop_utf8_bom(s);
+		CHECK(s == "a = b.");
+	}
 }

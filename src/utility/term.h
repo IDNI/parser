@@ -16,10 +16,10 @@
 
 namespace idni::term {
 
-/// Drops a UTF-8 byte order mark at the start of @p s. PowerShell writes one
-/// before the text it pipes into a program.
+/// Drops every UTF-8 byte order mark at the start of @p s. Windows PowerShell
+/// can write two marks before the text it pipes into a program.
 inline void drop_utf8_bom(std::string& s) {
-	if (s.starts_with("\xEF\xBB\xBF")) s.erase(0, 3);
+	while (s.starts_with("\xEF\xBB\xBF")) s.erase(0, 3);
 }
 
 bool open();

@@ -1,6 +1,6 @@
-# ftxui_repl_pipe_bom.ps1 - The FTXUI REPL drops the UTF-8 byte order mark
-# that Windows PowerShell writes before the text it pipes into a program, on
-# a one-line and on a two-line first command.
+# ftxui_repl_pipe_bom.ps1 - The FTXUI REPL drops the two UTF-8 byte order
+# marks that Windows PowerShell writes before the text it pipes into a
+# program, on a one-line and on a two-line first command.
 #
 # Usage:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File ftxui_repl_pipe_bom.ps1 <repl_ftxui_async_fixture>
@@ -9,9 +9,10 @@
 
 param([Parameter(Mandatory = $true)][string]$Fixture)
 
-# With this encoding Windows PowerShell writes the mark before the piped
-# text, as it does for a user whose console is set to UTF-8.
+# $OutputEncoding writes one mark and the stdin writer of the child writes a
+# second one from [Console]::InputEncoding, as on a UTF-8 console.
 $OutputEncoding = New-Object System.Text.UTF8Encoding $true
+[Console]::InputEncoding = New-Object System.Text.UTF8Encoding $true
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false
 $status = 0
 
@@ -29,11 +30,11 @@ function Check([string]$Name, [string[]]$Lines, [string]$Expected) {
 	Write-Host $text
 }
 
-# Without the mark in the pipe the checks below prove nothing.
+# Without the two marks in the pipe the checks below prove nothing.
 $hex = @("hello" | & $Fixture --hex) -join " "
 Write-Host "piped bytes: $hex"
-if (-not $hex.StartsWith("ef bb bf")) {
-	Write-Host "FAIL: PowerShell wrote no byte order mark before the piped text: $hex"
+if (-not $hex.StartsWith("ef bb bf ef bb bf")) {
+	Write-Host "FAIL: PowerShell did not write two byte order marks before the piped text: $hex"
 	$status = 1
 }
 
