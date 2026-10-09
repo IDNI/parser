@@ -212,7 +212,6 @@ Click on the type name in the following list to see more detailed documentation 
 
 ### Classes and structs usable for building command line interfaces
 
-- cli - provides CLI arguments management and processing
 - repl - provides terminal (currently only Linux is supported) REPL UI
 - term_colors - provides terminal color escape codes
 

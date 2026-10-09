@@ -26,8 +26,6 @@ set(TAU_PARSER_HEADERS
 	utility/characters.impl.h
 	utility/charclasses.h
 	utility/charclasses.impl.h
-	utility/cli.h
-	utility/cli.impl.h
 	utility/diagnostics.h
 	utility/diagnostics.tmpl.h
 	utility/filesystem.h

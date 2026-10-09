@@ -1,5 +1,4 @@
 set(TESTS
-	cli
 	input
 	negation_fix
 	parser
@@ -51,13 +50,6 @@ foreach(X IN LISTS TESTS)
 	add_executable(${N} "${N}.cpp")
 	if(EMSCRIPTEN)
 		tauparser_emcc_setup(${N})
-		# test_cli passes __FILE__ as a positional, and the CLI checks
-		# the file exists on disk. Preload the source at its absolute
-		# compile-time path so the check passes inside the WASM FS.
-		if(X STREQUAL "cli")
-			target_link_options(${N} PRIVATE
-				"SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/${N}.cpp@${CMAKE_CURRENT_SOURCE_DIR}/${N}.cpp")
-		endif()
 	else()
 		tauparser_setup(${N} PRIVATE ${TEST_LIBS})
 	endif()
