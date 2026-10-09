@@ -492,7 +492,22 @@ inline diagnostics::result<void> options_repository::load_env(
 		const option_spec& o = cat_->specs[i];
 		if (!o.from_env) continue;
 		const std::string var = detail::option_env_name(prefix, o.name);
+#ifdef _MSC_VER
+		// the MSVC CRT marks getenv unsafe and asks for _dupenv_s
+		char* raw = nullptr;
+		std::size_t raw_size = 0;
+		if (_dupenv_s(&raw, &raw_size, var.c_str()) != 0) {
+			r.error(diagnostics::code::runtime_error,
+				ps::messages::option_env_read_failed,
+				{ { ps::label::name, var } });
+			continue;
+		}
+		const std::unique_ptr<char, decltype(&std::free)> owned(raw,
+			&std::free);
+		const char* text = owned.get();
+#else
 		const char* text = std::getenv(var.c_str());
+#endif
 		if (!text) continue;
 		auto v = detail::parse_value(o, text);
 		if (!v.has_value()) {

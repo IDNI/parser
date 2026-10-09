@@ -312,6 +312,8 @@ struct messages {
 		"The option does not take the value";
 	static constexpr sv option_env_bad_value =
 		"The option does not take the value of the environment variable";
+	static constexpr sv option_env_read_failed =
+		"Cannot read the environment variable";
 	static constexpr sv option_missing_argument =
 		"Missing argument for option";
 	static constexpr sv option_unknown_command = "Unknown command";

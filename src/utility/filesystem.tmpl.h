@@ -106,7 +106,10 @@ inline result<bool> unlink(const path& p) {
 inline result<bool> write(const path& p, std::string_view content) {
 	using label = idni::parser_strings::label;
 	result<bool> r;
-#ifdef _WIN32
+#ifdef _MSC_VER
+	FILE* f = nullptr;
+	::_wfopen_s(&f, p.c_str(), L"wb");
+#elif defined(_WIN32)
 	FILE* f = ::_wfopen(p.c_str(), L"wb");
 #else
 	FILE* f = std::fopen(p.c_str(), "wb");

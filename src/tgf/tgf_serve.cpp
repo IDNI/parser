@@ -167,9 +167,25 @@ static bool log_append(std::ofstream& os, const value& v) {
 	return os.good();
 }
 
-// The log directory when the caller names none.
-static std::string default_log_dir() {
-#ifdef _WIN32
+// The log directory when the caller names none; empty when the home
+// variable is unset, or when it cannot be read, which @p rep records.
+static std::string default_log_dir(
+	[[maybe_unused]] diagnostics::report& rep)
+{
+#ifdef _MSC_VER
+	// the MSVC CRT marks getenv unsafe and asks for _dupenv_s
+	char* raw = nullptr;
+	std::size_t raw_size = 0;
+	if (_dupenv_s(&raw, &raw_size, "USERPROFILE") != 0) {
+		rep.error(diagnostics::code::runtime_error,
+			parser_strings::messages::option_env_read_failed,
+			{ { parser_strings::label::name, "USERPROFILE" } });
+		return {};
+	}
+	const std::unique_ptr<char, decltype(&std::free)> owned(raw,
+		&std::free);
+	const char* home = owned.get();
+#elif defined(_WIN32)
 	const char* home = std::getenv("USERPROFILE");
 #else
 	const char* home = std::getenv("HOME");
@@ -548,7 +564,7 @@ serve_server::serve_server(const serve_options& o)
 {
 	if (opt.max_sessions == 0) opt.max_sessions = 1;
 	if (opt.no_log) return;
-	log_dir = opt.log_dir.empty() ? default_log_dir() : opt.log_dir;
+	log_dir = opt.log_dir.empty() ? default_log_dir(report) : opt.log_dir;
 	if (log_dir.empty()) return;
 	make_dirs(log_dir);
 	server_log.open(log_dir + "/server.log", std::ios::app);
