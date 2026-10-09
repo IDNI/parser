@@ -79,6 +79,16 @@ _dep_parser_compiler_id() {
 	dep_compiler_id "$DEP_PARSER_CXX"
 }
 
+# cl.exe and clang-cl take the MSVC options and reject the GCC ones.
+# dep_compiler_id reports clang-cl as Clang, so its name decides.
+_dep_parser_takes_msvc_options() {
+	[ "$(_dep_parser_compiler_id)" = "MSVC" ] && return 0
+	case "$(basename "$DEP_PARSER_CXX" | tr '[:upper:]' '[:lower:]')" in
+		clang-cl|clang-cl.exe) return 0 ;;
+	esac
+	return 1
+}
+
 # Resolve a dependency package through its own script and print its prefix. The
 # dependency mode follows ours, so a consumer run never builds a dependency.
 _dep_parser_resolve_dep() {
@@ -154,10 +164,10 @@ _dep_parser_producer() {
 	build="${work}/build"
 	# The staging work tree is random per build, so it cannot enter the identity.
 	# The real paths go into the compiler flags; the identity records the fixed
-	# placeholder each role maps to. MSVC has no flag-encoded path map, so it
-	# relies on the install-time rewrite below instead.
+	# placeholder each role maps to. cl and clang-cl have no flag-encoded path
+	# map, so they rely on the install-time rewrite below instead.
 	prefix_map=""
-	if [ "$(dep_compiler_id "$DEP_PARSER_CXX")" != "MSVC" ]; then
+	if ! _dep_parser_takes_msvc_options; then
 		prefix_map="-ffile-prefix-map=${build}=parser-build -ffile-prefix-map=${work}=parser-src -ffile-prefix-map=${PARSER_SOURCE}=parser-src -ffile-prefix-map=${staging_prefix}=staging -ffile-prefix-map=${staging}=staging"
 	fi
 	rm -rf "$work"
@@ -377,9 +387,10 @@ PARSER_LTO_IPO="$PARSER_LTO"
 PARSER_LTO_FAT_FLAGS=""
 if [ "$PARSER_LTO_FAT_EFFECTIVE" = "ON" ]; then
 	PARSER_LTO_IPO=OFF
-	# AppleClang rejects -ffat-lto-objects; the package it produces is
-	# thin, so the recorded lto_fat must say so or the id would lie.
-	if [ "$(_dep_parser_compiler_id)" = "AppleClang" ]; then
+	# AppleClang and the MSVC front ends take no -ffat-lto-objects; the package
+	# is then not fat, so the recorded lto_fat must say so or the id would lie.
+	if [ "$(_dep_parser_compiler_id)" = "AppleClang" ] \
+			|| _dep_parser_takes_msvc_options; then
 		PARSER_LTO_FAT_EFFECTIVE=OFF
 	else
 		PARSER_LTO_FAT_FLAGS="-ffat-lto-objects"
