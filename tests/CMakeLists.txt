@@ -263,6 +263,9 @@ foreach(X IN LISTS DOCTESTS)
 		set_tests_properties(${N} PROPERTIES
 			ENVIRONMENT "TGF_BINARY_PATH=$<TARGET_FILE:tgf>")
 	endif()
+	if(${N} STREQUAL "doctest_measure")
+		set_tests_properties(${N} PROPERTIES TIMEOUT 120)
+	endif()
 	# add_dependencies(${N} ${TAU_PARSER_STATIC_LIB_NAME})
 endforeach()
 

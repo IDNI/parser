@@ -43,8 +43,8 @@ void reset_all_local() {
 }
 
 // Busy-loop helpers for the cpu_clock_tag-backed registry. These tests assert
-// positive CPU time, so the loop runs until clock() itself has advanced enough
-// to avoid depending on a particular platform's clock resolution.
+// positive CPU time, so the loop runs until clock() has advanced enough, or
+// stops at a cap of one second of wall time when clock() stands still.
 std::atomic_size_t cpu_burn_sink{0};
 
 void burn_cpu_slice() {
@@ -52,11 +52,23 @@ void burn_cpu_slice() {
 		cpu_burn_sink.fetch_add(i, std::memory_order_relaxed);
 }
 
-// Assumes clock() advances (CPU clock available); spins until it does.
-void burn_cpu_for_at_least(double min_ms = 3.0) {
-	auto start = cpu_clock_tag::now();
-	do burn_cpu_slice();
-	while (cpu_clock_tag::ms_between(start, cpu_clock_tag::now()) < min_ms);
+// True when clock() advances by min_ms, false when one second of wall time
+// passes first.
+bool burn_cpu_for_at_least(double min_ms = 3.0) {
+	const auto cap = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+	const auto start = cpu_clock_tag::now();
+	do {
+		burn_cpu_slice();
+		if (cpu_clock_tag::ms_between(start, cpu_clock_tag::now()) >= min_ms)
+			return true;
+	} while (std::chrono::steady_clock::now() < cap);
+	return false;
+}
+
+// wasm with pthreads has no CPU clock: clock() stands still there.
+bool cpu_clock_advances() {
+	static const bool advances = burn_cpu_for_at_least();
+	return advances;
 }
 
 // ---------------------------------------------------------------------------
@@ -322,22 +334,24 @@ TEST_SUITE("measure: basic_timer state machine") {
 TEST_SUITE("measure: basic_timer<cpu>") {
 
 	TEST_CASE("cpu time advances across busy work") {
+		if (!cpu_clock_advances()) { MESSAGE("the CPU clock does not advance here"); return; }
 		timer t(true);
 		t.start();
-		burn_cpu_for_at_least();
+		REQUIRE(burn_cpu_for_at_least());
 		CHECK(t.get() > 0.0);
 	}
 
 	TEST_CASE("pause excludes CPU work until unpause") {
+		if (!cpu_clock_advances()) { MESSAGE("the CPU clock does not advance here"); return; }
 		timer t(true);
 		t.start();
-		burn_cpu_for_at_least();
+		REQUIRE(burn_cpu_for_at_least());
 		double paused = t.pause();
 		CHECK(paused > 0.0);
-		burn_cpu_for_at_least();
+		REQUIRE(burn_cpu_for_at_least());
 		CHECK(t.get() == doctest::Approx(paused));
 		t.unpause();
-		burn_cpu_for_at_least();
+		REQUIRE(burn_cpu_for_at_least());
 		CHECK(t.stop() > paused);
 	}
 }
@@ -389,16 +403,18 @@ TEST_SUITE("measure: named timers") {
 	}
 
 	TEST_CASE("start_timer + get_timer returns positive elapsed CPU time") {
+		if (!cpu_clock_advances()) { MESSAGE("the CPU clock does not advance here"); return; }
 		reset_all_local();
 		start_timer("a", true);
-		burn_cpu_for_at_least();
+		REQUIRE(burn_cpu_for_at_least());
 		CHECK(get_timer("a") > 0.0);
 	}
 
 	TEST_CASE("start_timer on existing name does not reset the timer") {
+		if (!cpu_clock_advances()) { MESSAGE("the CPU clock does not advance here"); return; }
 		reset_all_local();
 		start_timer("a", true);
-		burn_cpu_for_at_least();
+		REQUIRE(burn_cpu_for_at_least());
 		double before = get_timer("a");
 		CHECK(before > 0.0);
 		start_timer("a", true);
@@ -406,36 +422,39 @@ TEST_SUITE("measure: named timers") {
 	}
 
 	TEST_CASE("stop_timer freezes get_timer at the final value") {
+		if (!cpu_clock_advances()) { MESSAGE("the CPU clock does not advance here"); return; }
 		reset_all_local();
 		start_timer("a", true);
-		burn_cpu_for_at_least();
+		REQUIRE(burn_cpu_for_at_least());
 		stop_timer("a");
 		double frozen = get_timer("a");
 		CHECK(frozen > 0.0);
-		burn_cpu_for_at_least();
+		REQUIRE(burn_cpu_for_at_least());
 		CHECK(get_timer("a") == doctest::Approx(frozen));
 	}
 
 	TEST_CASE("pause_timer freezes elapsed time until unpause_timer") {
+		if (!cpu_clock_advances()) { MESSAGE("the CPU clock does not advance here"); return; }
 		reset_all_local();
 		start_timer("a", true);
-		burn_cpu_for_at_least();
+		REQUIRE(burn_cpu_for_at_least());
 		pause_timer("a");
 		double paused = get_timer("a");
 		CHECK(paused > 0.0);
-		burn_cpu_for_at_least();
+		REQUIRE(burn_cpu_for_at_least());
 		CHECK(get_timer("a") == doctest::Approx(paused));
 		unpause_timer("a");
-		burn_cpu_for_at_least();
+		REQUIRE(burn_cpu_for_at_least());
 		CHECK(get_timer("a") > paused);
 	}
 
 	TEST_CASE("named timers are independent") {
+		if (!cpu_clock_advances()) { MESSAGE("the CPU clock does not advance here"); return; }
 		reset_all_local();
 		start_timer("a", true);
-		burn_cpu_for_at_least();
+		REQUIRE(burn_cpu_for_at_least());
 		start_timer("b", true);
-		burn_cpu_for_at_least();
+		REQUIRE(burn_cpu_for_at_least());
 		double a = get_timer("a");
 		double b = get_timer("b");
 		CHECK(a > 0.0);
@@ -444,10 +463,11 @@ TEST_SUITE("measure: named timers") {
 	}
 
 	TEST_CASE("remove_timer clears that timer only") {
+		if (!cpu_clock_advances()) { MESSAGE("the CPU clock does not advance here"); return; }
 		reset_all_local();
 		start_timer("a", true);
 		start_timer("b", true);
-		burn_cpu_for_at_least();
+		REQUIRE(burn_cpu_for_at_least());
 		pause_timer("b");
 		double b = get_timer("b");
 		CHECK(b > 0.0);
@@ -457,25 +477,27 @@ TEST_SUITE("measure: named timers") {
 	}
 
 	TEST_CASE("remove_all_timers clears every named timer") {
+		if (!cpu_clock_advances()) { MESSAGE("the CPU clock does not advance here"); return; }
 		reset_all_local();
 		start_timer("a", true);
 		start_timer("b", true);
-		burn_cpu_for_at_least();
+		REQUIRE(burn_cpu_for_at_least());
 		remove_all_timers();
 		CHECK(get_timer("a") == doctest::Approx(0.0));
 		CHECK(get_timer("b") == doctest::Approx(0.0));
 	}
 
 	TEST_CASE("restart_timer resets elapsed time and keeps timer running") {
+		if (!cpu_clock_advances()) { MESSAGE("the CPU clock does not advance here"); return; }
 		reset_all_local();
 		start_timer("a", true);
-		burn_cpu_for_at_least(10.0);
+		REQUIRE(burn_cpu_for_at_least(10.0));
 		double before = get_timer("a");
 		CHECK(before > 0.0);
 		restart_timer("a");
 		double after_restart = get_timer("a");
 		CHECK(after_restart < before);
-		burn_cpu_for_at_least();
+		REQUIRE(burn_cpu_for_at_least());
 		CHECK(get_timer("a") > after_restart);
 	}
 
