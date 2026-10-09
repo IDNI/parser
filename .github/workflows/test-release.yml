@@ -380,7 +380,7 @@ jobs:
 
       - name: Resolve the cl.exe store packages
         run: |
-          ./dev preset release-msvc-all --configure-only -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+          ./dev preset release-msvc-cl-all --configure-only -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
             -DTAU_PARSER_DEPS_FROM_STORE=ON
 
       - name: Resolve the clang-cl store packages
@@ -408,7 +408,7 @@ jobs:
     env:
       # windows-latest runners are 4-core
       TAU_BUILD_JOBS: 4
-      PRESET: ${{ matrix.compiler == 'clang-cl' && 'release-msvc-all-clang-cl' || 'release-msvc-all' }}
+      PRESET: ${{ matrix.compiler == 'clang-cl' && 'release-msvc-all-clang-cl' || 'release-msvc-cl-all' }}
     strategy:
       fail-fast: false
       matrix:

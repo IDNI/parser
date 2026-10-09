@@ -158,19 +158,19 @@
 			"binaryDir": "${sourceDir}/build/devel-msvc"
 		},
 		{
-			"name": "_build_dir-release-msvc-clang-cl",
+			"name": "_build_dir-release-msvc-cl",
 			"hidden": true,
-			"binaryDir": "${sourceDir}/build/release-msvc-clang-cl"
+			"binaryDir": "${sourceDir}/build/release-msvc-cl"
 		},
 		{
-			"name": "_build_dir-debug-msvc-clang-cl",
+			"name": "_build_dir-debug-msvc-cl",
 			"hidden": true,
-			"binaryDir": "${sourceDir}/build/debug-msvc-clang-cl"
+			"binaryDir": "${sourceDir}/build/debug-msvc-cl"
 		},
 		{
-			"name": "_build_dir-devel-msvc-clang-cl",
+			"name": "_build_dir-devel-msvc-cl",
 			"hidden": true,
-			"binaryDir": "${sourceDir}/build/devel-msvc-clang-cl"
+			"binaryDir": "${sourceDir}/build/devel-msvc-cl"
 		},
 		{
 			"name": "_build_dir-relwithdebinfo",
@@ -601,37 +601,77 @@
 			]
 		},
 		{
-			"name": "release-msvc",
-			"displayName": "Release (MSVC / Ninja / x64)",
-			"description": "Native Windows. Requires cl.exe on PATH (x64 Native Tools prompt or vcvars64).",
+			"name": "release-msvc-clang-cl",
+			"displayName": "Release (clang-cl / Ninja / x64)",
+			"description": "Native Windows. Requires clang-cl on PATH, inside an MSVC environment.",
 			"inherits": [
 				"_condition-windows",
 				"_build_dir-release-msvc",
-				"_toolchain-msvc",
+				"_toolchain-clang-cl",
 				"_build-type-release",
 				"_build-static"
 			]
 		},
 		{
-			"name": "debug-msvc",
-			"displayName": "Debug (MSVC / Ninja / x64)",
+			"name": "debug-msvc-clang-cl",
+			"displayName": "Debug (clang-cl / Ninja / x64)",
 			"inherits": [
 				"_condition-windows",
 				"_build_dir-debug-msvc",
-				"_toolchain-msvc",
+				"_toolchain-clang-cl",
 				"_build-type-debug",
 				"_build-static"
 			]
 		},
 		{
-			"name": "devel-msvc",
-			"displayName": "Devel (MSVC / Ninja / x64)",
+			"name": "devel-msvc-clang-cl",
+			"displayName": "Devel (clang-cl / Ninja / x64)",
 			"inherits": [
 				"_condition-windows",
 				"_build_dir-devel-msvc",
-				"_toolchain-msvc",
+				"_toolchain-clang-cl",
 				"_build-type-devel",
 				"_build-static"
+			]
+		},
+		{
+			"name": "release-msvc-all-clang-cl",
+			"displayName": "Release all targets (clang-cl / Ninja / x64)",
+			"inherits": [
+				"release-msvc-clang-cl",
+				"_build-all"
+			]
+		},
+		{
+			"name": "debug-msvc-all-clang-cl",
+			"inherits": [
+				"debug-msvc-clang-cl",
+				"_build-all"
+			]
+		},
+		{
+			"name": "devel-msvc-all-clang-cl",
+			"inherits": [
+				"devel-msvc-clang-cl",
+				"_build-all"
+			]
+		},
+		{
+			"name": "release-msvc",
+			"inherits": [
+				"release-msvc-clang-cl"
+			]
+		},
+		{
+			"name": "debug-msvc",
+			"inherits": [
+				"debug-msvc-clang-cl"
+			]
+		},
+		{
+			"name": "devel-msvc",
+			"inherits": [
+				"devel-msvc-clang-cl"
 			]
 		},
 		{
@@ -699,24 +739,20 @@
 		},
 		{
 			"name": "release-msvc-all",
-			"displayName": "Release all targets (MSVC)",
 			"inherits": [
-				"release-msvc",
-				"_build-all"
+				"release-msvc-all-clang-cl"
 			]
 		},
 		{
 			"name": "debug-msvc-all",
 			"inherits": [
-				"debug-msvc",
-				"_build-all"
+				"debug-msvc-all-clang-cl"
 			]
 		},
 		{
 			"name": "devel-msvc-all",
 			"inherits": [
-				"devel-msvc",
-				"_build-all"
+				"devel-msvc-all-clang-cl"
 			]
 		},
 		{
@@ -726,37 +762,121 @@
 			]
 		},
 		{
-			"name": "release-msvc-all-clang-cl",
-			"displayName": "Release all targets (clang-cl / Ninja / x64)",
-			"description": "Native Windows. Requires clang-cl on PATH, inside an MSVC environment.",
+			"name": "release-msvc-cl",
+			"displayName": "Release (MSVC cl / Ninja / x64)",
+			"description": "Native Windows. Requires cl.exe on PATH (x64 Native Tools prompt or vcvars64).",
 			"inherits": [
 				"_condition-windows",
-				"_build_dir-release-msvc-clang-cl",
-				"_toolchain-clang-cl",
+				"_build_dir-release-msvc-cl",
+				"_toolchain-msvc",
 				"_build-type-release",
-				"_build-static",
-				"_build-all"
+				"_build-static"
 			]
 		},
 		{
-			"name": "debug-msvc-all-clang-cl",
+			"name": "debug-msvc-cl",
+			"displayName": "Debug (MSVC cl / Ninja / x64)",
 			"inherits": [
 				"_condition-windows",
-				"_build_dir-debug-msvc-clang-cl",
-				"_toolchain-clang-cl",
+				"_build_dir-debug-msvc-cl",
+				"_toolchain-msvc",
 				"_build-type-debug",
-				"_build-static",
+				"_build-static"
+			]
+		},
+		{
+			"name": "devel-msvc-cl",
+			"displayName": "Devel (MSVC cl / Ninja / x64)",
+			"inherits": [
+				"_condition-windows",
+				"_build_dir-devel-msvc-cl",
+				"_toolchain-msvc",
+				"_build-type-devel",
+				"_build-static"
+			]
+		},
+		{
+			"name": "release-msvc-cl-tgf",
+			"inherits": [
+				"release-msvc-cl",
+				"_build-tgf"
+			]
+		},
+		{
+			"name": "debug-msvc-cl-tgf",
+			"inherits": [
+				"debug-msvc-cl",
+				"_build-tgf"
+			]
+		},
+		{
+			"name": "devel-msvc-cl-tgf",
+			"inherits": [
+				"devel-msvc-cl",
+				"_build-tgf"
+			]
+		},
+		{
+			"name": "release-msvc-cl-tests",
+			"inherits": [
+				"release-msvc-cl",
+				"_build-tests"
+			]
+		},
+		{
+			"name": "debug-msvc-cl-tests",
+			"inherits": [
+				"debug-msvc-cl",
+				"_build-tests"
+			]
+		},
+		{
+			"name": "devel-msvc-cl-tests",
+			"inherits": [
+				"devel-msvc-cl",
+				"_build-tests"
+			]
+		},
+		{
+			"name": "release-msvc-cl-examples",
+			"inherits": [
+				"release-msvc-cl",
+				"_build-examples"
+			]
+		},
+		{
+			"name": "debug-msvc-cl-examples",
+			"inherits": [
+				"debug-msvc-cl",
+				"_build-examples"
+			]
+		},
+		{
+			"name": "devel-msvc-cl-examples",
+			"inherits": [
+				"devel-msvc-cl",
+				"_build-examples"
+			]
+		},
+		{
+			"name": "release-msvc-cl-all",
+			"displayName": "Release all targets (MSVC cl / Ninja / x64)",
+			"inherits": [
+				"release-msvc-cl",
 				"_build-all"
 			]
 		},
 		{
-			"name": "devel-msvc-all-clang-cl",
+			"name": "debug-msvc-cl-all",
 			"inherits": [
-				"_condition-windows",
-				"_build_dir-devel-msvc-clang-cl",
-				"_toolchain-clang-cl",
-				"_build-type-devel",
-				"_build-static",
+				"debug-msvc-cl",
+				"_build-all"
+			]
+		},
+		{
+			"name": "devel-msvc-cl-all",
+			"inherits": [
+				"devel-msvc-cl",
 				"_build-all"
 			]
 		},
@@ -1381,6 +1501,30 @@
 			"configurePreset": "devel-arm64-tests"
 		},
 		{
+			"name": "release-msvc-clang-cl",
+			"configurePreset": "release-msvc-clang-cl"
+		},
+		{
+			"name": "debug-msvc-clang-cl",
+			"configurePreset": "debug-msvc-clang-cl"
+		},
+		{
+			"name": "devel-msvc-clang-cl",
+			"configurePreset": "devel-msvc-clang-cl"
+		},
+		{
+			"name": "release-msvc-all-clang-cl",
+			"configurePreset": "release-msvc-all-clang-cl"
+		},
+		{
+			"name": "debug-msvc-all-clang-cl",
+			"configurePreset": "debug-msvc-all-clang-cl"
+		},
+		{
+			"name": "devel-msvc-all-clang-cl",
+			"configurePreset": "devel-msvc-all-clang-cl"
+		},
+		{
 			"name": "release-msvc",
 			"configurePreset": "release-msvc"
 		},
@@ -1445,16 +1589,64 @@
 			"configurePreset": "msvc-all"
 		},
 		{
-			"name": "release-msvc-all-clang-cl",
-			"configurePreset": "release-msvc-all-clang-cl"
+			"name": "release-msvc-cl",
+			"configurePreset": "release-msvc-cl"
 		},
 		{
-			"name": "debug-msvc-all-clang-cl",
-			"configurePreset": "debug-msvc-all-clang-cl"
+			"name": "debug-msvc-cl",
+			"configurePreset": "debug-msvc-cl"
 		},
 		{
-			"name": "devel-msvc-all-clang-cl",
-			"configurePreset": "devel-msvc-all-clang-cl"
+			"name": "devel-msvc-cl",
+			"configurePreset": "devel-msvc-cl"
+		},
+		{
+			"name": "release-msvc-cl-tgf",
+			"configurePreset": "release-msvc-cl-tgf"
+		},
+		{
+			"name": "debug-msvc-cl-tgf",
+			"configurePreset": "debug-msvc-cl-tgf"
+		},
+		{
+			"name": "devel-msvc-cl-tgf",
+			"configurePreset": "devel-msvc-cl-tgf"
+		},
+		{
+			"name": "release-msvc-cl-tests",
+			"configurePreset": "release-msvc-cl-tests"
+		},
+		{
+			"name": "debug-msvc-cl-tests",
+			"configurePreset": "debug-msvc-cl-tests"
+		},
+		{
+			"name": "devel-msvc-cl-tests",
+			"configurePreset": "devel-msvc-cl-tests"
+		},
+		{
+			"name": "release-msvc-cl-examples",
+			"configurePreset": "release-msvc-cl-examples"
+		},
+		{
+			"name": "debug-msvc-cl-examples",
+			"configurePreset": "debug-msvc-cl-examples"
+		},
+		{
+			"name": "devel-msvc-cl-examples",
+			"configurePreset": "devel-msvc-cl-examples"
+		},
+		{
+			"name": "release-msvc-cl-all",
+			"configurePreset": "release-msvc-cl-all"
+		},
+		{
+			"name": "debug-msvc-cl-all",
+			"configurePreset": "debug-msvc-cl-all"
+		},
+		{
+			"name": "devel-msvc-cl-all",
+			"configurePreset": "devel-msvc-cl-all"
 		},
 		{
 			"name": "release-msvc-packages",
@@ -1799,6 +1991,18 @@
 			"configurePreset": "relwithdebinfo-all"
 		},
 		{
+			"name": "release-msvc-all-clang-cl",
+			"configurePreset": "release-msvc-all-clang-cl"
+		},
+		{
+			"name": "debug-msvc-all-clang-cl",
+			"configurePreset": "debug-msvc-all-clang-cl"
+		},
+		{
+			"name": "devel-msvc-all-clang-cl",
+			"configurePreset": "devel-msvc-all-clang-cl"
+		},
+		{
 			"name": "release-msvc-tests",
 			"configurePreset": "release-msvc-tests"
 		},
@@ -1827,16 +2031,28 @@
 			"configurePreset": "msvc-all"
 		},
 		{
-			"name": "release-msvc-all-clang-cl",
-			"configurePreset": "release-msvc-all-clang-cl"
+			"name": "release-msvc-cl-tests",
+			"configurePreset": "release-msvc-cl-tests"
 		},
 		{
-			"name": "debug-msvc-all-clang-cl",
-			"configurePreset": "debug-msvc-all-clang-cl"
+			"name": "debug-msvc-cl-tests",
+			"configurePreset": "debug-msvc-cl-tests"
 		},
 		{
-			"name": "devel-msvc-all-clang-cl",
-			"configurePreset": "devel-msvc-all-clang-cl"
+			"name": "devel-msvc-cl-tests",
+			"configurePreset": "devel-msvc-cl-tests"
+		},
+		{
+			"name": "release-msvc-cl-all",
+			"configurePreset": "release-msvc-cl-all"
+		},
+		{
+			"name": "debug-msvc-cl-all",
+			"configurePreset": "debug-msvc-cl-all"
+		},
+		{
+			"name": "devel-msvc-cl-all",
+			"configurePreset": "devel-msvc-cl-all"
 		},
 		{
 			"name": "release-wasm-tests",

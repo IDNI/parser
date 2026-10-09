@@ -158,12 +158,14 @@ Default preset name is `release` if omitted. Every build-type preset has
 | `release-wasm-tests-pthreads` (+ `debug-`, `devel-`) | the same tests with `TAU_PARSER_WASM_PTHREADS=ON`, so their thread cases run | `build/release-wasm` |
 | `release-wasm-tgf`, `debug-wasm-tgf` | Emscripten + the tgf FTXUI REPL, run by `./dev tgf-node` | `build/release-wasm`, … |
 | `release-wasm-tests-browser` | Emscripten tests + tgf, the browser REPL page and the headless Chrome tests | `build/release-wasm` |
-| `release-msvc`, `debug-msvc` | Native MSVC (static lib) | `build/release-msvc`, `build/debug-msvc` |
-| `release-msvc-tgf`, `debug-msvc-tgf` | + TGF (+ FTXUI fetch) | same |
-| `release-msvc-tests`, `debug-msvc-tests` | + tests | same |
-| `release-msvc-all`, `msvc-all` | everything (`TAU_PARSER_BUILD_ALL`) | `build/release-msvc` |
-| `release-msvc-packages`, `release-msvc-packages-zip` | TGF + examples + NSIS/ZIP | `build/release-msvc` |
-| `release-msvc-all-clang-cl` (+ `debug-`, `devel-`) | everything, clang-cl / Ninja / x64 | `build/release-msvc-clang-cl` |
+| `release-msvc-clang-cl` (+ `debug-`, `devel-`) | Native MSVC with clang-cl, the default MSVC toolchain (static lib) | `build/release-msvc`, … |
+| `release-msvc-all-clang-cl` (+ `debug-`, `devel-`) | everything (`TAU_PARSER_BUILD_ALL`), clang-cl | same |
+| `release-msvc`, `debug-msvc` (+ `devel-msvc`) | alias of the clang-cl preset | same |
+| `release-msvc-tgf`, `debug-msvc-tgf` | + TGF (+ FTXUI fetch), clang-cl | same |
+| `release-msvc-tests`, `debug-msvc-tests` | + tests, clang-cl | same |
+| `release-msvc-all`, `msvc-all` | alias of `release-msvc-all-clang-cl` | `build/release-msvc` |
+| `release-msvc-packages`, `release-msvc-packages-zip` | TGF + examples + NSIS/ZIP, clang-cl | `build/release-msvc` |
+| `release-msvc-cl` (+ `debug-`, `devel-`; `-tgf`, `-tests`, `-examples`, `-all`) | the same with cl.exe | `build/release-msvc-cl`, … |
 
 `TAU_PARSER_WASM_PTHREADS` (default `OFF`, Emscripten only) compiles and
 links the wasm test targets with `-pthread` and a pool of node workers. It
