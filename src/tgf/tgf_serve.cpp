@@ -576,9 +576,9 @@ serve_server::serve_server(const serve_options& o)
 // outlives the server. The normal path already emptied the sessions.
 serve_server::~serve_server() {
 	try {
-		std::vector<std::shared_ptr<serve_session>> all;
-		for (auto& kv : sessions) all.push_back(kv.second);
-		for (auto& s : all) shutdown_session(s);
+		std::vector<std::shared_ptr<serve_session>> live;
+		for (auto& kv : sessions) live.push_back(kv.second);
+		for (auto& s : live) shutdown_session(s);
 		sessions.clear();
 	} catch (...) {
 		// A destructor must not throw; a child that stays is better
@@ -704,9 +704,9 @@ void serve_server::run() {
 		});
 	io.run();
 	// The io_context stopped: end every session and its child.
-	std::vector<std::shared_ptr<serve_session>> all;
-	for (auto& kv : sessions) all.push_back(kv.second);
-	for (auto& s : all) shutdown_session(s);
+	std::vector<std::shared_ptr<serve_session>> live;
+	for (auto& kv : sessions) live.push_back(kv.second);
+	for (auto& s : live) shutdown_session(s);
 }
 
 void serve_server::start_accept() {

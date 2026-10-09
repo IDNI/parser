@@ -347,10 +347,10 @@ namespace idni::testing
 				r.inline_grammar_transformations(g);
 				if (print.graphs)
 				{
-					static size_t c = 1;
+					static size_t graph_no = 1;
 					ss << "\n\t# parsed graph";
-					if (c++ > 1)
-						ss << " " << c;
+					if (graph_no++ > 1)
+						ss << " " << graph_no;
 					ss << ":\n\n";
 					g.extract_trees()->to_print(ss);
 					ss << "\n\n";

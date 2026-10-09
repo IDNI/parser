@@ -524,18 +524,18 @@ TEST_SUITE("tgf serve: logs") {
 		CHECK(have_server_log);
 		REQUIRE_FALSE(session_log.empty());
 		std::ifstream in(session_log);
-		std::string all((std::istreambuf_iterator<char>(in)),
+		std::string text((std::istreambuf_iterator<char>(in)),
 			std::istreambuf_iterator<char>());
-		CHECK(all.find("\"dir\":\"in\"") != std::string::npos);
-		CHECK(all.find("\"dir\":\"out\"") != std::string::npos);
-		CHECK(all.find("\"event\":\"new\"") != std::string::npos);
-		CHECK(all.find("\"event\":\"end-session\"") != std::string::npos);
+		CHECK(text.find("\"dir\":\"in\"") != std::string::npos);
+		CHECK(text.find("\"dir\":\"out\"") != std::string::npos);
+		CHECK(text.find("\"event\":\"new\"") != std::string::npos);
+		CHECK(text.find("\"event\":\"end-session\"") != std::string::npos);
 		// The first line of the connection is logged as in too.
-		CHECK(all.find("\\\"cmd\\\":\\\"new\\\"")
+		CHECK(text.find("\\\"cmd\\\":\\\"new\\\"")
 			!= std::string::npos);
 		// The child exit is logged exactly once.
 		size_t pos = 0, exits = 0;
-		while ((pos = all.find("\"event\":\"child-exit\"", pos))
+		while ((pos = text.find("\"event\":\"child-exit\"", pos))
 				!= std::string::npos) { ++exits; ++pos; }
 		CHECK(exits == 1);
 		// Windows refuses to delete a file an open stream still holds.

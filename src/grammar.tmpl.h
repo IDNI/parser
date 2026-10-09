@@ -258,12 +258,12 @@ disjs<C, T> operator~(const disjs<C, T>& x) {
 	std::vector<conjs<C, T>> cs(ncsv[0].begin(), ncsv[0].end());
 	//cout << "cs("<<cs.size()<<"): " << disjs(cs.begin(), cs.end()) << std::endl;
 	for (size_t i = 1; i != ncsv.size(); ++i) {
-		std::vector<conjs<C, T>> ncs(ncsv[i].begin(), ncsv[i].end());
-		//cout << "\tncs("<<ncs.size()<<"): " << disjs(ncs.begin(), ncs.end()) << std::endl;
-		for (size_t j = 0; j != ncs.size(); ++j)
+		std::vector<conjs<C, T>> next(ncsv[i].begin(), ncsv[i].end());
+		//cout << "\tncs("<<next.size()<<"): " << disjs(next.begin(), next.end()) << std::endl;
+		for (size_t j = 0; j != next.size(); ++j)
 			for (size_t k = 0; k != cs.size(); ++k) {
 				conjs<C, T> c(cs[k]);
-				c.insert(*(ncs[j].begin()));
+				c.insert(*(next[j].begin()));
 				rcs.push_back(c);
 			}
 		cs = rcs;
@@ -801,9 +801,9 @@ void grammar<C, T>::derive_char_classes(bool on) {
 }
 template <typename C, typename T>
 void grammar<C, T>::exclude_from_char_classes(
-	const std::set<size_t>& nts)
+	const std::set<size_t>& excluded)
 {
-	cc_excluded_nts_ = nts;
+	cc_excluded_nts_ = excluded;
 	set_enabled_productions(opt_.enabled_guards);
 }
 template <typename C, typename T>
@@ -1087,8 +1087,8 @@ std::optional<cc_expr<T>> grammar<C, T>::single_char_rule(size_t nt,
 	cc_expr<T> alts;
 	alts.k = cc_expr<T>::kind::any_of;
 	for (size_t p : ps) {
-		cc_expr<T> all;
-		all.k = cc_expr<T>::kind::all_of;
+		cc_expr<T> conj;
+		conj.k = cc_expr<T>::kind::all_of;
 		bool positive = false;
 		for (const lits<C, T>& cj : G[p].second) {
 			if (cj.size() != 1)
@@ -1117,16 +1117,16 @@ std::optional<cc_expr<T>> grammar<C, T>::single_char_rule(size_t nt,
 				cc_expr<T> n;
 				n.k = cc_expr<T>::kind::neg;
 				n.sub.push_back(std::move(e));
-				all.sub.push_back(std::move(n));
+				conj.sub.push_back(std::move(n));
 			} else {
-				all.sub.push_back(std::move(e));
+				conj.sub.push_back(std::move(e));
 				positive = true;
 			}
 		}
 		if (!positive)
 			return cc_reject(nt, w, "no positive conjunct");
-		w.prod_expr[p] = all;
-		alts.sub.push_back(std::move(all));
+		w.prod_expr[p] = conj;
+		alts.sub.push_back(std::move(conj));
 		if (cc_expr_node_count(alts) > max_nodes
 				|| cc_expr_depth(alts) > max_depth)
 			return cc_reject(nt, w, "too large");
@@ -1616,10 +1616,10 @@ std::set<size_t> grammar<C, T>::unreachable_productions(const lit<C, T>& l)
 	const
 {
 	std::set<size_t> ids = reachable_productions(l);
-	std::set<size_t> all;
-	for (size_t i = 0; i != G.size(); ++i) all.insert(i);
+	std::set<size_t> every;
+	for (size_t i = 0; i != G.size(); ++i) every.insert(i);
 	std::set<size_t> diff;
-	std::set_difference(all.begin(), all.end(), ids.begin(), ids.end(),
+	std::set_difference(every.begin(), every.end(), ids.begin(), ids.end(),
 		std::inserter(diff, diff.begin()));
 	return diff;
 }

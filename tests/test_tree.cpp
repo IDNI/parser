@@ -184,19 +184,19 @@ int main() {
     // now using string
     {
     using nd_t2 = std::string;
-    nd_t2 n1,n2, n3, n4;
-    n1 = "1";
-    n2 = "2", n3 ="3", n4= "4";
+    nd_t2 s1,s2, s3, s4;
+    s1 = "1";
+    s2 = "2", s3 ="3", s4= "4";
     {
-        nd_t2 child [] = {n2, n3};
-        auto tid = tree<nd_t2>::get(n1, child, sizeof(child)/sizeof(nd_t2));
+        nd_t2 child [] = {s2, s3};
+        auto tid = tree<nd_t2>::get(s1, child, sizeof(child)/sizeof(nd_t2));
         auto handle = tree<nd_t2>::get(tid);
         tree<nd_t2>::get(tid).print(std::cout);
     }
     // above handle goes out of scope
     {
-    nd_t2 arr [] = { n1,n2 ,n3,n4 };
-    auto id = tree<nd_t2>::get(n2, arr, sizeof(arr)/sizeof(nd_t2));
+    nd_t2 arr [] = { s1,s2 ,s3,s4 };
+    auto id = tree<nd_t2>::get(s2, arr, sizeof(arr)/sizeof(nd_t2));
     //get shared handle for id to avoid being gced.
     auto sh = bintree<nd_t2>::geth(id);
     //print though id

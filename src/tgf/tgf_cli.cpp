@@ -372,9 +372,9 @@ void tgf_repl_evaluator::begin_server_session(const std::string& id) {
 }
 
 diagnostics::report tgf_repl_evaluator::take_report() {
-	diagnostics::report r = std::move(report);
+	diagnostics::report res = std::move(report);
 	report.clear();
-	return r;
+	return res;
 }
 
 // A text stream adds the CR of a CRLF back on Windows, so drop it here.
@@ -432,7 +432,7 @@ ostream& tgf_repl_evaluator::pretty_print(ostream& os, tref n,
 		skip.find(t.value.first.n()) != skip.end())
 			return os;
 	if (!nulls && t.value.first.is_null()) return os;
-	for (size_t t = 0; t < l; t++) os << "\t";
+	for (size_t i = 0; i < l; i++) os << "\t";
 	if (t.value.first.nt())
 		os << TC_NT << t.value.first << TC.CLEAR() << TC_NT_ID
 			<< "(" << t.value.first.n() << ")" << TC.CLEAR();
@@ -585,26 +585,26 @@ void tgf_repl_evaluator::set_repl(repl<tgf_repl_evaluator>& r_) {
 	reprompt();
 }
 
-format::json::value tgf_repl_evaluator::parsed(parser_type::result& r,
+format::json::value tgf_repl_evaluator::parsed(parser_type::result& res,
 	std::string& text)
 {
 	using value = format::json::value;
-	if (!r.good() || !r.found) {
-		report.append(std::move(r.report()));
+	if (!res.good() || !res.found) {
+		report.append(std::move(res.report()));
 		return value::object();
 	}
-	auto f = r.get_forest();
+	auto f = res.get_forest();
 	using c_t = parser_type::char_type;
 	using t_t = parser_type::terminal_type;
 	if (!opt.json) {
 		stringstream ss;
-		if (opt.print_input) ss << "input: \"" << r.get_input() << "\"\n";
-		if (opt.print_ambiguity) r.print_ambiguous_nodes(ss);
+		if (opt.print_input) ss << "input: \"" << res.get_input() << "\"\n";
+		if (opt.print_ambiguity) res.print_ambiguous_nodes(ss);
 		if (opt.print_terminals) ss << "parsed terminals: "
-			<< TC_T << to_std_string(r.get_terminals())
+			<< TC_T << to_std_string(res.get_terminals())
 			<< TC_CLEARED_DEFAULT << "\n";
-		auto cb_next_g = [&r, &ss, this](parser_type::pgraph& g) {
-			r.inline_grammar_transformations(g);
+		auto cb_next_g = [&res, &ss, this](parser_type::pgraph& g) {
+			res.inline_grammar_transformations(g);
 			if (opt.tml_rules) to_tml_rules<c_t, t_t,
 				parser_type::pgraph>(ss << "TML rules:\n", g),
 				ss << "\n";
@@ -612,21 +612,21 @@ format::json::value tgf_repl_evaluator::parsed(parser_type::result& r,
 		};
 		if (opt.tml_rules) f->extract_graphs(f->root(), cb_next_g);
 		if (opt.tml_facts) to_tml_facts<c_t, t_t>(
-			ss << "TML facts:\n", r);
+			ss << "TML facts:\n", res);
 		if (opt.print_graphs) pretty_print(ss << "parsed graph:\n",
-			r.get_shaped_tree2(shaping()), {}, false, 1);
+			res.get_shaped_tree2(shaping()), {}, false, 1);
 		text = ss.str();
-		report.append(std::move(r.report()));
+		report.append(std::move(res.report()));
 		return value::object();
 	}
 	auto v = value::object();
-	if (opt.print_input) v.set("input", value::string(r.get_input()));
+	if (opt.print_input) v.set("input", value::string(res.get_input()));
 	if (opt.print_ambiguity) {
 		auto amb = value::object();
 		amb.set("trees", value::number(
-			static_cast<double>(r.count_trees())));
+			static_cast<double>(res.count_trees())));
 		auto nodes = value::array();
-		for (const auto& [n, alts] : r.ambiguous_nodes()) {
+		for (const auto& [n, alts] : res.ambiguous_nodes()) {
 			auto a = value::object();
 			a.set("symbol", value::string(
 				n.first.to_std_string()))
@@ -638,7 +638,7 @@ format::json::value tgf_repl_evaluator::parsed(parser_type::result& r,
 				auto alt = value::object();
 				auto children = value::array();
 				for (const auto& child : ns) {
-					tref t = r.get_tree2(child);
+					tref t = res.get_tree2(child);
 					if (t) children.push_back(
 						format::ast_json::
 							node_to_value<tree>(t));
@@ -653,11 +653,11 @@ format::json::value tgf_repl_evaluator::parsed(parser_type::result& r,
 		v.set("ambiguous", std::move(amb));
 	}
 	if (opt.print_terminals) v.set("terminals",
-		value::string(to_std_string(r.get_terminals())));
+		value::string(to_std_string(res.get_terminals())));
 	if (opt.tml_rules) {
 		stringstream ss;
-		auto cb_next_g = [&r, &ss](parser_type::pgraph& g) {
-			r.inline_grammar_transformations(g);
+		auto cb_next_g = [&res, &ss](parser_type::pgraph& g) {
+			res.inline_grammar_transformations(g);
 			to_tml_rules<c_t, t_t, parser_type::pgraph>(
 				ss << "TML rules:\n", g), ss << "\n";
 			return true;
@@ -667,13 +667,13 @@ format::json::value tgf_repl_evaluator::parsed(parser_type::result& r,
 	}
 	if (opt.tml_facts) {
 		stringstream ss;
-		to_tml_facts<c_t, t_t>(ss << "TML facts:\n", r);
+		to_tml_facts<c_t, t_t>(ss << "TML facts:\n", res);
 		v.set("tml_facts", value::string(ss.str()));
 	}
 	if (opt.print_graphs) v.set("tree",
 		format::ast_json::node_to_value<tree>(
-			r.get_shaped_tree2(shaping())));
-	report.append(std::move(r.report()));
+			res.get_shaped_tree2(shaping())));
+	report.append(std::move(res.report()));
 	return v;
 }
 
@@ -682,8 +682,8 @@ format::json::value tgf_repl_evaluator::parse(const char* input, size_t size,
 {
 	if (!require_grammar()) return format::json::value::object();
 	if (!good()) return format::json::value::object();
-	auto r = p().parse(input, size);
-	return parsed(r, text);
+	auto res = p().parse(input, size);
+	return parsed(res, text);
 }
 
 format::json::value tgf_repl_evaluator::parse(istream& instream,
@@ -691,8 +691,8 @@ format::json::value tgf_repl_evaluator::parse(istream& instream,
 {
 	if (!require_grammar()) return format::json::value::object();
 	if (!good()) return format::json::value::object();
-	auto r = p().parse(instream);
-	return parsed(r, text);
+	auto res = p().parse(instream);
+	return parsed(res, text);
 }
 
 format::json::value tgf_repl_evaluator::parse(const string& infile,
@@ -700,8 +700,8 @@ format::json::value tgf_repl_evaluator::parse(const string& infile,
 {
 	if (!require_grammar()) return format::json::value::object();
 	if (!good()) return format::json::value::object();
-	auto r = p().parse(infile);
-	return parsed(r, text);
+	auto res = p().parse(infile);
+	return parsed(res, text);
 }
 
 shaping_options tgf_repl_evaluator::shaping() {
@@ -868,9 +868,9 @@ format::json::value tgf_repl_evaluator::set_cmd(std::string_view name,
 {
 	if (!option_of_kind(name, std::nullopt))
 		return format::json::value::object();
-	auto r = idni::options().set_text(name, text);
-	const bool ok = !r.has_error();
-	report.append(r.report());
+	auto res = idni::options().set_text(name, text);
+	const bool ok = !res.has_error();
+	report.append(res.report());
 	if (!ok) return format::json::value::object();
 	return get_cmd(name);
 }
@@ -880,9 +880,9 @@ format::json::value tgf_repl_evaluator::set_option(std::string_view name,
 {
 	if (!option_of_kind(name, std::nullopt))
 		return format::json::value::object();
-	auto r = idni::options().set(name, std::move(v));
-	const bool ok = !r.has_error();
-	report.append(r.report());
+	auto res = idni::options().set(name, std::move(v));
+	const bool ok = !res.has_error();
+	report.append(res.report());
 	if (!ok) return format::json::value::object();
 	return get_cmd(name);
 }
@@ -1206,10 +1206,10 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			auto n = s | p::symbol;
 			bool changed = false;
 			if (n.has_value()) {
-				auto r = idni::options().set_text("start",
+				auto written = idni::options().set_text("start",
 					n | tt::terminals);
-				changed = !r.has_error();
-				report.append(r.report());
+				changed = !written.has_error();
+				report.append(written.report());
 			}
 			const string start = start_symbol();
 			auto v = value::object();
@@ -1323,25 +1323,25 @@ eval_result tgf_repl_evaluator::run(const std::string& src,
 {
 	eval_result er;
 	static tgf_repl_parser rp;
-	auto r = rp.parse(src.c_str(), src.size());
-	if (!r.found) {
-		if (opt.continue_on_eof && r.parse_error.at_eof()) {
+	auto res = rp.parse(src.c_str(), src.size());
+	if (!res.found) {
+		if (opt.continue_on_eof && res.parse_error.at_eof()) {
 			er.status = cmd_status::incomplete;
-			r.report().demote_errors_to_warnings();
-			er.report.append(std::move(r.report()));
+			res.report().demote_errors_to_warnings();
+			er.report.append(std::move(res.report()));
 			return er;
 		}
 		er.status = cmd_status::error;
-		er.report.append(std::move(r.report()));
+		er.report.append(std::move(res.report()));
 		return er;
 	}
 	if (!opt.json) {
-		r.print_ambiguous_nodes(cout);
+		res.print_ambiguous_nodes(cout);
 		if (idni::options().get<bool>("debug"))
 			pretty_print(cout << "input command graph:\n",
-				r.get_shaped_tree2(), {}, false, 1);
+				res.get_shaped_tree2(), {}, false, 1);
 	}
-	tref ref = r.get_shaped_tree2();
+	tref ref = res.get_shaped_tree2();
 	auto t = tt(ref);
 	auto statements = t || tgf_repl_parser::statement;
 	for (const auto& statement : statements()) {
@@ -1677,14 +1677,14 @@ void render_command_text(const cmd_result& r, std::ostream& os,
 	}
 }
 
-void tgf_repl_evaluator::render_text(const cmd_result& r,
+void tgf_repl_evaluator::render_text(const cmd_result& res,
 	std::ostream& os) const
 {
 	// The live evaluator prints the loaded source, so its text matches
 	// the REPL text. A client with no evaluator renders the grammar from
 	// data only.
-	if (r.cmd == "grammar") { print_source(os); return; }
-	render_command_text(r, os, TC);
+	if (res.cmd == "grammar") { print_source(os); return; }
+	render_command_text(res, os, TC);
 }
 
 format::json::value statement_request(const tgf_repl_evaluator::trv& n) {

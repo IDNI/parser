@@ -88,7 +88,7 @@ tref parser<C, T>::result::inline_bintree_paths(tref ref,
 				if (auto y = go(c, i + 1); y) return y;
 			return nullptr;
 		};
-		if (auto p = go(ref, 0); p) return inline_bintree_paths(p, opts);
+		if (auto hit = go(ref, 0); hit) return inline_bintree_paths(hit, opts);
 	}
 	trefs ch;
 	for (const auto& c : t.children()) {
@@ -199,37 +199,37 @@ tref parser<C, T>::result::get_bintree(const pnode& n) {
 	if (froot != 0) {
 		tref root = froot->get();
 		if (!root) return nullptr;
-		tref found = nullptr;
+		tref hit = nullptr;
 		auto search = [&](tref ref) {
 			const auto& t = tree::get(ref);
 			if (amb_node.nt() && t.value.first == amb_node) {
 				for (tref c : t.children())
 					if (same_pnode(tree::get(c).value, n)) {
-						found = ref;
+						hit = ref;
 						return false;
 					}
 			} else if (same_pnode(t.value, n)) {
-				found = ref;
+				hit = ref;
 				return false;
 			}
 			return true;
 		};
 		pre_order<pnode>(root).search_unique(search);
-		return found;
+		return hit;
 	}
 	if (!f) return nullptr;
 	htref t;
 	auto _rb = diag_report
 			.open_if(measure_scopes, label::reconstruct_bintree);
-	typename pforest::graph g;
-	g = diag_report.step(measure_scopes, label::extract_graph, [&] {
+	typename pforest::graph fg;
+	fg = diag_report.step(measure_scopes, label::extract_graph, [&] {
 		return f->extract_first_graph(n);
 	});
 	diag_report.step(measure_scopes, label::inline_grammar, [&] {
-		inline_grammar_transformations(g);
+		inline_grammar_transformations(fg);
 	});
 	t = diag_report.step(measure_scopes, label::extract_tree2, [&] {
-		return g.extract_tree2();
+		return fg.extract_tree2();
 	});
 	return t->get();
 }

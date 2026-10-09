@@ -248,10 +248,10 @@ private:
 			  nts_handle(std::shared_ptr<nonterminals<C, T>>(
 				std::shared_ptr<void>(), &nts_)) { build(t, diag); }
 		void build(const trv& t,
-			idni::diagnostics::report* diag = nullptr,
-			const char* source = nullptr) {
-			this->diag = diag;
-			source_ = source;
+			idni::diagnostics::report* rep = nullptr,
+			const char* source_text = nullptr) {
+			diag = rep;
+			source_ = source_text;
 			// each directive writes its option into own_ at once, and the
 			// bind in g() pushes the values into the grammar
 			keep(own_.declare(grammar_option_set));

@@ -19,10 +19,10 @@ int main(int argc, char **argv) {
 	o.ambiguity_fails = false;
 
 	// test parsing of a TGF having a comment but no statements
-	nonterminals<char> nts;
-	auto gr = tgf<char>::from_string(nts,
+	nonterminals<char> comment_nts;
+	auto comment_gr = tgf<char>::from_string(comment_nts,
 		"	# TGF only with ws and ws_comment \n");
-	if (!gr.print_and_ok(cerr))
+	if (!comment_gr.print_and_ok(cerr))
 		return cerr << "comment-only TGF should load\n", 1;
 
 	TEST("basic", "char terminals")

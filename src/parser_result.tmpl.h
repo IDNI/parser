@@ -318,9 +318,9 @@ typename parser<C, T>::psptree
 		t = std::make_shared<ptree>(n);
 		return t;
 	}
-	auto f = get_forest();
-	auto it = f->g.find(n);
-	if (it == f->g.end()) {
+	auto pf = get_forest();
+	auto it = pf->g.find(n);
+	if (it == pf->g.end()) {
 		//std::cerr << "\t not existing node, skipping" << std::endl;
 		return t;
 	}
@@ -411,8 +411,8 @@ typename parser<C, T>::psptree
 			}
 			return 0;
 		};
-		const psptree p = go(t, 0);
-		if (p) return inline_forest_tree_paths(p, opts);
+		const psptree hit = go(t, 0);
+		if (hit) return inline_forest_tree_paths(hit, opts);
 	}
 	r = std::make_shared<ptree>(t->value);
 	for (auto& c : t->child) {
@@ -733,9 +733,9 @@ std::set<std::pair<typename parser<C, T>::pnode,
 			alts.pop_back();
 		}
 	};
-	auto all = [](tref) { return true; };
+	auto every = [](tref) { return true; };
 	auto no_between = [](tref, tref) {};
-	pre_order<pnode>(froot->get()).visit(enter, all, leave, no_between);
+	pre_order<pnode>(froot->get()).visit(enter, every, leave, no_between);
 	return r;
 }
 
@@ -826,22 +826,22 @@ typename parser<C, T>::result::nodes_and_edges
 	}
 	for (auto& it : pf->g) {
 		ns[nid[it.first]] = it.first;
-		size_t p = 0;
+		size_t k = 0;
 		for (auto& pack : it.second) {
 			if (it.second.size() > 1) {  //skipping if only one ambigous node, an optimization
-				++p;
-				ns[nid[it.first] + p] = it.first;
-				es.emplace_back(nid[it.first], nid[it.first]+p);
+				++k;
+				ns[nid[it.first] + k] = it.first;
+				es.emplace_back(nid[it.first], nid[it.first]+k);
 			}
 			for (auto& nn : pack) {
 				if (nid.find(nn) == nid.end()) nid[nn] = id++; // for terminals, not seen before
 				ns[nid[nn]] = nn;
-				es.emplace_back(nid[it.first] + p, nid[nn]);
+				es.emplace_back(nid[it.first] + k, nid[nn]);
 			}
 		}
 	}
 	n.resize(id);
-	for (auto& p : ns) n[p.first] = p.second;
+	for (auto& e : ns) n[e.first] = e.second;
 	return nodes_and_edges{ n, es };
 }
 

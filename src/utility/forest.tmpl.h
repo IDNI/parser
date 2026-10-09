@@ -9,19 +9,19 @@ template <typename NodeT>
 std::ostream& forest<NodeT>::tree::to_print(std::ostream& os, size_t l,
 	std::set<size_t> skip, bool nulls) const
 {
-	const NodeT &value = this->value;
-	if (skip.size() && value.first.nt() &&
-		skip.find(value.first.n()) != skip.end())
+	const NodeT &v = this->value;
+	if (skip.size() && v.first.nt() &&
+		skip.find(v.first.n()) != skip.end())
 			return os;
-	if (!nulls && value.first.is_null()) return os;
+	if (!nulls && v.first.is_null()) return os;
 	os << "\n";
 	for (size_t t = 0; t < l; t++) os << "\t";
-	if (value.first.nt()) os << value.first
-		<< "(" << value.first.n() << ")";
-	else if (value.first.is_null()) os << "null";
-	else os << value.first;
-	os << "[" << value.second[0] << ", "
-		<< value.second[1] << "]";
+	if (v.first.nt()) os << v.first
+		<< "(" << v.first.n() << ")";
+	else if (v.first.is_null()) os << "null";
+	else os << v.first;
+	os << "[" << v.second[0] << ", "
+		<< v.second[1] << "]";
 	for (auto& d : child)
 		d->to_print(os, l + 1, skip, nulls);
 	return os;
@@ -457,7 +457,7 @@ bool forest<NodeT>::_traverse(const node_graph& g, const node& root,
 }
 
 template <typename NodeT>
-bool forest<NodeT>::replace_nodes(graph& g, nodes& s) {
+bool forest<NodeT>::replace_nodes(graph& gr, nodes& s) {
 
 	MC(last_replace_nodes = s.size();)
 
@@ -465,8 +465,8 @@ bool forest<NodeT>::replace_nodes(graph& g, nodes& s) {
 	replmap.reserve(s.size());
 	//Build replacement map and check for direct cycles
 	for (node& n : s) {
-		auto git = g.find(n);
-		if (git != g.end() ) {
+		auto git = gr.find(n);
+		if (git != gr.end() ) {
 			DBG(assert(!git->second.empty()));
 			auto& repl = *(git->second.begin());
 			for (auto& r : repl) {
@@ -515,8 +515,8 @@ bool forest<NodeT>::replace_nodes(graph& g, nodes& s) {
 	};
 
 	// A replaced node leaves the graph, so its own rhs is not expanded.
-	for (auto& [lhs, rhs_set] : g) {
-		if (!(lhs == g.root) && replmap.find(lhs) != replmap.end())
+	for (auto& [lhs, rhs_set] : gr) {
+		if (!(lhs == gr.root) && replmap.find(lhs) != replmap.end())
 			continue;
 		std::set<nodes> updated_rhs_set;
 		for (const auto& rhs : rhs_set) {
@@ -532,11 +532,11 @@ bool forest<NodeT>::replace_nodes(graph& g, nodes& s) {
 
 	// Cleanup replaced nodes from graph
 	for (const auto& n : cleanup) {
-		g.erase(n);
+		gr.erase(n);
 	}
 
 	MC(last_total_replacements = total_replacements;)
-	// g was mutated in place; predecessors()/traverse_backward() would
+	// gr was mutated in place; predecessors()/traverse_backward() would
 	// otherwise walk a stale index.
 	if (gchange) invalidate_reverse_index();
 	return gchange;

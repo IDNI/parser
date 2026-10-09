@@ -118,10 +118,10 @@ const htref bintree<T>::geth(tref h) {
 }
 
 template <typename T>
-const bintree<T>& bintree<T>::get(const tref id) {
-	//std::cout<< id <<"\n";
-	DBG(assert(id != NULL && sizeof(bintree<T>*) == sizeof(tref));)
-	return *(bintree<T>*)id;
+const bintree<T>& bintree<T>::get(const tref ref) {
+	//std::cout<< ref <<"\n";
+	DBG(assert(ref != NULL && sizeof(bintree<T>*) == sizeof(tref));)
+	return *(bintree<T>*)ref;
 }
 
 template <typename T>
@@ -644,9 +644,9 @@ const lcrs_tree<T>& lcrs_tree<T>::get(const htref& h) {
 }
 
 template <typename T>
-const lcrs_tree<T>& lcrs_tree<T>::get(tref id) {
-	DBG(assert(id != nullptr);)
-	return (const lcrs_tree<T>&) bintree<T>::get(id);
+const lcrs_tree<T>& lcrs_tree<T>::get(tref ref) {
+	DBG(assert(ref != nullptr);)
+	return (const lcrs_tree<T>&) bintree<T>::get(ref);
 }
 
 template <typename T>

@@ -142,9 +142,9 @@ template <typename C, typename T>
 bool parser<C, T>::input::next() {
 	if (isstream()) {
 		if (!sgood) return false;
-		const std::streamoff o = sb->pubseekoff(0, std::ios_base::cur,
+		const std::streamoff off = sb->pubseekoff(0, std::ios_base::cur,
 							std::ios_base::in);
-		n = o == -1 ? 0 : static_cast<size_t>(o);
+		n = off == -1 ? 0 : static_cast<size_t>(off);
 		int_type c = sb->sbumpc();
 		if (c == e) sgood = false;
 		return l = n + (c == e ? 0 : 1), true;
@@ -1082,8 +1082,8 @@ parser<C, T>::result parser<C, T>::_parse() {
 						: g.start_literal();
 	container_t t, c;
 	for (size_t p : g.prod_ids_of_literal(start_lit))
-		for (size_t c = 0; c != g.n_conjs(p); ++c) {
-			auto [it, _] = add(t, { 0, p, c, 0, 0 });
+		for (size_t cj = 0; cj != g.n_conjs(p); ++cj) {
+			auto [it, _] = add(t, { 0, p, cj, 0, 0 });
 			if (po.enable_gc) ++refi[*it];
 		}
 	size_t r = 1, cb = 0; // row and cel beginning
@@ -1387,13 +1387,13 @@ bool parser<C, T>::found(size_t start) {
 							: g.start_literal()))
 	{
 		f = true;
-		item all(in_->tpos(), n, 0, 0, 0);
+		item probe(in_->tpos(), n, 0, 0, 0);
 		for (size_t c = 0; c != g.n_conjs(n); ++c) {
-			all = item(in_->tpos(), n, c, 0, g.len(n, c));
+			probe = item(in_->tpos(), n, c, 0, g.len(n, c));
 			bool neg = g[n][c].neg;
-			//DBG(print(std::cout << "search: ", all) << "\n";)
+			//DBG(print(std::cout << "search: ", probe) << "\n";)
 			//DBG(std::cout << "neg: " << neg << "\n";)
-			f = S[in_->tpos()].find(all) != S[in_->tpos()].end();
+			f = S[in_->tpos()].find(probe) != S[in_->tpos()].end();
 			f = f != neg;
 			if (!f)	break;
 		}
@@ -1734,7 +1734,7 @@ void parser<C, T>::pre_process(const item& i) {
 // alternatives under __AMB__ nodes.
 template <typename C, typename T>
 tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
-	[[maybe_unused]] const parse_options& po)
+	[[maybe_unused]] const parse_options& opts)
 {
 	bin_tnt.clear();
 	sorted_citem.clear();
@@ -1747,7 +1747,7 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 	use_citem_index = o.binarize;
 	if (use_citem_index) {
 		int preprocess_count = do_preprocess();
-		if (po.debug) report_.info(messages::preprocess,
+		if (opts.debug) report_.info(messages::preprocess,
 			{{label::size, preprocess_count}});
 	}
 
@@ -1935,7 +1935,7 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 		return result.empty() ? nullptr : result[0];
 	};
 
-	tref ret = report_.step(po.measure_scopes && po.measure_forest,
+	tref ret = report_.step(opts.measure_scopes && opts.measure_forest,
 		label::build_bintree, [&] { return build(root); });
 
 	return ret;
@@ -1944,7 +1944,7 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 // default-mode init_forest: builds a pforest eagerly from S-items
 template <typename C, typename T>
 bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
-	[[maybe_unused]] const parse_options& po)
+	[[maybe_unused]] const parse_options& opts)
 {
 	bool ret = false;
 	bin_tnt.clear();
@@ -1958,13 +1958,13 @@ bool parser<C, T>::init_forest(pforest& f, const lit<C, T>& start_lit,
 	use_citem_index = true;
 	// preprocess parser items for faster retrieval
 	int preprocess_count = do_preprocess();
-	if (po.debug) {
+	if (opts.debug) {
 		report_.info(messages::preprocess, {{label::size, preprocess_count}});
 		report_.info("sorted_citem", {{label::size, sorted_citem.size()}});
 		report_.info("rsorted_citem", {{label::size, rsorted_citem.size()}});
 	}
 
-	ret = report_.step(po.measure_scopes && po.measure_forest,
+	ret = report_.step(opts.measure_scopes && opts.measure_forest,
 		label::build_forest, [&] { return build_forest(f, root); });
 	// f.print_data(std::cout) << "\n";
 

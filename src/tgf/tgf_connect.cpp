@@ -86,9 +86,9 @@ tgf_remote_evaluator::tgf_remote_evaluator(std::ostream& o, bool colors)
 tgf_remote_evaluator::~tgf_remote_evaluator() = default;
 
 diagnostics::report tgf_remote_evaluator::take_report() {
-	diagnostics::report r = std::move(report);
+	diagnostics::report rep = std::move(report);
 	report.clear();
-	return r;
+	return rep;
 }
 
 void tgf_remote_evaluator::apply_state(const value& state) {
@@ -286,24 +286,24 @@ int tgf_remote_evaluator::send_statement(value req) {
 diagnostics::result<int> tgf_remote_evaluator::eval(const std::string& src) {
 	diagnostics::result<int> res;
 	static tgf_repl_parser rp;
-	auto r = rp.parse(src.c_str(), src.size());
-	if (!r.found) {
-		if (r.parse_error.at_eof()) {
+	auto parsed = rp.parse(src.c_str(), src.size());
+	if (!parsed.found) {
+		if (parsed.parse_error.at_eof()) {
 			// The client owns the REPL parse, so an incomplete line
 			// needs no request to the server.
-			diagnostics::result<int> res(2);
-			r.report().demote_errors_to_warnings();
-			res.report().append(std::move(r.report()));
-			return res;
+			diagnostics::result<int> incomplete(2);
+			parsed.report().demote_errors_to_warnings();
+			incomplete.report().append(std::move(parsed.report()));
+			return incomplete;
 		}
 		// A syntax error is a local report; no request reaches the
 		// server. Print it, as the local REPL does.
-		r.report().print(out, TC);
+		parsed.report().print(out, TC);
 		out.flush();
-		res.report().append(std::move(r.report()));
+		res.report().append(std::move(parsed.report()));
 		return res;
 	}
-	tref ref = r.get_shaped_tree2();
+	tref ref = parsed.get_shaped_tree2();
 	auto t = tt(ref);
 	auto statements = t || tgf_repl_parser::statement;
 	for (const auto& statement : statements()) {
