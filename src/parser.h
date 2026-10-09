@@ -1023,8 +1023,6 @@ public:
 			bool has_value_ = true;
 			trefs values_{};
 		};
-		traverser operator|(size_t nt) const;
-		traverser operator||(size_t nt) const;
 	};
 	using tt = tree::traverser;
 	using pforest         = forest<pnode_type<C, T>>;
@@ -1302,7 +1300,6 @@ public:
 			tref f, bool found, error err);
 		result(parser& p, std::unique_ptr<input> in_,
 			std::unique_ptr<pforest> f, bool found, error err);
-		parser& get_parser() const;
 
 		/// FOREST APIs
 
@@ -1416,8 +1413,6 @@ public:
 		/// Read terminals from input according to the position span of
 		/// a provided node
 		std::basic_string<T> get_terminals(const pnode& n) const;
-		std::basic_ostream<T>& get_terminals_to_stream(
-			std::basic_ostream<T>& os, const pnode& n) const;
 		/// Reads terminals of a node and converts them to int
 		/// if the conversion fails or the int is out of range
 		/// returns no value
@@ -1483,10 +1478,6 @@ public:
 		// if ambiguous, this is __AMB__ node lit used in a shaped tree
 		lit<C, T> amb_node{};
 		tref shape_tree2_impl(tref t, const shaping_options& opts);
-		/// Recursive part of get_shaped_tree()
-		void _get_shaped_tree_children(const shaping_options& opts,
-			const pnodes& nodes,
-			std::vector<psptree>& child) const;
 	};
 
 	// constructor
@@ -1744,7 +1735,6 @@ private:
 	void remove_item(const item& i);
 	// parsing
 	result _parse();
-	result _parse(const parse_options& po);
 	std::pair<container_iter, bool> add(container_t& t, const item& i);
 	bool nullable(const item& i) const;
 	void resolve_conjunctions(container_t& c);

@@ -223,7 +223,6 @@ Read terminals from input (input's terminal type, ie. T).
 
 
 ### std::basic_string<T> get_terminals(const pnode& n) const;
-### std::basic_ostream<T>& get_terminals_to_stream(std::basic_ostream<T>& os, const pnode& n) const;
 
 Read terminals from input at position span of a provided node.
 
