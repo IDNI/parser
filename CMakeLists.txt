@@ -542,7 +542,9 @@ if(TAU_PARSER_BUILD_DOC)
 		# note the option ALL which allows to build the docs together with the application
 		add_custom_target(documentation ALL
 			COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile
-			WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+			# The Doxyfile paths are relative to the source root, as for the
+			# Pages workflow, and the install step reads _site from there.
+			WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 			COMMENT "Generating API documentation with Doxygen"
 			VERBATIM
 		)
