@@ -383,9 +383,9 @@ endif()
 
 # The committed generated parsers must match their grammars, so a grammar
 # change without a regenerated parser fails here.
-if(TARGET tgf AND NOT WIN32)
+if(TARGET tgf AND TAU_PARSER_BASH AND NOT CMAKE_CROSSCOMPILING)
 	add_test(NAME tgf_roundtrip_self_check
-		COMMAND bash "${PROJECT_SOURCE_DIR}/scripts/tgf-roundtrip-self-check.sh"
+		COMMAND "${TAU_PARSER_BASH}" "${PROJECT_SOURCE_DIR}/scripts/tgf-roundtrip-self-check.sh"
 			$<TARGET_FILE:tgf>)
 endif()
 

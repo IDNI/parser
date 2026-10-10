@@ -47,9 +47,10 @@ for entry in "${ENTRIES[@]}"; do
 	for ext in h cpp; do
 		gen_file="$gendir/$name.generated.$ext"
 		committed_file="$TOP/$outdir/$name.generated.$ext"
-		if ! diff -q "$committed_file" "$gen_file" >/dev/null 2>&1; then
+		# A Windows checkout or a Windows tgf can end lines with CR LF.
+		if ! cmp -s <(tr -d '\r' < "$committed_file") <(tr -d '\r' < "$gen_file"); then
 			echo "roundtrip: FAIL $name.generated.$ext differs from committed output"
-			diff -u "$committed_file" "$gen_file" | head -40
+			diff -u <(tr -d '\r' < "$committed_file") <(tr -d '\r' < "$gen_file") | head -40
 			exit 1
 		fi
 	done

@@ -8,13 +8,14 @@
 include_guard(GLOBAL)
 
 include("${CMAKE_CURRENT_LIST_DIR}/tau-store.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/parser-bash.cmake")
 
 option(TAU_PARSER_DEPS_FROM_STORE
 	"Resolve FTXUI, unordered_dense, and the Boost headers from the dependency store" OFF)
 
 # The producer scripts are bash; CMake must reach a bash that is not WSL's.
 if(NOT DEFINED TAU_BASH OR TAU_BASH STREQUAL "")
-	find_program(TAU_BASH NAMES bash NO_CACHE)
+	set(TAU_BASH "${TAU_PARSER_BASH}")
 	if(NOT TAU_BASH)
 		set(TAU_BASH bash)
 	endif()
