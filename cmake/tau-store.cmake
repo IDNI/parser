@@ -191,13 +191,22 @@ function(_tau_store_mv_no_clobber_supported out scratch)
 	set(${out} "${_ok}" PARENT_SCOPE)
 endfunction()
 
+# The interpreter of the python3 helpers. FindPython3 runs each candidate, so
+# it never takes a stub that does not run.
+function(_tau_store_python out)
+	if(NOT Python3_EXECUTABLE)
+		find_package(Python3 COMPONENTS Interpreter QUIET)
+	endif()
+	set(${out} "${Python3_EXECUTABLE}" PARENT_SCOPE)
+endfunction()
+
 # Move <src> to <dst> with renamex_np(RENAME_EXCL) through a python3 ctypes
 # helper. Sets <out-rc> to the process exit code: 0 when moved, non-zero when
 # the destination exists or the call failed. python3 is already required on
 # every host by store-transport.sh, and renamex_np is macOS's atomic
 # no-replace rename.
 function(_tau_store_renamex_np src dst out_rc)
-	find_program(_python3 python3 NO_CACHE)
+	_tau_store_python(_python3)
 	if(NOT _python3)
 		set(${out_rc} "python3 not found" PARENT_SCOPE)
 		return()
@@ -216,7 +225,7 @@ endfunction()
 function(_tau_store_renamex_np_supported out scratch)
 	set(_ok FALSE)
 	if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
-		find_program(_python3 python3 NO_CACHE)
+		_tau_store_python(_python3)
 		if(_python3)
 			string(RANDOM LENGTH 12 _tok)
 			set(_a_src "${scratch}/.tau-rnx-${_tok}-a-src")

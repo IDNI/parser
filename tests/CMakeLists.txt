@@ -331,14 +331,19 @@ if(TARGET tgf AND NOT WIN32)
 	endif()
 endif()
 
+# The presets pass the interpreter that dep_python proves to run. FindPython3
+# runs each candidate too, so the Windows store stub never passes.
+if(NOT Python3_EXECUTABLE)
+	find_package(Python3 COMPONENTS Interpreter QUIET)
+endif()
+
 # The JSON API must end every message with one LF on the real stdout. An
 # in-process capture cannot see the line-ending translation that a
 # text-mode stdout does, so this runs the program and reads its bytes.
 if(TARGET tgf)
-	find_program(PYTHON3_JSON_STDOUT_EXECUTABLE NAMES python3 python)
-	if(PYTHON3_JSON_STDOUT_EXECUTABLE)
+	if(Python3_EXECUTABLE)
 		add_test(NAME json_stdout_bytes
-			COMMAND "${PYTHON3_JSON_STDOUT_EXECUTABLE}"
+			COMMAND "${Python3_EXECUTABLE}"
 				"${CMAKE_CURRENT_SOURCE_DIR}/parity/json_stdout_bytes.py"
 				"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tiny.tgf"
 				${CMAKE_CROSSCOMPILING_EMULATOR}
@@ -349,10 +354,9 @@ endif()
 # A real server process on a free port, driven over a plain socket. The
 # harness runs the native python3 and passes the emulator before tgf.exe.
 if(TARGET tgf AND TAU_PARSER_BUILD_SERVE AND NOT EMSCRIPTEN)
-	find_program(PYTHON3_SERVE_EXECUTABLE NAMES python3 python)
-	if(PYTHON3_SERVE_EXECUTABLE)
+	if(Python3_EXECUTABLE)
 		add_test(NAME tgf_serve_smoke
-			COMMAND "${PYTHON3_SERVE_EXECUTABLE}"
+			COMMAND "${Python3_EXECUTABLE}"
 				"${CMAKE_CURRENT_SOURCE_DIR}/serve/tgf_serve_smoke.py"
 				"${PROJECT_SOURCE_DIR}/tests/fixtures/tiny.tgf"
 				${CMAKE_CROSSCOMPILING_EMULATOR}
@@ -397,9 +401,9 @@ if(TARGET tgf AND NOT WIN32)
 				$<TARGET_FILE:tgf>
 				"${MINGW_DIR}/tgf.exe"
 				"${PROJECT_SOURCE_DIR}/src/format/json/json.tgf")
-		if(PYTHON3_JSON_STDOUT_EXECUTABLE)
+		if(Python3_EXECUTABLE)
 			add_test(NAME json_stdout_bytes_wine
-				COMMAND "${PYTHON3_JSON_STDOUT_EXECUTABLE}"
+				COMMAND "${Python3_EXECUTABLE}"
 					"${CMAKE_CURRENT_SOURCE_DIR}/parity/json_stdout_bytes.py"
 					"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tiny.tgf"
 					"${WINE_EXECUTABLE}" "${MINGW_DIR}/tgf.exe")
@@ -409,30 +413,29 @@ endif()
 
 # Native REPL tests - python3 + pexpect/pyte; skip if modules absent.
 if(TARGET tgf AND NOT WIN32)
-	find_program(PYTHON3_EXECUTABLE python3)
-	if(PYTHON3_EXECUTABLE)
+	if(Python3_EXECUTABLE)
 		execute_process(
-			COMMAND "${PYTHON3_EXECUTABLE}" -c "import pexpect, pyte"
+			COMMAND "${Python3_EXECUTABLE}" -c "import pexpect, pyte"
 			RESULT_VARIABLE _py_deps_missing)
 		if(NOT _py_deps_missing)
 			# Legacy (-X) REPL keybindings - no FTXUI required.
 			add_test(NAME repl_keybindings_test
-				COMMAND "${PYTHON3_EXECUTABLE}"
+				COMMAND "${Python3_EXECUTABLE}"
 					"${CMAKE_CURRENT_SOURCE_DIR}/repl/test_repl_keybindings.py"
 					$<TARGET_FILE:tgf>
 					"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tau.tgf")
 			if(TAU_PARSER_HAS_FTXUI_DEP)
 				add_test(NAME repl_ftxui_test
-					COMMAND "${PYTHON3_EXECUTABLE}"
+					COMMAND "${Python3_EXECUTABLE}"
 						"${CMAKE_CURRENT_SOURCE_DIR}/repl/test_repl_ftxui.py"
 						$<TARGET_FILE:tgf>
 						"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tau.tgf")
 				add_test(NAME repl_ftxui_async_test
-					COMMAND "${PYTHON3_EXECUTABLE}"
+					COMMAND "${Python3_EXECUTABLE}"
 						"${CMAKE_CURRENT_SOURCE_DIR}/repl/test_repl_ftxui_async.py"
 						$<TARGET_FILE:repl_ftxui_async_fixture>)
 				add_test(NAME repl_ftxui_drain_test
-					COMMAND "${PYTHON3_EXECUTABLE}"
+					COMMAND "${Python3_EXECUTABLE}"
 						"${CMAKE_CURRENT_SOURCE_DIR}/repl/test_repl_ftxui_drain.py"
 						$<TARGET_FILE:tgf>
 						"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tau.tgf")
@@ -452,22 +455,21 @@ endif()
 # Validate real tgf JSON output against the AST schema and the API schema
 # when the Python jsonschema module is available.
 if(TARGET tgf AND NOT WIN32)
-	find_program(PYTHON3_SCHEMA_EXECUTABLE python3)
-	if(PYTHON3_SCHEMA_EXECUTABLE)
+	if(Python3_EXECUTABLE)
 		execute_process(
-			COMMAND "${PYTHON3_SCHEMA_EXECUTABLE}" -c
+			COMMAND "${Python3_EXECUTABLE}" -c
 				"import jsonschema, referencing"
 			RESULT_VARIABLE _jsonschema_missing)
 		if(NOT _jsonschema_missing)
 			add_test(NAME ast_schema_check
-				COMMAND "${PYTHON3_SCHEMA_EXECUTABLE}"
+				COMMAND "${Python3_EXECUTABLE}"
 					"${CMAKE_CURRENT_SOURCE_DIR}/schema_check.py"
 					"--ast"
 					"$<TARGET_FILE:tgf>"
 					"${PROJECT_SOURCE_DIR}/tests/fixtures/ambig.tgf"
 					"${PROJECT_SOURCE_DIR}/src/format/ast.json/ast.schema.json")
 			add_test(NAME tgf_api_schema_check
-				COMMAND "${PYTHON3_SCHEMA_EXECUTABLE}"
+				COMMAND "${Python3_EXECUTABLE}"
 					"${CMAKE_CURRENT_SOURCE_DIR}/schema_check.py"
 					"--api"
 					"$<TARGET_FILE:tgf>"

@@ -381,6 +381,18 @@ preset_entry() {
 	fi
 	dev_check_no_extra_positionals "preset argument"
 
+	# One interpreter for the configure, its producers and its tests. A set
+	# TAU_PYTHON stays: a cross build names a target interpreter there.
+	local python python_arg
+	python="$(dep_python)" || return 1
+	if [ -z "${TAU_PYTHON:-}" ]; then
+		export TAU_PYTHON="$python"
+	fi
+	python_arg="$python"
+	if command -v cygpath > /dev/null 2>&1; then
+		python_arg="$(cygpath -m "$python")"
+	fi
+
 	PRESET_RUN_BIN="${PRESET_RUN_BIN:-tgf}"
 
 	# only the configure step takes a generator or cache variables
@@ -412,6 +424,7 @@ preset_entry() {
 	echo "Configuring with preset ${PRESET}"
 	cmake ${fresh[@]+"${fresh[@]}"} --preset "${PRESET}" \
 		${generator_args[@]+"${generator_args[@]}"} \
+		"-DPython3_EXECUTABLE=${python_arg}" \
 		${DEV_CMAKE[@]+"${DEV_CMAKE[@]}"}
 	local status=$?
 	if [[ $status -ne 0 ]]; then
@@ -545,6 +558,31 @@ source "${__devrc_dir}/dep-build"
 dep_vars_reset
 DEP_POSITIONAL=()
 DEP_TARGET="$(dep_host_target)"
+
+# A python3 that runs, 3.12 first because the binding needs exactly 3.12. On
+# Windows the first python3 on PATH can be the WindowsApps stub, so each
+# candidate must run a line of Python.
+dep_python() {
+	local c probe prefix="${TAU_SHARED_PREFIX:-${HOME}/.tau}"
+	# The venv comes before a bare python3.12: only the venv holds nanobind.
+	local candidates=("${TAU_PYTHON:-}" \
+		"${prefix}/py312/Scripts/python.exe" "${prefix}/py312/bin/python3" \
+		"$(command -v python3.12 2>/dev/null)" \
+		"$(command -v python3 2>/dev/null)" "$(command -v python 2>/dev/null)")
+	for probe in 'import sys; sys.exit(sys.version_info[:2] != (3, 12))' \
+			'import sys'; do
+		for c in "${candidates[@]}"; do
+			[ -n "$c" ] || continue
+			case "$c" in *WindowsApps*) continue ;; esac
+			if "$c" -c "$probe" > /dev/null 2>&1; then
+				printf '%s' "$c"
+				return 0
+			fi
+		done
+	done
+	echo "dep: no python3 that runs; install python3, or run ./dev dep-python-venv in tau" >&2
+	return 1
+}
 
 # Print scripts/dep/<target>/<dep>.sh under <root>, or name the targets that
 # have a producer and fail.

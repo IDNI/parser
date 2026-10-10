@@ -144,7 +144,7 @@ _dep_ftxui_producer() {
 	local archive
 	for archive in "$staging_prefix"/lib/*.lib "$staging_prefix"/lib/*.a; do
 		[ -f "$archive" ] || continue
-		if ! python3 - "$archive" "$build" "$work" "$staging" \
+		if ! "$DEP_PYTHON" - "$archive" "$build" "$work" "$staging" \
 				"$staging_prefix" <<'PY'
 import sys
 path, *olds = sys.argv[1:]
@@ -207,6 +207,7 @@ DEP_FTXUI_CFLAGS="$(dep_var TAU_DEP_CFLAGS "")"
 DEP_FTXUI_CXXFLAGS="$(dep_var TAU_DEP_CXXFLAGS "")"
 DEP_FTXUI_TARGET="${DEP_TARGET:-$(dep_host_target)}"
 DEP_FTXUI_TOOLCHAIN="$(dep_var TAU_DEP_TOOLCHAIN "")"
+DEP_PYTHON="$(dep_python)" || exit 2
 _DEP_FTXUI_TOOLCHAIN_ARGS=()
 if dep_target_needs_toolchain "$DEP_FTXUI_TARGET"; then
 	if [ -z "$DEP_FTXUI_TOOLCHAIN" ]; then

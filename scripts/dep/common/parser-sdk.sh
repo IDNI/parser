@@ -216,7 +216,7 @@ _dep_parser_producer() {
 			"$staging_prefix/lib/tauparser.lib" \
 			"$staging_prefix/lib/tauparser_static.lib"; do
 		[ -f "$archive" ] || continue
-		if ! python3 - "$archive" "$build" "$staging_prefix" "$PARSER_SOURCE" \
+		if ! "$DEP_PYTHON" - "$archive" "$build" "$staging_prefix" "$PARSER_SOURCE" \
 			"$work" "$staging" "$ftxui_prefix" "$unordered_dense_prefix" <<'PY'
 import sys
 path, *olds = sys.argv[1:]
@@ -344,6 +344,7 @@ DEP_PARSER_CFLAGS="$(dep_var TAU_DEP_CFLAGS "")"
 DEP_PARSER_CXXFLAGS="$(dep_var TAU_DEP_CXXFLAGS "")"
 DEP_PARSER_TARGET="${DEP_TARGET:-$(dep_host_target)}"
 DEP_PARSER_TOOLCHAIN="$(dep_var TAU_DEP_TOOLCHAIN "")"
+DEP_PYTHON="$(dep_python)" || exit 2
 _DEP_PARSER_TOOLCHAIN_ARGS=()
 if dep_target_needs_toolchain "$DEP_PARSER_TARGET"; then
 	if [ -z "$DEP_PARSER_TOOLCHAIN" ]; then
