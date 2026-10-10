@@ -115,7 +115,7 @@ dep_target_host() {
 		linux-x86_64|linux-arm64|windows-x86_64-mingw|wasm32-emscripten)
 			echo linux ;;
 		darwin-arm64|darwin-x86_64) echo darwin ;;
-		windows-x86_64-msvc) echo windows ;;
+		windows-x86_64-msvc|windows-arm64-msvc) echo windows ;;
 		*) echo unknown ;;
 	esac
 }
@@ -125,7 +125,7 @@ dep_target_arch() {
 	case "$1" in
 		linux-x86_64|windows-x86_64-mingw|windows-x86_64-msvc|darwin-x86_64)
 			echo x86_64 ;;
-		linux-arm64|darwin-arm64) echo aarch64 ;;
+		linux-arm64|darwin-arm64|windows-arm64-msvc) echo aarch64 ;;
 		wasm32-emscripten) echo wasm32 ;;
 		*) echo unknown ;;
 	esac
@@ -152,6 +152,7 @@ dep_host_target() {
 		darwin:aarch64) echo darwin-arm64 ;;
 		darwin:x86_64) echo darwin-x86_64 ;;
 		windows:x86_64) echo windows-x86_64-mingw ;;
+		windows:aarch64) echo windows-arm64-msvc ;;
 		esac
 }
 
@@ -244,12 +245,15 @@ dep_compiler_version() {
 	fi
 }
 
-# cl.exe has no -dumpmachine. The only MSVC preset is x64, so the triple is
-# derivable from the compiler alone.
+# cl.exe has no -dumpmachine, so the triple comes from the arch of the target.
 dep_compiler_triple() {
 	local cxx="$1" target="${2:-$(dep_host_target)}"
 	if [ "$(dep_compiler_id "$cxx")" = "MSVC" ]; then
-		echo "x86_64-pc-windows-msvc"
+		if [ "$(dep_target_arch "$target")" = aarch64 ]; then
+			echo "aarch64-pc-windows-msvc"
+		else
+			echo "x86_64-pc-windows-msvc"
+		fi
 		return 0
 	fi
 	"$cxx" -dumpmachine 2>/dev/null || echo "unknown-${target}"
