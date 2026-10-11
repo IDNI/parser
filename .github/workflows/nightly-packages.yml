@@ -292,7 +292,7 @@ jobs:
           if-no-files-found: error
 
   windows_msvc_package:
-    name: Windows MSVC · package
+    name: Windows x86_64 · package
     needs: [check_date, check_tests]
     if: ${{ needs.check_date.outputs.should_run != 'false' }}
     runs-on: windows-latest
