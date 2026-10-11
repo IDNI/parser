@@ -342,6 +342,11 @@ struct treemr_parser_nonterminals {
 	};
 };
 
+#ifdef _MSC_VER
+// the base parser puts its chart indexes on a cache line, so the padding is wanted
+#	pragma warning(push)
+#	pragma warning(disable : 4324)
+#endif
 struct treemr_parser : public idni::parser<char, char32_t>, public treemr_parser_nonterminals {
 	static treemr_parser& instance() {
 		static treemr_parser inst;
@@ -360,5 +365,8 @@ struct treemr_parser : public idni::parser<char, char32_t>, public treemr_parser
 		return symbol_type(nt, &treemr_parser_data::nts);
 	}
 };
+#ifdef _MSC_VER
+#	pragma warning(pop)
+#endif
 
 #endif // __TREEMR_PARSER_H__

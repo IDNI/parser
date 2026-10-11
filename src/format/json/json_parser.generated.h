@@ -281,6 +281,11 @@ struct json_parser_nonterminals {
 	};
 };
 
+#ifdef _MSC_VER
+// the base parser puts its chart indexes on a cache line, so the padding is wanted
+#	pragma warning(push)
+#	pragma warning(disable : 4324)
+#endif
 struct json_parser : public idni::parser<char, char32_t>, public json_parser_nonterminals {
 	static json_parser& instance() {
 		static json_parser inst;
@@ -299,5 +304,8 @@ struct json_parser : public idni::parser<char, char32_t>, public json_parser_non
 		return symbol_type(nt, &json_parser_data::nts);
 	}
 };
+#ifdef _MSC_VER
+#	pragma warning(pop)
+#endif
 
 #endif // __JSON_PARSER_H__

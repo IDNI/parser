@@ -569,6 +569,11 @@ struct tgf_repl_parser_nonterminals {
 	};
 };
 
+#ifdef _MSC_VER
+// the base parser puts its chart indexes on a cache line, so the padding is wanted
+#	pragma warning(push)
+#	pragma warning(disable : 4324)
+#endif
 struct tgf_repl_parser : public idni::parser<char, char32_t>, public tgf_repl_parser_nonterminals {
 	static tgf_repl_parser& instance() {
 		static tgf_repl_parser inst;
@@ -587,5 +592,8 @@ struct tgf_repl_parser : public idni::parser<char, char32_t>, public tgf_repl_pa
 		return symbol_type(nt, &tgf_repl_parser_data::nts);
 	}
 };
+#ifdef _MSC_VER
+#	pragma warning(pop)
+#endif
 
 #endif // __TGF_REPL_PARSER_H__

@@ -143,6 +143,11 @@ struct csv_parser_nonterminals {
 	};
 };
 
+#ifdef _MSC_VER
+// the base parser puts its chart indexes on a cache line, so the padding is wanted
+#	pragma warning(push)
+#	pragma warning(disable : 4324)
+#endif
 struct csv_parser : public idni::parser<char, char32_t>, public csv_parser_nonterminals {
 	static csv_parser& instance() {
 		static csv_parser inst;
@@ -161,5 +166,8 @@ struct csv_parser : public idni::parser<char, char32_t>, public csv_parser_nonte
 		return symbol_type(nt, &csv_parser_data::nts);
 	}
 };
+#ifdef _MSC_VER
+#	pragma warning(pop)
+#endif
 
 #endif // __CSV_PARSER_H__

@@ -387,6 +387,11 @@ idni::diagnostics::result<std::vector<std::string>> generate_parser_cpp(
 		"	};\n"
 		"};\n"
 		"\n"
+		"#ifdef _MSC_VER\n"
+		"// the base parser puts its chart indexes on a cache line, so the padding is wanted\n"
+		"#\tpragma warning(push)\n"
+		"#\tpragma warning(disable : 4324)\n"
+		"#endif\n"
 		"struct " << opt.name << " : public idni::parser<"
 			<< opt.char_type << ", " << opt.terminal_type << ">, "
 			"public " << opt.name << "_nonterminals {\n"
@@ -411,6 +416,9 @@ idni::diagnostics::result<std::vector<std::string>> generate_parser_cpp(
 		"		return ::idni::treemr::matcher_for(*this, pattern);\n"
 		"	}\n";
 	os <<	"};\n"
+		"#ifdef _MSC_VER\n"
+		"#\tpragma warning(pop)\n"
+		"#endif\n"
 		"\n";
 	if (opt.ns.size()) os << "\n} // " <<opt.ns<< " namespace\n";
 	os <<	"#endif // __" << guard << "_H__\n";
