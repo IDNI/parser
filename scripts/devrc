@@ -312,6 +312,14 @@ preset_binary_dir() {
 		*-w64*)
 			echo "build/${type}-w64"
 			;;
+		# The arm64 MSVC folders name the toolchain before the arch. Their cases
+		# come first, as they also match *-arm64*.
+		*-msvc-cl-arm64*)
+			echo "build/${type}-msvc-cl-arm64"
+			;;
+		*-msvc-arm64*)
+			echo "build/${type}-msvc-arm64"
+			;;
 		*-arm64*)
 			echo "build/${type}-arm64"
 			;;
