@@ -160,118 +160,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # emsdk and the browser test dependencies on the Linux x86_64 deps layers,
-  # so the wasm test jobs import them instead of each one building them.
-  # Change the scope to force a rebuild.
-  wasm-deps:
-    name: WebAssembly · environment
-    needs: linux-resolve
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    env:
-      # ubuntu-24.04 runners are 4-core
-      BUILD_JOBS: 4
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - uses: docker/setup-buildx-action@v4
-
-      - uses: crazy-max/ghaction-github-runtime@v4
-
-      # mode=min keeps the layers of the final target only, so each slow
-      # stage is the final target of its own build.
-      - name: Build wasm-deps stage
-        run: |
-          ./dev docker wasm-deps --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --cache-from type=gha,scope=parser-deps \
-            --cache-from type=gha,scope=parser-wasm-deps \
-            --cache-to   type=gha,scope=parser-wasm-deps,mode=min
-
-      - name: Build wasm-browser-deps stage
-        run: |
-          ./dev docker wasm-browser-deps --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --cache-from type=gha,scope=parser-wasm-deps \
-            --cache-from type=gha,scope=parser-wasm-browser-deps \
-            --cache-to   type=gha,scope=parser-wasm-browser-deps,mode=min
-
-  # The wasm32-emscripten resolver: the wasm-publish stage it drives publishes
-  # the FTXUI and unordered_dense packages. parser-wasm is produced after that
-  # publish, so it never reaches GHCR. The publish is its own stage, so the
-  # node build imports the same resolve layers the browser job reads.
-  wasm-node:
-    name: WebAssembly · tests (node)
-    needs: [guard, wasm-deps]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    permissions:
-      contents: read
-      packages: write
-    env:
-      # ubuntu-24.04 runners are 4-core
-      BUILD_JOBS: 4
-      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - uses: docker/setup-buildx-action@v4
-
-      - uses: crazy-max/ghaction-github-runtime@v4
-
-      - name: Publish the wasm store packages
-        run: |
-          ./dev docker wasm-publish \
-            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
-            --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
-            --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=parser-wasm-deps
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and test
-        run: |
-          ./dev docker wasm-node \
-            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
-            --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=parser-wasm-deps \
-            --cache-from type=gha,scope=parser-wasm-build \
-            --cache-to   type=gha,scope=parser-wasm-build,mode=min
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # The native tgf configure of the browser gate reads the linux-x86_64
-  # packages of the Linux x86_64 environment, so it waits for that job, not
-  # for the Linux x86_64 test job.
-  wasm-browser:
-    name: WebAssembly · tests (browser)
-    needs: [wasm-deps, wasm-node, linux-resolve]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    env:
-      # ubuntu-24.04 runners are 4-core
-      BUILD_JOBS: 4
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - uses: docker/setup-buildx-action@v4
-
-      - uses: crazy-max/ghaction-github-runtime@v4
-
-      - name: Build and test
-        run: |
-          ./dev docker wasm-browser \
-            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
-            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
-            --secret id=gh_token,env=GH_TOKEN \
-            --cache-from type=gha,scope=parser-wasm-browser-deps \
-            --cache-from type=gha,scope=parser-wasm-build
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   # The x86_64 environment on an arm runner, so the arm64 store packages are
   # built natively. Its one scope holds the arm64 tool layers only: the x86
   # layers never match an arm runner.
@@ -340,6 +228,198 @@ jobs:
             --cache-from type=gha,scope=parser-linux-arm64-deps
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # The darwin-x86_64 environment: resolves and publishes the store and saves
+  # it for the tests job below. The key names the arch, so the two macOS
+  # platforms never share an entry.
+  macos-x86_64-store:
+    name: macOS x86_64 · environment
+    needs: guard
+    runs-on: macos-15-intel
+    timeout-minutes: 240
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # macos-15-intel runners are 4-core x86_64
+      TAU_BUILD_JOBS: 4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.tau/store
+          key: parser-store-macos-x86_64-${{ github.sha }}
+          restore-keys: |
+            parser-store-macos-x86_64-
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Resolve the store packages
+        run: |
+          ./dev preset release-all --configure-only \
+            -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DTAU_PARSER_DEPS_FROM_STORE=ON
+
+      - name: Publish the store packages
+        if: needs.guard.outputs.allowed == 'true'
+        run: ./dev store-publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.tau/store
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}
+
+  # The store comes from the cache that the environment job saved in this
+  # run, so a run without publish rights builds no store package either.
+  macos-x86_64:
+    name: macOS x86_64 · tests
+    needs: macos-x86_64-store
+    runs-on: macos-15-intel
+    timeout-minutes: 240
+    env:
+      # macos-15-intel runners are 4-core x86_64
+      TAU_BUILD_JOBS: 4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # The schema and REPL tests need new jsonschema, pexpect and pyte. uv
+      # builds the venv, and its bin lands ahead of Homebrew in PATH where
+      # configure finds the python3 probe.
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          # the same uv as the Docker base image
+          version: "0.12.13"
+
+      - name: Install the Python test modules
+        run: |
+          uv venv --python 3.12 "$RUNNER_TEMP/tau-python"
+          uv pip install --python "$RUNNER_TEMP/tau-python/bin/python" \
+            -r tests/requirements.txt
+          echo "$RUNNER_TEMP/tau-python/bin" >> "$GITHUB_PATH"
+
+      # An exact hit holds every package, so configure never reads the remote.
+      - name: Restore the dependency store (~/.tau/store)
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.tau/store
+          key: parser-store-macos-x86_64-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      # `run` on an -all preset makes ./dev call ctest itself.
+      - name: Build and test
+        run: |
+          ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DTAU_PARSER_DEPS_FROM_STORE=ON
+
+  # The darwin-arm64 environment: resolves and publishes the store and saves
+  # it for the tests job below. The key names the arch, so the two macOS
+  # platforms never share an entry.
+  macos-arm64-store:
+    name: macOS arm64 · environment
+    needs: guard
+    runs-on: macos-15
+    timeout-minutes: 240
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # macos-15 runners are 3-core arm64
+      TAU_BUILD_JOBS: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Restore the dependency store (~/.tau/store)
+        id: cache-store
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.tau/store
+          key: parser-store-macos-arm64-${{ github.sha }}
+          restore-keys: |
+            parser-store-macos-arm64-
+
+      - name: Install oras for the dependency store
+        run: ./dev dep-oras
+
+      - name: Log in to the dependency store
+        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Resolve the store packages
+        run: |
+          ./dev preset release-all --configure-only \
+            -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DTAU_PARSER_DEPS_FROM_STORE=ON
+
+      - name: Publish the store packages
+        if: needs.guard.outputs.allowed == 'true'
+        run: ./dev store-publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Save the dependency store (~/.tau/store)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.tau/store
+          key: ${{ steps.cache-store.outputs.cache-primary-key }}
+
+  # The store comes from the cache that the environment job saved in this
+  # run, so a run without publish rights builds no store package either.
+  macos-arm64:
+    name: macOS arm64 · tests
+    needs: macos-arm64-store
+    runs-on: macos-15
+    timeout-minutes: 240
+    env:
+      # macos-15 runners are 3-core arm64
+      TAU_BUILD_JOBS: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # The schema and REPL tests need new jsonschema, pexpect and pyte. uv
+      # builds the venv, and its bin lands ahead of Homebrew in PATH where
+      # configure finds the python3 probe.
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          # the same uv as the Docker base image
+          version: "0.12.13"
+
+      - name: Install the Python test modules
+        run: |
+          uv venv --python 3.12 "$RUNNER_TEMP/tau-python"
+          uv pip install --python "$RUNNER_TEMP/tau-python/bin/python" \
+            -r tests/requirements.txt
+          echo "$RUNNER_TEMP/tau-python/bin" >> "$GITHUB_PATH"
+
+      # An exact hit holds every package, so configure never reads the remote.
+      - name: Restore the dependency store (~/.tau/store)
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.tau/store
+          key: parser-store-macos-arm64-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      # `run` on an -all preset makes ./dev call ctest itself.
+      - name: Build and test
+        run: |
+          ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
+            -DTAU_PARSER_DEPS_FROM_STORE=ON
 
   # The Windows x86_64 environment: the windows-x86_64-msvc store. It resolves
   # both presets, cl.exe and clang-cl; the test matrix below needs it and
@@ -571,194 +651,114 @@ jobs:
           path: ~/.tau/store
           key: ${{ steps.cache-store.outputs.cache-primary-key }}
 
-  # The darwin-arm64 environment: resolves and publishes the store and saves
-  # it for the tests job below. The key names the arch, so the two macOS
-  # platforms never share an entry.
-  macos-arm64-store:
-    name: macOS arm64 · environment
-    needs: guard
-    runs-on: macos-15
-    timeout-minutes: 240
+  # emsdk and the browser test dependencies on the Linux x86_64 deps layers,
+  # so the wasm test jobs import them instead of each one building them.
+  # Change the scope to force a rebuild.
+  wasm-deps:
+    name: WebAssembly · environment
+    needs: linux-resolve
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: crazy-max/ghaction-github-runtime@v4
+
+      # mode=min keeps the layers of the final target only, so each slow
+      # stage is the final target of its own build.
+      - name: Build wasm-deps stage
+        run: |
+          ./dev docker wasm-deps --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --cache-from type=gha,scope=parser-deps \
+            --cache-from type=gha,scope=parser-wasm-deps \
+            --cache-to   type=gha,scope=parser-wasm-deps,mode=min
+
+      - name: Build wasm-browser-deps stage
+        run: |
+          ./dev docker wasm-browser-deps --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --cache-from type=gha,scope=parser-wasm-deps \
+            --cache-from type=gha,scope=parser-wasm-browser-deps \
+            --cache-to   type=gha,scope=parser-wasm-browser-deps,mode=min
+
+  # The wasm32-emscripten resolver: the wasm-publish stage it drives publishes
+  # the FTXUI and unordered_dense packages. parser-wasm is produced after that
+  # publish, so it never reaches GHCR. The publish is its own stage, so the
+  # node build imports the same resolve layers the browser job reads.
+  wasm-node:
+    name: WebAssembly · tests (node)
+    needs: [guard, wasm-deps]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
     env:
-      # macos-15 runners are 3-core arm64
-      TAU_BUILD_JOBS: 3
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
+      TAU_STORE_PUBLISH: ${{ needs.guard.outputs.allowed == 'true' && 'ON' || 'OFF' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Restore the dependency store (~/.tau/store)
-        id: cache-store
-        uses: actions/cache/restore@v6
-        with:
-          path: ~/.tau/store
-          key: parser-store-macos-arm64-${{ github.sha }}
-          restore-keys: |
-            parser-store-macos-arm64-
+      - uses: docker/setup-buildx-action@v4
 
-      - name: Install oras for the dependency store
-        run: ./dev dep-oras
+      - uses: crazy-max/ghaction-github-runtime@v4
 
-      - name: Log in to the dependency store
-        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
-
-      - name: Resolve the store packages
+      - name: Publish the wasm store packages
         run: |
-          ./dev preset release-all --configure-only \
-            -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
-            -DTAU_PARSER_DEPS_FROM_STORE=ON
-
-      - name: Publish the store packages
-        if: needs.guard.outputs.allowed == 'true'
-        run: ./dev store-publish
+          ./dev docker wasm-publish \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --build-arg TAU_STORE_PUBLISH=${{ env.TAU_STORE_PUBLISH }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=parser-wasm-deps
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Save the dependency store (~/.tau/store)
-        if: always()
-        uses: actions/cache/save@v6
-        with:
-          path: ~/.tau/store
-          key: ${{ steps.cache-store.outputs.cache-primary-key }}
-
-  # The store comes from the cache that the environment job saved in this
-  # run, so a run without publish rights builds no store package either.
-  macos-arm64:
-    name: macOS arm64 · tests
-    needs: macos-arm64-store
-    runs-on: macos-15
-    timeout-minutes: 240
-    env:
-      # macos-15 runners are 3-core arm64
-      TAU_BUILD_JOBS: 3
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      # The schema and REPL tests need new jsonschema, pexpect and pyte. uv
-      # builds the venv, and its bin lands ahead of Homebrew in PATH where
-      # configure finds the python3 probe.
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v10.2.0
-        with:
-          # the same uv as the Docker base image
-          version: "0.12.13"
-
-      - name: Install the Python test modules
-        run: |
-          uv venv --python 3.12 "$RUNNER_TEMP/tau-python"
-          uv pip install --python "$RUNNER_TEMP/tau-python/bin/python" \
-            -r tests/requirements.txt
-          echo "$RUNNER_TEMP/tau-python/bin" >> "$GITHUB_PATH"
-
-      # An exact hit holds every package, so configure never reads the remote.
-      - name: Restore the dependency store (~/.tau/store)
-        uses: actions/cache/restore@v6
-        with:
-          path: ~/.tau/store
-          key: parser-store-macos-arm64-${{ github.sha }}
-          fail-on-cache-miss: true
-
-      # `run` on an -all preset makes ./dev call ctest itself.
       - name: Build and test
         run: |
-          ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
-            -DTAU_PARSER_DEPS_FROM_STORE=ON
-
-  # The darwin-x86_64 environment: resolves and publishes the store and saves
-  # it for the tests job below. The key names the arch, so the two macOS
-  # platforms never share an entry.
-  macos-x86_64-store:
-    name: macOS x86_64 · environment
-    needs: guard
-    runs-on: macos-15-intel
-    timeout-minutes: 240
-    permissions:
-      contents: read
-      packages: write
-    env:
-      # macos-15-intel runners are 4-core x86_64
-      TAU_BUILD_JOBS: 4
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Restore the dependency store (~/.tau/store)
-        id: cache-store
-        uses: actions/cache/restore@v6
-        with:
-          path: ~/.tau/store
-          key: parser-store-macos-x86_64-${{ github.sha }}
-          restore-keys: |
-            parser-store-macos-x86_64-
-
-      - name: Install oras for the dependency store
-        run: ./dev dep-oras
-
-      - name: Log in to the dependency store
-        run: oras login "${TAU_STORE_REMOTE%%/*}" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
-
-      - name: Resolve the store packages
-        run: |
-          ./dev preset release-all --configure-only \
-            -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
-            -DTAU_PARSER_DEPS_FROM_STORE=ON
-
-      - name: Publish the store packages
-        if: needs.guard.outputs.allowed == 'true'
-        run: ./dev store-publish
+          ./dev docker wasm-node \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=parser-wasm-deps \
+            --cache-from type=gha,scope=parser-wasm-build \
+            --cache-to   type=gha,scope=parser-wasm-build,mode=min
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Save the dependency store (~/.tau/store)
-        if: always()
-        uses: actions/cache/save@v6
-        with:
-          path: ~/.tau/store
-          key: ${{ steps.cache-store.outputs.cache-primary-key }}
-
-  # The store comes from the cache that the environment job saved in this
-  # run, so a run without publish rights builds no store package either.
-  macos-x86_64:
-    name: macOS x86_64 · tests
-    needs: macos-x86_64-store
-    runs-on: macos-15-intel
-    timeout-minutes: 240
+  # The native tgf configure of the browser gate reads the linux-x86_64
+  # packages of the Linux x86_64 environment, so it waits for that job, not
+  # for the Linux x86_64 test job.
+  wasm-browser:
+    name: WebAssembly · tests (browser)
+    needs: [wasm-deps, wasm-node, linux-resolve]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     env:
-      # macos-15-intel runners are 4-core x86_64
-      TAU_BUILD_JOBS: 4
+      # ubuntu-24.04 runners are 4-core
+      BUILD_JOBS: 4
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      # The schema and REPL tests need new jsonschema, pexpect and pyte. uv
-      # builds the venv, and its bin lands ahead of Homebrew in PATH where
-      # configure finds the python3 probe.
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v10.2.0
-        with:
-          # the same uv as the Docker base image
-          version: "0.12.13"
+      - uses: docker/setup-buildx-action@v4
 
-      - name: Install the Python test modules
-        run: |
-          uv venv --python 3.12 "$RUNNER_TEMP/tau-python"
-          uv pip install --python "$RUNNER_TEMP/tau-python/bin/python" \
-            -r tests/requirements.txt
-          echo "$RUNNER_TEMP/tau-python/bin" >> "$GITHUB_PATH"
+      - uses: crazy-max/ghaction-github-runtime@v4
 
-      # An exact hit holds every package, so configure never reads the remote.
-      - name: Restore the dependency store (~/.tau/store)
-        uses: actions/cache/restore@v6
-        with:
-          path: ~/.tau/store
-          key: parser-store-macos-x86_64-${{ github.sha }}
-          fail-on-cache-miss: true
-
-      # `run` on an -all preset makes ./dev call ctest itself.
       - name: Build and test
         run: |
-          ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
-            -DTAU_PARSER_DEPS_FROM_STORE=ON
+          ./dev docker wasm-browser \
+            --build-arg BUILD_JOBS=${{ env.BUILD_JOBS }} \
+            --build-arg TAU_STORE_REMOTE=${{ env.TAU_STORE_REMOTE }} \
+            --secret id=gh_token,env=GH_TOKEN \
+            --cache-from type=gha,scope=parser-wasm-browser-deps \
+            --cache-from type=gha,scope=parser-wasm-build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
