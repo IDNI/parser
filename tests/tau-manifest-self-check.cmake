@@ -504,6 +504,11 @@ if(UNIX)
 				file(CHMOD "${_scale_pkg}/f${_i}.txt"
 					PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
 						GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+			else()
+				# set explicitly, the umask decides the mode otherwise
+				file(CHMOD "${_scale_pkg}/f${_i}.txt"
+					PERMISSIONS OWNER_READ OWNER_WRITE
+						GROUP_READ WORLD_READ)
 			endif()
 		endif()
 	endforeach()
