@@ -559,6 +559,22 @@ TEST_CASE("another thread has its own repository") {
 	CHECK(there != here);
 	CHECK(there != &mine);
 }
+
+TEST_CASE("a scope on another thread sets the repository of the first") {
+	options_repository mine;
+	options_scope scope(mine);
+	REQUIRE(options().declare(option_set{ .options = {
+		{ "handed-test", "test", size_t{ 0 }, "", {} } } }).has_value());
+	bool set = false;
+	thread t([&, repo = &options()] {
+		options_scope handed(*repo);
+		set = options().set_text("handed-test", "7").has_value();
+	});
+	t.join();
+	CHECK(set);
+	CHECK(options().get<size_t>("handed-test") == 7);
+	CHECK(options().set_text("handed-test", "8").has_value());
+}
 #endif
 
 } // TEST_SUITE

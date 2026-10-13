@@ -174,8 +174,10 @@ private:
 	std::string command_;
 	args_config cfg_;
 #ifdef DEBUG
-	// A repository and the fields it binds belong to one thread.
+	// A repository and the fields it binds belong to one thread; a scope
+	// on another thread takes it over until the scope ends.
 	std::thread::id thread_ = std::this_thread::get_id();
+	friend struct options_scope;
 #endif
 };
 
@@ -184,6 +186,8 @@ private:
 options_repository& options();
 
 /// Makes a repository current for a scope. Restores the previous one.
+/// A scope opened on another thread hands the repository to that thread:
+/// the thread that owned it must not touch it until the scope ends.
 struct options_scope {
 	explicit options_scope(options_repository& r);
 	~options_scope();
@@ -194,6 +198,7 @@ private:
 	options_repository* previous_;
 #ifdef DEBUG
 	options_repository* current_;
+	std::thread::id owner_;
 #endif
 };
 

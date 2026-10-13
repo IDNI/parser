@@ -16,6 +16,7 @@
 #include <string>
 #include <thread>
 #include <utility>
+#include <vector>
 #ifdef _WIN32
 #include <io.h>
 #ifndef STDIN_FILENO
@@ -32,6 +33,7 @@
 #include <ftxui/component/screen_interactive.hpp>
 #include <ftxui/dom/elements.hpp>
 
+#include "options.h"
 #include "repl_ftxui.h"
 #include "term.h"
 
@@ -61,9 +63,12 @@ static inline std::string key_token(const ftxui::Event& e) {
 
 class thread_routing_streambuf : public std::streambuf {
 public:
+	using written_t = std::vector<std::pair<bool, std::string>>;
+
 	thread_routing_streambuf(std::streambuf* passthrough,
-		std::string& buffer, std::mutex& mutex)
-		: passthrough_(passthrough), buffer_(buffer), mutex_(mutex) {}
+		written_t& written, std::mutex& mutex, bool is_err)
+		: passthrough_(passthrough), written_(written), mutex_(mutex),
+			is_err_(is_err) {}
 
 	void set_routed_thread(std::thread::id id) {
 		routed_thread_.store(id, std::memory_order_release);
@@ -75,7 +80,7 @@ protected:
 		char ch = traits_type::to_char_type(c);
 		if (is_routed()) {
 			std::lock_guard<std::mutex> lock(mutex_);
-			buffer_.push_back(ch);
+			run().push_back(ch);
 		} else return passthrough_->sputc(ch);
 		return c;
 	}
@@ -83,7 +88,7 @@ protected:
 	std::streamsize xsputn(const char* s, std::streamsize n) override {
 		if (is_routed()) {
 			std::lock_guard<std::mutex> lock(mutex_);
-			buffer_.append(s, static_cast<size_t>(n));
+			run().append(s, static_cast<size_t>(n));
 			return n;
 		}
 		return passthrough_->sputn(s, n);
@@ -100,10 +105,18 @@ private:
 			== routed_thread_.load(std::memory_order_acquire);
 	}
 
+	// The run this stream appends to; the caller holds mutex_.
+	std::string& run() {
+		if (written_.empty() || written_.back().first != is_err_)
+			written_.emplace_back(is_err_, std::string{});
+		return written_.back().second;
+	}
+
 	std::streambuf* passthrough_;
 	std::atomic<std::thread::id> routed_thread_{};
-	std::string& buffer_;
+	written_t& written_;
 	std::mutex& mutex_;
+	bool is_err_;
 };
 
 // Renders a string carrying ANSI SGR sequences (as produced by term::colors)
@@ -530,21 +543,17 @@ void repl_eval_widget<evaluator_t>::start(ftxui::ScreenInteractive* screen,
 	done_.store(false, std::memory_order_relaxed);
 	active_.store(true, std::memory_order_relaxed);
 	{
-		std::lock_guard<std::mutex> lock(out_mutex());
-		out_buf_.clear();
-	}
-	{
-		std::lock_guard<std::mutex> lock(err_mutex());
-		err_buf_.clear();
+		std::lock_guard<std::mutex> lock(written_mutex_);
+		written_.clear();
 	}
 
 	stream_lock_ = std::unique_lock<std::mutex>(repl_stream_mutex());
 	saved_cout_buf_ = std::cout.rdbuf();
 	saved_cerr_buf_ = std::cerr.rdbuf();
 	out_tsb_ = std::make_unique<thread_routing_streambuf>(
-		saved_cout_buf_, out_buf_, out_mutex());
+		saved_cout_buf_, written_, written_mutex_, false);
 	err_tsb_ = std::make_unique<thread_routing_streambuf>(
-		saved_cerr_buf_, err_buf_, err_mutex());
+		saved_cerr_buf_, written_, written_mutex_, true);
 	std::cout.rdbuf(out_tsb_.get());
 	std::cerr.rdbuf(err_tsb_.get());
 
@@ -556,7 +565,10 @@ void repl_eval_widget<evaluator_t>::start(ftxui::ScreenInteractive* screen,
 				screen_->PostEvent(ftxui::Event::Custom);
 		}
 	});
-	worker_ = std::thread([this] {
+	// the evaluator reads and sets the options of the thread that runs
+	// the REPL, which waits for the worker and leaves them alone meanwhile
+	worker_ = std::thread([this, repo = &idni::options()] {
+		options_scope scope(*repo);
 		out_tsb_->set_routed_thread(std::this_thread::get_id());
 		err_tsb_->set_routed_thread(std::this_thread::get_id());
 		result_ = evaluator_.eval(text_).value_or(0);
@@ -593,37 +605,32 @@ void repl_eval_widget<evaluator_t>::finish() {
 
 template <typename evaluator_t>
 void repl_eval_widget<evaluator_t>::drain_output(bool flush_partial) {
-	auto cutoff = [&](const std::string& buffer) -> size_t {
-		if (flush_partial) return buffer.size();
-		size_t newline = buffer.rfind('\n');
-		return newline == std::string::npos ? 0 : newline + 1;
-	};
-	std::string out_ready;
-	std::string err_ready;
+	// Complete lines only, unless flush_partial: every run up to the last
+	// newline written.
+	std::vector<std::pair<bool, std::string>> ready;
 	{
-		std::lock_guard<std::mutex> lock(out_mutex());
-		size_t count = cutoff(out_buf_);
-		out_ready = out_buf_.substr(0, count);
-		out_buf_.erase(0, count);
+		std::lock_guard<std::mutex> lock(written_mutex_);
+		if (flush_partial) ready.swap(written_);
+		else for (size_t i = written_.size(); i-- > 0;) {
+			size_t newline = written_[i].second.rfind('\n');
+			if (newline == std::string::npos) continue;
+			ready.assign(written_.begin(), written_.begin() + i);
+			ready.emplace_back(written_[i].first,
+				written_[i].second.substr(0, newline + 1));
+			written_[i].second.erase(0, newline + 1);
+			written_.erase(written_.begin(), written_.begin() + i);
+			break;
+		}
 	}
-	{
-		std::lock_guard<std::mutex> lock(err_mutex());
-		size_t count = cutoff(err_buf_);
-		err_ready = err_buf_.substr(0, count);
-		err_buf_.erase(0, count);
-	}
-	if (out_ready.empty() && err_ready.empty()) return;
-	if (flush_partial && !out_ready.empty() && out_ready.back() != '\n')
-		out_ready += '\n';
-	if (flush_partial && !err_ready.empty() && err_ready.back() != '\n')
-		err_ready += '\n';
+	std::erase_if(ready, [](const auto& run) { return run.second.empty(); });
+	if (ready.empty()) return;
+	if (flush_partial && ready.back().second.back() != '\n')
+		ready.back().second += '\n';
 	screen_->WithRestoredIO([&] {
 		// Clears rows the previous frame drew below the cursor, not just the current line.
 		std::cout << "\r\033[J";
-		std::cout << out_ready;
-		std::cerr << err_ready;
-		std::cout.flush();
-		std::cerr.flush();
+		for (const auto& [is_err, run] : ready)
+			(is_err ? std::cerr : std::cout) << run << std::flush;
 		// Scrolls past the next frame's stale reset-cursor move so it lands below this text, not on it.
 		const int dimy = screen_->dimy();
 		const size_t dy = dimy > 0 ? static_cast<size_t>(dimy - 1) : 0;

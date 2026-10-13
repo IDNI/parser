@@ -11,6 +11,8 @@
 #include <streambuf>
 #include <string>
 #include <thread>
+#include <utility>
+#include <vector>
 
 #include "repl_history.h"
 
@@ -39,8 +41,6 @@ struct repl_eval_widget {
 private:
 	void finish();
 	void drain_output(bool flush_partial);
-	std::mutex& out_mutex() { return out_mutex_; }
-	std::mutex& err_mutex() { return err_mutex_; }
 
 	evaluator_t& evaluator_;
 	ftxui::ScreenInteractive* screen_ = nullptr;
@@ -60,10 +60,10 @@ private:
 	std::chrono::steady_clock::time_point started_{};
 	std::streambuf* saved_cout_buf_ = nullptr;
 	std::streambuf* saved_cerr_buf_ = nullptr;
-	std::string out_buf_;
-	std::string err_buf_;
-	std::mutex out_mutex_;
-	std::mutex err_mutex_;
+	// What the worker wrote, in the order it wrote it: each run of text
+	// with whether it went to the error stream.
+	std::vector<std::pair<bool, std::string>> written_;
+	std::mutex written_mutex_;
 	std::unique_ptr<thread_routing_streambuf> out_tsb_;
 	std::unique_ptr<thread_routing_streambuf> err_tsb_;
 	std::unique_lock<std::mutex> stream_lock_;

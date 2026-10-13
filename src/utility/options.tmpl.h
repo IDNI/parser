@@ -836,12 +836,15 @@ inline options_scope::options_scope(options_repository& r)
 	: previous_(detail::current_options())
 {
 	DBG(current_ = &r;)
+	DBG(owner_ = r.thread_;)
+	DBG(r.thread_ = std::this_thread::get_id();)
 	detail::current_options() = &r;
 }
 
 inline options_scope::~options_scope() {
 	DBG(assert(detail::current_options() == current_
 		&& "an options scope ends out of order");)
+	DBG(current_->thread_ = owner_;)
 	detail::current_options() = previous_;
 }
 
