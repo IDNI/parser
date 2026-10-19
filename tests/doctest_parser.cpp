@@ -1036,6 +1036,45 @@ TEST_SUITE("bintree trim of a deep tree") {
 	}
 }
 
+TEST_SUITE("bintree tree path inline of a deep tree") {
+	TEST_CASE("inline_bintree_paths inlines a tree 100000 levels deep") {
+		using tree = parser<char>::tree;
+		nonterminals<char> nts;
+		auto gr = tgf<char>::from_string(nts, string(
+			"@inline w > v.\nstart => n.\nn => '(' w ')' | 'x'.\n"
+			"w => v.\nv => n.\n"));
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		const size_t depth = 100000;
+		string input(depth, '(');
+		input += 'x';
+		input += string(depth, ')');
+		parser<char> p(g, make_parser_options());
+		auto r = p.parse(input.c_str(), input.size(), { .tree_path =
+			parse_tree_path::bintree_path, .enable_gc = false });
+		REQUIRE(r.found);
+		tref t = r.inline_bintree_paths(r.get_bintree());
+		REQUIRE(t != nullptr);
+		REQUIRE(tree::get(t).value.first == nts("start"));
+		REQUIRE(tree::get(t).children_size() == 1);
+		// each n keeps '(' v ')', the path end v replaces w
+		auto level = [&nts](const tree& nt) {
+			return nt.value.first == nts("n") && nt.children_size() == 3
+				&& nt.first_tree().value.first.t() == '('
+				&& nt.second_tree().value.first == nts("v")
+				&& nt.second_tree().children_size() == 1
+				&& nt.third_tree().value.first.t() == ')';
+		};
+		size_t levels = 0;
+		tref n = tree::get(t).first();
+		for (; level(tree::get(n)); ++levels)
+			n = tree::get(n).second_tree().first();
+		CHECK(levels == depth);
+		REQUIRE(tree::get(n).children_size() == 1);
+		CHECK(tree::get(n).first_tree().value.first.t() == 'x');
+	}
+}
+
 // ---------------------------------------------------------------------------
 // parse_tree_path - runtime selection between forest_path and bintree_path
 // ---------------------------------------------------------------------------

@@ -77,33 +77,40 @@ template <typename C, typename T>
 tref parser<C, T>::result::inline_bintree_paths(tref ref,
 	const shaping_options& opts) const
 {
-	if (!ref) return nullptr;
-	const auto& t = tree::get(ref);
-	if (t.is_null()) return nullptr;
-	if (t.is_t()) return tree::get(t.value);
-	//std::cerr << "inlining treepath for node: `" << t.value.first.to_std_string() << "`" << std::endl;
-	for (auto& tp : opts.to_inline) {
-		if (tp.size() < 2) continue;
-		std::function<tref(tref, size_t)> go =
-			[&](tref ref, size_t i) -> tref
-		{
-			const auto& t = tree::get(ref);
-			if (!t.is_nt() || !t.is(tp[i])) return nullptr;
-			//std::cerr << "treepath go " << i << ": `"
-			//	<< t->value.first.to_std_string() << "`" << std::endl;
-			if (i == tp.size() - 1) return ref;
-			for (tref c : t.children())
-				if (auto y = go(c, i + 1); y) return y;
-			return nullptr;
-		};
-		if (auto hit = go(ref, 0); hit) return inline_bintree_paths(hit, opts);
-	}
-	trefs ch;
-	for (const auto& c : t.children()) {
-		if (auto x = inline_bintree_paths(c, opts); x)
-			ch.push_back(x);
-	}
-	return tree::get(t.value, ch);
+	if (!ref || tree::get(ref).is_null()) return nullptr;
+	// The end of the first tree path of to_inline that starts at n.
+	auto path_end = [&opts](tref n) -> tref {
+		for (auto& tp : opts.to_inline) {
+			if (tp.size() < 2) continue;
+			std::function<tref(tref, size_t)> go =
+				[&](tref ref, size_t i) -> tref
+			{
+				const auto& t = tree::get(ref);
+				if (!t.is_nt() || !t.is(tp[i])) return nullptr;
+				//std::cerr << "treepath go " << i << ": `"
+				//	<< t->value.first.to_std_string() << "`" << std::endl;
+				if (i == tp.size() - 1) return ref;
+				for (tref c : t.children())
+					if (auto y = go(c, i + 1); y) return y;
+				return nullptr;
+			};
+			if (auto hit = go(n, 0); hit) return hit;
+		}
+		return nullptr;
+	};
+	// Pre order, so the children of a path end are inlined as well.
+	auto inliner = [&path_end](tref n) {
+		if (tree::get(n).is_t()) return tree::get(tree::get(n).value);
+		while (tref hit = path_end(n)) n = hit;
+		const auto& t = tree::get(n);
+		trefs ch;
+		bool changed = false;
+		for (tref c : t.children())
+			if (tree::get(c).is_null()) changed = true;
+			else ch.push_back(c);
+		return changed ? tree::get(t.value, ch) : n;
+	};
+	return pre_order<pnode>(ref).apply(inliner);
 }
 template <typename C, typename T>
 tref parser<C, T>::result::inline_bintree_paths(tref ref) const {
