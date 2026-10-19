@@ -1365,20 +1365,20 @@ public:
 		/// derive a bintree from the forest when the result was produced in
 		/// forest mode.
 		tref get_trimmed_bintree(tref ref) const;
-		tref get_trimmed_bintree(tref ref, const shaping_options opts) const;
+		tref get_trimmed_bintree(tref ref, const shaping_options& opts) const;
 		tref inline_bintree_nodes(tref t) const;
-		tref inline_bintree_nodes(tref t, const shaping_options opts) const;
+		tref inline_bintree_nodes(tref t, const shaping_options& opts) const;
 		tref inline_bintree_paths(tref t) const;
-		tref inline_bintree_paths(tref t, const shaping_options opts) const;
+		tref inline_bintree_paths(tref t, const shaping_options& opts) const;
 		tref inline_bintree(tref t) const;
-		tref inline_bintree(tref t, const shaping_options opts) const;
+		tref inline_bintree(tref t, const shaping_options& opts) const;
 		tref trim_bintree_child_terminals(tref ref) const;
 		tref trim_bintree_child_terminals(tref ref,
-			const shaping_options opts) const;
+			const shaping_options& opts) const;
 		tref get_shaped_bintree();
-		tref get_shaped_bintree(const shaping_options opts);
+		tref get_shaped_bintree(const shaping_options& opts);
 		tref get_shaped_bintree(tref t);
-		tref get_shaped_bintree(tref t, const shaping_options opts);
+		tref get_shaped_bintree(tref t, const shaping_options& opts);
 		tref get_bintree();
 		/// Returns the bintree rooted at pnode n. In bintree mode this
 		/// searches froot directly and preserves an __AMB__ wrapper when n
@@ -1387,20 +1387,20 @@ public:
 
 		/// Legacy names for bintree (`tref`) APIs.
 		tref get_trimmed_tree2(tref ref) const;
-		tref get_trimmed_tree2(tref ref, const shaping_options opts) const;
+		tref get_trimmed_tree2(tref ref, const shaping_options& opts) const;
 		tref inline_tree_nodes2(tref t) const;
-		tref inline_tree_nodes2(tref t, const shaping_options opts) const;
+		tref inline_tree_nodes2(tref t, const shaping_options& opts) const;
 		tref inline_tree_paths2(tref t) const;
-		tref inline_tree_paths2(tref t, const shaping_options opts) const;
+		tref inline_tree_paths2(tref t, const shaping_options& opts) const;
 		tref inline_tree2(tref t) const;
-		tref inline_tree2(tref t, const shaping_options opts) const;
+		tref inline_tree2(tref t, const shaping_options& opts) const;
 		tref trim_children_terminals2(tref ref) const;
 		tref trim_children_terminals2(tref ref,
-			const shaping_options opts) const;
+			const shaping_options& opts) const;
 		tref get_shaped_tree2();
-		tref get_shaped_tree2(const shaping_options opts);
+		tref get_shaped_tree2(const shaping_options& opts);
 		tref get_shaped_tree2(tref t);
-		tref get_shaped_tree2(tref t, const shaping_options opts);
+		tref get_shaped_tree2(tref t, const shaping_options& opts);
 		tref get_tree2();
 		tref get_tree2(const pnode& n);
 
