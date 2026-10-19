@@ -5,6 +5,10 @@
 
 #include "init_test.h"
 
+#include <atomic>
+#include <chrono>
+#include <thread>
+
 struct is_capture_predicate {
 
 	bool operator()(const tref& n) const {
@@ -1391,6 +1395,7 @@ TEST_SUITE("print") {
 // own nodes and no other case sees a gc.
 enum class gc_deep_node : uint32_t {};
 enum class gc_wide_node : uint32_t {};
+enum class gc_pause_node : uint32_t {};
 
 TEST_SUITE("gc") {
 
@@ -1429,4 +1434,43 @@ TEST_SUITE("gc") {
 		CHECK( bintree<N>::node_count() == size_t{ gc_size } + 1 );
 		CHECK( tree::get(h).children_size() == gc_size );
 	}
+
+	TEST_CASE("gc: inside an open gc_pause, gc frees nothing") {
+		using N = gc_pause_node;
+		using tree = lcrs_tree<N>;
+		htref h = tree::geth(tree::get(N{ 0 }, tree::get(N{ 1 })));
+		tree::get(N{ 2 });
+		CHECK( bintree<N>::node_count() == 3 );
+		{
+			typename bintree<N>::gc_pause pause;
+			bintree<N>::gc();
+			CHECK( bintree<N>::node_count() == 3 );
+			std::unordered_set<tref> keep;
+			bintree<N>::gc(keep);
+			CHECK( bintree<N>::node_count() == 3 );
+		}
+		bintree<N>::gc();
+		CHECK( bintree<N>::node_count() == 2 );
+		CHECK( tree::get(h).children_size() == 1 );
+	}
+
+#if !defined(__EMSCRIPTEN__) || defined(__EMSCRIPTEN_PTHREADS__)
+	TEST_CASE("gc_pause: a pause waits while the gc holds the lock") {
+		using N = gc_pause_node;
+		std::atomic<bool> opened{ false };
+		std::thread t;
+		{
+			std::unique_lock lock(bintree<N>::mutex());
+			t = std::thread([&opened] {
+				typename bintree<N>::gc_pause pause;
+				opened = true;
+			});
+			std::this_thread::sleep_for(std::chrono::milliseconds(50));
+			CHECK_FALSE( opened.load() );
+		}
+		t.join();
+		CHECK( opened.load() );
+		CHECK( bintree<N>::gc_pause_depth.load() == 0 );
+	}
+#endif
 }

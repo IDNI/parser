@@ -237,7 +237,7 @@ struct bintree {
 	 * a raw flag a nested traversal would clear on the way out.
 	 */
 	struct gc_pause {
-		gc_pause() { gc_pause_depth.fetch_add(1, std::memory_order_relaxed); }
+		gc_pause();
 		~gc_pause() { gc_pause_depth.fetch_sub(1, std::memory_order_relaxed); }
 		gc_pause(const gc_pause&) = delete;
 		gc_pause& operator=(const gc_pause&) = delete;

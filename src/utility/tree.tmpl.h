@@ -164,6 +164,13 @@ void bintree<T>::dump() {
 	std::cout << "-----\n";
 }
 
+// the lock makes a pause wait for a running gc, and the gc sees it
+template <typename T>
+bintree<T>::gc_pause::gc_pause() {
+	std::shared_lock lock(mutex());
+	gc_pause_depth.fetch_add(1, std::memory_order_relaxed);
+}
+
 template <typename T>
 void bintree<T>::gc() {
 	if (gc_pause_depth.load(std::memory_order_relaxed) > 0) return;
@@ -175,6 +182,8 @@ template <typename T>
 void bintree<T>::gc(std::unordered_set<tref>& keep) {
 	if (gc_pause_depth.load(std::memory_order_relaxed) > 0) return;
 	std::unique_lock lock(mutex());
+	// a pause opens under the lock, so this check sees every open pause
+	if (gc_pause_depth.load(std::memory_order_relaxed) > 0) return;
 	// DBG(dump();)
 	//DBG(htree::dump();)
 
