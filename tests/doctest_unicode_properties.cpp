@@ -86,6 +86,24 @@ TEST_SUITE("unicode properties") {
 		}
 	}
 
+	TEST_CASE("python str classes") {
+		CHECK(python::isdecimal(0x0661));
+		CHECK_FALSE(python::isdecimal(0x00B2));
+		CHECK(python::isdigit(0x00B2));
+		CHECK_FALSE(python::isdigit(0x00BD));
+		CHECK(python::isnumeric(0x00BD));
+		CHECK_FALSE(python::isnumeric(U'a'));
+		CHECK(python::isalpha(0x02B0));
+		CHECK_FALSE(python::isalpha(0x0903));
+		CHECK(python::isalnum(0x00BD));
+		CHECK(python::isalnum(U'A'));
+		CHECK_FALSE(python::isalnum(U'_'));
+		CHECK_FALSE(python::isalnum(0x110000));
+		std::u32string out;
+		python::lower(U"\u0391\u03A3", out);
+		CHECK(out == U"\u03B1\u03C2");
+	}
+
 	TEST_CASE("to_lower") {
 		CHECK(to_lower(U'A') == U'a');
 		CHECK(to_lower(U'a') == U'a');
@@ -110,6 +128,25 @@ TEST_SUITE("unicode properties") {
 		one.clear();
 		to_lower_full(0x03A3, one);
 		CHECK(one == std::u32string{ 0x03C3 });
+	}
+
+	TEST_CASE("is_letter and has_numeric_value") {
+		// a code point, Python str.isalpha and str.isnumeric of it
+		const struct { char32_t cp; bool letter, numeric_value; } cases[] = {
+			{ U'A', true, false }, { 0x02B0, true, false },
+			{ 0x4E94, true, true }, { 0x0903, false, false },
+			{ 0x0300, false, false }, { 0x2160, false, true },
+			{ 0x16EE, false, true }, { 0x3007, false, true },
+			{ 0x00BD, false, true }, { 0x00B2, false, true },
+			{ 0x0661, false, true }, { 0x1F100, false, true },
+			{ U'_', false, false }, { U' ', false, false },
+			{ 0x110000, false, false },
+		};
+		for (const auto& c : cases) {
+			CAPTURE(static_cast<uint32_t>(c.cp));
+			CHECK(is_letter(c.cp) == c.letter);
+			CHECK(has_numeric_value(c.cp) == c.numeric_value);
+		}
 	}
 
 	TEST_CASE("is_cased and is_case_ignorable") {

@@ -86,6 +86,8 @@ A value above U+10FFFF has no property.
 |---|---|
 | `decimal_digit_value(cp)` | The value 0 to 9 when Numeric_Type is Decimal, else no value |
 | `has_digit_value(cp)` | True when Numeric_Type is Decimal or Digit, for example U+00B2 |
+| `is_letter(cp)` | True for the General Category Lu, Ll, Lt, Lm or Lo. A mark is no letter |
+| `has_numeric_value(cp)` | True when Numeric_Type is Decimal, Digit or Numeric, for example U+00BD |
 | `is_cased(cp)` | True for the property Cased |
 | `is_case_ignorable(cp)` | True for the property Case_Ignorable |
 | `to_lower(cp)` | The simple lowercase mapping, or `cp` |
@@ -113,6 +115,11 @@ The functions use the tables of the Unicode properties.
 
 | function | Python method | result |
 |---|---|---|
+| `isdecimal(c)` | `str.isdecimal` | True when Numeric_Type is Decimal |
+| `isdigit(c)` | `str.isdigit` | True when Numeric_Type is Decimal or Digit, for example U+00B2 |
+| `isnumeric(c)` | `str.isnumeric` | True when Numeric_Type is Decimal, Digit or Numeric, for example U+00BD |
+| `isalpha(c)` | `str.isalpha` | True for the General Category Lu, Ll, Lt, Lm or Lo |
+| `isalnum(c)` | `str.isalnum` | `isalpha` or `isnumeric` |
 | `isspace(c)` | `str.isspace` | True for White_Space and for the Bidi_Class WS, B and S |
 | `isprintable(c)` | `str.isprintable` | True for U+0020, and for no General Category Cc, Cf, Cs, Co, Cn, Zl, Zp or Zs |
 | `lower(s, out)` | `str.lower` | Appends the full lowercase mapping of `s` to `out`, with the Final_Sigma rule |
@@ -140,18 +147,19 @@ python3 tools/unicode/gen_charclasses.py
 ```
 
 The script downloads `UnicodeData.txt`, `DerivedCoreProperties.txt`,
-`PropList.txt`, `SpecialCasing.txt` and `ReadMe.txt` of Unicode 17.0.0 into
-`~/.cache/idni-ucd/<version>/`.
+`PropList.txt`, `SpecialCasing.txt`, `extracted/DerivedNumericType.txt` and
+`ReadMe.txt` of Unicode 17.0.0 into `~/.cache/idni-ucd/<version>/`.
 The script stops with an error when a file is missing.
 It also stops when the version in `ReadMe.txt`, `PropList.txt`,
-`DerivedCoreProperties.txt` or `SpecialCasing.txt` is not the version that
-the script asks for.
+`DerivedCoreProperties.txt`, `SpecialCasing.txt` or `DerivedNumericType.txt`
+is not the version that the script asks for.
 It needs Python 3 and no other package.
 
 Arguments:
 - `--unicode-version <version>` downloads the files of a different Unicode version.
 - `--cache-dir <dir>` keeps the downloaded files in a different folder.
-- `--ucd-dir <dir>` reads the five files from a local folder and downloads nothing.
+- `--ucd-dir <dir>` reads the six files from a local folder and downloads nothing.
+  The folder keeps `DerivedNumericType.txt` in its subfolder `extracted`.
 - `--output <file>` writes the header of the classes to a different file.
 - `--properties-output <file>` writes the header of the properties to a different file.
 - `--selftest` checks the tables against the data files and the ASCII `<cctype>` classes.

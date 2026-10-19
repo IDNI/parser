@@ -38,6 +38,18 @@ inline bool has_digit_value(char32_t cp) {
 	return property_word(cp) & tables::UP_DIGIT;
 }
 
+/// True for the General_Category Lu, Ll, Lt, Lm and Lo. A mark, such as
+/// U+0903, is no letter here.
+inline bool is_letter(char32_t cp) {
+	return property_word(cp) & tables::UP_LETTER;
+}
+
+/// True for Numeric_Type Decimal, Digit or Numeric, such as U+00BD or
+/// U+2160.
+inline bool has_numeric_value(char32_t cp) {
+	return property_word(cp) & tables::UP_NUMERIC_VALUE;
+}
+
 /// True for the Cased property of DerivedCoreProperties.txt.
 inline bool is_cased(char32_t cp) {
 	return property_word(cp) & tables::UP_CASED;

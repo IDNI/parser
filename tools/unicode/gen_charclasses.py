@@ -23,7 +23,7 @@ from pathlib import Path
 UNICODE_VERSION = "17.0.0"
 UCD_URL = "https://www.unicode.org/Public/{version}/ucd/{name}"
 UCD_FILES = ("UnicodeData.txt", "DerivedCoreProperties.txt", "PropList.txt",
-	"SpecialCasing.txt", "ReadMe.txt")
+	"SpecialCasing.txt", "extracted/DerivedNumericType.txt", "ReadMe.txt")
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = ROOT / "src" / "utility" / "charclasses_unicode.generated.h"
@@ -68,6 +68,7 @@ def download_ucd(version, cache_dir):
 			continue
 		url = UCD_URL.format(version=version, name=name)
 		print(f"downloading {url}", file=sys.stderr)
+		path.parent.mkdir(parents=True, exist_ok=True)
 		# A partial download must not look like a cached file.
 		tmp = path.with_suffix(".part")
 		with urllib.request.urlopen(url) as response, open(tmp, "wb") as out:
@@ -154,7 +155,7 @@ def parse_range_file(path):
 
 
 VERSIONED_FILES = ("PropList.txt", "DerivedCoreProperties.txt",
-	"SpecialCasing.txt")
+	"SpecialCasing.txt", "extracted/DerivedNumericType.txt")
 # UnicodeData.txt has no version line, so ReadMe.txt of the same folder
 # gives its version.
 README_VERSION = re.compile(r"for Version (\S+) of the Unicode Standard")
@@ -178,7 +179,7 @@ def check_ucd_version(ucd_dir, version):
 		path = Path(ucd_dir) / name
 		with open(path, encoding="utf-8") as f:
 			first = f.readline().strip()
-		stem = name[:-len(".txt")]
+		stem = Path(name).stem
 		expected = f"# {stem}-{version}.txt"
 		if first != expected:
 			return (f"{path}: the first line is '{first}', "
@@ -203,14 +204,20 @@ UP_SPACE = 1 << 6
 UP_PRINTABLE = 1 << 7
 UP_CASED = 1 << 8
 UP_CASE_IGNORABLE = 1 << 9
+UP_LETTER = 1 << 10
+UP_NUMERIC_VALUE = 1 << 11
+
+LETTER_CATEGORIES = frozenset(("Lu", "Ll", "Lt", "Lm", "Lo"))
 
 SPACE_BIDI_CLASSES = frozenset(("WS", "B", "S"))
 NOT_PRINTABLE_CATEGORIES = frozenset(
 	("Cc", "Cf", "Cs", "Co", "Cn", "Zl", "Zp", "Zs"))
 
 
-def compute_unicode_properties(fields_of, proplist, derived):
-	"""Return the property word of each code point."""
+def compute_unicode_properties(fields_of, proplist, derived, numeric_type):
+	"""Return the property word of each code point. @p numeric_type maps
+	Decimal, Digit and Numeric to their code points."""
+	numeric = set().union(*numeric_type.values())
 	space = proplist["White_Space"]
 	cased = derived["Cased"]
 	case_ignorable = derived["Case_Ignorable"]
@@ -235,6 +242,10 @@ def compute_unicode_properties(fields_of, proplist, derived):
 			word |= UP_CASED
 		if cp in case_ignorable:
 			word |= UP_CASE_IGNORABLE
+		if cat in LETTER_CATEGORIES:
+			word |= UP_LETTER
+		if cp in numeric:
+			word |= UP_NUMERIC_VALUE
 		words[cp] = word
 	return words
 
@@ -395,6 +406,8 @@ enum property_bit : uint16_t {{
     UP_PRINTABLE   = 1 << 7,  // U+0020, or no category Cc Cf Cs Co Cn Zl Zp Zs
     UP_CASED       = 1 << 8,  // DerivedCoreProperties: Cased
     UP_CASE_IGNORABLE = 1 << 9,  // DerivedCoreProperties: Case_Ignorable
+    UP_LETTER      = 1 << 10, // General_Category Lu, Ll, Lt, Lm or Lo
+    UP_NUMERIC_VALUE = 1 << 11, // Numeric_Type = Decimal, Digit or Numeric
 }};
 
 // Stage 1: maps the high bits (cp >> 8) to a block index.
@@ -525,7 +538,7 @@ def selftest(props, stage1, stage2, gc, derived, proplist):
 
 
 def properties_selftest(words, stage1, stage2, fields_of, proplist, derived,
-		simple, full, special_lower):
+		numeric_type, simple, full, special_lower):
 	errors = []
 	for cp in range(MAX_CP):
 		got = stage2[stage1[cp >> 8] * BLOCK_SIZE + (cp & (BLOCK_SIZE - 1))]
@@ -541,6 +554,27 @@ def properties_selftest(words, stage1, stage2, fields_of, proplist, derived,
 	space |= proplist["White_Space"]
 	if {cp for cp in range(MAX_CP) if words[cp] & UP_SPACE} != space:
 		errors.append("UP_SPACE differs from the data files")
+	letters = {cp for cp, f in fields_of.items() if f[2] in LETTER_CATEGORIES}
+	if {cp for cp in range(MAX_CP) if words[cp] & UP_LETTER} != letters:
+		errors.append("UP_LETTER differs from the data files")
+	numeric = set().union(*numeric_type.values())
+	if {cp for cp in range(MAX_CP) if words[cp] & UP_NUMERIC_VALUE} != numeric:
+		errors.append("UP_NUMERIC_VALUE differs from the data files")
+	# Numeric_Type Decimal and Digit are the code points with a digit value.
+	digits = numeric_type["Decimal"] | numeric_type["Digit"]
+	if {cp for cp in range(MAX_CP) if words[cp] & UP_DIGIT} != digits:
+		errors.append("UP_DIGIT differs from DerivedNumericType.txt")
+	for cp, bit in ((0x0903, 0), (0x2160, UP_LETTER), (0x00BD, UP_LETTER),
+			(0x4E94, UP_DIGIT)):
+		if words[cp] & bit:
+			errors.append(f"U+{cp:04X}: 0x{words[cp]:04X} fails the spot check")
+	for cp, bit in ((0x2160, UP_NUMERIC_VALUE), (0x00BD, UP_NUMERIC_VALUE),
+			(0x4E94, UP_NUMERIC_VALUE | UP_LETTER), (0x0041, UP_LETTER),
+			(0x02B0, UP_LETTER)):
+		if words[cp] & bit != bit:
+			errors.append(f"U+{cp:04X}: 0x{words[cp]:04X} fails the spot check")
+	if words[0x0903] & (UP_LETTER | UP_NUMERIC_VALUE):
+		errors.append("U+0903: a mark has the letter or the numeric bit")
 	for bit, name in ((UP_CASED, "Cased"), (UP_CASE_IGNORABLE,
 			"Case_Ignorable")):
 		if {cp for cp in range(MAX_CP) if words[cp] & bit} != derived[name]:
@@ -594,14 +628,17 @@ def main():
 	stage1, stage2, blocks = build_two_stage(props)
 	fields_of = parse_unicode_fields(Path(ucd_dir) / "UnicodeData.txt")
 	special_lower = parse_special_lower(Path(ucd_dir) / "SpecialCasing.txt")
-	words = compute_unicode_properties(fields_of, proplist, derived)
+	numeric_type = parse_range_file(
+		Path(ucd_dir) / "extracted" / "DerivedNumericType.txt")
+	words = compute_unicode_properties(fields_of, proplist, derived,
+		numeric_type)
 	p_stage1, p_stage2, p_blocks = build_two_stage(words)
 	simple, full = compute_lower(fields_of, special_lower)
 
 	if args.selftest:
 		ok = selftest(props, stage1, stage2, gc, derived, proplist)
 		ok = properties_selftest(words, p_stage1, p_stage2, fields_of,
-			proplist, derived, simple, full, special_lower) and ok
+			proplist, derived, numeric_type, simple, full, special_lower) and ok
 		return 0 if ok else 1
 
 	text = render_header(args.unicode_version, stage1, stage2, blocks)
