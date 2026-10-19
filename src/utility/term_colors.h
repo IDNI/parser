@@ -150,7 +150,7 @@ struct colors {
 
 namespace idni {
 
-inline static term::colors TC(true);
+inline term::colors TC(true);
 
 } // idni namespace
 

@@ -19,7 +19,9 @@ inline unsigned hex_val(char c) {
 	return 0;
 }
 
-static constexpr struct { char letter; char32_t cp; } control_escapes[] = {
+// a named type, so the inline table has external linkage and one copy
+struct control_escape { char letter; char32_t cp; };
+inline constexpr control_escape control_escapes[] = {
 	{ 'a', 0x07 }, { 'b', 0x08 }, { 'e', 0x1B }, { 'f', 0x0C },
 	{ 'n', 0x0A }, { 'r', 0x0D }, { 't', 0x09 }, { 'v', 0x0B },
 };

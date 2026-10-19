@@ -1,10 +1,10 @@
 namespace idni::tauparser {
 
-constexpr char commit_date[]  = "@COMMIT_DATE_ISO@";
-constexpr char version[]      = "@VERSION@";
-constexpr char full_version[] = "TGF version @VERSION@ ("
+inline constexpr char commit_date[]  = "@COMMIT_DATE_ISO@";
+inline constexpr char version[]      = "@VERSION@";
+inline constexpr char full_version[] = "TGF version @VERSION@ ("
 				TAU_PARSER_GIT_COMMIT_HASH ")";
-constexpr char license[] = R"LICENSE_TEXT(
+inline constexpr char license[] = R"LICENSE_TEXT(
 @LICENSE_CONTENT@
 
 )LICENSE_TEXT";
