@@ -399,6 +399,21 @@ TEST_SUITE("parser: basic") {
 		CHECK(g.start_literal().nt());
 		CHECK(g.start_literal().n() == nts.get("start"));
 	}
+
+	TEST_CASE("prods takes a single terminal") {
+		const prods<char> nul('\0'), a('a');
+		CHECK(nul == prods<char>(lit<char>('\0')));
+		CHECK(a == prods<char>(lit<char>('a')));
+		for (const auto& [p, c] : { std::pair{ &nul, '\0' },
+				std::pair{ &a, 'a' } })
+		{
+			REQUIRE(p->size() == 1);
+			const lits<char>& body = *(*p)[0].second.begin()->begin();
+			REQUIRE(body.size() == 1);
+			CHECK_FALSE(body[0].nt());
+			CHECK(body[0].t() == c);
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------

@@ -382,6 +382,8 @@ prods<C, T>::prods() : prods_t() { }
 template <typename C, typename T>
 prods<C, T>::prods(const lit<C, T>& l) : prods_t() { (*this)(l); }
 template <typename C, typename T>
+prods<C, T>::prods(T t) : prods(lit<C, T>(t)) { }
+template <typename C, typename T>
 prods<C, T>::prods(const std::basic_string<C>& s) : prods_t() { (*this)(s); }
 template <typename C, typename T>
 prods<C, T>::prods(const std::vector<T>& v) : prods_t() { (*this)(v); }

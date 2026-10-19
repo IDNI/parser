@@ -209,6 +209,12 @@ struct prods : public std::vector<prod<C, T>> {
 	 * literal lit usable in expressions.
 	 */
 	prods(const lit<C, T>& l);
+	/// The same as prods(lit<C, T>(t)).
+	prods(T t);
+	/// A wider integer is a nonterminal id, which needs the nonterminals.
+	template <std::integral U>
+		requires (sizeof(U) > sizeof(T))
+	prods(U) = delete;
 	/**
 	 * Same as previous constructor but instead of a single literal l in body
 	 * of the rule it represents a sequence of terminal literals from the
