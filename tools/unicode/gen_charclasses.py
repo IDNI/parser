@@ -8,8 +8,9 @@ Database (UCD).
 
 The first header holds a two-stage lookup table that maps each code point to
 a bitmask of the 12 <cctype> classes. The second holds a two-stage table of
-the digit value, the space and the printable properties. Do not edit the
-headers by hand: change this script and run it again.
+the digit value, the space and the printable properties, and the lowercase
+mappings. Do not edit the headers by hand: change this script and run it
+again.
 """
 
 import argparse
@@ -22,7 +23,7 @@ from pathlib import Path
 UNICODE_VERSION = "17.0.0"
 UCD_URL = "https://www.unicode.org/Public/{version}/ucd/{name}"
 UCD_FILES = ("UnicodeData.txt", "DerivedCoreProperties.txt", "PropList.txt",
-	"ReadMe.txt")
+	"SpecialCasing.txt", "ReadMe.txt")
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = ROOT / "src" / "utility" / "charclasses_unicode.generated.h"
@@ -122,6 +123,20 @@ def parse_unicode_fields(path):
 	return fields_of
 
 
+def parse_special_lower(path):
+	"""Return a dict that maps a code point to its unconditional full
+	lowercase mapping, a tuple of code points."""
+	lower = {}
+	for line in data_lines(path):
+		fields = [f.strip() for f in line.split(";")]
+		# A condition field (for example Final_Sigma) makes a sixth field.
+		if len(fields) != 5 or fields[4]:
+			continue
+		lower[int(fields[0], 16)] = tuple(
+			int(c, 16) for c in fields[1].split())
+	return lower
+
+
 def parse_range_file(path):
 	"""Return a dict that maps a property name to a set of code points."""
 	props = {}
@@ -138,7 +153,8 @@ def parse_range_file(path):
 	return props
 
 
-VERSIONED_FILES = ("PropList.txt", "DerivedCoreProperties.txt")
+VERSIONED_FILES = ("PropList.txt", "DerivedCoreProperties.txt",
+	"SpecialCasing.txt")
 # UnicodeData.txt has no version line, so ReadMe.txt of the same folder
 # gives its version.
 README_VERSION = re.compile(r"for Version (\S+) of the Unicode Standard")
@@ -213,6 +229,22 @@ def compute_unicode_properties(fields_of, proplist):
 			word |= UP_PRINTABLE
 		words[cp] = word
 	return words
+
+
+def compute_lower(fields_of, special_lower):
+	"""Return the simple lowercase pairs and the full mappings that differ
+	from the simple one, each sorted by code point."""
+	simple = []
+	for cp in sorted(fields_of):
+		if fields_of[cp][13]:
+			simple.append((cp, int(fields_of[cp][13], 16)))
+	simple_of = dict(simple)
+	full = []
+	for cp in sorted(special_lower):
+		mapping = special_lower[cp]
+		if mapping != (simple_of.get(cp, cp),):
+			full.append((cp, mapping))
+	return simple, full
 
 
 def is_punct(cp, cat):
@@ -361,12 +393,33 @@ inline constexpr uint16_t props_stage1[{stage1_len}] = {{
 """
 
 
-def render_properties_header(version, stage1, stage2, blocks):
+def emit_hex32(out, values, per_row):
+	rows = []
+	for i in range(0, len(values), per_row):
+		rows.append("    " + ", ".join(
+			f"0x{v:06X}" for v in values[i:i + per_row]))
+	out.append(",\n".join(rows))
+
+
+def render_properties_header(version, stage1, stage2, blocks, simple, full):
 	out = [PROPERTIES_TOP.format(version=version, stage1_len=len(stage1),
 		blocks=blocks)]
 	emit_array(out, stage1)
 	out.append(f"\n}};\n\ninline constexpr uint16_t props_stage2[{len(stage2)}] = {{\n")
 	emit_array(out, stage2)
+	out.append("\n};\n\n// The simple lowercase mapping: pairs of a code point "
+		"and its lowercase,\n// sorted by code point. A code point that is not "
+		"here maps to itself.\n"
+		f"inline constexpr uint32_t lower_simple[{2 * len(simple)}] = {{\n")
+	emit_hex32(out, [v for pair in simple for v in pair], 8)
+	flat = []
+	for cp, mapping in full:
+		flat.extend((cp, len(mapping)) + mapping + (0,) * (3 - len(mapping)))
+	out.append("\n};\n\n// The unconditional full lowercase mapping that "
+		"differs from the simple one:\n// a code point, the length of its "
+		"mapping and three code points, sorted\n// by code point.\n"
+		f"inline constexpr uint32_t lower_full[{len(flat)}] = {{\n")
+	emit_hex32(out, flat, 5)
 	out.append("\n};\n\n} // namespace idni::charclasses::unicode::tables\n\n"
 		"#endif //__IDNI__PARSER__UTILITY__UNICODE_PROPERTIES_GENERATED_H__\n")
 	return "".join(out)
@@ -461,7 +514,8 @@ def selftest(props, stage1, stage2, gc, derived, proplist):
 	return not errors
 
 
-def properties_selftest(words, stage1, stage2, fields_of, proplist):
+def properties_selftest(words, stage1, stage2, fields_of, proplist, simple,
+		full, special_lower):
 	errors = []
 	for cp in range(MAX_CP):
 		got = stage2[stage1[cp >> 8] * BLOCK_SIZE + (cp & (BLOCK_SIZE - 1))]
@@ -481,6 +535,12 @@ def properties_selftest(words, stage1, stage2, fields_of, proplist):
 		if bool(words[cp] & UP_DECIMAL) != bool(f[6]) or (f[6]
 				and f[6] != f[7]):
 			errors.append(f"U+{cp:04X}: the decimal value differs")
+	if dict(simple).get(0x0130) != 0x0069 or dict(simple).get(0x0041) != 0x61:
+		errors.append("the simple lowercase of U+0130 or U+0041 differs")
+	if dict(full).get(0x0130) != (0x0069, 0x0307):
+		errors.append("the full lowercase of U+0130 differs")
+	if any(len(m) > 3 for m in special_lower.values()):
+		errors.append("a full mapping has more than three code points")
 	report_errors(errors)
 	return not errors
 
@@ -519,13 +579,15 @@ def main():
 	props = compute_props(gc, derived, proplist)
 	stage1, stage2, blocks = build_two_stage(props)
 	fields_of = parse_unicode_fields(Path(ucd_dir) / "UnicodeData.txt")
+	special_lower = parse_special_lower(Path(ucd_dir) / "SpecialCasing.txt")
 	words = compute_unicode_properties(fields_of, proplist)
 	p_stage1, p_stage2, p_blocks = build_two_stage(words)
+	simple, full = compute_lower(fields_of, special_lower)
 
 	if args.selftest:
 		ok = selftest(props, stage1, stage2, gc, derived, proplist)
 		ok = properties_selftest(words, p_stage1, p_stage2, fields_of,
-			proplist) and ok
+			proplist, simple, full, special_lower) and ok
 		return 0 if ok else 1
 
 	text = render_header(args.unicode_version, stage1, stage2, blocks)
@@ -533,11 +595,12 @@ def main():
 		f.write(text)
 	print(f"wrote {args.output}: {blocks} unique blocks", file=sys.stderr)
 	text = render_properties_header(args.unicode_version, p_stage1, p_stage2,
-		p_blocks)
+		p_blocks, simple, full)
 	with open(args.properties_output, "w", encoding="utf-8",
 			newline="\n") as f:
 		f.write(text)
-	print(f"wrote {args.properties_output}: {p_blocks} unique blocks",
+	print(f"wrote {args.properties_output}: {p_blocks} unique blocks, "
+		f"{len(simple)} simple and {len(full)} full lowercase mappings",
 		file=sys.stderr)
 	return 0
 

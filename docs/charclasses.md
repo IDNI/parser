@@ -86,8 +86,12 @@ A value above U+10FFFF has no property.
 |---|---|
 | `decimal_digit_value(cp)` | The value 0 to 9 when Numeric_Type is Decimal, else no value |
 | `has_digit_value(cp)` | True when Numeric_Type is Decimal or Digit, for example U+00B2 |
+| `to_lower(cp)` | The simple lowercase mapping, or `cp` |
+| `to_lower_full(cp, out)` | Appends the unconditional full lowercase mapping to `out`, else the simple one |
 
 The section [Python string classes](#python-string-classes) uses these functions for the rules of the Python `str` methods.
+The one code point form of `to_lower_full` has no mapping that needs the
+context.
 
 ## Python string classes
 
@@ -126,17 +130,18 @@ python3 tools/unicode/gen_charclasses.py
 ```
 
 The script downloads `UnicodeData.txt`, `DerivedCoreProperties.txt`,
-`PropList.txt` and `ReadMe.txt` of Unicode 17.0.0 into
+`PropList.txt`, `SpecialCasing.txt` and `ReadMe.txt` of Unicode 17.0.0 into
 `~/.cache/idni-ucd/<version>/`.
 The script stops with an error when a file is missing.
-It also stops when the version in `ReadMe.txt`, `PropList.txt` or
-`DerivedCoreProperties.txt` is not the version that the script asks for.
+It also stops when the version in `ReadMe.txt`, `PropList.txt`,
+`DerivedCoreProperties.txt` or `SpecialCasing.txt` is not the version that
+the script asks for.
 It needs Python 3 and no other package.
 
 Arguments:
 - `--unicode-version <version>` downloads the files of a different Unicode version.
 - `--cache-dir <dir>` keeps the downloaded files in a different folder.
-- `--ucd-dir <dir>` reads the four files from a local folder and downloads nothing.
+- `--ucd-dir <dir>` reads the five files from a local folder and downloads nothing.
 - `--output <file>` writes the header of the classes to a different file.
 - `--properties-output <file>` writes the header of the properties to a different file.
 - `--selftest` checks the tables against the data files and the ASCII `<cctype>` classes.

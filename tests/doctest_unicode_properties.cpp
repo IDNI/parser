@@ -6,6 +6,8 @@
 #include "utility/python_charclasses.h"
 #include "utility/unicode_properties.h"
 
+#include <string>
+
 using namespace idni::charclasses::unicode;
 namespace python = idni::charclasses::python;
 
@@ -80,5 +82,31 @@ TEST_SUITE("unicode properties") {
 			CAPTURE(static_cast<uint32_t>(cp));
 			CHECK_FALSE(python::isprintable(cp));
 		}
+	}
+
+	TEST_CASE("to_lower") {
+		CHECK(to_lower(U'A') == U'a');
+		CHECK(to_lower(U'a') == U'a');
+		CHECK(to_lower(0x0130) == 0x0069);
+		CHECK(to_lower(0x2160) == 0x2170);
+		CHECK(to_lower(0x0410) == 0x0430);
+		CHECK(to_lower(0x10400) == 0x10428);
+		CHECK(to_lower(0xFF11) == 0xFF11);
+		CHECK(to_lower(0x0007) == 0x0007);
+		CHECK(to_lower(0x110000) == 0x110000);
+	}
+
+	TEST_CASE("to_lower_full") {
+		std::u32string out;
+		to_lower_full(0x0130, out);
+		CHECK(out == std::u32string{ 0x0069, 0x0307 });
+		to_lower_full(U'A', out);
+		CHECK(out == std::u32string{ 0x0069, 0x0307, U'a' });
+		std::u32string one;
+		to_lower_full(0x00DF, one);
+		CHECK(one == std::u32string{ 0x00DF });
+		one.clear();
+		to_lower_full(0x03A3, one);
+		CHECK(one == std::u32string{ 0x03C3 });
 	}
 }
