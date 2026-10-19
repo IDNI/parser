@@ -7,6 +7,8 @@
 #include "utility/unicode_properties.h"
 
 #include <string>
+#include <string_view>
+#include <utility>
 
 using namespace idni::charclasses::unicode;
 namespace python = idni::charclasses::python;
@@ -108,5 +110,52 @@ TEST_SUITE("unicode properties") {
 		one.clear();
 		to_lower_full(0x03A3, one);
 		CHECK(one == std::u32string{ 0x03C3 });
+	}
+
+	TEST_CASE("is_cased and is_case_ignorable") {
+		CHECK(is_cased(U'A'));
+		CHECK(is_cased(0x03A3));
+		CHECK(is_cased(0x02B0));
+		CHECK_FALSE(is_cased(U'1'));
+		CHECK_FALSE(is_cased(U'.'));
+		CHECK(is_case_ignorable(U'\''));
+		CHECK(is_case_ignorable(U'.'));
+		CHECK(is_case_ignorable(0x0301));
+		CHECK(is_case_ignorable(0x00AD));
+		CHECK(is_case_ignorable(0x02B0));
+		CHECK_FALSE(is_case_ignorable(U'A'));
+		CHECK_FALSE(is_case_ignorable(U' '));
+	}
+
+	// The expected strings come from Python str.lower.
+	TEST_CASE("to_lower_full of a text has the final sigma") {
+		const std::pair<std::u32string, std::u32string> cases[] = {
+			{ U"\u039F\u0394\u039F\u03A3", U"\u03BF\u03B4\u03BF\u03C2" },
+			{ U"\u03A3", U"\u03C3" },
+			{ U"\u0391\u03A3.", U"\u03B1\u03C2." },
+			{ U"\u0391\u03A3 \u0392", U"\u03B1\u03C2 \u03B2" },
+			{ U"\u03A3.", U"\u03C3." },
+			{ U"\u0130", U"\u0069\u0307" },
+			{ U"\u0391\u0301\u03A3", U"\u03B1\u0301\u03C2" },
+			{ U"\u0391'\u03A3", U"\u03B1'\u03C2" },
+			{ U"\u0391\u03A3\u0301\u0392", U"\u03B1\u03C3\u0301\u03B2" },
+			{ U"\u0391\u03A3\u0301", U"\u03B1\u03C2\u0301" },
+			{ U"\u0391\u03A3\u0391", U"\u03B1\u03C3\u03B1" },
+			{ U"\u0391\u03A31", U"\u03B1\u03C21" },
+			{ U"1\u03A3", U"1\u03C3" },
+			{ U"\u0391\u03A3\u03A3", U"\u03B1\u03C3\u03C2" },
+			{ U"\u0391\u03A3\u00AD\u0392", U"\u03B1\u03C3\u00AD\u03B2" },
+			{ U"ABC", U"abc" },
+			{ U"", U"" },
+		};
+		for (const auto& [text, lower] : cases) {
+			CAPTURE(text.size());
+			std::u32string out;
+			to_lower_full(std::u32string_view(text), out);
+			CHECK(out == lower);
+		}
+		std::u32string out = U"x";
+		to_lower_full(U"\u0391\u03A3", out);
+		CHECK(out == U"x\u03B1\u03C2");
 	}
 }

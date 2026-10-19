@@ -86,12 +86,21 @@ A value above U+10FFFF has no property.
 |---|---|
 | `decimal_digit_value(cp)` | The value 0 to 9 when Numeric_Type is Decimal, else no value |
 | `has_digit_value(cp)` | True when Numeric_Type is Decimal or Digit, for example U+00B2 |
+| `is_cased(cp)` | True for the property Cased |
+| `is_case_ignorable(cp)` | True for the property Case_Ignorable |
 | `to_lower(cp)` | The simple lowercase mapping, or `cp` |
 | `to_lower_full(cp, out)` | Appends the unconditional full lowercase mapping to `out`, else the simple one |
+| `to_lower_full(text, out)` | Appends the full lowercase mapping of each code point of `text` to `out`, with the Final_Sigma rule |
 
 The section [Python string classes](#python-string-classes) uses these functions for the rules of the Python `str` methods.
 The one code point form of `to_lower_full` has no mapping that needs the
-context.
+context. The text form has the one rule of the full mapping that needs
+the context and no language: U+03A3 gives U+03C2 at the end of a word.
+The rules for one language, such as Turkish or Lithuanian, are not here.
+
+The tables are Unicode 17.0.0. A program that must match another Unicode
+version can differ for the code points that are new or changed after that
+version.
 
 ## Python string classes
 
@@ -106,6 +115,7 @@ The functions use the tables of the Unicode properties.
 |---|---|---|
 | `isspace(c)` | `str.isspace` | True for White_Space and for the Bidi_Class WS, B and S |
 | `isprintable(c)` | `str.isprintable` | True for U+0020, and for no General Category Cc, Cf, Cs, Co, Cn, Zl, Zp or Zs |
+| `lower(s, out)` | `str.lower` | Appends the full lowercase mapping of `s` to `out`, with the Final_Sigma rule |
 
 ## Names in a grammar
 

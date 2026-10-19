@@ -201,15 +201,19 @@ UP_DIGIT = 1 << 4
 UP_DECIMAL = 1 << 5
 UP_SPACE = 1 << 6
 UP_PRINTABLE = 1 << 7
+UP_CASED = 1 << 8
+UP_CASE_IGNORABLE = 1 << 9
 
 SPACE_BIDI_CLASSES = frozenset(("WS", "B", "S"))
 NOT_PRINTABLE_CATEGORIES = frozenset(
 	("Cc", "Cf", "Cs", "Co", "Cn", "Zl", "Zp", "Zs"))
 
 
-def compute_unicode_properties(fields_of, proplist):
+def compute_unicode_properties(fields_of, proplist, derived):
 	"""Return the property word of each code point."""
 	space = proplist["White_Space"]
+	cased = derived["Cased"]
+	case_ignorable = derived["Case_Ignorable"]
 	words = [0] * MAX_CP
 	for cp in range(MAX_CP):
 		fields = fields_of.get(cp)
@@ -227,6 +231,10 @@ def compute_unicode_properties(fields_of, proplist):
 			word |= UP_SPACE
 		if cp == 0x20 or cat not in NOT_PRINTABLE_CATEGORIES:
 			word |= UP_PRINTABLE
+		if cp in cased:
+			word |= UP_CASED
+		if cp in case_ignorable:
+			word |= UP_CASE_IGNORABLE
 		words[cp] = word
 	return words
 
@@ -385,6 +393,8 @@ enum property_bit : uint16_t {{
     UP_DECIMAL     = 1 << 5,  // Numeric_Type = Decimal
     UP_SPACE       = 1 << 6,  // White_Space, or Bidi_Class WS, B or S
     UP_PRINTABLE   = 1 << 7,  // U+0020, or no category Cc Cf Cs Co Cn Zl Zp Zs
+    UP_CASED       = 1 << 8,  // DerivedCoreProperties: Cased
+    UP_CASE_IGNORABLE = 1 << 9,  // DerivedCoreProperties: Case_Ignorable
 }};
 
 // Stage 1: maps the high bits (cp >> 8) to a block index.
@@ -514,8 +524,8 @@ def selftest(props, stage1, stage2, gc, derived, proplist):
 	return not errors
 
 
-def properties_selftest(words, stage1, stage2, fields_of, proplist, simple,
-		full, special_lower):
+def properties_selftest(words, stage1, stage2, fields_of, proplist, derived,
+		simple, full, special_lower):
 	errors = []
 	for cp in range(MAX_CP):
 		got = stage2[stage1[cp >> 8] * BLOCK_SIZE + (cp & (BLOCK_SIZE - 1))]
@@ -531,6 +541,10 @@ def properties_selftest(words, stage1, stage2, fields_of, proplist, simple,
 	space |= proplist["White_Space"]
 	if {cp for cp in range(MAX_CP) if words[cp] & UP_SPACE} != space:
 		errors.append("UP_SPACE differs from the data files")
+	for bit, name in ((UP_CASED, "Cased"), (UP_CASE_IGNORABLE,
+			"Case_Ignorable")):
+		if {cp for cp in range(MAX_CP) if words[cp] & bit} != derived[name]:
+			errors.append(f"the {name} bit differs from the data files")
 	for cp, f in fields_of.items():
 		if bool(words[cp] & UP_DECIMAL) != bool(f[6]) or (f[6]
 				and f[6] != f[7]):
@@ -580,14 +594,14 @@ def main():
 	stage1, stage2, blocks = build_two_stage(props)
 	fields_of = parse_unicode_fields(Path(ucd_dir) / "UnicodeData.txt")
 	special_lower = parse_special_lower(Path(ucd_dir) / "SpecialCasing.txt")
-	words = compute_unicode_properties(fields_of, proplist)
+	words = compute_unicode_properties(fields_of, proplist, derived)
 	p_stage1, p_stage2, p_blocks = build_two_stage(words)
 	simple, full = compute_lower(fields_of, special_lower)
 
 	if args.selftest:
 		ok = selftest(props, stage1, stage2, gc, derived, proplist)
 		ok = properties_selftest(words, p_stage1, p_stage2, fields_of,
-			proplist, simple, full, special_lower) and ok
+			proplist, derived, simple, full, special_lower) and ok
 		return 0 if ok else 1
 
 	text = render_header(args.unicode_version, stage1, stage2, blocks)

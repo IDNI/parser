@@ -9,12 +9,14 @@
 #include <iterator>
 #include <optional>
 #include <string>
+#include <string_view>
 
 #include "unicode_properties.generated.h"
 
-// Unicode properties of one code point, from the tables of the Unicode
-// version in unicode_properties.generated.h. A value above U+10FFFF has
-// no property.
+// Unicode properties of one code point, from the tables of Unicode
+// 17.0.0 in unicode_properties.generated.h. A program that must match
+// another Unicode version can differ for the code points that are new or
+// changed after that version. A value above U+10FFFF has no property.
 namespace idni::charclasses::unicode {
 
 inline uint16_t property_word(char32_t cp) {
@@ -34,6 +36,16 @@ inline std::optional<int> decimal_digit_value(char32_t cp) {
 /// True for Numeric_Type Decimal or Digit, such as U+00B2.
 inline bool has_digit_value(char32_t cp) {
 	return property_word(cp) & tables::UP_DIGIT;
+}
+
+/// True for the Cased property of DerivedCoreProperties.txt.
+inline bool is_cased(char32_t cp) {
+	return property_word(cp) & tables::UP_CASED;
+}
+
+/// True for the Case_Ignorable property of DerivedCoreProperties.txt.
+inline bool is_case_ignorable(char32_t cp) {
+	return property_word(cp) & tables::UP_CASE_IGNORABLE;
 }
 
 /// The simple lowercase mapping of UnicodeData.txt, or @p cp itself.
@@ -64,6 +76,29 @@ inline void to_lower_full(char32_t cp, std::u32string& out) {
 			return;
 		}
 	out.push_back(to_lower(cp));
+}
+
+/// Append the full lowercase mapping of each code point of @p text to
+/// @p out, with the Final_Sigma rule of the Unicode standard: U+03A3
+/// gives U+03C2 when a cased code point comes before it and none comes
+/// after it, with the case-ignorable code points between them skipped.
+inline void to_lower_full(std::u32string_view text, std::u32string& out) {
+	constexpr char32_t capital_sigma = 0x03A3;
+	for (size_t i = 0; i != text.size(); ++i) {
+		if (text[i] != capital_sigma) {
+			to_lower_full(text[i], out);
+			continue;
+		}
+		size_t j = i;
+		while (j != 0 && is_case_ignorable(text[j - 1])) --j;
+		bool final_sigma = j != 0 && is_cased(text[j - 1]);
+		if (final_sigma) {
+			size_t k = i + 1;
+			while (k != text.size() && is_case_ignorable(text[k])) ++k;
+			final_sigma = k == text.size() || !is_cased(text[k]);
+		}
+		out.push_back(final_sigma ? 0x03C2 : 0x03C3);
+	}
 }
 
 } // namespace idni::charclasses::unicode
