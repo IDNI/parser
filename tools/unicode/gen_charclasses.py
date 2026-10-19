@@ -336,11 +336,15 @@ def selftest(props, stage1, stage2, gc, derived, proplist):
 		if table != cps:
 			errors.append(f"bit 0x{bit:04X}: {len(table ^ cps)} code points "
 				"differ from the data files")
+	report_errors(errors)
+	return not errors
+
+
+def report_errors(errors):
 	for msg in errors[:50]:
 		print(f"selftest: {msg}", file=sys.stderr)
 	print(f"selftest: {'FAILED, ' + str(len(errors)) + ' errors' if errors else 'passed'}",
 		file=sys.stderr)
-	return not errors
 
 
 def main():
