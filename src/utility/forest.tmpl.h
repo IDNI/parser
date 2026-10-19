@@ -43,21 +43,29 @@ typename htree::sp forest<NodeT>::graph::_extract_tree2(
 	node& r) {
 
 	std::map<node,size_t> edgcount;
-   	auto post_trav = [&edgcount, this](const node& root, tref rchd,
-		auto &post_trav) -> tref
-	{
-		nodes_set pack;
-		auto &g = *this;
-		if (root->first.nt()) {
-			auto it = g.find(root);
-			if (it == g.end()) return nullptr;
-			pack = it->second;
-		}
-		else // leaf terminal
-			return bintree<NodeT>::get(root, 0, rchd);
-		//DBG( assert(! (pack.size()>1) ));
-		auto nodesit = pack.begin();
+	// A nonterminal in progress: its right sibling, the children of its
+	// chosen pack, the next child from the end and the tree of the
+	// children built so far.
+	struct frame {
+		node root;
+		tref rchd;
+		const nodes* kids;
+		size_t i;
 		tref crchd = nullptr;    // child's right child
+	};
+	std::vector<frame> open;
+	// The tree of a node that needs no children, or nothing when the node
+	// opens a frame. The children are built from right to left, so each
+	// gets the tree of its right sibling.
+	auto enter = [&edgcount, &open, this](const node& root, tref rchd)
+		-> std::optional<tref>
+	{
+		if (!root->first.nt()) // leaf terminal
+			return bintree<NodeT>::get(root, 0, rchd);
+		auto it = this->find(root);
+		if (it == this->end()) return tref(nullptr);
+		const nodes_set& pack = it->second;
+		//DBG( assert(! (pack.size()>1) ));
 		if (pack.size() >= 1) {
 			// select pack to traverse not already done;
 			if (edgcount[root] >= pack.size()) {
@@ -66,20 +74,32 @@ typename htree::sp forest<NodeT>::graph::_extract_tree2(
 				return bintree<NodeT>::get(root, nullptr, rchd);
 			}
 			//still an edge to children unexplored
+			auto nodesit = pack.begin();
 			for (size_t i = 0; i < edgcount[root]; i++)
 				++nodesit;
 			edgcount[root]++;
-			for (auto chdit = nodesit->rbegin();
-				chdit != nodesit->rend(); chdit++)
-			{
-				crchd = post_trav(*chdit, crchd, post_trav);
-			}
+			open.push_back({ root, rchd, &*nodesit, nodesit->size() });
+			return std::nullopt;
 		}
-
-		return bintree<NodeT>::get((NodeT)root, crchd, rchd);
-    };
+		return bintree<NodeT>::get((NodeT)root, nullptr, rchd);
+	};
 	//bintree<NodeT>::dump();
-	tref tid = post_trav(r, 0, post_trav);
+	tref tid = nullptr;
+	if (auto x = enter(r, nullptr); x) tid = *x;
+	while (!open.empty()) {
+		frame& f = open.back();
+		if (f.i == 0) {
+			tref x = bintree<NodeT>::get((NodeT)f.root, f.crchd,
+				f.rchd);
+			open.pop_back();
+			if (open.empty()) tid = x;
+			else open.back().crchd = x;
+			continue;
+		}
+		const node& c = (*f.kids)[--f.i];
+		const tref crchd = f.crchd;
+		if (auto x = enter(c, crchd); x) open.back().crchd = *x;
+	}
 	return bintree<NodeT>::geth(tid);
 }
 

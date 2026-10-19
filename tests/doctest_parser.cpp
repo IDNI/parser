@@ -1110,6 +1110,47 @@ TEST_SUITE("bintree trim of child terminals of a deep tree") {
 	}
 }
 
+TEST_SUITE("forest graph of a deep tree") {
+	TEST_CASE("extract_tree2 builds a tree 100000 levels deep") {
+		using tree = parser<char>::tree;
+		nonterminals<char> nts;
+		auto gr = tgf<char>::from_string(nts, string(
+			"start => n.\nn => '(' n ')' | 'x'.\n"));
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		const size_t depth = 100000;
+		string input(depth, '(');
+		input += 'x';
+		input += string(depth, ')');
+		parser<char> p(g, make_parser_options());
+		auto r = p.parse(input.c_str(), input.size(), { .tree_path =
+			parse_tree_path::forest_path, .enable_gc = false });
+		REQUIRE(r.found);
+		// the graph of the forest as it is, so no traversal runs before
+		auto f = r.get_forest();
+		REQUIRE(f);
+		parser<char>::pforest::graph fg;
+		static_cast<parser<char>::pforest::node_graph&>(fg) = f->g;
+		fg.root = f->root();
+		auto h = fg.extract_tree2();
+		REQUIRE(h);
+		tref t = h->get();
+		REQUIRE(tree::get(t).value.first == nts("start"));
+		REQUIRE(tree::get(t).children_size() == 1);
+		auto level = [&nts](const tree& nt) {
+			return nt.value.first == nts("n") && nt.children_size() == 3
+				&& nt.first_tree().value.first.t() == '('
+				&& nt.third_tree().value.first.t() == ')';
+		};
+		size_t levels = 0;
+		tref n = tree::get(t).first();
+		for (; level(tree::get(n)); ++levels) n = tree::get(n).second();
+		CHECK(levels == depth);
+		REQUIRE(tree::get(n).children_size() == 1);
+		CHECK(tree::get(n).first_tree().value.first.t() == 'x');
+	}
+}
+
 TEST_SUITE("shaping inlines a tree path") {
 	TEST_CASE("the path end replaces the path start on both tree paths") {
 		nonterminals<char> nts;
