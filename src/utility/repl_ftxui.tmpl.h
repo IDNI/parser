@@ -307,6 +307,8 @@ int repl_ftxui<evaluator_t>::run_pipe() {
 		int ret = re_.eval(full).value_or(0);
 		if (ret == 2) {
 			acc = std::move(full);
+			cout << continuation_prompt_;
+			cout.flush();
 			continue;
 		} // incomplete
 		store_history(full); // store on ok and quit (matches repl<>)
@@ -336,19 +338,20 @@ int repl_ftxui<evaluator_t>::run_interactive() {
 	opt.transform       = [](InputState state) { return state.element; };
 	Component input     = Input(opt);
 
-	// Prompt rendered as a left gutter; continuation lines indent beneath it.
-	// While an evaluation runs, the spinner row replaces the prompt row.
+	// Prompt rendered as a left gutter, one row per input line: the prompt,
+	// then the continuation prompt. While an evaluation runs, the spinner row
+	// replaces the prompt row.
 	Component line = Renderer(input, [this, input] {
 		if (eval_widget_.active()) return eval_widget_.render();
-		std::string prompt;
-		{
-			std::lock_guard<std::mutex> lock(prompt_mutex());
-			prompt = prompt_;
-		}
+		Elements rows;
+		size_t h = count_newlines(input_text_.data(),
+			input_text_.size()) + 1;
+		for (size_t i = 0; i != h; ++i)
+			rows.push_back(ansi_to_element(gutter(i)));
 		Element editor = input_text_.empty()
 			? (text(" ") | focusCursorBarBlinking)
 			: input->Render();
-		return hbox({ ansi_to_element(prompt), editor });
+		return hbox({ vbox(std::move(rows)), editor });
 	});
 
 	// Is the cursor on the first / last line of the (possibly multiline) buffer?
@@ -375,14 +378,7 @@ int repl_ftxui<evaluator_t>::run_interactive() {
 				: input_text_.rfind('\n', cp > 0 ? cp - 1 : 0) + 1;
 			size_t line_end = input_text_.find('\n', cp);
 			if (line_end == std::string::npos) line_end = input_text_.size();
-			std::string prompt;
-			{
-				std::lock_guard<std::mutex> lock(prompt_mutex());
-				prompt = prompt_;
-			}
-			std::cout << "\r\033[K";
-			std::cout << (cy == 0
-				? prompt : std::string(visible_width(prompt), ' '));
+			std::cout << "\r\033[K" << gutter(cy);
 			std::cout << input_text_.substr(line_start,
 				line_end - line_start);
 			size_t down = h - 1 - cy;
@@ -686,6 +682,26 @@ void repl_ftxui<evaluator_t>::set_prompt(const std::string& p) {
 		prompt_ = p;
 	}
 	if (screen_) screen_->PostEvent(ftxui::Event::Custom); // request redraw
+}
+
+template <typename evaluator_t>
+void repl_ftxui<evaluator_t>::set_continuation_prompt(const std::string& p) {
+	{
+		std::lock_guard<std::mutex> lock(prompt_mutex());
+		continuation_prompt_ = p;
+	}
+	if (screen_) screen_->PostEvent(ftxui::Event::Custom); // request redraw
+}
+
+template <typename evaluator_t>
+std::string repl_ftxui<evaluator_t>::gutter(size_t row) {
+	std::lock_guard<std::mutex> lock(prompt_mutex());
+	size_t pw = visible_width(prompt_);
+	size_t cw = visible_width(continuation_prompt_);
+	size_t w = std::max(pw, cw);
+	// the prompt keeps its column, the continuation prompt ends where it ends
+	if (row == 0) return prompt_ + std::string(w - pw, ' ');
+	return std::string(w - cw, ' ') + continuation_prompt_;
 }
 
 template <typename evaluator_t>

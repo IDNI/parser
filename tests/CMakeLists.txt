@@ -294,6 +294,12 @@ if(TARGET tgf AND TAU_PARSER_HAS_FTXUI_DEP)
 				${CMAKE_CROSSCOMPILING_EMULATOR}
 				$<TARGET_FILE:repl_ftxui_async_fixture>)
 	endif()
+	if(NOT CMAKE_HOST_WIN32)
+		add_test(NAME ftxui_repl_pipe_continuation
+			COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/parity/ftxui_repl_pipe_continuation.sh"
+				${CMAKE_CROSSCOMPILING_EMULATOR}
+				$<TARGET_FILE:repl_ftxui_async_fixture>)
+	endif()
 	# Runs `tgf repl` vs `tgf repl -x` over identical scripted input and
 	# asserts identical .tgf_history. See ftxui_repl_parity.sh.
 	if(NOT WIN32)

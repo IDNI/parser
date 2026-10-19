@@ -19,7 +19,10 @@ using namespace std::chrono_literals;
 struct slow_evaluator {
 	idni::repl_ftxui<slow_evaluator>* r_ftx = nullptr;
 
-	void reprompt() { r_ftx->set_prompt("test> "); }
+	void reprompt() {
+		r_ftx->set_prompt("test> ");
+		r_ftx->set_continuation_prompt("...> ");
+	}
 
 	idni::diagnostics::result<int> eval(const std::string& text) {
 		idni::diagnostics::result<int> result;

@@ -68,6 +68,9 @@ def main():
         tester._stabilize(0.1)
         if not any("incomplete" in line for line in tester.render()):
             fail("incomplete input was not restored", tester)
+        if not any(line.lstrip().startswith("...>")
+                for line in tester.render()):
+            fail("the continuation line shows no continuation prompt", tester)
         tester.send_ctrl("c")
         tester.send("quit")
         tester.child.expect_exact(b"Quit.", timeout=10)

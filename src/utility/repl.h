@@ -126,6 +126,10 @@ struct repl {
 		TDBG(std::cerr << " <EVAL: " << ret << ">";)
 		if (ret == 2) { // Unexpected end of file, continue
 			input_.insert(it_at(pos_ - 1), '\n');
+			// the interactive editor starts continuation rows at
+			// column 0 (see update_widths), so only a pipe shows it
+			if (is_pipe_) term::out(continuation_prompt_.c_str(),
+				continuation_prompt_.size());
 			return ret;
 		}
 		history_.store(s);
@@ -163,6 +167,11 @@ struct repl {
 		TDBG(print_debug();)
 	}
 	void set_prompt(const std::string& p) { prompt_ = p; }
+	/// Sets the prompt of the lines after the first while the input is
+	/// incomplete (pipe mode only); empty by default
+	void set_continuation_prompt(const std::string& p) {
+		continuation_prompt_ = p;
+	}
 	void clear() { if (!is_pipe_) term::clear(); }
 	/// Returns the current prompt
 	std::string prompt() const { return prompt_; }
@@ -388,6 +397,7 @@ private:
 	}
 	evaluator_t& re_;
 	std::string prompt_;
+	std::string continuation_prompt_;
 	repl_history history_;
 	std::vector<char> input_;
 	size_t pos_ = 0; /// cursor position in input

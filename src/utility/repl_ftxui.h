@@ -105,6 +105,9 @@ struct repl_ftxui {
 
 	/// Sets the prompt (used by the evaluator's reprompt()).
 	void set_prompt(const std::string& p);
+	/// Sets the prompt of the lines after the first while the input is
+	/// incomplete; empty (the default) indents them under the prompt.
+	void set_continuation_prompt(const std::string& p);
 
 	/// Clears the terminal while the interactive screen is temporarily restored.
 	void clear();
@@ -123,12 +126,16 @@ private:
 
 	void store_history(const std::string& s);
 	std::mutex& prompt_mutex() { return prompt_mutex_; }
+	/// Gutter of input row `row`: the prompt on the first, the continuation
+	/// prompt on the others, both padded to one width.
+	std::string gutter(size_t row);
 	void apply_eval_result(int result, const std::string& text,
 		int cursor, bool store, bool allow_incomplete);
 
 	evaluator_t& re_;
 	repl_eval_widget<evaluator_t> eval_widget_;
 	std::string  prompt_;
+	std::string  continuation_prompt_;
 	mutable std::mutex prompt_mutex_;
 	repl_history history_;
 
