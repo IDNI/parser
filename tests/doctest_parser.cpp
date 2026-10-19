@@ -1151,6 +1151,46 @@ TEST_SUITE("forest graph of a deep tree") {
 	}
 }
 
+TEST_SUITE("forest traversal of a deep tree") {
+	TEST_CASE("traverse visits a forest 100000 levels deep in pre order") {
+		nonterminals<char> nts;
+		auto gr = tgf<char>::from_string(nts, string(
+			"start => n.\nn => '(' n ')' | 'x'.\n"));
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		const size_t depth = 100000;
+		string input(depth, '(');
+		input += 'x';
+		input += string(depth, ')');
+		parser<char> p(g, make_parser_options());
+		auto r = p.parse(input.c_str(), input.size(), { .tree_path =
+			parse_tree_path::forest_path, .enable_gc = false });
+		REQUIRE(r.found);
+		auto* f = r.get_forest();
+		REQUIRE(f);
+		// an n enters from the outside in and exits from the inside out
+		const auto n_id = nts("n");
+		size_t entered = 0, exited = 0, n_in = 0, n_out = 0, bad = 0;
+		auto cb_enter = [&](const auto& n) {
+			++entered;
+			if (n->first.nt() && n->first == n_id)
+				if (n->second[0] != n_in++) ++bad;
+		};
+		auto cb_exit = [&](const auto& n, const auto&) {
+			++exited;
+			if (n->first.nt() && n->first == n_id)
+				if (n->second[0] != depth - n_out++) ++bad;
+		};
+		CHECK(f->traverse(cb_enter, cb_exit));
+		// start, depth + 1 times n, depth times '(' and ')', and 'x'
+		CHECK(entered == 3 * depth + 3);
+		CHECK(exited == entered);
+		CHECK(n_in == depth + 1);
+		CHECK(n_out == depth + 1);
+		CHECK(bad == 0);
+	}
+}
+
 TEST_SUITE("shaping inlines a tree path") {
 	TEST_CASE("the path end replaces the path start on both tree paths") {
 		nonterminals<char> nts;

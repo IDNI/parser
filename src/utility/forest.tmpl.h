@@ -1,6 +1,7 @@
 // To view the license please visit
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
+#include <deque>
 #include <optional>
 #include "forest.h"
 namespace idni {
@@ -428,51 +429,65 @@ bool forest<NodeT>::_traverse(const node_graph& g, const node& root,
 	std::set<node>& done, cb_enter_t cb_enter, cb_exit_t cb_exit,
 	cb_revisit_t cb_revisit, cb_ambig_t cb_ambig, bool post_ord) const
 {
+	// A node in progress: its chosen packs, the current pack, the next
+	// child in visit order and the result of its children. A deque keeps
+	// each frame in place, so the pack iterator stays valid.
+	struct frame {
+		node root;
+		nodes_set chosen;
+		typename nodes_set::const_iterator pack{};
+		size_t i = 0;
+		bool ret = true;
+	};
+	std::deque<frame> open;
+	// Open a node, or give false for a nonterminal outside the graph.
+	auto start = [&](const node& n) -> std::optional<bool> {
 //#define DEBUG_TRAVERSE
 #ifdef DEBUG_TRAVERSE
-	std::cout << "enter: \t\t" << root->first.to_std_string() << "\n";
-	std::cout << "\t" << (root->first.nt() ? "NT" : " T") << " ";
-	if (root->first.nt()) std::cout << "n: " << root->first.n()
-		<< " `" << root->first.to_std_string();
-	else std::cout << "t: `" << to_std_string(root->first.t()) << "`";
-	std::cout << "\n";
+		std::cout << "enter: \t\t" << n->first.to_std_string() << "\n";
+		std::cout << "\t" << (n->first.nt() ? "NT" : " T") << " ";
+		if (n->first.nt()) std::cout << "n: " << n->first.n()
+			<< " `" << n->first.to_std_string();
+		else std::cout << "t: `" << to_std_string(n->first.t()) << "`";
+		std::cout << "\n";
 #endif
-	bool ret = true;
-	nodes_set pack;
-	if (root->first.nt()) {
-		auto it = g.find(root);
-		if (it == g.end()) return false;
-		pack = it->second;
-	}
-	auto visit_root = [&](){
-		cb_enter(root);
-		done.insert(root);
+		nodes_set pack;
+		if (n->first.nt()) {
+			auto it = g.find(n);
+			if (it == g.end()) return false;
+			pack = it->second;
+		}
+		if (!post_ord) cb_enter(n), done.insert(n);
+		open.push_back({ n, pack.size() > 1 ? cb_ambig(n, pack) : pack });
+		open.back().pack = open.back().chosen.begin();
+		return std::nullopt;
 	};
-	if(!post_ord) visit_root();
-
-	nodes_set choosen_pack = pack.size() > 1
-		? cb_ambig(root, pack) : pack;
-	for (auto& nodes : choosen_pack) {
-		if (!post_ord) {
-			for (auto& chd : nodes)
-				if (done.find(chd) == done.end() || cb_revisit(chd))
-					ret &= _traverse(g, chd, done, cb_enter,
-						cb_exit, cb_revisit, cb_ambig, post_ord);
-		}
-		else {
-			for (auto chd = nodes.rbegin(); chd != nodes.rend(); chd++)
-				if (done.find(*chd) == done.end() || cb_revisit(*chd))
-					ret &= _traverse(g, *chd, done, cb_enter,
-						cb_exit, cb_revisit, cb_ambig, post_ord);
-
-		}
-
-	}
+	if (auto r = start(root); r) return *r;
+	bool ret = true;
+	while (!open.empty()) {
+		frame& f = open.back();
+		if (f.pack == f.chosen.end()) {
 #ifdef DEBUG_TRAVERSE
-	std::cout << "exit: \t" << root->first.to_std_string() << "\n";
+			std::cout << "exit: \t" << f.root->first.to_std_string() << "\n";
 #endif
-	if(post_ord) visit_root();
-	cb_exit(root, choosen_pack);
+			if (post_ord) cb_enter(f.root), done.insert(f.root);
+			cb_exit(f.root, f.chosen);
+			const bool r = f.ret;
+			open.pop_back();
+			if (open.empty()) ret = r;
+			else open.back().ret &= r;
+			continue;
+		}
+		const nodes& ns = *f.pack;
+		if (f.i == ns.size()) {
+			++f.pack, f.i = 0;
+			continue;
+		}
+		const node& chd = post_ord ? ns[ns.size() - 1 - f.i] : ns[f.i];
+		++f.i;
+		if (done.find(chd) == done.end() || cb_revisit(chd))
+			if (auto r = start(chd); r) open.back().ret &= *r;
+	}
 	return ret;
 }
 
