@@ -10,6 +10,8 @@
 #include "testing.h"
 #include "format/json/json.h"
 
+#include <filesystem>
+#include <fstream>
 #include <sstream>
 
 using namespace std;
@@ -2199,5 +2201,139 @@ TEST_SUITE("chart item size") {
 		idni::diagnostics::report rep;
 		grammar<char> g(nts, ps, start, {}, {}, &rep);
 		CHECK(rep.has_error());
+	}
+}
+
+TEST_SUITE("parser: every input byte") {
+
+	using jp_t = parser<char, char32_t>;
+	enum class source { string, file, stream };
+	const source sources[] = { source::string, source::file,
+		source::stream };
+
+	// The facts of one failed or successful parse.
+	struct byte_parse {
+		bool found = false;
+		bool at_eof = false;
+		size_t loc = SIZE_MAX;
+		std::string msg;
+	};
+
+	template <typename P>
+	static byte_parse facts(typename P::result& r) {
+		byte_parse b;
+		b.found = r.found;
+		b.at_eof = r.parse_error.at_eof();
+		b.loc = r.parse_error.loc;
+		b.msg = r.parse_error.to_str(P::error::info_lvl::INFO_BASIC);
+		return b;
+	}
+
+	// Parse @p in with @p p from a string, a file or a stream.
+	template <typename P>
+	static byte_parse parse_bytes(P& p, const std::string& in, source s) {
+		if (s == source::string) {
+			auto r = p.parse(in.data(), in.size());
+			return facts<P>(r);
+		}
+		if (s == source::stream) {
+			std::istringstream is(in);
+			auto r = p.parse(is);
+			return facts<P>(r);
+		}
+		static size_t counter = 0;
+		const auto path = std::filesystem::temp_directory_path()
+			/ ("tau_parser_input_bytes_" + std::to_string(counter++));
+		{
+			std::ofstream f(path, std::ios::binary);
+			f.write(in.data(), static_cast<std::streamsize>(in.size()));
+		}
+		byte_parse b;
+		{
+			auto r = p.parse(path.string());
+			b = facts<P>(r);
+		}
+		std::error_code ec;
+		std::filesystem::remove(path, ec);
+		return b;
+	}
+
+	static byte_parse parse_json(const std::string& in, source s) {
+		jp_t p(json_parser_data::grammar,
+			json_parser_data::make_parser_options());
+		return parse_bytes(p, in, s);
+	}
+
+	TEST_CASE("a NUL is a syntax error at the NUL, not the end of file") {
+		const std::string inputs[] = {
+			std::string("[\"a\0b\"]", 7),
+			std::string("[1]\0", 4),
+			std::string("[\"a\0", 4) };
+		for (source s : sources)
+			for (const auto& in : inputs) {
+				auto r = parse_json(in, s);
+				CHECK_FALSE(r.found);
+				CHECK_FALSE(r.at_eof);
+				CHECK(r.loc == 3);
+				CHECK(r.msg.find("end of file") == std::string::npos);
+			}
+	}
+
+	TEST_CASE("valid input parses and a cut input ends at the end of file") {
+		for (source s : sources) {
+			CHECK(parse_json("[\"a\"]", s).found);
+			auto cut = parse_json("[\"a", s);
+			CHECK_FALSE(cut.found);
+			CHECK(cut.at_eof);
+			CHECK(cut.loc == 3);
+			CHECK(cut.msg.find("end of file") != std::string::npos);
+		}
+	}
+
+	TEST_CASE("a byte parser reads 0xFF and NUL as plain bytes") {
+		nonterminals<char> nts;
+		auto start = nts("start");
+		prods<char> ps, ff('\xff'), nul('\0'), a('a');
+		ps(start, ff + nul + a);
+		grammar<char> g(nts, ps, start, {}, make_grammar_options());
+		parser<char> p(g, make_parser_options());
+		for (source s : sources) {
+			CHECK(parse_bytes(p, std::string("\xff\0a", 3), s).found);
+			auto cut = parse_bytes(p, std::string("\xff\0", 2), s);
+			CHECK_FALSE(cut.found);
+			CHECK(cut.at_eof);
+			auto bad = parse_bytes(p, std::string("\xff\xff", 2), s);
+			CHECK_FALSE(bad.found);
+			CHECK_FALSE(bad.at_eof);
+			CHECK(bad.loc == 1);
+		}
+	}
+
+	TEST_CASE("the eof char class matches only at the real end") {
+		nonterminals<char> nts;
+		auto start = nts("start");
+		char_class_fns<char> cc =
+			predefined_char_classes<char>({ "eof" }, nts);
+		prods<char> ps, a('a'), eof(nts("eof"));
+		ps(start, a + eof);
+		grammar<char> g(nts, ps, start, cc, make_grammar_options());
+		parser<char> p(g, make_parser_options());
+		for (source s : sources) {
+			CHECK(parse_bytes(p, "a", s).found);
+			auto r = parse_bytes(p, std::string("a\0", 2), s);
+			CHECK_FALSE(r.found);
+			CHECK_FALSE(r.at_eof);
+			CHECK(r.loc == 1);
+		}
+		nonterminals<char> nts2;
+		auto start2 = nts2("start");
+		char_class_fns<char> cc2 =
+			predefined_char_classes<char>({ "eof" }, nts2);
+		prods<char> ps2, a2('a'), nul2('\0'), eof2(nts2("eof"));
+		ps2(start2, a2 + nul2 + eof2);
+		grammar<char> g2(nts2, ps2, start2, cc2, make_grammar_options());
+		parser<char> p2(g2, make_parser_options());
+		for (source s : sources)
+			CHECK(parse_bytes(p2, std::string("a\0", 2), s).found);
 	}
 }

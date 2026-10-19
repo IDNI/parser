@@ -42,7 +42,7 @@ parser<C, T>::result parse(int filedescriptor, parse_options po); // WIN32 only
 Another argument is `parser::parse_options` and it's optional.
 - `size` length of the data
 - `max_length` to specify a maximum length of the parsed input or 0 if not limiting (defaults to 0)
-- `eof`, ie end of file character (defaults to `std::char_traits<C>::eof()`)
+- `eof`, ie end of file character (defaults to `std::char_traits<C>::eof()`). The input ends at its last character. A character value here also ends it at that character
 
 `parse` method call returns `parse<C, T>::result`
 

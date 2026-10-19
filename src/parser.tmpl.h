@@ -146,15 +146,28 @@ bool parser<C, T>::input::next() {
 							std::ios_base::in);
 		n = off == -1 ? 0 : static_cast<size_t>(off);
 		int_type c = sb->sbumpc();
-		if (c == e) sgood = false;
-		return l = n + (c == e ? 0 : 1), true;
+		const bool end = traits_type::eq_int_type(c, traits_type::eof())
+			|| traits_type::eq_int_type(c, e);
+		if (end) sgood = false;
+		return l = n + (end ? 0 : 1), true;
 	}
 	return n < l && (max_l == 0 || n < max_l) ? ++n, true : false;
 }
 template <typename C, typename T>
 size_t parser<C, T>::input::pos() { return n; }
 template <typename C, typename T>
-bool parser<C, T>::input::eof() { return cur() == static_cast<C>(e); }
+bool parser<C, T>::input::eof() {
+	// The end is a position. A character whose value casts to e is input,
+	// unless the caller set e to a character value.
+	if (isstream()) {
+		if (!sgood) return true;
+		const int_type c = sb->sgetc();
+		return traits_type::eq_int_type(c, traits_type::eof())
+			|| traits_type::eq_int_type(c, e);
+	}
+	if (n >= l || (max_l != 0 && n >= max_l)) return true;
+	return traits_type::eq_int_type(traits_type::to_int_type(d[n]), e);
+}
 template <typename C, typename T>
 C parser<C, T>::input::at(size_t p) {
 	if (isstream()) return static_cast<C>(
@@ -720,19 +733,22 @@ void parser<C, T>::complete(const item& i, container_t& t, container_t& c,
 	//gcready.insert(i);
 }
 template <typename C, typename T>
-bool parser<C, T>::first_can_match(size_t p, size_t c, T ch) const {
+bool parser<C, T>::first_can_match(size_t p, size_t c, T ch, bool at_end)
+	const
+{
 	const auto& conj = g[p][c];
 	if (conj.size() == 0) return true;
 	const lit<C, T>& l = conj[0];
 	if (l.is_null()) return true;
-	if (!l.nt()) return l.t() == ch;
+	if (!l.nt()) return !at_end && l.t() == ch;
 	if (!g.is_cc_fn(l.n())) return true;
-	if (g.is_eof_fn(l.n()))
-		return ch == static_cast<T>(0) || ch == static_cast<T>(-1);
-	return !g.char_class_check(l, ch);
+	if (g.is_eof_fn(l.n())) return at_end;
+	return !at_end && !g.char_class_check(l, ch);
 }
 template <typename C, typename T>
-void parser<C, T>::predict(const item& i, container_t& t, T ch) {
+void parser<C, T>::predict(const item& i, container_t& t, T ch,
+	bool at_end)
+{
 	MC(count(cnt.predict_calls);)
 	DBGP(std::cout << "    predicting\n";)
 	lit<C, T> parl = get_lit(i);
@@ -779,7 +795,7 @@ void parser<C, T>::predict(const item& i, container_t& t, T ch) {
 			// is never predicted never completes, which is exactly
 			// what its scan failure would have produced, for
 			// positive and negated conjuncts alike.
-			if (!first_can_match(p, c, ch)) {
+			if (!first_can_match(p, c, ch, at_end)) {
 				MC(count(cnt.predict_lookahead_skips);)
 				continue;
 			}
@@ -803,13 +819,17 @@ void parser<C, T>::predict(const item& i, container_t& t, T ch) {
 	}
 }
 template <typename C, typename T>
-void parser<C, T>::scan(const item& i, size_t n, T ch) {
+void parser<C, T>::scan(const item& i, size_t n, T ch, bool at_end) {
 	MC(count(cnt.scan_calls);)
 	DBGP(std::cout << "    scanning character: '"<<to_std_string(ch)<<"' ";)
-	item j(n + (ch == static_cast<T>(0) ? 0 : 1),
+	item j(n + (at_end ? 0 : 1),
 		i.prod, i.con, i.from, i.dot + 1);
-	DBGP(std::cout << (ch == get_lit(i).t()?"SUCCESS":"FAIL") << "\n";)
-	if (ch != get_lit(i).t()) {
+	// a null literal holds the value 0, so it must not match a NUL byte:
+	// it matches only the end of the input, with no width
+	const bool ok = get_lit(i).is_null() ? at_end
+		: !at_end && ch == get_lit(i).t();
+	DBGP(std::cout << (ok ? "SUCCESS" : "FAIL") << "\n";)
+	if (!ok) {
 		if(po.enable_gc) {
 			//when the item fails, decrement refcount of items that
 			//predicted it i.e predicting items ( only the one) for
@@ -871,7 +891,7 @@ void parser<C, T>::scan(const item& i, size_t n, T ch) {
 }
 template <typename C, typename T>
 void parser<C, T>::scan_cc_function(const item& i, size_t n, T ch,
-	container_t& c)
+	bool at_end, container_t& c)
 {
 	MC(count(cnt.scan_cc_calls);)
 	DBGP(std::cout << "    scanning cc function for char: `"
@@ -879,7 +899,7 @@ void parser<C, T>::scan_cc_function(const item& i, size_t n, T ch,
 	size_t p = 0; // character's prod rule
 	DBG(assert(!completed(i)));
 	lit<C, T> l = get_lit(i);
-	bool eof = ch == static_cast<T>(0) || ch == static_cast<T>(-1);
+	bool eof = at_end;
 	//DBG(std::cout << "\tEOF: " << (eof ? "true" : "false") << "\n";)
 	bool eof_fn = g.is_eof_fn(l.n());
 	if (eof_fn) {
@@ -888,6 +908,8 @@ void parser<C, T>::scan_cc_function(const item& i, size_t n, T ch,
 		p = eofprods.size() == 1 ? *eofprods.begin()
 			: g.add_char_class_production(l, ch);
 	} else {
+		// only the eof class matches at the end of the input
+		if (eof) return;
 		p = g.get_char_class_production(l, ch);
 		if (p == static_cast<size_t>(-1)) return;
 	}
@@ -1095,6 +1117,7 @@ parser<C, T>::result parser<C, T>::_parse() {
 	do {
 		if ((new_pos = (cn != in_->pos()))) cn = in_->pos();
 		ch = in_->tcur(), n = in_->tpos();
+		const bool at_end = in_->teof();
 		if (n > max_item_pos) { too_long = true; break; }
 		if (n >= S.size()) S.resize(n + 1);
 		if (debug && debug_at.second > 0) debug =
@@ -1159,9 +1182,10 @@ parser<C, T>::result parser<C, T>::_parse() {
 				if (completed(x)) complete(x, t, c);
 				else if (get_lit(x).nt()) {
 					if (g.is_cc_fn(get_lit(x).n()))
-						scan_cc_function(x, n, ch, c);
-					else predict(x, t, ch);
-				} else scan(x, n, ch);
+						scan_cc_function(x, n, ch, at_end,
+							c);
+					else predict(x, t, ch, at_end);
+				} else scan(x, n, ch, at_end);
 			}
 			//DBGP(print_S(std::cout << "S loop:\n") << "\n";)
 			//DBGP(print(std::cout << "t loop:\n", t) << "\n";)
@@ -1455,28 +1479,17 @@ std::vector<typename parser<C, T>::item> parser<C, T>::rsorted_citem(
 //------------------------------------------------------------------------------
 template <typename C, typename T>
 bool parser<C, T>::error::at_eof() const {
-	if (unexp.size() == 0) return false;
-	for (const auto& t : unexp)
-		if (t.nt() || t.is_null()
-			|| (t.t() != static_cast<T>(0)
-				&& t.t() != static_cast<T>(-1)))
-			return false;
-	return true;
+	return unexp.size() != 0 && end;
 }
 //------------------------------------------------------------------------------
 template <typename C, typename T>
 std::string parser<C, T>::error::to_str(info_lvl elvl, size_t line_start) const{
 	if (ctxt.size() == 0) return "";
 	std::stringstream ss;
-	bool eof = unexp.size() != 0;
-	for (const auto& t : unexp) {
-		if (t.nt() || t.is_null() || (t.t() != static_cast<T>(0)
-						&& t.t() != static_cast<T>(-1)))
-		{
-			eof = false;
-			std::string s = t.to_std_string();
-			if (s.size() >= 2) ss << s.substr(1, s.size() - 2);
-		}
+	bool eof = at_eof();
+	if (!eof) for (const auto& t : unexp) {
+		std::string s = t.to_std_string();
+		if (s.size() >= 2) ss << s.substr(1, s.size() - 2);
 	}
 	std::string s{ ss.str() }; ss = {};
 	if (!eof && s.size()) {
@@ -1543,14 +1556,15 @@ void parser<C, T>::predict_all_at(size_t n) {
 	// deeper prediction is needed, and a skipped conjunct starts with
 	// a terminal or a character class, so no nullable advance either.
 	if (n >= S.size()) return;
-	T ch = n < in_->tpos() ? in_->tat(n) : static_cast<T>(0);
+	const bool at_end = n >= in_->tpos();
+	T ch = at_end ? static_cast<T>(0) : in_->tat(n);
 	std::vector<item> snapshot(S[n].begin(), S[n].end());
 	for (const item& x : snapshot) {
 		if (completed(x) || !get_lit(x).nt()
 			|| g.is_cc_fn(get_lit(x).n())) continue;
 		for (size_t p : g.prod_ids_of_literal(get_lit(x)))
 			for (size_t c = 0; c != g.n_conjs(p); ++c)
-				if (!first_can_match(p, c, ch))
+				if (!first_can_match(p, c, ch, at_end))
 					S[n].insert(item(n, p, c, n, 0));
 	}
 }
@@ -1667,6 +1681,7 @@ typename parser<C, T>::error parser<C, T>::get_error() {
 
 		break;
 	}
+	err.end = err.loc == in.tpos();
 	err.line = 1;
 	if (err.loc != SIZE_MAX) {
 		size_t line_loc = 0;

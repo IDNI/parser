@@ -304,6 +304,26 @@ TEST_SUITE("input: binarize (char -> bool)") {
 			false, true, false, false, false, false, false, true };
 		CHECK(in.get_terminals(0, 8) == expected);
 	}
+
+	TEST_CASE("a bit string parses with bool terminals") {
+		nonterminals<char, bool> nts;
+		auto start = nts("start");
+		auto bit = nts("bit");
+		prods<char, bool> ps, s(start), b(bit),
+			one(lit<char, bool>(true)), zero(lit<char, bool>(false));
+		ps(start, b + s | b);
+		ps(bit, one | zero);
+		grammar<char, bool> g(nts, ps, start, {});
+		parser<char, bool>::options o;
+		o.codec.decode = bconv;
+		parser<char, bool> p(g, o);
+		const std::string src = "\xa5";
+		auto r = p.parse(src.c_str(), src.size());
+		REQUIRE(r.found);
+		const std::vector<bool> expected{
+			true, false, true, false, false, true, false, true };
+		CHECK(r.get_terminals() == expected);
+	}
 }
 
 // ---------------------------------------------------------------------------
