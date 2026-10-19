@@ -242,6 +242,25 @@ idni::diagnostics::result<std::vector<std::string>> generate_parser_cpp(
 			}
 			os << "\n\t}";
 		}
+		auto quoted = [](const std::string& v) {
+			return "\"" + escapes::encode(v, escapes::c_like) + "\"";
+		};
+		// a host selects a profile by name, so the profiles go with the guards
+		if (g.opt().variants.size()) {
+			os << ",\n\t.variants = {";
+			size_t i = 0;
+			for (const auto& [name, guards] : g.opt().variants) {
+				os << (i++ ? "," : "") << "\n\t\t{ "
+					<< quoted(name) << ", { ";
+				size_t j = 0;
+				for (const auto& guard : guards)
+					os << (j++ ? ", " : "") << quoted(guard);
+				os << " } }";
+			}
+			os << "\n\t}";
+		}
+		if (g.opt().variant.size())
+			os << ",\n\t.variant = " << quoted(g.opt().variant);
 		os << "\n";
 		return os.str();
 	};

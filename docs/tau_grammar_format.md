@@ -329,6 +329,7 @@ A name is one symbol, and it may hold `_`. The first profile of the file is the 
 
 A later write of `enabled-productions` keeps `variant` when the selected profile has the same guards. Else it sets `variant` to the first profile in name order with the same guards, or to empty when no profile has them.
 The selected or default profile sets the guards after the `@enable` and `@disable` lines of the file, whatever their order.
+A generated parser keeps the profiles and the selected name in its grammar options, so a host can select a profile by name.
 
 Usage:
 ```

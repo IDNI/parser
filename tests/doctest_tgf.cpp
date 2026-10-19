@@ -1096,4 +1096,32 @@ TEST_SUITE("parser generator") {
 			parser_strings::messages::cannot_open_file) != string::npos);
 		CHECK(printed.str().find(dir) != string::npos);
 	}
+
+	TEST_CASE("a generated parser keeps the variant profiles") {
+		namespace fs = std::filesystem;
+		nonterminals<char> nts;
+		auto gr = tgf<char>::from_string(nts, string(
+			"@variants va: a; vc: a, b.\n@variant vc.\n"
+			"start[a] => 'a'.\nstart[b] => 'b'.\n"));
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		parser_gen_options gopt;
+		gopt.output_dir = fs::temp_directory_path().string() + "/";
+		gopt.output = "variants_gen_test.generated.h";
+		gopt.name = "variants_gen_test_parser";
+		REQUIRE(generate_parser_cpp<char>("variants_gen_test.tgf", g, gopt)
+			.has_value());
+		const fs::path out = fs::path(gopt.output_dir) / gopt.output;
+		ifstream in(out);
+		REQUIRE(in.is_open());
+		ostringstream text;
+		text << in.rdbuf();
+		in.close();
+		fs::remove(out);
+		const string s = text.str();
+		CHECK(s.find(".variants = {") != string::npos);
+		CHECK(s.find("{ \"va\", { \"a\" } }") != string::npos);
+		CHECK(s.find("{ \"vc\", { \"a\", \"b\" } }") != string::npos);
+		CHECK(s.find(".variant = \"vc\"") != string::npos);
+	}
 }
