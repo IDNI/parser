@@ -236,7 +236,7 @@ struct tgf_repl_evaluator {
 	void set_grammar_option(std::string_view name, idni::option_value v);
 	/// Declare tgf_repl_option_set and bind it to the fields of opt.
 	void bind_repl_options();
-	/// Declare parser_option_set and give each parse option its default,
+	/// Declare parser_option_set() and give each parse option its default,
 	/// before the first parser of the evaluator binds.
 	void reset_parse_options();
 	/// The option values that argv gave, written again after each load.

@@ -698,7 +698,7 @@ idni::diagnostics::result<void> grammar<C, T>::bind_options() {
 	if (options_repo_) return r;
 	// qualified, because grammar::options names the struct of the fields
 	options_repository& repo = idni::options();
-	if (!r.merge_ok(repo.declare(grammar_option_set))) return r;
+	if (!r.merge_ok(repo.declare(grammar_option_set()))) return r;
 	r.merge(bind_to(repo));
 	return r;
 }
@@ -775,7 +775,7 @@ idni::diagnostics::result<void> grammar<C, T>::bind_to(
 template <typename C, typename T>
 void grammar<C, T>::unbind_options() {
 	if (!options_repo_) return;
-	for (const auto& o : grammar_option_set.options)
+	for (const auto& o : grammar_option_set().options)
 		options_repo_->unbind(o.name);
 	options_repo_->remove_detach(this);
 	options_repo_ = nullptr;

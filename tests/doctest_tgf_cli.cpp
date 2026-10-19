@@ -27,8 +27,8 @@ using namespace idni;
 struct tgf_options_fixture {
 	options_repository repo;
 	tgf_options_fixture() {
-		for (const auto* set : { &tgf_option_set, &grammar_option_set,
-			&parser_option_set, &tgf_repl_option_set })
+		for (const auto* set : { &tgf_option_set, &grammar_option_set(),
+			&parser_option_set(), &tgf_repl_option_set })
 				REQUIRE(repo.declare(*set).has_value());
 		for (const auto& [name, surface] : tgf_surfaces)
 			REQUIRE(repo.add_surface(name, surface).has_value());

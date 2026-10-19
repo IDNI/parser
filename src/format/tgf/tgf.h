@@ -254,7 +254,7 @@ private:
 			source_ = source_text;
 			// each directive writes its option into own_ at once, and the
 			// bind in g() pushes the values into the grammar
-			keep(own_.declare(grammar_option_set));
+			keep(own_.declare(grammar_option_set()));
 			auto statements  = t || tgf_parser::statement;
 			auto directive_nodes = statements || tgf_parser::directive;
 			for (const auto& d : directive_nodes()) collect_cc_names(d);
@@ -346,7 +346,7 @@ private:
 		}
 		grammar<C, T> g() {
 			// a presplit load of no statement never runs build()
-			keep(own_.declare(grammar_option_set));
+			keep(own_.declare(grammar_option_set()));
 			grammar<C, T> gr(nts_handle, ps,
 				prods_t(nts(own_.get<std::string>("start"))), cc, {},
 				diag);

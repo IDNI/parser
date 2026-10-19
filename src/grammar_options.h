@@ -23,45 +23,48 @@ template <typename C, typename T> struct lit;
 template <typename T> struct char_class_fns;
 
 /// The options of a grammar. The directive names are the option names.
-inline const option_set grammar_option_set = { .options = {
-	{ "auto-disambiguate", "grammar", true,
-		"enables auto-disambiguation" },
-	{ "nodisambig-list", "grammar", option_list{},
-		"nonterminals whose ambiguity is kept" },
-	{ "trim-terminals", "grammar", false, "trim all terminals" },
-	{ "inline-char-classes", "grammar", false,
-		"inline character classes" },
-	{ "derive-char-classes", "grammar", true,
-		"scan rules that match one character as character classes" },
-	{ "trim", "grammar", option_list{},
-		"nonterminals to trim from the tree" },
-	{ "trim-children", "grammar", option_list{},
-		"nonterminals whose children are trimmed" },
-	{ "trim-children-terminals", "grammar", option_list{},
-		"nonterminals whose children and terminals are trimmed" },
-	{ "dont-trim-terminals-of", "grammar", option_list{},
-		"nonterminals whose terminals are kept" },
-	{ "inline", "grammar", option_list{},
-		"tree paths to inline, each written as a > b" },
-	{ "enabled-productions", "grammar", option_list{},
-		"comma-separated enabled productions" },
-	{ "start", "grammar", std::string("start"), "starting literal" },
-	{ "char-classes", "grammar", option_list{},
-		"character classes of the grammar, an entry is a class or "
-		"class as name" },
-	{ "highlight-auto", "grammar", false,
-		"highlight by name and content heuristics" },
-	{ "highlight", "grammar", option_list{},
-		"highlight types, each entry written as type: nonterminal" },
-	{ "dynamic", "grammar", option_list{},
-		"default values for a @dynamic nonterminal, each entry written "
-		"as name=value" },
-	{ "variants", "grammar", option_list{},
-		"profiles of enabled productions, each entry written as "
-		"name=guard" },
-	{ "variant", "grammar", std::string(),
-		"the selected profile of enabled productions" },
-} };
+inline const option_set& grammar_option_set() {
+	static const option_set v = { .options = {
+		{ "auto-disambiguate", "grammar", true,
+			"enables auto-disambiguation" },
+		{ "nodisambig-list", "grammar", option_list{},
+			"nonterminals whose ambiguity is kept" },
+		{ "trim-terminals", "grammar", false, "trim all terminals" },
+		{ "inline-char-classes", "grammar", false,
+			"inline character classes" },
+		{ "derive-char-classes", "grammar", true,
+			"scan rules that match one character as character classes" },
+		{ "trim", "grammar", option_list{},
+			"nonterminals to trim from the tree" },
+		{ "trim-children", "grammar", option_list{},
+			"nonterminals whose children are trimmed" },
+		{ "trim-children-terminals", "grammar", option_list{},
+			"nonterminals whose children and terminals are trimmed" },
+		{ "dont-trim-terminals-of", "grammar", option_list{},
+			"nonterminals whose terminals are kept" },
+		{ "inline", "grammar", option_list{},
+			"tree paths to inline, each written as a > b" },
+		{ "enabled-productions", "grammar", option_list{},
+			"comma-separated enabled productions" },
+		{ "start", "grammar", std::string("start"), "starting literal" },
+		{ "char-classes", "grammar", option_list{},
+			"character classes of the grammar, an entry is a class or "
+			"class as name" },
+		{ "highlight-auto", "grammar", false,
+			"highlight by name and content heuristics" },
+		{ "highlight", "grammar", option_list{},
+			"highlight types, each entry written as type: nonterminal" },
+		{ "dynamic", "grammar", option_list{},
+			"default values for a @dynamic nonterminal, each entry written "
+			"as name=value" },
+		{ "variants", "grammar", option_list{},
+			"profiles of enabled productions, each entry written as "
+			"name=guard" },
+		{ "variant", "grammar", std::string(),
+			"the selected profile of enabled productions" },
+	} };
+	return v;
+}
 
 /// @highlight token type legend, in index order.
 constexpr std::array<std::string_view, 8> highlight_token_types = {

@@ -574,7 +574,7 @@ void tgf_repl_evaluator::bind_repl_options() {
 
 void tgf_repl_evaluator::reset_parse_options() {
 	auto& opts = idni::options();
-	report.append(opts.declare(parser_option_set).report());
+	report.append(opts.declare(parser_option_set()).report());
 	// a load keeps the parse options, a new evaluator starts from the
 	// defaults
 	opts.reset("parse");
@@ -2281,8 +2281,8 @@ static diagnostics::result<void> declare_tgf_options(
 	options_repository& repo)
 {
 	diagnostics::result<void> r;
-	for (const auto* set : { &tgf_option_set, &grammar_option_set,
-		&parser_option_set, &tgf_repl_option_set })
+	for (const auto* set : { &tgf_option_set, &grammar_option_set(),
+		&parser_option_set(), &tgf_repl_option_set })
 			if (!r.merge_ok(repo.declare(*set))) return r;
 	for (const auto& [name, surface] : tgf_surfaces)
 		r.merge(repo.add_surface(name, surface));

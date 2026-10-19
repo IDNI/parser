@@ -575,7 +575,7 @@ TEST_SUITE("grammar options") {
 	TEST_CASE("a write before the bind goes into the field") {
 		options_repository repo;
 		options_scope scope(repo);
-		REQUIRE(repo.declare(grammar_option_set).has_value());
+		REQUIRE(repo.declare(grammar_option_set()).has_value());
 		REQUIRE(repo.set_text("trim", "ws").has_value());
 		nonterminals<char> nts;
 		grammar<char> g = options_grammar(nts);
@@ -657,7 +657,7 @@ TEST_SUITE("grammar options") {
 	TEST_CASE("the bind pushes a value stored before it") {
 		options_repository repo;
 		options_scope scope(repo);
-		REQUIRE(repo.declare(grammar_option_set).has_value());
+		REQUIRE(repo.declare(grammar_option_set()).has_value());
 		REQUIRE(repo.set_text("trim", "x").has_value());
 		nonterminals<char> nts;
 		auto gr = load(nts, "@trim ws.\n");
@@ -789,7 +789,7 @@ TEST_SUITE("grammar options") {
 	TEST_CASE("the default of start is start") {
 		options_repository repo;
 		options_scope scope(repo);
-		REQUIRE(repo.declare(grammar_option_set).has_value());
+		REQUIRE(repo.declare(grammar_option_set()).has_value());
 		CHECK(text_of(repo, "start") == "start");
 	}
 

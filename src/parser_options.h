@@ -15,30 +15,33 @@ template <typename C, typename T> class parser;
 
 /// The options of a parse. The defaults are those of parse_options.
 // parser.h includes this file after it defines the two DEFAULT_ macros.
-inline const option_set parser_option_set = { .options = {
-	{ "gc", "parse", bool(DEFAULT_ENABLE_GC),
-		"enable garbage collection" },
-	{ "gc-lag", "parse", size_t(DEFAULT_GC_LAG),
-		"garbage collection lag" },
-	{ "max-length", "parse", size_t(0),
-		"maximum input length (0 = unlimited)" },
-	{ "measure", "parse", false,
-		"measure parse time and counters, turns every measure flag on" },
-	{ "measure-each-pos", "parse", false,
-		"measure parse time at each position" },
-	{ "measure-forest", "parse", false, "measure forest building time" },
-	{ "measure-preprocess", "parse", false,
-		"measure forest preprocess time" },
-	{ "measure-scopes", "parse", false,
-		"record timed scopes in the report" },
-	{ "measure-counters", "parse", false,
-		"record parse counters and memory in the report" },
-	{ "debug", "parse", false, "print debug diagnostics" },
-	{ "error-verbosity", "parse", std::string("detailed"),
-		"parse error verbosity: basic, detailed, root-cause" },
-	{ "tree-path", "parse", std::string("bintree"),
-		"parse tree path: bintree or forest" },
-} };
+inline const option_set& parser_option_set() {
+	static const option_set v = { .options = {
+		{ "gc", "parse", bool(DEFAULT_ENABLE_GC),
+			"enable garbage collection" },
+		{ "gc-lag", "parse", size_t(DEFAULT_GC_LAG),
+			"garbage collection lag" },
+		{ "max-length", "parse", size_t(0),
+			"maximum input length (0 = unlimited)" },
+		{ "measure", "parse", false,
+			"measure parse time and counters, turns every measure flag on" },
+		{ "measure-each-pos", "parse", false,
+			"measure parse time at each position" },
+		{ "measure-forest", "parse", false, "measure forest building time" },
+		{ "measure-preprocess", "parse", false,
+			"measure forest preprocess time" },
+		{ "measure-scopes", "parse", false,
+			"record timed scopes in the report" },
+		{ "measure-counters", "parse", false,
+			"record parse counters and memory in the report" },
+		{ "debug", "parse", false, "print debug diagnostics" },
+		{ "error-verbosity", "parse", std::string("detailed"),
+			"parse error verbosity: basic, detailed, root-cause" },
+		{ "tree-path", "parse", std::string("bintree"),
+			"parse tree path: bintree or forest" },
+	} };
+	return v;
+}
 
 namespace detail {
 
