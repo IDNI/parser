@@ -358,6 +358,7 @@ Usage:
 #### @trim
 
 Trim is a parsed tree shaping action which removes a node and its subtree from the parsed tree.
+The root of the parsed tree is never removed, also when `@trim` names it.
 It writes the grammar option `trim`.
 
 Usage:

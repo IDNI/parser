@@ -326,7 +326,7 @@ typename parser<C, T>::psptree
 			jobs.push_back({ n, k->first, 0, k->second });
 		return t;
 	};
-	if (trimmable_node<C, T>(n0, opts)) return nullptr;
+	// the root stays also when trim names it, trimmable_child drops a child
 	psptree root = open(n0);
 	while (!jobs.empty()) {
 		job& j = jobs.back();

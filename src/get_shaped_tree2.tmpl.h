@@ -12,8 +12,8 @@ tref parser<C, T>::result::get_trimmed_bintree(tref ref,
 	const shaping_options& opts) const
 {
 	if (!ref) return nullptr;
-	const auto& rt = tree::get(ref);
-	if (rt.is_null() || trimmable_node<C, T>(rt.value, opts)) return nullptr;
+	// the root stays also when trim names it, so a parse keeps a tree
+	if (tree::get(ref).is_null()) return nullptr;
 	auto dropped = [&opts](tref parent, tref c) {
 		const auto& ct = tree::get(c);
 		return ct.is_null() || trimmable_node<C, T>(ct.value, opts)
@@ -21,7 +21,7 @@ tref parser<C, T>::result::get_trimmed_bintree(tref ref,
 				ct.value, opts);
 	};
 	// A child that the trim drops is not worth a visit. The root has no
-	// parent and is checked above.
+	// parent and is never dropped.
 	auto visit = [&dropped](tref c, tref parent = nullptr) {
 		return !parent || !dropped(parent, c);
 	};

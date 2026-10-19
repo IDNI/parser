@@ -1001,6 +1001,9 @@ TEST_SUITE("AMB wrapping with TGF shaping") {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// The shaping keeps the root, also when @trim names the start symbol.
+// ---------------------------------------------------------------------------
 TEST_SUITE("forest shaping of a deep tree") {
 	// The children names of each node on the chain of the first
 	// nonterminal child, in a forest shaped tree.
@@ -1508,6 +1511,84 @@ TEST_SUITE("shaping inlines a tree path") {
 		REQUIRE(f);
 		REQUIRE(f->child.size() == 1);
 		CHECK(f->child[0]->value->first == nts("x"));
+	}
+}
+
+TEST_SUITE("shaping keeps the root") {
+
+	using p_t = parser<char>;
+
+	// The shaped tree of @p input with the grammar @p tgf_src.
+	static htref shaped_tree(nonterminals<char>& nts, const char* tgf_src,
+		const std::string& input)
+	{
+		auto gr = tgf<char>::from_string(nts, string(tgf_src));
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		parser<char> p(g);
+		auto r = p.parse(input.c_str(), input.size());
+		REQUIRE(r.found);
+		tref t = r.get_shaped_tree2();
+		return t ? p_t::tree::geth(t) : htref();
+	}
+
+	TEST_CASE("trim of the start symbol keeps the root") {
+		nonterminals<char> nts;
+		htref t = shaped_tree(nts, "@trim start.\nstart => 'a'.\n", "a");
+		REQUIRE(t != nullptr);
+		const auto& root = p_t::tree::get(t);
+		CHECK(root.value.first == nts("start"));
+		REQUIRE(root.children_size() == 1);
+		CHECK(root.first_tree().value.first.t() == 'a');
+	}
+
+	TEST_CASE("trim of the start symbol drops an inner start") {
+		nonterminals<char> nts;
+		htref t = shaped_tree(nts,
+			"@trim start.\nstart => 'a' | 'b' start.\n", "ba");
+		REQUIRE(t != nullptr);
+		const auto& root = p_t::tree::get(t);
+		CHECK(root.value.first == nts("start"));
+		REQUIRE(root.children_size() == 1);
+		CHECK(root.first_tree().value.first.t() == 'b');
+	}
+
+	// The root and the child symbols of the forest shaped tree of
+	// @p input with the grammar @p tgf_src. Empty without a tree.
+	static std::vector<lit<char>> forest_root_and_children(
+		nonterminals<char>& nts, const char* tgf_src,
+		const std::string& input)
+	{
+		auto gr = tgf<char>::from_string(nts, string(tgf_src));
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		parser<char> p(g);
+		auto r = p.parse(input.c_str(), input.size());
+		REQUIRE(r.found);
+		auto t = r.get_shaped_tree();
+		std::vector<lit<char>> out;
+		if (!t) return out;
+		out.push_back(t->value->first);
+		for (const auto& c : t->child) out.push_back(c->value->first);
+		return out;
+	}
+
+	TEST_CASE("forest: trim of the start symbol keeps the root") {
+		nonterminals<char> nts;
+		auto t = forest_root_and_children(nts,
+			"@trim start.\nstart => 'a'.\n", "a");
+		REQUIRE(t.size() == 2);
+		CHECK(t[0] == nts("start"));
+		CHECK(t[1].t() == 'a');
+	}
+
+	TEST_CASE("forest: trim of the start symbol drops an inner start") {
+		nonterminals<char> nts;
+		auto t = forest_root_and_children(nts,
+			"@trim start.\nstart => 'a' | 'b' start.\n", "ba");
+		REQUIRE(t.size() == 2);
+		CHECK(t[0] == nts("start"));
+		CHECK(t[1].t() == 'b');
 	}
 }
 

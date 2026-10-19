@@ -12,6 +12,7 @@ It can be provided to a grammar in `grammar::options` as attribute `shaping`.
 ### std::set<size_t> to_trim;
 
 nonterminal ids of symbols to trim (including their children) away from the resulting tree.
+The root of the tree is never trimmed.
 
 List can be provided in TGF with `@trim whitespace, comment.`
 

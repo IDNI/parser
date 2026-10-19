@@ -421,4 +421,31 @@ TEST_SUITE("tgf cli: derived character classes") {
 	}
 }
 
+TEST_SUITE("tgf cli: trim keeps the root") {
+
+	TEST_CASE("parse --trim start prints the tree with the root") {
+		namespace fs = std::filesystem;
+		const string path = (fs::temp_directory_path()
+			/ "tgf_cli_trim_root.tgf").string();
+		{
+			ofstream f(path);
+			f << "start => 'a'.\n";
+		}
+		string out = capture_tgf_run({ "tgf", path, "parse", "--trim",
+			"start", "-e", "a", "-c", "false" });
+		CHECK(out.find("parsed graph:\n\tstart(") != string::npos);
+		CHECK(out.find("\t\t'a'[0, 1]") != string::npos);
+		fs::remove(path);
+	}
+
+	TEST_CASE("set trim start in the REPL, then a parse") {
+		const string tiny = string(PROJECT_SOURCE_DIR)
+			+ "/tests/fixtures/tiny.tgf";
+		string out = capture_tgf_run({ "tgf", tiny, "repl", "-c", "false",
+			"-e", "set trim start . parse 123" });
+		CHECK(out.find("parsed graph:\n\tstart(") != string::npos);
+		CHECK(out.find("\t\tnum(") != string::npos);
+	}
+}
+
 #endif // TAU_TEST_HAS_TGF_CLI && PROJECT_SOURCE_DIR
