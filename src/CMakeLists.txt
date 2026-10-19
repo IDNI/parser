@@ -45,6 +45,7 @@ set(TAU_PARSER_HEADERS
 	utility/term.h
 	utility/term.impl.h
 	utility/term_colors.h
+	utility/terminal_traits.h
 	utility/tree.h
 	utility/tree.tmpl.h
 	utility/utf8char_traits.h

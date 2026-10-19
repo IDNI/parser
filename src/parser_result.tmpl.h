@@ -664,7 +664,7 @@ typename parser<C, T>::psptree parser<C, T>::result::get_tree(
 }
 
 template <typename C, typename T>
-std::basic_string<T> parser<C, T>::result::get_terminals() const {
+terminal_string<T> parser<C, T>::result::get_terminals() const {
 	if (f) return in_->get_terminals(f->root()->second);
 	if (froot != 0)
 		return in_->get_terminals(tree::get(froot).value.second);
@@ -672,7 +672,7 @@ std::basic_string<T> parser<C, T>::result::get_terminals() const {
 }
 
 template <typename C, typename T>
-std::basic_string<T> parser<C, T>::result::get_terminals(const pnode& n) const {
+terminal_string<T> parser<C, T>::result::get_terminals(const pnode& n) const {
 	return in_->get_terminals(n.second);
 }
 

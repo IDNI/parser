@@ -943,7 +943,7 @@ void grammar<C, T>::host_dynamic_values(const lit<C, T>& l,
 		for (const C& c : v) a.emplace_back(c);
 		G.emplace_back(l, std::vector<lits<C, T>>{ a });
 		size_t idx = G.size() - 1;
-		std::basic_string<T> terminals;
+		terminal_string<T> terminals;
 		terminals.reserve(v.size());
 		for (const C& c : v) terminals.push_back(static_cast<T>(c));
 		dynamic_[idx] = dynamic_entry{ dynamic_entry::state::host, l, v,
@@ -1287,7 +1287,7 @@ std::optional<size_t> grammar<C, T>::add_dynamic_production_from(
 	// same conversion the production body above uses per character; kept
 	// alongside value so confirm_dynamic can match against what
 	// input::get_terminals resolves a span to, in the terminal alphabet
-	std::basic_string<T> terminals;
+	terminal_string<T> terminals;
 	terminals.reserve(value.size());
 	for (const C& c : value) terminals.push_back(static_cast<T>(c));
 	dynamic_[idx] = dynamic_entry{ dynamic_entry::state::pending, l, value,
@@ -1362,7 +1362,7 @@ void grammar<C, T>::sync_dynamic_context(const dynamic_context<C>& ctx) {
 			for (const C& c : value) a.emplace_back(c);
 			G.emplace_back(l, std::vector<lits<C, T>>{ a });
 			size_t idx = G.size() - 1;
-			std::basic_string<T> terminals;
+			terminal_string<T> terminals;
 			terminals.reserve(value.size());
 			for (const C& c : value) terminals.push_back(static_cast<T>(c));
 			dynamic_[idx] = dynamic_entry{ dynamic_entry::state::committed,
@@ -1374,7 +1374,7 @@ void grammar<C, T>::sync_dynamic_context(const dynamic_context<C>& ctx) {
 }
 template <typename C, typename T>
 void grammar<C, T>::confirm_dynamic(size_t parent, const lit<C, T>& l,
-	const std::basic_string<T>& value)
+	const terminal_string<T>& value)
 {
 	for (size_t idx : pending_) {
 		auto& e = dynamic_[idx];

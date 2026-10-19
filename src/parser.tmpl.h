@@ -2260,33 +2260,35 @@ std::basic_string<C> parser<C, T>::input::get_string() {
 	return clear(), r;
 }
 template <typename C, typename T>
-std::basic_string<T> parser<C, T>::input::get_terminals(
+terminal_string<T> parser<C, T>::input::get_terminals(
 	std::array<size_t, 2> pos_span)
 {
 	return get_terminals(pos_span[0], pos_span[1]);
 }
 template <typename C, typename T>
-std::basic_string<T> parser<C, T>::input::get_terminals(
+terminal_string<T> parser<C, T>::input::get_terminals(
 	size_t start, size_t end)
 {
 	if (decoder) {
 		if (start > ts.size()) start = ts.size();
 		if (end > ts.size()) end = ts.size();
-		return std::basic_string<T>(ts.data() + start,
-			ts.data() + end);
+		// iterators, since std::vector<bool> has no data()
+		return terminal_string<T>(
+			ts.begin() + static_cast<std::ptrdiff_t>(start),
+			ts.begin() + static_cast<std::ptrdiff_t>(end));
 	}
 	// No decoder: Only valid when the parser's char_type and terminal_type match
 	if constexpr (std::is_same_v<C, T>) {
-		if (!isstream()) return std::basic_string<T>(d + start,
+		if (!isstream()) return terminal_string<T>(d + start,
 								end - start);
-		std::basic_string<T> r;
+		terminal_string<T> r;
 		sb->pubseekpos(static_cast<std::streamoff>(start),
 				std::ios_base::in);
 		while (end > start++)
 			r.push_back(traits_type::to_char_type(sb->sbumpc()));
 		return clear(), r;
 	} else {
-		return std::basic_string<T>{};
+		return terminal_string<T>{};
 	}
 }
 

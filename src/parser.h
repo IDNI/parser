@@ -22,6 +22,7 @@
 #include "utility/memory_map.h"
 #include "utility/characters.h"
 #include "utility/charclasses.h"
+#include "utility/terminal_traits.h"
 #include "utility/term_colors.h"
 #include "utility/tree.h"
 #include "utility/forest.h"
@@ -711,7 +712,7 @@ private:
 	 * a registered parent completes, passing that head as parent.
 	 */
 	void confirm_dynamic(size_t parent, const lit<C, T>& l,
-		const std::basic_string<T>& value);
+		const terminal_string<T>& value);
 	/// True iff idx names a dynamic production currently retired.
 	bool is_retired(size_t idx) const;
 	/// Links idx into ntsm. The only place a dynamic entry gets linked.
@@ -809,7 +810,7 @@ private:
 		/// value in the terminal alphabet, matching what
 		/// parser::input::get_terminals resolves a span to; this is
 		/// what confirm_dynamic compares against.
-		std::basic_string<T> terminals;
+		terminal_string<T> terminals;
 		/// Meaningful in pending: every (parent, child) dynamic_grow_nts
 		/// pair this grow is associated with, for confirm_dynamic's
 		/// lookup. active_grow_ at each add call for this (l, value), or
@@ -898,7 +899,7 @@ public:
 	struct input;
 	using char_type       = C;
 	using terminal_type   = T;
-	using traits_type     = std::char_traits<char_type>;
+	using traits_type     = terminal_char_traits<char_type>;
 	using int_type        = typename traits_type::int_type;
 	using grammar_type    = idni::grammar<char_type, terminal_type>;
 	using grammar_options = grammar_type::options;
@@ -1061,23 +1062,23 @@ public:
 				std::function<std::vector<T>(input&)>;
 		input(const C* data, size_t size, size_t max_length = 0,
 			decoder_type decoder = 0,
-			int_type e = std::char_traits<C>::eof());
+			int_type e = traits_type::eof());
 		input(std::basic_istream<C>& is, size_t max_length = 0,
 			decoder_type decoder = 0,
-			int_type e = std::char_traits<C>::eof());
+			int_type e = traits_type::eof());
 		input(const std::string& filename, size_t max_length = 0,
 			decoder_type decoder = 0,
-			int_type e = std::char_traits<C>::eof(),
+			int_type e = traits_type::eof(),
 			idni::diagnostics::report* diag = nullptr);
 #ifdef _WIN32
 		input(const std::wstring& filename, size_t max_length = 0,
 			decoder_type decoder = 0,
-			int_type e = std::char_traits<C>::eof(),
+			int_type e = traits_type::eof(),
 			idni::diagnostics::report* diag = nullptr);
 #else
 		input(int filedescriptor, size_t max_length = 0,
 			decoder_type decoder = 0,
-			int_type e = std::char_traits<C>::eof());
+			int_type e = traits_type::eof());
 #endif
 		~input();
 		inline bool good() const;
@@ -1086,8 +1087,8 @@ public:
 		void clear();
 		/// Returns input data as a string
 		std::basic_string<C> get_string();
-		std::basic_string<T> get_terminals(size_t start, size_t end);
-		std::basic_string<T> get_terminals(
+		terminal_string<T> get_terminals(size_t start, size_t end);
+		terminal_string<T> get_terminals(
 			std::array<size_t, 2> pos_span);
 		// source stream access
 		/// The current character.
@@ -1119,7 +1120,7 @@ public:
 		/// input type
 		enum type { POINTER, STREAM, MMAP } itype = POINTER;
 		/// end of a stream
-		int_type e = std::char_traits<C>::eof();
+		int_type e = traits_type::eof();
 		decoder_type decoder = 0;
 		fs::memory_map mm{};
 		/// input position
@@ -1180,7 +1181,7 @@ public:
 		/// Start non-terminal, SIZE_MAX = use default
 		size_t start = SIZE_MAX;
 		/// End of a stream
-		int_type eof = std::char_traits<C>::eof();
+		int_type eof = traits_type::eof();
 		/// Record timed scopes in diagnostics report
 		bool measure_scopes = false;
 		/// Record parse counters and RSS metrics in report
@@ -1409,10 +1410,10 @@ public:
 		/// Returns the input as a string (input's char type, ie. C)
 		std::basic_string<C> get_input();
 		/// Read terminals from input (input's terminal type, ie. T)
-		std::basic_string<T> get_terminals() const;
+		terminal_string<T> get_terminals() const;
 		/// Read terminals from input according to the position span of
 		/// a provided node
-		std::basic_string<T> get_terminals(const pnode& n) const;
+		terminal_string<T> get_terminals(const pnode& n) const;
 		/// Reads terminals of a node and converts them to int
 		/// if the conversion fails or the int is out of range
 		/// returns no value

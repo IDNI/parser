@@ -46,6 +46,9 @@ std::string to_std_string(const std::u32string& s);
 std::string to_std_string(const std::u16string& s);
 std::string to_std_string(const char32_t& ch);
 std::string to_std_string(char ch);
+// a template, so a pointer argument never converts to bool
+template <std::same_as<bool> B>
+std::string to_std_string(B bit);
 #ifdef _WIN32
 std::wstring utf8_to_wide(const std::string& s);
 std::string  wide_to_utf8(const std::wstring& w);

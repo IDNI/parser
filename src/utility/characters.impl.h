@@ -93,6 +93,8 @@ inline std::string to_std_string(const char32_t& ch) {
 	return to_std_string(to_utf8string(ch));}
 // A char is one byte of the string, never a code point to encode.
 inline std::string to_std_string(char ch) { return std::string(1, ch); }
+template <std::same_as<bool> B>
+std::string to_std_string(B bit) { return bit ? "1" : "0"; }
 
 // UTF-16 codec — defined below peek_codepoint / emit_codepoint declarations
 // because the conversion functions use them. Templated on the 16-bit code

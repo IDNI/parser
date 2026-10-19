@@ -283,6 +283,27 @@ TEST_SUITE("input: binarize (char -> bool)") {
 			false, true, false, false, false, false, true,  false };
 		CHECK(r == expected);
 	}
+
+	TEST_CASE("a parser with bool terminals builds, and its input gives the "
+		"bits as a vector of bool")
+	{
+		nonterminals<char, bool> nts;
+		auto start = nts("start");
+		prods<char, bool> ps, s(start), one(lit<char, bool>(true)),
+			zero(lit<char, bool>(false));
+		ps(start, (one | zero) + s | one | zero);
+		grammar<char, bool> g(nts, ps, start, {});
+		parser<char, bool>::options o;
+		o.codec.decode = bconv;
+		parser<char, bool> p(g, o);
+		const std::string src = "A";
+		parser<char, bool>::input in(src.c_str(), src.size(), 0, bconv);
+		while (!in.teof()) in.tnext();
+		// 'A' = 0x41 = 0b01000001
+		const std::vector<bool> expected{
+			false, true, false, false, false, false, false, true };
+		CHECK(in.get_terminals(0, 8) == expected);
+	}
 }
 
 // ---------------------------------------------------------------------------
