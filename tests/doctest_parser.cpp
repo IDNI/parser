@@ -1001,6 +1001,40 @@ TEST_SUITE("AMB wrapping with TGF shaping") {
 	}
 }
 
+TEST_SUITE("forest trim of a deep tree") {
+	TEST_CASE("get_trimmed_forest_tree trims a forest 100000 levels deep") {
+		nonterminals<char> nts;
+		auto gr = tgf<char>::from_string(nts, string(
+			"@trim s.\nstart => n.\nn => '(' n ')' s | 'x'.\ns => ' '.\n"));
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		const size_t depth = 100000;
+		string input(depth, '(');
+		input += 'x';
+		for (size_t i = 0; i != depth; ++i) input += ") ";
+		parser<char> p(g, make_parser_options());
+		auto r = p.parse(input.c_str(), input.size(), { .tree_path =
+			parse_tree_path::forest_path, .enable_gc = false });
+		REQUIRE(r.found);
+		auto t = r.get_trimmed_forest_tree(r.get_forest()->root());
+		REQUIRE(t);
+		REQUIRE(t->value->first == nts("start"));
+		REQUIRE(t->child.size() == 1);
+		// each n keeps '(' n ')' without its s, the last n keeps 'x'
+		auto level = [&nts](const parser<char>::ptree& n) {
+			return n.value->first == nts("n") && n.child.size() == 3
+				&& n.child[0]->value->first.t() == '('
+				&& n.child[2]->value->first.t() == ')';
+		};
+		size_t levels = 0;
+		auto n = t->child[0];
+		for (; level(*n); ++levels) n = n->child[1];
+		CHECK(levels == depth);
+		REQUIRE(n->child.size() == 1);
+		CHECK(n->child[0]->value->first.t() == 'x');
+	}
+}
+
 TEST_SUITE("bintree trim of a deep tree") {
 	TEST_CASE("get_trimmed_bintree trims a tree 100000 levels deep") {
 		using tree = parser<char>::tree;

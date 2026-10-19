@@ -289,59 +289,57 @@ bool node_to_inline(const typename parser<C, T>::pnode& n,
 template <typename C, typename T>
 typename parser<C, T>::psptree
 	parser<C, T>::result::get_trimmed_forest_tree(
-		const pnode& n, const shaping_options& opts) const
+		const pnode& n0, const shaping_options& opts) const
 {
-	//std::cerr << "get_trimmed_tree for node: `" << n.first.to_std_string() << "`" << std::endl;
-	auto get_children_nodes = [&](const pnode& n,
-		const pnodes& nodes, std::vector<psptree>& output)
-	{
-		//std::cerr << "getting children for nodes of `" << n.first.to_std_string() << "`" << std::endl;
-		for (auto& c : nodes) {
-			//std::cerr << "getting child `" << c.first.to_std_string() << "` for node `" << n.first.to_std_string() << "`" << std::endl;
-			if (trimmable_child<C, T>(n, c, opts)) {
-				//std::cerr << "trimmable child: " << c.first.to_std_string();
-				//std::cerr << " in: " << n.first.to_std_string() << std::endl;
-				continue;
-			}
-			auto x = get_trimmed_forest_tree(c, opts);
-			if (x) output.push_back(x);
-		}
+	// a manual stack, since a deep forest overflows the call stack
+	struct job {
+		pnode parent;
+		const pnodes* nodes;
+		size_t i;
+		std::vector<psptree>* out;
 	};
-	psptree t = 0;
-	if (n.first.is_null()) return t;
-	if (trimmable_node<C, T>(n, opts)) {
-		//std::cerr << "\t is trimmable, skipping" << std::endl;
-		return t;
-	}
-	if (!n.first.nt()) {
-		//std::cerr << "\t terminal node, returning" << std::endl;
-		t = std::make_shared<ptree>(n);
-		return t;
-	}
+	std::vector<job> jobs;
 	auto pf = get_forest();
-	auto it = pf->g.find(n);
-	if (it == pf->g.end()) {
-		//std::cerr << "\t not existing node, skipping" << std::endl;
-		return t;
-	}
-	t = std::make_shared<ptree>(n);
-	pnodes_set pack = it->second;
-	if (pack.size() > 1) {
-		//std::cerr << "Ambigous node: `" << n.first.to_std_string() << "`" << std::endl;
-		// move ambiguous children sets each into its separate child
-		// copy them also a value of amb. node
-		// and replace value of amb. node with nt: __AMB_<ID>
-		pnode v = t->value;
-		pnode x(amb_node, v.second);
-		t = std::make_shared<ptree>(x);
-		//std::cout << "Ambigous node " << n.first.to_std_string() << std::endl;
-		for (auto& nodes : pack) {
-			psptree tc = std::make_shared<ptree>(n);
-			get_children_nodes(n, nodes, tc->child);
-			t->child.push_back(tc);
+	auto open = [&](const pnode& n) -> psptree {
+		if (n.first.is_null()) return nullptr;
+		if (!n.first.nt()) return std::make_shared<ptree>(n);
+		auto it = pf->g.find(n);
+		if (it == pf->g.end()) return nullptr;
+		const pnodes_set& pack = it->second;
+		std::vector<std::pair<const pnodes*, std::vector<psptree>*>> kids;
+		psptree t;
+		if (pack.size() > 1) {
+			// each pack of an ambiguous node is a child of an amb node
+			t = std::make_shared<ptree>(pnode(amb_node, n.second));
+			for (const auto& nodes : pack) {
+				auto tc = std::make_shared<ptree>(n);
+				t->child.push_back(tc);
+				kids.emplace_back(&nodes, &tc->child);
+			}
+		} else {
+			t = std::make_shared<ptree>(n);
+			for (const auto& nodes : pack)
+				kids.emplace_back(&nodes, &t->child);
 		}
-	} else for (auto& nodes : pack) get_children_nodes(n, nodes, t->child);
-	return t;
+		// the first pack goes on top, so it is built first
+		for (auto k = kids.rbegin(); k != kids.rend(); ++k)
+			jobs.push_back({ n, k->first, 0, k->second });
+		return t;
+	};
+	if (trimmable_node<C, T>(n0, opts)) return nullptr;
+	psptree root = open(n0);
+	while (!jobs.empty()) {
+		job& j = jobs.back();
+		if (j.i == j.nodes->size()) {
+			jobs.pop_back();
+			continue;
+		}
+		const pnode& c = (*j.nodes)[j.i++];
+		if (trimmable_child<C, T>(j.parent, c, opts)) continue;
+		std::vector<psptree>* out = j.out;
+		if (psptree x = open(c); x) out->push_back(x);
+	}
+	return root;
 }
 template <typename C, typename T>
 typename parser<C, T>::psptree
