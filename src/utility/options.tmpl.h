@@ -811,11 +811,11 @@ inline void options_repository::help(std::ostream& os,
 	}
 	const auto rows = rows_of(cfg.global_surface);
 	os << header;
-	if (!rows.empty()) os << " [ options ] ";
+	if (!rows.empty()) os << " [ options ]";
 	if (!cat.commands.empty()) {
-		if (!cfg.default_command.empty()) os << "[ ";
-		os << "<command> [ <command options> ] ";
-		if (!cfg.default_command.empty()) os << "]";
+		const char* usage = "<command> [ <command options> ]";
+		if (cfg.default_command.empty()) os << " " << usage;
+		else os << " [ " << usage << " ]";
 	}
 	os << "\n";
 	if (!cfg.description.empty()) os << cfg.description << "\n";

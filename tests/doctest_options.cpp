@@ -1131,6 +1131,11 @@ TEST_CASE("the help shows the declared default and no trailing space") {
 	const string p = program.str();
 	CHECK(contains(p, "show the help (default: false)"));
 	CHECK(contains(p, "print more (default: false)"));
+	for (const string& text : { p, run.str() }) {
+		istringstream lines(text);
+		for (string line; getline(lines, line); )
+			CHECK_MESSAGE(!line.ends_with(' '), "line: '" << line << "'");
+	}
 }
 
 } // TEST_SUITE
