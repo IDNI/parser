@@ -809,7 +809,7 @@ private:
 		/// value in the terminal alphabet, matching what
 		/// parser::input::get_terminals resolves a span to; this is
 		/// what confirm_dynamic compares against.
-		std::basic_string<T> value_t;
+		std::basic_string<T> terminals;
 		/// Meaningful in pending: every (parent, child) dynamic_grow_nts
 		/// pair this grow is associated with, for confirm_dynamic's
 		/// lookup. active_grow_ at each add call for this (l, value), or
