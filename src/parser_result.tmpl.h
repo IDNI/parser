@@ -470,26 +470,42 @@ typename parser<C, T>::psptree
 template <typename C, typename T>
 typename parser<C, T>::psptree
 	parser<C, T>::result::trim_forest_tree_child_terminals(
-		const psptree& t, const shaping_options& opts) const
+		const psptree& t0, const shaping_options& opts) const
 {
-	psptree r = 0;
-	if (!t) return r;
-	auto& l = t->value->first;
-	if (!l.nt()) return r = t, r;
-	bool trim = (opts.trim_terminals
+	struct job {
+		psptree src;
+		psptree out;
+		bool trim;
+		size_t i;
+	};
+	std::vector<job> jobs;
+	auto open = [&](const psptree& t) -> psptree {
+		if (!t) return nullptr;
+		const auto& l = t->value->first;
+		if (!l.nt()) return t;
+		const bool trim = (opts.trim_terminals
 				&& opts.dont_trim_terminals_of.find(l.n())
 					== opts.dont_trim_terminals_of.end())
 			|| opts.to_trim_children_terminals.find(l.n())
 				!= opts.to_trim_children_terminals.end();
-	r = std::make_shared<ptree>(t->value);
-	for (auto& c : t->child) {
-		auto& cl = c->value->first;
-		if (cl.nt() || cl.is_null() || !trim) {
-			auto x = trim_forest_tree_child_terminals(c, opts);
-			if (x) r->child.push_back(x);
+		psptree r = std::make_shared<ptree>(t->value);
+		jobs.push_back({ t, r, trim, 0 });
+		return r;
+	};
+	psptree root = open(t0);
+	while (!jobs.empty()) {
+		job& j = jobs.back();
+		if (j.i == j.src->child.size()) {
+			jobs.pop_back();
+			continue;
 		}
+		psptree c = j.src->child[j.i++];
+		const auto& cl = c->value->first;
+		if (!cl.nt() && !cl.is_null() && j.trim) continue;
+		psptree out = j.out;
+		if (psptree x = open(c); x) out->child.push_back(x);
 	}
-	return r;
+	return root;
 }
 template <typename C, typename T>
 typename parser<C, T>::psptree
