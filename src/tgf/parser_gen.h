@@ -392,11 +392,11 @@ idni::diagnostics::result<std::vector<std::string>> generate_parser_cpp(
 		"\n";
 
 	// grammar table; inline in the header it lands in every including TU
+	// a function-local static, so two threads never fill the table twice
 	const std::string productions_body =
-		"	static bool loaded = false;\n"
-		"	static idni::prods<char_type, terminal_type>\n"
+		"	static idni::prods<char_type, terminal_type> p = [] {\n"
+		"	idni::prods<char_type, terminal_type>\n"
 		"		p, nul(idni::lit<char_type, terminal_type>{});\n"
-		"	if (loaded) return p;\n"
 		// one accessor call each, not one per literal
 		"	const auto& ts = terminals();\n"
 		"	auto& ns = nts();\n"
@@ -405,7 +405,9 @@ idni::diagnostics::result<std::vector<std::string>> generate_parser_cpp(
 		+ ps +
 		"	#undef T\n"
 		"	#undef NT\n"
-		"	return loaded = true, p;\n";
+		"	return p;\n"
+		"	}();\n"
+		"	return p;\n";
 
 	if (opt.header_only) os <<
 		"inline idni::prods<char_type, terminal_type>& productions() {\n"

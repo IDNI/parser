@@ -101,10 +101,9 @@ inline ::idni::prods<char_type, terminal_type>& start_symbol() {
 
 #ifdef TAU_PARSER_BUILD_HEADER_ONLY
 inline idni::prods<char_type, terminal_type>& productions() {
-	static bool loaded = false;
-	static idni::prods<char_type, terminal_type>
+	static idni::prods<char_type, terminal_type> p = [] {
+	idni::prods<char_type, terminal_type>
 		p, nul(idni::lit<char_type, terminal_type>{});
-	if (loaded) return p;
 	const auto& ts = terminals();
 	auto& ns = nts();
 	#define  T(x) (idni::prods<char_type, terminal_type>{ ts[x] })
@@ -507,7 +506,9 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(114), (T(39)+NT(116)+NT(117)));
 	#undef T
 	#undef NT
-	return loaded = true, p;
+	return p;
+	}();
+	return p;
 }
 #else
 idni::prods<char_type, terminal_type>& productions();

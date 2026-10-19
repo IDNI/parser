@@ -1124,6 +1124,33 @@ TEST_SUITE("parser generator") {
 		CHECK(s.find("{ \"vc\", { \"a\", \"b\" } }") != string::npos);
 		CHECK(s.find(".variant = \"vc\"") != string::npos);
 	}
+
+	TEST_CASE("a generated productions() fills its table in one static") {
+		namespace fs = std::filesystem;
+		nonterminals<char> nts;
+		auto gr = tgf<char>::from_string(nts, string("start => 'a'.\n"));
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		parser_gen_options gopt;
+		gopt.output_dir = fs::temp_directory_path().string() + "/";
+		gopt.output = "productions_gen_test.generated.h";
+		gopt.name = "productions_gen_test_parser";
+		REQUIRE(generate_parser_cpp<char>("productions_gen_test.tgf", g,
+			gopt).has_value());
+		const fs::path out = fs::path(gopt.output_dir) / gopt.output;
+		ifstream in(out);
+		REQUIRE(in.is_open());
+		ostringstream text;
+		text << in.rdbuf();
+		in.close();
+		fs::remove(out);
+		const string s = text.str();
+		// a flag set after the fill lets two first callers fill it twice
+		CHECK(s.find("static bool loaded") == string::npos);
+		CHECK(s.find("static idni::prods<char_type, terminal_type> p = [] {")
+			!= string::npos);
+		CHECK(s.find("\t}();\n\treturn p;\n") != string::npos);
+	}
 }
 
 // ---------------------------------------------------------------------------
