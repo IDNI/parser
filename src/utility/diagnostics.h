@@ -474,7 +474,9 @@ struct result {
 
 	result() = default;
 
-	explicit result(std::string_view name);
+	/// A result with no value and a report whose root is @p name. A
+	/// factory, so a text argument of a constructor is always a value.
+	[[nodiscard]] static result named(std::string_view name);
 
 	result(result&& other) noexcept;
 	result& operator=(result&& other) noexcept;
@@ -483,8 +485,14 @@ struct result {
 	result& operator=(const result&) = delete;
 
 	explicit result(stored_t value)
-		requires(!std::is_void_v<T>
-			&& !std::is_same_v<std::decay_t<T>, std::string>);
+		requires(!std::is_void_v<T>);
+	/// A string value from a view or a literal, which std::string takes
+	/// only by an explicit conversion.
+	template <typename U>
+	explicit result(U&& text)
+		requires(std::is_same_v<T, std::string>
+			&& std::is_convertible_v<U&&, std::string_view>
+			&& !std::is_same_v<std::remove_cvref_t<U>, std::string>);
 	explicit result(diagnostics_report rep);
 
 	~result();

@@ -44,18 +44,19 @@ return r;
 
 ```
 result();                                // empty
-explicit result(std::string_view name);  // empty, reset report root to `name`
+static result named(std::string_view n); // empty, report root is `n`
 explicit result(T value);                // success, no diagnostics
 explicit result(report rep);             // failure (or pre-populated report)
 result(result&& other) noexcept;
 result& operator=(result&& other) noexcept;
 ```
 
-The name-constructor only calls `report::reset(name)` — use `open` / `open_if` for timed scopes.
+`named` only calls `report::reset(name)`. Use `open` / `open_if` for timed scopes.
 
-The value-taking constructor is disabled when `T = std::string` (it would
-clash with the `std::string_view` name-constructor). For
-`result<std::string>`, use `emplace` or `operator=` instead.
+`named` is a factory, not a constructor, so a text argument of a
+constructor is always a value. `result<std::string>("x")`,
+`result<std::string>(std::string_view)` and `result<std::string>(std::string)`
+each hold a value.
 
 
 ### bool has_value() const;

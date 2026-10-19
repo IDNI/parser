@@ -5,7 +5,7 @@
 //
 // Focused on the ergonomics surface: closing a scope_guard early, the
 // measure() sugar, a null pointer as a legitimate value in result<T*>,
-// forward_as<T> for a type result<T>(T) cannot construct, take_or_error(),
+// forward_as<T>, a string value against a named result, take_or_error(),
 // and the expected-style chain: and_then(), transform(), or_else(), value_or().
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
@@ -14,6 +14,8 @@
 #include "utility/diagnostics.h"
 
 #include <string>
+#include <string_view>
+#include <type_traits>
 #include <vector>
 #include <sstream>
 
@@ -123,6 +125,48 @@ TEST_SUITE("diagnostics: forward_as") {
 		auto r = forward_as<std::string>(std::move(src), std::string("ok"));
 		CHECK_FALSE(r.has_value());
 		CHECK(r.has_error());
+	}
+}
+
+TEST_SUITE("diagnostics: a string value and a named result") {
+
+	TEST_CASE("every text argument of a constructor is a value") {
+		result<std::string> from_string(std::string("x"));
+		REQUIRE(from_string.has_value());
+		CHECK(from_string.value() == "x");
+		result<std::string> from_literal("x");
+		REQUIRE(from_literal.has_value());
+		CHECK(from_literal.value() == "x");
+		const std::string_view view = "x";
+		result<std::string> from_view(view);
+		REQUIRE(from_view.has_value());
+		CHECK(from_view.value() == "x");
+		CHECK(from_view.report().nodes().empty());
+	}
+
+	TEST_CASE("a named result keeps its name and holds no value") {
+		auto r = result<std::string>::named("load");
+		CHECK_FALSE(r.has_value());
+		CHECK_FALSE(r.has_error());
+		REQUIRE_FALSE(r.report().nodes().empty());
+		CHECK(r.report().str(r.report().nodes()[0].key) == "load");
+		r = std::string("x");
+		CHECK(r.value() == "x");
+		CHECK(r.report().str(r.report().nodes()[0].key) == "load");
+	}
+
+	TEST_CASE("no text type selects a name") {
+		static_assert(!std::is_constructible_v<result<int>,
+			std::string_view>);
+		static_assert(!std::is_constructible_v<result<int>,
+			const char*>);
+		static_assert(std::is_constructible_v<result<std::string>,
+			std::string_view>);
+		static_assert(std::is_constructible_v<result<std::string>,
+			const char*>);
+		static_assert(!std::is_convertible_v<std::string,
+			result<std::string>>);
+		CHECK(true);
 	}
 }
 

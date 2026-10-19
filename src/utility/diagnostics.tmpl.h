@@ -876,8 +876,10 @@ inline std::ostream& operator<<(std::ostream& os, const report& r) {
 }
 
 template <typename T>
-result<T>::result(std::string_view name) {
-	diag_rep_.reset(name);
+result<T> result<T>::named(std::string_view name) {
+	result r;
+	r.diag_rep_.reset(name);
+	return r;
 }
 
 template <typename T>
@@ -896,9 +898,16 @@ result<T>& result<T>::operator=(result&& other) noexcept {
 
 template <typename T>
 result<T>::result(typename result<T>::stored_t value)
-	requires(!std::is_void_v<T>
-		&& !std::is_same_v<std::decay_t<T>, std::string>)
+	requires(!std::is_void_v<T>)
 	: value_(std::move(value)) {}
+
+template <typename T>
+template <typename U>
+result<T>::result(U&& text)
+	requires(std::is_same_v<T, std::string>
+		&& std::is_convertible_v<U&&, std::string_view>
+		&& !std::is_same_v<std::remove_cvref_t<U>, std::string>)
+	: value_(std::string(std::string_view(std::forward<U>(text)))) {}
 
 template <typename T>
 result<T>::result(typename result<T>::diagnostics_report rep)

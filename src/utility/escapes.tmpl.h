@@ -255,14 +255,14 @@ inline bool decode_core(std::string_view body, const profile& p, Sink& sink,
 
 inline u32decoded u32decode(std::string_view body, const profile& p) {
 	u32sink sink;
-	u32decoded r("escapes::u32decode");
+	auto r = u32decoded::named("escapes::u32decode");
 	if (decode_core(body, p, sink, r.report())) r.emplace(std::move(sink.out));
 	return r;
 }
 
 inline decoded decode(std::string_view body, const profile& p) {
 	utf8sink     sink;
-	decoded r("escapes::decode");
+	auto r = decoded::named("escapes::decode");
 	if (decode_core(body, p, sink, r.report())) r.emplace(std::move(sink.out));
 	return r;
 }
@@ -323,7 +323,7 @@ inline decoded utf8encode(std::string_view utf8, const profile& p) {
 	using label = parser_strings::label;
 	const auto* src = reinterpret_cast<const idni::utf8char*>(utf8.data());
 	size_t len = utf8.size();
-	decoded r("escapes::utf8encode");
+	auto r = decoded::named("escapes::utf8encode");
 	auto& rep = r.report();
 	std::string out;
 	out.reserve(len * 2);

@@ -130,7 +130,7 @@ Grammar-specific codes include `unknown_char_class` (undefined character class n
 
 ## 6. The `result<T>` class
 
-`result<T>` is the main diagnostics container. It holds a value **and** a `report`. Use `open` / `open_if` for timed scopes; the name constructor only resets the report root.
+`result<T>` is the main diagnostics container. It holds a value **and** a `report`. Use `open` / `open_if` for timed scopes. `result<T>::named(name)` only resets the report root.
 
 ### 6.1 Success path
 
@@ -187,7 +187,7 @@ if (r.has_value()) {
 
 ```cpp
 result<std::string> load_file(const char* path) {
-    result<std::string> r("load_file");  // resets root only; no timing
+    auto r = result<std::string>::named("load_file");  // root only; no timing
 
     if (!file_exists(path)) {
         r.error(code::io_error, "file not found");
@@ -252,7 +252,7 @@ Collect diagnostics from a sub-operation into a parent result:
 
 ```cpp
 result<int> parent_op() {
-    result<int> r("parent");
+    auto r = result<int>::named("parent");
     result<int> child = child_op();   // has its own report
     r << std::move(child);            // merge child's report into r
     r.emplace(42);
