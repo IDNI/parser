@@ -34,6 +34,15 @@ This library currently provides decoder and encoder for conversions between UTF-
 
 Decoder for UTF-8 in `char` into Unicode in `char32_t`.
 
+For a byte sequence that is not valid UTF-8, the decoder gives
+`std::char_traits<char32_t>::eof()`. No character class and no terminal
+accepts this value, so the parse stops at the bad byte. The report then
+holds the code `invalid_utf8` ("Invalid UTF-8."). Its `loc`, `line` and
+`col` are the terminal position, as for a syntax error. Its `byte` is the
+byte position of the bad byte in the input. After a multibyte character
+the two differ: in `["é\xff"]` the bad byte has `loc` 3 and `byte` 4. The
+example below shows the shape of a decoder only.
+
 ```
 parser<char, char32_t>::decoder_type utf8_to_u32_conv =
 	[](idni::parser<char, char32_t>::input& in) {

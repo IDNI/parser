@@ -157,6 +157,11 @@ static decode_result run_decoder(const char* data, size_t len) {
 	return out;
 }
 
+// No char class and no terminal accepts this value, so a parse stops at the
+// bad byte, where U+FFFD would pass as a valid character.
+static const char32_t invalid_u8 =
+	static_cast<char32_t>(std::char_traits<char32_t>::eof());
+
 TEST_SUITE("utf8_to_u32_conv recoder") {
 	TEST_CASE("ASCII passes through") {
 		auto r = run_decoder("hi", 2);
@@ -189,13 +194,13 @@ TEST_SUITE("utf8_to_u32_conv recoder") {
 		CHECK(r.codepoints[0] == U'\U0001F600');
 		CHECK(r.consumed == 4);
 	}
-	TEST_CASE("CP-1252 stray byte: emit U+FFFD, do NOT eat next byte") {
+	TEST_CASE("CP-1252 stray byte: emit the invalid value, do NOT eat next byte") {
 		// 0xE9 alone (CP-1252 'é') followed by '_'. Old code consumed
 		// the '_' trying to complete a 3-byte sequence and dropped it.
 		const char data[] = "\xE9_";
 		auto r = run_decoder(data, 2);
 		REQUIRE(r.codepoints.size() == 2);
-		CHECK(r.codepoints[0] == 0xFFFD);
+		CHECK(r.codepoints[0] == invalid_u8);
 		CHECK(r.codepoints[1] == U'_');
 		CHECK(r.consumed == 2);
 	}
@@ -204,28 +209,28 @@ TEST_SUITE("utf8_to_u32_conv recoder") {
 		const char data[] = "\xE9 _";
 		auto r = run_decoder(data, 3);
 		REQUIRE(r.codepoints.size() == 3);
-		CHECK(r.codepoints[0] == 0xFFFD);
+		CHECK(r.codepoints[0] == invalid_u8);
 		CHECK(r.codepoints[1] == U' ');
 		CHECK(r.codepoints[2] == U'_');
 	}
-	TEST_CASE("Truncated 2-byte sequence at EOF -> U+FFFD") {
+	TEST_CASE("Truncated 2-byte sequence at EOF -> the invalid value") {
 		const char data[] = "\xC3";
 		auto r = run_decoder(data, 1);
 		REQUIRE(r.codepoints.size() == 1);
-		CHECK(r.codepoints[0] == 0xFFFD);
+		CHECK(r.codepoints[0] == invalid_u8);
 	}
-	TEST_CASE("Truncated 4-byte sequence at EOF -> U+FFFD") {
+	TEST_CASE("Truncated 4-byte sequence at EOF -> the invalid value") {
 		const char data[] = "\xF0\x9F";
 		auto r = run_decoder(data, 2);
 		REQUIRE(r.codepoints.size() == 1);
-		CHECK(r.codepoints[0] == 0xFFFD);
+		CHECK(r.codepoints[0] == invalid_u8);
 	}
 	TEST_CASE("Lead byte followed by non-continuation: only lead consumed") {
 		// 0xC3 followed by ASCII 'A' (not a continuation byte).
 		const char data[] = "\xC3" "A";
 		auto r = run_decoder(data, 2);
 		REQUIRE(r.codepoints.size() == 2);
-		CHECK(r.codepoints[0] == 0xFFFD);
+		CHECK(r.codepoints[0] == invalid_u8);
 		CHECK(r.codepoints[1] == U'A');
 	}
 	TEST_CASE("Mixed valid + malformed input round-trips") {
@@ -235,7 +240,7 @@ TEST_SUITE("utf8_to_u32_conv recoder") {
 		REQUIRE(r.codepoints.size() == 4);
 		CHECK(r.codepoints[0] == U'a');
 		CHECK(r.codepoints[1] == 0x00E9);
-		CHECK(r.codepoints[2] == 0xFFFD);
+		CHECK(r.codepoints[2] == invalid_u8);
 		CHECK(r.codepoints[3] == U'b');
 	}
 }

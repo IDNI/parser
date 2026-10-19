@@ -125,7 +125,7 @@ r.error(code::parse_error, "unexpected token",
      {label::col,  col_num}});
 ```
 
-Grammar-specific codes include `unknown_char_class` (undefined character class name). See the [error `code` table](diagnostics.md#code) in the reference.
+Grammar-specific codes include `unknown_char_class` (undefined character class name). A parse of input that is not valid UTF-8 gives `invalid_utf8` at the byte position. See the [error `code` table](diagnostics.md#code) in the reference.
 
 
 ## 6. The `result<T>` class

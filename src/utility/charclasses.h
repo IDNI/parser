@@ -6,12 +6,14 @@
 
 #include <cctype>
 
+#include "terminal_traits.h"
+
 // mingw-w64 (<= 11.x) defines isascii as a macro, even for C++
 #undef isascii
 
 namespace idni::charclasses {
 
-template <typename C> bool iseof(C c)  {return c == static_cast<C>(std::char_traits<C>::eof());}
+template <typename C> bool iseof(C c)  {return is_invalid_terminal(c);}
 template <typename C> bool isany(C c)  {return !iseof(c);}
 template <typename C> bool isascii(C c){return static_cast<unsigned int>(c) <= 0x7F;}
 template <typename C> bool isalnum(C c);

@@ -12,8 +12,10 @@ namespace idni {
 // Decoding strategy: read the lead byte to derive the expected sequence
 // length (1-4 bytes), then advance only over actual UTF-8 continuation
 // bytes. Malformed input (invalid lead byte, missing continuation,
-// truncation at EOF) emits U+FFFD and advances exactly one byte so that
-// the bad byte is consumed but no good bytes are eaten.
+// truncation at EOF) emits char_traits<char32_t>::eof(), which no
+// character class and no terminal accepts, so the parse stops there with
+// an "Invalid UTF-8." error. It advances exactly one byte so that the bad
+// byte is consumed but no good bytes are eaten.
 inline std::vector<char32_t> utf8_to_u32_conv(
 	parser<char, char32_t>::input& in)
 {
@@ -47,7 +49,7 @@ inline std::vector<char32_t> utf8_to_u32_conv(
 	char32_t ch;
 	size_t decoded = idni::peek_codepoint(s, got, ch);
 	if (decoded == 0 || decoded == static_cast<size_t>(-1))
-		ch = 0xFFFD; // replacement character for malformed input
+		ch = static_cast<char32_t>(std::char_traits<char32_t>::eof());
 	return r = { ch };
 }
 

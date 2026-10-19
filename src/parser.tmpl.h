@@ -149,9 +149,10 @@ bool parser<C, T>::input::next() {
 		const bool end = traits_type::eq_int_type(c, traits_type::eof())
 			|| traits_type::eq_int_type(c, e);
 		if (end) sgood = false;
+		else ++cn;
 		return l = n + (end ? 0 : 1), true;
 	}
-	return n < l && (max_l == 0 || n < max_l) ? ++n, true : false;
+	return n < l && (max_l == 0 || n < max_l) ? ++n, ++cn, true : false;
 }
 template <typename C, typename T>
 size_t parser<C, T>::input::pos() { return n; }
@@ -197,6 +198,10 @@ size_t parser<C, T>::input::known_length() const {
 	return l;
 }
 template <typename C, typename T>
+size_t parser<C, T>::input::invalid_tpos() const { return bad_tp; }
+template <typename C, typename T>
+size_t parser<C, T>::input::invalid_pos() const { return bad_n; }
+template <typename C, typename T>
 size_t parser<C, T>::input::tpos() { return tp; }
 template <typename C, typename T>
 T parser<C, T>::input::tat(size_t p) {
@@ -213,7 +218,16 @@ bool parser<C, T>::input::teof() {
 template <typename C, typename T>
 void parser<C, T>::input::decode() {
 	if (!decoder || eof()) return;
+	[[maybe_unused]] const size_t at = cn;
 	std::vector<T> x = decoder(*this);
+	// the decoder gives the end value of T for a sequence it cannot decode
+	if constexpr (terminal_traits<T>::has_invalid_value) if (bad_tp == SIZE_MAX) {
+		for (size_t i = 0; i != x.size(); ++i)
+			if (is_invalid_terminal(x[i])) {
+				bad_tp = ts.size() + i, bad_n = at;
+				break;
+			}
+	}
 	ts.insert(ts.end(), x.begin(), x.end());
 }
 //------------------------------------------------------------------------------
@@ -1487,12 +1501,13 @@ std::string parser<C, T>::error::to_str(info_lvl elvl, size_t line_start) const{
 	if (ctxt.size() == 0) return "";
 	std::stringstream ss;
 	bool eof = at_eof();
-	if (!eof) for (const auto& t : unexp) {
+	if (!eof && !invalid_input) for (const auto& t : unexp) {
 		std::string s = t.to_std_string();
 		if (s.size() >= 2) ss << s.substr(1, s.size() - 2);
 	}
 	std::string s{ ss.str() }; ss = {};
-	if (!eof && s.size()) {
+	if (invalid_input) ss << "invalid UTF-8";
+	else if (!eof && s.size()) {
 		char quote = unexp.size() > 1 ? '"' : '\'';
 		ss << quote << s << quote;
 	} else ss << "end of file";
@@ -1682,6 +1697,8 @@ typename parser<C, T>::error parser<C, T>::get_error() {
 		break;
 	}
 	err.end = err.loc == in.tpos();
+	if (err.loc != SIZE_MAX && err.loc == in.invalid_tpos())
+		err.invalid_input = true, err.input_pos = in.invalid_pos();
 	err.line = 1;
 	if (err.loc != SIZE_MAX) {
 		size_t line_loc = 0;

@@ -2217,6 +2217,10 @@ TEST_SUITE("parser: every input byte") {
 		bool at_eof = false;
 		size_t loc = SIZE_MAX;
 		std::string msg;
+		bool invalid = false;
+		// loc and byte attributes of the invalid_utf8 report node
+		int64_t invalid_loc = -1;
+		int64_t invalid_byte = -1;
 	};
 
 	template <typename P>
@@ -2226,6 +2230,20 @@ TEST_SUITE("parser: every input byte") {
 		b.at_eof = r.parse_error.at_eof();
 		b.loc = r.parse_error.loc;
 		b.msg = r.parse_error.to_str(P::error::info_lvl::INFO_BASIC);
+		const auto& rep = r.report();
+		for (const auto& n : rep.nodes()) {
+			if (n.tag != diagnostics::code::invalid_utf8) continue;
+			b.invalid = true;
+			for (uint8_t i = 0; i != n.attr_cnt; ++i) {
+				const auto& a = rep.attrs()[n.attr_off + i];
+				if (a.key == static_cast<int_t>(
+						parser_strings::label::loc))
+					b.invalid_loc = a.value;
+				if (a.key == static_cast<int_t>(
+						parser_strings::label::byte))
+					b.invalid_byte = a.value;
+			}
+		}
 		return b;
 	}
 
@@ -2264,6 +2282,50 @@ TEST_SUITE("parser: every input byte") {
 		return parse_bytes(p, in, s);
 	}
 
+	TEST_CASE("a 0xFF byte after a value is rejected at the byte") {
+		for (source s : sources) {
+			auto a = parse_json(std::string("[1] \xff"), s);
+			CHECK_FALSE(a.found);
+			CHECK(a.invalid);
+			CHECK(a.invalid_loc == 4);
+			CHECK(a.invalid_byte == 4);
+			CHECK(a.loc == 4);
+			auto f = parse_json(std::string("[1]\xff]"), s);
+			CHECK_FALSE(f.found);
+			CHECK(f.invalid);
+			CHECK(f.invalid_loc == 3);
+			CHECK(f.invalid_byte == 3);
+		}
+	}
+
+	TEST_CASE("an invalid byte in a string gives Invalid UTF-8 at the byte") {
+		CHECK(std::string(diagnostics::code_name(
+			diagnostics::code::invalid_utf8)) == "Invalid UTF-8.");
+		for (source s : sources) {
+			auto b = parse_json(std::string("[\"\xff\"]"), s);
+			CHECK_FALSE(b.found);
+			CHECK(b.invalid);
+			CHECK(b.invalid_loc == 2);
+			CHECK(b.invalid_byte == 2);
+			CHECK_FALSE(b.at_eof);
+			CHECK(b.msg.find("invalid UTF-8") != std::string::npos);
+			CHECK(b.msg.find("at 1:3 (3)") != std::string::npos);
+		}
+	}
+
+	TEST_CASE("after a multibyte character loc and byte differ") {
+		// the bad byte is terminal 3 and byte 4, after the 2 bytes of e acute
+		for (source s : sources) {
+			auto b = parse_json(std::string("[\"\xc3\xa9\xff\"]"), s);
+			CHECK_FALSE(b.found);
+			CHECK(b.invalid);
+			CHECK(b.loc == 3);
+			CHECK(b.invalid_loc == 3);
+			CHECK(b.invalid_byte == 4);
+			CHECK(b.msg.find("at 1:4 (4)") != std::string::npos);
+		}
+	}
+
 	TEST_CASE("a NUL is a syntax error at the NUL, not the end of file") {
 		const std::string inputs[] = {
 			std::string("[\"a\0b\"]", 7),
@@ -2273,6 +2335,7 @@ TEST_SUITE("parser: every input byte") {
 			for (const auto& in : inputs) {
 				auto r = parse_json(in, s);
 				CHECK_FALSE(r.found);
+				CHECK_FALSE(r.invalid);
 				CHECK_FALSE(r.at_eof);
 				CHECK(r.loc == 3);
 				CHECK(r.msg.find("end of file") == std::string::npos);

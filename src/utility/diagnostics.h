@@ -60,6 +60,7 @@ enum class code : uint16_t {
 	unknown_char_class       = 17,
 	no_grammar               = 18,
 	server_path              = 19,
+	invalid_utf8             = 20,
 
 	// 01 band — warnings
 	warning                  = 0x4000,

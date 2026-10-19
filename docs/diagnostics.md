@@ -484,10 +484,15 @@ Top two bits of the `uint16_t` value (`c & 0xC000`) encode severity:
 
 | Prefix | Range | Meaning |
 |--------|-------|---------|
-| `00` | `0x0000`–`0x3FFF` | error codes (`unknown=0`, `invalid_argument`, `io_error`, `parse_error`, `runtime_error`, `unknown_char_class=17`, …) |
+| `00` | `0x0000`–`0x3FFF` | error codes (`unknown=0`, `invalid_argument`, `io_error`, `parse_error`, `runtime_error`, `unknown_char_class=17`, `invalid_utf8=20`, …) |
 | `01` | `0x4000`–`0x7FFF` | warnings (`warning` = `0x4000`) |
 | `10` | `0x8000`–`0xBFFF` | info and metrics (`info` = `0x8000`, `info_micros` = `0x8001` — time in µs, auto-scaled on print to µs/ms/s; `info_kb` = `0x8002`; `info_count` = `0x8003`) |
 | `11` | `0xC000`–`0xFFFF` | unused — do not emit |
+
+A parse error (`parse_error`) carries the attributes `loc`, `line` and
+`col`: the terminal position, its line and its column. An `invalid_utf8`
+error carries the same three, plus `byte`, the byte position of the bad
+byte in the input.
 
 Predicates:
 

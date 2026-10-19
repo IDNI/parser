@@ -1115,6 +1115,11 @@ public:
 		/// Number of input positions known before the parse, or 0 for an
 		/// unbounded stream.
 		size_t known_length() const;
+		/// The terminal position of the first terminal that the decoder
+		/// gave as invalid input, SIZE_MAX when there is none.
+		size_t invalid_tpos() const;
+		/// The input position where the sequence of invalid_tpos() starts.
+		size_t invalid_pos() const;
 	private:
 		void decode();
 		/// input type
@@ -1139,6 +1144,11 @@ public:
 		std::vector<T> ts{};
 		/// current terminal pos
 		size_t tp = 0;
+		/// number of characters that next() consumed
+		size_t cn = 0;
+		/// see invalid_tpos() and invalid_pos()
+		size_t bad_tp = SIZE_MAX;
+		size_t bad_n = SIZE_MAX;
 	};
 	using decoder_type = input::decoder_type;
 	/// Parse error
@@ -1170,6 +1180,10 @@ public:
 		std::vector<exp_prod_t> expv;
 		/// Whether the error is at the end of the input.
 		bool end = false;
+		/// Whether the unexpected terminal is input that the decoder
+		/// could not decode, and the input position where it starts.
+		bool invalid_input = false;
+		size_t input_pos = SIZE_MAX;
 		error() : loc(SIZE_MAX) {}
 		bool at_eof() const;
 		/// Produces a string containing human readable information about the error.

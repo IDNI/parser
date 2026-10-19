@@ -97,7 +97,8 @@ using id_t = idni::int_t;
 	X(inline_nodes,       "inline nodes") \
 	X(inline_paths,       "inline paths") \
 	X(trim_terminals,     "trim terminals") \
-	X(offset,             "offset")
+	X(offset,             "offset") \
+	X(byte,               "byte")
 
 // The labels whose attr value holds interned text, not a number. A
 // separate list, so LABELS keeps its two-argument shape and every
@@ -132,6 +133,7 @@ using id_t = idni::int_t;
 	X(unknown_char_class,       "Unknown character class.") \
 	X(no_grammar,               "No grammar.") \
 	X(server_path,              "Server path.") \
+	X(invalid_utf8,             "Invalid UTF-8.") \
 	X(warning,                  "Warning.") \
 	X(info,                     "Info.") \
 	X(info_micros,              "Time.") \

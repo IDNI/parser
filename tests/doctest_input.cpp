@@ -284,6 +284,36 @@ TEST_SUITE("input: binarize (char -> bool)") {
 		CHECK(r == expected);
 	}
 
+	TEST_CASE("a true bit is no invalid input") {
+		const std::string src = "\xff";
+		parser<char, bool>::input in(src.c_str(), src.size(), 0, bconv);
+		while (!in.teof()) in.tnext();
+		CHECK(in.invalid_tpos() == SIZE_MAX);
+	}
+
+	TEST_CASE("a byte 0xFF from a char decoder is no invalid input") {
+		auto pass = [](parser<char>::input& in) {
+			auto x = in.cur();
+			return in.next(), vector<char>{ x };
+		};
+		nonterminals<char> nts;
+		auto start = nts("start");
+		prods<char> ps, a('a'), b('b');
+		ps(start, a + b);
+		grammar<char> g(nts, ps, start, {});
+		parser<char>::options o;
+		o.codec.decode = pass;
+		parser<char> p(g, o);
+		const std::string src = "a\xff";
+		auto r = p.parse(src.c_str(), src.size());
+		REQUIRE_FALSE(r.found);
+		CHECK(r.parse_error.loc == 1);
+		CHECK_FALSE(r.parse_error.invalid_input);
+		const std::string msg = r.parse_error.to_str(
+			parser<char>::error::info_lvl::INFO_BASIC);
+		CHECK(msg.find("UTF-8") == std::string::npos);
+	}
+
 	TEST_CASE("a parser with bool terminals builds, and its input gives the "
 		"bits as a vector of bool")
 	{
@@ -323,6 +353,25 @@ TEST_SUITE("input: binarize (char -> bool)") {
 		const std::vector<bool> expected{
 			true, false, true, false, false, true, false, true };
 		CHECK(r.get_terminals() == expected);
+	}
+
+	TEST_CASE("a parse error on a true bit is no invalid input") {
+		nonterminals<char, bool> nts;
+		auto start = nts("start");
+		prods<char, bool> ps, s(start), zero(lit<char, bool>(false));
+		ps(start, zero + s | zero);
+		grammar<char, bool> g(nts, ps, start, {});
+		parser<char, bool>::options o;
+		o.codec.decode = bconv;
+		parser<char, bool> p(g, o);
+		const std::string src = "\x80";
+		auto r = p.parse(src.c_str(), src.size());
+		REQUIRE_FALSE(r.found);
+		CHECK(r.parse_error.loc == 0);
+		CHECK_FALSE(r.parse_error.invalid_input);
+		const std::string msg = r.parse_error.to_str(
+			parser<char, bool>::error::info_lvl::INFO_BASIC);
+		CHECK(msg.find("UTF-8") == std::string::npos);
 	}
 }
 

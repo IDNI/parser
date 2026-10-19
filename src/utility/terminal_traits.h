@@ -43,18 +43,24 @@ struct bit_traits {
 	}
 };
 
-/// The traits of a terminal or input type @p T and the string of its
-/// terminals.
+/// The traits of a terminal or input type @p T, the string of its terminals,
+/// and the value that a decoder gives for a sequence it cannot decode. A type
+/// with no listed traits has no such value.
 template <typename T>
 struct terminal_traits {
 	using string_type = std::basic_string<T>;
+	static constexpr bool has_invalid_value = false;
 };
 
-/// A character type: std::char_traits.
+/// A character type: std::char_traits. A code point type of 32 bits has
+/// room for the end value, so that value marks invalid input. In a narrower
+/// type the end value is a real character, as the byte 0xFF.
 template <typename C>
 struct char_terminal_traits {
 	using type = std::char_traits<C>;
 	using string_type = std::basic_string<C>;
+	static constexpr bool has_invalid_value = sizeof(C) >= 4;
+	static C invalid_value() noexcept { return static_cast<C>(type::eof()); }
 };
 
 template <> struct terminal_traits<char> : char_terminal_traits<char> {};
@@ -65,17 +71,21 @@ template <> struct terminal_traits<char16_t>
 template <> struct terminal_traits<char32_t>
 	: char_terminal_traits<char32_t> {};
 
+/// Each byte value is a real byte, so a byte has no invalid value.
 template <>
 struct terminal_traits<unsigned char> {
 	using type = utf8char_traits;
 	using string_type = std::basic_string<unsigned char>;
+	static constexpr bool has_invalid_value = false;
 };
 
+/// true and false are both real bits, so a bit stream has no invalid value.
 template <>
 struct terminal_traits<bool> {
 	using type = bit_traits;
 	// std::basic_string<bool> needs std::char_traits<bool>
 	using string_type = std::vector<bool>;
+	static constexpr bool has_invalid_value = false;
 };
 
 template <typename T>
@@ -85,6 +95,14 @@ using terminal_char_traits = typename terminal_traits<T>::type;
 /// character type, std::vector<bool> for a bit.
 template <typename T>
 using terminal_string = typename terminal_traits<T>::string_type;
+
+/// True when @p c is the invalid value of its type.
+template <typename T>
+bool is_invalid_terminal([[maybe_unused]] T c) noexcept {
+	if constexpr (terminal_traits<T>::has_invalid_value)
+		return c == terminal_traits<T>::invalid_value();
+	else return false;
+}
 
 } // namespace idni
 
