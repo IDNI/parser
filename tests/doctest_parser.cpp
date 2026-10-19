@@ -2369,6 +2369,9 @@ TEST_SUITE("parser: every input byte") {
 			CHECK_FALSE(bad.found);
 			CHECK_FALSE(bad.at_eof);
 			CHECK(bad.loc == 1);
+			auto late = parse_bytes(p, std::string("\xff\0b", 3), s);
+			CHECK_FALSE(late.found);
+			CHECK(late.msg.find(": \\xff\\0b") != std::string::npos);
 		}
 	}
 

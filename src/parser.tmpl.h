@@ -1514,14 +1514,21 @@ std::string parser<C, T>::error::to_str(info_lvl elvl, size_t line_start) const{
 	s = ss.str();
 	ss = {}, ss << "Syntax Error: Unexpected " << s << " at "
 		<< (line_start+line) << ":" << col << " (" << loc+1 << "): ";
-	for (size_t i = ctxt.size() - 1; i != 0; --i)
-		if (ctxt[i] != static_cast<T>(0)
-			&& ctxt[i] != static_cast<T>(-1))
-		{
-			if constexpr (std::is_same_v<T, char32_t>)
-				ss << to_std_string(ctxt[i]);
-			else ss << ctxt[i];
-		}
+	for (size_t i = ctxt.size(); i-- > 1; ) {
+		const T c = ctxt[i];
+		// a NUL and a byte 0xFF are input, so they show as escapes
+		if constexpr (std::is_same_v<T, bool>
+			|| !std::is_integral_v<T>) ss << c;
+		else if (c == static_cast<T>(0)) ss << "\\0";
+		// the message already names the input that did not decode
+		else if (is_invalid_terminal(c)) continue;
+		else if constexpr (sizeof(T) == 1) {
+			if (c == static_cast<T>(0xFF)) ss << "\\xff";
+			else ss << c;
+		} else if constexpr (std::is_same_v<T, char32_t>)
+			ss << to_std_string(c);
+		else ss << c;
+	}
 	if (elvl == INFO_BASIC) return ss.str();
 	for (auto& e : expv) {
 		ss << "\n...expecting " << e.exp << " due to (" << e.prod_nt
