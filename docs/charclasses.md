@@ -7,7 +7,9 @@ All functions are in the namespace `idni::charclasses`.
 To use them without the rest of the library, include only `charclasses.h`.
 
 Each function is a template on the character type `C`.
-`C` is `char` or `char32_t`.
+`C` is `char`, `char32_t` or another integral type.
+Another integral type, such as `unsigned int`, converts to `char32_t` and
+gets the `char32_t` answer.
 
 There are two sets of the twelve character class functions.
 The plain set is in `idni::charclasses`.

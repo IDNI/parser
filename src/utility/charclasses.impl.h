@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cstdint>
 #include <cstddef>
+#include <type_traits>
 #include "charclasses.h"
 #include "charclasses_unicode.generated.h"
 
@@ -45,6 +46,25 @@ template<> inline bool isspace<char32_t>(char32_t cp) { return ascii_props(cp) &
 template<> inline bool isupper<char32_t>(char32_t cp) { return ascii_props(cp) & UC_UPPER; }
 template<> inline bool isxdigit<char32_t>(char32_t cp){ return ascii_props(cp) & UC_XDIGIT;}
 
+// A code point of any integral type reads the char32_t class.
+template <typename C> char32_t code_point(C c) {
+	static_assert(std::is_integral_v<C>, "a code point is integral");
+	return static_cast<char32_t>(c);
+}
+
+template <typename C> bool isalnum(C c) { return isalnum<char32_t>(code_point(c)); }
+template <typename C> bool isalpha(C c) { return isalpha<char32_t>(code_point(c)); }
+template <typename C> bool isblank(C c) { return isblank<char32_t>(code_point(c)); }
+template <typename C> bool iscntrl(C c) { return iscntrl<char32_t>(code_point(c)); }
+template <typename C> bool isdigit(C c) { return isdigit<char32_t>(code_point(c)); }
+template <typename C> bool isgraph(C c) { return isgraph<char32_t>(code_point(c)); }
+template <typename C> bool islower(C c) { return islower<char32_t>(code_point(c)); }
+template <typename C> bool isprint(C c) { return isprint<char32_t>(code_point(c)); }
+template <typename C> bool ispunct(C c) { return ispunct<char32_t>(code_point(c)); }
+template <typename C> bool isspace(C c) { return isspace<char32_t>(code_point(c)); }
+template <typename C> bool isupper(C c) { return isupper<char32_t>(code_point(c)); }
+template <typename C> bool isxdigit(C c) { return isxdigit<char32_t>(code_point(c)); }
+
 namespace unicode {
 
 template<> inline bool isalnum<char>(char c) { return charclasses::isalnum<char>(c); }
@@ -72,6 +92,19 @@ template<> inline bool ispunct<char32_t>(char32_t cp) { return char_props(cp) & 
 template<> inline bool isspace<char32_t>(char32_t cp) { return char_props(cp) & UC_SPACE; }
 template<> inline bool isupper<char32_t>(char32_t cp) { return char_props(cp) & UC_UPPER; }
 template<> inline bool isxdigit<char32_t>(char32_t cp){ return char_props(cp) & UC_XDIGIT;}
+
+template <typename C> bool isalnum(C c) { return isalnum<char32_t>(code_point(c)); }
+template <typename C> bool isalpha(C c) { return isalpha<char32_t>(code_point(c)); }
+template <typename C> bool isblank(C c) { return isblank<char32_t>(code_point(c)); }
+template <typename C> bool iscntrl(C c) { return iscntrl<char32_t>(code_point(c)); }
+template <typename C> bool isdigit(C c) { return isdigit<char32_t>(code_point(c)); }
+template <typename C> bool isgraph(C c) { return isgraph<char32_t>(code_point(c)); }
+template <typename C> bool islower(C c) { return islower<char32_t>(code_point(c)); }
+template <typename C> bool isprint(C c) { return isprint<char32_t>(code_point(c)); }
+template <typename C> bool ispunct(C c) { return ispunct<char32_t>(code_point(c)); }
+template <typename C> bool isspace(C c) { return isspace<char32_t>(code_point(c)); }
+template <typename C> bool isupper(C c) { return isupper<char32_t>(code_point(c)); }
+template <typename C> bool isxdigit(C c) { return isxdigit<char32_t>(code_point(c)); }
 
 } // idni::charclasses::unicode namespace
 

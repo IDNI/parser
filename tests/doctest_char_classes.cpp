@@ -30,6 +30,32 @@
 using namespace std;
 using namespace idni;
 
+TEST_CASE("a class takes any integral code point type") {
+	namespace uc = charclasses::unicode;
+	CHECK(uc::isdigit(0x0661u));
+	CHECK(uc::isdigit(static_cast<unsigned int>('7')));
+	CHECK_FALSE(uc::isdigit(0x00B2u));
+	CHECK(uc::isalpha(0x00C0u));
+	CHECK(uc::isspace(0x3000u));
+	CHECK(uc::isupper(char16_t{ 0x0410 }));
+	CHECK(uc::islower(uint8_t{ 'a' }));
+	CHECK(uc::isxdigit(0xFF21u));
+	CHECK(uc::isalnum(0x4E00l));
+	CHECK(uc::isblank(0x3000ull));
+	CHECK(uc::iscntrl(0x85u));
+	CHECK(uc::ispunct(0x00BFu));
+	CHECK(uc::isgraph(0x1F600u));
+	CHECK(uc::isprint(0x3000u));
+	CHECK_FALSE(uc::isdigit(0x110000u));
+	CHECK_FALSE(uc::isdigit(-1));
+	CHECK(charclasses::isdigit(static_cast<unsigned int>('7')));
+	CHECK_FALSE(charclasses::isdigit(0x0661u));
+	CHECK(charclasses::isspace(uint16_t{ '\t' }));
+	CHECK_FALSE(charclasses::isalpha(uint8_t{ 0xC0 }));
+	CHECK(charclasses::isalpha('a'));
+	CHECK(uc::isdigit(U'\u0661'));
+}
+
 #ifdef PROJECT_SOURCE_DIR
 
 // ---------------------------------------------------------------------------
