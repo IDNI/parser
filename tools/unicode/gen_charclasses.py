@@ -8,8 +8,8 @@ Database (UCD).
 
 The first header holds a two-stage lookup table that maps each code point to
 a bitmask of the 12 <cctype> classes. The second holds a two-stage table of
-the digit value properties. Do not edit the headers by hand: change this
-script and run it again.
+the digit value, the space and the printable properties. Do not edit the
+headers by hand: change this script and run it again.
 """
 
 import argparse
@@ -183,13 +183,22 @@ def read_ucd(ucd_dir):
 UP_DIGIT_VALUE = 0xF
 UP_DIGIT = 1 << 4
 UP_DECIMAL = 1 << 5
+UP_SPACE = 1 << 6
+UP_PRINTABLE = 1 << 7
+
+SPACE_BIDI_CLASSES = frozenset(("WS", "B", "S"))
+NOT_PRINTABLE_CATEGORIES = frozenset(
+	("Cc", "Cf", "Cs", "Co", "Cn", "Zl", "Zp", "Zs"))
 
 
-def compute_unicode_properties(fields_of):
+def compute_unicode_properties(fields_of, proplist):
 	"""Return the property word of each code point."""
+	space = proplist["White_Space"]
 	words = [0] * MAX_CP
 	for cp in range(MAX_CP):
 		fields = fields_of.get(cp)
+		cat = fields[2] if fields else "Cn"
+		bidi = fields[4] if fields else ""
 		decimal = fields[6] if fields else ""
 		digit = fields[7] if fields else ""
 		word = 0
@@ -198,6 +207,10 @@ def compute_unicode_properties(fields_of):
 			word |= UP_DIGIT | int(digit)
 		if decimal:
 			word |= UP_DECIMAL
+		if cp in space or bidi in SPACE_BIDI_CLASSES:
+			word |= UP_SPACE
+		if cp == 0x20 or cat not in NOT_PRINTABLE_CATEGORIES:
+			word |= UP_PRINTABLE
 		words[cp] = word
 	return words
 
@@ -338,6 +351,8 @@ enum property_bit : uint16_t {{
     UP_DIGIT_VALUE = 0xF,     // the value of a UP_DIGIT code point
     UP_DIGIT       = 1 << 4,  // Numeric_Type = Decimal or Digit
     UP_DECIMAL     = 1 << 5,  // Numeric_Type = Decimal
+    UP_SPACE       = 1 << 6,  // White_Space, or Bidi_Class WS, B or S
+    UP_PRINTABLE   = 1 << 7,  // U+0020, or no category Cc Cf Cs Co Cn Zl Zp Zs
 }};
 
 // Stage 1: maps the high bits (cp >> 8) to a block index.
@@ -360,10 +375,16 @@ def render_properties_header(version, stage1, stage2, blocks):
 # (code point, the digit value or None, the bits that must be set, the bits
 # that must be clear)
 PROPERTY_CHECKS = (
-	(0x0031, 1, UP_DIGIT | UP_DECIMAL, 0),
-	(0xFF11, 1, UP_DIGIT | UP_DECIMAL, 0),
-	(0x0661, 1, UP_DIGIT | UP_DECIMAL, 0),
-	(0x00B2, 2, UP_DIGIT, UP_DECIMAL),
+	(0x0031, 1, UP_DIGIT | UP_DECIMAL | UP_PRINTABLE, UP_SPACE),
+	(0xFF11, 1, UP_DIGIT | UP_DECIMAL | UP_PRINTABLE, UP_SPACE),
+	(0x0661, 1, UP_DIGIT | UP_DECIMAL | UP_PRINTABLE, UP_SPACE),
+	(0x00B2, 2, UP_DIGIT | UP_PRINTABLE, UP_DECIMAL),
+	(0x2028, None, UP_SPACE, UP_DIGIT | UP_PRINTABLE),
+	(0x00A0, None, UP_SPACE, UP_DIGIT | UP_PRINTABLE),
+	(0x0020, None, UP_SPACE | UP_PRINTABLE, UP_DIGIT),
+	(0x001C, None, UP_SPACE, UP_PRINTABLE),
+	(0x0007, None, 0, UP_SPACE | UP_PRINTABLE | UP_DIGIT),
+	(0x00AD, None, 0, UP_PRINTABLE),
 	(0xD800, None, 0, 0xFF),
 	(0x10FFFF, None, 0, 0xFF),
 )
@@ -440,7 +461,7 @@ def selftest(props, stage1, stage2, gc, derived, proplist):
 	return not errors
 
 
-def properties_selftest(words, stage1, stage2, fields_of):
+def properties_selftest(words, stage1, stage2, fields_of, proplist):
 	errors = []
 	for cp in range(MAX_CP):
 		got = stage2[stage1[cp >> 8] * BLOCK_SIZE + (cp & (BLOCK_SIZE - 1))]
@@ -452,6 +473,10 @@ def properties_selftest(words, stage1, stage2, fields_of):
 		if word & must_set != must_set or word & must_clear or (value
 				is not None and word & UP_DIGIT_VALUE != value):
 			errors.append(f"U+{cp:04X}: 0x{word:04X} fails the spot check")
+	space = {cp for cp, f in fields_of.items() if f[4] in SPACE_BIDI_CLASSES}
+	space |= proplist["White_Space"]
+	if {cp for cp in range(MAX_CP) if words[cp] & UP_SPACE} != space:
+		errors.append("UP_SPACE differs from the data files")
 	for cp, f in fields_of.items():
 		if bool(words[cp] & UP_DECIMAL) != bool(f[6]) or (f[6]
 				and f[6] != f[7]):
@@ -494,12 +519,13 @@ def main():
 	props = compute_props(gc, derived, proplist)
 	stage1, stage2, blocks = build_two_stage(props)
 	fields_of = parse_unicode_fields(Path(ucd_dir) / "UnicodeData.txt")
-	words = compute_unicode_properties(fields_of)
+	words = compute_unicode_properties(fields_of, proplist)
 	p_stage1, p_stage2, p_blocks = build_two_stage(words)
 
 	if args.selftest:
 		ok = selftest(props, stage1, stage2, gc, derived, proplist)
-		ok = properties_selftest(words, p_stage1, p_stage2, fields_of) and ok
+		ok = properties_selftest(words, p_stage1, p_stage2, fields_of,
+			proplist) and ok
 		return 0 if ok else 1
 
 	text = render_header(args.unicode_version, stage1, stage2, blocks)

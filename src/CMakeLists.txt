@@ -28,6 +28,7 @@ set(TAU_PARSER_HEADERS
 	utility/charclasses.impl.h
 	utility/unicode_properties.h
 	utility/unicode_properties.generated.h
+	utility/python_charclasses.h
 	utility/diagnostics.h
 	utility/diagnostics.tmpl.h
 	utility/filesystem.h

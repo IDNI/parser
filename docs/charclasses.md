@@ -87,6 +87,22 @@ A value above U+10FFFF has no property.
 | `decimal_digit_value(cp)` | The value 0 to 9 when Numeric_Type is Decimal, else no value |
 | `has_digit_value(cp)` | True when Numeric_Type is Decimal or Digit, for example U+00B2 |
 
+The section [Python string classes](#python-string-classes) uses these functions for the rules of the Python `str` methods.
+
+## Python string classes
+
+`src/utility/python_charclasses.h` gives the character classes of the CPython `str` methods,
+in the namespace `idni::charclasses::python`.
+Each class function takes one `char32_t` and returns `true` when the Python method returns `True` for a string of that one code point.
+A value above U+10FFFF is in no class.
+The functions use the tables of the Unicode properties.
+`unicode::decimal_digit_value` gives the value of the digits that Python `int()` reads.
+
+| function | Python method | result |
+|---|---|---|
+| `isspace(c)` | `str.isspace` | True for White_Space and for the Bidi_Class WS, B and S |
+| `isprintable(c)` | `str.isprintable` | True for U+0020, and for no General Category Cc, Cf, Cs, Co, Cn, Zl, Zp or Zs |
+
 ## Names in a grammar
 
 A grammar names a plain class with its short name, for example `digit`.
