@@ -180,18 +180,26 @@ void bintree<T>::gc(std::unordered_set<tref>& keep) {
 
 	//mark all
 	std::unordered_set<tref> next;
-	auto mark = [&next](tref r, auto& mark) -> void {
-		if (!next.insert(r).second) return;
-		auto& bn = get(r);
-		if (bn.r != NULL) mark(bn.r, mark);
-		if (bn.l != NULL) mark(bn.l, mark);
+	// a hand stack, since a deep tree or a long sibling chain overflows
+	// the call stack
+	trefs todo;
+	auto mark = [&next, &todo](tref root) {
+		todo.push_back(root);
+		while (!todo.empty()) {
+			tref r = todo.back();
+			todo.pop_back();
+			if (!next.insert(r).second) continue;
+			auto& bn = get(r);
+			if (bn.r != NULL) todo.push_back(bn.r);
+			if (bn.l != NULL) todo.push_back(bn.l);
+		}
 	};
 	//check if any handle expired and needs to be garbaged
 	// otherwise mark all to be retained live
 
 	for (auto& x : M())
-		if (!x.second.expired()) mark(x.second.lock()->get(), mark);
-	for (auto& x : keep) mark(x, mark);
+		if (!x.second.expired()) mark(x.second.lock()->get());
+	for (auto& x : keep) mark(x);
 
 	// do not run gc, if no handle expired or empty.
 	if (!M().size() || (next.size() == M().size())) {
@@ -210,7 +218,7 @@ void bintree<T>::gc(std::unordered_set<tref>& keep) {
 		std::unordered_set<tref> to_mark;
 		for (const auto& cb : gc_expand_callbacks) cb(next, to_mark);
 		for (tref t : to_mark)
-			if (!next.contains(t)) mark(t, mark), grown = true;
+			if (!next.contains(t)) mark(t), grown = true;
 	}
 
 	/*

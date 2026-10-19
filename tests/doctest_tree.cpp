@@ -1386,3 +1386,47 @@ TEST_SUITE("print") {
 		CHECK( buf.bad == 0 );
 	}
 }
+
+// Each gc case has a node type of its own, so its intern map holds only its
+// own nodes and no other case sees a gc.
+enum class gc_deep_node : uint32_t {};
+enum class gc_wide_node : uint32_t {};
+
+TEST_SUITE("gc") {
+
+	constexpr uint32_t gc_size = 1000000;
+
+	TEST_CASE("gc: given a tree 1000000 levels deep held by a handle, it "
+		"keeps the tree and frees the nodes outside it")
+	{
+		using N = gc_deep_node;
+		using tree = lcrs_tree<N>;
+		tref t = tree::get(N{ 0 });
+		for (uint32_t i = 1; i < gc_size; ++i) t = tree::get(N{ i }, t);
+		htref h = tree::geth(t);
+		for (uint32_t i = 0; i < 10; ++i) tree::get(N{ gc_size + i });
+		CHECK( bintree<N>::node_count() == gc_size + 10 );
+		bintree<N>::gc();
+		CHECK( bintree<N>::node_count() == gc_size );
+		uint32_t level = gc_size;
+		for (tref c = h->get(); c != nullptr; c = tree::get(c).l)
+			if (tree::get(c).value != N{ --level }) break;
+		CHECK( level == 0 );
+	}
+
+	TEST_CASE("gc: given a node with 1000000 children held by a handle, it "
+		"keeps the sibling chain and frees the unplaced children")
+	{
+		using N = gc_wide_node;
+		using tree = lcrs_tree<N>;
+		trefs ch;
+		ch.reserve(gc_size);
+		for (uint32_t i = 0; i < gc_size; ++i) ch.push_back(tree::get(N{ i }));
+		htref h = tree::geth(tree::get(N{ gc_size }, ch));
+		// the chain copies each child but the last with its right sibling
+		CHECK( bintree<N>::node_count() == 2 * size_t{ gc_size } );
+		bintree<N>::gc();
+		CHECK( bintree<N>::node_count() == size_t{ gc_size } + 1 );
+		CHECK( tree::get(h).children_size() == gc_size );
+	}
+}
