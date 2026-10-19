@@ -12,23 +12,31 @@ tref parser<C, T>::result::get_trimmed_bintree(tref ref,
 	const shaping_options& opts) const
 {
 	if (!ref) return nullptr;
-	const auto& t = tree::get(ref);
-	// std::cerr << "get_trimmed_tree for node: `" << t.value.first.to_std_string() << "`" << std::endl;
-	if (t.is_null()) return nullptr;
-	if (trimmable_node<C, T>(t.value, opts)) return nullptr;
-
-	if (t.is_t()) return ref; // terminal leaf node
-
-	trefs ch;
-	for (tref c : t.children()) {
-		// std::cerr << "child: " << tree::get(c).value.first.to_std_string() << std::endl;
-		if (trimmable_child<C, T>(t.value, tree::get(c).value, opts)) {
-			// std::cerr << "\t is trimmable, skipping" << std::endl;
-			continue;
+	const auto& rt = tree::get(ref);
+	if (rt.is_null() || trimmable_node<C, T>(rt.value, opts)) return nullptr;
+	auto dropped = [&opts](tref parent, tref c) {
+		const auto& ct = tree::get(c);
+		return ct.is_null() || trimmable_node<C, T>(ct.value, opts)
+			|| trimmable_child<C, T>(tree::get(parent).value,
+				ct.value, opts);
+	};
+	// A child that the trim drops is not worth a visit. The root has no
+	// parent and is checked above.
+	auto visit = [&dropped](tref c, tref parent = nullptr) {
+		return !parent || !dropped(parent, c);
+	};
+	auto trim = [&dropped](tref n) {
+		const auto& t = tree::get(n);
+		if (t.is_t()) return n; // terminal leaf node
+		trefs ch;
+		bool changed = false;
+		for (tref c : t.children()) {
+			if (dropped(n, c)) changed = true;
+			else ch.push_back(c);
 		}
-		if (auto x = get_trimmed_bintree(c, opts); x) ch.push_back(x);
-	}
-	return tree::get(t.value, ch);
+		return changed ? tree::get(t.value, ch) : n;
+	};
+	return post_order<pnode>(ref).apply_unique(trim, visit);
 }
 template <typename C, typename T>
 tref parser<C, T>::result::get_trimmed_bintree(tref n) const {
