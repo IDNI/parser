@@ -254,7 +254,7 @@ enum unicode_prop : uint16_t {{
 
 // Stage 1: maps high 13 bits (cp >> 8) to a block index.
 // {stage1_len} entries, {blocks} unique blocks.
-constexpr uint16_t stage1[{stage1_len}] = {{
+inline constexpr uint16_t stage1[{stage1_len}] = {{
 """
 
 
@@ -262,7 +262,7 @@ def render_header(version, stage1, stage2, blocks):
 	out = [HEADER_TOP.format(version=version, stage1_len=len(stage1),
 		blocks=blocks)]
 	emit_array(out, stage1)
-	out.append(f"\n}};\n\nconstexpr uint16_t stage2[{len(stage2)}] = {{\n")
+	out.append(f"\n}};\n\ninline constexpr uint16_t stage2[{len(stage2)}] = {{\n")
 	emit_array(out, stage2)
 	out.append("\n};\n\n} // namespace idni::charclasses\n\n"
 		"#endif //__IDNI__PARSER__UTILITY__CHARCLASSES_UNICODE_GENERATED_H__\n")
