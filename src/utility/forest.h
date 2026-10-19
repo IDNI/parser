@@ -150,7 +150,7 @@ public:
 		/// Frees the subtrees with a manual stack, so a deep tree does
 		/// not overflow the call stack.
 		~tree();
-		/// Prints the tree recursively to a stream os. l is used for indentation level.
+		/// Prints the tree to a stream os. l is used for indentation level.
 		std::ostream& to_print(std::ostream& os, size_t l = 0,
 			std::set<size_t> skip = {}, bool nulls = false) const;
 	};

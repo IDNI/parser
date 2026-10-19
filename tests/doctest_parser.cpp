@@ -1241,6 +1241,32 @@ TEST_SUITE("forest tree of a deep chain") {
 		for (const auto& w : nodes) if (!w.expired()) ++alive;
 		CHECK(alive == 0);
 	}
+
+	TEST_CASE("to_print prints a chain 10000 levels deep, each level on "
+		"its own line with one more tab")
+	{
+		nonterminals<char> nts;
+		const auto v = chain_value(nts);
+		const size_t depth = 10000;
+		psptree root = chain(v, depth);
+		std::ostringstream one;
+		std::make_shared<ptree>(v)->to_print(one);
+		const string line = one.str().substr(1);
+		std::ostringstream os;
+		root->to_print(os);
+		const string printed = os.str();
+		size_t lines = 0, bad = 0;
+		for (size_t pos = 0; pos < printed.size(); ++lines) {
+			size_t end = printed.find('\n', pos + 1);
+			if (end == string::npos) end = printed.size();
+			const string l = printed.substr(pos + 1, end - pos - 1);
+			const size_t tabs = l.find_first_not_of('\t');
+			if (tabs != lines || l.substr(tabs) != line) ++bad;
+			pos = end;
+		}
+		CHECK(lines == depth);
+		CHECK(bad == 0);
+	}
 }
 
 TEST_SUITE("shaping inlines a tree path") {

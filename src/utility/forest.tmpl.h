@@ -22,21 +22,26 @@ template <typename NodeT>
 std::ostream& forest<NodeT>::tree::to_print(std::ostream& os, size_t l,
 	std::set<size_t> skip, bool nulls) const
 {
-	const NodeT &v = this->value;
-	if (skip.size() && v.first.nt() &&
-		skip.find(v.first.n()) != skip.end())
-			return os;
-	if (!nulls && v.first.is_null()) return os;
-	os << "\n";
-	for (size_t t = 0; t < l; t++) os << "\t";
-	if (v.first.nt()) os << v.first
-		<< "(" << v.first.n() << ")";
-	else if (v.first.is_null()) os << "null";
-	else os << v.first;
-	os << "[" << v.second[0] << ", "
-		<< v.second[1] << "]";
-	for (auto& d : child)
-		d->to_print(os, l + 1, skip, nulls);
+	std::vector<std::pair<const tree*, size_t>> todo{ { this, l } };
+	while (!todo.empty()) {
+		auto [t, level] = todo.back();
+		todo.pop_back();
+		const NodeT &v = t->value;
+		if (skip.size() && v.first.nt() &&
+			skip.find(v.first.n()) != skip.end())
+				continue;
+		if (!nulls && v.first.is_null()) continue;
+		os << "\n";
+		for (size_t k = 0; k < level; k++) os << "\t";
+		if (v.first.nt()) os << v.first
+			<< "(" << v.first.n() << ")";
+		else if (v.first.is_null()) os << "null";
+		else os << v.first;
+		os << "[" << v.second[0] << ", "
+			<< v.second[1] << "]";
+		for (auto c = t->child.rbegin(); c != t->child.rend(); ++c)
+			todo.emplace_back(c->get(), level + 1);
+	}
 	return os;
 }
 
