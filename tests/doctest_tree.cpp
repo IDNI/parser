@@ -1332,3 +1332,57 @@ TEST_SUITE("apply") {
 		CHECK( cmp(replaced, expected) );
 	}
 }
+
+enum class print_deep_node : uint32_t {};
+
+std::ostream& operator<<(std::ostream& os, print_deep_node v) {
+	return os << static_cast<uint32_t>(v);
+}
+
+// Checks each line of a printed chain: line k has k tabs and the value
+// depth - 1 - k. It keeps no copy of the text.
+struct print_check_buf : std::streambuf {
+	explicit print_check_buf(size_t depth) : depth(depth) {
+		setp(buf, buf + sizeof buf);
+	}
+	size_t depth, lines = 0, bad = 0, tabs = 0;
+	uint64_t value = 0;
+	char buf[4096];
+	void scan() {
+		for (char* c = pbase(); c != pptr(); ++c) {
+			if (*c == '\t') ++tabs;
+			else if (*c != '\n') value = value * 10 + uint64_t(*c - '0');
+			else {
+				if (tabs != lines || value != depth - 1 - lines) ++bad;
+				++lines, tabs = 0, value = 0;
+			}
+		}
+		setp(buf, buf + sizeof buf);
+	}
+	int overflow(int c) override {
+		scan();
+		if (c != traits_type::eof()) *pptr() = char(c), pbump(1);
+		return 0;
+	}
+	int sync() override { return scan(), 0; }
+};
+
+TEST_SUITE("print") {
+
+	TEST_CASE("print: given a chain 10000 levels deep, it prints each level "
+		"on its own line with one more tab")
+	{
+		using N = print_deep_node;
+		using tree = lcrs_tree<N>;
+		// the text grows with the square of the depth
+		constexpr uint32_t depth = 10000;
+		tref t = tree::get(N{ 0 });
+		for (uint32_t i = 1; i < depth; ++i) t = tree::get(N{ i }, t);
+		print_check_buf buf(depth);
+		std::ostream os(&buf);
+		tree::get(t).print(os);
+		os.flush();
+		CHECK( buf.lines == depth );
+		CHECK( buf.bad == 0 );
+	}
+}

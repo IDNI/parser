@@ -972,11 +972,16 @@ const lcrs_tree<T>& lcrs_tree<T>::only_child_tree() const {
 
 template <typename T>
 std::ostream& lcrs_tree<T>::print(std::ostream& os, size_t s) const {
-	for (size_t i = 0; i < s; i++) os << "\t";
-	os << this->value;
-	// DBG(os << " *" << get();)
-	os << "\n";
-	for (const auto& c : children()) get(c).print(os, s + 1);
+	size_t level = s;
+	auto on_enter = [&os, &level](tref n) {
+		for (size_t i = 0; i < level; i++) os << "\t";
+		os << get(n).value;
+		// DBG(os << " *" << n;)
+		os << "\n";
+		++level;
+	};
+	auto on_leave = [&level](tref) { --level; };
+	pre_order<T>(get()).visit(on_enter, all, on_leave);
 	return os;
 }
 
