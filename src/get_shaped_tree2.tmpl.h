@@ -82,19 +82,18 @@ tref parser<C, T>::result::inline_bintree_paths(tref ref,
 	auto path_end = [&opts](tref n) -> tref {
 		for (auto& tp : opts.to_inline) {
 			if (tp.size() < 2) continue;
-			std::function<tref(tref, size_t)> go =
-				[&](tref ref, size_t i) -> tref
-			{
-				const auto& t = tree::get(ref);
-				if (!t.is_nt() || !t.is(tp[i])) return nullptr;
-				//std::cerr << "treepath go " << i << ": `"
-				//	<< t->value.first.to_std_string() << "`" << std::endl;
-				if (i == tp.size() - 1) return ref;
-				for (tref c : t.children())
-					if (auto y = go(c, i + 1); y) return y;
-				return nullptr;
-			};
-			if (auto hit = go(n, 0); hit) return hit;
+			// a child goes above its right sibling, so the walk is pre order
+			std::vector<std::pair<tref, size_t>> todo{ { n, 0 } };
+			while (!todo.empty()) {
+				auto [r, i] = todo.back();
+				todo.pop_back();
+				const auto& t = tree::get(r);
+				if (i > 0) if (tref s = t.right_sibling(); s)
+					todo.emplace_back(s, i);
+				if (!t.is_nt() || !t.is(tp[i])) continue;
+				if (i == tp.size() - 1) return r;
+				if (tref c = t.first(); c) todo.emplace_back(c, i + 1);
+			}
 		}
 		return nullptr;
 	};

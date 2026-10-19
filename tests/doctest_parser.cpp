@@ -1075,6 +1075,34 @@ TEST_SUITE("bintree tree path inline of a deep tree") {
 	}
 }
 
+TEST_SUITE("shaping inlines a tree path") {
+	TEST_CASE("the path end replaces the path start on both tree paths") {
+		nonterminals<char> nts;
+		auto gr = tgf<char>::from_string(nts, string(
+			"@inline v > w > x.\nstart => v.\nv => y w.\n"
+			"y => 'a'.\nw => 'c' x.\nx => 'd'.\n"));
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		const string input = "acd";
+		parser<char> pb(g, make_parser_options());
+		auto rb = pb.parse(input.c_str(), input.size(), { .tree_path =
+			parse_tree_path::bintree_path, .enable_gc = false });
+		REQUIRE(rb.found);
+		using tree = parser<char>::tree;
+		const auto& b = tree::get(rb.get_shaped_tree2());
+		REQUIRE(b.children_size() == 1);
+		CHECK(b.first_tree().value.first == nts("x"));
+		parser<char> pf(g, make_parser_options());
+		auto rf = pf.parse(input.c_str(), input.size(), { .tree_path =
+			parse_tree_path::forest_path, .enable_gc = false });
+		REQUIRE(rf.found);
+		auto f = rf.get_shaped_tree();
+		REQUIRE(f);
+		REQUIRE(f->child.size() == 1);
+		CHECK(f->child[0]->value->first == nts("x"));
+	}
+}
+
 // ---------------------------------------------------------------------------
 // parse_tree_path - runtime selection between forest_path and bintree_path
 // ---------------------------------------------------------------------------
