@@ -1312,20 +1312,20 @@ public:
 		/// result was produced in bintree mode.
 		psptree get_trimmed_forest_tree(const pnode& n) const;
 		psptree get_trimmed_forest_tree(const pnode& n,
-			const shaping_options opts) const;
+			const shaping_options& opts) const;
 		psptree inline_forest_tree_nodes(const psptree& t,
 			psptree& parent) const;
 		psptree inline_forest_tree_nodes(const psptree& t,
-			psptree& parent, const shaping_options opts) const;
+			psptree& parent, const shaping_options& opts) const;
 		psptree inline_forest_tree_paths(const psptree& t) const;
 		psptree inline_forest_tree_paths(const psptree& t,
-			const shaping_options opts) const;
+			const shaping_options& opts) const;
 		psptree inline_forest_tree(psptree& t) const;
 		psptree inline_forest_tree(psptree& t,
 			const shaping_options opts) const;
 		psptree trim_forest_tree_child_terminals(const psptree& t) const;
 		psptree trim_forest_tree_child_terminals(const psptree& t,
-			const shaping_options opts) const;
+			const shaping_options& opts) const;
 		psptree get_shaped_forest_tree() const;
 		psptree get_shaped_forest_tree(const shaping_options opts) const;
 		psptree get_shaped_forest_tree(const pnode& n) const;

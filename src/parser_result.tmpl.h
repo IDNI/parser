@@ -289,7 +289,7 @@ bool node_to_inline(const typename parser<C, T>::pnode& n,
 template <typename C, typename T>
 typename parser<C, T>::psptree
 	parser<C, T>::result::get_trimmed_forest_tree(
-		const pnode& n, const shaping_options opts) const
+		const pnode& n, const shaping_options& opts) const
 {
 	//std::cerr << "get_trimmed_tree for node: `" << n.first.to_std_string() << "`" << std::endl;
 	auto get_children_nodes = [&](const pnode& n,
@@ -353,7 +353,7 @@ typename parser<C, T>::psptree
 template <typename C, typename T>
 typename parser<C, T>::psptree
 	parser<C, T>::result::inline_forest_tree_nodes(const psptree& t,
-		psptree& parent, const shaping_options opts) const
+		psptree& parent, const shaping_options& opts) const
 {
 	psptree r = 0;
 	if (!t) return r;
@@ -387,7 +387,7 @@ typename parser<C, T>::psptree
 template <typename C, typename T>
 typename parser<C, T>::psptree
 	parser<C, T>::result::inline_forest_tree_paths(const psptree& t,
-		const shaping_options opts) const
+		const shaping_options& opts) const
 {
 	psptree r = 0;
 	if (!t) return r;
@@ -446,7 +446,7 @@ typename parser<C, T>::psptree
 template <typename C, typename T>
 typename parser<C, T>::psptree
 	parser<C, T>::result::trim_forest_tree_child_terminals(
-		const psptree& t, const shaping_options opts) const
+		const psptree& t, const shaping_options& opts) const
 {
 	psptree r = 0;
 	if (!t) return r;
