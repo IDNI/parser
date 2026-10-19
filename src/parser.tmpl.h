@@ -1796,6 +1796,10 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 			if (n.first.nt() && n.first.n() == nt) return false;
 		return true;
 	};
+	auto listed = [this](const pnode& n) {
+		return n.first.nt()
+			&& g.opt().nodisambig_list.count(n.first.n()) > 0;
+	};
 
 	auto pick_best = [](pnodes_set& packs) -> pnodes {
 		if (packs.size() <= 1)
@@ -1833,11 +1837,11 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 	std::set<pnode> visiting;
 
 	// collects the child packs of a node; sets ad_allowed for the node
-	auto collect_packs = [&](const pnode& node, bool& ad_allowed)
-		-> pnodes_set
+	auto collect_packs = [&](const pnode& node, bool& ad_allowed,
+		bool keep_all) -> pnodes_set
 	{
 		pnodes_set packs;
-		ad_allowed = check_allowed(node);
+		ad_allowed = !keep_all && check_allowed(node);
 		const size_t nt = node.first.n(), from = node.second[0],
 			set = node.second[1];
 		if (set == from + 1 && g.uses_derived_recipe(nt)) {
@@ -1898,9 +1902,14 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 		size_t sink;             // frame index that takes the output
 		bool flatten = false;    // EBNF helper: no node of its own
 		bool amb = false;        // one alternative node per pack
+		// EBNF helper: its packs become alternatives of the sink
+		bool lift = false;
 		std::vector<pnodes> packs;
 		size_t pi = 0, ei = 0;
 		trefs children, alts;
+		// children of each lifted pack, spliced in at lift_at
+		std::vector<trefs> lifted{};
+		size_t lift_at = SIZE_MAX;
 	};
 	std::vector<frame> stack;
 	trefs result;
@@ -1913,15 +1922,19 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 		size_t sink = from == SIZE_MAX ? SIZE_MAX
 			: stack[from].flatten ? stack[from].sink : from;
 		visiting.insert(n);
-		stack.push_back(frame{ n, sink, flatten, amb_node,
-			std::move(packs), 0, 0, {}, {} });
+		stack.push_back(frame{ n, sink, flatten, amb_node, false,
+			std::move(packs), 0, 0, {}, {}, {}, SIZE_MAX });
 	};
 	auto open_node = [&](const pnode& n, size_t from) {
-		bool ad_allowed = false;
-		pnodes_set packs = collect_packs(n, ad_allowed);
 		bool ebnf = is_ebnf(n);
-		trefs& out = sink_of(from == SIZE_MAX ? SIZE_MAX
-			: stack[from].flatten ? stack[from].sink : from);
+		size_t si = from == SIZE_MAX ? SIZE_MAX
+			: stack[from].flatten ? stack[from].sink : from;
+		// a helper has no node of its own, so its sink's directive decides
+		bool lift = ebnf && si != SIZE_MAX && listed(stack[si].node)
+			&& !stack[si].amb && stack[si].lift_at == SIZE_MAX;
+		bool ad_allowed = false;
+		pnodes_set packs = collect_packs(n, ad_allowed, lift);
+		trefs& out = sink_of(si);
 		if (packs.empty()) {
 			if (!ebnf) out.push_back(tree::get(n));
 			return;
@@ -1930,8 +1943,11 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 			push_frame(n, from, ebnf, false, { *packs.begin() });
 		else if (ad_allowed)
 			push_frame(n, from, ebnf, false, { pick_best(packs) });
-		else push_frame(n, from, false, true,
-			std::vector<pnodes>(packs.begin(), packs.end()));
+		else {
+			push_frame(n, from, false, true,
+				std::vector<pnodes>(packs.begin(), packs.end()));
+			stack.back().lift = lift;
+		}
 	};
 	auto build = [&](const pnode& root) -> tref {
 		if (!root.first.nt()) return tree::get(root);
@@ -1952,18 +1968,38 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 					} else open_node(nxt, fi);
 					continue;
 				}
-				if (f.amb) {
+				if (f.lift) f.lifted.push_back(std::move(f.children));
+				else if (f.amb) {
 					if (auto alt = tree::get(f.node, f.children); alt)
 						f.alts.push_back(alt);
-					f.children.clear();
 				}
+				if (f.amb) f.children.clear();
 				f.pi++, f.ei = 0;
 				continue;
 			}
 			tref r = nullptr;
-			if (f.amb) r = tree::get(pnode(g.nt(from_str<C>(
-				std::string("__AMB__"))), f.node.second), f.alts);
-			else if (!f.flatten) r = tree::get(f.node, f.children);
+			auto amb_of = [&](const trefs& alts) {
+				return tree::get(pnode(g.nt(from_str<C>(
+					std::string("__AMB__"))), f.node.second), alts);
+			};
+			if (f.lift) {
+				frame& s = stack[f.sink];
+				s.lift_at = s.children.size();
+				s.lifted = std::move(f.lifted);
+			} else if (f.amb) r = amb_of(f.alts);
+			else if (f.lift_at != SIZE_MAX) {
+				auto at = f.children.begin()
+					+ static_cast<std::ptrdiff_t>(f.lift_at);
+				trefs alts;
+				for (const trefs& l : f.lifted) {
+					trefs ch(f.children.begin(), at);
+					ch.insert(ch.end(), l.begin(), l.end());
+					ch.insert(ch.end(), at, f.children.end());
+					if (auto alt = tree::get(f.node, ch); alt)
+						alts.push_back(alt);
+				}
+				r = amb_of(alts);
+			} else if (!f.flatten) r = tree::get(f.node, f.children);
 			if (r) sink_of(f.sink).push_back(r);
 			visiting.erase(f.node);
 			stack.pop_back();
@@ -2150,11 +2186,22 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root0) {
 	// repetition does not overflow the C stack.
 	std::vector<pnode> stack{ root0 };
 	bool built = false;
+	auto is_ebnf = [this](const pnode& n) { return is_ebnf_helper(n); };
+	// the first node seen with an EBNF helper in one of its packs
+	std::map<pnode, pnode> parent_of;
 	while (!stack.empty()) {
 		pnode root = stack.back();
 		stack.pop_back();
 		if (!root.first.nt()) continue;
 		if (f.contains(root)) continue;
+		// a helper has no node of its own, so its parent's directive decides
+		const pnode* parent = nullptr;
+		if (is_ebnf(root))
+			if (auto it = parent_of.find(root); it != parent_of.end()
+				&& !is_ebnf(it->second) && it->second.first.nt()
+				&& g.opt().nodisambig_list.count(
+					it->second.first.n()) && f.contains(it->second))
+				parent = &it->second;
 		// std::cout << "build_forest for node: `" << root << "`" << std::endl;
 		//auto& nxtset = sorted_citem[root.n()][root.second[0]];
 		pnodes_set ambset, cambset;
@@ -2203,7 +2250,7 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root0) {
 					? g(cur.prod) : g.nt(root.first.n()),
 					{ cur.from, cur.set });
 				cambset.clear();
-				bool allowed_disambg = check_allowed(cnode);
+				bool allowed_disambg = !parent && check_allowed(cnode);
 				if (o.binarize) binarize_comb(cur,
 								allowed_disambg ? cambset : ambset);
 				else {
@@ -2283,12 +2330,32 @@ bool parser<C, T>::build_forest(pforest& f, const pnode& root0) {
 		//std::cout << gi.size() << std::endl;
 		}
 
+		if (parent && ambset.size() > 1) {
+			pnodes_set spliced;
+			bool found = false;
+			for (const pnodes& pp : f[*parent]) {
+				auto at = std::find(pp.begin(), pp.end(), root);
+				if (at == pp.end()) { spliced.insert(pp); continue; }
+				found = true;
+				for (const pnodes& hp : ambset) {
+					pnodes np(pp.begin(), at);
+					np.insert(np.end(), hp.begin(), hp.end());
+					np.insert(np.end(), at + 1, pp.end());
+					spliced.insert(std::move(np));
+				}
+			}
+			if (found) f[*parent] = std::move(spliced), f.g.erase(root);
+		}
 		const pnodes_set& chosen =
 			(snodes.size() && check_allowed(*snodes.begin()))
 			? cambset : ambset;
 		for (auto pit = chosen.rbegin(); pit != chosen.rend(); ++pit)
-			for (auto nit = pit->rbegin(); nit != pit->rend(); ++nit)
-				stack.push_back(*nit);
+			for (auto nit = pit->rbegin(); nit != pit->rend(); ++nit) {
+				pnode c = *nit;
+				if (c.first.nt() && is_ebnf(c))
+					parent_of.emplace(c, root);
+				stack.push_back(c);
+			}
 		built = true;
 	}
 	return built;

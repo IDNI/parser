@@ -178,6 +178,76 @@ TEST_CASE("directive: @ambiguous") {
 	REQUIRE(g.opt().nodisambig_list.count(g.nt("term").n()) == 1);
 }
 
+// counts of the ambiguity in the parse of "123", in the tree and in the list
+struct pair_ambiguity {
+	size_t ambs = 0, alts = 0, pair_alts = 0, helpers = 0;
+	size_t nodes = 0, pair_nodes = 0, packs = 0;
+};
+
+static pair_ambiguity parse_pair_ambiguity(const char* tgf_src,
+	parse_tree_path tp)
+{
+	nonterminals<char> nts;
+	auto g = build_grammar(nts, tgf_src);
+	const auto pair = g.nt("pair");
+	auto o = default_parser_options<char, char>();
+	o.parse_opts.tree_path = tp;
+	parser<char> p(g, o);
+	auto r = p.parse("123", 3, o.parse_opts);
+	REQUIRE(r.found);
+	pair_ambiguity a;
+	const auto amb = r.ambiguity_literal();
+	auto collect = [&](tref n) {
+		const auto& v = parser<char>::tree::get(n).value;
+		if (v.first.nt() && v.first.to_std_string().starts_with("__E_"))
+			a.helpers++;
+		if (!amb.nt() || v.first != amb) return true;
+		a.ambs++;
+		for (tref c : parser<char>::tree::get(n).children()) {
+			a.alts++;
+			if (parser<char>::tree::get(c).value.first == pair)
+				a.pair_alts++;
+		}
+		return true;
+	};
+	pre_order<parser<char>::pnode>(r.get_shaped_tree2()).visit(collect);
+	for (auto& n : r.ambiguous_nodes()) {
+		a.nodes++;
+		if (n.first.first == pair) a.pair_nodes++, a.packs += n.second.size();
+	}
+	return a;
+}
+
+TEST_CASE("directive: @ambiguous on a shorthand group") {
+	for (auto tp : { parse_tree_path::bintree_path,
+		parse_tree_path::forest_path })
+	{
+		CAPTURE(static_cast<int>(tp));
+		auto group = parse_pair_ambiguity(
+			"@use char class digit.\n"
+			"@ambiguous pair.\n"
+			"start => (start start):pair | digit.\n", tp);
+		auto rule = parse_pair_ambiguity(
+			"@use char class digit.\n"
+			"@ambiguous pair.\n"
+			"start => pair | digit.\n"
+			"pair => start start.\n", tp);
+		CHECK(group.helpers == 0);
+		CHECK(group.ambs == rule.ambs);
+		CHECK(group.alts == rule.alts);
+		CHECK(group.pair_alts == rule.pair_alts);
+		CHECK(group.nodes == 1);
+		CHECK(group.pair_nodes == 1);
+		CHECK(group.packs == 2);
+		// a forest keeps the alternatives out of the shaped tree
+		if (tp == parse_tree_path::bintree_path) {
+			CHECK(group.ambs == 1);
+			CHECK(group.alts == 2);
+			CHECK(group.pair_alts == 2);
+		}
+	}
+}
+
 // ============================================================
 // @enable
 // ============================================================
