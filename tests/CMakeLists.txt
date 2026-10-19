@@ -131,6 +131,7 @@ set(DOCTESTS
 	tree_rewriter
 	enhancements
 	utf8
+	unicode_properties
 	highlight
 	relaxed_directives
 	boolean_grammar

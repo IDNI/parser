@@ -26,6 +26,8 @@ set(TAU_PARSER_HEADERS
 	utility/characters.impl.h
 	utility/charclasses.h
 	utility/charclasses.impl.h
+	utility/unicode_properties.h
+	utility/unicode_properties.generated.h
 	utility/diagnostics.h
 	utility/diagnostics.tmpl.h
 	utility/filesystem.h

@@ -75,6 +75,18 @@ For ASCII, the table gives the same result as `<cctype>` in the C locale.
 The ASCII symbols in `ispunct` are ``$ + < = > ^ ` | ~``.
 TAB is blank, but it is not printable.
 
+## Unicode properties
+
+`src/utility/unicode_properties.h` gives more properties of one code point,
+in the namespace `idni::charclasses::unicode`.
+Each function takes a `char32_t`.
+A value above U+10FFFF has no property.
+
+| function | result |
+|---|---|
+| `decimal_digit_value(cp)` | The value 0 to 9 when Numeric_Type is Decimal, else no value |
+| `has_digit_value(cp)` | True when Numeric_Type is Decimal or Digit, for example U+00B2 |
+
 ## Names in a grammar
 
 A grammar names a plain class with its short name, for example `digit`.
@@ -85,10 +97,11 @@ See [character class functions](char_class_fns.md) for the full list.
 ## Unicode tables
 
 The Unicode classes read the tables in
-`src/utility/charclasses_unicode.generated.h`.
-The script `tools/unicode/gen_charclasses.py` writes this header from the
+`src/utility/charclasses_unicode.generated.h`, and the Unicode properties
+read the tables in `src/utility/unicode_properties.generated.h`.
+The script `tools/unicode/gen_charclasses.py` writes both headers from the
 Unicode Character Database.
-Do not edit the header by hand.
+Do not edit the headers by hand.
 Change the script and run it again.
 
 To write the header again, run this command from the parser root:
@@ -108,6 +121,7 @@ Arguments:
 - `--unicode-version <version>` downloads the files of a different Unicode version.
 - `--cache-dir <dir>` keeps the downloaded files in a different folder.
 - `--ucd-dir <dir>` reads the four files from a local folder and downloads nothing.
-- `--output <file>` writes the header to a different file.
+- `--output <file>` writes the header of the classes to a different file.
+- `--properties-output <file>` writes the header of the properties to a different file.
 - `--selftest` checks the tables against the data files and the ASCII `<cctype>` classes.
   It writes no file.

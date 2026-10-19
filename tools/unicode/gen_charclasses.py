@@ -2,12 +2,14 @@
 # To view the license please visit
 # https://github.com/IDNI/parser/blob/main/LICENSE.md
 
-"""Generate src/utility/charclasses_unicode.generated.h from the Unicode
-Character Database (UCD).
+"""Generate src/utility/charclasses_unicode.generated.h and
+src/utility/unicode_properties.generated.h from the Unicode Character
+Database (UCD).
 
-The header holds a two-stage lookup table that maps each code point to a
-bitmask of the 12 <cctype> classes. Do not edit the header by hand: change
-this script and run it again.
+The first header holds a two-stage lookup table that maps each code point to
+a bitmask of the 12 <cctype> classes. The second holds a two-stage table of
+the digit value properties. Do not edit the headers by hand: change this
+script and run it again.
 """
 
 import argparse
@@ -24,6 +26,8 @@ UCD_FILES = ("UnicodeData.txt", "DerivedCoreProperties.txt", "PropList.txt",
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = ROOT / "src" / "utility" / "charclasses_unicode.generated.h"
+DEFAULT_PROPERTIES_OUTPUT = (ROOT / "src" / "utility"
+	/ "unicode_properties.generated.h")
 
 MAX_CP = 0x110000
 BLOCK_SIZE = 256
@@ -98,6 +102,26 @@ def parse_unicode_data(path):
 	return gc
 
 
+def parse_unicode_fields(path):
+	"""Return a dict that maps a code point to its UnicodeData.txt fields.
+	A First/Last range gives each code point of the range its fields."""
+	fields_of = {}
+	first = None
+	for line in data_lines(path):
+		fields = line.split(";")
+		cp, name = int(fields[0], 16), fields[1]
+		if name.endswith(", First>"):
+			first = cp
+			continue
+		if name.endswith(", Last>"):
+			for c in range(first, cp + 1):
+				fields_of[c] = fields
+			first = None
+			continue
+		fields_of[cp] = fields
+	return fields_of
+
+
 def parse_range_file(path):
 	"""Return a dict that maps a property name to a set of code points."""
 	props = {}
@@ -152,6 +176,30 @@ def read_ucd(ucd_dir):
 	derived = parse_range_file(ucd_dir / "DerivedCoreProperties.txt")
 	proplist = parse_range_file(ucd_dir / "PropList.txt")
 	return gc, derived, proplist
+
+
+# The bits of a word of the properties table. The low four bits hold the
+# digit value.
+UP_DIGIT_VALUE = 0xF
+UP_DIGIT = 1 << 4
+UP_DECIMAL = 1 << 5
+
+
+def compute_unicode_properties(fields_of):
+	"""Return the property word of each code point."""
+	words = [0] * MAX_CP
+	for cp in range(MAX_CP):
+		fields = fields_of.get(cp)
+		decimal = fields[6] if fields else ""
+		digit = fields[7] if fields else ""
+		word = 0
+		# Numeric_Type=Decimal has field 6, Numeric_Type=Digit field 7 only.
+		if digit:
+			word |= UP_DIGIT | int(digit)
+		if decimal:
+			word |= UP_DECIMAL
+		words[cp] = word
+	return words
 
 
 def is_punct(cp, cat):
@@ -269,6 +317,58 @@ def render_header(version, stage1, stage2, blocks):
 	return "".join(out)
 
 
+PROPERTIES_TOP = """\
+// To view the license please visit
+// https://github.com/IDNI/parser/blob/main/LICENSE.md
+
+// ============================================================================
+// Unicode property lookup tables for char32_t.
+// Unicode version: {version}
+// ============================================================================
+
+#ifndef __IDNI__PARSER__UTILITY__UNICODE_PROPERTIES_GENERATED_H__
+#define __IDNI__PARSER__UTILITY__UNICODE_PROPERTIES_GENERATED_H__
+
+#include <cstdint>
+
+namespace idni::charclasses::unicode::tables {{
+
+// The bits of a word of props_stage2. The low four bits hold the digit value.
+enum property_bit : uint16_t {{
+    UP_DIGIT_VALUE = 0xF,     // the value of a UP_DIGIT code point
+    UP_DIGIT       = 1 << 4,  // Numeric_Type = Decimal or Digit
+    UP_DECIMAL     = 1 << 5,  // Numeric_Type = Decimal
+}};
+
+// Stage 1: maps the high bits (cp >> 8) to a block index.
+// {stage1_len} entries, {blocks} unique blocks.
+inline constexpr uint16_t props_stage1[{stage1_len}] = {{
+"""
+
+
+def render_properties_header(version, stage1, stage2, blocks):
+	out = [PROPERTIES_TOP.format(version=version, stage1_len=len(stage1),
+		blocks=blocks)]
+	emit_array(out, stage1)
+	out.append(f"\n}};\n\ninline constexpr uint16_t props_stage2[{len(stage2)}] = {{\n")
+	emit_array(out, stage2)
+	out.append("\n};\n\n} // namespace idni::charclasses::unicode::tables\n\n"
+		"#endif //__IDNI__PARSER__UTILITY__UNICODE_PROPERTIES_GENERATED_H__\n")
+	return "".join(out)
+
+
+# (code point, the digit value or None, the bits that must be set, the bits
+# that must be clear)
+PROPERTY_CHECKS = (
+	(0x0031, 1, UP_DIGIT | UP_DECIMAL, 0),
+	(0xFF11, 1, UP_DIGIT | UP_DECIMAL, 0),
+	(0x0661, 1, UP_DIGIT | UP_DECIMAL, 0),
+	(0x00B2, 2, UP_DIGIT, UP_DECIMAL),
+	(0xD800, None, 0, 0xFF),
+	(0x10FFFF, None, 0, 0xFF),
+)
+
+
 # (code point, bits that must be set, bits that must be clear)
 SPOT_CHECKS = (
 	(0x00C0, UC_ALPHA | UC_UPPER, UC_LOWER),
@@ -340,6 +440,26 @@ def selftest(props, stage1, stage2, gc, derived, proplist):
 	return not errors
 
 
+def properties_selftest(words, stage1, stage2, fields_of):
+	errors = []
+	for cp in range(MAX_CP):
+		got = stage2[stage1[cp >> 8] * BLOCK_SIZE + (cp & (BLOCK_SIZE - 1))]
+		if got != words[cp]:
+			errors.append(f"U+{cp:04X}: table 0x{got:04X}, "
+				f"computed 0x{words[cp]:04X}")
+	for cp, value, must_set, must_clear in PROPERTY_CHECKS:
+		word = words[cp]
+		if word & must_set != must_set or word & must_clear or (value
+				is not None and word & UP_DIGIT_VALUE != value):
+			errors.append(f"U+{cp:04X}: 0x{word:04X} fails the spot check")
+	for cp, f in fields_of.items():
+		if bool(words[cp] & UP_DECIMAL) != bool(f[6]) or (f[6]
+				and f[6] != f[7]):
+			errors.append(f"U+{cp:04X}: the decimal value differs")
+	report_errors(errors)
+	return not errors
+
+
 def report_errors(errors):
 	for msg in errors[:50]:
 		print(f"selftest: {msg}", file=sys.stderr)
@@ -358,6 +478,9 @@ def main():
 		help="folder for downloaded UCD files (default %(default)s)")
 	parser.add_argument("--output", default=DEFAULT_OUTPUT,
 		help="header to write (default %(default)s)")
+	parser.add_argument("--properties-output",
+		default=DEFAULT_PROPERTIES_OUTPUT,
+		help="header of the properties to write (default %(default)s)")
 	parser.add_argument("--selftest", action="store_true",
 		help="check the tables against the UCD files, do not write the header")
 	args = parser.parse_args()
@@ -370,14 +493,26 @@ def main():
 	gc, derived, proplist = read_ucd(ucd_dir)
 	props = compute_props(gc, derived, proplist)
 	stage1, stage2, blocks = build_two_stage(props)
+	fields_of = parse_unicode_fields(Path(ucd_dir) / "UnicodeData.txt")
+	words = compute_unicode_properties(fields_of)
+	p_stage1, p_stage2, p_blocks = build_two_stage(words)
 
 	if args.selftest:
-		return 0 if selftest(props, stage1, stage2, gc, derived, proplist) else 1
+		ok = selftest(props, stage1, stage2, gc, derived, proplist)
+		ok = properties_selftest(words, p_stage1, p_stage2, fields_of) and ok
+		return 0 if ok else 1
 
 	text = render_header(args.unicode_version, stage1, stage2, blocks)
 	with open(args.output, "w", encoding="utf-8", newline="\n") as f:
 		f.write(text)
 	print(f"wrote {args.output}: {blocks} unique blocks", file=sys.stderr)
+	text = render_properties_header(args.unicode_version, p_stage1, p_stage2,
+		p_blocks)
+	with open(args.properties_output, "w", encoding="utf-8",
+			newline="\n") as f:
+		f.write(text)
+	print(f"wrote {args.properties_output}: {p_blocks} unique blocks",
+		file=sys.stderr)
 	return 0
 
 
