@@ -395,40 +395,55 @@ typename parser<C, T>::psptree
 
 template <typename C, typename T>
 typename parser<C, T>::psptree
-	parser<C, T>::result::inline_forest_tree_paths(const psptree& t,
+	parser<C, T>::result::inline_forest_tree_paths(const psptree& t0,
 		const shaping_options& opts) const
 {
-	psptree r = 0;
-	if (!t) return r;
-	auto& l = t->value->first;
-	if (l.is_null()) return r;
-	if (!l.nt()) return r = std::make_shared<ptree>(t->value), r;
-	//std::cerr << "inlining treepath for node: `" << l.to_std_string() << "`" << std::endl;
-	for (auto& tp : opts.to_inline) {
-		if (tp.size() < 2) continue;
-		std::function<const psptree(const psptree&, size_t)>
-			go = [&](const psptree& t, size_t i) -> const psptree
-		{
-			if (!t->value->first.nt()
-				|| t->value->first.n() != tp[i]) return 0;
-			//std::cerr << "treepath go " << i << ": `"
-			//	<< t->value.first.to_std_string() << "`" << std::endl;
-			if (i == tp.size() - 1) return t;
-			for (const auto& c : t->child) {
-				auto y = go(c, i + 1);
-				if (y) return y;
+	// The end of the first tree path of to_inline that starts at t, in
+	// pre order.
+	auto path_end = [&opts](const psptree& t) -> psptree {
+		for (const auto& tp : opts.to_inline) {
+			if (tp.size() < 2) continue;
+			std::vector<std::pair<psptree, size_t>> todo{ { t, 0 } };
+			while (!todo.empty()) {
+				auto [n, i] = todo.back();
+				todo.pop_back();
+				if (!n->value->first.nt()
+					|| n->value->first.n() != tp[i]) continue;
+				if (i == tp.size() - 1) return n;
+				for (auto c = n->child.rbegin(); c != n->child.rend(); ++c)
+					todo.emplace_back(*c, i + 1);
 			}
-			return 0;
-		};
-		const psptree hit = go(t, 0);
-		if (hit) return inline_forest_tree_paths(hit, opts);
+		}
+		return nullptr;
+	};
+	struct job {
+		psptree src;
+		psptree out;
+		size_t i;
+	};
+	std::vector<job> jobs;
+	auto open = [&](psptree t) -> psptree {
+		if (!t) return nullptr;
+		const auto& l = t->value->first;
+		if (l.is_null()) return nullptr;
+		if (!l.nt()) return std::make_shared<ptree>(t->value);
+		while (psptree hit = path_end(t)) t = hit;
+		psptree r = std::make_shared<ptree>(t->value);
+		jobs.push_back({ t, r, 0 });
+		return r;
+	};
+	psptree root = open(t0);
+	while (!jobs.empty()) {
+		job& j = jobs.back();
+		if (j.i == j.src->child.size()) {
+			jobs.pop_back();
+			continue;
+		}
+		psptree c = j.src->child[j.i++];
+		psptree out = j.out;
+		if (psptree x = open(c); x) out->child.push_back(x);
 	}
-	r = std::make_shared<ptree>(t->value);
-	for (auto& c : t->child) {
-		auto x = inline_forest_tree_paths(c, opts);
-		if (x) r->child.push_back(x);
-	}
-	return r;
+	return root;
 }
 template <typename C, typename T>
 typename parser<C, T>::psptree
