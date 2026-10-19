@@ -191,6 +191,23 @@ inline options_repository::options_repository()
 	: cat_(std::make_shared<const detail::options_catalog>())
 {}
 
+inline options_repository::~options_repository() {
+	for (auto& [owner, detach] : std::exchange(detach_, {})) detach();
+}
+
+inline void options_repository::add_detach(const void* owner,
+	std::function<void()> detach)
+{
+	remove_detach(owner);
+	detach_.emplace_back(owner, std::move(detach));
+}
+
+inline void options_repository::remove_detach(const void* owner) {
+	std::erase_if(detach_, [owner](const auto& d) {
+		return d.first == owner;
+	});
+}
+
 inline option_value options_repository::effective(std::size_t i,
 	std::string_view command) const
 {

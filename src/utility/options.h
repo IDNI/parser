@@ -79,6 +79,8 @@ struct options_repository {
 	options_repository();
 	options_repository(const options_repository&) = delete;
 	options_repository& operator=(const options_repository&) = delete;
+	/// Runs every detach callback, so no bound owner keeps a pointer here.
+	~options_repository();
 
 	/// A name that is new or declared with an equal spec is fine. The
 	/// surfaces are not compared, and the declared ones stay. A different
@@ -116,6 +118,10 @@ struct options_repository {
 	/// The owner calls it in its destructor. The last value of the field
 	/// stays in the repository.
 	void unbind(std::string_view name);
+	/// Register @p detach of a bound @p owner. The destructor runs it.
+	void add_detach(const void* owner, std::function<void()> detach);
+	/// Forget the detach callback of @p owner.
+	void remove_detach(const void* owner);
 	/// Give every option of @p owner its default value: the fallback of
 	/// the spec. A bound field gets it written, an unbound slot is cleared.
 	void reset(std::string_view owner);
@@ -169,6 +175,8 @@ private:
 	std::shared_ptr<const detail::options_catalog> cat_;
 	std::vector<std::optional<option_value>> values_;
 	std::vector<std::optional<detail::option_binding>> bindings_;
+	// an owner can outlive the repository, as a static one does a thread local
+	std::vector<std::pair<const void*, std::function<void()>>> detach_;
 	/// The command of the last parse_args(), which selects the surface
 	/// defaults.
 	std::string command_;

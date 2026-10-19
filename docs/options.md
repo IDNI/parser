@@ -238,6 +238,8 @@ Errors: the error of the codec, when a stored value does not fit the field.
 
 The owner calls it in its destructor. The last value of the field stays in the repository, so a later `bind()` puts it into the next field.
 
+An owner can outlive its repository, as a static grammar outlives the thread local repository of `options()`. So the owner registers a callback with `add_detach()`, and the destructor of the repository runs every callback. The owner then forgets the repository, and its own destructor unbinds nothing. `remove_detach()` drops the callback when the owner unbinds first.
+
 An option that is not bound is a programming error, caught by a DBG assert only.
 
 

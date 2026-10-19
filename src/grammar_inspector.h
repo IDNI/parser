@@ -23,6 +23,9 @@ struct grammar_inspector {
 	/// Production indices of the derived class `A => ch` productions.
 	const std::set<size_t>& cc_char_prod_ids() const
 		{ return g.cc_char_prod_ids_; }
+	/// The repository the options are bound to, null when unbound.
+	const options_repository* options_repo() const
+		{ return g.options_repo_; }
 };
 
 } // namespace idni

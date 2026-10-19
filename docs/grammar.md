@@ -250,6 +250,11 @@ parser<char> p(g);
 ```
 
 
+### result<void> bind_options();
+
+Declares the grammar options in the current repository of `options()` and binds each option to its field. When the repository ends before the grammar, the grammar forgets it, and the destructor of the grammar unbinds nothing.
+
+
 ### result<void> set_variant(const std::string& name);
 
 Selects the variant profile `name`. It enables the guards of the profile and sets `opt.variant` to `name`. A host calls it when its own language names a variant. The `@variant` directive and the option `variant` do not use it.

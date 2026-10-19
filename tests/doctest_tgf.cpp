@@ -1125,3 +1125,26 @@ TEST_SUITE("parser generator") {
 		CHECK(s.find(".variant = \"vc\"") != string::npos);
 	}
 }
+
+// ---------------------------------------------------------------------------
+// TEST SUITE: options detach
+// ---------------------------------------------------------------------------
+
+TEST_SUITE("options detach") {
+
+	TEST_CASE("a grammar and a parser outlive their repository") {
+		nonterminals<char> nts;
+		grammar<char> g = options_grammar(nts);
+		parser<char> p(g);
+		{
+			options_repository repo;
+			options_scope scope(repo);
+			REQUIRE(g.bind_options().has_value());
+			REQUIRE(p.bind_options().has_value());
+		}
+		CHECK(grammar_inspector<char, char>(g).options_repo() == nullptr);
+		// a dangling repository would make the unbind touch freed memory
+		p.unbind_options();
+		g.unbind_options();
+	}
+}

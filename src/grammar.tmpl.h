@@ -710,6 +710,8 @@ idni::diagnostics::result<void> grammar<C, T>::bind_to(
 	using paths_codec = detail::nonterminal_paths_codec<C, T>;
 	idni::diagnostics::result<void> r;
 	options_repo_ = &repo;
+	// a grammar can outlive the repository, so it must forget it then
+	repo.add_detach(this, [this] { options_repo_ = nullptr; });
 	const ids_codec ids{ &nts };
 	const paths_codec paths{ &nts };
 	auto rebuild = [this] { set_enabled_productions(opt_.enabled_guards); };
@@ -775,6 +777,7 @@ void grammar<C, T>::unbind_options() {
 	if (!options_repo_) return;
 	for (const auto& o : grammar_option_set.options)
 		options_repo_->unbind(o.name);
+	options_repo_->remove_detach(this);
 	options_repo_ = nullptr;
 }
 template <typename C, typename T>

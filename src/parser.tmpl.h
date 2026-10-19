@@ -305,6 +305,8 @@ idni::diagnostics::result<void> parser<C, T>::bind_to(
 {
 	idni::diagnostics::result<void> r;
 	options_repo_ = &repo;
+	// a parser can outlive the repository, so it must forget it then
+	repo.add_detach(this, [this] { options_repo_ = nullptr; });
 	auto& f = o.parse_opts;
 	// parse() reads po, and po holds o.parse_opts between parses
 	auto sync = [this] { po = o.parse_opts; };
@@ -336,6 +338,7 @@ void parser<C, T>::unbind_options() {
 	if (!options_repo_) return;
 	for (const auto& opt : parser_option_set.options)
 		options_repo_->unbind(opt.name);
+	options_repo_->remove_detach(this);
 	options_repo_ = nullptr;
 }
 
