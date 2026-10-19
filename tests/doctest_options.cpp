@@ -1118,4 +1118,19 @@ TEST_CASE("the help text of the program and of a command") {
 	CHECK(contains(c, "(default: none)"));
 }
 
+TEST_CASE("the help shows the declared default and no trailing space") {
+	fixture f;
+	args_config cfg = tool_config();
+	cfg.help_header = "tool <file>";
+	argv_of a{ "tool", "--help", "--verbose" };
+	REQUIRE(f.repo.parse_args(a.argc(), a.argv(), cfg).has_value());
+	REQUIRE(f.repo.get<bool>("help"));
+	ostringstream program, run;
+	f.repo.help(program);
+	f.repo.help(run, "run");
+	const string p = program.str();
+	CHECK(contains(p, "show the help (default: false)"));
+	CHECK(contains(p, "print more (default: false)"));
+}
+
 } // TEST_SUITE

@@ -782,8 +782,15 @@ inline void options_repository::help(std::ostream& os,
 				<< (o.name.length() < 6 ? "\t\t" : "\t");
 			if (sf->short_name) os << '-' << sf->short_name;
 			os << "\t" << o.help;
-			const std::string def = detail::format_value(
-				effective(i, cmd));
+			// the declared default: --help is set while the help prints
+			const option_value* declared = &o.fallback;
+			if (!bindings_[i])
+				for (const auto& surf : o.surfaces)
+					if (surf.command == cmd && surf.fallback) {
+						declared = &*surf.fallback;
+						break;
+					}
+			const std::string def = detail::format_value(*declared);
 			if (!def.empty()) os << " (default: " << def << ")";
 			os << "\n";
 		}
