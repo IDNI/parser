@@ -942,6 +942,43 @@ TEST_SUITE("grammar options") {
 		CHECK(text_of(repo, "variant") == "va");
 	}
 
+	TEST_CASE("set_variant selects a profile by name") {
+		const string src = "@variants va: a; vc: a.\n"
+			+ variant_productions;
+		auto check = [](grammar<char>& g) {
+			REQUIRE(g.set_variant("vc").has_value());
+			CHECK(g.opt().variant == "vc");
+			CHECK(g.opt().enabled_guards == set<string>{ "a" });
+			auto r = g.set_variant("nosuch");
+			CHECK(r.has_error());
+			ostringstream printed;
+			r.report().print(printed);
+			CHECK(printed.str().find(
+				parser_strings::messages::unknown_variant)
+					!= string::npos);
+			CHECK(g.opt().variant == "vc");
+			CHECK(g.opt().enabled_guards == set<string>{ "a" });
+		};
+		SUBCASE("unbound") {
+			nonterminals<char> nts;
+			auto gr = tgf<char>::from_string(nts, src);
+			REQUIRE(gr.has_value());
+			grammar<char> g = std::move(gr).value();
+			check(g);
+		}
+		SUBCASE("bound") {
+			options_repository repo;
+			options_scope scope(repo);
+			nonterminals<char> nts;
+			auto gr = tgf<char>::from_string(nts, src);
+			REQUIRE(gr.has_value());
+			grammar<char> g = std::move(gr).value();
+			REQUIRE(g.bind_options().has_value());
+			check(g);
+			CHECK(text_of(repo, "variant") == "vc");
+		}
+	}
+
 	TEST_CASE("@variant selects one of two profiles with one set of guards") {
 		options_repository repo;
 		options_scope scope(repo);

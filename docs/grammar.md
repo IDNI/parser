@@ -250,6 +250,22 @@ parser<char> p(g);
 ```
 
 
+### result<void> set_variant(const std::string& name);
+
+Selects the variant profile `name`. It enables the guards of the profile and sets `opt.variant` to `name`. A host calls it when its own language names a variant. The `@variant` directive and the option `variant` do not use it.
+
+An unknown name is the error `unknown_variant`, with the name in `label::name`, and nothing changes.
+
+When the grammar is bound to an options repository, the method writes the option `variant`. The bound fields and the hooks then see the change. When the grammar is not bound, the method enables the guards and sets the name directly.
+
+```
+auto g = tgf<char>::from_string(nts,
+	"@variants va: a; vc: a.\nstart[a] => 'a'.\n");
+auto r = g.value().set_variant("vc");
+// r.has_error() == false, g.value().opt().variant == "vc"
+```
+
+
 ### const std::set<size_t>& prod_ids_of_literal(const lit<C, T>& l);
 
 Returns indexes of all production rules for a nonterminal `l`.

@@ -520,6 +520,10 @@ public:
 	void unbind_options();
 	/// Sets guards of enabled productions
 	void set_enabled_productions(const std::set<std::string>&);
+	/// Enables the guards of the profile @p name and selects it. An
+	/// unknown name is an error, and nothing changes.
+	[[nodiscard]] idni::diagnostics::result<void> set_variant(
+		const std::string& name);
 	/**
 	 * Turns the derived character class scanner on or off and applies it.
 	 * The grammar object is shared by every parser that uses it, so this

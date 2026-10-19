@@ -783,6 +783,26 @@ options_repository* grammar<C, T>::release_options() {
 	unbind_options();
 	return repo;
 }
+// one call for a host that selects a profile by a name of its own language
+template <typename C, typename T>
+idni::diagnostics::result<void> grammar<C, T>::set_variant(
+	const std::string& name)
+{
+	namespace ps = idni::parser_strings;
+	idni::diagnostics::result<void> r;
+	auto it = opt_.variants.find(name);
+	if (it == opt_.variants.end())
+		return r.with_error(idni::diagnostics::code::not_found,
+			ps::messages::unknown_variant, { { ps::label::name, name } });
+	// a bound grammar writes through the repository, so its hooks run
+	if (options_repo_) {
+		r.merge(options_repo_->set("variant", option_value(name)));
+		return r;
+	}
+	set_enabled_productions(it->second);
+	opt_.variant = name;
+	return r.with_value();
+}
 template <typename C, typename T>
 void grammar<C, T>::set_enabled_productions(const std::set<std::string>& grds) {
 	opt_.enabled_guards = grds;
