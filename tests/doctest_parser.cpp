@@ -1001,6 +1001,74 @@ TEST_SUITE("AMB wrapping with TGF shaping") {
 	}
 }
 
+TEST_SUITE("forest shaping of a deep tree") {
+	// The children names of each node on the chain of the first
+	// nonterminal child, in a forest shaped tree.
+	static std::vector<string> forest_chain(const parser<char>::psptree& t) {
+		std::vector<string> out;
+		for (auto n = t; n; ) {
+			string names = n->value->first.to_std_string() + ":";
+			parser<char>::psptree next;
+			for (const auto& c : n->child) {
+				names += " " + c->value->first.to_std_string();
+				if (!next && c->value->first.nt()) next = c;
+			}
+			out.push_back(names);
+			n = next;
+		}
+		return out;
+	}
+
+	// The same chain in a bintree shaped tree.
+	static std::vector<string> bintree_chain(tref t) {
+		using tree = parser<char>::tree;
+		std::vector<string> out;
+		for (tref n = t; n; ) {
+			string names = tree::get(n).value.first.to_std_string() + ":";
+			tref next = nullptr;
+			for (tref c : tree::get(n).children()) {
+				const auto& l = tree::get(c).value.first;
+				names += " " + l.to_std_string();
+				if (!next && l.nt()) next = c;
+			}
+			out.push_back(names);
+			n = next;
+		}
+		return out;
+	}
+
+	TEST_CASE("a deep tree shapes on the forest path as on the bintree path") {
+		nonterminals<char> nts;
+		auto gr = tgf<char>::from_string(nts, string(
+			"@inline w.\n@trim s.\nstart => n.\n"
+			"n => '(' w ')' s | 'x'.\nw => n.\ns => ' '.\n"));
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		const size_t depth = 20000;
+		string input;
+		for (size_t i = 0; i != depth; ++i) input += '(';
+		input += 'x';
+		for (size_t i = 0; i != depth; ++i) input += ") ";
+		parser<char> pf(g, make_parser_options());
+		auto rf = pf.parse(input.c_str(), input.size(), { .tree_path =
+			parse_tree_path::forest_path, .enable_gc = false });
+		REQUIRE(rf.found);
+		parser<char> pb(g, make_parser_options());
+		auto rb = pb.parse(input.c_str(), input.size(), { .tree_path =
+			parse_tree_path::bintree_path, .enable_gc = false });
+		REQUIRE(rb.found);
+		const auto shaped = rf.get_shaped_tree();
+		const auto chain = forest_chain(shaped);
+		CHECK(chain.size() > depth);
+		CHECK(chain == bintree_chain(rb.get_shaped_tree2()));
+		std::ostringstream os;
+		shaped->to_print(os);
+		const string printed = os.str();
+		CHECK(static_cast<size_t>(std::count(printed.begin(),
+			printed.end(), '\n')) > depth);
+	}
+}
+
 TEST_SUITE("forest trim of a deep tree") {
 	TEST_CASE("get_trimmed_forest_tree trims a forest 100000 levels deep") {
 		nonterminals<char> nts;
@@ -1021,6 +1089,42 @@ TEST_SUITE("forest trim of a deep tree") {
 		REQUIRE(t->value->first == nts("start"));
 		REQUIRE(t->child.size() == 1);
 		// each n keeps '(' n ')' without its s, the last n keeps 'x'
+		auto level = [&nts](const parser<char>::ptree& n) {
+			return n.value->first == nts("n") && n.child.size() == 3
+				&& n.child[0]->value->first.t() == '('
+				&& n.child[2]->value->first.t() == ')';
+		};
+		size_t levels = 0;
+		auto n = t->child[0];
+		for (; level(*n); ++levels) n = n->child[1];
+		CHECK(levels == depth);
+		REQUIRE(n->child.size() == 1);
+		CHECK(n->child[0]->value->first.t() == 'x');
+	}
+}
+
+TEST_SUITE("forest inline of a deep tree") {
+	TEST_CASE("inline_forest_tree_nodes inlines a forest 100000 levels deep") {
+		nonterminals<char> nts;
+		auto gr = tgf<char>::from_string(nts, string(
+			"@inline w.\nstart => n.\nn => '(' w ')' | 'x'.\nw => n.\n"));
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		const size_t depth = 100000;
+		string input(depth, '(');
+		input += 'x';
+		input += string(depth, ')');
+		parser<char> p(g, make_parser_options());
+		auto r = p.parse(input.c_str(), input.size(), { .tree_path =
+			parse_tree_path::forest_path, .enable_gc = false });
+		REQUIRE(r.found);
+		auto trimmed = r.get_trimmed_forest_tree(r.get_forest()->root());
+		REQUIRE(trimmed);
+		auto t = r.inline_forest_tree_nodes(trimmed, trimmed);
+		REQUIRE(t);
+		REQUIRE(t->value->first == nts("start"));
+		REQUIRE(t->child.size() == 1);
+		// each n keeps '(' n ')', the n of w takes the place of w
 		auto level = [&nts](const parser<char>::ptree& n) {
 			return n.value->first == nts("n") && n.child.size() == 3
 				&& n.child[0]->value->first.t() == '('

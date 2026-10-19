@@ -350,29 +350,40 @@ typename parser<C, T>::psptree
 
 template <typename C, typename T>
 typename parser<C, T>::psptree
-	parser<C, T>::result::inline_forest_tree_nodes(const psptree& t,
-		psptree& parent, const shaping_options& opts) const
+	parser<C, T>::result::inline_forest_tree_nodes(const psptree& t0,
+		psptree& parent0, const shaping_options& opts) const
 {
-	psptree r = 0;
-	if (!t) return r;
-	auto& l = t->value->first;
-	if (l.is_null()) return r;
-	if (!l.nt()) return r = std::make_shared<ptree>(t->value), r;
-	//std::cerr << "inlining tree for node: `" << l.to_std_string() << "`" << std::endl;
-	bool do_inline = (t != parent) && node_to_inline<C, T>(t->value, opts);
-	//std::cerr << "do_inline: " << do_inline << std::endl;
-	if (!do_inline) r = std::make_shared<ptree>(t->value);
-	psptree& rf = do_inline ? parent : r;
-	for (auto& c : t->child) {
-		auto x = inline_forest_tree_nodes(c, rf, opts);
-		if (x) //{
-			//std::cerr << "inlining child: `" << c->value.first.to_std_string() << "`" << std::endl;
-			//std::cerr << (do_inline ? "- inlined\t" : "- passed\t") << " `"
-			//	<< x->value.first.to_std_string() << "`" << std::endl,
-			rf->child.push_back(x);
-		//} else std::cerr << "skipped\t" << c->value.first.to_std_string() << std::endl;
+	// out is the node that takes the children: the node itself, or the
+	// node it is inlined into
+	struct job {
+		psptree src;
+		psptree out;
+		size_t i;
+	};
+	std::vector<job> jobs;
+	auto open = [&](const psptree& t, const psptree& parent) -> psptree {
+		if (!t) return nullptr;
+		const auto& l = t->value->first;
+		if (l.is_null()) return nullptr;
+		if (!l.nt()) return std::make_shared<ptree>(t->value);
+		const bool do_inline = (t != parent)
+			&& node_to_inline<C, T>(t->value, opts);
+		psptree r = do_inline ? nullptr : std::make_shared<ptree>(t->value);
+		jobs.push_back({ t, do_inline ? parent : r, 0 });
+		return r;
+	};
+	psptree root = open(t0, parent0);
+	while (!jobs.empty()) {
+		job& j = jobs.back();
+		if (j.i == j.src->child.size()) {
+			jobs.pop_back();
+			continue;
+		}
+		psptree c = j.src->child[j.i++];
+		psptree out = j.out;
+		if (psptree x = open(c, out); x) out->child.push_back(x);
 	}
-	return r;
+	return root;
 }
 template <typename C, typename T>
 typename parser<C, T>::psptree
