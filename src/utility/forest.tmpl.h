@@ -7,6 +7,18 @@
 namespace idni {
 
 template <typename NodeT>
+forest<NodeT>::tree::~tree() {
+	std::vector<sptree> drop = std::move(child);
+	while (!drop.empty()) {
+		sptree t = std::move(drop.back());
+		drop.pop_back();
+		// a subtree that another owner holds stays whole
+		if (t.use_count() == 1)
+			for (auto& c : t->child) drop.push_back(std::move(c));
+	}
+}
+
+template <typename NodeT>
 std::ostream& forest<NodeT>::tree::to_print(std::ostream& os, size_t l,
 	std::set<size_t> skip, bool nulls) const
 {

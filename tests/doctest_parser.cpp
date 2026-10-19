@@ -1191,6 +1191,58 @@ TEST_SUITE("forest traversal of a deep tree") {
 	}
 }
 
+TEST_SUITE("forest tree of a deep chain") {
+	using ptree = parser<char>::ptree;
+	using psptree = parser<char>::psptree;
+
+	// The root node of the forest of "x", the value of each chain node.
+	static parser<char>::pnode chain_value(nonterminals<char>& nts) {
+		auto gr = tgf<char>::from_string(nts, string("start => 'x'.\n"));
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		parser<char> p(g, make_parser_options());
+		auto r = p.parse("x", 1, { .tree_path =
+			parse_tree_path::forest_path, .enable_gc = false });
+		REQUIRE(r.found);
+		return r.get_forest()->root();
+	}
+
+	// A chain of n nodes, each the only child of the node above.
+	static psptree chain(const parser<char>::pnode& v, size_t n,
+		std::vector<std::weak_ptr<ptree>>* keep = nullptr)
+	{
+		psptree root = std::make_shared<ptree>(v);
+		ptree* cur = root.get();
+		if (keep) keep->push_back(root);
+		for (size_t i = 1; i < n; ++i) {
+			cur->child.push_back(std::make_shared<ptree>(v));
+			if (keep) keep->push_back(cur->child.back());
+			cur = cur->child.back().get();
+		}
+		return root;
+	}
+
+	TEST_CASE("a chain 1000000 levels deep frees each node, and a held "
+		"subtree stays whole")
+	{
+		nonterminals<char> nts;
+		const auto v = chain_value(nts);
+		const size_t depth = 1000000;
+		std::vector<std::weak_ptr<ptree>> nodes;
+		psptree root = chain(v, depth, &nodes);
+		psptree mid = nodes[depth / 2].lock();
+		root.reset();
+		CHECK(nodes.front().expired());
+		CHECK(nodes[depth / 2 - 1].expired());
+		CHECK_FALSE(nodes[depth / 2 + 1].expired());
+		CHECK_FALSE(nodes.back().expired());
+		mid.reset();
+		size_t alive = 0;
+		for (const auto& w : nodes) if (!w.expired()) ++alive;
+		CHECK(alive == 0);
+	}
+}
+
 TEST_SUITE("shaping inlines a tree path") {
 	TEST_CASE("the path end replaces the path start on both tree paths") {
 		nonterminals<char> nts;
