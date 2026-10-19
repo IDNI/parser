@@ -240,8 +240,9 @@ Each `@` directive of the grammar file writes a grammar option, so
 - `variant`: the name of `@variant name.`, else the first profile of
   the file, or empty. A text option. A
   write of `variant` sets `enabled-productions` to the guards of the
-  profile, and a write of `enabled-productions` sets `variant` to the
-  profile with the same guards, or to empty.
+  profile. A write of `enabled-productions` keeps `variant` when that
+  profile has the same guards. Else it sets `variant` to the first
+  profile in name order with the same guards, or to empty.
 
 ## The tree
 

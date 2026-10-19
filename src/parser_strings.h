@@ -229,8 +229,6 @@ struct messages {
 		"The variant is defined twice";
 	static constexpr sv unknown_variant =
 		"The grammar defines no such variant";
-	static constexpr sv variant_same_guards =
-		"Two variants have the same guards";
 	// chart field limits
 	static constexpr sv input_too_long =
 		"Input is longer than the largest parse position";

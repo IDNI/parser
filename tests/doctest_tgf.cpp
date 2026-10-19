@@ -919,19 +919,42 @@ TEST_SUITE("grammar options") {
 				!= string::npos);
 	}
 
-	TEST_CASE("two profiles with one set of guards are an error") {
+	TEST_CASE("two profiles may share one set of guards") {
 		options_repository repo;
 		options_scope scope(repo);
 		nonterminals<char> nts;
 		grammar<char> g = variant_grammar(nts);
-		auto r = repo.set_text("variants", "va=a, vc=a");
-		CHECK(r.has_error());
-		ostringstream printed;
-		r.report().print(printed);
-		CHECK(printed.str().find(
-			parser_strings::messages::variant_same_guards)
-				!= string::npos);
-		CHECK(text_of(repo, "variants") == "va=a, vb=b");
+		REQUIRE(repo.set_text("variants", "va=a, vc=a").has_value());
+		CHECK(text_of(repo, "variants") == "va=a, vc=a");
+		REQUIRE(repo.set_text("variant", "vc").has_value());
+		CHECK(text_of(repo, "enabled-productions") == "a");
+		CHECK(text_of(repo, "variant") == "vc");
+		REQUIRE(repo.set_text("enabled-productions", "a").has_value());
+		CHECK(text_of(repo, "variant") == "vc");
+		REQUIRE(repo.set_text("enabled-productions", "b").has_value());
+		CHECK(text_of(repo, "variant") == "");
+		REQUIRE(repo.set_text("enabled-productions", "a").has_value());
+		CHECK(text_of(repo, "variant") == "va");
+		REQUIRE(repo.set_text("variants", "va=a, vb=b, vc=a")
+			.has_value());
+		REQUIRE(repo.set_text("variant", "vb").has_value());
+		REQUIRE(repo.set_text("enabled-productions", "a").has_value());
+		CHECK(text_of(repo, "variant") == "va");
+	}
+
+	TEST_CASE("@variant selects one of two profiles with one set of guards") {
+		options_repository repo;
+		options_scope scope(repo);
+		nonterminals<char> nts;
+		auto gr = tgf<char>::from_string(nts,
+			"@variants va: a; vc: a.\n@variant vc.\n"
+			+ variant_productions);
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		CHECK(g.opt().variant == "vc");
+		REQUIRE(g.bind_options().has_value());
+		CHECK(text_of(repo, "variant") == "vc");
+		CHECK(g.opt().enabled_guards == set<string>{ "a" });
 	}
 }
 

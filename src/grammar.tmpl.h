@@ -715,9 +715,16 @@ idni::diagnostics::result<void> grammar<C, T>::bind_to(
 	auto rebuild = [this] { set_enabled_productions(opt_.enabled_guards); };
 	// variant is written through its field, so its hook does not run again
 	auto match_variant = [this] {
+		// profiles may share guards, so the selected one keeps its name
+		if (auto it = opt_.variants.find(opt_.variant);
+			it != opt_.variants.end() && it->second == opt_.enabled_guards)
+			return;
 		opt_.variant.clear();
 		for (const auto& [name, guards] : opt_.variants)
-			if (guards == opt_.enabled_guards) opt_.variant = name;
+			if (guards == opt_.enabled_guards) {
+				opt_.variant = name;
+				break;
+			}
 	};
 	auto& sh = opt_.shaping;
 	r.merge(repo.bind("auto-disambiguate", opt_.auto_disambiguate));

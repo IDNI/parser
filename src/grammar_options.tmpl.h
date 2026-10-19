@@ -310,7 +310,6 @@ inline option_value variants_codec::to_value(const profiles& m) const {
 inline diagnostics::result<variants_codec::profiles>
 	variants_codec::from_value(const option_value& v) const
 {
-	namespace ps = parser_strings;
 	diagnostics::result<profiles> r;
 	const option_list* entries = option_list_of(v, r.report());
 	if (!entries) return r;
@@ -327,14 +326,6 @@ inline diagnostics::result<variants_codec::profiles>
 		}
 		out[name].insert(std::move(guard));
 	}
-	// a set of guards names one profile, so a write of the guards finds it
-	for (auto a = out.begin(); a != out.end(); ++a)
-		for (auto b = std::next(a); b != out.end(); ++b)
-			if (a->second == b->second)
-				r.error(diagnostics::code::invalid_argument,
-					ps::messages::variant_same_guards,
-					{ { ps::label::name, a->first },
-					  { ps::label::value, b->first } });
 	if (r.has_error()) return r;
 	return r.with_value(std::move(out));
 }

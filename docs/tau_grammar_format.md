@@ -325,9 +325,9 @@ A variant is a named profile of production guards.
 `@variants <name>: <guard>, <guard>, ...; <name>: <guard>, ... .` defines one profile per pair. It writes the grammar option `variants`, with one entry `name=guard` for each guard.
 `@variant <name>.` selects a profile. It writes the grammar option `variant`, and the guards of the profile become the grammar option `enabled-productions`.
 
-A name is one symbol, and it may hold `_`. The first profile of the file is the default, unless `@variant` selects another one. A second `@variants` adds profiles. A second definition of a name is a load error, and so is a pair without a colon or without a guard. Two profiles with the same guards are an error. A selection of a name that no profile has is an error, and the guards do not change.
+A name is one symbol, and it may hold `_`. The first profile of the file is the default, unless `@variant` selects another one. A second `@variants` adds profiles. A second definition of a name is a load error, and so is a pair without a colon or without a guard. Two profiles may have the same guards. A selection of a name that no profile has is an error, and the guards do not change.
 
-A later write of `enabled-productions` sets `variant` to the profile with the same guards, or to empty when no profile has them.
+A later write of `enabled-productions` keeps `variant` when the selected profile has the same guards. Else it sets `variant` to the first profile in name order with the same guards, or to empty when no profile has them.
 The selected or default profile sets the guards after the `@enable` and `@disable` lines of the file, whatever their order.
 
 Usage:
