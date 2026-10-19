@@ -1828,10 +1828,7 @@ tref parser<C, T>::build_bintree(const lit<C, T>& start_lit,
 		return *cand.front();
 	};
 
-	auto is_ebnf = [](const pnode& n) -> bool {
-		auto s = n.first.to_std_string();
-		return s.size() >= 4 && s.substr(0, 4) == "__E_";
-	};
+	auto is_ebnf = [this](const pnode& n) { return is_ebnf_helper(n); };
 
 	std::set<pnode> visiting;
 
@@ -2138,6 +2135,13 @@ void parser<C, T>::derived_class_packs(size_t nt, size_t pos, bool ad_allowed,
 			if (ad_allowed) return;
 		}
 	}
+}
+template <typename C, typename T>
+bool parser<C, T>::is_ebnf_helper(const pnode& n) const {
+	if (!n.first.nt()) return false;
+	static const std::basic_string<C> prefix = from_str<C>(
+		std::string("__E_"));
+	return g.nts.get(n.first.n()).starts_with(prefix);
 }
 // default-mode build_forest — builds a pforest from a root pnode
 template <typename C, typename T>

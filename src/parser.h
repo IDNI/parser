@@ -1799,6 +1799,8 @@ private:
 	/// productions and the character at pos, instead of from the chart.
 	void derived_class_packs(size_t nt, size_t pos, bool ad_allowed,
 		pnodes_set& packs) const;
+	/// True for the node of an EBNF helper, which has no node of its own.
+	bool is_ebnf_helper(const pnode& n) const;
 #ifdef DEBUG
 	template <typename CharU>
 	friend std::ostream& operator<<(std::ostream& os, lit<C, T>& l);
