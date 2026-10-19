@@ -1074,6 +1074,55 @@ TEST_SUITE("forest shaping of a deep tree") {
 	}
 }
 
+TEST_SUITE("@ambiguous on two groups of one rule") {
+	TEST_CASE("each group is lifted, so the node has every pair") {
+		nonterminals<char> nts;
+		auto gr = tgf<char>::from_string(nts, string(
+			"@ambiguous r.\nstart => r.\nr => (a | b) (a | b).\n"
+			"a => 'x'.\nb => 'x'.\n"));
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		const size_t r_nt = g.nt("r").n();
+		const string input = "xx";
+		using tree = parser<char>::tree;
+		parser<char> pb(g, make_parser_options());
+		auto rb = pb.parse(input.c_str(), input.size(), { .tree_path =
+			parse_tree_path::bintree_path, .enable_gc = false });
+		REQUIRE(rb.found);
+		size_t ambs = 0, alts = 0;
+		auto count = [&](tref n) {
+			const auto& t = tree::get(n);
+			if (t.is_nt() && t.value.first.to_std_string() == "__AMB__") {
+				++ambs;
+				for (tref c : t.children())
+					if (tree::get(c).is(r_nt)) ++alts;
+			}
+			return true;
+		};
+		pre_order<parser<char>::pnode>(rb.get_bintree()).visit(count);
+		CHECK(ambs == 1);
+		CHECK(alts == 4);
+		parser<char> pf(g, make_parser_options());
+		auto rf = pf.parse(input.c_str(), input.size(), { .tree_path =
+			parse_tree_path::forest_path, .enable_gc = false });
+		REQUIRE(rf.found);
+		size_t r_packs = 0, helpers = 0;
+		for (const auto& [n, packs] : rf.get_forest()->g) {
+			if (!n->first.nt()) continue;
+			if (n->first.n() == r_nt) {
+				r_packs = packs.size();
+				// each child of a lifted pack has its own node
+				for (const auto& pack : packs)
+					for (const auto& c : pack)
+						CHECK(rf.get_forest()->contains(c));
+			}
+			if (n->first.to_std_string().starts_with("__E_")) ++helpers;
+		}
+		CHECK(r_packs == 4);
+		CHECK(helpers == 0);
+	}
+}
+
 TEST_SUITE("forest trim of a deep tree") {
 	TEST_CASE("get_trimmed_forest_tree trims a forest 100000 levels deep") {
 		nonterminals<char> nts;
