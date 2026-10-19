@@ -134,22 +134,26 @@ tref parser<C, T>::result::trim_bintree_child_terminals(tref ref,
 	const shaping_options& opts) const
 {
 	if (!ref) return nullptr;
-	const auto& t = tree::get(ref);
-	if (t.is_t()) return ref;
-	bool trim = (opts.trim_terminals
-			&& opts.dont_trim_terminals_of.find(t.get_nt())
+	auto trim = [&opts](tref n) {
+		const auto& t = tree::get(n);
+		if (t.is_t()) return n;
+		const size_t nt = t.get_nt();
+		if (!((opts.trim_terminals
+				&& opts.dont_trim_terminals_of.find(nt)
 					== opts.dont_trim_terminals_of.end())
-		|| opts.to_trim_children_terminals.find(t.get_nt())
-				!= opts.to_trim_children_terminals.end();
-	trefs ch;
-	for (const auto& c : t.children()) {
-		auto& ct = tree::get(c);
-		if (ct.is_nt() || ct.is_null() || !trim) {
-			auto x = trim_bintree_child_terminals(c, opts);
-			if (x) ch.push_back(x);
+			|| opts.to_trim_children_terminals.find(nt)
+				!= opts.to_trim_children_terminals.end()))
+			return n;
+		trefs ch;
+		bool changed = false;
+		for (tref c : t.children()) {
+			const auto& ct = tree::get(c);
+			if (ct.is_nt() || ct.is_null()) ch.push_back(c);
+			else changed = true;
 		}
-	}
-	return tree::get(t.value, ch);
+		return changed ? tree::get(t.value, ch) : n;
+	};
+	return post_order<pnode>(ref).apply_unique(trim);
 }
 template <typename C, typename T>
 tref parser<C, T>::result::trim_bintree_child_terminals(tref ref) const {

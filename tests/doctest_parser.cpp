@@ -1075,6 +1075,41 @@ TEST_SUITE("bintree tree path inline of a deep tree") {
 	}
 }
 
+TEST_SUITE("bintree trim of child terminals of a deep tree") {
+	TEST_CASE("trim_bintree_child_terminals trims a tree 100000 levels deep") {
+		using tree = parser<char>::tree;
+		nonterminals<char> nts;
+		auto gr = tgf<char>::from_string(nts, string(
+			"@trim children terminals n.\nstart => n.\n"
+			"n => '(' n ')' | 'x'.\n"));
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		const size_t depth = 100000;
+		string input(depth, '(');
+		input += 'x';
+		input += string(depth, ')');
+		parser<char> p(g, make_parser_options());
+		auto r = p.parse(input.c_str(), input.size(), { .tree_path =
+			parse_tree_path::bintree_path, .enable_gc = false });
+		REQUIRE(r.found);
+		tref t = r.trim_bintree_child_terminals(r.get_bintree());
+		REQUIRE(t != nullptr);
+		REQUIRE(tree::get(t).value.first == nts("start"));
+		REQUIRE(tree::get(t).children_size() == 1);
+		// each n keeps only its child n, the last n keeps nothing of 'x'
+		auto level = [&nts](const tree& nt) {
+			return nt.value.first == nts("n") && nt.children_size() == 1
+				&& nt.first_tree().value.first == nts("n");
+		};
+		size_t levels = 0;
+		tref n = tree::get(t).first();
+		for (; level(tree::get(n)); ++levels) n = tree::get(n).first();
+		CHECK(levels == depth);
+		CHECK(tree::get(n).value.first == nts("n"));
+		CHECK(tree::get(n).children_size() == 0);
+	}
+}
+
 TEST_SUITE("shaping inlines a tree path") {
 	TEST_CASE("the path end replaces the path start on both tree paths") {
 		nonterminals<char> nts;
