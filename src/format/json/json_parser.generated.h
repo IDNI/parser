@@ -13,7 +13,9 @@ using char_type     = char;
 using terminal_type = char32_t;
 
 inline static constexpr size_t nt_bits = 6;
-inline const std::vector<std::string> symbol_names{
+
+inline const std::vector<std::string>& symbol_names() {
+	static const std::vector<std::string> v{
 	"", "digit", "any", "ascii", "xdigit", "cntrl", "start", "_", "value", "__", 
 	"__E____0", "__E___1", "true_sym", "false_sym", "null_sym", "number", "q_str", "arr", "object", "__E_number_2", 
 	"integral", "fractional", "__E_number_3", "exponent", "__E_number_4", "zero", "nonzerodigit", "nzintegral", "ascii_digit", "__E_nzintegral_5", 
@@ -21,27 +23,41 @@ inline const std::vector<std::string> symbol_names{
 	"esc", "__E_escaped_13", "uni_cp", "ascii_xdigit", "__E_arr_14", "values", "__E_values_15", "__E_values_16", "__E_object_17", "object_pair", 
 	"__E___E_object_17_18", "__E___E_object_17_19", "__N_0", "__N_1", "__N_2", 
 };
+	return v;
+}
 
-inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
+inline ::idni::nonterminals<char_type, terminal_type>& nts() {
+	static ::idni::nonterminals<char_type, terminal_type> v{
+		symbol_names() };
+	return v;
+}
 
-inline std::vector<terminal_type> terminals{
+inline std::vector<terminal_type>& terminals() {
+	static std::vector<terminal_type> v{
 	U'\0', U' ', U'\t', U'\r', U'\n', U't', U'r', U'u', U'e', 
 	U'f', U'a', U'l', U's', U'n', U'-', U'0', U'.', U'E', U'+', 
 	U'"', U'\\', U'', U'/', U'b', U'[', U']', U',', U'{', U'}', 
 	U':', 
 };
+	return v;
+}
 
-inline ::idni::char_class_fns<terminal_type> char_classes =
+inline ::idni::char_class_fns<terminal_type>& char_classes() {
+	static ::idni::char_class_fns<terminal_type> v =
 	::idni::predefined_char_classes<char_type, terminal_type>({
 		"digit",
 		"any",
 		"ascii",
 		"xdigit",
 		"cntrl",
-	}, nts);
+	}, nts());
+	return v;
+}
 
-inline struct ::idni::grammar<char_type, terminal_type>::options
-	grammar_options
+inline ::idni::grammar<char_type, terminal_type>::options&
+	grammar_options()
+{
+	static struct ::idni::grammar<char_type, terminal_type>::options v
 {
 	.transform_negation = false,
 	.auto_disambiguate = true,
@@ -69,6 +85,8 @@ inline struct ::idni::grammar<char_type, terminal_type>::options
 		.inline_char_classes = true
 	}
 };
+	return v;
+}
 
 inline auto make_parser_options() {
 	auto o = ::idni::default_parser_options<char_type, terminal_type>();
@@ -77,7 +95,10 @@ inline auto make_parser_options() {
 	return o;
 }
 
-inline ::idni::prods<char_type, terminal_type> start_symbol{ nts(6) };
+inline ::idni::prods<char_type, terminal_type>& start_symbol() {
+	static ::idni::prods<char_type, terminal_type> v{ nts()(6) };
+	return v;
+}
 
 #ifdef TAU_PARSER_BUILD_HEADER_ONLY
 inline idni::prods<char_type, terminal_type>& productions() {
@@ -85,8 +106,10 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	static idni::prods<char_type, terminal_type>
 		p, nul(idni::lit<char_type, terminal_type>{});
 	if (loaded) return p;
-	#define  T(x) (idni::prods<char_type, terminal_type>{ terminals[x] })
-	#define NT(x) (idni::prods<char_type, terminal_type>{ nts(x) })
+	const auto& ts = terminals();
+	auto& ns = nts();
+	#define  T(x) (idni::prods<char_type, terminal_type>{ ts[x] })
+	#define NT(x) (idni::prods<char_type, terminal_type>{ ns(x) })
 //G0:   start(6)             => _(7) value(8) _(7).
 	p(NT(6), (NT(7)+NT(8)+NT(7)));
 //G1:   __E____0(10)         => ' '.
@@ -265,8 +288,12 @@ inline idni::prods<char_type, terminal_type>& productions() {
 idni::prods<char_type, terminal_type>& productions();
 #endif
 
-inline ::idni::grammar<char_type, terminal_type> grammar(
-	nts, productions(), start_symbol, char_classes, grammar_options);
+inline ::idni::grammar<char_type, terminal_type>& grammar() {
+	static ::idni::grammar<char_type, terminal_type> v(nts(),
+		productions(), start_symbol(), char_classes(),
+		grammar_options());
+	return v;
+}
 
 } // namespace json_parser_data
 
@@ -292,16 +319,16 @@ struct json_parser : public idni::parser<char, char32_t>, public json_parser_non
 		return inst;
 	}
 	json_parser() : idni::parser<char_type, terminal_type>(
-		json_parser_data::grammar,
+		json_parser_data::grammar(),
 		json_parser_data::make_parser_options()) {}
 	size_t id(const std::basic_string<char_type>& name) {
-		return json_parser_data::nts.get(name);
+		return json_parser_data::nts().get(name);
 	}
 	const std::basic_string<char_type>& name(size_t id) {
-		return json_parser_data::nts.get(id);
+		return json_parser_data::nts().get(id);
 	}
 	symbol_type literal(const nonterminal& nt) {
-		return symbol_type(nt, &json_parser_data::nts);
+		return symbol_type(nt, &json_parser_data::nts());
 	}
 };
 #ifdef _MSC_VER

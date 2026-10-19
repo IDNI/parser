@@ -13,27 +13,43 @@ using char_type     = char;
 using terminal_type = char32_t;
 
 inline static constexpr size_t nt_bits = 5;
-inline const std::vector<std::string> symbol_names{
+
+inline const std::vector<std::string>& symbol_names() {
+	static const std::vector<std::string> v{
 	"", "digit", "printable", "integer", "__E_integer_0", "__E_integer_1", "quote", "esc", "escaping", "unescaped", 
 	"escaped", "strchar", "str", "__E_str_2", "nullvalue", "val", "eol", "__E_eol_3", "row", "__E_row_4", 
 	"__E_row_5", "rows", "__E_rows_6", "__E_rows_7", "start", "__N_0", 
 };
+	return v;
+}
 
-inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
+inline ::idni::nonterminals<char_type, terminal_type>& nts() {
+	static ::idni::nonterminals<char_type, terminal_type> v{
+		symbol_names() };
+	return v;
+}
 
-inline std::vector<terminal_type> terminals{
+inline std::vector<terminal_type>& terminals() {
+	static std::vector<terminal_type> v{
 	U'\0', U'-', U'"', U'\\', U'\r', U'\n', U',', 
 };
+	return v;
+}
 
-inline ::idni::char_class_fns<terminal_type> char_classes =
+inline ::idni::char_class_fns<terminal_type>& char_classes() {
+	static ::idni::char_class_fns<terminal_type> v =
 	::idni::predefined_char_classes<char_type, terminal_type>({
 		"digit",
 	}, {
 		{ "unicode_printable", "printable" },
-	}, nts);
+	}, nts());
+	return v;
+}
 
-inline struct ::idni::grammar<char_type, terminal_type>::options
-	grammar_options
+inline ::idni::grammar<char_type, terminal_type>::options&
+	grammar_options()
+{
+	static struct ::idni::grammar<char_type, terminal_type>::options v
 {
 	.transform_negation = false,
 	.auto_disambiguate = true,
@@ -42,6 +58,8 @@ inline struct ::idni::grammar<char_type, terminal_type>::options
 		.inline_char_classes = false
 	}
 };
+	return v;
+}
 
 inline auto make_parser_options() {
 	auto o = ::idni::default_parser_options<char_type, terminal_type>();
@@ -50,15 +68,20 @@ inline auto make_parser_options() {
 	return o;
 }
 
-inline ::idni::prods<char_type, terminal_type> start_symbol{ nts(24) };
+inline ::idni::prods<char_type, terminal_type>& start_symbol() {
+	static ::idni::prods<char_type, terminal_type> v{ nts()(24) };
+	return v;
+}
 
 inline idni::prods<char_type, terminal_type>& productions() {
 	static bool loaded = false;
 	static idni::prods<char_type, terminal_type>
 		p, nul(idni::lit<char_type, terminal_type>{});
 	if (loaded) return p;
-	#define  T(x) (idni::prods<char_type, terminal_type>{ terminals[x] })
-	#define NT(x) (idni::prods<char_type, terminal_type>{ nts(x) })
+	const auto& ts = terminals();
+	auto& ns = nts();
+	#define  T(x) (idni::prods<char_type, terminal_type>{ ts[x] })
+	#define NT(x) (idni::prods<char_type, terminal_type>{ ns(x) })
 //G0:   __E_integer_0(4)     => '-'.
 	p(NT(4), (T(1)));
 //G1:   __E_integer_0(4)     => null.
@@ -130,8 +153,12 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	return loaded = true, p;
 }
 
-inline ::idni::grammar<char_type, terminal_type> grammar(
-	nts, productions(), start_symbol, char_classes, grammar_options);
+inline ::idni::grammar<char_type, terminal_type>& grammar() {
+	static ::idni::grammar<char_type, terminal_type> v(nts(),
+		productions(), start_symbol(), char_classes(),
+		grammar_options());
+	return v;
+}
 
 } // namespace csv_parser_data
 
@@ -154,16 +181,16 @@ struct csv_parser : public idni::parser<char, char32_t>, public csv_parser_nonte
 		return inst;
 	}
 	csv_parser() : idni::parser<char_type, terminal_type>(
-		csv_parser_data::grammar,
+		csv_parser_data::grammar(),
 		csv_parser_data::make_parser_options()) {}
 	size_t id(const std::basic_string<char_type>& name) {
-		return csv_parser_data::nts.get(name);
+		return csv_parser_data::nts().get(name);
 	}
 	const std::basic_string<char_type>& name(size_t id) {
-		return csv_parser_data::nts.get(id);
+		return csv_parser_data::nts().get(id);
 	}
 	symbol_type literal(const nonterminal& nt) {
-		return symbol_type(nt, &csv_parser_data::nts);
+		return symbol_type(nt, &csv_parser_data::nts());
 	}
 };
 #ifdef _MSC_VER

@@ -14,8 +14,10 @@ idni::prods<char_type, terminal_type>& productions() {
 	static idni::prods<char_type, terminal_type>
 		p, nul(idni::lit<char_type, terminal_type>{});
 	if (loaded) return p;
-	#define  T(x) (idni::prods<char_type, terminal_type>{ terminals[x] })
-	#define NT(x) (idni::prods<char_type, terminal_type>{ nts(x) })
+	const auto& ts = terminals();
+	auto& ns = nts();
+	#define  T(x) (idni::prods<char_type, terminal_type>{ ts[x] })
+	#define NT(x) (idni::prods<char_type, terminal_type>{ ns(x) })
 //G0:   __E_start_0(8)       => _(9) statement(10).
 	p(NT(8), (NT(9)+NT(10)));
 //G1:   __E_start_1(11)      => null.

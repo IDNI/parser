@@ -318,7 +318,7 @@ TEST_SUITE("tgf cli: grammar options") {
 		ostringstream ss;
 		ss << in.rdbuf();
 		const string text = ss.str();
-		const auto b = text.find("terminals{");
+		const auto b = text.find("terminals() {");
 		REQUIRE(b != string::npos);
 		return text.substr(b, text.find("};", b) - b);
 	}

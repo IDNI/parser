@@ -12,7 +12,9 @@ using char_type     = char;
 using terminal_type = char;
 
 inline static constexpr size_t nt_bits = 7;
-inline const std::vector<std::string> symbol_names{
+
+inline const std::vector<std::string>& symbol_names() {
+	static const std::vector<std::string> v{
 	"", "eof", "alnum", "alpha", "space", "printable", "xdigit", "start", "__E_start_0", "_", 
 	"statement", "__E_start_1", "directive", "production", "start_statement", "sym", "__E_production_2", "production_guard", "alternation", "conjunction", 
 	"__E_alternation_3", "__E_alternation_4", "concatenation", "__E_conjunction_5", "__E_conjunction_6", "factor", "__E_concatenation_7", "__", "__E_concatenation_8", "shorthand_rule", 
@@ -27,18 +29,28 @@ inline const std::vector<std::string> symbol_names{
 	"__E___E_treemr_pattern_53_54", "__E_treemr_pattern_55", "pat_char", "__E_pat_char_56", "comment", "__E_comment_57", "__E_comment_58", "__E_comment_59", "__N_0", "__N_1", 
 	"__N_2", "__N_3", 
 };
+	return v;
+}
 
-inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
+inline ::idni::nonterminals<char_type, terminal_type>& nts() {
+	static ::idni::nonterminals<char_type, terminal_type> v{
+		symbol_names() };
+	return v;
+}
 
-inline std::vector<terminal_type> terminals{
+inline std::vector<terminal_type>& terminals() {
+	static std::vector<terminal_type> v{
 	'\0', '[', ']', '=', '>', '.', '|', '&', ':', 
 	'?', '+', '*', '~', '(', ')', '{', '}', '0', 'x', 
 	'_', '\'', '\\', '"', 'a', 'b', 'f', 'n', 'r', 't', 
 	'v', '/', 'X', 'u', 'U', '@', ';', '-', ',', 's', 
 	'#', ' ', '\t', '\r', '\n', 
 };
+	return v;
+}
 
-inline ::idni::char_class_fns<terminal_type> char_classes =
+inline ::idni::char_class_fns<terminal_type>& char_classes() {
+	static ::idni::char_class_fns<terminal_type> v =
 	::idni::predefined_char_classes<char_type, terminal_type>({
 		"eof",
 		"alnum",
@@ -46,10 +58,14 @@ inline ::idni::char_class_fns<terminal_type> char_classes =
 		"space",
 		"printable",
 		"xdigit",
-	}, nts);
+	}, nts());
+	return v;
+}
 
-inline struct ::idni::grammar<char_type, terminal_type>::options
-	grammar_options
+inline ::idni::grammar<char_type, terminal_type>::options&
+	grammar_options()
+{
+	static struct ::idni::grammar<char_type, terminal_type>::options v
 {
 	.transform_negation = false,
 	.auto_disambiguate = true,
@@ -70,13 +86,18 @@ inline struct ::idni::grammar<char_type, terminal_type>::options
 		.inline_char_classes = true
 	}
 };
+	return v;
+}
 
 inline auto make_parser_options() {
 	auto o = ::idni::default_parser_options<char_type, terminal_type>();
 	return o;
 }
 
-inline ::idni::prods<char_type, terminal_type> start_symbol{ nts(7) };
+inline ::idni::prods<char_type, terminal_type>& start_symbol() {
+	static ::idni::prods<char_type, terminal_type> v{ nts()(7) };
+	return v;
+}
 
 #ifdef TAU_PARSER_BUILD_HEADER_ONLY
 inline idni::prods<char_type, terminal_type>& productions() {
@@ -84,8 +105,10 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	static idni::prods<char_type, terminal_type>
 		p, nul(idni::lit<char_type, terminal_type>{});
 	if (loaded) return p;
-	#define  T(x) (idni::prods<char_type, terminal_type>{ terminals[x] })
-	#define NT(x) (idni::prods<char_type, terminal_type>{ nts(x) })
+	const auto& ts = terminals();
+	auto& ns = nts();
+	#define  T(x) (idni::prods<char_type, terminal_type>{ ts[x] })
+	#define NT(x) (idni::prods<char_type, terminal_type>{ ns(x) })
 //G0:   __E_start_0(8)       => _(9) statement(10).
 	p(NT(8), (NT(9)+NT(10)));
 //G1:   __E_start_1(11)      => null.
@@ -490,8 +513,12 @@ inline idni::prods<char_type, terminal_type>& productions() {
 idni::prods<char_type, terminal_type>& productions();
 #endif
 
-inline ::idni::grammar<char_type, terminal_type> grammar(
-	nts, productions(), start_symbol, char_classes, grammar_options);
+inline ::idni::grammar<char_type, terminal_type>& grammar() {
+	static ::idni::grammar<char_type, terminal_type> v(nts(),
+		productions(), start_symbol(), char_classes(),
+		grammar_options());
+	return v;
+}
 
 } // namespace tgf_parser_data
 
@@ -524,16 +551,16 @@ struct tgf_parser : public idni::parser<char, char>, public tgf_parser_nontermin
 		return inst;
 	}
 	tgf_parser() : idni::parser<char_type, terminal_type>(
-		tgf_parser_data::grammar,
+		tgf_parser_data::grammar(),
 		tgf_parser_data::make_parser_options()) {}
 	size_t id(const std::basic_string<char_type>& name) {
-		return tgf_parser_data::nts.get(name);
+		return tgf_parser_data::nts().get(name);
 	}
 	const std::basic_string<char_type>& name(size_t id) {
-		return tgf_parser_data::nts.get(id);
+		return tgf_parser_data::nts().get(id);
 	}
 	symbol_type literal(const nonterminal& nt) {
-		return symbol_type(nt, &tgf_parser_data::nts);
+		return symbol_type(nt, &tgf_parser_data::nts());
 	}
 };
 #ifdef _MSC_VER

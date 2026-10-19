@@ -2219,7 +2219,7 @@ TEST_SUITE("forest_path: long input") {
 		string in = "\"";
 		in.append(64000, 'a');
 		in.push_back('\"');
-		auto& g = json_parser_data::grammar;
+		auto& g = json_parser_data::grammar();
 		jp_t p(g, json_parser_data::make_parser_options());
 		auto r = p.parse(in.data(), in.size(),
 			{ .tree_path = parse_tree_path::forest_path,
@@ -2326,7 +2326,7 @@ TEST_SUITE("parser: every input byte") {
 	}
 
 	static byte_parse parse_json(const std::string& in, source s) {
-		jp_t p(json_parser_data::grammar,
+		jp_t p(json_parser_data::grammar(),
 			json_parser_data::make_parser_options());
 		return parse_bytes(p, in, s);
 	}

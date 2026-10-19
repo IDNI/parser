@@ -13,7 +13,9 @@ using char_type     = char;
 using terminal_type = char32_t;
 
 inline static constexpr size_t nt_bits = 7;
-inline const std::vector<std::string> symbol_names{
+
+inline const std::vector<std::string>& symbol_names() {
+	static const std::vector<std::string> v{
 	"", "eof", "alpha", "alnum", "space", "graph", "printable", "xdigit", "start", "_", 
 	"__E_start_0", "entry", "__E_start_1", "negate", "__E_entry_2", "__E_entry_3", "words", "__", "__E_entry_4", "matcher", 
 	"entry_tail", "item_list", "nested_block", "__E_entry_tail_5", "entry_terminator", "__E_entry_tail_6", "__E_entry_tail_7", "__E_entry_tail_8", "__E_nested_block_9", "__E_nested_block_10", 
@@ -24,17 +26,27 @@ inline const std::vector<std::string> symbol_names{
 	"unescaped_s", "escaped_s", "__E_unescaped_s_32", "__E_unescaped_s_33", "__E_escaped_s_34", "esc_hex", "esc_u4", "esc_U8", "__E_esc_hex_35", "__E___36", 
 	"__E____37", "comment", "__E_comment_38", "__E_comment_39", "__E_comment_40", "__N_0", "__N_1", "__N_2", 
 };
+	return v;
+}
 
-inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
+inline ::idni::nonterminals<char_type, terminal_type>& nts() {
+	static ::idni::nonterminals<char_type, terminal_type> v{
+		symbol_names() };
+	return v;
+}
 
-inline std::vector<terminal_type> terminals{
+inline std::vector<terminal_type>& terminals() {
+	static std::vector<terminal_type> v{
 	U'\0', U':', U'~', U'{', U'}', U'.', U',', U'@', U'f', 
 	U'o', U'r', U'b', U'i', U'd', U'u', U'n', U'q', U'e', U'a', 
 	U'l', U'y', U'w', U'\'', U'"', U'#', U' ', U'\t', U'_', U'\\', 
 	U't', U'v', U'/', U'x', U'X', U'U', U'\r', U'\n', 
 };
+	return v;
+}
 
-inline ::idni::char_class_fns<terminal_type> char_classes =
+inline ::idni::char_class_fns<terminal_type>& char_classes() {
+	static ::idni::char_class_fns<terminal_type> v =
 	::idni::predefined_char_classes<char_type, terminal_type>({
 		"eof",
 		"alpha",
@@ -44,10 +56,14 @@ inline ::idni::char_class_fns<terminal_type> char_classes =
 		"xdigit",
 	}, {
 		{ "unicode_printable", "printable" },
-	}, nts);
+	}, nts());
+	return v;
+}
 
-inline struct ::idni::grammar<char_type, terminal_type>::options
-	grammar_options
+inline ::idni::grammar<char_type, terminal_type>::options&
+	grammar_options()
+{
+	static struct ::idni::grammar<char_type, terminal_type>::options v
 {
 	.transform_negation = false,
 	.auto_disambiguate = true,
@@ -63,6 +79,8 @@ inline struct ::idni::grammar<char_type, terminal_type>::options
 		.inline_char_classes = true
 	}
 };
+	return v;
+}
 
 inline auto make_parser_options() {
 	auto o = ::idni::default_parser_options<char_type, terminal_type>();
@@ -71,7 +89,10 @@ inline auto make_parser_options() {
 	return o;
 }
 
-inline ::idni::prods<char_type, terminal_type> start_symbol{ nts(8) };
+inline ::idni::prods<char_type, terminal_type>& start_symbol() {
+	static ::idni::prods<char_type, terminal_type> v{ nts()(8) };
+	return v;
+}
 
 #ifdef TAU_PARSER_BUILD_HEADER_ONLY
 inline idni::prods<char_type, terminal_type>& productions() {
@@ -79,8 +100,10 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	static idni::prods<char_type, terminal_type>
 		p, nul(idni::lit<char_type, terminal_type>{});
 	if (loaded) return p;
-	#define  T(x) (idni::prods<char_type, terminal_type>{ terminals[x] })
-	#define NT(x) (idni::prods<char_type, terminal_type>{ nts(x) })
+	const auto& ts = terminals();
+	auto& ns = nts();
+	#define  T(x) (idni::prods<char_type, terminal_type>{ ts[x] })
+	#define NT(x) (idni::prods<char_type, terminal_type>{ ns(x) })
 //G0:   __E_start_0(10)      => entry(11) _(9).
 	p(NT(10), (NT(11)+NT(9)));
 //G1:   __E_start_1(12)      => null.
@@ -375,8 +398,12 @@ inline idni::prods<char_type, terminal_type>& productions() {
 idni::prods<char_type, terminal_type>& productions();
 #endif
 
-inline ::idni::grammar<char_type, terminal_type> grammar(
-	nts, productions(), start_symbol, char_classes, grammar_options);
+inline ::idni::grammar<char_type, terminal_type>& grammar() {
+	static ::idni::grammar<char_type, terminal_type> v(nts(),
+		productions(), start_symbol(), char_classes(),
+		grammar_options());
+	return v;
+}
 
 } // namespace tgf_test_parser_data
 
@@ -405,16 +432,16 @@ struct tgf_test_parser : public idni::parser<char, char32_t>, public tgf_test_pa
 		return inst;
 	}
 	tgf_test_parser() : idni::parser<char_type, terminal_type>(
-		tgf_test_parser_data::grammar,
+		tgf_test_parser_data::grammar(),
 		tgf_test_parser_data::make_parser_options()) {}
 	size_t id(const std::basic_string<char_type>& name) {
-		return tgf_test_parser_data::nts.get(name);
+		return tgf_test_parser_data::nts().get(name);
 	}
 	const std::basic_string<char_type>& name(size_t id) {
-		return tgf_test_parser_data::nts.get(id);
+		return tgf_test_parser_data::nts().get(id);
 	}
 	symbol_type literal(const nonterminal& nt) {
-		return symbol_type(nt, &tgf_test_parser_data::nts);
+		return symbol_type(nt, &tgf_test_parser_data::nts());
 	}
 };
 #ifdef _MSC_VER

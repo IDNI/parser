@@ -145,13 +145,13 @@ TEST_CASE("JSON TGF text: inner set is the JSON grammar table") {
 }
 
 TEST_CASE("generated JSON grammar: derived set matches the TGF text") {
-	const auto& g = json_parser_data::grammar;
+	const auto& g = json_parser_data::grammar();
 	CHECK(names_of<char32_t>(g, cc_rule_info<char32_t>::state::derived)
 		== json_derived);
 }
 
 TEST_CASE("generated JSON grammar: inner set matches the TGF text") {
-	const auto& g = json_parser_data::grammar;
+	const auto& g = json_parser_data::grammar();
 	CHECK(names_of<char32_t>(g, cc_rule_info<char32_t>::state::inner)
 		== json_inner);
 }
@@ -159,7 +159,7 @@ TEST_CASE("generated JSON grammar: inner set matches the TGF text") {
 // The unescaped predicate accepts every character that is not a quote, a
 // backslash, or an ASCII control character other than DEL.
 TEST_CASE("unescaped predicate accepts plain, non-ASCII and DEL") {
-	const auto& g = json_parser_data::grammar;
+	const auto& g = json_parser_data::grammar();
 	optional<char_class_fn<char32_t>> fn;
 	for (const auto& e : g.derive_char_classes_report())
 		if (g.get_nts().get(e.nt) == "unescaped") fn = e.fn;
@@ -170,7 +170,7 @@ TEST_CASE("unescaped predicate accepts plain, non-ASCII and DEL") {
 }
 
 TEST_CASE("unescaped predicate rejects quote, backslash and a control char") {
-	const auto& g = json_parser_data::grammar;
+	const auto& g = json_parser_data::grammar();
 	optional<char_class_fn<char32_t>> fn;
 	for (const auto& e : g.derive_char_classes_report())
 		if (g.get_nts().get(e.nt) == "unescaped") fn = e.fn;
@@ -829,7 +829,7 @@ TEST_CASE("generated parser code is the same before and after a parse") {
 }
 
 TEST_CASE("the generated JSON grammar keeps the same trees off and on") {
-	auto& g = json_parser_data::grammar;
+	auto& g = json_parser_data::grammar();
 	bool ad = g.opt().auto_disambiguate;
 	option_list nd;
 	for (size_t id : g.opt().nodisambig_list)
@@ -1091,7 +1091,7 @@ TEST_CASE("the generated parser gives the renames as a map") {
 	REQUIRE(L.g.has_value());
 	string text = generate_parser_text(*L.g);
 	CHECK(text.find("\t\t\"alpha\",\n\t}, {\n"
-		"\t\t{ \"digit\", \"d\" },\n\t}, nts);") != string::npos);
+		"\t\t{ \"digit\", \"d\" },\n\t}, nts());") != string::npos);
 }
 
 TEST_CASE("the generated parser of a grammar without renames has no map") {
@@ -1102,7 +1102,7 @@ TEST_CASE("the generated parser of a grammar without renames has no map") {
 	string text = generate_parser_text(*L.g);
 	auto b = text.find("predefined_char_classes");
 	REQUIRE(b != string::npos);
-	auto call = text.substr(b, text.find("nts);", b) - b);
+	auto call = text.substr(b, text.find("nts());", b) - b);
 	CHECK(call.find("\t\t\"digit\",\n\t}, ") != string::npos);
 	CHECK(call.find("}, {") == string::npos);
 }
