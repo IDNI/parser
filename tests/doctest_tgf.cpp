@@ -15,6 +15,7 @@
 #include "tgf/parser_gen.h"
 
 #include <filesystem>
+#include <fstream>
 #include <sstream>
 
 using namespace std;

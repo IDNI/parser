@@ -4,6 +4,7 @@
 #ifndef __IDNI__PARSER__TGF__PARSER_GEN_H__
 #define __IDNI__PARSER__TGF__PARSER_GEN_H__
 #include <filesystem>
+#include <fstream>
 #include <string_view>
 #include <cmath>
 #include "parser.h"

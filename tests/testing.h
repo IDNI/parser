@@ -3,6 +3,7 @@
 
 #ifndef __IDNI__PARSER__TESTING_H__
 #define __IDNI__PARSER__TESTING_H__
+#include <fstream>
 #include <string>
 #include <vector>
 #include <iostream>

@@ -10,7 +10,6 @@
 #include <iostream>
 #include <iomanip>
 #include <map>
-#include <fstream>
 
 #if defined(__linux__) || defined(__APPLE__)
 #	include <unistd.h>

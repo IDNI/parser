@@ -2,6 +2,7 @@
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #include <cstdint>
+#include <fstream>
 
 #include "measure.h"
 

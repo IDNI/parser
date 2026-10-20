@@ -7,7 +7,6 @@
 #include <array>
 #include <cstddef>
 #include <cstdio>
-#include <fstream>
 #include <memory>
 #include <ostream>
 #include <streambuf>
