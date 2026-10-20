@@ -376,7 +376,6 @@ Formats a single message node as `"<text> (key=value ...)"` when attributes are 
 ### void print(std::ostream& os) const;
 ### void print(const sink& s) const;
 ### void print() const;
-### std::ostream& to_json(std::ostream& os, bool print_names = false) const;
 ### friend std::ostream& operator<<(std::ostream& os, const report& r);
 
 Output the report.
@@ -384,7 +383,7 @@ Output the report.
 * `print(os)` / `print(sink)` — all bands to one destination (common case).
 * `print(const sinks&)` — per-band routing (errors/warnings flat, info tab-indented). Partial literals are fine; empty sinks drop their band.
 * `print()` — `{ .error = &std::cerr, .warning = &std::cerr, .info = &std::cout }`.
-* `to_json(ostream&, print_names=false)` — full tree as JSON for tooling. With `print_names=true` each node carries an extra `"tag_name"` field with the symbolic `code` label (e.g. `"parse_error"`).
+* `idni::format::json::print(r, os, print_names = false)` — the full tree as JSON on one line, for tooling. With `print_names = true` each node carries an extra `"message"` field with the label of its `code`. `idni::format::json::tree::build_report(r, names)` gives the same tree as a JSON document.
 * `operator<<` — every node on one stream, like `reprint(os)`.
 * `print` marks each error and warning node it writes. A node that a print already wrote does not print again. `operator<<` prints every node again like `reprint`.
 
@@ -548,7 +547,7 @@ auto r = p.parse(input);
 if (!r.found) std::cerr << r.parse_error.to_str() << '\n';
 r.report().print({                         // routed output
     .error = &std::cerr, .warning = &std::cerr, .info = &std::cout });
-r.report().to_json(std::cout);             // JSON for tooling
+format::json::print(r.report(), std::cout); // JSON for tooling
 ```
 
 See [`measure`](measure.md) for the underlying timer primitive.

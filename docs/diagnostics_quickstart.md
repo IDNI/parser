@@ -325,7 +325,7 @@ r.print({
 std::cout << r;
 
 // Machine-readable JSON.
-r.to_json(std::cout);
+idni::format::json::print(r, std::cout);
 ```
 
 Each print marks the error and warning lines it writes, so a line
