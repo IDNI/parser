@@ -231,6 +231,14 @@ inline const tree::traverser::extractor<htref> tree::traverser::handle(
 inline const tree::traverser::extractor<const tree&> tree::traverser::Tree(
 	[](const traverser& t) -> const tree& { return t.value_tree(); });
 
+inline const tree::traverser::extractor<tree::traverser>
+	tree::traverser::dump(
+		[](const traverser& t) -> traverser {
+			if (!t) return t;
+			t.value_tree().dump(std::cout) << "\n";
+			return t;
+		});
+
 inline const tree::traverser::extractor<tree::type> tree::traverser::nt(
 	[](const traverser& t) -> type {
 		return t ? t.value_tree().get_type() : json_parser::nul;

@@ -196,6 +196,16 @@ struct tree : public lcrs_tree<node> {
 	/// carries no value.
 	static diagnostics::result<tref> get(std::string_view text);
 
+	// printers
+
+	/// The JSON text on one line, without recursion.
+	std::ostream& print(std::ostream& os) const;
+	std::string to_str() const;
+	/// The node structure, one node per line.
+	std::ostream& print_tree(std::ostream& os, size_t s = 0) const;
+	std::ostream& dump(std::ostream& os, bool subtree = true) const;
+	std::string dump_to_str(bool subtree = true) const;
+
 	/// Tree navigation: `| nt` gives the first child with the nonterminal
 	/// nt, `|| nt` all of them, `| extractor` a value.
 	struct traverser {
@@ -235,6 +245,7 @@ struct tree : public lcrs_tree<node> {
 		static const extractor<htref>            handle;
 		/// The traverser must hold a value.
 		static const extractor<const tree&>      Tree;
+		static const extractor<traverser>        dump;
 		static const extractor<type>             nt;
 		static const extractor<std::string>      string;
 		static const extractor<double>           number;
@@ -278,6 +289,15 @@ std::function<bool(tref)> is(std::initializer_list<size_t> nts);
 /// The string member @p key of @p object, or nullptr when the member is
 /// absent or holds no string.
 const std::string* string_member(tref object, std::string_view key);
+
+std::ostream& operator<<(std::ostream& os, const node& n);
+/// The JSON text of @p t.
+std::ostream& operator<<(std::ostream& os, const tree& t);
+std::ostream& operator<<(std::ostream& os, const tt& t);
+
+/// Write @p v as one line: the JSON text, one '\n', then a flush. On
+/// Windows std::cout goes to binary mode first, so no '\r' joins the '\n'.
+std::ostream& write_line(tref v, std::ostream& os);
 
 /// The JSON value of @p v: a bool, an unsigned integer, a std::string, or
 /// a std::vector or a std::variant of these types.
@@ -335,5 +355,6 @@ std::ostream& print(const diagnostics::report& r, std::ostream& os,
 #include "json_tree.tmpl.h"
 #include "json_tree_builders.tmpl.h"
 #include "json_tree_from_parser.tmpl.h"
+#include "json_tree_printers.tmpl.h"
 
 #endif // __IDNI__PARSER__FORMAT__JSON_H__

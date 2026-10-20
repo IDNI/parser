@@ -6,7 +6,9 @@
 #include "format/json/json.h"
 
 #include <bit>
+#include <sstream>
 #include <string>
+#include <vector>
 
 using namespace idni;
 using namespace idni::format::json;
@@ -21,6 +23,37 @@ static tref parsed(std::string_view text) {
 }
 
 TEST_SUITE("json tree: round trip") {
+	// The texts the tests of doctest_json read.
+	const std::vector<std::string> texts{
+		"null", "true", "false", "42", "-1.5e2", "\"hello\"",
+		"[1,2,3]", "{\"a\":1}", "[10,20,30]",
+		R"({"a":[1,{"b":true},null],"c":{"d":[]}})",
+		"\"line\\nbreak\"", R"("q\"b\\")",
+		"{\r\"a\"\r:\r[\r1\r,\r2\r]\r,\r\"b\"\r:\rtrue\r}\r",
+		"\r\r1", "[]", "{}" };
+
+	TEST_CASE("the tree prints the expected text") {
+		const std::vector<std::string> printed{
+			"null", "true", "false", "42", "-150", "\"hello\"",
+			"[1,2,3]", "{\"a\":1}", "[10,20,30]",
+			R"({"a":[1,{"b":true},null],"c":{"d":[]}})",
+			"\"line\\nbreak\"", R"("q\"b\\")",
+			R"({"a":[1,2],"b":true})", "1", "[]", "{}" };
+		REQUIRE(printed.size() == texts.size());
+		for (size_t i = 0; i != texts.size(); ++i) {
+			CAPTURE(texts[i]);
+			CHECK(jt::get(parsed(texts[i])).to_str() == printed[i]);
+		}
+	}
+
+	TEST_CASE("the printed text parses back to the same node") {
+		for (const auto& s : texts) {
+			CAPTURE(s);
+			tref t = parsed(s);
+			CHECK(parsed(jt::get(t).to_str()) == t);
+		}
+	}
+
 	TEST_CASE("malformed input reports an error and no value") {
 		for (const char* s : { "", "[1,2,]", "{\"a\":1,}", "\"abc",
 				"\"\\uD800\"", "{\"\\uD800\":1}" })
@@ -30,6 +63,105 @@ TEST_SUITE("json tree: round trip") {
 			CHECK_FALSE(r.has_value());
 			CHECK(r.has_error());
 		}
+	}
+}
+
+TEST_SUITE("json tree: values") {
+	TEST_CASE("a repeated key keeps its first position and its last value") {
+		tref t = parsed(R"({"a":1,"b":2,"a":3})");
+		CHECK(jt::get(t).to_str() == R"({"a":3,"b":2})");
+	}
+
+	TEST_CASE("-0 is 0") {
+		CHECK(jt::build_number(-0.0) == jt::build_number(0.0));
+		CHECK(jt::get(parsed("-0")).to_str() == "0");
+		CHECK(jt::get(parsed("[-0,0,-0.0]")).to_str() == "[0,0,0]");
+		CHECK(parsed("-0") == parsed("0"));
+	}
+
+	TEST_CASE("escapes read back decoded and print escaped") {
+		tref t = parsed(R"("a\nb\"c\\d\/e\t")");
+		CHECK(jt::get(t).get_string() == "a\nb\"c\\d/e\t");
+		CHECK(jt::get(t).to_str() == R"("a\nb\"c\\d/e\t")");
+	}
+
+	TEST_CASE("unicode escapes and raw UTF-8 decode to UTF-8") {
+		tref t = parsed(R"("\u00e9\ud83d\ude00")");
+		CHECK(jt::get(t).get_string() == "\xc3\xa9\xf0\x9f\x98\x80");
+		CHECK(parsed("\"\xc3\xa9\xf0\x9f\x98\x80\"") == t);
+		CHECK(parsed(jt::get(t).to_str()) == t);
+	}
+
+	TEST_CASE("an element printed alone has no trailing comma") {
+		tref t = parsed("[1,[2,3],4]");
+		CHECK(jt::get(jt::get(t).first()).to_str() == "1");
+		CHECK(jt::get(jt::get(t).second()).to_str() == "[2,3]");
+	}
+
+	TEST_CASE("builders, queries and the traverser") {
+		tref state = jt::build_object({
+			jt::build_pair("grammar", jt::build_string("g.tgf")),
+			jt::build_pair("start", jt::_null()) });
+		tref t = jt::build_object({
+			jt::build_pair("id", jt::build_number(7)),
+			jt::build_pair("ok", jt::build_bool(true)),
+			jt::build_pair("list", jt::build_array({
+				jt::build_string("x"), jt::build_number(1.5) })),
+			jt::build_pair("state", state) });
+		CHECK(jt::get(t).to_str() == R"({"id":7,"ok":true,)"
+			R"("list":["x",1.5],"state":{"grammar":"g.tgf",)"
+			R"("start":null}})");
+		CHECK((tt(t) | tt::member("id") | tt::number) == 7);
+		CHECK((tt(t) | tt::member("ok") | tt::boolean) == true);
+		CHECK((tt(t) | tt::member("state") | tt::member("grammar")
+			| tt::string) == "g.tgf");
+		CHECK_FALSE((tt(t) | tt::member("missing")).has_value());
+		CHECK_FALSE((tt(t) | tt::member("missing") | tt::member("x"))
+			.has_value());
+		CHECK((tt(t) | tt::member("list") | tt::children).size() == 2);
+		CHECK((tt(t) || json_parser::object_pair).size() == 4);
+		CHECK((tt(t) | tt::member("list") | json_parser::number
+			| tt::number) == 1.5);
+		CHECK(*string_member(state, "grammar") == "g.tgf");
+		CHECK(string_member(state, "start") == nullptr);
+		CHECK(format::json::is(t, json_parser::object));
+		CHECK(format::json::is(json_parser::object)(t));
+		CHECK(format::json::is(t,
+			{ json_parser::arr, json_parser::object }));
+		CHECK(jt::get(t).find("state") == state);
+		CHECK(jt::get(t).find("nope") == nullptr);
+		tref u = jt::set_member(t, "id", jt::build_number(8));
+		CHECK(jt::get(u).to_str().starts_with(R"({"id":8,"ok":true)"));
+		tref w = jt::set_member(state, "start", jt::build_string("s"));
+		CHECK(jt::get(w).to_str() == R"({"grammar":"g.tgf","start":"s"})");
+	}
+}
+
+TEST_SUITE("json tree: deep documents and gc") {
+	constexpr size_t deep = 1000000;
+
+	TEST_CASE("a document 1000000 levels deep builds, prints and is freed") {
+		jt::gc();
+		const size_t before = jt::m_size();
+		{
+			tref t = jt::_null();
+			for (size_t i = 0; i != deep; ++i)
+				t = i % 2 ? jt::build_array({ t })
+					: jt::build_object({ jt::build_pair("k", t) });
+			htref h = jt::geth(t);
+			std::string open, close;
+			for (size_t i = deep; i-- != 0; ) {
+				open += i % 2 ? "[" : "{\"k\":";
+				close += (deep - 1 - i) % 2 ? ']' : '}';
+			}
+			const std::string text = open + "null" + close;
+			CHECK(jt::get(h).to_str() == text);
+			jt::gc();
+			CHECK(jt::get(h).to_str() == text);
+			CHECK(jt::m_size() > deep);
+		}
+		jt::gc();
+		CHECK(jt::m_size() == before);
 	}
 }
 
@@ -287,5 +419,33 @@ TEST_SUITE("json tree: parse") {
 		CHECK_FALSE(failed.has_value());
 		CHECK(failed.report().first_error_code()
 			== idni::diagnostics::code::parse_error);
+	}
+}
+
+TEST_SUITE("json tree: printers") {
+	TEST_CASE("the stream operators, write_line and the node dump") {
+		tref t = parsed(R"({"a":[1.5,"x"]})");
+		std::ostringstream os;
+		os << jt::get(t);
+		CHECK(os.str() == jt::get(t).to_str());
+		std::ostringstream line;
+		write_line(t, line);
+		CHECK(line.str() == R"({"a":[1.5,"x"]})" "\n");
+		std::ostringstream nodes;
+		nodes << node(json_parser::number, std::bit_cast<uint64_t>(1.5))
+			<< '|' << node(json_parser::str, 0, "x\"y")
+			<< '|' << node(json_parser::null_sym);
+		CHECK(nodes.str() == R"(number 1.5|str "x\"y"|null_sym)");
+		std::ostringstream two;
+		two << (tt(t) | tt::member("a") | tt::children);
+		CHECK(two.str() == "1.5\n\"x\"");
+		std::ostringstream none;
+		none << tt();
+		CHECK(none.str() == "(no value)");
+		CHECK_FALSE(jt::get(t).dump_to_str().empty());
+		std::ostringstream tree_text;
+		jt::get(t).print_tree(tree_text);
+		CHECK_FALSE(tree_text.str().empty());
+		CHECK((tt() | tt::dump).empty());
 	}
 }
