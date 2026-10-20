@@ -219,7 +219,7 @@ inline result<bool> memory_map::seek_beginning() {
 	if (::lseek(fh_, 0, SEEK_SET) == -1)
 		return err(diagnostics::code::io_error,
 			"failed to seek to the beginning of the file",
-			{{label::exit_code, static_cast<int_t>(errno)}});
+			{{label::error_number, static_cast<int_t>(errno)}});
 	result<bool> r;
 	return r.with_value(true);
 }

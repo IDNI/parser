@@ -95,7 +95,7 @@ public:
 	 * @return on success, true. On failure, an error with
 	 * code::invalid_state for a precondition, or code::io_error for
 	 * a failing system call, with the path in label::path and the
-	 * OS error code in label::exit_code.
+	 * OS error code in label::error_number.
 	 * @pre Needs the CLOSED state.
 	 * @post On success, moves to the UNMAPPED state. size() then
 	 * holds the file size, autodetected when the caller passed zero.
@@ -109,7 +109,7 @@ public:
 	 * @return on success, true. On failure, an error with
 	 * code::invalid_state for a precondition, or code::io_error for
 	 * a failing system call, with the OS error code in
-	 * label::exit_code.
+	 * label::error_number.
 	 * @pre Needs the UNMAPPED state.
 	 * @post On success, moves to the MAPPED state, and data()
 	 * returns the mapped memory. A zero-size file has no bytes to
@@ -120,7 +120,7 @@ public:
 	/**
 	 * @brief Flushes the mapped memory to disk.
 	 * @return on success, true. On failure, an error with
-	 * code::io_error and the OS error code in label::exit_code.
+	 * code::io_error and the OS error code in label::error_number.
 	 */
 	result<bool> sync();
 
@@ -129,7 +129,7 @@ public:
 	 * @return true on success. On a call outside the MAPPED state,
 	 * false, with a warning in the report. On a failing sync or a
 	 * failing system call, an error with code::io_error and the OS
-	 * error code in label::exit_code.
+	 * error code in label::error_number.
 	 * @post On success, moves to the UNMAPPED state, and data()
 	 * returns null. On the redundant-call case, nothing changes.
 	 */

@@ -272,3 +272,35 @@ TEST_CASE("open_stream opens a file in the given mode") {
 }
 
 } // TEST_SUITE
+
+TEST_SUITE("fs errors name the system error number") {
+
+// The printed report of @p rep, with no colour.
+std::string printed(const diagnostics::report& rep) {
+	std::ostringstream os;
+	rep.print(os);
+	return os.str();
+}
+
+TEST_CASE("size and unlink of a missing file give errno, not an exit code") {
+	temp_folder t("fs_errno_missing");
+	const fs::path p = t.file("missing.txt");
+	auto sz = fs::size(p);
+	REQUIRE_FALSE(sz.has_value());
+	CHECK(printed(sz.report()).find("errno=") != std::string::npos);
+	CHECK(printed(sz.report()).find("exit code=") == std::string::npos);
+	auto rm = fs::unlink(p);
+	REQUIRE_FALSE(rm.has_value());
+	CHECK(printed(rm.report()).find("errno=") != std::string::npos);
+	CHECK(printed(rm.report()).find("exit code=") == std::string::npos);
+}
+
+TEST_CASE("open of a missing file gives errno, not an exit code") {
+	temp_folder t("fs_errno_open");
+	auto f = fs::open(t.file("missing.bin"), fs::MMAP_READ);
+	REQUIRE_FALSE(f.has_value());
+	CHECK(printed(f.report()).find("errno=") != std::string::npos);
+	CHECK(printed(f.report()).find("exit code=") == std::string::npos);
+}
+
+} // TEST_SUITE

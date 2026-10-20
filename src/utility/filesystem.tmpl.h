@@ -65,7 +65,7 @@ inline result<size_t> size(const path& p) {
 		return r.with_error(diagnostics::code::io_error,
 			"failed to get file size",
 			{{label::path, to_utf8(p)},
-				{label::exit_code, static_cast<int_t>(::GetLastError())}});
+				{label::error_number, static_cast<int_t>(::GetLastError())}});
 	LARGE_INTEGER sz;
 	sz.HighPart = static_cast<LONG>(data.nFileSizeHigh);
 	sz.LowPart = data.nFileSizeLow;
@@ -80,7 +80,7 @@ inline result<size_t> size(const path& p) {
 		return r.with_error(diagnostics::code::io_error,
 			"failed to get file size",
 			{{label::path, p},
-				{label::exit_code, static_cast<int_t>(errno)}});
+				{label::error_number, static_cast<int_t>(errno)}});
 	return r.with_value(static_cast<size_t>(s.st_size));
 }
 #endif
@@ -93,7 +93,7 @@ inline result<bool> unlink(const path& p) {
 		return r.with_error(diagnostics::code::io_error,
 			"failed to delete file",
 			{{label::path, to_utf8(p)},
-				{label::exit_code, static_cast<int_t>(::GetLastError())}});
+				{label::error_number, static_cast<int_t>(::GetLastError())}});
 	return r.with_value(true);
 }
 #else
@@ -104,7 +104,7 @@ inline result<bool> unlink(const path& p) {
 		return r.with_error(diagnostics::code::io_error,
 			"failed to delete file",
 			{{label::path, p},
-				{label::exit_code, static_cast<int_t>(errno)}});
+				{label::error_number, static_cast<int_t>(errno)}});
 	return r.with_value(true);
 }
 #endif
@@ -184,7 +184,7 @@ inline result<bool> write(const path& p, std::string_view content) {
 		return r.with_error(diagnostics::code::io_error,
 			"failed to flush the file",
 			{{label::path, to_utf8(p)},
-				{label::exit_code, static_cast<int_t>(flush_errno)}});
+				{label::error_number, static_cast<int_t>(flush_errno)}});
 	}
 	return r.with_value(true);
 }
@@ -462,7 +462,7 @@ inline result<file_handle> open(const path& p, mmap_mode m) {
 		return r.with_error(diagnostics::code::io_error,
 			"failed to open file",
 			{{label::path, to_utf8(p)},
-				{label::exit_code, static_cast<int_t>(::GetLastError())}});
+				{label::error_number, static_cast<int_t>(::GetLastError())}});
 	return r.with_value(f);
 }
 inline result<file_handle> create(const path& p, mmap_mode m) {
@@ -475,7 +475,7 @@ inline result<bool> close(file_handle f) {
 	if (!::CloseHandle(f))
 		return r.with_error(diagnostics::code::io_error,
 			"failed to close file",
-			{{label::exit_code, static_cast<int_t>(::GetLastError())}});
+			{{label::error_number, static_cast<int_t>(::GetLastError())}});
 	return r.with_value(true);
 }
 inline result<size_t> size(file_handle f) {
@@ -485,7 +485,7 @@ inline result<size_t> size(file_handle f) {
 	if (!::GetFileSizeEx(f, &sz))
 		return r.with_error(diagnostics::code::io_error,
 			"failed to get file size",
-			{{label::exit_code, static_cast<int_t>(::GetLastError())}});
+			{{label::error_number, static_cast<int_t>(::GetLastError())}});
 	return r.with_value(static_cast<size_t>(sz.QuadPart));
 }
 inline result<bool> resize(file_handle f, size_t n) {
@@ -496,7 +496,7 @@ inline result<bool> resize(file_handle f, size_t n) {
 		!::SetEndOfFile(f))
 		return r.with_error(diagnostics::code::io_error,
 			"failed to resize file",
-			{{label::exit_code, static_cast<int_t>(::GetLastError())}});
+			{{label::error_number, static_cast<int_t>(::GetLastError())}});
 	return r.with_value(true);
 }
 inline result<size_t> write(file_handle f, std::string_view content) {
@@ -507,7 +507,7 @@ inline result<size_t> write(file_handle f, std::string_view content) {
 		static_cast<DWORD>(content.size()), &written, nullptr))
 		return r.with_error(diagnostics::code::io_error,
 			"failed to write to file",
-			{{label::exit_code, static_cast<int_t>(::GetLastError())}});
+			{{label::error_number, static_cast<int_t>(::GetLastError())}});
 	return r.with_value(static_cast<size_t>(written));
 }
 inline result<mapping> map(file_handle f, size_t n, mmap_mode m) {
@@ -521,14 +521,14 @@ inline result<mapping> map(file_handle f, size_t n, mmap_mode m) {
 	if (mh == nullptr) // CreateFileMappingW fails with NULL, not INVALID_HANDLE_VALUE
 		return r.with_error(diagnostics::code::io_error,
 			"failed to create file mapping",
-			{{label::exit_code, static_cast<int_t>(::GetLastError())}});
+			{{label::error_number, static_cast<int_t>(::GetLastError())}});
 	void* data = ::MapViewOfFile(mh, m == MMAP_READ ? FILE_MAP_READ
 		: FILE_MAP_WRITE, 0, 0, n);
 	if (data == nullptr) {
 		auto ec = static_cast<int_t>(::GetLastError());
 		::CloseHandle(mh);
 		return r.with_error(diagnostics::code::io_error,
-			"failed to map file", {{label::exit_code, ec}});
+			"failed to map file", {{label::error_number, ec}});
 	}
 	mapping map_;
 	map_.data = data;
@@ -543,7 +543,7 @@ inline result<bool> sync(file_handle f, const mapping& r_map) {
 		::FlushFileBuffers(f) == 0)
 		return r.with_error(diagnostics::code::io_error,
 			"failed to sync mapped memory",
-			{{label::exit_code, static_cast<int_t>(::GetLastError())}});
+			{{label::error_number, static_cast<int_t>(::GetLastError())}});
 	return r.with_value(true);
 }
 inline result<bool> unmap(mapping& r_map) {
@@ -552,7 +552,7 @@ inline result<bool> unmap(mapping& r_map) {
 	if (!::UnmapViewOfFile(r_map.data))
 		return r.with_error(diagnostics::code::io_error,
 			"failed to unmap file",
-			{{label::exit_code, static_cast<int_t>(::GetLastError())}});
+			{{label::error_number, static_cast<int_t>(::GetLastError())}});
 	::CloseHandle(r_map.mh);
 	r_map = mapping{};
 	return r.with_value(true);
@@ -565,7 +565,7 @@ inline result<file_handle> open(const path& p, mmap_mode m) {
 	if (fd == -1)
 		return r.with_error(diagnostics::code::io_error,
 			"failed to open file",
-			{{label::path, p}, {label::exit_code, static_cast<int_t>(errno)}});
+			{{label::path, p}, {label::error_number, static_cast<int_t>(errno)}});
 	return r.with_value(fd);
 }
 inline result<file_handle> create(const path& p, mmap_mode m) {
@@ -578,7 +578,7 @@ inline result<file_handle> create(const path& p, mmap_mode m) {
 	if (fd == -1)
 		return r.with_error(diagnostics::code::io_error,
 			"failed to create file",
-			{{label::path, p}, {label::exit_code, static_cast<int_t>(errno)}});
+			{{label::path, p}, {label::error_number, static_cast<int_t>(errno)}});
 	return r.with_value(fd);
 }
 inline result<bool> close(file_handle f) {
@@ -587,7 +587,7 @@ inline result<bool> close(file_handle f) {
 	if (::close(f) != 0)
 		return r.with_error(diagnostics::code::io_error,
 			"failed to close file",
-			{{label::exit_code, static_cast<int_t>(errno)}});
+			{{label::error_number, static_cast<int_t>(errno)}});
 	return r.with_value(true);
 }
 inline result<size_t> size(file_handle f) {
@@ -597,7 +597,7 @@ inline result<size_t> size(file_handle f) {
 	if (::fstat(f, &s) != 0)
 		return r.with_error(diagnostics::code::io_error,
 			"failed to get file size",
-			{{label::exit_code, static_cast<int_t>(errno)}});
+			{{label::error_number, static_cast<int_t>(errno)}});
 	return r.with_value(static_cast<size_t>(s.st_size));
 }
 inline result<bool> resize(file_handle f, size_t n) {
@@ -606,7 +606,7 @@ inline result<bool> resize(file_handle f, size_t n) {
 	if (::ftruncate(f, static_cast<off_t>(n)) == -1)
 		return r.with_error(diagnostics::code::io_error,
 			"failed to resize file",
-			{{label::exit_code, static_cast<int_t>(errno)}});
+			{{label::error_number, static_cast<int_t>(errno)}});
 	return r.with_value(true);
 }
 inline result<size_t> write(file_handle f, std::string_view content) {
@@ -616,7 +616,7 @@ inline result<size_t> write(file_handle f, std::string_view content) {
 	if (written == -1)
 		return r.with_error(diagnostics::code::io_error,
 			"failed to write to file",
-			{{label::exit_code, static_cast<int_t>(errno)}});
+			{{label::error_number, static_cast<int_t>(errno)}});
 	return r.with_value(static_cast<size_t>(written));
 }
 inline result<mapping> map(file_handle f, size_t n, mmap_mode m) {
@@ -627,7 +627,7 @@ inline result<mapping> map(file_handle f, size_t n, mmap_mode m) {
 	if (data == MAP_FAILED)
 		return r.with_error(diagnostics::code::io_error,
 			"failed to map file",
-			{{label::exit_code, static_cast<int_t>(errno)}});
+			{{label::error_number, static_cast<int_t>(errno)}});
 	mapping map_;
 	map_.data = data;
 	map_.size = n;
@@ -639,7 +639,7 @@ inline result<bool> sync(file_handle, const mapping& r_map) {
 	if (::msync(r_map.data, r_map.size, MS_SYNC) == -1)
 		return r.with_error(diagnostics::code::io_error,
 			"failed to sync mapped memory",
-			{{label::exit_code, static_cast<int_t>(errno)}});
+			{{label::error_number, static_cast<int_t>(errno)}});
 	return r.with_value(true);
 }
 inline result<bool> unmap(mapping& r_map) {
@@ -648,7 +648,7 @@ inline result<bool> unmap(mapping& r_map) {
 	if (::munmap(r_map.data, r_map.size) == -1)
 		return r.with_error(diagnostics::code::io_error,
 			"failed to unmap file",
-			{{label::exit_code, static_cast<int_t>(errno)}});
+			{{label::error_number, static_cast<int_t>(errno)}});
 	r_map = mapping{};
 	return r.with_value(true);
 }

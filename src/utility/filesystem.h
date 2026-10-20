@@ -74,7 +74,7 @@ bool exists(const path& p);
  * @param p the path to the file.
  * @return on success, the size in bytes. On failure, an error with
  * code::io_error, the path in label::path, and the OS error code in
- * label::exit_code.
+ * label::error_number.
  */
 result<size_t> size(const path& p);
 
@@ -82,7 +82,7 @@ result<size_t> size(const path& p);
  * @brief Deletes a file.
  * @param p the path to the file.
  * @return on success, true. On failure, an error with code::io_error,
- * the path in label::path, and the OS error code in label::exit_code.
+ * the path in label::path, and the OS error code in label::error_number.
  */
 result<bool> unlink(const path& p);
 
@@ -214,7 +214,7 @@ struct mapping {
  * other mode opens it for reading and writing.
  * @return on success, an open file_handle. On failure, an error
  * with code::io_error, the path in label::path, and the OS error
- * code in label::exit_code.
+ * code in label::error_number.
  * @post The caller closes the returned handle, through @ref close.
  */
 result<file_handle> open(const path& p, mmap_mode m);
@@ -226,7 +226,7 @@ result<file_handle> open(const path& p, mmap_mode m);
  * always opens it for reading and writing.
  * @return on success, an open file_handle. On failure, an error
  * with code::io_error, the path in label::path, and the OS error
- * code in label::exit_code.
+ * code in label::error_number.
  * @post The caller closes the returned handle, through @ref close.
  * @note On Windows, this opens the file with write access, because only
  * a write-open creates a missing file.
@@ -237,7 +237,7 @@ result<file_handle> create(const path& p, mmap_mode m);
  * @brief Closes a file handle.
  * @param f the handle to close.
  * @return on success, true. On failure, an error with
- * code::io_error and the OS error code in label::exit_code.
+ * code::io_error and the OS error code in label::error_number.
  * @post @p f no longer names an open file.
  */
 result<bool> close(file_handle f);
@@ -246,7 +246,7 @@ result<bool> close(file_handle f);
  * @brief Reads the size of an open file.
  * @param f the open file.
  * @return on success, the size in bytes. On failure, an error with
- * code::io_error and the OS error code in label::exit_code. Unlike
+ * code::io_error and the OS error code in label::error_number. Unlike
  * size(const path&), this overload has no path to report.
  */
 result<size_t> size(file_handle f);
@@ -256,7 +256,7 @@ result<size_t> size(file_handle f);
  * @param f the open file.
  * @param n the new size, in bytes.
  * @return on success, true. On failure, an error with
- * code::io_error and the OS error code in label::exit_code.
+ * code::io_error and the OS error code in label::error_number.
  * @post The file is exactly @p n bytes long.
  */
 result<bool> resize(file_handle f, size_t n);
@@ -267,7 +267,7 @@ result<bool> resize(file_handle f, size_t n);
  * @param content the bytes to write.
  * @return on success, the number of bytes written, which can be
  * less than content.size(). On failure, an error with
- * code::io_error and the OS error code in label::exit_code.
+ * code::io_error and the OS error code in label::error_number.
  * @warning Unlike write(const path&, ...), this overload never
  * checks for a short write. A caller compares the returned count
  * against content.size() itself.
@@ -281,7 +281,7 @@ result<size_t> write(file_handle f, std::string_view content);
  * @param m the access mode. MMAP_READ maps it read-only, and any
  * other mode maps it for reading and writing.
  * @return on success, the mapping. On failure, an error with
- * code::io_error and the OS error code in label::exit_code.
+ * code::io_error and the OS error code in label::error_number.
  * @pre @p f stays open for the life of the mapping. @ref sync
  * reads it back on Windows.
  * @post A caller undoes this with @ref unmap.
@@ -295,7 +295,7 @@ result<mapping> map(file_handle f, size_t n, mmap_mode m);
  * POSIX msync needs only the mapping.
  * @param r the mapping to flush.
  * @return on success, true. On failure, an error with
- * code::io_error and the OS error code in label::exit_code.
+ * code::io_error and the OS error code in label::error_number.
  */
 result<bool> sync(file_handle f, const mapping& r);
 
@@ -303,7 +303,7 @@ result<bool> sync(file_handle f, const mapping& r);
  * @brief Unmaps a mapped region.
  * @param r the mapping to undo.
  * @return on success, true. On failure, an error with
- * code::io_error and the OS error code in label::exit_code.
+ * code::io_error and the OS error code in label::error_number.
  * @post On success, r no longer names any memory: its fields reset
  * to their default state.
  */
