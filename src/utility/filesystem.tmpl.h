@@ -192,6 +192,25 @@ inline result<bool> write(const path& p, std::string_view content) {
 // One definition for every translation unit, so no unnamed namespace.
 namespace detail {
 
+// The error of a private folder or file: the path and the system error.
+inline void private_path_error(diagnostics::report& rep,
+	std::string_view msg, const path& p, int err)
+{
+	using label = idni::parser_strings::label;
+	rep.error(diagnostics::code::io_error, msg,
+		{ { label::path, to_utf8(p) },
+		  { label::error_number, static_cast<int_t>(err) } });
+}
+
+// The error of a private file when the system gives no error number.
+inline void private_path_error(diagnostics::report& rep,
+	std::string_view msg, const path& p)
+{
+	using label = idni::parser_strings::label;
+	rep.error(diagnostics::code::io_error, msg,
+		{ { label::path, to_utf8(p) } });
+}
+
 // The temp file of fs::replace is <path><temp_infix><unique part>.
 inline constexpr std::string_view temp_infix = ".tmp.";
 
@@ -654,6 +673,141 @@ inline result<bool> unmap(mapping& r_map) {
 	return r.with_value(true);
 }
 #endif
+
+inline file_outbuf::file_outbuf(file_handle f) : f_(f) {
+	setp(buf_.data(), buf_.data() + buf_.size());
+}
+
+inline file_outbuf::~file_outbuf() { close(); }
+
+inline bool file_outbuf::is_open() const { return f_ != invalid_file_handle; }
+
+inline file_handle file_outbuf::native_handle() const { return f_; }
+
+inline bool file_outbuf::close() {
+	if (!is_open()) return true;
+	bool ok = flush_buffer();
+#ifdef _WIN32
+	ok = ::CloseHandle(f_) && ok;
+#else
+	ok = ::close(f_) == 0 && ok;
+#endif
+	f_ = invalid_file_handle;
+	return ok;
+}
+
+inline bool file_outbuf::write_all(const char* s, size_t n) {
+	if (!is_open()) return false;
+	while (n != 0) {
+#ifdef _WIN32
+		const DWORD chunk = static_cast<DWORD>(
+			std::min<size_t>(n, size_t{ 1 } << 30));
+		DWORD written = 0;
+		if (!::WriteFile(f_, s, chunk, &written, nullptr) || written == 0)
+			return false;
+#else
+		const ssize_t written = ::write(f_, s, n);
+		if (written < 0 && errno == EINTR) continue;
+		if (written <= 0) return false;
+#endif
+		s += written;
+		n -= static_cast<size_t>(written);
+	}
+	return true;
+}
+
+// The buffer empties also on a failed write, so a later write does not
+// repeat the lost bytes.
+inline bool file_outbuf::flush_buffer() {
+	const bool ok = write_all(pbase(),
+		static_cast<size_t>(pptr() - pbase()));
+	setp(buf_.data(), buf_.data() + buf_.size());
+	return ok;
+}
+
+inline file_outbuf::int_type file_outbuf::overflow(int_type ch) {
+	if (!flush_buffer()) return traits_type::eof();
+	if (traits_type::eq_int_type(ch, traits_type::eof()))
+		return traits_type::not_eof(ch);
+	*pptr() = traits_type::to_char_type(ch);
+	pbump(1);
+	return ch;
+}
+
+inline int file_outbuf::sync() { return flush_buffer() ? 0 : -1; }
+
+inline file_ostream::file_ostream() : std::ostream(nullptr) {}
+
+inline file_ostream::file_ostream(file_handle f)
+	: std::ostream(nullptr), buf_(std::make_unique<file_outbuf>(f))
+{
+	rdbuf(buf_.get());
+}
+
+// basic_ios moves the state and leaves rdbuf, so each stream gets the
+// buffer that it owns, and the moved-from stream gets badbit.
+inline file_ostream::file_ostream(file_ostream&& o) noexcept
+	: std::ostream(std::move(o)), buf_(std::move(o.buf_))
+{
+	set_rdbuf(buf_.get());
+	o.rdbuf(nullptr);
+}
+
+inline file_ostream& file_ostream::operator=(file_ostream&& o) noexcept {
+	if (this == &o) return *this;
+	std::ostream::swap(o);
+	buf_.swap(o.buf_);
+	set_rdbuf(buf_.get());
+	o.set_rdbuf(o.buf_.get());
+	return *this;
+}
+
+inline bool file_ostream::is_open() const { return buf_ && buf_->is_open(); }
+
+inline file_handle file_ostream::native_handle() const {
+	return buf_ ? buf_->native_handle() : invalid_file_handle;
+}
+
+inline void file_ostream::close() {
+	if (buf_ && !buf_->close()) setstate(std::ios::badbit);
+}
+
+inline result<file_ostream> open_private_append(const path& p) {
+	result<file_ostream> r;
+#ifdef _WIN32
+	// Windows keeps the ACL that a new file inherits, no mode is set. No
+	// security attributes, so a child program does not inherit the handle.
+	const file_handle h = ::CreateFileW(p.c_str(), FILE_APPEND_DATA,
+		FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+		OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+	if (h == invalid_file_handle) {
+		detail::private_path_error(r.report(),
+			"failed to open the file for append", p,
+			static_cast<int>(::GetLastError()));
+		return r;
+	}
+	return r.with_value(file_ostream(h));
+#else
+	// O_NOFOLLOW refuses a symlink, so the mode and the lines go to the
+	// file at the path itself.
+	const int fd = ::open(p.c_str(),
+		O_WRONLY | O_APPEND | O_CREAT | O_NOFOLLOW | O_CLOEXEC,
+		S_IRUSR | S_IWUSR);
+	if (fd < 0) {
+		detail::private_path_error(r.report(),
+			"failed to open the file for append", p, errno);
+		return r;
+	}
+	if (::fchmod(fd, S_IRUSR | S_IWUSR) != 0) {
+		const int err = errno;
+		::close(fd);
+		detail::private_path_error(r.report(),
+			"failed to set the file mode", p, err);
+		return r;
+	}
+	return r.with_value(file_ostream(fd));
+#endif
+}
 
 } // namespace idni::fs
 

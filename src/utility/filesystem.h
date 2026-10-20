@@ -4,8 +4,13 @@
 #ifndef __IDNI__PARSER__UTILITY__FILESYSTEM_H__
 #define __IDNI__PARSER__UTILITY__FILESYSTEM_H__
 
+#include <array>
 #include <cstddef>
 #include <cstdio>
+#include <fstream>
+#include <memory>
+#include <ostream>
+#include <streambuf>
 #include <string>
 #include <string_view>
 #ifdef _WIN32
@@ -115,6 +120,23 @@ result<bool> write(const path& p, std::string_view content);
  */
 result<bool> replace(const path& p, std::string_view content);
 
+class file_ostream;
+
+/**
+ * @brief Opens a file for append, readable by its owner only.
+ * The call opens the file once, and the stream writes through that open
+ * file. A child program does not inherit it: the fd has O_CLOEXEC on
+ * POSIX, and the handle is not inheritable on Windows.
+ * A new file gets mode 0600 on POSIX, and an existing file with a wider
+ * mode gets 0600 too. On POSIX, a symlink at @p p is an error. The
+ * stream is binary, so a line ends with LF on every system.
+ * @param p the path to the file.
+ * @return on success, the open stream. On failure, an error with
+ * code::io_error, the failing path in label::path and the system error
+ * number in label::error_number.
+ */
+result<file_ostream> open_private_append(const path& p);
+
 /**
  * @brief Reads a whole file.
  * @param p the path to the file.
@@ -180,6 +202,53 @@ inline const file_handle invalid_file_handle =
 #else
 	-1;
 #endif
+
+/**
+ * @brief A write-only stream buffer over one open file.
+ * It owns the handle and closes it in its destructor, after it writes
+ * the buffered bytes. A failed write makes overflow and sync fail, so
+ * the stream of the buffer gets badbit.
+ */
+class file_outbuf : public std::streambuf {
+public:
+	explicit file_outbuf(file_handle f);
+	~file_outbuf() override;
+	file_outbuf(const file_outbuf&) = delete;
+	file_outbuf& operator=(const file_outbuf&) = delete;
+	bool is_open() const;
+	file_handle native_handle() const;
+	/// Writes the buffered bytes and closes the file. False when a write
+	/// or the close fails.
+	bool close();
+protected:
+	int_type overflow(int_type ch) override;
+	int sync() override;
+private:
+	bool write_all(const char* s, size_t n);
+	bool flush_buffer();
+	file_handle f_;
+	std::array<char, 4096> buf_{};
+};
+
+/**
+ * @brief An output stream that owns one open file through a
+ * @ref file_outbuf. A default stream has no file and bad state.
+ */
+class file_ostream : public std::ostream {
+public:
+	file_ostream();
+	explicit file_ostream(file_handle f);
+	file_ostream(file_ostream&& o) noexcept;
+	file_ostream& operator=(file_ostream&& o) noexcept;
+	bool is_open() const;
+	/// The handle of the file, or invalid_file_handle.
+	file_handle native_handle() const;
+	/// Writes the buffered bytes and closes the file. A failure sets
+	/// badbit.
+	void close();
+private:
+	std::unique_ptr<file_outbuf> buf_;
+};
 
 /**
  * @brief The access mode for a mapped file.

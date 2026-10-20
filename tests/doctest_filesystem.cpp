@@ -233,6 +233,105 @@ TEST_CASE("the error of a missing folder is an io_error") {
 
 }
 
+TEST_SUITE("fs::open_private_append") {
+#ifndef _WIN32
+TEST_CASE("a new file gets mode 0600") {
+	temp_folder t("doctest_filesystem_append_new.tmp");
+	const fs::path p = t.file("log.txt");
+	auto r = fs::open_private_append(p);
+	REQUIRE(r.has_value());
+	CHECK(mode_of(p) == 0600);
+}
+
+TEST_CASE("a file with mode 0644 gets mode 0600 and keeps its lines") {
+	temp_folder t("doctest_filesystem_append_old.tmp");
+	const fs::path p = t.file("log.txt");
+	REQUIRE(fs::write(p, "first\n").has_value());
+	REQUIRE(::chmod(p.c_str(), 0644) == 0);
+	{
+		auto r = fs::open_private_append(p);
+		REQUIRE(r.has_value());
+		fs::file_ostream os = std::move(r).value();
+		os << "second\n";
+	}
+	CHECK(mode_of(p) == 0600);
+	CHECK(read_text(p) == "first\nsecond\n");
+}
+
+TEST_CASE("a symlink at the path is an error and its target stays") {
+	temp_folder t("doctest_filesystem_append_link.tmp");
+	const fs::path target = t.file("target.txt");
+	const fs::path p = t.file("log.txt");
+	REQUIRE(fs::write(target, "first\n").has_value());
+	REQUIRE(::chmod(target.c_str(), 0644) == 0);
+	REQUIRE(::symlink(target.c_str(), p.c_str()) == 0);
+	auto r = fs::open_private_append(p);
+	CHECK_FALSE(r.has_value());
+	CHECK(has_io_error(r.report()));
+	CHECK(mode_of(target) == 0644);
+	CHECK(read_text(target) == "first\n");
+}
+
+TEST_CASE("two streams append to the same file") {
+	temp_folder t("doctest_filesystem_append_two.tmp");
+	const fs::path p = t.file("log.txt");
+	{
+		auto first = fs::open_private_append(p);
+		auto second = fs::open_private_append(p);
+		REQUIRE(first.has_value());
+		REQUIRE(second.has_value());
+		fs::file_ostream a = std::move(first).value();
+		fs::file_ostream b = std::move(second).value();
+		a << "one\n" << std::flush;
+		b << "two\n" << std::flush;
+		a << "three\n" << std::flush;
+	}
+	CHECK(read_text(p) == "one\ntwo\nthree\n");
+}
+#endif
+
+TEST_CASE("a missing folder is an error that names the path") {
+	temp_folder t("doctest_filesystem_append_missing.tmp");
+	const fs::path p = t.file("absent/log.txt");
+	auto r = fs::open_private_append(p);
+	CHECK_FALSE(r.has_value());
+	CHECK(has_io_error(r.report()));
+	std::ostringstream os;
+	r.report().print(os);
+	CHECK(os.str().find("absent") != std::string::npos);
+}
+
+TEST_CASE("a child program does not inherit the stream") {
+	temp_folder t("doctest_filesystem_append_inherit.tmp");
+	const fs::path p = t.file("log.txt");
+	auto r = fs::open_private_append(p);
+	REQUIRE(r.has_value());
+	const fs::file_ostream os = std::move(r).value();
+	REQUIRE(os.is_open());
+#ifdef _WIN32
+	DWORD flags = 0;
+	REQUIRE(::GetHandleInformation(os.native_handle(), &flags));
+	CHECK((flags & HANDLE_FLAG_INHERIT) == 0);
+#else
+	CHECK((::fcntl(os.native_handle(), F_GETFD) & FD_CLOEXEC) != 0);
+#endif
+}
+
+TEST_CASE("a write error shows in the stream state") {
+	temp_folder t("doctest_filesystem_append_error.tmp");
+	const fs::path p = t.file("read_only.txt");
+	REQUIRE(fs::write(p, "first\n").has_value());
+	// a read-only handle refuses each write
+	auto opened = fs::open(p, fs::MMAP_READ);
+	REQUIRE(opened.has_value());
+	fs::file_ostream os(opened.value());
+	CHECK(os.good());
+	os << "second\n" << std::flush;
+	CHECK(os.bad());
+	CHECK(read_text(p) == "first\n");
+}
+}
+
 #ifndef _WIN32
 TEST_SUITE("fs::open and fs::create") {
 TEST_CASE("an open file closes in a child program") {
