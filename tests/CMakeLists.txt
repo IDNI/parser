@@ -557,5 +557,9 @@ if(TAU_TEST_BASH)
 			"${CMAKE_CURRENT_SOURCE_DIR}/release-workflow-self-check.sh")
 endif()
 
+if(TAU_PARSER_BUILD_FUZZ)
+	add_subdirectory(fuzz)
+endif()
+
 include(ctest-test-defaults)
 tau_set_test_defaults()

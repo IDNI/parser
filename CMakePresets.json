@@ -255,6 +255,13 @@
 			}
 		},
 		{
+			"name": "_build-fuzz",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_PARSER_BUILD_FUZZ": "ON"
+			}
+		},
+		{
 			"name": "_run-grammar-tests",
 			"hidden": true,
 			"cacheVariables": {
