@@ -4,6 +4,7 @@
 #ifndef __IDNI__PARSER__FORMAT__JSON_TREE_BUILDERS_TMPL_H__
 #define __IDNI__PARSER__FORMAT__JSON_TREE_BUILDERS_TMPL_H__
 
+#include <algorithm>
 #include <bit>
 #include <charconv>
 #include <cmath>
@@ -47,6 +48,28 @@ inline tref tree::build_integer(int64_t n) {
 inline tref tree::build_float(double d) {
 	if (std::isnan(d)) d = std::numeric_limits<double>::quiet_NaN();
 	return get(node(json_parser::number, std::bit_cast<uint64_t>(d)));
+}
+
+inline diagnostics::result<tref> tree::build_integer(
+	std::string_view decimal)
+{
+	diagnostics::result<tref> r;
+	const std::string_view digits = decimal.starts_with('-')
+		? decimal.substr(1) : decimal;
+	const bool canonical = !digits.empty()
+		&& std::all_of(digits.begin(), digits.end(),
+			[](char c) { return c >= '0' && c <= '9'; })
+		&& (digits[0] != '0' || (digits == decimal && digits.size() == 1));
+	if (!canonical) {
+		std::string shown(decimal.substr(0, 32));
+		if (decimal.size() > 32) shown += "...";
+		return r.with_error(code::invalid_argument,
+			parser_strings::messages::json_integer_text,
+			{ { label::value, shown } });
+	}
+	const std::string text(decimal);
+	return r.with_value(get(node(json_parser::number,
+		std::bit_cast<uint64_t>(parse_number_saturating(text)), text)));
 }
 
 inline tref tree::build_string(std::string_view s) {

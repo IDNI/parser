@@ -243,6 +243,8 @@ struct messages {
 		"Conjunct has too many literals";
 	// REPL command errors
 	static constexpr sv unknown_command        = "Unknown command";
+	static constexpr sv json_integer_text       =
+		"The text is no canonical decimal integer";
 	static constexpr sv no_grammar_loaded      =
 		"no grammar loaded, use load";
 	static constexpr sv server_path_forbidden  =

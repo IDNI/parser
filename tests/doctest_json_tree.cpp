@@ -744,6 +744,17 @@ TEST_SUITE("json tree: the float and integer builders") {
 			== "[1.0, -0.0, 1]");
 		CHECK(jt::get(t).to_str() == "[1,-0,1]");
 	}
+
+	TEST_CASE("build_integer refuses a text that is no canonical integer") {
+		for (const char* text : { "", "-", "+1", "01", "00", "-0", "-01",
+				"1.0", "1e3", " 1", "1 ", "0x1", "1a" })
+		{
+			CAPTURE(text);
+			auto r = jt::build_integer(std::string_view(text));
+			CHECK_FALSE(r.has_value());
+			CHECK(r.report().first_error_code() == code::invalid_argument);
+		}
+	}
 }
 
 TEST_SUITE("json tree: report") {

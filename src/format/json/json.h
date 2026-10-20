@@ -249,6 +249,11 @@ struct tree : public lcrs_tree<node> {
 	/// A float node of @p d with no text, so -0.0 and an integer value
 	/// stay floats. Every NaN gives the one quiet NaN node.
 	static tref build_float(double d);
+	/// A number node with the decimal text of an integer of any size.
+	/// The text is canonical: an optional '-', then 0 or digits with no
+	/// leading zero. -0 is no canonical text. The double of the node is an
+	/// infinity when the integer is out of range, as a lenient read gives.
+	static diagnostics::result<tref> build_integer(std::string_view decimal);
 	static tref build_string(std::string_view s);
 	static tref build_array(const trefs& elements);
 	static tref build_pair(std::string_view key, tref v);
