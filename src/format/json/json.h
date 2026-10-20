@@ -79,8 +79,8 @@ using code   = idni::diagnostics::code;
 using result = idni::diagnostics::result<value>;
 using label  = idni::parser_strings::label;
 
-using tree = json_parser::tree;
-using trv  = tree::traverser;
+using parse_tree = json_parser::tree;
+using trv  = parse_tree::traverser;
 
 /// The JSON value of @p v: a bool, an unsigned integer, a std::string, or
 /// a std::vector or a std::variant of these types.
