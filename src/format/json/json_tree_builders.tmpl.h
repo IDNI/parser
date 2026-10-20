@@ -22,6 +22,8 @@ inline tref tree::_false() { return get(json_parser::false_sym); }
 inline tref tree::build_bool(bool b) { return b ? _true() : _false(); }
 
 inline tref tree::build_number(double n) {
+	// JSON has no text for an infinity or a NaN
+	if (!std::isfinite(n)) return _null();
 	// 2^63 is exact as a double, and every double below it in magnitude
 	// converts to int64 without overflow
 	// exact: only a whole double is an integer

@@ -185,7 +185,8 @@ struct tree : public lcrs_tree<node> {
 	static tref _true();
 	static tref _false();
 	static tref build_bool(bool b);
-	/// -0 becomes 0, so both are one node and print as 0.
+	/// -0 becomes 0, so both are one node and print as 0. An infinity
+	/// or a NaN becomes null.
 	/// An integral @p n with |n| < 2^63 keeps its decimal text.
 	static tref build_number(double n);
 	static tref build_integer(int64_t n);

@@ -7,6 +7,7 @@
 #include "format/ast.json/ast_json.h"
 
 #include <bit>
+#include <cmath>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -251,6 +252,14 @@ TEST_SUITE("json tree: integers") {
 			CAPTURE(s);
 			CHECK_FALSE(split_decimal(s).has_value());
 		}
+	}
+
+	TEST_CASE("an infinity or a NaN builds null") {
+		CHECK(jt::build_number(INFINITY) == jt::_null());
+		CHECK(jt::build_number(-INFINITY) == jt::_null());
+		CHECK(jt::build_number(NAN) == jt::_null());
+		CHECK(jt::get(jt::build_array({ jt::build_number(NAN) })).to_str()
+			== "[null]");
 	}
 
 	TEST_CASE("an integer outside int64 prints its text and has no integer") {
