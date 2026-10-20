@@ -617,10 +617,12 @@ inline std::string report::format_message(size_t node_idx) const {
 inline void report::print_tree(const sinks& s, const term::colors& tc,
 	bool again) const
 {
-	// An open scope has not yet had its elapsed time written by
-	// scope_guard::close(), so its printed value would be stale.
-	DBG(assert(scope_stack_.empty()
-		&& "printing a report with open scopes");)
+	// scope_guard::close() writes the time of a timed scope, so an open one
+	// prints a stale value. The root of reset() and an untimed parent stay
+	// open by design.
+	DBG(for (int32_t idx : scope_stack_)
+		assert(nodes_[static_cast<size_t>(idx)].tag != code::info_micros
+			&& "printing a report with an open timed scope");)
 	if (nodes_.empty()) return;
 	// Three passes over nodes_ — children index, label-width pass, value-
 	// column pass — kept separate for clarity. Reports stay small enough

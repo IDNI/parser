@@ -1200,3 +1200,23 @@ TEST_SUITE("diagnostics: a warning and an info take a code") {
 		CHECK_FALSE(r.has_error());
 	}
 }
+
+TEST_SUITE("diagnostics: a print with an open scope") {
+
+	TEST_CASE("the root of reset() and an open untimed scope print") {
+		report r;
+		r.reset();
+		auto s = r.open("rules", code::info_count, size_t{ 3 });
+		r.error(code::parse_error, "Bad header");
+		std::vector<std::string> errors, infos;
+		r.print({ .error = [&errors](std::string_view l) {
+				errors.emplace_back(l); },
+			.warning = {},
+			.info = [&infos](std::string_view l) {
+				infos.emplace_back(l); } }, idni::term::colors(false));
+		CHECK(errors == std::vector<std::string>{ "Bad header" });
+		REQUIRE(infos.size() == 2);
+		CHECK(infos[0].starts_with("root"));
+		CHECK(infos[1].starts_with("\trules:"));
+	}
+}
