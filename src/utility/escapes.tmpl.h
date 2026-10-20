@@ -78,6 +78,27 @@ inline bool emit_escaped_value(std::string& out, unsigned v, const profile& p) {
 	return false;
 }
 
+// A code point from U+0080 up as \uXXXX, or above U+FFFF as a UTF-16 pair,
+// or as \UXXXXXXXX when the profile has it and no utf16 escapes.
+inline void emit_ascii_escape(std::string& out, char32_t cp, const profile& p) {
+	char tmp[16];
+	auto u4 = [&](unsigned v) {
+		out += p.prefix;
+		std::snprintf(tmp, sizeof tmp, "u%04x", v);
+		out += tmp;
+	};
+	if (cp <= 0xFFFF) return u4((unsigned)cp);
+	if (p.hex_U8 && p.hex_u4 != hex_u4_mode::utf16) {
+		out += p.prefix;
+		std::snprintf(tmp, sizeof tmp, "U%08X", (unsigned)cp);
+		out += tmp;
+		return;
+	}
+	const unsigned v = (unsigned)cp - 0x10000;
+	u4(0xD800 + (v >> 10));
+	u4(0xDC00 + (v & 0x3FF));
+}
+
 // Codepoint-domain output sink: collects char32_t scalars.
 struct u32sink {
 	std::u32string out;
@@ -309,6 +330,11 @@ inline std::string encode_(const std::basic_string<C>& units,
 				append_unit(cp);
 			continue;
 		}
+		// the byte path decodes the UTF-8 first, so a unit here is a code point
+		if (!is_byte && has_prefix && p.ascii_only && cp >= 0x80) {
+			emit_ascii_escape(out, cp, p);
+			continue;
+		}
 		append_unit(cp);
 	}
 	return out;
@@ -346,7 +372,25 @@ inline decoded utf8encode(std::string_view utf8, const profile& p) {
 }
 
 inline std::string encode(std::string_view bytes, const profile& p) {
-	return encode_<char>(std::string(bytes), p);
+	if (!p.ascii_only) return encode_<char>(std::string(bytes), p);
+	// an invalid byte stays as it is, between runs of valid code points
+	const auto* src = reinterpret_cast<const idni::utf8char*>(bytes.data());
+	const size_t len = bytes.size();
+	std::string out;
+	std::u32string run;
+	for (size_t i = 0; i < len; ) {
+		char32_t cp = 0;
+		size_t n = idni::peek_codepoint(src + i, len - i, cp);
+		if (n == (size_t)-1 || n == 0) {
+			out += encode_<char32_t>(run, p);
+			run.clear();
+			out += bytes[i++];
+			continue;
+		}
+		run.push_back(cp);
+		i += n;
+	}
+	return out + encode_<char32_t>(run, p);
 }
 
 } // namespace idni::escapes

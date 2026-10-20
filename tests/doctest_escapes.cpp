@@ -275,3 +275,23 @@ TEST_SUITE("encode: 8-bit / multibyte passthrough (cp1250, UTF-8)") {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+TEST_SUITE("ascii_only (json_ascii)") {
+
+	TEST_CASE("json_ascii escapes from U+0080 up, with a pair above U+FFFF") {
+		CHECK(encode("\xc3\xa9", json_ascii) == "\\u00e9");
+		CHECK(encode("\xf0\x9f\x98\x80", json_ascii) == "\\ud83d\\ude00");
+		CHECK(encode(U"é\U0001F600", json_ascii)
+			== "\\u00e9\\ud83d\\ude00");
+		CHECK(encode("a\"\n\x7f", json_ascii) == "a\\\"\\n\\u007f");
+	}
+	TEST_CASE("json_ascii keeps an invalid byte as it is") {
+		CHECK(encode(std::string_view("a\xff" "b", 3), json_ascii)
+			== std::string("a\xff" "b"));
+	}
+	TEST_CASE("json keeps the raw UTF-8 bytes") {
+		CHECK(encode("\xc3\xa9\xf0\x9f\x98\x80", json)
+			== "\xc3\xa9\xf0\x9f\x98\x80");
+	}
+}

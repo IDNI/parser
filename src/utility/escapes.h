@@ -39,6 +39,10 @@ struct profile {
 	hex_u4_mode hex_u4 = hex_u4_mode::off;
 	bool	    hex_U8 = false;
 	bool	    octal  = false;
+	/// Every code point from U+0080 up is an escape: `\uXXXX`, with a
+	/// UTF-16 pair above U+FFFF when hex_u4 is utf16. A byte that is not
+	/// valid UTF-8 has no code point, so it stays as it is.
+	bool	    ascii_only = false;
 };
 
 // Built-in profiles
@@ -73,6 +77,18 @@ inline constexpr profile json {
 	.hex_u4	      = hex_u4_mode::utf16,
 	.hex_U8	      = false,
 	.octal	      = false,
+};
+
+inline constexpr profile json_ascii {
+	.delim	      = '"',
+	.prefix	      = '\\',
+	.escape_chars = "bfnrt/",
+	.lenient      = lenient_mode::off,
+	.hex_x	      = hex_x_mode::off,
+	.hex_u4	      = hex_u4_mode::utf16,
+	.hex_U8	      = false,
+	.octal	      = false,
+	.ascii_only   = true,
 };
 
 inline constexpr profile csv {

@@ -118,6 +118,16 @@ struct node {
 	bool operator==(const node& that) const;
 };
 
+/// How tree::print writes a document.
+struct print_options {
+	/// Keys of every object in code point order. UTF-8 byte order is
+	/// code point order, so std::string compare sorts them.
+	bool sorted_keys = false;
+	/// Every non-ASCII character as a `\u` escape. A byte that is not
+	/// valid UTF-8 has no code point, so it prints as it is.
+	bool ascii_only = false;
+};
+
 /// A JSON document as an interned lcrs tree. A tref of it is valid until
 /// a gc of bintree<node> drops it, so a document that outlives the step
 /// that built it is held by an htref.
@@ -224,6 +234,8 @@ struct tree : public lcrs_tree<node> {
 	/// The JSON text on one line, without recursion.
 	std::ostream& print(std::ostream& os) const;
 	std::string to_str() const;
+	std::ostream& print(std::ostream& os, const print_options& o) const;
+	std::string to_str(const print_options& o) const;
 	/// The node structure, one node per line.
 	std::ostream& print_tree(std::ostream& os, size_t s = 0) const;
 	std::ostream& dump(std::ostream& os, bool subtree = true) const;

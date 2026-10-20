@@ -4,6 +4,7 @@
 #ifndef __IDNI__PARSER__FORMAT__JSON_TREE_PRINTERS_TMPL_H__
 #define __IDNI__PARSER__FORMAT__JSON_TREE_PRINTERS_TMPL_H__
 
+#include <algorithm>
 #include <charconv>
 #include <sstream>
 #include <string>
@@ -18,14 +19,27 @@
 namespace idni::format::json {
 
 inline std::ostream& tree::print(std::ostream& os) const {
+	return print(os, print_options{});
+}
+
+inline std::string tree::to_str() const { return to_str(print_options{}); }
+
+inline std::ostream& tree::print(std::ostream& os, const print_options& o)
+	const
+{
+	auto prof = o.ascii_only ? idni::escapes::json_ascii
+		: idni::escapes::json;
 	auto text = [&](const std::string& s) {
-		os << '"' << idni::escapes::encode(s, idni::escapes::json) << '"';
+		os << '"' << idni::escapes::encode(s, prof) << '"';
 	};
 	// A container on the way down and its next child: the lcrs sibling
-	// cursor. A stack, so a deep document fits.
+	// cursor, or the index into its keys when they print sorted. A stack,
+	// so a deep document fits.
 	struct frame {
 		tref n;
 		tref cursor;
+		trefs sorted{};
+		size_t at = 0;
 		bool started = false;
 	};
 	std::vector<frame> open;
@@ -53,14 +67,23 @@ inline std::ostream& tree::print(std::ostream& os) const {
 			break;
 		default: DBG(assert(false);) return;
 		}
-		open.push_back({ n, t.left_child() });
+		if (!o.sorted_keys || !t.is_object()) {
+			open.push_back({ n, t.left_child() });
+			return;
+		}
+		trefs keys = t.get_children();
+		std::sort(keys.begin(), keys.end(), [](tref a, tref b) {
+			return get(a).get_string() < get(b).get_string();
+		});
+		open.push_back({ n, nullptr, std::move(keys) });
 	};
 	// the root can be an element with a right sibling, which is not printed
 	enter(get());
 	while (!open.empty()) {
 		frame& f = open.back();
 		tref c = nullptr;
-		if ((c = f.cursor)) f.cursor = get(c).right_sibling();
+		if (f.at != f.sorted.size()) c = f.sorted[f.at++];
+		else if ((c = f.cursor)) f.cursor = get(c).right_sibling();
 		const tree& ft = get(f.n);
 		const bool pair = ft.get_type() == json_parser::object_pair;
 		if (c != nullptr) {
@@ -75,9 +98,9 @@ inline std::ostream& tree::print(std::ostream& os) const {
 	return os;
 }
 
-inline std::string tree::to_str() const {
+inline std::string tree::to_str(const print_options& o) const {
 	std::ostringstream os;
-	print(os);
+	print(os, o);
 	return os.str();
 }
 

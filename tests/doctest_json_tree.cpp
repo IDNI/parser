@@ -8,6 +8,8 @@
 
 #include <bit>
 #include <cmath>
+#include <filesystem>
+#include <fstream>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -22,6 +24,15 @@ static tref parsed(std::string_view text) {
 	auto r = jt::get(text);
 	REQUIRE(r.has_value());
 	return r.value();
+}
+
+// The bytes of the hex text @p s.
+static std::string unhex(std::string_view s) {
+	std::string b;
+	for (size_t i = 0; i + 1 < s.size(); i += 2)
+		b.push_back(static_cast<char>(std::stoi(
+			std::string(s.substr(i, 2)), nullptr, 16)));
+	return b;
 }
 
 TEST_SUITE("json tree: round trip") {
@@ -282,6 +293,87 @@ TEST_SUITE("json tree: integers") {
 			.has_value());
 		CHECK(jt::get(jt::build_string("12")).get_integer()
 			== std::nullopt);
+	}
+}
+
+TEST_SUITE("json tree: print options") {
+	// The tree of one vector line: { } [ ] open and close, k: a key,
+	// s: a string, i: an int64, u: a uint64, each value in hex or decimal.
+	static tref vector_tree(const std::string& calls) {
+		struct level {
+			bool object;
+			trefs items{};
+			std::string key{};
+		};
+		std::vector<level> open;
+		tref root = nullptr;
+		auto add = [&open, &root](tref v) {
+			if (open.empty()) { root = v; return; }
+			level& l = open.back();
+			l.items.push_back(l.object ? jt::build_pair(l.key, v) : v);
+		};
+		std::istringstream ss(calls);
+		std::string c;
+		while (ss >> c) {
+			if (c == "{" || c == "[") open.push_back({ c == "{" });
+			else if (c == "}" || c == "]") {
+				level l = std::move(open.back());
+				open.pop_back();
+				add(l.object ? jt::build_object(l.items)
+					: jt::build_array(l.items));
+			}
+			else if (c.starts_with("k:")) open.back().key = unhex(c.substr(2));
+			else if (c.starts_with("s:")) add(jt::build_string(unhex(c.substr(2))));
+			else if (c.starts_with("i:"))
+				add(jt::build_integer(std::stoll(c.substr(2))));
+			// no builder takes a uint64, so the parse of the literal does
+			else if (c.starts_with("u:")) add(parsed(c.substr(2)));
+			else FAIL("unknown call " << c);
+		}
+		return root;
+	}
+
+#ifndef __EMSCRIPTEN__
+	// a wasm test under node has no host file system
+	TEST_CASE("sorted keys and ascii_only give the bytes of Python json.dumps") {
+		const auto file = std::filesystem::path(__FILE__).parent_path()
+			/ "data" / "json_vectors.txt";
+		std::ifstream in(file);
+		REQUIRE(in.good());
+		std::string line;
+		size_t count = 0;
+		while (std::getline(in, line)) {
+			const size_t tab = line.find('\t');
+			REQUIRE(tab != std::string::npos);
+			const std::string calls = line.substr(0, tab);
+			CAPTURE(calls);
+			tref t = vector_tree(calls);
+			REQUIRE(t != nullptr);
+			CHECK(jt::get(t).to_str({ .sorted_keys = true,
+				.ascii_only = true }) == unhex(line.substr(tab + 1)));
+			++count;
+		}
+		CHECK(count == 67);
+	}
+#endif
+
+	TEST_CASE("sorted keys order every object and leave the tree as it is") {
+		tref t = parsed(R"({"b":{"z":1,"a":[{"y":2,"x":3}]},"a":0,)"
+			"\"\xc3\xa9\":1,\"z\":2}");
+		const std::string before = jt::get(t).to_str();
+		CHECK(jt::get(t).to_str({ .sorted_keys = true })
+			== R"({"a":0,"b":{"a":[{"x":3,"y":2}],"z":1},"z":2,)"
+			"\"\xc3\xa9\":1}");
+		CHECK(jt::get(t).to_str() == before);
+		CHECK(jt::get(t).to_str(print_options{}) == before);
+	}
+
+	TEST_CASE("ascii_only escapes every non-ASCII character") {
+		tref t = jt::build_string("\xc3\xa9\xe2\x82\xac\xf0\x9f\x98\x80");
+		CHECK(jt::get(t).to_str({ .ascii_only = true })
+			== R"("\u00e9\u20ac\ud83d\ude00")");
+		CHECK(jt::get(t).to_str()
+			== "\"\xc3\xa9\xe2\x82\xac\xf0\x9f\x98\x80\"");
 	}
 }
 
