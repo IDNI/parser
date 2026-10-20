@@ -315,13 +315,13 @@ inline void report::error(code c, std::string_view msg, size_t primary,
 inline void report::warning(key msg, int_t primary,
 	std::initializer_list<attr_in> extra)
 {
-	push_tagged(code::warning, msg, primary, extra);
+	warning(code::warning, msg, primary, extra);
 }
 
 inline void report::warning(key msg, size_t primary,
 	std::initializer_list<attr_in> extra)
 {
-	push_tagged(code::warning, msg, checked_i64(primary), extra);
+	warning(code::warning, msg, primary, extra);
 }
 
 inline void report::warning(std::string_view msg, int_t primary,
@@ -339,13 +339,13 @@ inline void report::warning(std::string_view msg, size_t primary,
 inline void report::info(key msg, int_t primary,
 	std::initializer_list<attr_in> extra)
 {
-	push_tagged(code::info, msg, primary, extra);
+	info(code::info, msg, primary, extra);
 }
 
 inline void report::info(key msg, size_t primary,
 	std::initializer_list<attr_in> extra)
 {
-	push_tagged(code::info, msg, checked_i64(primary), extra);
+	info(code::info, msg, primary, extra);
 }
 
 inline void report::info(std::string_view msg, int_t primary,
@@ -382,6 +382,44 @@ inline void report::warning(std::string_view msg,
 	warning(msg, 0, extra);
 }
 
+inline void report::warning(code c, key msg, int_t primary,
+	std::initializer_list<attr_in> extra)
+{
+	DBG(assert(is_warning(c));)
+	push_tagged(c, msg, primary, extra);
+}
+
+inline void report::warning(code c, key msg, size_t primary,
+	std::initializer_list<attr_in> extra)
+{
+	DBG(assert(is_warning(c));)
+	push_tagged(c, msg, checked_i64(primary), extra);
+}
+
+inline void report::warning(code c, std::string_view msg, int_t primary,
+	std::initializer_list<attr_in> extra)
+{
+	warning(c, intern_dynamic(msg), primary, extra);
+}
+
+inline void report::warning(code c, std::string_view msg, size_t primary,
+	std::initializer_list<attr_in> extra)
+{
+	warning(c, intern_dynamic(msg), primary, extra);
+}
+
+inline void report::warning(code c, key msg,
+	std::initializer_list<attr_in> extra)
+{
+	warning(c, msg, 0, extra);
+}
+
+inline void report::warning(code c, std::string_view msg,
+	std::initializer_list<attr_in> extra)
+{
+	warning(c, msg, 0, extra);
+}
+
 inline void report::info(key msg, std::initializer_list<attr_in> extra) {
 	info(msg, 0, extra);
 }
@@ -390,6 +428,44 @@ inline void report::info(std::string_view msg,
 	std::initializer_list<attr_in> extra)
 {
 	info(msg, 0, extra);
+}
+
+inline void report::info(code c, key msg, int_t primary,
+	std::initializer_list<attr_in> extra)
+{
+	DBG(assert(is_info(c));)
+	push_tagged(c, msg, primary, extra);
+}
+
+inline void report::info(code c, key msg, size_t primary,
+	std::initializer_list<attr_in> extra)
+{
+	DBG(assert(is_info(c));)
+	push_tagged(c, msg, checked_i64(primary), extra);
+}
+
+inline void report::info(code c, std::string_view msg, int_t primary,
+	std::initializer_list<attr_in> extra)
+{
+	info(c, intern_dynamic(msg), primary, extra);
+}
+
+inline void report::info(code c, std::string_view msg, size_t primary,
+	std::initializer_list<attr_in> extra)
+{
+	info(c, intern_dynamic(msg), primary, extra);
+}
+
+inline void report::info(code c, key msg,
+	std::initializer_list<attr_in> extra)
+{
+	info(c, msg, 0, extra);
+}
+
+inline void report::info(code c, std::string_view msg,
+	std::initializer_list<attr_in> extra)
+{
+	info(c, msg, 0, extra);
 }
 
 template <typename Other>

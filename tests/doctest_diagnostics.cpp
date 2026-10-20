@@ -1042,3 +1042,19 @@ TEST_SUITE("diagnostics: a result<void> takes a child's value") {
 		CHECK(failed.report().nodes().back().tag == code::solver_error);
 	}
 }
+
+TEST_SUITE("diagnostics: a warning and an info take a code") {
+
+	TEST_CASE("the node carries the given code, the message and the value") {
+		report r;
+		r.warning(code::warning, "x");
+		r.info(code::info_count, "rules", size_t{ 3 });
+		REQUIRE(r.nodes().size() == 2);
+		CHECK(r.nodes()[0].tag == code::warning);
+		CHECK(r.str(r.nodes()[0].key) == "x");
+		CHECK(r.nodes()[1].tag == code::info_count);
+		CHECK(r.str(r.nodes()[1].key) == "rules");
+		CHECK(r.nodes()[1].value == 3);
+		CHECK_FALSE(r.has_error());
+	}
+}

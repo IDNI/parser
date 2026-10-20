@@ -278,6 +278,17 @@ struct report {
 		     std::initializer_list<attr_in> extra = {});
 	void warning(key msg, std::initializer_list<attr_in> extra);
 	void warning(std::string_view msg, std::initializer_list<attr_in> extra);
+	void warning(code c, key msg, int_t primary = 0,
+	     std::initializer_list<attr_in> extra = {});
+	void warning(code c, key msg, size_t primary,
+	     std::initializer_list<attr_in> extra = {});
+	void warning(code c, std::string_view msg, int_t primary = 0,
+	     std::initializer_list<attr_in> extra = {});
+	void warning(code c, std::string_view msg, size_t primary,
+	     std::initializer_list<attr_in> extra = {});
+	void warning(code c, key msg, std::initializer_list<attr_in> extra);
+	void warning(code c, std::string_view msg,
+	     std::initializer_list<attr_in> extra);
 
 	void info(key msg, int_t primary = 0,
 		  std::initializer_list<attr_in> extra = {});
@@ -289,6 +300,17 @@ struct report {
 		  std::initializer_list<attr_in> extra = {});
 	void info(key msg, std::initializer_list<attr_in> extra);
 	void info(std::string_view msg, std::initializer_list<attr_in> extra);
+	void info(code c, key msg, int_t primary = 0,
+	    std::initializer_list<attr_in> extra = {});
+	void info(code c, key msg, size_t primary,
+	    std::initializer_list<attr_in> extra = {});
+	void info(code c, std::string_view msg, int_t primary = 0,
+	    std::initializer_list<attr_in> extra = {});
+	void info(code c, std::string_view msg, size_t primary,
+	    std::initializer_list<attr_in> extra = {});
+	void info(code c, key msg, std::initializer_list<attr_in> extra);
+	void info(code c, std::string_view msg,
+	    std::initializer_list<attr_in> extra);
 
 	void append(const report& other);
 	void append(report&& other);
