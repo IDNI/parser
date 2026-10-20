@@ -10,7 +10,6 @@
 #include "format/json/json.h"
 
 #include <array>
-#include <sstream>
 #include <string>
 #include <string_view>
 
@@ -73,9 +72,9 @@ TEST_SUITE("program codes") {
 		REQUIRE(rep.nodes().size() >= 1);
 		CHECK(rep.nodes().back().tag == program_error(1));
 		CHECK(rep.has_error());
-		std::ostringstream os;
-		idni::format::json::print(rep, os, true);
-		const std::string text = os.str();
+		namespace json = idni::format::json;
+		const std::string text = json::tree::get(
+			json::tree::build_report(rep, true)).to_str();
 		CHECK(text.find(R"({"tag":4097,"message":"Bad key.",)")
 			!= std::string::npos);
 	}
@@ -95,9 +94,9 @@ TEST_SUITE("program codes") {
 		CHECK(i.tag == program_info(1));
 		CHECK(i.value == 12);
 		CHECK_FALSE(rep.has_error());
-		std::ostringstream os;
-		idni::format::json::print(rep, os, true);
-		const std::string text = os.str();
+		namespace json = idni::format::json;
+		const std::string text = json::tree::get(
+			json::tree::build_report(rep, true)).to_str();
 		CHECK(text.find(R"({"tag":20481,"message":"Old node.",)")
 			!= std::string::npos);
 		CHECK(text.find(R"({"tag":36865,"message":"Fee paid.",)")

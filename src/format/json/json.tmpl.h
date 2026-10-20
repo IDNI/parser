@@ -469,12 +469,6 @@ inline diagnostics::report report_from_value(const value& v) {
 	return r;
 }
 
-inline std::ostream& print(const diagnostics::report& r, std::ostream& os,
-	bool print_names)
-{
-	return print(to_value(r, print_names), os);
-}
-
 }
 
 #endif // __IDNI__PARSER__FORMAT__JSON_TMPL_H__

@@ -285,6 +285,55 @@ TEST_SUITE("json tree: integers") {
 	}
 }
 
+TEST_SUITE("json tree: report") {
+	using idni::diagnostics::code;
+	using idni::diagnostics::report;
+	using idni::parser_strings::label;
+
+	static report sample() {
+		report r;
+		{
+			auto s = r.open("parse", code::info_count, size_t(120));
+			r.info("child");
+		}
+		r.error(code::io_error, "failed", 7,
+			{{label::name, std::string_view("tok")},
+			 {label::exit_code, idni::int_t(-1)}});
+		r.warning("careful");
+		return r;
+	}
+
+	TEST_CASE("the report prints the expected text") {
+		report r = sample();
+		CHECK(jt::get(jt::build_report(r, true)).to_str()
+			== R"({"nodes":[{"tag":32771,"message":"Count.",)"
+			R"("key":"parse","value":120,"attrs":[],"children":[)"
+			R"({"tag":32768,"message":"Info.","key":"child",)"
+			R"("attrs":[]}]},{"tag":3,)"
+			R"("message":"I/O error.","key":"failed","value":7,)"
+			R"("attrs":[{"key":"name","value":"tok"},)"
+			R"({"key":"exit code","value":-1}]},{"tag":16384,)"
+			R"("message":"Warning.","key":"careful","value":0,)"
+			R"("attrs":[]}]})");
+		CHECK(jt::get(jt::build_report(r, false)).to_str()
+			== R"({"nodes":[{"tag":32771,"key":"parse","value":120,)"
+			R"("attrs":[],"children":[{"tag":32768,"key":"child",)"
+			R"("attrs":[]}]},{"tag":3,"key":"failed",)"
+			R"("value":7,"attrs":[{"key":"name","value":"tok"},)"
+			R"({"key":"exit code","value":-1}]},{"tag":16384,)"
+			R"("key":"careful","value":0,"attrs":[]}]})");
+	}
+
+	TEST_CASE("report to JSON and back prints the same text") {
+		report r = sample();
+		report back = report_of(jt::build_report(r, true));
+		std::ostringstream a, b;
+		r.print(a);
+		back.print(b);
+		CHECK(a.str() == b.str());
+	}
+}
+
 TEST_SUITE("json tree: AST JSON") {
 	using p_t = idni::parser<char, char32_t>;
 	using lit_t = idni::lit<char, char32_t>;
@@ -425,6 +474,31 @@ TEST_SUITE("json tree: deep documents and gc") {
 		CHECK(jt::gc_if_grown());
 		CHECK(jt::m_size() == kept);
 		CHECK(jt::get(held).get_string() == "held");
+	}
+
+	TEST_CASE("gc after a response keeps the held document") {
+		htref state = jt::geth(jt::build_object({
+			jt::build_pair("grammar", jt::build_string("g.tgf")),
+			jt::build_pair("start", jt::build_string("start")) }));
+		const std::string state_text = jt::get(state).to_str();
+		jt::gc();
+		const size_t held = jt::m_size();
+		{
+			idni::diagnostics::report r;
+			r.error(idni::diagnostics::code::parse_error, "bad");
+			tref resp = jt::build_object({
+				jt::build_pair("id", jt::build_number(1)),
+				jt::build_pair("status", jt::build_string("error")),
+				jt::build_pair("state", state->get()),
+				jt::build_pair("report", jt::build_report(r)) });
+			std::ostringstream os;
+			write_line(resp, os);
+			CHECK(os.str().ends_with("\n"));
+			CHECK(jt::m_size() > held);
+		}
+		jt::gc();
+		CHECK(jt::m_size() == held);
+		CHECK(jt::get(state).to_str() == state_text);
 	}
 }
 

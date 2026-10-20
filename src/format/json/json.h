@@ -198,6 +198,16 @@ struct tree : public lcrs_tree<node> {
 	static tref build_object(const trefs& pairs);
 	/// A copy of @p object with the member @p key set to @p v.
 	static tref set_member(tref object, std::string_view key, tref v);
+	/// A diagnostics report as a nested JSON object. A node with parent -1
+	/// is a root. children is absent when a node has none. With @p names
+	/// each node carries a "message" field with its code name.
+	static tref build_report(const diagnostics::report& r,
+		bool names = true);
+	/// The report node @p i with its children as a JSON object. @p kids[i]
+	/// lists the children of node i, so the parent index never reaches
+	/// the JSON.
+	static tref build_report_node(const diagnostics::report& r, size_t i,
+		const std::vector<std::vector<size_t>>& kids, bool names = true);
 
 	// from parser
 
@@ -303,6 +313,16 @@ std::function<bool(tref)> is(std::initializer_list<size_t> nts);
 /// absent or holds no string.
 const std::string* string_member(tref object, std::string_view key);
 
+/// Rebuild a diagnostics report from its JSON form, the reverse of
+/// @ref tree::build_report. The message field is ignored: the tag carries
+/// the code. A missing tag reads as @ref diagnostics::code::unknown.
+diagnostics::report report_of(tref v);
+
+/// Append the report node of the JSON object @p n, with its children,
+/// under the current parent of @p r. A missing tag reads as
+/// @ref diagnostics::code::unknown. The message field is ignored.
+void report_node_of(diagnostics::report& r, tref n);
+
 std::ostream& operator<<(std::ostream& os, const node& n);
 /// The JSON text of @p t.
 std::ostream& operator<<(std::ostream& os, const tree& t);
@@ -311,6 +331,11 @@ std::ostream& operator<<(std::ostream& os, const tt& t);
 /// Write @p v as one line: the JSON text, one '\n', then a flush. On
 /// Windows std::cout goes to binary mode first, so no '\r' joins the '\n'.
 std::ostream& write_line(tref v, std::ostream& os);
+
+/// Write a diagnostics report as JSON on one line. With @p print_names
+/// each node carries a "message" field with its code name.
+std::ostream& print(const diagnostics::report& r, std::ostream& os,
+	bool print_names = false);
 
 /// The JSON value of @p v: a bool, an unsigned integer, a std::string, or
 /// a std::vector or a std::variant of these types.
@@ -358,11 +383,6 @@ void report_node_from_value(diagnostics::report& r, const value& n);
 /// @ref to_value. The @c message field is ignored: the tag carries the
 /// code.
 diagnostics::report report_from_value(const value& v);
-
-/// Serialize a diagnostics report as JSON on one line. With @p print_names
-/// = true, each node carries an extra "message" field with its code name.
-std::ostream& print(const diagnostics::report& r, std::ostream& os,
-	bool print_names = false);
 
 }
 

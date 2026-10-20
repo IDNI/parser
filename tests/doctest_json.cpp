@@ -14,6 +14,15 @@
 using namespace idni;
 using namespace idni::format::json;
 
+using jt = idni::format::json::tree;
+
+// The tree of a JSON text that must parse.
+static tref parsed(std::string_view text) {
+	auto r = jt::get(text);
+	REQUIRE(r.has_value());
+	return r.value();
+}
+
 TEST_SUITE("json: value kinds") {
 	TEST_CASE("null") {
 		auto r = parse("null");
@@ -353,6 +362,134 @@ TEST_SUITE("ast_json: parser tree to AST JSON") {
 		REQUIRE(range->size() == 2);
 		CHECK((*range)[0].as_number() == 2);
 		CHECK((*range)[1].as_number() == 3);
+	}
+}
+
+TEST_SUITE("json: report print and report nodes") {
+	using idni::diagnostics::code;
+	using idni::diagnostics::report;
+	using idni::parser_strings::label;
+
+	// A root with a child, a root with two attrs and a warning.
+	static report sample() {
+		report r;
+		{
+			auto s = r.open("parse", code::info_count, size_t(120));
+			r.info("child");
+		}
+		r.error(code::io_error, "failed", 7,
+			{{label::name, std::string_view("tok")},
+			 {label::exit_code, idni::int_t(-1)}});
+		r.warning("careful");
+		return r;
+	}
+
+	static std::string printed(const report& r, bool names) {
+		std::ostringstream os;
+		print(r, os, names);
+		return os.str();
+	}
+
+	const std::string named = "{\"nodes\":["
+		"{\"tag\":32771,\"message\":\"Count.\",\"key\":\"parse\","
+		"\"value\":120,\"attrs\":[],\"children\":["
+		"{\"tag\":32768,\"message\":\"Info.\",\"key\":\"child\","
+		"\"attrs\":[]}]},"
+		"{\"tag\":3,\"message\":\"I/O error.\",\"key\":\"failed\","
+		"\"value\":7,\"attrs\":[{\"key\":\"name\",\"value\":\"tok\"},"
+		"{\"key\":\"exit code\",\"value\":-1}]},"
+		"{\"tag\":16384,\"message\":\"Warning.\",\"key\":\"careful\","
+		"\"value\":0,\"attrs\":[]}]}";
+	const std::string plain = "{\"nodes\":["
+		"{\"tag\":32771,\"key\":\"parse\",\"value\":120,\"attrs\":[],"
+		"\"children\":[{\"tag\":32768,\"key\":\"child\","
+		"\"attrs\":[]}]},"
+		"{\"tag\":3,\"key\":\"failed\",\"value\":7,\"attrs\":["
+		"{\"key\":\"name\",\"value\":\"tok\"},"
+		"{\"key\":\"exit code\",\"value\":-1}]},"
+		"{\"tag\":16384,\"key\":\"careful\",\"value\":0,\"attrs\":[]}]}";
+
+	TEST_CASE("print writes the report with names") {
+		CHECK(printed(sample(), true) == named);
+	}
+
+	TEST_CASE("print writes the report without names") {
+		CHECK(printed(sample(), false) == plain);
+	}
+
+	TEST_CASE("print writes no names by default") {
+		std::ostringstream os;
+		print(sample(), os);
+		CHECK(os.str() == plain);
+	}
+
+	TEST_CASE("print of an empty report") {
+		CHECK(printed(report{}, true) == "{\"nodes\":[]}");
+	}
+
+	TEST_CASE("build_report_node gives one root of build_report") {
+		report r = sample();
+		std::vector<std::vector<size_t>> kids(r.nodes().size());
+		for (size_t i = 0; i < r.nodes().size(); ++i)
+			if (r.nodes()[i].parent >= 0) kids[static_cast<size_t>(
+				r.nodes()[i].parent)].push_back(i);
+		auto nodes = tt(jt::build_report(r, true)) | tt::member("nodes");
+		REQUIRE(nodes.value_tree().children_size() == 3);
+		// an element tref also holds its siblings, so compare the text
+		CHECK(jt::get(jt::build_report_node(r, 0, kids, true)).to_str()
+			== nodes.value_tree()[0].to_str());
+		CHECK(jt::get(jt::build_report_node(r, 2, kids, false)).to_str()
+			== (tt(jt::build_report(r, false)) | tt::member("nodes"))
+				.value_tree()[1].to_str());
+	}
+
+	TEST_CASE("report_node_of appends one node under the open parent") {
+		report r = sample();
+		auto nodes = tt(jt::build_report(r, true)) | tt::member("nodes");
+		report back;
+		{
+			auto s = back.open("outer", code::info, size_t(0));
+			report_node_of(back, nodes.value_tree()[0].get());
+		}
+		REQUIRE(back.nodes().size() == 3);
+		CHECK(back.nodes()[1].parent == 0);
+		CHECK(back.nodes()[2].parent == 1);
+		CHECK(back.str(back.nodes()[1].key) == "parse");
+		CHECK(back.nodes()[1].value == 120);
+		CHECK(back.str(back.nodes()[2].key) == "child");
+	}
+
+	TEST_CASE("report_of reads back what print wrote") {
+		report back = report_of(parsed(printed(sample(), true)));
+		CHECK(printed(back, true) == named);
+	}
+
+	TEST_CASE("report_of reads no number that does not fit") {
+		report back = report_of(parsed(R"({"nodes":[)"
+			R"({"tag":70000,"key":"a","value":1e300,"attrs":[)"
+			R"({"key":"port","value":-1e300}]},)"
+			R"({"tag":-1,"key":"b","value":1.5,"attrs":[]},)"
+			R"({"tag":3.5,"key":"c","attrs":[]}]})"));
+		REQUIRE(back.nodes().size() == 3);
+		for (const auto& n : back.nodes()) {
+			CHECK(n.tag == code::unknown);
+			CHECK(n.value == 0);
+		}
+		CHECK(back.nodes()[0].attr_cnt == 0);
+	}
+
+	TEST_CASE("a report value above 2^53 keeps its digits") {
+		constexpr int64_t big = 9007199254740993;
+		report r;
+		r.error(code::io_error, "big", 0, {{label::port, size_t(big)}});
+		r.push_node(code::info_count, r.intern("n"), big, {});
+		const std::string text = printed(r, false);
+		CHECK(text.find(R"("value":9007199254740993)") != std::string::npos);
+		report back = report_of(parsed(text));
+		REQUIRE(back.nodes().size() == 2);
+		CHECK(back.attrs()[back.nodes()[0].attr_off].value == big);
+		CHECK(back.nodes()[1].value == big);
+		CHECK(printed(back, false) == text);
 	}
 }
 

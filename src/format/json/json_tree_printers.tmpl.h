@@ -122,6 +122,12 @@ inline std::ostream& write_line(tref v, std::ostream& os) {
 	return tree::get(v).print(os) << '\n' << std::flush;
 }
 
+inline std::ostream& print(const diagnostics::report& r, std::ostream& os,
+	bool print_names)
+{
+	return tree::get(tree::build_report(r, print_names)).print(os);
+}
+
 } // namespace idni::format::json
 
 #endif // __IDNI__PARSER__FORMAT__JSON_TREE_PRINTERS_TMPL_H__
