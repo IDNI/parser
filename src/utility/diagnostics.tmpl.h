@@ -18,7 +18,7 @@ namespace idni::diagnostics {
 
 namespace {
 
-constexpr uint16_t code_band(code c) {
+constexpr uint16_t severity_bits(code c) {
 	return static_cast<uint16_t>(c) & 0xC000u;
 }
 
@@ -27,9 +27,9 @@ constexpr size_t print_tab_width = 8;
 
 } // namespace
 
-constexpr bool is_error(code c) { return code_band(c) == 0x0000u; }
-constexpr bool is_warning(code c) { return code_band(c) == 0x4000u; }
-constexpr bool is_info(code c) { return code_band(c) == 0x8000u; }
+constexpr bool is_error(code c) { return severity_bits(c) == 0x0000u; }
+constexpr bool is_warning(code c) { return severity_bits(c) == 0x4000u; }
+constexpr bool is_info(code c) { return severity_bits(c) == 0x8000u; }
 // Whitelist, not range check: if a new metric tag is added to `code`,
 // extend this predicate too.
 constexpr bool is_metric(code c) {
@@ -639,7 +639,7 @@ inline int32_t report::push_tagged_impl(code tag, key name, int64_t v,
 {
 	// Catches only the explicitly-unused 0xC000 band; out-of-enum
 	// values inside the valid bands still pass.
-	DBG(assert(code_band(tag) != 0xC000u);)
+	DBG(assert(severity_bits(tag) != 0xC000u);)
 	if (is_error(tag)) has_error_ = true;
 	node n;
 	n.tag    = tag;
