@@ -40,6 +40,8 @@ set(TAU_PARSER_HEADERS
 	utility/options_types.tmpl.h
 	utility/options.h
 	utility/options.tmpl.h
+	utility/program_codes.h
+	utility/program_codes.tmpl.h
 	utility/repl.h
 	utility/repl_ftxui.h
 	utility/repl_ftxui.tmpl.h

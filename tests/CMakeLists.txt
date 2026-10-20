@@ -118,6 +118,7 @@ enable_testing()
 
 set(DOCTESTS
 	diagnostics
+	program_codes
 	dynamic_grow
 	escapes
 	hashing

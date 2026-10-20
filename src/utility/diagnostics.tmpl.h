@@ -39,6 +39,16 @@ constexpr bool is_metric(code c) {
 
 constexpr bool uses_micros_scale(code c) { return c == code::info_micros; }
 
+namespace detail {
+
+/// The labels of the program codes, filled by register_codes().
+inline std::unordered_map<uint16_t, const char*>& program_code_labels() {
+	static std::unordered_map<uint16_t, const char*> labels;
+	return labels;
+}
+
+} // namespace detail
+
 inline const char* code_name(code c) {
 	using cl = idni::parser_strings::code_label;
 	using idni::parser_strings::id_t;
@@ -47,6 +57,11 @@ inline const char* code_name(code c) {
 #define CASE(nm, s) case code::nm: k = cl::nm; break;
 	CODE_LABELS(CASE)
 #undef CASE
+	}
+	if (k == cl::none) {
+		const auto& labels = detail::program_code_labels();
+		if (auto it = labels.find(static_cast<uint16_t>(c));
+			it != labels.end()) return it->second;
 	}
 	return idni::parser_strings::str_code(k).data();
 }

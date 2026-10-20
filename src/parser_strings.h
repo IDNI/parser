@@ -321,6 +321,11 @@ struct messages {
 		"Only one command is allowed";
 	static constexpr sv option_no_such_input =
 		"Invalid command, or no such file or URL";
+	static constexpr sv code_outside_program_bands =
+		"The code is outside the program code bands";
+	static constexpr sv code_registered_twice =
+		"The code is registered twice";
+	static constexpr sv code_without_label = "The code has no label";
 };
 
 struct counters {
