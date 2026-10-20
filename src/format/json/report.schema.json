@@ -32,7 +32,10 @@
 				},
 				"message": { "type": "string" },
 				"key": { "type": "string" },
-				"value": { "type": "integer" },
+				"value": {
+					"type": "integer",
+					"description": "A missing value is 0."
+				},
 				"attrs": {
 					"type": "array",
 					"items": { "$ref": "#/$defs/attr" }
@@ -42,7 +45,7 @@
 					"items": { "$ref": "#/$defs/node" }
 				}
 			},
-			"required": ["tag", "message", "key", "value", "attrs"],
+			"required": ["tag", "message", "key", "attrs"],
 			"additionalProperties": false
 		}
 	}

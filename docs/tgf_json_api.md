@@ -142,7 +142,8 @@ parent index; `children` is absent when a node has none.
       "attrs":[{"key":"name","value":"tok"}],"children":[...]}]}
 
 A text label attribute holds a JSON string; a numeric attribute holds a
-number. `message` is the code name and is present in API output.
+number. `message` is the code name and is present in API output. An info
+message with the value 0 has no `value`, and a missing `value` is 0.
 
 ## Command data
 

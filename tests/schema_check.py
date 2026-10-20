@@ -140,6 +140,16 @@ def run_repl(tgf, fixture, validator, requests):
     return ok, responses
 
 
+def check_report_sample(jsonschema, report_path):
+    """Validate the report that json::print writes for an info message
+    with the value 0: the node has no value field."""
+    sample = ('{"nodes":[{"tag":32771,"message":"Count.","key":"parse",'
+        '"value":120,"attrs":[],"children":[{"tag":32768,'
+        '"message":"Info.","key":"child","attrs":[]}]}]}')
+    validator = jsonschema.Draft202012Validator(load_schema(report_path))
+    return validate_line(validator, sample, "report of an info message")
+
+
 def run_api(tgf, fixture, api_path, report_path, ast_path):
     mods = require_jsonschema()
     if mods is None:
@@ -253,6 +263,7 @@ def run_api(tgf, fixture, api_path, report_path, ast_path):
         ok &= run_oneshot(tgf, validator,
             [fixture, "gen", "--json", "--name", "schema_check",
              "--header-only", "false", "--output-dir", gen_dir], "gen")
+        ok &= check_report_sample(jsonschema, report_path)
 
     if not ok:
         print("api schema check: FAILED")
