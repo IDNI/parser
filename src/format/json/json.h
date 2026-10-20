@@ -186,6 +186,16 @@ struct tree : public lcrs_tree<node> {
 	/// A copy of @p object with the member @p key set to @p v.
 	static tref set_member(tref object, std::string_view key, tref v);
 
+	// from parser
+
+	/// The JSON tree of a shaped parse tree whose root is a start node, a
+	/// value node or the node of one JSON value, such as a str.
+	static diagnostics::result<tref> get(const parse_tree& t);
+	static diagnostics::result<tref> get(json_parser::result& r);
+	/// Parse a JSON text. On a syntax error or a bad escape the result
+	/// carries no value.
+	static diagnostics::result<tref> get(std::string_view text);
+
 	/// Tree navigation: `| nt` gives the first child with the nonterminal
 	/// nt, `|| nt` all of them, `| extractor` a value.
 	struct traverser {
@@ -324,5 +334,6 @@ std::ostream& print(const diagnostics::report& r, std::ostream& os,
 #include "json.tmpl.h"
 #include "json_tree.tmpl.h"
 #include "json_tree_builders.tmpl.h"
+#include "json_tree_from_parser.tmpl.h"
 
 #endif // __IDNI__PARSER__FORMAT__JSON_H__

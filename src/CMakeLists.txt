@@ -23,6 +23,7 @@ set(TAU_PARSER_HEADERS
 	format/json/json_parser.generated.h
 	format/json/json_tree.tmpl.h
 	format/json/json_tree_builders.tmpl.h
+	format/json/json_tree_from_parser.tmpl.h
 	version_license.h
 	utility/characters.h
 	utility/characters.impl.h

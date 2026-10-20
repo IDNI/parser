@@ -13,6 +13,26 @@ using namespace idni::format::json;
 
 using jt = idni::format::json::tree;
 
+// The tree of a JSON text that must parse.
+static tref parsed(std::string_view text) {
+	auto r = jt::get(text);
+	REQUIRE(r.has_value());
+	return r.value();
+}
+
+TEST_SUITE("json tree: round trip") {
+	TEST_CASE("malformed input reports an error and no value") {
+		for (const char* s : { "", "[1,2,]", "{\"a\":1,}", "\"abc",
+				"\"\\uD800\"", "{\"\\uD800\":1}" })
+		{
+			CAPTURE(s);
+			auto r = jt::get(std::string_view(s));
+			CHECK_FALSE(r.has_value());
+			CHECK(r.has_error());
+		}
+	}
+}
+
 TEST_SUITE("json tree: nodes") {
 	TEST_CASE("equal nodes give one tree, and each field tells nodes apart") {
 		tref a = jt::get(node(json_parser::str, 0, "x"));
@@ -216,5 +236,56 @@ TEST_SUITE("json tree: builders") {
 		CHECK((tt(added) || json_parser::object_pair).size() == 3);
 		CHECK(jt::get(added)[2].get_string() == "new");
 		CHECK(jt::set_member(obj, "ok", jt::_true()) == obj);
+	}
+}
+
+TEST_SUITE("json tree: parse") {
+	TEST_CASE("a parse gives the tree of each kind") {
+		tref t = parsed(R"({"a":[1.5,{"b":true},null],"c":"x","d":false})");
+		CHECK(jt::get(t).is_object());
+		CHECK((tt(t) | tt::member("a") | tt::first | tt::number) == 1.5);
+		CHECK((tt(t) | tt::member("a") | tt::second | tt::member("b")
+			| tt::boolean));
+		CHECK((tt(t) | tt::member("a") | tt::children).size() == 3);
+		CHECK((tt(t) | tt::member("a") | json_parser::null_sym)
+			.has_value());
+		CHECK(*string_member(t, "c") == "x");
+		CHECK_FALSE((tt(t) | tt::member("d") | tt::boolean));
+		CHECK(parsed(" \r\n[ 1 , 2 ]\t") == parsed("[1,2]"));
+		CHECK(parsed(R"({"a":[1.5,{"b":true},null],"c":"x","d":false})")
+			== t);
+	}
+
+	TEST_CASE("a parse and the builders give one node") {
+		CHECK(parsed("-0") == parsed("0"));
+		CHECK(parsed("-0") == jt::build_number(0));
+		CHECK(parsed("-1.5e2") == jt::build_number(-150));
+		CHECK(parsed(R"({"a":1,"b":2,"a":3})") == jt::build_object({
+			jt::build_pair("a", jt::build_number(3)),
+			jt::build_pair("b", jt::build_number(2)) }));
+		CHECK(parsed(R"("a\nb\"c\\d\/e\t")")
+			== jt::build_string("a\nb\"c\\d/e\t"));
+		CHECK(parsed(R"("\u00e9\ud83d\ude00")")
+			== jt::build_string("\xc3\xa9\xf0\x9f\x98\x80"));
+	}
+
+	TEST_CASE("the tree of a parse result and of a parse tree") {
+		json_parser::parse_options po{ .start = json_parser::start };
+		const std::string text = R"([true,"s"])";
+		auto r = json_parser::instance().parse(text.data(), text.size(),
+			po);
+		REQUIRE(r.found);
+		auto from_tree = jt::get(parse_tree::get(r.get_shaped_tree2()));
+		REQUIRE(from_tree.has_value());
+		CHECK(from_tree.value() == parsed(text));
+		auto from_result = jt::get(r);
+		REQUIRE(from_result.has_value());
+		CHECK(from_result.value() == parsed(text));
+		const std::string bad = "[true,";
+		auto f = json_parser::instance().parse(bad.data(), bad.size(), po);
+		auto failed = jt::get(f);
+		CHECK_FALSE(failed.has_value());
+		CHECK(failed.report().first_error_code()
+			== idni::diagnostics::code::parse_error);
 	}
 }
