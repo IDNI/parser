@@ -183,6 +183,23 @@ result<path> temp_dir();
 result<path> temp_filename(const std::string& prefix);
 
 /**
+ * @brief Creates a new, uniquely named folder in the temporary directory.
+ * @param prefix a UTF-8 name to seed the folder name.
+ * @return on success, the native path of the folder this call just
+ * created. On failure, an error. A malformed prefix, or one that holds a
+ * '/', a '\\', a ':' or a NUL on any platform, gets code::invalid_argument,
+ * with the prefix in label::value. A failing OS call gets code::io_error,
+ * with the attempted path in label::path.
+ * @post The folder exists and is empty, once this call returns a value.
+ * On POSIX, it has mode 0700.
+ * @note On Windows, it stops after 1000 tries of a taken name, with
+ * code::io_error, the last path in label::path and 1000 in label::limit.
+ * @note The caller removes the folder.
+ * @see temp_dir
+ */
+result<path> temp_folder(const std::string& prefix);
+
+/**
  * @brief A native file handle.
  * This is a raw handle, not an owning type. A caller that opens one
  * closes it, through @ref close.

@@ -9,6 +9,7 @@
 #include <cerrno>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <cwchar>
 #include <filesystem>
@@ -462,6 +463,76 @@ inline result<path> temp_filename(const std::string& prefix) {
 			{{label::path, tmpl}});
 	}
 	::close(fd);
+	return r.with_value(std::string(buf.data()));
+}
+#endif
+
+namespace detail {
+inline bool is_folder_prefix(const std::string& prefix) {
+	return prefix.find_first_of(std::string_view("/\\:\0", 4))
+		== std::string::npos;
+}
+} // namespace detail
+
+#ifdef _WIN32
+inline result<path> temp_folder(const std::string& prefix) {
+	using label = idni::parser_strings::label;
+	result<path> r;
+	if (!idni::is_valid_utf8(prefix, &r.report())) return r;
+	if (!detail::is_folder_prefix(prefix))
+		return r.with_error(diagnostics::code::invalid_argument,
+			"the temporary folder prefix must not contain a path separator",
+			{{label::value, prefix}});
+
+	auto dir = r.merge_take(temp_dir());
+	if (!dir) return r;
+	path base = *dir;
+	if (!base.empty() && base.back() != L'\\') base += L'\\';
+	base += to_path(prefix);
+
+	// CreateDirectoryW fails on a taken name, so a retry with the next
+	// number never takes a folder of another program
+	static std::atomic<uint64_t> counter{ 0 };
+	const uint64_t seed = (static_cast<uint64_t>(::GetCurrentProcessId()) << 32)
+		^ ::GetTickCount64();
+	constexpr size_t tries = 1000;
+	path p;
+	for (size_t i = 0; i < tries; ++i) {
+		p = base + L"_" + std::to_wstring(
+			seed + counter.fetch_add(1, std::memory_order_relaxed));
+		if (::CreateDirectoryW(p.c_str(), nullptr)) return r.with_value(p);
+		const DWORD e = ::GetLastError();
+		if (e != ERROR_ALREADY_EXISTS)
+			return r.with_error(diagnostics::code::io_error,
+				"failed to create a temporary folder",
+				{{label::path, to_utf8(p)},
+					{label::error_number, static_cast<int_t>(e)}});
+	}
+	return r.with_error(diagnostics::code::io_error,
+		"each tried temporary folder name is taken",
+		{{label::path, to_utf8(p)}, {label::limit, tries}});
+}
+#else
+inline result<path> temp_folder(const std::string& prefix) {
+	using label = idni::parser_strings::label;
+	result<path> r;
+	if (!idni::is_valid_utf8(prefix, &r.report())) return r;
+	if (!detail::is_folder_prefix(prefix))
+		return r.with_error(diagnostics::code::invalid_argument,
+			"the temporary folder prefix must not contain a path separator",
+			{{label::value, prefix}});
+
+	auto dir = r.merge_take(temp_dir());
+	if (!dir) return r;
+
+	std::string tmpl = *dir + "/" + prefix + "_XXXXXX";
+	std::vector<char> buf(tmpl.begin(), tmpl.end());
+	buf.push_back('\0');
+	if (::mkdtemp(buf.data()) == nullptr)
+		return r.with_error(diagnostics::code::io_error,
+			"failed to create a temporary folder",
+			{{label::path, tmpl},
+				{label::error_number, static_cast<int_t>(errno)}});
 	return r.with_value(std::string(buf.data()));
 }
 #endif

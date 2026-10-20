@@ -331,6 +331,39 @@ TEST_CASE("a write error shows in the stream state") {
 }
 }
 
+TEST_SUITE("fs::temp_folder") {
+TEST_CASE("two calls make two different empty folders") {
+	auto a = fs::temp_folder("doctest_fs");
+	auto b = fs::temp_folder("doctest_fs");
+	REQUIRE(a.has_value());
+	REQUIRE(b.has_value());
+	const sfs::path pa(a.value()), pb(b.value());
+	CHECK(pa != pb);
+	CHECK(sfs::is_directory(pa));
+	CHECK(sfs::is_directory(pb));
+	CHECK(sfs::is_empty(pa));
+	CHECK(pa.filename().string().starts_with("doctest_fs_"));
+#ifndef _WIN32
+	struct stat st{};
+	REQUIRE(::stat(pa.c_str(), &st) == 0);
+	CHECK((st.st_mode & 0777) == 0700);
+#endif
+	std::error_code ec;
+	sfs::remove(pa, ec);
+	sfs::remove(pb, ec);
+}
+
+TEST_CASE("a prefix with a path separator is an invalid_argument") {
+	for (const char* p : { "a/b", "a\\b" }) {
+		CAPTURE(p);
+		auto r = fs::temp_folder(p);
+		CHECK_FALSE(r.has_value());
+		CHECK(r.report().first_error_code()
+			== diagnostics::code::invalid_argument);
+	}
+}
+}
+
 #ifndef _WIN32
 TEST_SUITE("fs::open and fs::create") {
 TEST_CASE("an open file closes in a child program") {
