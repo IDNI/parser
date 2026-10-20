@@ -207,8 +207,6 @@ Click on the type name in the following list to see more detailed documentation 
 - [`forest::graph`](docs/forest_graph.md) - a graph extracted from a forest
 - [`forest::tree`](docs/forest_tree.md) - a tree extracted from a graph
 - [`tgf`](docs/tgf.md) - Tau Grammar Format parser - reads a grammar in TGF format from a string or a file. An alternative way to describe a grammar instead of creating it programmatically.
-- [`traverser`](docs/traverser.md) - struct for traversing and accessing rewriter trees
-- [`rewriting`](docs/rewriting.md) - API for rewriting a resulting parse tree
 - [`measure`](docs/measure.md) - simple struct for measuring time
 - [`idni::fs`](docs/filesystem.md) - portable file layer, with `temp_file` for an RAII temporary file and `memory_map` for a memory-mapped file
 
