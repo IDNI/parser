@@ -41,7 +41,7 @@ inline diagnostics::result<tref> tree::get(const parse_tree& t,
 		if (++d > o.max_depth) {
 			R.error(code::out_of_range,
 				parser_strings::messages::json_too_deep,
-				{ { label::limit, o.max_depth } });
+				{ { label::depth, d }, { label::limit, o.max_depth } });
 			return false;
 		}
 		depth.emplace(x, d);
@@ -111,6 +111,7 @@ inline diagnostics::result<tref> tree::get(const parse_tree& t,
 					parser_strings::messages::json_int_too_long,
 					{ { label::value, truncated(s) },
 					  { label::size, digits },
+					  { label::digits, digits },
 					  { label::limit, o.max_int_digits } });
 				return false;
 			}

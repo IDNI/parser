@@ -697,6 +697,24 @@ TEST_SUITE("json tree: the read limits") {
 		return r.report().first_error_code();
 	}
 
+	TEST_CASE("a label tells the two limits apart") {
+		const read_options o{ .max_int_digits = 3, .max_depth = 2 };
+		auto lng = jt::get("[1234]", o);
+		REQUIRE_FALSE(lng.has_value());
+		CHECK(lng.report().error_attr(label::digits) == 4);
+		CHECK(lng.report().error_attr(label::size) == 4);
+		CHECK(lng.report().error_attr(label::limit) == 3);
+		CHECK_FALSE(lng.report().error_attr(label::depth).has_value());
+		auto deep = jt::get("[[[1]]]", o);
+		REQUIRE_FALSE(deep.has_value());
+		CHECK(deep.report().error_attr(label::depth) == 3);
+		CHECK(deep.report().error_attr(label::limit) == 2);
+		CHECK_FALSE(deep.report().error_attr(label::digits).has_value());
+		CHECK_FALSE(deep.report().error_attr(label::size).has_value());
+		CHECK(lng.report().first_error_code() == code::out_of_range);
+		CHECK(deep.report().first_error_code() == code::out_of_range);
+	}
+
 	TEST_CASE("max_int_digits: at the limit and over it") {
 		const auto lax = read_options::lenient(4300, 1000);
 		const std::string at(4300, '9'), over(4301, '9');

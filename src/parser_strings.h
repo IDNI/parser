@@ -101,6 +101,8 @@ using id_t = idni::int_t;
 	X(byte,               "byte") \
 	X(port,               "port") \
 	X(error_number,       "errno") \
+	X(depth,              "depth") \
+	X(digits,             "digits") \
 	X(index,              "index")
 
 // The labels whose attr value holds interned text, not a number. A
