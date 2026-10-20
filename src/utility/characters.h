@@ -53,6 +53,10 @@ std::string to_std_string(B bit);
 std::wstring utf8_to_wide(const std::string& s);
 std::string  wide_to_utf8(const std::wstring& w);
 #endif
+// The case of A to Z only, with no locale, so a UTF-8 byte stays as it is.
+// These are Python bytes.lower() and bytes.upper().
+std::string ascii_to_lower(std::string_view s);
+std::string ascii_to_upper(std::string_view s);
 // traits to use for basic_string<CharT>: utf8char_traits for utf8char,
 // std::char_traits<CharT> otherwise. A specialization (not conditional_t)
 // so std::char_traits<utf8char> is never named.

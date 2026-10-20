@@ -11,6 +11,7 @@
 #include "recoders.h"
 #include "utility/term.h"
 
+#include <clocale>
 #include <initializer_list>
 #include <algorithm>
 
@@ -272,6 +273,36 @@ TEST_SUITE("UTF-8 ↔ UTF-16 conversions") {
 		std::u32string u32 = U"a©€\U0001F600";
 		auto u16 = idni::to_u16string(u32);
 		CHECK(idni::to_u32string(u16) == u32);
+	}
+}
+
+TEST_SUITE("ascii_to_lower and ascii_to_upper") {
+	TEST_CASE("only A to Z change, other bytes stay") {
+		CHECK(idni::ascii_to_lower("YeS On-1@[`{") == "yes on-1@[`{");
+		CHECK(idni::ascii_to_upper("YeS On-1@[`{") == "YES ON-1@[`{");
+		CHECK(idni::ascii_to_lower("") == "");
+		CHECK(idni::ascii_to_upper("") == "");
+		// the UTF-8 bytes of É and é
+		CHECK(idni::ascii_to_lower("\xC3\x89T\xC3\xA9") == "\xC3\x89t\xC3\xA9");
+		CHECK(idni::ascii_to_upper("\xC3\x89t\xC3\xA9") == "\xC3\x89T\xC3\xA9");
+	}
+
+	TEST_CASE("a Latin-1 locale does not change a UTF-8 byte") {
+		const char* found = nullptr;
+		for (const char* name : { "en_US.ISO-8859-1", "en_US.iso88591",
+				"de_DE.ISO-8859-1", "de_DE.iso88591", "fr_FR.ISO-8859-1",
+				"C.ISO-8859-1" })
+			if (std::setlocale(LC_CTYPE, name)) { found = name; break; }
+		if (!found) {
+			MESSAGE(std::string("skipped: the host has no Latin-1 locale"));
+			return;
+		}
+		CAPTURE(found);
+		const std::string lower = idni::ascii_to_lower("\xC3\x89");
+		const std::string upper = idni::ascii_to_upper("\xC3\xA9");
+		std::setlocale(LC_CTYPE, "C");
+		CHECK(lower == "\xC3\x89");
+		CHECK(upper == "\xC3\xA9");
 	}
 }
 

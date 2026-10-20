@@ -10,6 +10,7 @@
 #include <system_error>
 
 #include "options_types.h"
+#include "characters.h"
 #include "escapes.h"
 #include "../parser_strings.h"
 
@@ -89,9 +90,7 @@ inline diagnostics::result<option_value> parse_value(option_kind kind,
 	const std::string trimmed = option_trim(text);
 	switch (kind) {
 	case option_kind::flag: {
-		std::string w = trimmed;
-		for (auto& c : w) c = static_cast<char>(
-			std::tolower(static_cast<unsigned char>(c)));
+		const std::string w = ascii_to_lower(trimmed);
 		if (w == "true" || w == "on" || w == "1" || w == "yes"
 			|| w == "y" || w == "t") return r.with_value(option_value(true));
 		if (w == "false" || w == "off" || w == "0" || w == "no"

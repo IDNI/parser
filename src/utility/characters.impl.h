@@ -96,6 +96,19 @@ inline std::string to_std_string(char ch) { return std::string(1, ch); }
 template <std::same_as<bool> B>
 std::string to_std_string(B bit) { return bit ? "1" : "0"; }
 
+inline std::string ascii_to_lower(std::string_view s) {
+	std::string r(s);
+	for (auto& c : r)
+		if (c >= 'A' && c <= 'Z') c = static_cast<char>(c + ('a' - 'A'));
+	return r;
+}
+inline std::string ascii_to_upper(std::string_view s) {
+	std::string r(s);
+	for (auto& c : r)
+		if (c >= 'a' && c <= 'z') c = static_cast<char>(c - ('a' - 'A'));
+	return r;
+}
+
 // UTF-16 codec — defined below peek_codepoint / emit_codepoint declarations
 // because the conversion functions use them. Templated on the 16-bit code
 // unit type (char16_t, or wchar_t on Windows) since both only ever read/write
