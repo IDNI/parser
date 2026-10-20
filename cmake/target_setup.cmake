@@ -29,6 +29,8 @@ function(target_setup target access compile_definitions compile_options link_opt
 				# configurations. -Wsign-conversion is named explicitly because
 				# GCC's -Wconversion does not report sign changes.
 				-Wconversion -Wsign-conversion
+				# A name may hide another name, on every compiler.
+				-Wno-shadow
 				$<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:-Werror>
 				# -Wfatal-errors
 			)
@@ -55,7 +57,9 @@ function(target_setup target access compile_definitions compile_options link_opt
 			endif()
 		else()
 			target_compile_options(${target} PRIVATE
-				/W4 /EHsc /utf-8 /bigobj)
+				/W4 /EHsc /utf-8 /bigobj
+				# A name may hide another name, on every compiler.
+				/wd4456 /wd4457 /wd4458 /wd4459)
 			target_compile_definitions(${target} ${access}
 				NOMINMAX
 				WIN32_LEAN_AND_MEAN
