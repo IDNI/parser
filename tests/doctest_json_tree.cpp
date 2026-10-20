@@ -4,6 +4,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "quiet_doctest.h"
 #include "format/json/json.h"
+#include "format/ast.json/ast_json.h"
 
 #include <bit>
 #include <sstream>
@@ -137,8 +138,73 @@ TEST_SUITE("json tree: values") {
 	}
 }
 
+TEST_SUITE("json tree: AST JSON") {
+	using p_t = idni::parser<char, char32_t>;
+	using lit_t = idni::lit<char, char32_t>;
+	using tree_t = p_t::tree;
+	using pnode_t = p_t::pnode;
+
+	static idni::nonterminals<char, char32_t> nts({"", "start", "digit"});
+
+	static tref term_node(char32_t c, size_t b, size_t e) {
+		return tree_t::get(pnode_t(lit_t(c), {b, e}));
+	}
+
+	// The shaped parse tree of a JSON text that must parse.
+	static tref parse_tree_of(const std::string& text) {
+		json_parser::parse_options po{ .start = json_parser::start };
+		auto r = json_parser::instance().parse(text.data(),
+			text.size(), po);
+		REQUIRE(r.found);
+		return r.get_shaped_tree2();
+	}
+
+	TEST_CASE("the tree form prints the expected text") {
+		tref term = term_node(char32_t('1'), 0, 1);
+		tref nul = tree_t::get(pnode_t(lit_t(), {1, 1}));
+		tref dig = tree_t::get(pnode_t(nts("digit"), {0, 1}),
+			trefs{term, nul});
+		tref root = tree_t::get(pnode_t(nts("start"), {0, 1}),
+			trefs{dig});
+		const std::string start_id = std::to_string(nts("start").n());
+		const std::string digit_id = std::to_string(nts("digit").n());
+		const std::string text = R"({"format":"ast","version":"1",)"
+			R"("start":"start","input":"1","ast":{"symbol":"start",)"
+			R"("id":)" + start_id + R"(,"range":[0,1],"children":[)"
+			R"({"symbol":"digit","id":)" + digit_id
+			+ R"(,"range":[0,1],"children":[{"symbol":"",)"
+			R"("range":[0,1],"text":"1"}]}]}})";
+		namespace aj = idni::format::ast_json;
+		CHECK(jt::get(aj::to_tree<tree_t>(root, "start", "1")).to_str()
+			== text);
+
+		tref x = term_node(char32_t('x'), 2, 3);
+		tref r = tree_t::get(pnode_t(nts("start"), {2, 3}), trefs{x});
+		CHECK(jt::get(aj::node_to_tree<tree_t>(r)).to_str()
+			== R"({"symbol":"start","id":)" + start_id
+			+ R"(,"range":[2,3],"children":[{"symbol":"",)"
+			R"("range":[2,3],"text":"x"}]})");
+	}
+
+	TEST_CASE("the AST JSON of a JSON parse tree") {
+		namespace aj = idni::format::ast_json;
+		for (const char* s : { "1", "[1,2,3]", "[[],[]]",
+			R"({"a":[1,{"b":true},null],"c":{"d":[]}})" })
+		{
+			CAPTURE(s);
+			tref p = parse_tree_of(s);
+			tref t = aj::node_to_tree<parse_tree>(p);
+			CHECK(parsed(jt::get(t).to_str()) == t);
+			CHECK((tt(t) | tt::member("symbol") | tt::string)
+				== "start");
+		}
+	}
+}
+
 TEST_SUITE("json tree: deep documents and gc") {
 	constexpr size_t deep = 1000000;
+	// The deepest parse that stays under 10 s in a release build.
+	constexpr size_t deep_parse = 150000;
 
 	TEST_CASE("a document 1000000 levels deep builds, prints and is freed") {
 		jt::gc();
@@ -162,6 +228,28 @@ TEST_SUITE("json tree: deep documents and gc") {
 		}
 		jt::gc();
 		CHECK(jt::m_size() == before);
+	}
+
+	TEST_CASE("parse and print deep arrays") {
+		const std::string text = std::string(deep_parse, '[')
+			+ std::string(deep_parse, ']');
+		json_parser::parse_options po{ .start = json_parser::start };
+		auto r = json_parser::instance().parse(text.data(),
+			text.size(), po);
+		REQUIRE(r.found);
+		tref p = r.get_shaped_tree2();
+		auto t = jt::get(parse_tree::get(p));
+		REQUIRE(t.has_value());
+		CHECK(jt::get(t.value()).to_str() == text);
+		// the AST JSON of the same parse tree
+		const std::string ast = jt::get(format::ast_json::
+			node_to_tree<parse_tree>(p)).to_str();
+		const std::string arr = R"("symbol":"arr")";
+		size_t arrays = 0;
+		for (size_t at = ast.find(arr); at != std::string::npos;
+				at = ast.find(arr, at + arr.size()))
+			++arrays;
+		CHECK(arrays == deep_parse);
 	}
 }
 
