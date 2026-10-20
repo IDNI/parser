@@ -63,7 +63,9 @@ target_compile_options(tgf_standalone PRIVATE -fno-exceptions -pthread)
 # The generated parser tables need a larger stack during static init.
 set_target_properties(tgf_standalone PROPERTIES
     SUFFIX ".js"
-    LINK_FLAGS "-pthread -Wno-pthreads-mem-growth -s ASYNCIFY -s PROXY_TO_PTHREAD -s STACK_SIZE=16777216 -s ALLOW_MEMORY_GROWTH=1 -s INITIAL_MEMORY=64MB -s MAXIMUM_MEMORY=1GB -s EXIT_RUNTIME=1 -lnodefs.js --preload-file ${TOP_SRC}/tests/fixtures/tau.tgf@/tau.tgf")
+    LINK_FLAGS "-pthread -Wno-pthreads-mem-growth -s ASYNCIFY -s PROXY_TO_PTHREAD -s ALLOW_MEMORY_GROWTH=1 -s INITIAL_MEMORY=64MB -s MAXIMUM_MEMORY=1GB -s EXIT_RUNTIME=1 -lnodefs.js --preload-file ${TOP_SRC}/tests/fixtures/tau.tgf@/tau.tgf")
+# a link option comes after the stack size of the top folder, so this one wins
+target_link_options(tgf_standalone PRIVATE "SHELL:-s STACK_SIZE=16777216")
 
 if(TAU_PARSER_BUILD_BROWSER_PAGE)
     # Browser page files, copied next to the program output

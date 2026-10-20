@@ -474,6 +474,9 @@ version_license(
 
 if (TAU_PARSER_BUILD_EMSCRIPTEN)
 	if (EMSCRIPTEN)
+		# a frame larger than the default 64 KB wasm stack overwrites static
+		# data with no error; this covers each wasm program below and the tests
+		add_link_options("SHELL:-s STACK_SIZE=1MB")
 		add_subdirectory("js")
 		add_subdirectory("js/syntax_highlighting")
 		if(TAU_PARSER_BUILD_TGF)
