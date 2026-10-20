@@ -126,6 +126,14 @@ struct print_options {
 	/// Every non-ASCII character as a `\u` escape. A byte that is not
 	/// valid UTF-8 has no code point, so it prints as it is.
 	bool ascii_only = false;
+	/// Between two items of an array or an object. The two separators
+	/// are views, so their text must outlive the print.
+	std::string_view item_separator = ",";
+	/// Between a key and its value.
+	std::string_view key_separator = ":";
+	/// 0: one line. n > 0: a new line for each item, n spaces for each
+	/// level. An empty array or object stays on one line.
+	size_t indent = 0;
 };
 
 /// A JSON document as an interned lcrs tree. A tref of it is valid until

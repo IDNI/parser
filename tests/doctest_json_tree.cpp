@@ -878,3 +878,28 @@ TEST_SUITE("json tree: printers") {
 		CHECK((tt() | tt::dump).empty());
 	}
 }
+
+TEST_SUITE("json tree: print layout") {
+	// The expected bytes are the bytes of Python json.dumps.
+	TEST_CASE("the separators and the indent set the layout") {
+		tref t = parsed(R"({"a": [1, 2], "b": {}})");
+		CHECK(jt::get(t).to_str({ .item_separator = ", ",
+			.key_separator = ": " }) == R"({"a": [1, 2], "b": {}})");
+		CHECK(jt::get(t).to_str({ .key_separator = ": ", .indent = 2 })
+			== "{\n  \"a\": [\n    1,\n    2\n  ],\n  \"b\": {}\n}");
+		CHECK(jt::get(t).to_str({ .indent = 4 })
+			== "{\n    \"a\":[\n        1,\n        2\n    ],\n"
+			"    \"b\":{}\n}");
+		CHECK(jt::get(t).to_str(print_options{}) == R"({"a":[1,2],"b":{}})");
+	}
+
+	TEST_CASE("an indent keeps an empty array or object on one line") {
+		const print_options o{ .key_separator = ": ", .indent = 2 };
+		CHECK(jt::get(parsed(R"({"x":[[],{}],"z":{"e":[]}})")).to_str(o)
+			== "{\n  \"x\": [\n    [],\n    {}\n  ],\n  \"z\": {\n"
+			"    \"e\": []\n  }\n}");
+		CHECK(jt::get(parsed("[]")).to_str(o) == "[]");
+		CHECK(jt::get(parsed("{}")).to_str(o) == "{}");
+		CHECK(jt::get(parsed("1")).to_str(o) == "1");
+	}
+}

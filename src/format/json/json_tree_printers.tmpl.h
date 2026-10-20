@@ -43,6 +43,13 @@ inline std::ostream& tree::print(std::ostream& os, const print_options& o)
 		bool started = false;
 	};
 	std::vector<frame> open;
+	// The open arrays and objects. A pair frame adds no level.
+	size_t depth = 0;
+	auto new_line = [&](size_t level) {
+		if (!o.indent) return;
+		os << '\n';
+		for (size_t i = 0; i != level * o.indent; ++i) os << ' ';
+	};
 	// Write the opening of n and push its frame when it has children.
 	auto enter = [&](tref n) {
 		const tree& t = get(n);
@@ -63,10 +70,11 @@ inline std::ostream& tree::print(std::ostream& os, const print_options& o)
 		case json_parser::object: os << '{'; break;
 		case json_parser::object_pair:
 			text(t.get_string());
-			os << ':';
+			os << o.key_separator;
 			break;
 		default: DBG(assert(false);) return;
 		}
+		if (t.get_type() != json_parser::object_pair) ++depth;
 		if (!o.sorted_keys || !t.is_object()) {
 			open.push_back({ n, t.left_child() });
 			return;
@@ -87,12 +95,19 @@ inline std::ostream& tree::print(std::ostream& os, const print_options& o)
 		const tree& ft = get(f.n);
 		const bool pair = ft.get_type() == json_parser::object_pair;
 		if (c != nullptr) {
-			if (!pair && f.started) os << ',';
+			if (!pair) {
+				if (f.started) os << o.item_separator;
+				new_line(depth);
+			}
 			f.started = true;
 			enter(c);
 			continue;
 		}
-		if (!pair) os << (ft.is_array() ? ']' : '}');
+		if (!pair) {
+			--depth;
+			if (f.started) new_line(depth);
+			os << (ft.is_array() ? ']' : '}');
+		}
 		open.pop_back();
 	}
 	return os;
