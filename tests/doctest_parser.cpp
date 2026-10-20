@@ -717,6 +717,56 @@ TEST_SUITE("regression: binarize_comb dot==1") {
 	}
 }
 
+TEST_SUITE("grammar: a nullable conjunction") {
+
+	// The parse of each text in `ok` is found, and of each in `bad` is not.
+	static void check_parses(const string& tgf_src,
+		const vector<string>& ok, const vector<string>& bad)
+	{
+		nonterminals<char> nts;
+		auto gr = tgf<char>::from_string(nts, tgf_src);
+		REQUIRE(gr.has_value());
+		grammar<char> g = std::move(gr).value();
+		parser<char> p(g);
+		for (const string& in : ok)
+			CHECK_MESSAGE(p.parse(in.data(), in.size()).found, in);
+		for (const string& in : bad)
+			CHECK_MESSAGE(!p.parse(in.data(), in.size()).found, in);
+	}
+
+	const string empty_conj_rules = "s => ' '.\nr => 'c' | null.\n"
+		"ne => 'c'.\ne => 'c' | null.\nq => r.\n";
+
+	TEST_CASE("a conjunction is empty only when every conjunct can be") {
+		check_parses("start => s (r & ne) 'b'.\n" + empty_conj_rules,
+			{ " cb" }, { " b" });
+		check_parses("start => ' ' (r & ne) 'b'.\n" + empty_conj_rules,
+			{ " cb" }, { " b" });
+		check_parses("start => s (ne & r) 'b'.\n" + empty_conj_rules,
+			{ " cb" }, { " b" });
+		check_parses("start => s (r & e) 'b'.\n" + empty_conj_rules,
+			{ " b", " cb" }, {});
+	}
+
+	TEST_CASE("an empty conjunction with a negated conjunct") {
+		check_parses("start => s (r & ~ne) 'b'.\n" + empty_conj_rules,
+			{ " b" }, { " cb" });
+		check_parses("start => s (r & ~e) 'b'.\n" + empty_conj_rules,
+			{}, { " b", " cb" });
+		check_parses("start => s (r & ne & ~s) 'b'.\n" + empty_conj_rules,
+			{ " cb" }, { " b" });
+	}
+
+	TEST_CASE("an empty conjunct by a nested rule") {
+		check_parses("start => s (q & ne) 'b'.\n" + empty_conj_rules,
+			{ " cb" }, { " b" });
+		check_parses("start => s w 'b'.\nw => v.\nv => q & ne.\n"
+			+ empty_conj_rules, { " cb" }, { " b" });
+		check_parses("start => s (q & e) 'b'.\n" + empty_conj_rules,
+			{ " b", " cb" }, {});
+	}
+}
+
 // ---------------------------------------------------------------------------
 // AMB wrapping: when the tree/forest mode build_forest sees a node with multiple
 // disambiguation-candidate packs (only possible with auto_disambiguate=false),

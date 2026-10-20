@@ -1481,16 +1481,34 @@ bool grammar<C, T>::all_nulls(const lits<C, T>& a) const {
 	return true;
 }
 template <typename C, typename T>
+bool grammar<C, T>::all_conjuncts_null(const std::vector<lits<C, T>>& cs)
+	const
+{
+	for (const lits<C, T>& a : cs)
+		if (all_nulls(a) == a.neg) return false;
+	return true;
+}
+template <typename C, typename T>
 void grammar<C, T>::compute_nullables() {
 	nullables.clear();
 	size_t k;
 	do {
 		k = nullables.size();
 		for (size_t n = 0; n != G.size(); ++n)
-			for (const auto& a : G[n].second)
-				if (all_nulls(a))
-					nullables.insert(G[n].first.n());
+			if (all_conjuncts_null(G[n].second))
+				nullables.insert(G[n].first.n());
 	} while (k != nullables.size());
+	// a negated conjunct loses its empty match once its body turns
+	// nullable, so drop each head that no production still makes empty
+	std::set<size_t> kept;
+	do {
+		kept.clear();
+		for (size_t n = 0; n != G.size(); ++n)
+			if (nullables.contains(G[n].first.n())
+				&& all_conjuncts_null(G[n].second))
+				kept.insert(G[n].first.n());
+		std::swap(kept, nullables);
+	} while (kept.size() != nullables.size());
 }
 template <typename C, typename T>
 lit<C, T> grammar<C, T>::nt(size_t n) const { return lit<C, T>(n, &nts); }

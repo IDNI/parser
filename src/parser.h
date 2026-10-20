@@ -690,6 +690,8 @@ private:
 	[[nodiscard]] idni::diagnostics::result<void> bind_to(
 		options_repository& repo);
 	bool all_nulls(const lits<C, T>& a) const;
+	/// True when the conjunction matches the empty string.
+	bool all_conjuncts_null(const std::vector<lits<C, T>>& cs) const;
 	/// Adds each value as a host value for l: a brand new production, or
 	/// an existing pending/committed/retired one promoted to host so
 	/// sync_dynamic_context never retires it. Shared by the
