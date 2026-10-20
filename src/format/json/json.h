@@ -123,8 +123,8 @@ struct node {
 /// caller can then change single fields. The default is minified(). With
 /// sorted_keys and ascii_only, a document of strings and integers prints
 /// the bytes of Python json.dumps with sort_keys, ensure_ascii and the
-/// separators "," and ":". A number that is no integer prints its
-/// shortest round trip text, which can differ from Python repr.
+/// separators "," and ":". With floats repr, a float prints the bytes
+/// of Python repr too.
 struct print_options {
 	/// Keys of every object in code point order. UTF-8 byte order is
 	/// code point order, so std::string compare sorts them.
@@ -140,6 +140,10 @@ struct print_options {
 	/// 0: one line. n > 0: a new line for each item, n spaces for each
 	/// level. An empty array or object stays on one line.
 	size_t indent = 0;
+	enum class float_format { shortest, repr };
+	/// The text of a number node with no decimal text. shortest: the
+	/// shortest round trip text of to_chars. repr: float_repr().
+	float_format floats = float_format::shortest;
 
 	/// One line with no spaces: the default fields.
 	static print_options minified();
@@ -394,6 +398,13 @@ value build_string(const trv& t, result& R);
 /// Read the JSON number @p s. A value below the smallest double reads as 0.
 /// A value above the largest double is an error.
 bool parse_number(const std::string& s, double& d);
+
+/// The text of Python repr(float) for @p d: the shortest digits that read
+/// back to @p d, in plain notation for a decimal exponent from -4 to 15,
+/// else in exponent notation with a sign and at least two digits. A
+/// float has a point or an exponent: 1.0, 1e+16. NaN and an infinity
+/// give nan, inf and -inf.
+std::string float_repr(double d);
 
 /// @p t is a "value" node; it always has exactly one child, the actual
 /// variant (true_sym/false_sym/null_sym/number/str/arr/object).

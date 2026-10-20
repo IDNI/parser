@@ -481,6 +481,36 @@ TEST_SUITE("json tree: the grammar variant nonfinite") {
 	}
 }
 
+TEST_SUITE("json tree: the float format repr") {
+	// The expected texts come from Python repr and json.dumps.
+	TEST_CASE("float_repr gives the text of Python repr") {
+		const std::pair<double, const char*> cases[] = {
+			{ 1.0, "1.0" }, { 0.0001, "0.0001" },
+			{ 100000.0, "100000.0" }, { 1e15, "1000000000000000.0" },
+			{ 0.30000000000000004, "0.30000000000000004" },
+			{ 1e16, "1e+16" }, { 1e22, "1e+22" }, { 1e-05, "1e-05" },
+			{ 1.2345678901234568e+17, "1.2345678901234568e+17" },
+			{ 5e-324, "5e-324" },
+			{ 1.7976931348623157e+308, "1.7976931348623157e+308" },
+			{ -0.0, "-0.0" }, { 0.0, "0.0" }, { 0.1, "0.1" },
+			{ 123.456, "123.456" }, { -2.5, "-2.5" }, { 1e-07, "1e-07" },
+			{ 1.5e-323, "1.5e-323" },
+			{ 12345678901234567.0, "1.2345678901234568e+16" },
+			{ 0.00012345, "0.00012345" }, { -1e100, "-1e+100" },
+		};
+		for (const auto& [d, text] : cases) {
+			CAPTURE(text);
+			CHECK(float_repr(d) == text);
+		}
+		CHECK(float_repr(std::numeric_limits<double>::quiet_NaN())
+			== "nan");
+		CHECK(float_repr(std::numeric_limits<double>::infinity())
+			== "inf");
+		CHECK(float_repr(-std::numeric_limits<double>::infinity())
+			== "-inf");
+	}
+}
+
 TEST_SUITE("json tree: report") {
 	using idni::diagnostics::code;
 	using idni::diagnostics::report;
@@ -1005,5 +1035,20 @@ TEST_SUITE("json tree: print layout") {
 		CHECK(jt::get(parsed("[]")).to_str(o) == "[]");
 		CHECK(jt::get(parsed("{}")).to_str(o) == "{}");
 		CHECK(jt::get(parsed("1")).to_str(o) == "1");
+	}
+}
+
+TEST_SUITE("json tree: the float format of the profiles") {
+	// The expected texts come from Python json.dumps.
+	TEST_CASE("normal and pretty print a float as repr") {
+		tref t = jt::build_array({ jt::build_number(0.0001),
+			jt::build_number(1.5), jt::build_integer(2) });
+		CHECK(jt::get(t).to_str(print_options::normal())
+			== "[0.0001, 1.5, 2]");
+		CHECK(jt::get(t).to_str(print_options::pretty(2))
+			== "[\n  0.0001,\n  1.5,\n  2\n]");
+		CHECK(jt::get(t).to_str({ .floats =
+			print_options::float_format::repr }) == "[0.0001,1.5,2]");
+		CHECK(jt::get(t).to_str() == "[1e-04,1.5,2]");
 	}
 }

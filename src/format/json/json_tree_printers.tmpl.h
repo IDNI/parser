@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cmath>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -22,12 +23,48 @@ inline print_options print_options::minified() { return {}; }
 
 inline print_options print_options::normal() {
 	return { .ascii_only = true, .item_separator = ", ",
-		.key_separator = ": " };
+		.key_separator = ": ", .floats = float_format::repr };
 }
 
 inline print_options print_options::pretty(size_t n) {
 	return { .ascii_only = true, .item_separator = ",",
-		.key_separator = ": ", .indent = n };
+		.key_separator = ": ", .indent = n,
+		.floats = float_format::repr };
+}
+
+inline std::string float_repr(double d) {
+	if (std::isnan(d)) return "nan";
+	if (std::isinf(d)) return d < 0 ? "-inf" : "inf";
+	// the shortest round trip digits, as d.ddde+XX
+	char buf[32];
+	auto r = std::to_chars(buf, buf + sizeof(buf), d,
+		std::chars_format::scientific);
+	std::string_view s(buf, static_cast<size_t>(r.ptr - buf));
+	std::string out;
+	if (s.front() == '-') out += '-', s.remove_prefix(1);
+	const size_t at = s.find('e');
+	std::string digits(1, s[0]);
+	if (at > 1) digits += s.substr(2, at - 2);
+	std::string_view es = s.substr(at + 1);
+	const bool neg_exp = es.front() == '-';
+	es.remove_prefix(1);
+	int e = 0;
+	std::from_chars(es.data(), es.data() + es.size(), e);
+	if (neg_exp) e = -e;
+	const size_t n = digits.size();
+	if (e < -4 || e >= 16) {
+		out += digits[0];
+		if (n > 1) out += '.', out.append(digits, 1);
+		const int mag = neg_exp ? -e : e;
+		out += neg_exp ? "e-" : "e+";
+		if (mag < 10) out += '0';
+		return out + std::to_string(mag);
+	}
+	if (e < 0) return out + "0." + std::string(static_cast<size_t>(-e - 1),
+		'0') + digits;
+	const size_t point = static_cast<size_t>(e) + 1;
+	if (n <= point) return out + digits + std::string(point - n, '0') + ".0";
+	return out + digits.substr(0, point) + "." + digits.substr(point);
 }
 
 inline std::ostream& tree::print(std::ostream& os) const {
@@ -72,6 +109,10 @@ inline std::ostream& tree::print(std::ostream& os, const print_options& o)
 		case json_parser::number: {
 			if (!t.value.str.empty()) { os << t.value.str; return; }
 			const double d = t.get_number();
+			if (o.floats == print_options::float_format::repr) {
+				os << float_repr(d);
+				return;
+			}
 			char buf[32];
 			auto r = std::to_chars(buf, buf + sizeof(buf), d);
 			os.write(buf, r.ptr - buf);
