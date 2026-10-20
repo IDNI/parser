@@ -60,18 +60,41 @@ inline bool is_case_ignorable(char32_t cp) {
 	return property_word(cp) & tables::UP_CASE_IGNORABLE;
 }
 
-/// The simple lowercase mapping of UnicodeData.txt, or @p cp itself.
-inline char32_t to_lower(char32_t cp) {
-	constexpr size_t n = std::size(tables::lower_simple) / 2;
+namespace detail {
+// @p table holds pairs of a code point and its mapping, sorted by code point.
+template <size_t N>
+char32_t simple_mapping(const uint32_t (&table)[N], char32_t cp) {
+	constexpr size_t n = N / 2;
 	size_t lo = 0, hi = n;
 	while (lo < hi) {
 		const size_t mid = lo + (hi - lo) / 2;
-		if (tables::lower_simple[2 * mid] < cp) lo = mid + 1;
+		if (table[2 * mid] < cp) lo = mid + 1;
 		else hi = mid;
 	}
-	if (lo != n && tables::lower_simple[2 * lo] == cp)
-		return tables::lower_simple[2 * lo + 1];
+	if (lo != n && table[2 * lo] == cp) return table[2 * lo + 1];
 	return cp;
+}
+
+// @p table holds rows of a code point, a length and three code points,
+// sorted by code point. Gives the row of @p cp, or nullptr.
+template <size_t N>
+const uint32_t* full_mapping(const uint32_t (&table)[N], char32_t cp) {
+	constexpr size_t stride = 5;
+	constexpr size_t n = N / stride;
+	size_t lo = 0, hi = n;
+	while (lo < hi) {
+		const size_t mid = lo + (hi - lo) / 2;
+		if (table[stride * mid] < cp) lo = mid + 1;
+		else hi = mid;
+	}
+	if (lo != n && table[stride * lo] == cp) return table + stride * lo;
+	return nullptr;
+}
+} // namespace detail
+
+/// The simple lowercase mapping of UnicodeData.txt, or @p cp itself.
+inline char32_t to_lower(char32_t cp) {
+	return detail::simple_mapping(tables::lower_simple, cp);
 }
 
 /// Append the full lowercase mapping of @p cp to @p out: the
@@ -79,15 +102,9 @@ inline char32_t to_lower(char32_t cp) {
 /// U+0130 gives U+0069 U+0307. A mapping that needs the context, such
 /// as the final sigma, is not here.
 inline void to_lower_full(char32_t cp, std::u32string& out) {
-	constexpr size_t stride = 5;
-	const auto* end = std::end(tables::lower_full);
-	for (const auto* e = std::begin(tables::lower_full); e != end;
-			e += stride)
-		if (e[0] == cp) {
-			out.append(e + 2, e + 2 + e[1]);
-			return;
-		}
-	out.push_back(to_lower(cp));
+	if (const uint32_t* e = detail::full_mapping(tables::lower_full, cp))
+		out.append(e + 2, e + 2 + e[1]);
+	else out.push_back(to_lower(cp));
 }
 
 /// Append the full lowercase mapping of each code point of @p text to
