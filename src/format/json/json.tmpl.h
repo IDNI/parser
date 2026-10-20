@@ -4,12 +4,15 @@
 #ifndef __IDNI__PARSER__FORMAT__JSON_TMPL_H__
 #define __IDNI__PARSER__FORMAT__JSON_TMPL_H__
 
+#include <algorithm>
 #include <cassert>
 #include <charconv>
 #include <cmath>
 #include <concepts>
 #include <cstdint>
 #include <limits>
+#include <optional>
+#include <string_view>
 #include <system_error>
 #include <type_traits>
 #include <variant>
@@ -181,6 +184,50 @@ inline value build_string(const trv& t, result& R) {
 	if (dec.has_error()) { R.append(std::move(dec).report()); return {}; }
 	return value::string(std::move(dec).value());
 }
+
+namespace detail {
+
+// The parts of a JSON number text. The value is the digits of integral and
+// fraction, times 10^(exp10 - fraction.size()).
+struct decimal_parts {
+	bool neg = false;
+	std::string_view integral;  // one or more digits
+	std::string_view fraction;  // the digits after '.', or empty
+	int64_t exp10 = 0;          // saturated at -1000000 and 1000000
+};
+
+// No value for a text that is no JSON number.
+inline std::optional<decimal_parts> split_decimal(std::string_view s) {
+	auto digit = [&s](size_t i) {
+		return i < s.size() && s[i] >= '0' && s[i] <= '9';
+	};
+	decimal_parts p;
+	size_t i = 0;
+	if (i < s.size() && s[i] == '-') { p.neg = true; ++i; }
+	const size_t int_at = i;
+	while (digit(i)) ++i;
+	p.integral = s.substr(int_at, i - int_at);
+	if (p.integral.empty()) return std::nullopt;
+	if (i < s.size() && s[i] == '.') {
+		const size_t at = ++i;
+		while (digit(i)) ++i;
+		p.fraction = s.substr(at, i - at);
+	}
+	if (i < s.size() && (s[i] == 'e' || s[i] == 'E')) {
+		const bool neg = ++i < s.size() && s[i] == '-';
+		if (i < s.size() && (s[i] == '-' || s[i] == '+')) ++i;
+		if (!digit(i)) return std::nullopt;
+		// a saturated exponent still tells a tiny value from a huge one
+		for (; digit(i); ++i)
+			p.exp10 = std::min<int64_t>(p.exp10 * 10 + (s[i] - '0'),
+				1000000);
+		if (neg) p.exp10 = -p.exp10;
+	}
+	if (i != s.size()) return std::nullopt;
+	return p;
+}
+
+} // namespace detail
 
 // strtod would read the decimal point of the current locale, and the write
 // side uses to_chars, so both directions must ignore it. libc++ ships

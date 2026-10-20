@@ -43,12 +43,12 @@ start : "0", "42", "999", "-1", "-42",
         "10", "200", "1e2", "1.0e2".
 
 # A number's shaped children are terminal digit chars plus an exponent node.
-# integral, fractional, zero and their digit helpers all inline into number.
+# integral, zero and their digit helpers inline into number. fractional is a node.
 start >> number > ^ '0' $           : "0".
 start >> number > ^ '-' '0' $       : "-0".
 start >> number > ^ '4' '2' $       : "42".
 start >> number > ^ '-' '1' $       : "-1".
-start >> number > ^ '1' '.' '5' $   : "1.5".
+start >> number > ^ '1' fractional $ : "1.5".
 start >> number > ^ '1' exponent $  : "1e5", "1E5".
 
 start >> exponent {
@@ -58,9 +58,9 @@ start >> exponent {
 	^ 'e' '-' '5' $ : "1e-5".
 }
 
-start >> number > ^ '1' '.' '5' exponent $ : "1.5e10".
+start >> number > ^ '1' fractional exponent $ : "1.5e10".
 
-# @raw exposes the inlined integral and fractional nodes before shaping.
+# @raw exposes the inlined integral node and the fractional node before shaping.
 @raw start >> integral   : "42".
 @raw start >> fractional : "1.5".
 

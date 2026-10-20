@@ -1,7 +1,7 @@
 @use char class digit, any, ascii, xdigit, cntrl.
 
 @inline char classes,
-	integral, fractional, zero, nonzerodigit, nzintegral,
+	integral, zero, nonzerodigit, nzintegral,
 	unescaped, esc, uni_cp, q_str > str, ascii_digit, ascii_xdigit.
 
 @trim _, __.

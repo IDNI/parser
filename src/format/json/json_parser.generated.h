@@ -72,7 +72,6 @@ inline ::idni::grammar<char_type, terminal_type>::options&
 		.to_inline = {
 			{ 16, 34 },
 			{ 20 },
-			{ 21 },
 			{ 25 },
 			{ 26 },
 			{ 27 },

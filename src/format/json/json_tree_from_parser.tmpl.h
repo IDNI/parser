@@ -6,6 +6,7 @@
 
 #include <bit>
 #include <cmath>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -25,6 +26,28 @@ inline diagnostics::result<tref> tree::get(const parse_tree& t) {
 	};
 	auto text = [](tref p) -> std::string {
 		return trv(p) | trv::terminals;
+	};
+	// The exact value of a number with a fraction or an exponent as the
+	// decimal text of an integer. No value when the number is no integer.
+	auto exact_integer = [](const detail::decimal_parts& p)
+			-> std::optional<std::string>
+	{
+		std::string digits(p.integral);
+		digits += p.fraction;
+		if (digits.find_first_not_of('0') == std::string::npos)
+			return "0";
+		const int64_t exp = p.exp10 - static_cast<int64_t>(p.fraction.size());
+		if (exp < 0) {
+			const size_t cut = static_cast<size_t>(-exp);
+			if (cut > digits.size() || digits.find_first_not_of('0',
+				digits.size() - cut) != std::string::npos)
+					return std::nullopt;
+			digits.resize(digits.size() - cut);
+		} else if (exp > 20) return std::nullopt;
+		else digits.append(static_cast<size_t>(exp), '0');
+		digits.erase(0, digits.find_first_not_of('0'));
+		if (digits.empty()) return "0";
+		return p.neg ? "-" + digits : digits;
 	};
 	auto leaf_kind = [](size_t nt) {
 		switch (nt) {
@@ -47,6 +70,8 @@ inline diagnostics::result<tref> tree::get(const parse_tree& t) {
 			break;
 		case json_parser::number: {
 			const std::string s = text(p);
+			const auto fr = trv(p) | json_parser::fractional;
+			const auto ep = trv(p) | json_parser::exponent;
 			double d = 0;
 			if (!parse_number(s, d)) {
 				R.error(code::parse_error, "Invalid JSON number",
@@ -55,8 +80,20 @@ inline diagnostics::result<tref> tree::get(const parse_tree& t) {
 			}
 			// -0 and 0 compare equal, so one node holds both
 			if (std::fpclassify(d) == FP_ZERO) d = 0;
-			if (s.find_first_of(".eE") != std::string::npos) {
-				x = build_number(d);
+			if (fr || ep) {
+				// the integer text only when the double is the number
+				// exactly, so 9007199254740993.0 gets none
+				const auto parts = detail::split_decimal(s);
+				const auto ex = parts ? exact_integer(*parts)
+					: std::optional<std::string>{};
+				// exact: only a whole double is an integer
+				if (ex && std::bit_cast<uint64_t>(std::trunc(d))
+						== std::bit_cast<uint64_t>(d)
+					&& std::fabs(d) < 0x1p63
+					&& std::to_string(static_cast<int64_t>(d)) == *ex)
+						x = build_integer(static_cast<int64_t>(d));
+				else x = get(node(json_parser::number,
+					std::bit_cast<uint64_t>(d)));
 				break;
 			}
 			// an integer literal outside int64 keeps its text too, so

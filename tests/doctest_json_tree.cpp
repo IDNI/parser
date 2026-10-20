@@ -174,6 +174,47 @@ TEST_SUITE("json tree: integers") {
 		CHECK(parsed("-0.0") == parsed("0"));
 	}
 
+	TEST_CASE("a fraction or exponent literal has an integer only when exact") {
+		CHECK(jt::get(parsed("1e3")).get_integer() == 1000);
+		CHECK(jt::get(parsed("100.0")).get_integer() == 100);
+		CHECK(parsed("100.0") == parsed("100"));
+		CHECK(parsed("1e3") == parsed("1000"));
+		CHECK_FALSE(jt::get(parsed("1.5")).get_integer().has_value());
+		// its double is 2^53, not the literal
+		CHECK_FALSE(jt::get(parsed("9007199254740993.0")).get_integer()
+			.has_value());
+		CHECK(jt::get(parsed("9007199254740992.0")).get_integer()
+			== 9007199254740992);
+		CHECK(jt::get(parsed("-0.0")).get_integer() == 0);
+		CHECK(jt::get(parsed("2500e-2")).get_integer() == 25);
+		CHECK_FALSE(jt::get(parsed("1500e-3")).get_integer().has_value());
+		// the leading zeros of an exponent do not count
+		CHECK(jt::get(parsed("1e000003")).get_integer() == 1000);
+		CHECK(jt::get(parsed("1000000e-000006")).get_integer() == 1);
+	}
+
+	TEST_CASE("split_decimal gives the sign, the digits and the exponent") {
+		using idni::format::json::detail::split_decimal;
+		const auto p = split_decimal("-12.50e-3");
+		REQUIRE(p.has_value());
+		CHECK(p->neg);
+		CHECK(p->integral == "12");
+		CHECK(p->fraction == "50");
+		CHECK(p->exp10 == -3);
+		const auto q = split_decimal("7E+2");
+		REQUIRE(q.has_value());
+		CHECK_FALSE(q->neg);
+		CHECK(q->integral == "7");
+		CHECK(q->fraction.empty());
+		CHECK(q->exp10 == 2);
+		CHECK(split_decimal("1e" + std::string(30, '9'))->exp10 == 1000000);
+		CHECK(split_decimal("1e-" + std::string(30, '9'))->exp10 == -1000000);
+		for (const char* s : { "1e", "-", "1e+", "abc", "", "1x" }) {
+			CAPTURE(s);
+			CHECK_FALSE(split_decimal(s).has_value());
+		}
+	}
+
 	TEST_CASE("an integer outside int64 prints its text and has no integer") {
 		tref t = parsed("18446744073709551616");
 		CHECK(jt::get(t).to_str() == "18446744073709551616");
