@@ -12,6 +12,13 @@
 #	include <map>
 #	include <deque>
 #	include <vector>
+// a full windows.h brings the winsock.h that conflicts with Boost.Asio
+#	ifndef WIN32_LEAN_AND_MEAN
+#		define WIN32_LEAN_AND_MEAN
+#	endif
+#	ifndef NOMINMAX
+#		define NOMINMAX
+#	endif
 #	include <windows.h>
 #endif
 
@@ -58,7 +65,8 @@ inline bool open() {
 	}
 	// Disable echo input, line input, and enable window/mouse input
 	raw_in_mode = orig_in_mode;
-	raw_in_mode &= ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT);
+	raw_in_mode &= ~static_cast<DWORD>(
+		ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT);
 	raw_in_mode |= ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
 
 	if (!SetConsoleMode(hIn, raw_in_mode)) {
@@ -275,8 +283,10 @@ inline std::pair<unsigned short, unsigned short> get_termsize() {
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
 	if (!init()) return { 0, 0 };
 	if (!GetConsoleScreenBufferInfo(hOut, &csbi)) return { 0, 0 };
-	unsigned short rows = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
-	unsigned short cols = csbi.srWindow.Right - csbi.srWindow.Left + 1;
+	auto rows = static_cast<unsigned short>(
+		csbi.srWindow.Bottom - csbi.srWindow.Top + 1);
+	auto cols = static_cast<unsigned short>(
+		csbi.srWindow.Right - csbi.srWindow.Left + 1);
 	return { rows, cols };
 #endif
 }
