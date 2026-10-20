@@ -141,3 +141,35 @@ TEST_SUITE("json tree: traverser") {
 		CHECK((tt(obj) | tt::children | strings).size() == 1);
 	}
 }
+
+TEST_SUITE("json tree: free queries") {
+	TEST_CASE("is tests the kind of a node, and nullptr is no kind") {
+		tref obj = jt::get(json_parser::object, trefs{});
+		CHECK(format::json::is(obj, json_parser::object));
+		CHECK_FALSE(format::json::is(obj, json_parser::arr));
+		CHECK_FALSE(format::json::is(nullptr, json_parser::object));
+		CHECK(format::json::is(json_parser::object)(obj));
+		CHECK_FALSE(format::json::is(json_parser::arr)(obj));
+		CHECK(format::json::is(obj,
+			{ json_parser::arr, json_parser::object }));
+		CHECK_FALSE(format::json::is(obj,
+			{ json_parser::arr, json_parser::str }));
+		auto either = format::json::is(
+			{ json_parser::arr, json_parser::object });
+		CHECK(either(obj));
+		CHECK_FALSE(either(nullptr));
+	}
+
+	TEST_CASE("string_member gives the text of a string member only") {
+		tref obj = jt::get(json_parser::object, {
+			jt::get(node(json_parser::object_pair, 0, "g"),
+				jt::get(node(json_parser::str, 0, "g.tgf"))),
+			jt::get(node(json_parser::object_pair, 0, "n"),
+				jt::get(json_parser::null_sym)) });
+		REQUIRE(string_member(obj, "g") != nullptr);
+		CHECK(*string_member(obj, "g") == "g.tgf");
+		CHECK(string_member(obj, "n") == nullptr);
+		CHECK(string_member(obj, "missing") == nullptr);
+		CHECK(string_member(nullptr, "g") == nullptr);
+	}
+}

@@ -7,6 +7,7 @@
 #include <compare>
 #include <cstdint>
 #include <functional>
+#include <initializer_list>
 #include <optional>
 #include <ostream>
 #include <string>
@@ -239,6 +240,17 @@ struct tree : public lcrs_tree<node> {
 };
 
 using tt = tree::traverser;
+
+// free queries
+
+bool is(tref n, size_t nt);
+std::function<bool(tref)> is(size_t nt);
+bool is(tref n, std::initializer_list<size_t> nts);
+std::function<bool(tref)> is(std::initializer_list<size_t> nts);
+
+/// The string member @p key of @p object, or nullptr when the member is
+/// absent or holds no string.
+const std::string* string_member(tref object, std::string_view key);
 
 /// The JSON value of @p v: a bool, an unsigned integer, a std::string, or
 /// a std::vector or a std::variant of these types.

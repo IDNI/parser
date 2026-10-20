@@ -325,6 +325,37 @@ inline tree::traverser::extractor<tree::traverser> tree::traverser::f(
 
 inline tree::traverser tree::operator()() const { return traverser(get()); }
 
+//------------------------------------------------------------------------------
+// free queries
+
+inline bool is(tref n, size_t nt) {
+	return n != nullptr && tree::get(n).is(nt);
+}
+
+inline std::function<bool(tref)> is(size_t nt) {
+	return [nt](tref n) { return is(n, nt); };
+}
+
+inline bool is(tref n, std::initializer_list<size_t> nts) {
+	for (size_t nt : nts) if (is(n, nt)) return true;
+	return false;
+}
+
+inline std::function<bool(tref)> is(std::initializer_list<size_t> nts) {
+	// an initializer_list does not own its elements
+	return [v = std::vector<size_t>(nts)](tref n) {
+		for (size_t nt : v) if (is(n, nt)) return true;
+		return false;
+	};
+}
+
+inline const std::string* string_member(tref object, std::string_view key) {
+	if (object == nullptr) return nullptr;
+	tref v = tree::get(object).find(key);
+	if (v == nullptr || !tree::get(v).is_string()) return nullptr;
+	return &tree::get(v).get_string();
+}
+
 } // namespace idni::format::json
 
 #endif // __IDNI__PARSER__FORMAT__JSON_TREE_TMPL_H__
