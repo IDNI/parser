@@ -629,9 +629,18 @@ inline void report::print_tree(const sinks& s, const term::colors& tc,
 	size_t label_w = max_label_width(children);
 	auto cols = value_column_widths();
 	info_row_ = 0;
-	for (size_t i = 0; i < nodes_.size(); ++i)
-		if (nodes_[i].parent < 0)
-			print_node(s, children, i, 0, label_w, cols, tc, again);
+	// a stack in place of recursion, so a deep report from the network
+	// prints; the children go on in reverse, so they print in order
+	std::vector<std::pair<size_t, size_t>> todo;
+	for (size_t i = nodes_.size(); i-- != 0; )
+		if (nodes_[i].parent < 0) todo.emplace_back(i, 0);
+	while (!todo.empty()) {
+		const auto [idx, level] = todo.back();
+		todo.pop_back();
+		print_node(s, children, idx, level, label_w, cols, tc, again);
+		for (auto c = children[idx].rbegin(); c != children[idx].rend(); ++c)
+			todo.emplace_back(*c, level + 1);
+	}
 }
 
 inline void report::print(const sinks& s, const term::colors& tc) const {
@@ -789,32 +798,29 @@ inline std::vector<std::vector<size_t>> report::build_children() const {
 }
 
 inline size_t report::max_label_width(
-	const std::vector<std::vector<size_t>>& children,
-	size_t lvl, size_t idx) const
+	const std::vector<std::vector<size_t>>& children) const
 {
-	if (idx >= nodes_.size()) {
-		// Top-level entry (caller passed defaults): fold over every
-		// root in the forest. This handles reports built without an
-		// initial reset() — multiple parent==-1 nodes coexist.
-		size_t best = 0;
-		for (size_t i = 0; i < nodes_.size(); ++i)
-			if (nodes_[i].parent < 0)
-				best = std::max(best,
-					max_label_width(children, 0, i));
-		return best;
-	}
-	const auto& n = nodes_[idx];
-	// Errors/warnings render flat at column 0 and don't influence
-	// the info-band metric column.
-	if (is_error(n.tag) || is_warning(n.tag)) return lvl;
-	// an info message line has no value column, but its children can
-	size_t best = is_info_message(n.tag) ? lvl
-		: lvl * print_tab_width + str(n.key).size() + 1;
-	for (size_t i : children[idx]) {
-		const auto& c = nodes_[i];
-		if (is_error(c.tag) || is_warning(c.tag)) continue;
-		size_t cw = max_label_width(children, lvl + 1, i);
-		best = std::max(best, cw);
+	size_t best = 0;
+	// every root of the forest, as a report can hold several
+	std::vector<std::pair<size_t, size_t>> todo;
+	for (size_t i = 0; i < nodes_.size(); ++i)
+		if (nodes_[i].parent < 0) todo.emplace_back(i, 0);
+	while (!todo.empty()) {
+		const auto [idx, lvl] = todo.back();
+		todo.pop_back();
+		const auto& n = nodes_[idx];
+		// Errors/warnings render flat at column 0 and don't influence
+		// the info-band metric column.
+		if (is_error(n.tag) || is_warning(n.tag)) {
+			best = std::max(best, lvl);
+			continue;
+		}
+		// an info message line has no value column, but its children can
+		best = std::max(best, is_info_message(n.tag) ? lvl
+			: lvl * print_tab_width + str(n.key).size() + 1);
+		for (size_t i : children[idx])
+			if (!is_error(nodes_[i].tag) && !is_warning(nodes_[i].tag))
+				todo.emplace_back(i, lvl + 1);
 	}
 	return best;
 }
@@ -981,8 +987,6 @@ inline void report::print_node(const sinks& s,
 	} else {
 		s.info(color_info_line(n, level, label_w, cols, tc));
 	}
-	for (size_t i : children[idx])
-		print_node(s, children, i, level + 1, label_w, cols, tc, again);
 }
 
 inline std::ostream& operator<<(std::ostream& os, const report& r) {

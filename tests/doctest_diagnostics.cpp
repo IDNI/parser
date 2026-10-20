@@ -1144,6 +1144,47 @@ TEST_SUITE("diagnostics: an info message prints as a message line") {
 	}
 }
 
+TEST_SUITE("diagnostics: a deep report prints") {
+
+	TEST_CASE("a chain of 1000000 nested errors prints each line in order") {
+		constexpr size_t deep = 1000000;
+		report r;
+		const auto k = r.intern("e");
+		for (size_t i = 0; i != deep; ++i)
+			r.push_node(code::io_error, k, static_cast<int64_t>(i));
+		for (size_t i = 0; i != deep; ++i) r.pop_node();
+		size_t lines = 0;
+		bool ordered = true;
+		r.print({ .error = [&](std::string_view l) {
+				ordered = ordered && l.starts_with("e")
+					&& r.nodes()[lines].value
+						== static_cast<int64_t>(lines);
+				++lines; },
+			.warning = {}, .info = {} }, idni::term::colors(false));
+		CHECK(lines == deep);
+		CHECK(ordered);
+	}
+
+	TEST_CASE("children print after their parent, in order") {
+		report r;
+		{
+			auto a = r.open("a", code::info_count, size_t(1));
+			{ auto b = r.open("b", code::info_count, size_t(2)); }
+			{ auto c = r.open("c", code::info_count, size_t(3)); }
+		}
+		{ auto d = r.open("d", code::info_count, size_t(4)); }
+		std::vector<std::string> lines;
+		r.print({ .error = {}, .warning = {},
+			.info = [&lines](std::string_view l) {
+				lines.emplace_back(l); } }, idni::term::colors(false));
+		REQUIRE(lines.size() == 4);
+		CHECK(lines[0].starts_with("a:"));
+		CHECK(lines[1].starts_with("\tb:"));
+		CHECK(lines[2].starts_with("\tc:"));
+		CHECK(lines[3].starts_with("d:"));
+	}
+}
+
 TEST_SUITE("diagnostics: a warning and an info take a code") {
 
 	TEST_CASE("the node carries the given code, the message and the value") {

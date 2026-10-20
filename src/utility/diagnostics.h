@@ -436,12 +436,9 @@ private:
 
 	std::vector<std::vector<size_t>> build_children() const;
 
-	// idx == SIZE_MAX (the default) folds across every root node — used
-	// by print() entry. An explicit idx restricts the walk to that
-	// subtree (used by the recursion).
+	// The widest label of the info rows over every root node.
 	size_t max_label_width(
-		const std::vector<std::vector<size_t>>& children,
-		size_t lvl = 0, size_t idx = SIZE_MAX) const;
+		const std::vector<std::vector<size_t>>& children) const;
 
 	struct value_parts {
 		std::string num;
