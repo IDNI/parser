@@ -1,3 +1,7 @@
+# standard is RFC 8259. nonfinite adds the values NaN, Infinity and
+# -Infinity.
+@variants standard: standard; nonfinite: nonfinite.
+
 @use char class digit, any, ascii, xdigit, cntrl.
 
 @inline char classes,
@@ -7,7 +11,7 @@
 @trim _, __.
 @trim children true_sym, false_sym, null_sym.
 
-@highlight keyword : true_sym, false_sym, null_sym, start.
+@highlight keyword : true_sym, false_sym, null_sym, nonfinite, start.
 @highlight type : value, arr, object, object_pair, values.
 @highlight string : str, q_str, escaped, unescaped.
 @highlight number : number, digit, integral, fractional, exponent, zero, nonzerodigit, nzintegral, xdigit, ascii_digit, ascii_xdigit.
@@ -21,11 +25,13 @@ _              => [__].
 
 # value
 value          => true_sym | false_sym | null_sym | number | q_str | arr | object.
+value[nonfinite] => nonfinite.
 
 # constants
 true_sym       => "true".
 false_sym      => "false".
 null_sym       => "null".
+nonfinite      => "NaN" | "Infinity" | "-Infinity".
 
 # number
 number         => '-'? integral fractional? exponent?.

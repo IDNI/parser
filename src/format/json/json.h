@@ -92,7 +92,8 @@ using trv  = parse_tree::traverser;
 /// A number keeps the bits of its double in `data`. An integer value
 /// below 2^63 in magnitude keeps its decimal text in `str` too, and so
 /// does an integer literal outside that range, so a value above 2^53
-/// prints exactly. A str
+/// prints exactly. NaN, Infinity and -Infinity of the grammar variant
+/// nonfinite are number nodes with no text, and NaN is a quiet NaN. A str
 /// keeps its decoded text in `str`. An object_pair keeps its
 /// key in `str` and has one child, the value. An arr has its elements as children, an
 /// object its object_pair nodes, both in order.
@@ -335,6 +336,17 @@ struct tree : public lcrs_tree<node> {
 };
 
 using tt = tree::traverser;
+
+namespace detail {
+
+/// The json.tgf grammar with the variant nonfinite: NaN, Infinity and
+/// -Infinity are values. It is a grammar object of its own, so the grammar
+/// of json_parser::instance() stays on the variant standard.
+grammar<char, char32_t>& nonfinite_grammar();
+/// The parser of nonfinite_grammar().
+parser<char, char32_t>& nonfinite_parser();
+
+} // namespace detail
 
 // free queries
 

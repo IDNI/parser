@@ -1,0 +1,40 @@
+# Tests the json.tgf grammar with the variant nonfinite.
+#
+# What changes from the standard default: NaN, Infinity and -Infinity are
+# values. Every other rule stays.
+#
+# To run:
+#   tgf json.tgf test --variant nonfinite json-nonfinite.tgf.test
+
+# ===========================================================================
+# 1  THE NONFINITE CONSTANTS
+# ===========================================================================
+
+start : "NaN", "Infinity", "-Infinity".
+
+start > value > nonfinite : "NaN", "Infinity", "-Infinity".
+start > value > nonfinite > ^ 'N' 'a' 'N' $ : "NaN".
+start > value > nonfinite > ^ '-' 'I' 'n' 'f' 'i' 'n' 'i' 't' 'y' $ : "-Infinity".
+
+# A constant in an array and in an object.
+start : "[NaN,Infinity,-Infinity]", "{\"a\":NaN}", " [ -Infinity ] ".
+start > value > arr > values > value > nonfinite : "[NaN]".
+start > value > object > object_pair > value > nonfinite : "{\"a\":Infinity}".
+
+# A negative number is no nonfinite constant.
+start > value > number : "-1".
+~start > value > nonfinite : "-1".
+
+# ===========================================================================
+# 2  THE STANDARD VALUES STAY
+# ===========================================================================
+
+start : "true", "false", "null", "0", "-0.5", "1e400",
+        "\"a\"", "[]", "{}", "[1,{\"b\":[null]}]".
+
+# ===========================================================================
+# 3  REJECTS -- other spellings of the constants
+# ===========================================================================
+
+~start : "nan", "NAN", "inf", "-inf", "infinity", "+Infinity", "-NaN",
+         "Inf", "Infinit", "NaNa", "\"NaN\"x", "[NaN,]".

@@ -10,6 +10,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -427,6 +428,56 @@ TEST_SUITE("json tree: print options") {
 		CHECK(jt::get(t).to_str(print_options{}) == m);
 		CHECK(m == "{\"b\":{\"z\":1,\"a\":[{\"y\":2},[]]},"
 			"\"a\":\"\xc3\xa9\"}");
+	}
+}
+
+TEST_SUITE("json tree: the grammar variant nonfinite") {
+	// The tree of a text that the nonfinite grammar must parse.
+	static tref nonfinite_parsed(std::string_view text) {
+		json_parser::parse_options po{ .start = json_parser::start };
+		auto r = idni::format::json::detail::nonfinite_parser().parse(text.data(), text.size(),
+			po);
+		auto t = jt::get(r);
+		REQUIRE(t.has_value());
+		return t.value();
+	}
+
+	TEST_CASE("NaN, Infinity and -Infinity are number nodes") {
+		const tref nan = nonfinite_parsed("NaN");
+		REQUIRE(jt::get(nan).is_number());
+		CHECK(std::isnan(jt::get(nan).get_number()));
+		CHECK(jt::get(nan).value.str.empty());
+		CHECK(nonfinite_parsed("NaN") == nan);
+		const tref inf = nonfinite_parsed("Infinity");
+		CHECK(jt::get(inf).get_number()
+			== std::numeric_limits<double>::infinity());
+		const tref minf = nonfinite_parsed("-Infinity");
+		CHECK(jt::get(minf).get_number()
+			== -std::numeric_limits<double>::infinity());
+		CHECK(inf != minf);
+	}
+
+	TEST_CASE("a constant in an array and in an object") {
+		const tref t = nonfinite_parsed(R"({"a":[NaN,1,-Infinity]})");
+		const tree& a = jt::get(jt::get(t).find("a"));
+		REQUIRE(a.is_array());
+		CHECK(std::isnan(a[0].get_number()));
+		CHECK(a[1].get_integer() == 1);
+		CHECK(a[2].get_number()
+			== -std::numeric_limits<double>::infinity());
+	}
+
+	TEST_CASE("the shared parser stays on the variant standard") {
+		(void)nonfinite_parsed("NaN");
+		CHECK(idni::format::json::detail::nonfinite_grammar().opt().variant == "nonfinite");
+		CHECK(json_parser_data::grammar().opt().variant == "standard");
+		for (const char* text : { "NaN", "Infinity", "-Infinity",
+				"[NaN]", R"({"a":Infinity})" })
+		{
+			CAPTURE(text);
+			CHECK_FALSE(jt::get(std::string_view(text)).has_value());
+		}
+		CHECK(parsed("[1,-2.5]") != nullptr);
 	}
 }
 

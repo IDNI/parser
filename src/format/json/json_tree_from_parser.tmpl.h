@@ -6,6 +6,7 @@
 
 #include <bit>
 #include <cmath>
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -53,7 +54,7 @@ inline diagnostics::result<tref> tree::get(const parse_tree& t) {
 		switch (nt) {
 		case json_parser::null_sym: case json_parser::true_sym:
 		case json_parser::false_sym: case json_parser::number:
-		case json_parser::str:
+		case json_parser::nonfinite: case json_parser::str:
 			return true;
 		default: return false;
 		}
@@ -100,6 +101,16 @@ inline diagnostics::result<tref> tree::get(const parse_tree& t) {
 			// it prints exactly
 			x = get(node(json_parser::number, std::bit_cast<uint64_t>(d),
 				s == "-0" ? "0" : s));
+			break;
+		}
+		case json_parser::nonfinite: {
+			const std::string s = text(p);
+			// one NaN pattern, so equal texts intern as one node
+			const double d = s == "NaN"
+				? std::numeric_limits<double>::quiet_NaN()
+				: s == "Infinity" ? std::numeric_limits<double>::infinity()
+				: -std::numeric_limits<double>::infinity();
+			x = get(node(json_parser::number, std::bit_cast<uint64_t>(d)));
 			break;
 		}
 		case json_parser::str: {
@@ -180,6 +191,31 @@ inline diagnostics::result<tref> tree::get(std::string_view text) {
 	auto r = json_parser::instance().parse(text.data(), text.size(), po);
 	return get(r);
 }
+
+namespace detail {
+
+inline grammar<char, char32_t>& nonfinite_grammar() {
+	static grammar<char, char32_t>& g = []() -> grammar<char, char32_t>& {
+		static grammar<char, char32_t> v(json_parser_data::nts(),
+			json_parser_data::productions(),
+			json_parser_data::start_symbol(),
+			json_parser_data::char_classes(),
+			json_parser_data::grammar_options());
+		auto r = v.set_variant("nonfinite");
+		DBG(assert(r.has_value());)
+		(void)r;
+		return v;
+	}();
+	return g;
+}
+
+inline parser<char, char32_t>& nonfinite_parser() {
+	static parser<char, char32_t> p(nonfinite_grammar(),
+		json_parser_data::make_parser_options());
+	return p;
+}
+
+} // namespace detail
 
 } // namespace idni::format::json
 

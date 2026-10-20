@@ -277,7 +277,7 @@ start >> values > ^ value > object $ : "[{\"a\":1}]".
          "{\"a\":1 \"b\":2}",
          "\"unterminated escape\\".
 
-~start : "NaN", "Infinity",
+~start : "NaN", "Infinity", "-Infinity", "[NaN]", "{\"a\":Infinity}",
          "'single quotes'",
          "/* comment */", "// comment",
          ".5e1", "1.e1".

@@ -28,3 +28,6 @@ add_test(NAME csv_header.tgf.test COMMAND tgf
 add_test(NAME json.tgf.test COMMAND tgf
 	"${PROJECT_SOURCE_DIR}/src/format/json/json.tgf" test
 	"${PROJECT_SOURCE_DIR}/tests/format/json/json.tgf.test")
+add_test(NAME json_nonfinite.tgf.test COMMAND tgf
+	"${PROJECT_SOURCE_DIR}/src/format/json/json.tgf" test
+	--variant nonfinite "${PROJECT_SOURCE_DIR}/tests/format/json/json-nonfinite.tgf.test")
