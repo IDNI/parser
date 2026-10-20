@@ -36,6 +36,9 @@ constexpr bool is_metric(code c) {
 	return c == code::info_micros || c == code::info_kb
 		|| c == code::info_count;
 }
+constexpr bool is_info_message(code c) {
+	return is_info(c) && !is_metric(c) && c != code::info_scope;
+}
 
 constexpr bool uses_micros_scale(code c) { return c == code::info_micros; }
 
@@ -570,7 +573,8 @@ inline void report::demote_errors_to_warnings() {
 inline std::string report::format_message(size_t node_idx) const {
 	if (node_idx >= nodes_.size()) return {};
 	const auto& n = nodes_[node_idx];
-	if (!is_error(n.tag) && !is_warning(n.tag)) return {};
+	if (!is_error(n.tag) && !is_warning(n.tag) && !is_info_message(n.tag))
+		return {};
 	std::string out;
 	auto msg = str(n.key);
 	if (!msg.empty()) out.append(msg);
@@ -787,8 +791,9 @@ inline size_t report::max_label_width(
 	// Errors/warnings render flat at column 0 and don't influence
 	// the info-band metric column.
 	if (is_error(n.tag) || is_warning(n.tag)) return lvl;
-	size_t w = lvl * print_tab_width + str(n.key).size() + 1;
-	size_t best = w;
+	// an info message line has no value column, but its children can
+	size_t best = is_info_message(n.tag) ? lvl
+		: lvl * print_tab_width + str(n.key).size() + 1;
 	for (size_t i : children[idx]) {
 		const auto& c = nodes_[i];
 		if (is_error(c.tag) || is_warning(c.tag)) continue;
@@ -865,7 +870,8 @@ inline report::value_columns report::value_column_widths() const {
 	constexpr size_t min_value_field_width = 6;
 	value_columns cols{ min_value_field_width, 0 };
 	for (const auto& n : nodes_) {
-		if (is_error(n.tag) || is_warning(n.tag)) continue;
+		if (is_error(n.tag) || is_warning(n.tag) || is_info_message(n.tag))
+			continue;
 		auto p = format_value_parts(n.value, n.tag);
 		cols.num_w  = std::max(cols.num_w, p.num.size());
 		cols.unit_w = std::max(cols.unit_w, p.unit.size());
@@ -951,6 +957,8 @@ inline void report::print_node(const sinks& s,
 	const auto& n = nodes_[idx];
 	if (is_error(n.tag) || is_warning(n.tag)) {
 		if (again || !n.printed) print_message(s, idx, tc);
+	} else if (is_info_message(n.tag)) {
+		s.info(std::string(level, '\t') + format_message(idx));
 	} else if (n.tag == code::info_scope
 		&& children[idx].empty()) {
 		// silent container with nothing to show — skip

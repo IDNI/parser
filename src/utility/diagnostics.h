@@ -81,6 +81,9 @@ enum class code : uint16_t {
 constexpr bool is_error(code c);
 constexpr bool is_warning(code c);
 constexpr bool is_info(code c);
+/// True for an info node that is no metric and no scope. Such a node prints
+/// as a message line.
+constexpr bool is_info_message(code c);
 constexpr bool is_metric(code c);
 constexpr bool uses_micros_scale(code c);
 

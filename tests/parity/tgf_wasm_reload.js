@@ -50,6 +50,11 @@ async function main() {
 	if (repl.filename() !== '/host' + grammarB)
 		fail('filename after reload is ' + repl.filename());
 
+	// the next command prints the report of the reload as a message line
+	const report = repl.eval_capture('version').replace(/\x1b\[[0-9;]*m/g, '');
+	if (!report.includes('Grammar reloaded (path=/host' + grammarB + ')'))
+		fail('no reload message line: ' + JSON.stringify(report));
+
 	// grammar B parses the same input, so its own symbols appear
 	const after = repl.eval_capture('p {"a":1}');
 	if (!after.includes('object_pair'))

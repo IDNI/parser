@@ -12,6 +12,7 @@
 #include "quiet_doctest.h"
 #include "debug_skip.h"
 #include "utility/diagnostics.h"
+#include "utility/program_codes.h"
 
 #include <string>
 #include <string_view>
@@ -1040,6 +1041,56 @@ TEST_SUITE("diagnostics: a result<void> takes a child's value") {
 		CHECK(none == std::nullopt);
 		CHECK_FALSE(failed.has_value());
 		CHECK(failed.report().nodes().back().tag == code::solver_error);
+	}
+}
+
+TEST_SUITE("diagnostics: an info message prints as a message line") {
+
+	using label = idni::parser_strings::label;
+
+	// The lines of one print() call on the info sink, with no colour.
+	static std::vector<std::string> info_lines(const report& r) {
+		std::vector<std::string> lines;
+		r.print({ .error = {}, .warning = {},
+			.info = [&lines](std::string_view l) {
+				lines.emplace_back(l); } }, idni::term::colors(false));
+		return lines;
+	}
+
+	TEST_CASE("an info node with an attribute prints its text and the attribute") {
+		report r;
+		r.info("Grammar reloaded", {{label::path, std::string_view("g.tgf")}});
+		CHECK(info_lines(r) == std::vector<std::string>{
+			"Grammar reloaded (path=g.tgf)" });
+		CHECK(r.format_message(0) == "Grammar reloaded (path=g.tgf)");
+	}
+
+	TEST_CASE("a program info node prints as a message line") {
+		report r;
+		r.info(program_info(1), "fee paid",
+			{{label::name, std::string_view("alice")}});
+		r.info(program_info(2), "fee", size_t{ 12 });
+		CHECK(info_lines(r) == std::vector<std::string>{
+			"fee paid (name=alice)", "fee (value=12)" });
+	}
+
+	TEST_CASE("a counter prints as a counter row beside a message") {
+		report r;
+		r.count("parse", size_t{ 120 });
+		r.info("Grammar reloaded", {{label::path, std::string_view("g.tgf")}});
+		CHECK(info_lines(r) == std::vector<std::string>{
+			"parse:    120", "Grammar reloaded (path=g.tgf)" });
+		CHECK(r.format_message(0).empty());
+	}
+
+	TEST_CASE("is_info_message tells a message from a metric") {
+		CHECK(is_info_message(code::info));
+		CHECK(is_info_message(program_info(0)));
+		CHECK(is_info_message(static_cast<code>(0x8010)));
+		CHECK_FALSE(is_info_message(code::info_count));
+		CHECK_FALSE(is_info_message(code::info_micros));
+		CHECK_FALSE(is_info_message(code::info_scope));
+		CHECK_FALSE(is_info_message(code::warning));
 	}
 }
 
