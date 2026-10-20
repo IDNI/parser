@@ -4,9 +4,9 @@
 #ifndef __IDNI__PARSER__UTILITY__WIN_ARGS_H__
 #define __IDNI__PARSER__UTILITY__WIN_ARGS_H__
 
-// The Windows command-line helpers: a UTF-8 to UTF-16 conversion and the
-// quoting one argument needs. They are empty on other platforms, so
-// including this header is always safe.
+// The Windows command-line helpers: a UTF-8 to UTF-16 conversion, the
+// quoting one argument needs and a main with UTF-8 arguments. On other
+// platforms the header declares nothing.
 
 #include <string>
 
@@ -17,6 +17,10 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#include <shellapi.h>
+#include <vector>
+
+#include "characters.h"
 
 namespace idni {
 
@@ -57,6 +61,29 @@ inline std::wstring win_quote_arg(const std::wstring& a) {
 	}
 	out.push_back(L'"');
 	return out;
+}
+
+/// Run @p run with the arguments of the process. They come from the wide
+/// command line as UTF-8, and the console uses UTF-8.
+inline int win_utf8_main(int argc, char** argv, int (*run)(int, char**)) {
+	::SetConsoleOutputCP(CP_UTF8);
+	::SetConsoleCP(CP_UTF8);
+	int wargc = 0;
+	LPWSTR* wargv = ::CommandLineToArgvW(::GetCommandLineW(), &wargc);
+	if (!wargv) return run(argc, argv);
+
+	std::vector<std::string> args;
+	args.reserve(static_cast<size_t>(wargc));
+	for (int i = 0; i < wargc; ++i)
+		args.emplace_back(wide_to_utf8(std::wstring(wargv[i])));
+	::LocalFree(wargv);
+
+	std::vector<char*> argv_utf8;
+	argv_utf8.reserve(args.size() + 1);
+	for (auto& s : args) argv_utf8.push_back(s.data());
+	argv_utf8.push_back(nullptr);
+
+	return run(static_cast<int>(args.size()), argv_utf8.data());
 }
 
 } // namespace idni

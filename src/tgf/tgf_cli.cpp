@@ -23,6 +23,7 @@
 #include "tgf_serve.h"
 #include "tgf_connect.h"
 #endif
+#include "utility/win_args.h"
 #include "format/tgf.test/tgf_test.h"
 #ifndef DEBUG
 #include "utility/devhelpers.h"
@@ -2371,6 +2372,14 @@ int tgf_run(int argc, char** argv) {
 		return command_line_error("TGF file does not exist");
 	tgf_repl_evaluator re(tgf_file);
 	return run_tool(argc, argv, tgf_args_config, tool, re, true);
+}
+
+int tgf_main(int argc, char** argv) {
+#ifdef _WIN32
+	return win_utf8_main(argc, argv, tgf_run);
+#else
+	return tgf_run(argc, argv);
+#endif
 }
 
 #ifdef TAU_PARSER_HAS_FTXUI

@@ -448,4 +448,21 @@ TEST_SUITE("tgf cli: trim keeps the root") {
 	}
 }
 
+// On Windows tgf_main reads the command line of the test process instead.
+#ifndef _WIN32
+TEST_SUITE("tgf cli: tgf_main") {
+
+	TEST_CASE("tgf_main gives its arguments to tgf_run") {
+		string a0 = "tgf", a1 = "-h";
+		char* argv[] = { a0.data(), a1.data(), nullptr };
+		ostringstream os;
+		streambuf* old_out = cout.rdbuf(os.rdbuf());
+		int rc = tgf_main(2, argv);
+		cout.rdbuf(old_out);
+		CHECK(rc == 0);
+		CHECK(os.str().find("Commands:") != string::npos);
+	}
+}
+#endif // _WIN32
+
 #endif // TAU_TEST_HAS_TGF_CLI && PROJECT_SOURCE_DIR

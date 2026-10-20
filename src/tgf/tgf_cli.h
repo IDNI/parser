@@ -29,6 +29,10 @@ namespace idni {
 /// TGF entry point
 int tgf_run(int argc, char** argv);
 
+/// The main of the tgf program. Only main calls it, because on Windows it
+/// reads the arguments from the command line of the process.
+int tgf_main(int argc, char** argv);
+
 /// Status of one command, or of one request text as a whole.
 enum class cmd_status { ok, error, incomplete, quit };
 

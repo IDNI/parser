@@ -289,3 +289,34 @@ TEST_SUITE("term::drop_utf8_bom") {
 		CHECK(s == "a = b.");
 	}
 }
+
+#ifdef _WIN32
+#include "utility/win_args.h"
+
+#include <cstdlib>
+#include <string>
+#include <vector>
+
+TEST_SUITE("win_utf8_main") {
+
+	static std::vector<std::string> seen_args;
+	static bool seen_argv_end = false;
+
+	static int record_args(int argc, char** argv) {
+		seen_args.assign(argv, argv + argc);
+		seen_argv_end = argv[argc] == nullptr;
+		return 7;
+	}
+
+	TEST_CASE("the program gets the arguments of the process with a null after them and gives its exit code") {
+		char prog[] = "prog";
+		char word[] = "\xC3\xA4";
+		char* argv[] = { prog, word, nullptr };
+		seen_args.clear();
+		CHECK(idni::win_utf8_main(2, argv, record_args) == 7);
+		CHECK(seen_argv_end);
+		CHECK(seen_args.size() == static_cast<size_t>(__argc));
+		CHECK_FALSE(seen_args.front().empty());
+	}
+}
+#endif // _WIN32
