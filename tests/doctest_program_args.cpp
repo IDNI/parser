@@ -58,6 +58,7 @@ struct outcome {
 	bool has_error = false;
 	info_flag info = info_flag::none;
 	string command;
+	vector<string> inputs;
 	size_t count = 0;
 	/// What read_program_args wrote on std::cout.
 	string read_out;
@@ -68,11 +69,12 @@ struct outcome {
 #ifdef PROGRAM_ARGS_TEST_THREADS
 // A new thread starts with an empty options repository.
 outcome read_on_thread(initializer_list<const char*> args,
-	const program_identity& who = demo)
+	const program_identity& who = demo,
+	const args_config& cfg = demo_config())
 {
 	outcome o;
 	vector<string> store(args.begin(), args.end());
-	thread t([&o, &store, &who] {
+	thread t([&o, &store, &who, &cfg] {
 		auto& opts = idni::options();
 		o.declared = opts.declare(demo_set()).has_value();
 		vector<char*> argv;
@@ -80,7 +82,7 @@ outcome read_on_thread(initializer_list<const char*> args,
 		ostringstream read_out, info_out;
 		streambuf* old_out = cout.rdbuf(read_out.rdbuf());
 		auto r = read_program_args(static_cast<int>(argv.size()),
-			argv.data(), who, demo_config());
+			argv.data(), who, cfg);
 		cout.rdbuf(info_out.rdbuf());
 		if (r.has_value()) print_info(who, r.value());
 		cout.rdbuf(old_out);
@@ -91,6 +93,7 @@ outcome read_on_thread(initializer_list<const char*> args,
 		if (r.has_value()) {
 			o.info = r.value().info;
 			o.command = r.value().args.command;
+			o.inputs = r.value().args.inputs;
 		}
 		o.count = opts.get<size_t>("count");
 	});
@@ -195,6 +198,64 @@ TEST_SUITE("read_program_args") {
 		CHECK_FALSE(o.has_value);
 		CHECK(o.has_error);
 		CHECK(o.read_out.empty());
+	}
+
+	TEST_CASE("-- -5: the word after -- is an input") {
+		auto o = read_on_thread({ "demo", "--", "-5" });
+		CHECK(o.has_value);
+		CHECK(o.command.empty());
+		CHECK(o.inputs == vector<string>{ "-5" });
+	}
+
+	TEST_CASE("-- --help: no help, and --help is an input") {
+		auto o = read_on_thread({ "demo", "--", "--help" });
+		CHECK(o.has_value);
+		CHECK(o.info == info_flag::none);
+		CHECK(o.inputs == vector<string>{ "--help" });
+		CHECK(o.info_out.empty());
+	}
+
+	TEST_CASE("a -- b gives the inputs a and b") {
+		args_config free = demo_config();
+		free.free_inputs = true;
+		auto o = read_on_thread({ "demo", "a", "--", "b" }, demo, free);
+		CHECK(o.has_value);
+		CHECK(o.inputs == vector<string>{ "a", "b" });
+	}
+
+	TEST_CASE("a second -- is an input") {
+		auto o = read_on_thread({ "demo", "--", "x", "--", "y" });
+		CHECK(o.has_value);
+		CHECK(o.inputs == vector<string>{ "x", "--", "y" });
+	}
+
+	TEST_CASE("after --, a command name and an option are inputs") {
+		auto o = read_on_thread({ "demo", "run", "-n", "2", "--",
+			"run", "-n", "5" });
+		CHECK(o.has_value);
+		CHECK(o.command == "run");
+		CHECK(o.count == 2u);
+		CHECK(o.inputs == vector<string>{ "run", "-n", "5" });
+	}
+
+	TEST_CASE("an option before -- that needs a value takes no --") {
+		auto o = read_on_thread({ "demo", "run", "-n", "--", "5" });
+		CHECK_FALSE(o.has_value);
+		CHECK(o.has_error);
+	}
+
+	TEST_CASE("without --, a run reads as before") {
+		auto o = read_on_thread({ "demo", "run", "-n", "4" });
+		CHECK(o.has_value);
+		CHECK(o.count == 4u);
+		CHECK(o.inputs.empty());
+		auto bad = read_on_thread({ "demo", "-5" });
+		CHECK_FALSE(bad.has_value);
+		CHECK(bad.has_error);
+		auto unknown = read_on_thread({ "demo", "--bogus" });
+		CHECK_FALSE(unknown.has_value);
+		auto help = read_on_thread({ "demo", "-h" });
+		CHECK(help.info == info_flag::help);
 	}
 
 	TEST_CASE("a bad value in the environment is an error") {

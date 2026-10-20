@@ -10,6 +10,7 @@
 #include <charconv>
 #include <cstdlib>
 #include <fstream>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <optional>
@@ -558,6 +559,15 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 	const detail::options_catalog& cat = *cat_;
 	std::vector<std::string> args;
 	for (int i = 0; i < argc; ++i) args.emplace_back(argv[i]);
+	// the first "--" ends the options: each later word is an input as it is
+	std::vector<std::string> after_options;
+	if (auto dd = std::find(args.begin() + (args.empty() ? 0 : 1),
+		args.end(), "--"); dd != args.end())
+	{
+		after_options.assign(std::make_move_iterator(dd + 1),
+			std::make_move_iterator(args.end()));
+		args.erase(dd, args.end());
+	}
 	parsed_args out;
 	// Stored only when the whole command line is valid. One entry per
 	// option, in the order of its first use in argv.
@@ -712,8 +722,11 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 		if ((status = process(arg, false, cfg.global_surface)) != 0)
 			break;
 	if (status == 1) return r;
+	const auto has_inputs = [&] {
+		return !out.inputs.empty() || !after_options.empty();
+	};
 	if (status == 3 && (cfg.default_command.empty()
-		|| (!out.inputs.empty() && cfg.default_command_when_inputs.empty())))
+		|| (has_inputs() && cfg.default_command_when_inputs.empty())))
 	{
 		fail_with_help(ps::messages::option_not_found,
 			{ { ps::label::name, args[arg] } });
@@ -721,7 +734,7 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 	}
 	out.command_given = status == 2;
 	const std::string cmd = status == 2 ? args[arg++]
-		: out.inputs.empty() ? cfg.default_command
+		: !has_inputs() ? cfg.default_command
 		: cfg.default_command_when_inputs;
 	if (!cmd.empty()) {
 		if (!cat.command(cmd)) {
@@ -740,6 +753,9 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 		}
 		out.command = cmd;
 	}
+	out.inputs.insert(out.inputs.end(),
+		std::make_move_iterator(after_options.begin()),
+		std::make_move_iterator(after_options.end()));
 	// a field takes no value until every value of argv fits its field
 	for (const auto& [i, v] : pending)
 		if (bindings_[i]) r.merge(bindings_[i]->write(v, false));
