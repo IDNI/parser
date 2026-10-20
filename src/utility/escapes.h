@@ -43,6 +43,10 @@ struct profile {
 	/// UTF-16 pair above U+FFFF when hex_u4 is utf16. A byte that is not
 	/// valid UTF-8 has no code point, so it stays as it is.
 	bool	    ascii_only = false;
+	/// With hex_u4 utf16, a lone surrogate escape gives the three bytes
+	/// of its code point (WTF-8). A high escape with no low escape after
+	/// it leaves the text after it.
+	bool	    wtf8_surrogates = false;
 	/// False writes U+007F raw. An encode escapes it by default.
 	bool	    escape_delete = true;
 };
@@ -91,6 +95,19 @@ inline constexpr profile json_ascii {
 	.hex_U8	      = false,
 	.octal	      = false,
 	.ascii_only   = true,
+};
+
+/// json with wtf8_surrogates.
+inline constexpr profile json_wtf8 {
+	.delim	      = '"',
+	.prefix	      = '\\',
+	.escape_chars = "bfnrt/",
+	.lenient      = lenient_mode::off,
+	.hex_x	      = hex_x_mode::off,
+	.hex_u4	      = hex_u4_mode::utf16,
+	.hex_U8	      = false,
+	.octal	      = false,
+	.wtf8_surrogates = true,
 };
 
 inline constexpr profile csv {

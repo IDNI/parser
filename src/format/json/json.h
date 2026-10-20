@@ -172,6 +172,10 @@ struct read_options {
 	/// integer text keeps its digits, and its double is an infinity when
 	/// it is out of range.
 	bool keep_float_form = false;
+	/// A lone surrogate escape gives the WTF-8 bytes of its code point in
+	/// the str, as escapes::json_wtf8 decodes it. Such a str is no valid
+	/// UTF-8. Raw input bytes of a surrogate stay invalid UTF-8.
+	bool lone_surrogates = false;
 };
 
 /// A JSON document as an interned lcrs tree. A tref of it is valid until

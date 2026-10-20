@@ -129,7 +129,8 @@ inline diagnostics::result<tref> tree::get(const parse_tree& t,
 			break;
 		}
 		case json_parser::str: {
-			auto dec = idni::escapes::decode(text(p), idni::escapes::json);
+			auto dec = idni::escapes::decode(text(p), o.lone_surrogates
+				? idni::escapes::json_wtf8 : idni::escapes::json);
 			if (dec.has_error()) {
 				R.append(std::move(dec).report());
 				return false;

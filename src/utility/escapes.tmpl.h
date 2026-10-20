@@ -103,6 +103,7 @@ inline void emit_ascii_escape(std::string& out, char32_t cp, const profile& p) {
 struct u32sink {
 	std::u32string out;
 	void unicode(char32_t cp) { out.push_back(cp); }
+	void surrogate(char32_t cp) { out.push_back(cp); }
 	void hexbyte(unsigned b)  { out.push_back((char32_t)b); }
 	std::string_view octal(unsigned v) {
 		if (!idni::is_valid_codepoint((char32_t)v))
@@ -128,6 +129,8 @@ struct utf8sink {
 		size_t n = idni::emit_codepoint(cp, buf);
 		out.append(reinterpret_cast<const char*>(buf), n);
 	}
+	// emit_codepoint writes the three bytes of a surrogate too
+	void surrogate(char32_t cp) { unicode(cp); }
 	void hexbyte(unsigned b) { out.push_back((char)(unsigned char)b); }
 	std::string_view octal(unsigned v) {
 		if (v > 0xFF)
@@ -194,10 +197,27 @@ inline bool decode_core(std::string_view body, const profile& p, Sink& sink,
 		return true;
 	};
 
+	// A \uXXXX escape of a low surrogate at src[at..], read without a move.
+	auto low_escape_at = [&](size_t at) -> bool {
+		if (at + 6 > len || src[at] != (unsigned char)p.prefix
+				|| src[at + 1] != 'u')
+			return false;
+		char32_t v = 0;
+		for (size_t k = at + 2; k != at + 6; ++k) {
+			if (!isxdigit((char)src[k])) return false;
+			v = (v << 4) | hex_val((char)src[k]);
+		}
+		return v >= 0xDC00 && v <= 0xDFFF;
+	};
+
 	auto parse_hex_u4 = [&](size_t es) -> bool {
 		char32_t cp = 0;
 		if (!read_nhex(cp, 4)) return fail(es, ps::escape_u4_need_4);
 		if (p.hex_u4 == hex_u4_mode::utf16 && cp >= 0xD800 && cp <= 0xDBFF) {
+			if (p.wtf8_surrogates && !low_escape_at(i)) {
+				sink.surrogate(cp);
+				return true;
+			}
 			if (i + 6 > len || src[i] != (unsigned char)p.prefix || src[i + 1] != 'u')
 				return fail(es, ps::escape_u4_high_no_low);
 			i += 2;
@@ -207,8 +227,11 @@ inline bool decode_core(std::string_view body, const profile& p, Sink& sink,
 			sink.unicode(0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00));
 			return true;
 		}
-		if (p.hex_u4 == hex_u4_mode::utf16 && cp >= 0xDC00 && cp <= 0xDFFF)
-			return fail(es, ps::escape_u4_lone_low);
+		if (p.hex_u4 == hex_u4_mode::utf16 && cp >= 0xDC00 && cp <= 0xDFFF) {
+			if (!p.wtf8_surrogates) return fail(es, ps::escape_u4_lone_low);
+			sink.surrogate(cp);
+			return true;
+		}
 		if (!idni::is_valid_codepoint(cp)) return fail(es, ps::escape_u4_invalid);
 		sink.unicode(cp);
 		return true;

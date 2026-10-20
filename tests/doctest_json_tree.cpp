@@ -645,6 +645,50 @@ TEST_SUITE("json tree: keep_float_form") {
 
 }
 
+TEST_SUITE("json tree: lone surrogates") {
+	const read_options lone{ .lone_surrogates = true };
+
+	static std::string str_of(std::string_view text, const read_options& o) {
+		auto r = jt::get(text, o);
+		REQUIRE(r.has_value());
+		REQUIRE(jt::get(r.value()).is_string());
+		return jt::get(r.value()).get_string();
+	}
+
+	TEST_CASE("the default reader refuses a lone surrogate escape") {
+		for (const char* text : { R"("\ud800")", R"("\udfff")",
+				R"("\ud83dA")", R"("\ude00\ud83d")" })
+		{
+			CAPTURE(text);
+			CHECK_FALSE(jt::get(std::string_view(text)).has_value());
+			CHECK_FALSE(jt::get(text, read_options{}).has_value());
+		}
+	}
+
+	TEST_CASE("a lone surrogate gives its WTF-8 bytes") {
+		CHECK(str_of(R"("\ud800")", lone) == "\xED\xA0\x80");
+		CHECK(str_of(R"("\udfff")", lone) == "\xED\xBF\xBF");
+		CHECK(str_of(R"("\ude00\ud83d")", lone)
+			== "\xED\xB8\x80\xED\xA0\xBD");
+		CHECK(str_of(R"("\ud83dA")", lone) == "\xED\xA0\xBD" "A");
+		CHECK(str_of(R"("\ud83d\ude00")", lone) == "\xF0\x9F\x98\x80");
+	}
+
+	TEST_CASE("a lone surrogate in a key") {
+		auto r = jt::get(R"({"\ud800":1,"\ue000":2,"a":3})", lone);
+		REQUIRE(r.has_value());
+		const tree& t = jt::get(r.value());
+		CHECK(jt::get(t.find("\xED\xA0\x80")).get_integer() == 1);
+		CHECK(jt::get(t.find("\xEE\x80\x80")).get_integer() == 2);
+		CHECK(jt::get(t.find("a")).get_integer() == 3);
+	}
+
+	TEST_CASE("raw surrogate bytes stay invalid") {
+		CHECK_FALSE(jt::get("\"\xED\xA0\x80\"", lone).has_value());
+	}
+
+}
+
 TEST_SUITE("json tree: the float format repr") {
 	// The expected texts come from Python repr and json.dumps.
 	TEST_CASE("float_repr gives the text of Python repr") {

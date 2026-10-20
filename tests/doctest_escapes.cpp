@@ -133,6 +133,48 @@ TEST_SUITE("hex_u4_mode::utf16 (json)") {
 }
 
 // ---------------------------------------------------------------------------
+TEST_SUITE("wtf8_surrogates (json_wtf8)") {
+
+	TEST_CASE("a pair still makes one code point") {
+		CHECK(dec("\\ud83d\\ude00", json_wtf8) == "\xF0\x9F\x98\x80");
+		CHECK(dcp("\\ud83d\\ude00", json_wtf8) == U"\U0001F600");
+	}
+	TEST_CASE("a lone high escape gives its three bytes") {
+		CHECK(dec("\\ud800", json_wtf8) == "\xED\xA0\x80");
+		CHECK(dec("\\udbff", json_wtf8) == "\xED\xAF\xBF");
+		CHECK(dcp("\\ud800", json_wtf8) == std::u32string(1, 0xD800));
+	}
+	TEST_CASE("a lone low escape gives its three bytes") {
+		CHECK(dec("\\udfff", json_wtf8) == "\xED\xBF\xBF");
+		CHECK(dcp("\\udc00", json_wtf8) == std::u32string(1, 0xDC00));
+	}
+	TEST_CASE("a high escape leaves the text after it") {
+		CHECK(dec("\\ud83dA", json_wtf8) == "\xED\xA0\xBD" "A");
+		CHECK(dec("\\ud83d\\u0041", json_wtf8) == "\xED\xA0\xBD" "A");
+		CHECK(dec("\\ud83d\\ud83d", json_wtf8)
+			== "\xED\xA0\xBD\xED\xA0\xBD");
+		CHECK(dec("\\ud83d\\n", json_wtf8) == "\xED\xA0\xBD\n");
+	}
+	TEST_CASE("a reversed pair gives two lone surrogates") {
+		CHECK(dec("\\ude00\\ud83d", json_wtf8)
+			== "\xED\xB8\x80\xED\xA0\xBD");
+	}
+	TEST_CASE("a bad escape after a high escape is still an error") {
+		CHECK_FALSE(ok("\\ud83d\\u00", json_wtf8));
+		CHECK_FALSE(ok("\\ud83d\\x", json_wtf8));
+	}
+	TEST_CASE("raw surrogate bytes stay invalid UTF-8") {
+		CHECK_FALSE(cpok("\xED\xA0\x80", json_wtf8));
+	}
+	TEST_CASE("the json profile still refuses a lone surrogate") {
+		CHECK_FALSE(ok("\\ud800", json));
+		CHECK_FALSE(ok("\\udfff", json));
+		CHECK_FALSE(ok("\\ud83dA", json));
+		CHECK_FALSE(ok("\\ud800", json_ascii));
+	}
+}
+
+// ---------------------------------------------------------------------------
 TEST_SUITE("escape_delete") {
 
 	TEST_CASE("the default escapes U+007F") {
