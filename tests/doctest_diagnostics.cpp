@@ -85,6 +85,24 @@ TEST_SUITE("diagnostics: measure()") {
 	}
 }
 
+TEST_SUITE("diagnostics: error_attr()") {
+
+	TEST_CASE("the attribute of an error, not of a warning") {
+		using idni::parser_strings::label;
+		report with_error;
+		with_error.error(code::io_error, "Port is in use",
+			{ { label::port, size_t{ 41137 } } });
+		CHECK(with_error.error_attr(label::port) == 41137);
+		report with_warning;
+		with_warning.warning("Port is in use",
+			{ { label::port, size_t{ 41137 } } });
+		CHECK_FALSE(with_warning.error_attr(label::port).has_value());
+		report without;
+		without.error(code::io_error, "Could not bind the listen port");
+		CHECK_FALSE(without.error_attr(label::port).has_value());
+	}
+}
+
 TEST_SUITE("diagnostics: first error") {
 
 	TEST_CASE("the first error, not a note before it or a later error") {

@@ -564,6 +564,16 @@ inline bool report::has_error() const {
 	return has_error_;
 }
 
+inline std::optional<int64_t> report::error_attr(key k) const {
+	for (const auto& n : nodes_) {
+		if (!is_error(n.tag)) continue;
+		for (uint8_t i = 0; i < n.attr_cnt; ++i)
+			if (attrs_[n.attr_off + i].key == k)
+				return attrs_[n.attr_off + i].value;
+	}
+	return std::nullopt;
+}
+
 inline std::optional<size_t> report::first_error_index() const {
 	for (size_t i = 0; i != nodes_.size(); ++i)
 		if (is_error(nodes_[i].tag)) return i;

@@ -320,6 +320,10 @@ struct report {
 
 	[[nodiscard]] bool has_error() const;
 
+	/// The value of the first attribute @p k on an error node, or nullopt
+	/// when no error node has it.
+	[[nodiscard]] std::optional<int64_t> error_attr(key k) const;
+
 	/// The index in @ref nodes() of the first error node, or nullopt when
 	/// no node is an error. @ref format_message of it gives the message
 	/// with the attributes of the node.
