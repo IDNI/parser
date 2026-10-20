@@ -136,6 +136,10 @@ inline constexpr profile c_like {
 using u32decoded = diagnostics::result<std::u32string>;
 using decoded    = diagnostics::result<std::string>;
 
+/// The offset of the first three bytes of a surrogate code point (WTF-8)
+/// in @p bytes, or npos.
+size_t        wtf8_surrogate_offset(std::string_view bytes);
+
 u32decoded    u32decode(std::string_view body, const profile& p);
 decoded       decode(std::string_view body, const profile& p);
 std::string   encode(std::u32string_view cps, const profile& p);

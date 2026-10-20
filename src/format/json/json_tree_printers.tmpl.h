@@ -78,12 +78,33 @@ inline std::string tree::to_str() const { return to_str(print_options{}); }
 inline std::ostream& tree::print(std::ostream& os, const print_options& o)
 	const
 {
+	return print_into(os, o, nullptr);
+}
+
+inline diagnostics::result<std::string> tree::to_str_checked(
+	const print_options& o) const
+{
+	diagnostics::result<std::string> r;
+	std::ostringstream os;
+	print_into(os, o, &r.report());
+	if (r.has_error()) return r;
+	return std::move(r).with_value(os.str());
+}
+
+inline std::ostream& tree::print_into(std::ostream& os,
+	const print_options& o, diagnostics::report* rep) const
+{
 	using policy = print_options::lone_surrogate_policy;
 	auto prof = o.ascii_only ? idni::escapes::json_ascii
 		: idni::escapes::json;
 	prof.escape_delete = o.escape_delete || o.ascii_only;
 	prof.wtf8_surrogates = o.lone_surrogate != policy::keep_bytes;
 	auto text = [&](const std::string& s) {
+		if (rep && o.lone_surrogate == policy::fail && !rep->has_error())
+			if (const size_t at = idni::escapes::wtf8_surrogate_offset(s);
+					at != std::string::npos)
+				rep->error(code::invalid_utf8, parser_strings::messages
+					::json_lone_surrogate, { { label::offset, at } });
 		os << '"' << idni::escapes::encode(s, prof) << '"';
 	};
 	// A container on the way down and its next child: the lcrs sibling
@@ -117,7 +138,12 @@ inline std::ostream& tree::print(std::ostream& os, const print_options& o)
 			if (!std::isfinite(d)) {
 				if (o.nonfinite) os << (std::isnan(d) ? "NaN"
 					: d < 0 ? "-Infinity" : "Infinity");
-				else os << "null";
+				else {
+					if (rep && !rep->has_error())
+						rep->error(code::out_of_range,
+							parser_strings::messages::json_nonfinite);
+					os << "null";
+				}
 				return;
 			}
 			if (o.floats == print_options::float_format::repr) {

@@ -148,12 +148,13 @@ struct print_options {
 	bool escape_delete = true;
 	/// What the printer does with the three bytes of a lone surrogate in
 	/// a str (WTF-8, see read_options::lone_surrogates). keep_bytes: the
-	/// bytes as they are. escape: `\udXXX`.
-	enum class lone_surrogate_policy { keep_bytes, escape };
+	/// bytes as they are. escape: `\udXXX`. fail: to_str_checked fails,
+	/// and a stream print, which cannot fail, writes the escape.
+	enum class lone_surrogate_policy { keep_bytes, escape, fail };
 	lone_surrogate_policy lone_surrogate = lone_surrogate_policy::keep_bytes;
-	/// On: a NaN or an infinity prints as NaN, Infinity or -Infinity, as
-	/// the grammar variant nonfinite reads them. Off: it prints as null,
-	/// so the text stays JSON.
+	/// On: a NaN or an infinity prints as NaN, Infinity or -Infinity,
+	/// beside read_options::nonfinite. Off: to_str_checked fails, and a
+	/// stream print writes null, so its text stays JSON.
 	bool nonfinite = false;
 
 	/// One line with no spaces: the default fields.
@@ -318,6 +319,9 @@ struct tree : public lcrs_tree<node> {
 	std::string to_str() const;
 	std::ostream& print(std::ostream& os, const print_options& o) const;
 	std::string to_str(const print_options& o) const;
+	/// to_str, or an error for a text that @p o cannot write.
+	diagnostics::result<std::string> to_str_checked(
+		const print_options& o) const;
 	/// The node structure, one node per line.
 	std::ostream& print_tree(std::ostream& os, size_t s = 0) const;
 	std::ostream& dump(std::ostream& os, bool subtree = true) const;
@@ -392,6 +396,11 @@ struct tree : public lcrs_tree<node> {
 	};
 
 	traverser operator()() const;
+private:
+	// The print of the stream and of the checked text. A null @p rep
+	// takes the fallback of each check.
+	std::ostream& print_into(std::ostream& os, const print_options& o,
+		diagnostics::report* rep) const;
 };
 
 using tt = tree::traverser;

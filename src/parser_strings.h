@@ -249,6 +249,10 @@ struct messages {
 		"A JSON integer has more digits than the limit";
 	static constexpr sv json_too_deep           =
 		"A JSON value nests deeper than the limit";
+	static constexpr sv json_lone_surrogate     =
+		"A JSON string holds a lone surrogate";
+	static constexpr sv json_nonfinite          =
+		"A JSON number is NaN or an infinity";
 	static constexpr sv json_integer_text       =
 		"The text is no canonical decimal integer";
 	static constexpr sv no_grammar_loaded      =

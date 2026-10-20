@@ -213,6 +213,11 @@ TEST_SUITE("wtf8_surrogates on encode") {
 		CHECK(encode(std::string_view("\xED\x9F\xBF"), json_wtf8)
 			== "\xED\x9F\xBF");
 	}
+	TEST_CASE("wtf8_surrogate_offset finds the first one") {
+		CHECK(wtf8_surrogate_offset("ab\xED\xA0\x80") == 2);
+		CHECK(wtf8_surrogate_offset("\xF0\x9F\x98\x80\xED\x9F\xBF")
+			== std::string_view::npos);
+	}
 }
 
 // ---------------------------------------------------------------------------

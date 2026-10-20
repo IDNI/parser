@@ -895,15 +895,146 @@ TEST_SUITE("json tree: the lone surrogate policy") {
 		CHECK(jt::get(t).to_str({ .ascii_only = true })
 			== "\"a\xED\xA0\x80\"");
 	}
+
+	TEST_CASE("fail makes the checked print fail") {
+		print_options o{ .sorted_keys = true,
+			.lone_surrogate = policy::fail };
+		for (const char* text : { R"("\ud800")", R"("\udfff")",
+				R"("\ude00\ud83d")", R"("\ud83dA")",
+				R"({"\ud800":1,"\ue000":2,"a":3})" })
+		{
+			CAPTURE(text);
+			auto r = jt::get(lone_read(text)).to_str_checked(o);
+			CHECK_FALSE(r.has_value());
+			CHECK(r.report().first_error_code() == code::invalid_utf8);
+		}
+		// the stream print cannot fail, so it writes the escape
+		CHECK(jt::get(lone_read(R"("\ud800")")).to_str(o)
+			== R"("\ud800")");
+		auto ok = jt::get(lone_read(R"({"\ud83d\ude00":"x"})"))
+			.to_str_checked(o);
+		REQUIRE(ok.has_value());
+		CHECK(ok.value() == "{\"\xF0\x9F\x98\x80\":\"x\"}");
+	}
+
+	TEST_CASE("to_str_checked equals to_str for a text it can write") {
+		const tref t = parsed(R"({"b":[1,2.5,"\u00e9",{}],"a":null})");
+		for (const auto& o : { print_options{}, print_options::normal(),
+				print_options::pretty(2) })
+		{
+			auto r = jt::get(t).to_str_checked(o);
+			REQUIRE(r.has_value());
+			CHECK(r.value() == jt::get(t).to_str(o));
+		}
+	}
 }
 
 TEST_SUITE("json tree: the print field nonfinite") {
+	static tref nonfinite_read(std::string_view text) {
+		auto r = jt::get(text, read_options{ .nonfinite = true,
+			.keep_float_form = true });
+		REQUIRE(r.has_value());
+		return r.value();
+	}
+
+	// The expected bytes come from Python json.dumps.
+	TEST_CASE("on: NaN, Infinity and -Infinity") {
+		const tref t = nonfinite_read("[NaN,Infinity,-Infinity,1e400,1.5]");
+		auto o = print_options::normal();
+		o.nonfinite = true;
+		CHECK(jt::get(t).to_str(o)
+			== "[NaN, Infinity, -Infinity, Infinity, 1.5]");
+		auto r = jt::get(t).to_str_checked(o);
+		REQUIRE(r.has_value());
+		CHECK(r.value() == jt::get(t).to_str(o));
+		print_options m;
+		m.nonfinite = true;
+		CHECK(jt::get(t).to_str(m) == "[NaN,Infinity,-Infinity,Infinity,1.5]");
+	}
+
+	TEST_CASE("off: the stream print writes null and the checked print fails") {
+		const tref t = nonfinite_read(R"({"a":NaN,"b":[-Infinity],"c":1})");
+		CHECK(jt::get(t).to_str() == R"({"a":null,"b":[null],"c":1})");
+		CHECK(jt::get(t).to_str(print_options::normal())
+			== R"({"a": null, "b": [null], "c": 1})");
+		for (const auto& o : { print_options{}, print_options::minified(),
+				print_options::normal(), print_options::pretty(2) })
+		{
+			CHECK_FALSE(o.nonfinite);
+			auto r = jt::get(t).to_str_checked(o);
+			CHECK_FALSE(r.has_value());
+			CHECK(r.report().first_error_code() == code::out_of_range);
+		}
+	}
+
 	TEST_CASE("the default read makes no such node") {
 		CHECK(jt::get(jt::build_number(
 			std::numeric_limits<double>::quiet_NaN())).to_str() == "null");
 		CHECK_FALSE(jt::get("NaN").has_value());
 		CHECK_FALSE(jt::get("1e400").has_value());
 	}
+}
+
+TEST_SUITE("json tree: the forms of the Python node") {
+	using policy = print_options::lone_surrogate_policy;
+
+	// Each line of a vector file: read the input with the lenient
+	// options, print it with @p o and compare the bytes.
+	static size_t check_form(const char* name, const print_options& o) {
+		const auto file = std::filesystem::path(__FILE__).parent_path()
+			/ "data" / name;
+		std::ifstream in(file);
+		REQUIRE(in.good());
+		std::string line;
+		size_t count = 0;
+		while (std::getline(in, line)) {
+			if (line.empty() || line[0] == '#') continue;
+			const size_t a = line.find('\t'), b = line.find('\t', a + 1);
+			REQUIRE(b != std::string::npos);
+			const std::string id = line.substr(0, a);
+			const std::string input = unhex(line.substr(a + 1, b - a - 1));
+			const std::string out = line.substr(b + 1);
+			CAPTURE(id);
+			++count;
+			auto r = jt::get(input, read_options::lenient(4300, 1000));
+			if (out.starts_with("ERR read")) {
+				CHECK_FALSE(r.has_value());
+				continue;
+			}
+			REQUIRE(r.has_value());
+			auto text = jt::get(r.value()).to_str_checked(o);
+			if (out.starts_with("ERR write")) {
+				CHECK_FALSE(text.has_value());
+				continue;
+			}
+			REQUIRE(text.has_value());
+			CHECK(text.value() == unhex(out));
+		}
+		return count;
+	}
+
+#ifndef __EMSCRIPTEN__
+	// a wasm test under node has no host file system
+	TEST_CASE("the tx form") {
+		print_options o = print_options::minified();
+		o.sorted_keys = true;
+		o.ascii_only = true;
+		o.floats = print_options::float_format::repr;
+		o.lone_surrogate = policy::escape;
+		o.nonfinite = true;
+		CHECK(check_form("json_tx_form.txt", o) == 72);
+	}
+
+	TEST_CASE("the canonical form") {
+		print_options o = print_options::minified();
+		o.sorted_keys = true;
+		o.floats = print_options::float_format::repr;
+		o.escape_delete = false;
+		o.lone_surrogate = policy::fail;
+		o.nonfinite = true;
+		CHECK(check_form("json_canonical_form.txt", o) == 72);
+	}
+#endif
 }
 
 TEST_SUITE("json tree: the float and integer builders") {

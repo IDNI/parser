@@ -108,6 +108,14 @@ inline size_t peek_wtf8_surrogate(const utf8char* s, size_t n, char32_t& cp) {
 	return 3;
 }
 
+inline size_t wtf8_surrogate_offset(std::string_view bytes) {
+	const auto* src = reinterpret_cast<const utf8char*>(bytes.data());
+	char32_t cp = 0;
+	for (size_t i = 0; i < bytes.size(); ++i)
+		if (peek_wtf8_surrogate(src + i, bytes.size() - i, cp)) return i;
+	return std::string_view::npos;
+}
+
 // Codepoint-domain output sink: collects char32_t scalars.
 struct u32sink {
 	std::u32string out;
