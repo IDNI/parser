@@ -6,6 +6,7 @@
 
 #include <compare>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <ostream>
 #include <string>
@@ -166,7 +167,78 @@ struct tree : public lcrs_tree<node> {
 	/// The value of the member @p key of an object, or nullptr when the
 	/// object has no such member.
 	tref find(std::string_view key) const;
+
+	/// Tree navigation: `| nt` gives the first child with the nonterminal
+	/// nt, `|| nt` all of them, `| extractor` a value.
+	struct traverser {
+		using type = node::type;
+
+		template <typename result_type>
+		struct extractor {
+			using function = std::function<
+				result_type(const traverser&)>;
+			extractor(const function& e) : e(e) {}
+			result_type operator()(const traverser& t) const
+				{ return e(t); }
+		private:
+			function e;
+		};
+
+		traverser();
+		traverser(tref r);
+		traverser(const tree& r);
+		traverser(const htref& r);
+		traverser(const trefs& n);
+
+		bool has_value() const;
+		explicit operator bool() const;
+		tref value() const;
+		const tree& value_tree() const;
+		const tree& operator[](size_t n) const;
+		const trefs& values() const;
+		std::vector<traverser> traversers() const;
+		std::vector<traverser> operator()() const;
+		bool is(size_t nt) const;
+		bool empty() const;
+		size_t size() const;
+
+		static const extractor<tref>             ref;
+		static const extractor<trefs>            refs;
+		static const extractor<htref>            handle;
+		/// The traverser must hold a value.
+		static const extractor<const tree&>      Tree;
+		static const extractor<type>             nt;
+		static const extractor<std::string>      string;
+		static const extractor<double>           number;
+		static const extractor<bool>             boolean;
+		static const extractor<traverser>        only_child;
+		static const extractor<traverser>        first;
+		static const extractor<traverser>        second;
+		static const extractor<traverser>        children;
+		static const extractor<tref_range<node>> children_range;
+		static const extractor<tree_range<tree>> children_trees_range;
+		/// The value of the member @p key of an object; no value when
+		/// the object has no such member.
+		static extractor<traverser> member(std::string_view key);
+		/// @p fn applied to each value; a nullptr result is dropped.
+		static extractor<traverser> f(const auto& fn);
+
+		traverser operator|(size_t nt) const;
+		traverser operator||(size_t nt) const;
+		template <typename result_type>
+		result_type operator|(const extractor<result_type>& e) const;
+		template <typename result_type>
+		result_type operator||(const extractor<result_type>& e) const;
+	private:
+		void set_values(const trefs& n);
+		bool has_value_ = true;
+		trefs values_{};
+	};
+
+	traverser operator()() const;
 };
+
+using tt = tree::traverser;
 
 /// The JSON value of @p v: a bool, an unsigned integer, a std::string, or
 /// a std::vector or a std::variant of these types.

@@ -6,6 +6,7 @@
 
 #include <bit>
 #include <cstddef>
+#include <vector>
 
 #include "json.h"
 
@@ -142,6 +143,187 @@ inline tref tree::find(std::string_view key) const {
 		if (p.value.str == key) return p.first();
 	return nullptr;
 }
+
+//------------------------------------------------------------------------------
+// traverser
+
+inline tree::traverser::traverser() : has_value_(false) {}
+inline tree::traverser::traverser(tref r) { set_values({ r }); }
+inline tree::traverser::traverser(const tree& r) : traverser(r.get()) {}
+inline tree::traverser::traverser(const htref& r)
+	: traverser(r ? r->get() : nullptr) {}
+inline tree::traverser::traverser(const trefs& n) { set_values(n); }
+
+inline void tree::traverser::set_values(const trefs& n) {
+	values_.clear();
+	for (tref r : n) if (r != nullptr) values_.push_back(r);
+	has_value_ = !values_.empty();
+}
+
+inline bool tree::traverser::has_value() const { return has_value_; }
+inline tree::traverser::operator bool() const { return has_value(); }
+inline tref tree::traverser::value() const { return values_.front(); }
+inline const tree& tree::traverser::value_tree() const {
+	return tree::get(values_.front());
+}
+inline const tree& tree::traverser::operator[](size_t n) const {
+	return value_tree()[n];
+}
+inline const trefs& tree::traverser::values() const { return values_; }
+
+inline std::vector<tree::traverser> tree::traverser::traversers() const {
+	std::vector<traverser> tv;
+	for (tref v : values_) tv.emplace_back(v);
+	return tv;
+}
+
+inline std::vector<tree::traverser> tree::traverser::operator()() const {
+	return traversers();
+}
+
+inline bool tree::traverser::is(size_t nt) const {
+	return has_value() && value_tree().is(nt);
+}
+inline bool tree::traverser::empty() const { return !has_value(); }
+inline size_t tree::traverser::size() const { return values_.size(); }
+
+inline tree::traverser tree::traverser::operator|(size_t nt) const {
+	if (!has_value()) return traverser();
+	for (tref c : tree::get(value()).children())
+		if (tree::get(c).is(nt)) return traverser(c);
+	return traverser();
+}
+
+inline tree::traverser tree::traverser::operator||(size_t nt) const {
+	trefs r;
+	for (tref v : values())
+		for (tref c : tree::get(v).children())
+			if (tree::get(c).is(nt)) r.push_back(c);
+	return traverser(r);
+}
+
+template <typename result_type>
+result_type tree::traverser::operator|(const extractor<result_type>& e) const
+{
+	return e(*this);
+}
+
+template <typename result_type>
+result_type tree::traverser::operator||(const extractor<result_type>& e)
+	const
+{
+	return e(*this);
+}
+
+inline const tree::traverser::extractor<tref> tree::traverser::ref(
+	[](const traverser& t) -> tref {
+		return t ? t.value() : nullptr;
+	});
+
+inline const tree::traverser::extractor<trefs> tree::traverser::refs(
+	[](const traverser& t) -> trefs { return t.values(); });
+
+inline const tree::traverser::extractor<htref> tree::traverser::handle(
+	[](const traverser& t) -> htref {
+		return t ? tree::geth(t.value()) : htref();
+	});
+
+inline const tree::traverser::extractor<const tree&> tree::traverser::Tree(
+	[](const traverser& t) -> const tree& { return t.value_tree(); });
+
+inline const tree::traverser::extractor<tree::type> tree::traverser::nt(
+	[](const traverser& t) -> type {
+		return t ? t.value_tree().get_type() : json_parser::nul;
+	});
+
+inline const tree::traverser::extractor<std::string>
+	tree::traverser::string(
+		[](const traverser& t) -> std::string {
+			if (!t || !t.value_tree().is_string()) return {};
+			return t.value_tree().get_string();
+		});
+
+inline const tree::traverser::extractor<double> tree::traverser::number(
+	[](const traverser& t) -> double {
+		if (!t || !t.value_tree().is_number()) return 0;
+		return t.value_tree().get_number();
+	});
+
+inline const tree::traverser::extractor<bool> tree::traverser::boolean(
+	[](const traverser& t) -> bool {
+		return t && t.value_tree().is(json_parser::true_sym);
+	});
+
+inline const tree::traverser::extractor<tree::traverser>
+	tree::traverser::only_child(
+		[](const traverser& t) -> traverser {
+			if (!t) return traverser();
+			return traverser(t.value_tree().only_child());
+		});
+
+inline const tree::traverser::extractor<tree::traverser>
+	tree::traverser::first(
+		[](const traverser& t) -> traverser {
+			if (!t) return traverser();
+			return traverser(t.value_tree().first());
+		});
+
+inline const tree::traverser::extractor<tree::traverser>
+	tree::traverser::second(
+		[](const traverser& t) -> traverser {
+			if (!t) return traverser();
+			return traverser(t.value_tree().second());
+		});
+
+inline const tree::traverser::extractor<tree::traverser>
+	tree::traverser::children(
+		[](const traverser& t) -> traverser {
+			trefs r;
+			for (tref v : t.values())
+				for (tref c : tree::get(v).children())
+					r.push_back(c);
+			return traverser(r);
+		});
+
+inline const tree::traverser::extractor<tref_range<node>>
+	tree::traverser::children_range(
+		[](const traverser& t) -> tref_range<node> {
+			if (!t) return { nullptr };
+			return t.value_tree().children();
+		});
+
+inline const tree::traverser::extractor<tree_range<tree>>
+	tree::traverser::children_trees_range(
+		[](const traverser& t) -> tree_range<tree> {
+			if (!t) return { nullptr };
+			return t.value_tree().children_trees();
+		});
+
+inline tree::traverser::extractor<tree::traverser> tree::traverser::member(
+	std::string_view key)
+{
+	// the key is copied: the extractor can outlive the caller's view
+	return extractor<traverser>([k = std::string(key)](const traverser& t)
+		-> traverser
+	{
+		if (!t) return traverser();
+		return traverser(t.value_tree().find(k));
+	});
+}
+
+inline tree::traverser::extractor<tree::traverser> tree::traverser::f(
+	const auto& fn)
+{
+	// the extractor can outlive the caller's callable
+	return extractor<traverser>([fn](const traverser& t) -> traverser {
+		trefs r;
+		for (tref v : t.values())
+			if (tref x = fn(v); x) r.push_back(x);
+		return traverser(r);
+	});
+}
+
+inline tree::traverser tree::operator()() const { return traverser(get()); }
 
 } // namespace idni::format::json
 

@@ -67,3 +67,77 @@ TEST_SUITE("json tree: nodes") {
 		CHECK(jt::get(jt::geth(obj)).get() == obj);
 	}
 }
+
+TEST_SUITE("json tree: traverser") {
+	// {"a":[1.5,"x"],"b":true,"s":"t"} from nodes only
+	static tref sample() {
+		tref num = jt::get(node(json_parser::number,
+			std::bit_cast<uint64_t>(1.5)));
+		tref x = jt::get(node(json_parser::str, 0, "x"));
+		tref arr = jt::get(json_parser::arr, { num, x });
+		return jt::get(json_parser::object, {
+			jt::get(node(json_parser::object_pair, 0, "a"), arr),
+			jt::get(node(json_parser::object_pair, 0, "b"),
+				jt::get(json_parser::true_sym)),
+			jt::get(node(json_parser::object_pair, 0, "s"),
+				jt::get(node(json_parser::str, 0, "t"))) });
+	}
+
+	TEST_CASE("a traverser holds values and drops a nullptr") {
+		tref obj = sample();
+		CHECK_FALSE(tt().has_value());
+		CHECK(tt().empty());
+		CHECK_FALSE(tt(nullptr));
+		CHECK(tt(trefs{ obj, nullptr, obj }).size() == 2);
+		CHECK(tt(jt::geth(obj)).value() == obj);
+		CHECK(tt(jt::get(obj)).value() == obj);
+		CHECK(jt::get(obj)().value() == obj);
+		CHECK(tt(obj).is(json_parser::object));
+		CHECK(tt(obj).value_tree().is_object());
+		CHECK(tt(obj)[2].get_string() == "s");
+		CHECK(tt(trefs{ obj, obj }).traversers().size() == 2);
+		CHECK(tt(trefs{ obj, obj })().size() == 2);
+	}
+
+	TEST_CASE("| and || select children, and the extractors read them") {
+		tref obj = sample();
+		CHECK((tt(obj) | json_parser::object_pair).value_tree()
+			.get_string() == "a");
+		CHECK((tt(obj) || json_parser::object_pair).size() == 3);
+		CHECK_FALSE((tt(obj) | json_parser::arr).has_value());
+		CHECK_FALSE((tt() | json_parser::arr).has_value());
+		CHECK((tt(obj) | tt::ref) == obj);
+		CHECK((tt() | tt::ref) == nullptr);
+		CHECK((tt(obj) | tt::refs).size() == 1);
+		CHECK((tt(obj) | tt::handle)->get() == obj);
+		CHECK((tt(obj) | tt::Tree).is_object());
+		CHECK((tt(obj) | tt::nt) == json_parser::object);
+		CHECK((tt(obj) | tt::member("s") | tt::string) == "t");
+		CHECK((tt(obj) | tt::member("b") | tt::string).empty());
+		CHECK((tt(obj) | tt::member("a") | json_parser::number
+			| tt::number) == 1.5);
+		CHECK((tt(obj) | tt::member("s") | tt::number) == 0);
+		CHECK((tt(obj) | tt::member("b") | tt::boolean));
+		CHECK_FALSE((tt(obj) | tt::member("missing")).has_value());
+		CHECK_FALSE((tt(obj) | tt::member("missing")
+			| tt::member("x")).has_value());
+		CHECK((tt(obj) | tt::member("a") | tt::children).size() == 2);
+		CHECK((tt(obj) | tt::member("a") | tt::first | tt::number) == 1.5);
+		CHECK((tt(obj) | tt::member("a") | tt::second | tt::string)
+			== "x");
+		CHECK((tt(obj) | json_parser::object_pair | tt::only_child)
+			.is(json_parser::arr));
+		size_t n = 0;
+		for (tref c : tt(obj) | tt::children_range) n += c != nullptr;
+		CHECK(n == 3);
+		n = 0;
+		for (const jt& c : tt(obj) | tt::children_trees_range)
+			n += c.is(json_parser::object_pair);
+		CHECK(n == 3);
+		auto strings = tt::f([](tref p) {
+			tref v = jt::get(p).first();
+			return jt::get(v).is_string() ? v : nullptr;
+		});
+		CHECK((tt(obj) | tt::children | strings).size() == 1);
+	}
+}
