@@ -689,6 +689,75 @@ TEST_SUITE("json tree: lone surrogates") {
 
 }
 
+TEST_SUITE("json tree: the read limits") {
+	// The code of the first error of a read that must fail.
+	static code failed(std::string_view text, const read_options& o) {
+		auto r = jt::get(text, o);
+		CHECK_FALSE(r.has_value());
+		return r.report().first_error_code();
+	}
+
+	TEST_CASE("max_int_digits: at the limit and over it") {
+		const auto lax = read_options::lenient(4300, 1000);
+		const std::string at(4300, '9'), over(4301, '9');
+		auto r = jt::get(at, lax);
+		REQUIRE(r.has_value());
+		CHECK(jt::get(r.value()).value.str == at);
+		CHECK(jt::get("-" + at, lax).has_value());
+		CHECK(failed(over, lax) == code::out_of_range);
+		CHECK(failed("[1,-" + over + "]", lax) == code::out_of_range);
+	}
+
+	TEST_CASE("max_int_digits counts integer texts only") {
+		const read_options o{ .max_int_digits = 3 };
+		CHECK(jt::get("123", o).has_value());
+		CHECK(jt::get("-123", o).has_value());
+		CHECK(jt::get("1234.5", o).has_value());
+		CHECK(jt::get("1234e0", o).has_value());
+		CHECK(failed("1234", o) == code::out_of_range);
+		CHECK(failed(R"({"a":-1234})", o) == code::out_of_range);
+		const read_options none{ .keep_float_form = true };
+		CHECK(jt::get(std::string(5000, '1'), none).has_value());
+	}
+
+	TEST_CASE("max_depth: at the limit and over it") {
+		const read_options o{ .max_depth = 2 };
+		CHECK(jt::get("1", o).has_value());
+		CHECK(jt::get("[[1],[]]", o).has_value());
+		CHECK(jt::get(R"({"a":{"b":1},"c":[]})", o).has_value());
+		CHECK(jt::get(R"([{"a":"[[["}])", o).has_value());
+		CHECK(failed("[[[1]]]", o) == code::out_of_range);
+		CHECK(failed("[[[]]]", o) == code::out_of_range);
+		CHECK(failed(R"({"a":{"b":[1]}})", o) == code::out_of_range);
+		CHECK(failed(R"([1,{"a":[{}]}])", o) == code::out_of_range);
+	}
+
+	TEST_CASE("max_depth of the lenient options") {
+		const auto lax = read_options::lenient(4300, 1000);
+		const auto nest = [](size_t n) {
+			return std::string(n, '[') + std::string(n, ']');
+		};
+		CHECK(jt::get(nest(1000), lax).has_value());
+		CHECK(failed(nest(1001), lax) == code::out_of_range);
+		CHECK(jt::get(nest(1001), read_options{}).has_value());
+	}
+
+	TEST_CASE("lenient sets every rule") {
+		const auto lax = read_options::lenient(7, 9);
+		CHECK(lax.nonfinite);
+		CHECK(lax.keep_float_form);
+		CHECK(lax.lone_surrogates);
+		CHECK(lax.max_int_digits == 7);
+		CHECK(lax.max_depth == 9);
+		const read_options none{};
+		CHECK_FALSE(none.nonfinite);
+		CHECK_FALSE(none.keep_float_form);
+		CHECK_FALSE(none.lone_surrogates);
+		CHECK(none.max_int_digits == 0);
+		CHECK(none.max_depth == 0);
+	}
+}
+
 TEST_SUITE("json tree: the float format repr") {
 	// The expected texts come from Python repr and json.dumps.
 	TEST_CASE("float_repr gives the text of Python repr") {
@@ -808,6 +877,27 @@ TEST_SUITE("json tree: the float and integer builders") {
 		CHECK(jt::get(t).to_str(print_options::normal())
 			== "[1.0, -0.0, 1]");
 		CHECK(jt::get(t).to_str() == "[1,-0,1]");
+	}
+
+	TEST_CASE("build_integer of a text of any size") {
+		const std::string big = "-" + std::string(400, '9');
+		for (const std::string& text : { std::string("0"),
+				std::string("-1"), std::string("9223372036854775807"),
+				std::string("18446744073709551616"), big })
+		{
+			CAPTURE(text);
+			auto r = jt::build_integer(std::string_view(text));
+			REQUIRE(r.has_value());
+			CHECK(jt::get(r.value()).value.str == text);
+			CHECK(jt::get(r.value()).to_str() == text);
+			auto read = jt::get(text, read_options::lenient(0, 0));
+			REQUIRE(read.has_value());
+			CHECK(r.value() == read.value());
+		}
+		CHECK(jt::build_integer(std::string_view("5")).value()
+			== jt::build_integer(int64_t{ 5 }));
+		CHECK(jt::get(jt::build_integer(std::string_view(big)).value())
+			.get_number() == -std::numeric_limits<double>::infinity());
 	}
 
 	TEST_CASE("build_integer refuses a text that is no canonical integer") {

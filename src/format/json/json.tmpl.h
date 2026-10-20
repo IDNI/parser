@@ -275,6 +275,14 @@ inline bool parse_number(const std::string& s, double& d) {
 	return true;
 }
 
+inline read_options read_options::lenient(size_t max_int_digits,
+	size_t max_depth)
+{
+	return { .nonfinite = true, .keep_float_form = true,
+		.lone_surrogates = true, .max_int_digits = max_int_digits,
+		.max_depth = max_depth };
+}
+
 inline double parse_number_saturating(const std::string& s) {
 	const bool neg = !s.empty() && s[0] == '-';
 	double d = 0;

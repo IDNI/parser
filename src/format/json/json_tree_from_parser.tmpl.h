@@ -4,11 +4,13 @@
 #ifndef __IDNI__PARSER__FORMAT__JSON_TREE_FROM_PARSER_TMPL_H__
 #define __IDNI__PARSER__FORMAT__JSON_TREE_FROM_PARSER_TMPL_H__
 
+#include <algorithm>
 #include <bit>
 #include <cmath>
 #include <limits>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <string_view>
 
 #include "json.h"
@@ -23,12 +25,38 @@ inline diagnostics::result<tref> tree::get(const parse_tree& t,
 	// parse tree node -> JSON tree node; the subtree equality matches
 	// the equal parse nodes that search_unique visits once
 	subtree_unordered_map<pnode, tref> m;
+	// the nest depth of each array and object node of the JSON tree
+	std::unordered_map<tref, size_t> depth;
+	// Record the depth of the container x with the children ch. False on
+	// a nest deeper than max_depth.
+	auto nest = [&](tref x, const trefs& ch) {
+		if (o.max_depth == 0) return true;
+		size_t d = 0;
+		for (tref c : ch) {
+			if (get(c).get_type() == json_parser::object_pair)
+				c = get(c).value_tree().get();
+			if (auto it = depth.find(c); it != depth.end())
+				d = std::max(d, it->second);
+		}
+		if (++d > o.max_depth) {
+			R.error(code::out_of_range,
+				parser_strings::messages::json_too_deep,
+				{ { label::limit, o.max_depth } });
+			return false;
+		}
+		depth.emplace(x, d);
+		return true;
+	};
 	auto mapped = [&m](tref p) -> tref {
 		auto it = m.find(p);
 		return it == m.end() ? nullptr : it->second;
 	};
 	auto text = [](tref p) -> std::string {
 		return trv(p) | trv::terminals;
+	};
+	// a long number text in a message shows its start only
+	auto truncated = [](const std::string& s) {
+		return s.size() <= 32 ? s : s.substr(0, 32) + "...";
 	};
 	// The exact value of a number with a fraction or an exponent as the
 	// decimal text of an integer. No value when the number is no integer.
@@ -75,6 +103,17 @@ inline diagnostics::result<tref> tree::get(const parse_tree& t,
 			const std::string s = text(p);
 			const auto fr = trv(p) | json_parser::fractional;
 			const auto ep = trv(p) | json_parser::exponent;
+			if (const size_t digits = s.size() - (s[0] == '-');
+				!fr && !ep && o.max_int_digits != 0
+					&& digits > o.max_int_digits)
+			{
+				R.error(code::out_of_range,
+					parser_strings::messages::json_int_too_long,
+					{ { label::value, truncated(s) },
+					  { label::size, digits },
+					  { label::limit, o.max_int_digits } });
+				return false;
+			}
 			if (o.keep_float_form) {
 				double d = parse_number_saturating(s);
 				if (fr || ep) {
@@ -149,6 +188,7 @@ inline diagnostics::result<tref> tree::get(const parse_tree& t,
 					|| json_parser::value).values())
 				el.push_back(mapped(v));
 			x = build_array(el);
+			if (!nest(x, el)) return false;
 			break;
 		}
 		case json_parser::object_pair:
@@ -162,6 +202,7 @@ inline diagnostics::result<tref> tree::get(const parse_tree& t,
 					.values())
 				pairs.push_back(mapped(c));
 			x = build_object(pairs);
+			if (!nest(x, pairs)) return false;
 			break;
 		}
 		default: return true;

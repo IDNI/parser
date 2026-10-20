@@ -243,6 +243,10 @@ struct messages {
 		"Conjunct has too many literals";
 	// REPL command errors
 	static constexpr sv unknown_command        = "Unknown command";
+	static constexpr sv json_int_too_long       =
+		"A JSON integer has more digits than the limit";
+	static constexpr sv json_too_deep           =
+		"A JSON value nests deeper than the limit";
 	static constexpr sv json_integer_text       =
 		"The text is no canonical decimal integer";
 	static constexpr sv no_grammar_loaded      =

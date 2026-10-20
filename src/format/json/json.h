@@ -176,6 +176,14 @@ struct read_options {
 	/// the str, as escapes::json_wtf8 decodes it. Such a str is no valid
 	/// UTF-8. Raw input bytes of a surrogate stay invalid UTF-8.
 	bool lone_surrogates = false;
+	/// 0 is no limit. Else an integer text with more digits is an
+	/// out_of_range error. The digits do not count the sign.
+	size_t max_int_digits = 0;
+	/// 0 is no limit. Else a deeper nest is an out_of_range error. Each
+	/// open array and each open object is one level.
+	size_t max_depth = 0;
+	/// Every rule of these options, with the limits of the caller.
+	static read_options lenient(size_t max_int_digits, size_t max_depth);
 };
 
 /// A JSON document as an interned lcrs tree. A tref of it is valid until
