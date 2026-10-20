@@ -169,6 +169,23 @@ struct tree : public lcrs_tree<node> {
 	/// object has no such member.
 	tref find(std::string_view key) const;
 
+	// builders
+
+	static tref _null();
+	static tref _true();
+	static tref _false();
+	static tref build_bool(bool b);
+	/// -0 becomes 0, so both are one node and print as 0.
+	static tref build_number(double n);
+	static tref build_string(std::string_view s);
+	static tref build_array(const trefs& elements);
+	static tref build_pair(std::string_view key, tref v);
+	/// An object of the object_pair nodes @p pairs. A repeated key keeps
+	/// its first position and its last value.
+	static tref build_object(const trefs& pairs);
+	/// A copy of @p object with the member @p key set to @p v.
+	static tref set_member(tref object, std::string_view key, tref v);
+
 	/// Tree navigation: `| nt` gives the first child with the nonterminal
 	/// nt, `|| nt` all of them, `| extractor` a value.
 	struct traverser {
@@ -306,5 +323,6 @@ std::ostream& print(const diagnostics::report& r, std::ostream& os,
 
 #include "json.tmpl.h"
 #include "json_tree.tmpl.h"
+#include "json_tree_builders.tmpl.h"
 
 #endif // __IDNI__PARSER__FORMAT__JSON_H__

@@ -173,3 +173,48 @@ TEST_SUITE("json tree: free queries") {
 		CHECK(string_member(nullptr, "g") == nullptr);
 	}
 }
+
+TEST_SUITE("json tree: builders") {
+	TEST_CASE("each builder gives the node of its kind") {
+		CHECK(jt::_null() == jt::get(json_parser::null_sym));
+		CHECK(jt::build_bool(true) == jt::_true());
+		CHECK(jt::build_bool(false) == jt::_false());
+		CHECK(jt::get(jt::build_number(1.5)).get_number() == 1.5);
+		CHECK(jt::build_number(1.5) == jt::build_number(1.5));
+		CHECK(jt::build_number(-0.0) == jt::build_number(0.0));
+		CHECK(jt::get(jt::build_string("x")).get_string() == "x");
+		tref arr = jt::build_array({ jt::build_string("x"),
+			jt::build_number(1.5) });
+		CHECK((tt(arr) | tt::first | tt::string) == "x");
+		CHECK((tt(arr) | tt::second | tt::number) == 1.5);
+		tref pair = jt::build_pair("k", jt::_true());
+		CHECK(jt::get(pair).is(json_parser::object_pair));
+		CHECK(jt::get(pair).get_string() == "k");
+		CHECK(jt::get(pair).value_tree().get() == jt::_true());
+	}
+
+	TEST_CASE("a repeated key keeps its first position and its last value") {
+		tref obj = jt::build_object({
+			jt::build_pair("a", jt::build_number(1)),
+			jt::build_pair("b", jt::build_number(2)),
+			jt::build_pair("a", jt::build_number(3)) });
+		CHECK((tt(obj) || json_parser::object_pair).size() == 2);
+		CHECK(jt::get(obj).first_tree().get_string() == "a");
+		CHECK((tt(obj) | tt::member("a") | tt::number) == 3);
+		CHECK((tt(obj) | tt::member("b") | tt::number) == 2);
+	}
+
+	TEST_CASE("set_member changes a member or adds it at the end") {
+		tref obj = jt::build_object({
+			jt::build_pair("id", jt::build_number(7)),
+			jt::build_pair("ok", jt::_true()) });
+		tref changed = jt::set_member(obj, "id", jt::build_number(8));
+		CHECK((tt(changed) | tt::member("id") | tt::number) == 8);
+		CHECK(jt::get(changed).first_tree().get_string() == "id");
+		CHECK((tt(obj) | tt::member("id") | tt::number) == 7);
+		tref added = jt::set_member(obj, "new", jt::_null());
+		CHECK((tt(added) || json_parser::object_pair).size() == 3);
+		CHECK(jt::get(added)[2].get_string() == "new");
+		CHECK(jt::set_member(obj, "ok", jt::_true()) == obj);
+	}
+}
