@@ -154,6 +154,9 @@ if(TAU_PARSER_BUILD_SERVE AND NOT EMSCRIPTEN AND TARGET tgf)
 	list(APPEND DOCTESTS tgf_serve tgf_connect)
 endif()
 
+# The JSON document tree on the tree library.
+list(APPEND DOCTESTS json_tree)
+
 list(APPEND DOCTESTS filesystem)
 
 foreach(X IN LISTS DOCTESTS)

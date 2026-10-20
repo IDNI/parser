@@ -4,6 +4,8 @@
 #ifndef __IDNI__PARSER__FORMAT__JSON_H__
 #define __IDNI__PARSER__FORMAT__JSON_H__
 
+#include <compare>
+#include <cstdint>
 #include <optional>
 #include <ostream>
 #include <string>
@@ -13,6 +15,7 @@
 
 #include "../../utility/escapes.h"
 #include "../../utility/diagnostics.h"
+#include "../../utility/tree.h"
 #include "../../parser_strings.h"
 #include "json_parser.generated.h"
 
@@ -82,6 +85,89 @@ using label  = idni::parser_strings::label;
 using parse_tree = json_parser::tree;
 using trv  = parse_tree::traverser;
 
+/// A node of a JSON document tree. The kind is a json_parser nonterminal:
+/// null_sym, true_sym, false_sym, number, str, arr, object or object_pair.
+/// A number keeps the bits of its double in `data`. A str
+/// keeps its decoded text in `str`. An object_pair keeps its
+/// key in `str` and has one child, the value. An arr has its elements as children, an
+/// object its object_pair nodes, both in order.
+struct node {
+	using type = json_parser::nonterminal;
+
+	const type nt;
+	const uint64_t data;
+	const std::string str;
+	const uint64_t hash;
+
+	explicit node(type nt = json_parser::null_sym, uint64_t data = 0,
+		std::string str = {});
+
+	/// The name of the nonterminal @p nt.
+	static const std::string& name(size_t nt);
+	const std::string& name() const;
+	size_t get_nt() const;
+	uint64_t hashit() const;
+
+	/// By hash, then nt, data and str.
+	std::weak_ordering operator<=>(const node& that) const;
+	bool operator==(const node& that) const;
+};
+
+/// A JSON document as an interned lcrs tree. A tref of it is valid until
+/// a gc of bintree<node> drops it, so a document that outlives the step
+/// that built it is held by an htref.
+struct tree : public lcrs_tree<node> {
+	using node_type = node;
+	using base_t    = lcrs_tree<node>;
+	using type      = node::type;
+
+	// direct tree API
+
+	tref get() const;
+	static const tree& get(const tref id);
+	static const tree& get(const htref& h);
+	static htref geth(tref id);
+	/// Number of interned nodes.
+	static size_t m_size();
+
+	static tref get(const node& v);
+	static tref get(const node& v, tref ch);
+	static tref get(const node& v, tref ch1, tref ch2);
+	static tref get(const node& v, const trefs& ch, tref r = nullptr);
+	static tref get(type nt);
+	static tref get(type nt, const trefs& ch, tref r = nullptr);
+
+	// children
+
+	tref_range<node> children() const;
+	tree_range<tree> children_trees() const;
+	const tree& operator[](size_t n) const;
+	const tree& child_tree(size_t n) const;
+	const tree& first_tree() const;
+	const tree& second_tree() const;
+	const tree& only_child_tree() const;
+
+	// fast access helpers
+
+	bool is(size_t nt) const;
+	bool is_null() const;
+	bool is_bool() const;
+	bool is_number() const;
+	bool is_string() const;
+	bool is_array() const;
+	bool is_object() const;
+	type get_type() const;
+	bool get_bool() const;
+	double get_number() const;
+	/// The text of a str node, or the key of an object_pair node.
+	const std::string& get_string() const;
+	/// The value of an object_pair node.
+	const tree& value_tree() const;
+	/// The value of the member @p key of an object, or nullptr when the
+	/// object has no such member.
+	tref find(std::string_view key) const;
+};
+
 /// The JSON value of @p v: a bool, an unsigned integer, a std::string, or
 /// a std::vector or a std::variant of these types.
 template <typename T> value to_json(const T& v);
@@ -135,5 +221,6 @@ std::ostream& print(const diagnostics::report& r, std::ostream& os,
 }
 
 #include "json.tmpl.h"
+#include "json_tree.tmpl.h"
 
 #endif // __IDNI__PARSER__FORMAT__JSON_H__
