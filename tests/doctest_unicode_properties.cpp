@@ -130,6 +130,47 @@ TEST_SUITE("unicode properties") {
 		CHECK(one == std::u32string{ 0x03C3 });
 	}
 
+	// The expected strings come from Python str.lower and str.upper.
+	TEST_CASE("python::lower and python::upper of UTF-8 text") {
+		const struct { std::string_view in, lower, upper; } cases[] = {
+			{ "\xC3\x9F", "\xC3\x9F", "SS" },
+			// ΟΔΟΣ, the last sigma is U+03C2 in the lowercase
+			{ "\xCE\x9F\xCE\x94\xCE\x9F\xCE\xA3",
+				"\xCE\xBF\xCE\xB4\xCE\xBF\xCF\x82",
+				"\xCE\x9F\xCE\x94\xCE\x9F\xCE\xA3" },
+			// U+0130 gives i U+0307
+			{ "\xC4\xB0", "i\xCC\x87", "\xC4\xB0" },
+			{ "AbC-1", "abc-1", "ABC-1" },
+			{ "", "", "" },
+		};
+		for (const auto& c : cases) {
+			CAPTURE(c.in);
+			const auto lo = python::lower(c.in);
+			const auto up = python::upper(c.in);
+			REQUIRE(lo.has_value());
+			REQUIRE(up.has_value());
+			CHECK(lo.value() == c.lower);
+			CHECK(up.value() == c.upper);
+		}
+		std::u32string out;
+		python::upper(U"a\u00DF", out);
+		CHECK(out == U"ASS");
+	}
+
+	TEST_CASE("python::lower of invalid UTF-8 is invalid_utf8") {
+		using idni::diagnostics::code;
+		using idni::parser_strings::label;
+		for (const auto& r : { python::lower("ab\xFF" "c"),
+				python::upper("ab\xFF" "c") })
+		{
+			CHECK_FALSE(r.has_value());
+			CHECK(r.report().first_error_code() == code::invalid_utf8);
+			CHECK(r.report().error_attr(label::offset) == 2);
+		}
+		CHECK(python::upper("\xC3").report().first_error_code()
+			== code::invalid_utf8);
+	}
+
 	TEST_CASE("to_upper") {
 		CHECK(to_upper(U'a') == U'A');
 		CHECK(to_upper(U'A') == U'A');

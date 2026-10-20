@@ -130,6 +130,9 @@ The functions use the tables of the Unicode properties.
 | `isspace(c)` | `str.isspace` | True for White_Space and for the Bidi_Class WS, B and S |
 | `isprintable(c)` | `str.isprintable` | True for U+0020, and for no General Category Cc, Cf, Cs, Co, Cn, Zl, Zp or Zs |
 | `lower(s, out)` | `str.lower` | Appends the full lowercase mapping of `s` to `out`, with the Final_Sigma rule |
+| `upper(s, out)` | `str.upper` | Appends the full uppercase mapping of `s` to `out` |
+| `lower(text)` | `str.lower` | The lowercase of the UTF-8 `text` as a `result<std::string>`. Invalid UTF-8 gives `code::invalid_utf8` with the byte offset in the label `offset` |
+| `upper(text)` | `str.upper` | The uppercase of the UTF-8 `text` as a `result<std::string>`, with the same error as `lower(text)` |
 
 ## Names in a grammar
 

@@ -7,7 +7,10 @@
 #include <string>
 #include <string_view>
 
+#include "characters.h"
+#include "diagnostics.h"
 #include "unicode_properties.h"
+#include "../parser_strings.h"
 
 // The character classes of the CPython str methods, from the Unicode
 // tables of unicode_properties.h. A value above U+10FFFF is in no class.
@@ -54,6 +57,49 @@ inline bool isprintable(char32_t c) {
 /// with the Final_Sigma rule.
 inline void lower(std::u32string_view s, std::u32string& out) {
 	unicode::to_lower_full(s, out);
+}
+
+/// Python str.upper: append the full uppercase mapping of @p s to @p out.
+inline void upper(std::u32string_view s, std::u32string& out) {
+	unicode::to_upper_full(s, out);
+}
+
+namespace detail {
+// Decodes @p s, maps the code points with @p map and encodes the result.
+// The first byte that starts no UTF-8 code point gives code::invalid_utf8.
+template <typename Map>
+diagnostics::result<std::string> map_utf8(std::string_view s, Map map) {
+	using label = parser_strings::label;
+	diagnostics::result<std::string> r;
+	std::u32string text;
+	text.reserve(s.size());
+	const auto* p = reinterpret_cast<const utf8char*>(s.data());
+	for (size_t i = 0; i < s.size(); ) {
+		char32_t cp;
+		const size_t n = peek_codepoint(p + i, s.size() - i, cp);
+		if (n == 0 || n == static_cast<size_t>(-1))
+			return r.with_error(diagnostics::code::invalid_utf8,
+				parser_strings::messages::escape_invalid_utf8,
+				{ { label::offset, i } });
+		text.push_back(cp);
+		i += n;
+	}
+	std::u32string out;
+	map(text, out);
+	return r.with_value(to_std_string(out));
+}
+} // namespace detail
+
+/// Python str.lower of the UTF-8 text @p s.
+inline diagnostics::result<std::string> lower(std::string_view s) {
+	return detail::map_utf8(s, [](std::u32string_view t, std::u32string& o) {
+		lower(t, o); });
+}
+
+/// Python str.upper of the UTF-8 text @p s.
+inline diagnostics::result<std::string> upper(std::string_view s) {
+	return detail::map_utf8(s, [](std::u32string_view t, std::u32string& o) {
+		upper(t, o); });
 }
 
 } // namespace idni::charclasses::python
