@@ -9,6 +9,7 @@
 #	include <termios.h>
 #	include <sys/ioctl.h>
 #else
+#	include <io.h>
 #	include <map>
 #	include <deque>
 #	include <vector>
@@ -48,7 +49,7 @@ inline bool init() {
 
 inline bool open() {
 	if (opened)    return true;
-	if (!is_tty()) return false;
+	if (!is_tty(stdin)) return false;
 #ifndef _WIN32
 	tcgetattr(STDIN_FILENO, &orig_attrs);
 	raw_attrs = orig_attrs;
@@ -178,7 +179,7 @@ inline std::ptrdiff_t in(char& c) {
 	}
 	if (!init()) return 0;
 	DWORD read;
-	if (is_tty()) while (true) {
+	if (is_tty(stdin)) while (true) {
 		INPUT_RECORD record;
 		if (!ReadConsoleInput(hIn, &record, 1, &read) || read == 0)
 			return 0;
@@ -291,12 +292,11 @@ inline std::pair<unsigned short, unsigned short> get_termsize() {
 #endif
 }
 
-inline bool is_tty() {
-#ifndef _WIN32
-	return isatty(STDIN_FILENO);
+inline bool is_tty(std::FILE* f) {
+#ifdef _WIN32
+	return _isatty(_fileno(f)) != 0;
 #else
-	if (!init()) return false;
-	return GetFileType(hIn) == FILE_TYPE_CHAR;
+	return isatty(fileno(f)) != 0;
 #endif
 }
 

@@ -404,7 +404,7 @@ private:
 	size_t term_h_ = 0, term_w_ = 0; /// term height and width
 	size_t r_ = 0, c_ = 0; /// current cursor's row and column
 	std::vector<size_t> lws_{ 0 }; /// input line widths
-	bool is_pipe_ = !term::is_tty();
+	bool is_pipe_ = !term::is_tty(stdin);
 	bool input_started_ = false;
 };
 

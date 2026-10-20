@@ -24,9 +24,12 @@
 //     cout << TC[COLOR] << TC[BG_GREEN] << TC[AND] << TC[WHITE] << TC[EOC]
 //            << "green background and white text" << TC[CLEAR];
 
+#include <cstdio>
 #include <vector>
 #include <string>
 #include <sstream>
+
+#include "term.h"
 
 namespace idni::term {
 
@@ -150,7 +153,8 @@ struct colors {
 
 namespace idni {
 
-inline term::colors TC(true);
+// a program that wants colors in a pipe sets TC itself
+inline term::colors TC(term::is_tty());
 
 } // idni namespace
 

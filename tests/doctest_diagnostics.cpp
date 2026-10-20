@@ -14,11 +14,20 @@
 #include "utility/diagnostics.h"
 #include "utility/program_codes.h"
 
+#include <cstdio>
 #include <string>
 #include <string_view>
 #include <type_traits>
 #include <vector>
 #include <sstream>
+#ifdef _WIN32
+#	include <fcntl.h>
+#	include <io.h>
+#else
+#	include <fcntl.h>
+#	include <stdlib.h>
+#	include <unistd.h>
+#endif
 
 using namespace idni::diagnostics;
 
@@ -1092,6 +1101,50 @@ TEST_SUITE("diagnostics: a result<void> takes a child's value") {
 		CHECK_FALSE(failed.has_value());
 		CHECK(failed.report().nodes().back().tag == code::solver_error);
 	}
+}
+
+TEST_SUITE("term colors: the terminal check") {
+
+	TEST_CASE("a pipe is no terminal") {
+		int fds[2];
+#ifdef _WIN32
+		REQUIRE(_pipe(fds, 256, _O_BINARY) == 0);
+		std::FILE* w = _fdopen(fds[1], "w");
+#else
+		REQUIRE(pipe(fds) == 0);
+		std::FILE* w = fdopen(fds[1], "w");
+#endif
+		REQUIRE(w != nullptr);
+		CHECK_FALSE(idni::term::is_tty(w));
+		std::fclose(w);
+#ifdef _WIN32
+		_close(fds[0]);
+#else
+		close(fds[0]);
+#endif
+	}
+
+#ifndef _WIN32
+	// a pseudo terminal gives a terminal on a host without one
+	TEST_CASE("a pseudo terminal is a terminal") {
+		const int master = posix_openpt(O_RDWR | O_NOCTTY);
+		if (master < 0) {
+			MESSAGE("no pseudo terminal on this host, case skipped");
+			return;
+		}
+		REQUIRE(grantpt(master) == 0);
+		REQUIRE(unlockpt(master) == 0);
+		const char* name = ptsname(master);
+		REQUIRE(name != nullptr);
+		const int fd = open(name, O_RDWR | O_NOCTTY);
+		REQUIRE(fd >= 0);
+		std::FILE* slave = fdopen(fd, "w");
+		REQUIRE(slave != nullptr);
+		CHECK(idni::term::is_tty(slave));
+		std::fclose(slave);
+		close(master);
+	}
+#endif
 }
 
 TEST_SUITE("diagnostics: an info message prints as a message line") {

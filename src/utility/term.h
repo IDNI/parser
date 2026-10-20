@@ -5,6 +5,7 @@
 #define __IDNI__PARSER__UTILITY__TERM_H__
 
 #include <cstddef>
+#include <cstdio>
 #include <string>
 
 // #define TERM_DEBUG 1
@@ -38,7 +39,8 @@ void cursor_down(size_t n = 1);
 void cursor_right(size_t n = 1);
 void cursor_left(size_t n = 1);
 std::pair<unsigned short, unsigned short> get_termsize();
-bool is_tty();
+/// True when @p f is a terminal, false for a pipe or a file.
+bool is_tty(std::FILE* f = stdout);
 
 } // namespace idni::term
 
