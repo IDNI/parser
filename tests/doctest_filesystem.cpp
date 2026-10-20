@@ -5,9 +5,20 @@
 #include "quiet_doctest.h"
 #include "utility/filesystem.h"
 
+#include <atomic>
 #include <filesystem>
+#include <fstream>
+#include <functional>
+#include <thread>
+#include <sstream>
 #include <string>
 #include <system_error>
+
+#ifndef _WIN32
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 
 using namespace idni;
 
@@ -36,6 +47,18 @@ std::string read_text(const fs::path& p) {
 	return r.value();
 }
 
+// True when the folder of @p p holds a temp file of fs::replace.
+bool temp_left(const fs::path& p) {
+	std::error_code ec;
+	const sfs::path dir = sfs::path(p).parent_path();
+	if (!sfs::is_directory(dir, ec)) return false;
+	for (const auto& e : sfs::directory_iterator(dir, ec))
+		if (e.path().filename().string().find(".tmp.")
+				!= std::string::npos)
+			return true;
+	return false;
+}
+
 // True when the report holds an io_error node.
 bool has_io_error(const diagnostics::report& r) {
 	for (const auto& n : r.nodes())
@@ -43,7 +66,172 @@ bool has_io_error(const diagnostics::report& r) {
 	return false;
 }
 
+#ifndef _WIN32
+// The permission bits of @p p.
+mode_t mode_of(const fs::path& p) {
+	struct stat st{};
+	REQUIRE(::stat(p.c_str(), &st) == 0);
+	return st.st_mode & 0777;
+}
+#endif
+
 } // namespace
+
+TEST_SUITE("fs::replace") {
+
+TEST_CASE("replaces an existing file") {
+	temp_folder t("doctest_filesystem_existing.tmp");
+	const fs::path p = t.file("data.txt");
+	REQUIRE(fs::write(p, "old content").has_value());
+	auto r = fs::replace(p, "new content");
+	REQUIRE(r.has_value());
+	CHECK(read_text(p) == "new content");
+	CHECK_FALSE(temp_left(p));
+}
+
+TEST_CASE("creates a missing file") {
+	temp_folder t("doctest_filesystem_missing.tmp");
+	const fs::path p = t.file("data.txt");
+	REQUIRE_FALSE(fs::exists(p));
+	auto r = fs::replace(p, "first content");
+	REQUIRE(r.has_value());
+	CHECK(read_text(p) == "first content");
+	CHECK_FALSE(temp_left(p));
+}
+
+TEST_CASE("a missing folder is an error that names the path") {
+	temp_folder t("doctest_filesystem_no_folder.tmp");
+	const fs::path p = t.file("absent/data.txt");
+	auto r = fs::replace(p, "content");
+	CHECK_FALSE(r.has_value());
+	std::ostringstream os;
+	r.report().print(os);
+	CHECK(os.str().find("absent") != std::string::npos);
+	// a system error number is no exit code of a process
+	CHECK(os.str().find("errno=") != std::string::npos);
+	CHECK(os.str().find("exit code=") == std::string::npos);
+	CHECK_FALSE(temp_left(p));
+}
+
+#ifndef _WIN32
+TEST_CASE("a new file gets mode 0600") {
+	temp_folder t("doctest_filesystem_new_mode.tmp");
+	const fs::path p = t.file("data.txt");
+	REQUIRE(fs::replace(p, "content").has_value());
+	CHECK(mode_of(p) == 0600);
+}
+
+TEST_CASE("a file with mode 0644 gets mode 0600") {
+	temp_folder t("doctest_filesystem_old_mode.tmp");
+	const fs::path p = t.file("data.txt");
+	REQUIRE(fs::write(p, "old content").has_value());
+	REQUIRE(::chmod(p.c_str(), 0644) == 0);
+	REQUIRE(mode_of(p) == 0644);
+	REQUIRE(fs::replace(p, "new content").has_value());
+	CHECK(mode_of(p) == 0600);
+	CHECK(read_text(p) == "new content");
+}
+#endif
+
+TEST_CASE("a file with a temp-like name stays") {
+	temp_folder t("doctest_filesystem_stale.tmp");
+	const fs::path p = t.file("data.txt");
+	const fs::path own = p + fs::to_path(".tmp");
+	REQUIRE(fs::write(own, "a file of the user").has_value());
+	REQUIRE(fs::replace(p, "new").has_value());
+	CHECK(read_text(p) == "new");
+	CHECK(read_text(own) == "a file of the user");
+	CHECK_FALSE(temp_left(p));
+}
+
+// Windows refuses the rename while the reader holds the file open.
+#if !defined(_WIN32) \
+	&& (!defined(__EMSCRIPTEN__) || defined(__EMSCRIPTEN_PTHREADS__))
+TEST_CASE("two writers never mix their content") {
+	temp_folder t("doctest_filesystem_writers.tmp");
+	const fs::path p = t.file("data.txt");
+	const std::string a(256 * 1024, 'a'), b(256 * 1024, 'b');
+	REQUIRE(fs::replace(p, a).has_value());
+	std::atomic<bool> failed{ false }, done{ false };
+	auto writer = [&](const std::string& content) {
+		for (int i = 0; i != 40; ++i)
+			if (!fs::replace(p, content).has_value()) failed = true;
+	};
+	std::thread reader([&] {
+		while (!done) {
+			auto r = fs::read(p);
+			if (r.has_value() && r.value() != a && r.value() != b)
+				failed = true;
+		}
+	});
+	std::thread wa(writer, std::cref(a)), wb(writer, std::cref(b));
+	wa.join(), wb.join();
+	done = true;
+	reader.join();
+	CHECK_FALSE(failed.load());
+	const std::string last = read_text(p);
+	CHECK((last == a || last == b));
+	CHECK_FALSE(temp_left(p));
+}
+#endif
+
+#ifndef _WIN32
+TEST_CASE("a symlink at the path is replaced and its target stays") {
+	temp_folder t("doctest_filesystem_replace_link.tmp");
+	const fs::path target = t.file("target.txt");
+	const fs::path p = t.file("data.txt");
+	REQUIRE(fs::write(target, "target content").has_value());
+	REQUIRE(::symlink(target.c_str(), p.c_str()) == 0);
+	REQUIRE(fs::replace(p, "new").has_value());
+	CHECK(read_text(target) == "target content");
+	CHECK(read_text(p) == "new");
+	std::error_code ec;
+	CHECK_FALSE(sfs::is_symlink(sfs::path(p), ec));
+}
+#endif
+
+TEST_CASE("an empty content gives an empty file") {
+	temp_folder t("doctest_filesystem_empty.tmp");
+	const fs::path p = t.file("data.txt");
+	REQUIRE(fs::write(p, "old content").has_value());
+	REQUIRE(fs::replace(p, "").has_value());
+	CHECK(fs::exists(p));
+	CHECK(read_text(p).empty());
+}
+
+TEST_CASE("a content of 3 MiB and 7 bytes comes back the same") {
+	temp_folder t("doctest_filesystem_large.tmp");
+	const fs::path p = t.file("data.bin");
+	std::string content(3u * 1024 * 1024 + 7, '\0');
+	for (size_t i = 0; i != content.size(); ++i)
+		content[i] = static_cast<char>((i * 131 + 7) % 251);
+	REQUIRE(fs::replace(p, content).has_value());
+	CHECK(read_text(p) == content);
+	CHECK_FALSE(temp_left(p));
+}
+
+TEST_CASE("a folder as the target is an io_error and the folder stays") {
+	temp_folder t("doctest_filesystem_folder.tmp");
+	const sfs::path dir = t.dir / "target";
+	std::error_code ec;
+	REQUIRE(sfs::create_directory(dir, ec));
+	const fs::path p = fs::to_path(dir.string());
+	auto r = fs::replace(p, "content");
+	CHECK_FALSE(r.has_value());
+	CHECK(has_io_error(r.report()));
+	CHECK(sfs::is_directory(dir, ec));
+	CHECK_FALSE(temp_left(p));
+}
+
+TEST_CASE("the error of a missing folder is an io_error") {
+	temp_folder t("doctest_filesystem_no_folder_code.tmp");
+	const fs::path p = t.file("absent/data.txt");
+	auto r = fs::replace(p, "content");
+	CHECK_FALSE(r.has_value());
+	CHECK(has_io_error(r.report()));
+}
+
+}
 
 TEST_SUITE("fs::read and fs::open_stream") {
 

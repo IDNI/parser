@@ -99,7 +99,8 @@ using id_t = idni::int_t;
 	X(trim_terminals,     "trim terminals") \
 	X(offset,             "offset") \
 	X(byte,               "byte") \
-	X(port,               "port")
+	X(port,               "port") \
+	X(error_number,       "errno")
 
 // The labels whose attr value holds interned text, not a number. A
 // separate list, so LABELS keeps its two-argument shape and every

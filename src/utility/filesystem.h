@@ -96,6 +96,26 @@ result<bool> unlink(const path& p);
 result<bool> write(const path& p, std::string_view content);
 
 /**
+ * @brief Replaces a file with new content, so a reader sees the old or
+ * the new file and never a part of one.
+ * A new temp file with a unique name in the same folder gets mode 0600
+ * on POSIX, the content and an fsync (F_FULLFSYNC on macOS). A rename
+ * replaces @p p, then a sync of the folder makes the rename durable. On
+ * Windows the temp file is flushed and one MoveFileExW call replaces the
+ * target. Two writers of one path never share a temp file.
+ * @note The new file has mode 0600 on POSIX, also when the old file had
+ * a wider mode. A symlink at @p p is replaced by the file, and the
+ * target of the link stays as it is.
+ * @note On Windows, the call fails while another handle holds @p p open
+ * without FILE_SHARE_DELETE.
+ * @param p the path to the file.
+ * @param content the bytes to write.
+ * @return on success, true. On failure, an error with code::io_error
+ * and the failing path in label::path.
+ */
+result<bool> replace(const path& p, std::string_view content);
+
+/**
  * @brief Reads a whole file.
  * @param p the path to the file.
  * @return on success, the bytes of the file. On failure, an error with

@@ -4,10 +4,13 @@
 #ifndef __IDNI__PARSER__UTILITY__FILESYSTEM_TMPL_H__
 #define __IDNI__PARSER__UTILITY__FILESYSTEM_TMPL_H__
 
+#include <algorithm>
+#include <atomic>
 #include <cerrno>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <cwchar>
 #include <filesystem>
 #include <system_error>
 #include <vector>
@@ -20,6 +23,7 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include <io.h>
 #else
 #include <unistd.h>
 #include <fcntl.h>
@@ -154,6 +158,13 @@ inline result<bool> write(const path& p, std::string_view content) {
 	}
 	size_t written = std::fwrite(content.data(), 1, content.size(), f);
 	bool short_write = written != content.size();
+#ifdef _WIN32
+	// fclose only hands the bytes to the system cache, not to the disk.
+	const bool synced = !short_write && std::fflush(f) == 0
+		&& ::FlushFileBuffers(reinterpret_cast<HANDLE>(
+			::_get_osfhandle(::_fileno(f))));
+	const DWORD sync_error = synced ? 0 : ::GetLastError();
+#endif
 	bool flush_failed = std::fclose(f) != 0;
 	int flush_errno = errno;
 	if (short_write) {
@@ -161,12 +172,174 @@ inline result<bool> write(const path& p, std::string_view content) {
 			"failed to write the file",
 			{{label::path, to_utf8(p)}});
 	}
+#ifdef _WIN32
+	if (!synced) {
+		return r.with_error(diagnostics::code::io_error,
+			"failed to write the file to the disk",
+			{{label::path, to_utf8(p)},
+				{label::error_number, static_cast<int_t>(sync_error)}});
+	}
+#endif
 	if (flush_failed) {
 		return r.with_error(diagnostics::code::io_error,
 			"failed to flush the file",
 			{{label::path, to_utf8(p)},
 				{label::exit_code, static_cast<int_t>(flush_errno)}});
 	}
+	return r.with_value(true);
+}
+
+// One definition for every translation unit, so no unnamed namespace.
+namespace detail {
+
+// The temp file of fs::replace is <path><temp_infix><unique part>.
+inline constexpr std::string_view temp_infix = ".tmp.";
+
+#ifndef _WIN32
+// The whole of @p text, also after a short write or a signal.
+inline bool write_all(int fd, std::string_view text) {
+	while (!text.empty()) {
+		const ssize_t n = ::write(fd, text.data(), text.size());
+		if (n < 0 && errno == EINTR) continue;
+		if (n <= 0) return false;
+		text.remove_prefix(static_cast<size_t>(n));
+	}
+	return true;
+}
+
+inline bool sync_fd(int fd) {
+#ifdef F_FULLFSYNC
+	// fsync on macOS leaves the bytes in the disk cache. A file system
+	// without F_FULLFSYNC falls back to fsync.
+	if (::fcntl(fd, F_FULLFSYNC) == 0) return true;
+#endif
+	int rc;
+	do rc = ::fsync(fd); while (rc != 0 && errno == EINTR);
+	return rc == 0;
+}
+
+// A new temp file with a unique name next to @p p, mode 0600 from its
+// open. O_EXCL never opens an existing file or follows a symlink, so
+// another writer or a planted link cannot take it.
+inline bool write_private_temp(const path& p, std::string_view text,
+	path& temp)
+{
+	std::vector<char> name(p.begin(), p.end());
+	name.insert(name.end(), temp_infix.begin(), temp_infix.end());
+	for (char c : std::string_view("XXXXXX")) name.push_back(c);
+	name.push_back('\0');
+	const int fd = ::mkstemp(name.data());
+	if (fd < 0) return false;
+	temp.assign(name.data());
+	::fcntl(fd, F_SETFD, FD_CLOEXEC);
+	const bool ok = write_all(fd, text) && sync_fd(fd);
+	const int saved = errno;
+	const bool closed = ::close(fd) == 0;
+	if (!ok) errno = saved;
+	return closed && ok;
+}
+
+// A rename is durable only after the folder entry reaches the disk.
+inline bool sync_folder(const path& dir) {
+	const int fd = ::open(dir.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+	if (fd < 0) return false;
+	const bool ok = sync_fd(fd);
+	const int saved = errno;
+	const bool closed = ::close(fd) == 0;
+	if (!ok) errno = saved;
+	return closed && ok;
+}
+#else
+// A new temp file with a unique name next to @p p, with the whole of
+// @p text flushed to the disk before the handle closes. CREATE_NEW never
+// opens a file of another writer.
+inline bool write_flushed_temp(const path& p, std::string_view text,
+	path& temp)
+{
+	static std::atomic<unsigned> counter{ 0 };
+	HANDLE h = INVALID_HANDLE_VALUE;
+	for (int attempt = 0; attempt != 100; ++attempt) {
+		wchar_t unique[40];
+		::swprintf(unique, 40, L"%lx.%x.%llx", ::GetCurrentProcessId(),
+			counter.fetch_add(1),
+			static_cast<unsigned long long>(::GetTickCount64()));
+		temp = p + path(temp_infix.begin(), temp_infix.end()) + unique;
+		h = ::CreateFileW(temp.c_str(), GENERIC_WRITE, 0, nullptr,
+			CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+		if (h != INVALID_HANDLE_VALUE
+				|| ::GetLastError() != ERROR_FILE_EXISTS)
+			break;
+	}
+	if (h == INVALID_HANDLE_VALUE) { temp.clear(); return false; }
+	bool ok = true;
+	while (ok && !text.empty()) {
+		const DWORD chunk = static_cast<DWORD>(
+			std::min<size_t>(text.size(), 1u << 30));
+		DWORD n = 0;
+		ok = ::WriteFile(h, text.data(), chunk, &n, nullptr) && n != 0;
+		if (ok) text.remove_prefix(n);
+	}
+	ok = ok && ::FlushFileBuffers(h);
+	const DWORD saved = ::GetLastError();
+	const bool closed = ::CloseHandle(h) != 0;
+	if (!ok) ::SetLastError(saved);
+	return closed && ok;
+}
+#endif
+
+} // namespace detail
+
+inline result<bool> replace(const path& p, std::string_view content) {
+	using label = idni::parser_strings::label;
+	result<bool> r;
+	path temp;
+#ifdef _WIN32
+	if (!detail::write_flushed_temp(p, content, temp)) {
+		const DWORD err = ::GetLastError();
+		if (!temp.empty() && exists(temp)) r.merge(unlink(temp));
+		return r.with_error(diagnostics::code::io_error,
+			"failed to write the temp file to the disk",
+			{{label::path, to_utf8(temp.empty() ? p : temp)},
+				{label::error_number, static_cast<int_t>(err)}});
+	}
+	if (!::MoveFileExW(temp.c_str(), p.c_str(),
+			MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+	{
+		const DWORD err = ::GetLastError();
+		if (exists(temp)) r.merge(unlink(temp));
+		return r.with_error(diagnostics::code::io_error,
+			"failed to replace the file",
+			{{label::path, to_utf8(p)},
+				{label::error_number, static_cast<int_t>(err)}});
+	}
+#else
+	if (!detail::write_private_temp(p, content, temp)) {
+		const int err = errno;
+		if (!temp.empty() && exists(temp)) r.merge(unlink(temp));
+		return r.with_error(diagnostics::code::io_error,
+			"failed to write the temp file to the disk",
+			{{label::path, to_utf8(temp.empty() ? p : temp)},
+				{label::error_number, static_cast<int_t>(err)}});
+	}
+	std::error_code ec;
+	std::filesystem::rename(std::filesystem::path(temp),
+		std::filesystem::path(p), ec);
+	if (ec) {
+		if (exists(temp)) r.merge(unlink(temp));
+		return r.with_error(diagnostics::code::io_error,
+			"failed to replace the file",
+			{{label::path, to_utf8(p)},
+				{label::error_number, static_cast<int_t>(ec.value())}});
+	}
+	// The new content is in place. Only the durability of the rename failed.
+	std::string dir = std::filesystem::path(p).parent_path().string();
+	if (dir.empty()) dir = ".";
+	if (!detail::sync_folder(dir))
+		return r.with_error(diagnostics::code::io_error,
+			"failed to write the folder of the file to the disk",
+			{{label::path, dir},
+				{label::error_number, static_cast<int_t>(errno)}});
+#endif
 	return r.with_value(true);
 }
 
