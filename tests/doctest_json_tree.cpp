@@ -481,6 +481,149 @@ TEST_SUITE("json tree: the grammar variant nonfinite") {
 	}
 }
 
+TEST_SUITE("json tree: keep_float_form") {
+	const read_options floats{ .nonfinite = true,
+		.keep_float_form = true };
+
+	static tref read(std::string_view text, const read_options& o) {
+		auto r = jt::get(text, o);
+		REQUIRE(r.has_value());
+		return r.value();
+	}
+	// A float node: a number with no decimal text.
+	static bool is_float(tref t) {
+		return jt::get(t).is_number() && jt::get(t).value.str.empty();
+	}
+
+	TEST_CASE("the default reader refuses the nonfinite and float forms") {
+		for (const char* text : { "NaN", "Infinity", "-Infinity",
+				"1e400", "-1e400" })
+		{
+			CAPTURE(text);
+			CHECK_FALSE(jt::get(std::string_view(text)).has_value());
+			CHECK_FALSE(jt::get(text, read_options{}).has_value());
+		}
+	}
+
+	TEST_CASE("the default options read as the default reader") {
+		for (const char* text : { "1.0", "-0", "-0.0", "1e2", "0.5",
+				"123456789012345678901234567890", "[1,2.5,{}]" })
+		{
+			CAPTURE(text);
+			CHECK(read(text, read_options{}) == parsed(text));
+		}
+		CHECK(jt::get(read("1.0", read_options{})).to_str() == "1");
+	}
+
+	TEST_CASE("nonfinite alone reads NaN and keeps the number rules") {
+		const read_options o{ .nonfinite = true };
+		CHECK(std::isnan(jt::get(read("NaN", o)).get_number()));
+		CHECK(read("1.0", o) == parsed("1.0"));
+		CHECK_FALSE(jt::get("1e400", o).has_value());
+	}
+
+	TEST_CASE("a fraction or an exponent gives a float node") {
+		for (const char* text : { "1.0", "1e15", "1e16", "1E22", "0e0",
+				"1.0e-5", "0.0001", "0.1", "0.30000000000000004",
+				"123456789012345678.0", "1.7976931348623157e308",
+				"5e-324" })
+		{
+			CAPTURE(text);
+			const tref t = read(text, floats);
+			CHECK(is_float(t));
+			double d = 0;
+			REQUIRE(parse_number(text, d));
+			CHECK(jt::get(t).get_number() == d);
+		}
+		CHECK(read("1.0", floats) != read("1", floats));
+		CHECK(read("1.0", floats) == read("1e0", floats));
+		CHECK(jt::get(read("5e-324", floats)).get_number()
+			== std::numeric_limits<double>::denorm_min());
+		CHECK(jt::get(read("123456789012345678.0", floats)).get_number()
+			== 1.2345678901234568e17);
+	}
+
+	TEST_CASE("-0.0 stays and the integer -0 is 0") {
+		const tref nz = read("-0.0", floats);
+		CHECK(is_float(nz));
+		CHECK(std::signbit(jt::get(nz).get_number()));
+		CHECK(nz != read("0.0", floats));
+		const tref iz = read("-0", floats);
+		CHECK(iz == read("0", floats));
+		CHECK(jt::get(iz).value.str == "0");
+		CHECK_FALSE(std::signbit(jt::get(iz).get_number()));
+	}
+
+	TEST_CASE("a float text out of range is an infinity or a signed zero") {
+		const double inf = std::numeric_limits<double>::infinity();
+		CHECK(jt::get(read("1e400", floats)).get_number() == inf);
+		CHECK(jt::get(read("-1e400", floats)).get_number() == -inf);
+		const tref under = read("1e-400", floats);
+		CHECK(is_float(under));
+		CHECK(jt::get(under).get_number() == 0);
+		CHECK_FALSE(std::signbit(jt::get(under).get_number()));
+		CHECK(std::signbit(jt::get(read("-1e-400", floats)).get_number()));
+		CHECK(read("1e-400", floats) == read("0.0", floats));
+	}
+
+	// The stream of libc++ fails on a subnormal and keeps its value.
+	TEST_CASE("a subnormal reads as its value") {
+		const double sub_min = std::numeric_limits<double>::denorm_min();
+		const struct { const char* text; double value; } cases[] = {
+			{ "4.9e-324", sub_min },
+			{ "5e-324", sub_min },
+			{ "-4.9e-324", -sub_min },
+			{ "1e-310", 1e-310 },
+			{ "2.2250738585072009e-308", 0x0.fffffffffffffp-1022 },
+			{ "2.2250738585072014e-308", std::numeric_limits<double>::min() },
+			// just above and just below half of the smallest subnormal
+			{ "2.4703282292062328e-324", sub_min },
+			{ "2.4703282292062327e-324", 0 },
+			{ "-2.4703282292062327e-324", 0 },
+		};
+		for (const auto& c : cases) {
+			const std::string text = c.text;
+			CAPTURE(text);
+			double d = 1;
+			REQUIRE(parse_number(c.text, d));
+			CHECK(d == c.value);
+			CHECK(jt::get(read(c.text, floats)).get_number() == c.value);
+			CHECK(jt::get(parsed(c.text)).get_number() == c.value);
+		}
+		CHECK(std::signbit(parse_number_saturating("-2.4703282292062327e-324")));
+		CHECK(std::signbit(jt::get(read("-2.4703282292062327e-324", floats))
+			.get_number()));
+	}
+
+	TEST_CASE("an integer text keeps its digits, also out of range") {
+		for (const char* text : { "0", "9223372036854775807",
+				"-9223372036854775808", "18446744073709551616",
+				"-1208925819614629174706176" })
+		{
+			CAPTURE(text);
+			const tref t = read(text, floats);
+			CHECK(jt::get(t).value.str == text);
+			CHECK(t == parsed(text));
+		}
+		const std::string big(400, '9');
+		CHECK_FALSE(jt::get(std::string_view(big)).has_value());
+		const tref t = read(big, floats);
+		CHECK(jt::get(t).value.str == big);
+		CHECK(jt::get(t).get_number()
+			== std::numeric_limits<double>::infinity());
+		CHECK(jt::get(read("-" + big, floats)).get_number()
+			== -std::numeric_limits<double>::infinity());
+	}
+
+	TEST_CASE("the floats of a tx") {
+		const tref t = read(R"({"fee_limit":5.0,"amount":1e3})", floats);
+		CHECK(is_float(jt::get(t).find("fee_limit")));
+		CHECK(jt::get(jt::get(t).find("amount")).get_number() == 1000);
+		CHECK(is_float(jt::get(t).find("amount")));
+	}
+
+}
+
 TEST_SUITE("json tree: the float format repr") {
 	// The expected texts come from Python repr and json.dumps.
 	TEST_CASE("float_repr gives the text of Python repr") {
@@ -508,6 +651,32 @@ TEST_SUITE("json tree: the float format repr") {
 			== "inf");
 		CHECK(float_repr(-std::numeric_limits<double>::infinity())
 			== "-inf");
+	}
+
+	TEST_CASE("the profiles print a float as repr and an integer as text") {
+		const read_options o{ .keep_float_form = true };
+		auto r = jt::get("[1.0,1e16,-0.0,1e3,0.5,7]", o);
+		REQUIRE(r.has_value());
+		const tree& t = jt::get(r.value());
+		CHECK(t.to_str(print_options::normal())
+			== "[1.0, 1e+16, -0.0, 1000.0, 0.5, 7]");
+		auto p = jt::get(R"({"a":[1.5,2],"b":1e-7})", o);
+		REQUIRE(p.has_value());
+		CHECK(jt::get(p.value()).to_str(print_options::pretty(2))
+			== "{\n  \"a\": [\n    1.5,\n    2\n  ],\n  \"b\": 1e-07\n}");
+	}
+
+	TEST_CASE("the default format stays the shortest text") {
+		const read_options o{ .keep_float_form = true };
+		auto r = jt::get("[1.0,1e16,-0.0,1e3,0.5]", o);
+		REQUIRE(r.has_value());
+		CHECK(jt::get(r.value()).to_str() == "[1,1e+16,-0,1000,0.5]");
+		CHECK(jt::get(r.value()).to_str(print_options::minified())
+			== "[1,1e+16,-0,1000,0.5]");
+		CHECK(jt::get(parsed("[1.0,-0,0.5,1e2]")).to_str()
+			== "[1,0,0.5,100]");
+		CHECK(jt::get(parsed("[1.0,-0,0.5]")).to_str(
+			print_options::normal()) == "[1, 0, 0.5]");
 	}
 }
 
@@ -553,6 +722,19 @@ TEST_SUITE("json tree: the float and integer builders") {
 		CHECK(jt::get(jt::build_float(1.0)).value.str.empty());
 		CHECK(jt::build_number(1.0) == jt::build_integer(int64_t{ 1 }));
 		CHECK(jt::build_number(-0.0) == jt::build_integer(int64_t{ 0 }));
+	}
+
+	TEST_CASE("build_float is the node of a float read") {
+		const read_options o{ .nonfinite = true, .keep_float_form = true };
+		for (const char* text : { "1.0", "-0.0", "1e400", "0.5", "NaN" }) {
+			CAPTURE(text);
+			auto r = jt::get(text, o);
+			REQUIRE(r.has_value());
+			CHECK(jt::build_float(jt::get(r.value()).get_number())
+				== r.value());
+		}
+		CHECK(jt::build_float(-std::numeric_limits<double>::quiet_NaN())
+			== jt::build_float(std::numeric_limits<double>::quiet_NaN()));
 	}
 
 	TEST_CASE("the profiles print a built float as repr") {

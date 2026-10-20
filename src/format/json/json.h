@@ -161,6 +161,19 @@ struct print_options {
 	static print_options pretty(size_t n);
 };
 
+/// How tree::get reads a JSON text. Each field is off by default, so the
+/// default options read RFC 8259 JSON as tree::get(std::string_view) does.
+struct read_options {
+	/// The grammar variant nonfinite: NaN, Infinity and -Infinity.
+	bool nonfinite = false;
+	/// A fraction or an exponent gives a float node with no text, also
+	/// for an integer value, and -0.0 stays. A text out of the double range
+	/// reads as an infinity, or as a zero with the sign of the text. An
+	/// integer text keeps its digits, and its double is an infinity when
+	/// it is out of range.
+	bool keep_float_form = false;
+};
+
 /// A JSON document as an interned lcrs tree. A tref of it is valid until
 /// a gc of bintree<node> drops it, so a document that outlives the step
 /// that built it is held by an htref.
@@ -259,11 +272,17 @@ struct tree : public lcrs_tree<node> {
 
 	/// The JSON tree of a shaped parse tree whose root is a start node, a
 	/// value node or the node of one JSON value, such as a str.
-	static diagnostics::result<tref> get(const parse_tree& t);
-	static diagnostics::result<tref> get(json_parser::result& r);
+	static diagnostics::result<tref> get(const parse_tree& t,
+		const read_options& o = {});
+	static diagnostics::result<tref> get(json_parser::result& r,
+		const read_options& o = {});
 	/// Parse a JSON text. On a syntax error or a bad escape the result
 	/// carries no value.
 	static diagnostics::result<tref> get(std::string_view text);
+	/// Parse a JSON text with the options @p o. With nonfinite the
+	/// parser of detail::nonfinite_grammar() reads the text.
+	static diagnostics::result<tref> get(std::string_view text,
+		const read_options& o);
 
 	// printers
 
@@ -407,6 +426,11 @@ value build_string(const trv& t, result& R);
 /// Read the JSON number @p s. A value below the smallest double reads as 0.
 /// A value above the largest double is an error.
 bool parse_number(const std::string& s, double& d);
+
+/// Read the JSON number @p s. A value below the smallest double reads as
+/// a zero with the sign of @p s, and a value above the largest double as
+/// an infinity with that sign.
+double parse_number_saturating(const std::string& s);
 
 /// The text of Python repr(float) for @p d: the shortest digits that read
 /// back to @p d, in plain notation for a decimal exponent from -4 to 15,

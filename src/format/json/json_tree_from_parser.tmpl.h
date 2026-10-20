@@ -15,7 +15,9 @@
 
 namespace idni::format::json {
 
-inline diagnostics::result<tref> tree::get(const parse_tree& t) {
+inline diagnostics::result<tref> tree::get(const parse_tree& t,
+	const read_options& o)
+{
 	using pnode = json_parser::pnode;
 	diagnostics::result<tref> R;
 	// parse tree node -> JSON tree node; the subtree equality matches
@@ -73,6 +75,19 @@ inline diagnostics::result<tref> tree::get(const parse_tree& t) {
 			const std::string s = text(p);
 			const auto fr = trv(p) | json_parser::fractional;
 			const auto ep = trv(p) | json_parser::exponent;
+			if (o.keep_float_form) {
+				double d = parse_number_saturating(s);
+				if (fr || ep) {
+					x = get(node(json_parser::number,
+						std::bit_cast<uint64_t>(d)));
+					break;
+				}
+				// an integer -0 is the integer 0
+				if (std::fpclassify(d) == FP_ZERO) d = 0;
+				x = get(node(json_parser::number,
+					std::bit_cast<uint64_t>(d), s == "-0" ? "0" : s));
+				break;
+			}
 			double d = 0;
 			if (!parse_number(s, d)) {
 				R.error(code::parse_error, "Invalid JSON number",
@@ -168,7 +183,9 @@ inline diagnostics::result<tref> tree::get(const parse_tree& t) {
 	return std::move(R).with_value(x);
 }
 
-inline diagnostics::result<tref> tree::get(json_parser::result& r) {
+inline diagnostics::result<tref> tree::get(json_parser::result& r,
+	const read_options& o)
+{
 	diagnostics::result<tref> R;
 	if (!r.found) {
 		if (!r.report().nodes().empty()) R.append(std::move(r.report()));
@@ -179,7 +196,7 @@ inline diagnostics::result<tref> tree::get(json_parser::result& r) {
 	}
 	tref n = r.get_shaped_tree2();
 	if (!r.report().nodes().empty()) R.append(std::move(r.report()));
-	auto x = get(parse_tree::get(n));
+	auto x = get(parse_tree::get(n), o);
 	tref v = x.has_value() ? x.value() : nullptr;
 	R.append(std::move(x).report());
 	if (R.has_error() || v == nullptr) return R;
@@ -190,6 +207,16 @@ inline diagnostics::result<tref> tree::get(std::string_view text) {
 	json_parser::parse_options po{ .start = json_parser::start };
 	auto r = json_parser::instance().parse(text.data(), text.size(), po);
 	return get(r);
+}
+
+inline diagnostics::result<tref> tree::get(std::string_view text,
+	const read_options& o)
+{
+	parser<char, char32_t>& p = o.nonfinite ? detail::nonfinite_parser()
+		: json_parser::instance();
+	parser<char, char32_t>::parse_options po{ .start = json_parser::start };
+	auto r = p.parse(text.data(), text.size(), po);
+	return get(r, o);
 }
 
 namespace detail {

@@ -275,6 +275,15 @@ inline bool parse_number(const std::string& s, double& d) {
 	return true;
 }
 
+inline double parse_number_saturating(const std::string& s) {
+	const bool neg = !s.empty() && s[0] == '-';
+	double d = 0;
+	if (!parse_number(s, d))
+		return neg ? -std::numeric_limits<double>::infinity()
+			: std::numeric_limits<double>::infinity();
+	return std::fpclassify(d) == FP_ZERO && neg ? -0.0 : d;
+}
+
 inline value build(const trv& t, result& R) {
 	auto v = t | trv::only_child;
 	switch (v | trv::nonterminal) {
