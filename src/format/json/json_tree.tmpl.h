@@ -4,6 +4,7 @@
 #ifndef __IDNI__PARSER__FORMAT__JSON_TREE_TMPL_H__
 #define __IDNI__PARSER__FORMAT__JSON_TREE_TMPL_H__
 
+#include <atomic>
 #include <bit>
 #include <charconv>
 #include <cstddef>
@@ -61,6 +62,16 @@ inline const tree& tree::get(const htref& h) {
 inline htref tree::geth(tref id) { return base_t::geth(id); }
 
 inline size_t tree::m_size() { return bintree<node>::node_count(); }
+
+inline bool tree::gc_if_grown() {
+	// the nodes that the last gc kept
+	static std::atomic<size_t> live{ 0 };
+	if (bintree<node>::gc_pause_depth.load() > 0
+		|| m_size() <= 2 * live.load() + 4096) return false;
+	gc();
+	live = m_size();
+	return true;
+}
 
 inline tref tree::get(const node& v) { return base_t::get(v); }
 

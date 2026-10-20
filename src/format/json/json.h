@@ -134,6 +134,10 @@ struct tree : public lcrs_tree<node> {
 	static htref geth(tref id);
 	/// Number of interned nodes.
 	static size_t m_size();
+	/// Run the gc when the cache holds more than twice the nodes that
+	/// the last gc kept, plus 4096. True when the gc ran. Call it from
+	/// the one thread that runs the gc, outside every gc_pause.
+	static bool gc_if_grown();
 
 	static tref get(const node& v);
 	static tref get(const node& v, tref ch);

@@ -310,6 +310,34 @@ TEST_SUITE("json tree: deep documents and gc") {
 			++arrays;
 		CHECK(arrays == deep_parse);
 	}
+
+	TEST_CASE("gc_if_grown runs above twice the kept nodes plus 4096") {
+		htref held = jt::geth(jt::build_string("held"));
+		int64_t next = 1000000000;
+		auto grow_to = [&next](size_t n) {
+			while (jt::m_size() < n) jt::build_integer(next++);
+		};
+		// the first run sets the count of the kept nodes
+		bool ran = false;
+		for (size_t i = 0; i != 100 && !ran; ++i) {
+			grow_to(jt::m_size() + 1000);
+			ran = jt::gc_if_grown();
+		}
+		REQUIRE(ran);
+		const size_t kept = jt::m_size();
+		grow_to(2 * kept + 4096);
+		CHECK_FALSE(jt::gc_if_grown());
+		CHECK(jt::m_size() == 2 * kept + 4096);
+		grow_to(2 * kept + 4097);
+		{
+			bintree<node>::gc_pause pause;
+			CHECK_FALSE(jt::gc_if_grown());
+			CHECK(jt::m_size() == 2 * kept + 4097);
+		}
+		CHECK(jt::gc_if_grown());
+		CHECK(jt::m_size() == kept);
+		CHECK(jt::get(held).get_string() == "held");
+	}
 }
 
 TEST_SUITE("json tree: nodes") {
