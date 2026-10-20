@@ -154,6 +154,8 @@ if(TAU_PARSER_BUILD_SERVE AND NOT EMSCRIPTEN AND TARGET tgf)
 	list(APPEND DOCTESTS tgf_serve tgf_connect)
 endif()
 
+list(APPEND DOCTESTS filesystem)
+
 foreach(X IN LISTS DOCTESTS)
 	# The highlight and char class tests read host grammar files
 	# through PROJECT_SOURCE_DIR and are not WASM-runnable.

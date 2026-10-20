@@ -5,6 +5,7 @@
 #define __IDNI__PARSER__UTILITY__FILESYSTEM_H__
 
 #include <cstddef>
+#include <cstdio>
 #include <string>
 #include <string_view>
 #ifdef _WIN32
@@ -93,6 +94,22 @@ result<bool> unlink(const path& p);
  * and the failing path in label::path.
  */
 result<bool> write(const path& p, std::string_view content);
+
+/**
+ * @brief Reads a whole file.
+ * @param p the path to the file.
+ * @return on success, the bytes of the file. On failure, an error with
+ * code::io_error and the failing path in label::path.
+ */
+result<std::string> read(const path& p);
+
+/**
+ * @brief Opens a C stream on a file.
+ * @param p the path to the file.
+ * @param mode the fopen mode, for example "rb" or "wb".
+ * @return the stream, or null when the file does not open.
+ */
+FILE* open_stream(const path& p, const char* mode);
 
 /**
  * @brief Finds the directory for temporary files.

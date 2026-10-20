@@ -7,6 +7,7 @@
 #include <cerrno>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <system_error>
 #include <vector>
@@ -104,17 +105,48 @@ inline result<bool> unlink(const path& p) {
 }
 #endif
 
+inline FILE* open_stream(const path& p, const char* mode) {
+#ifdef _WIN32
+	const std::wstring m(mode, mode + std::strlen(mode));
+#ifdef _MSC_VER
+	FILE* f = nullptr;
+	::_wfopen_s(&f, p.c_str(), m.c_str());
+	return f;
+#else
+	return ::_wfopen(p.c_str(), m.c_str());
+#endif
+#else
+	return std::fopen(p.c_str(), mode);
+#endif
+}
+
+inline result<std::string> read(const path& p) {
+	using label = idni::parser_strings::label;
+	result<std::string> r;
+	FILE* f = open_stream(p, "rb");
+	if (!f) {
+		return r.with_error(diagnostics::code::io_error,
+			idni::parser_strings::messages::cannot_open_file,
+			{{label::path, to_utf8(p)}});
+	}
+	std::string text;
+	// a wasm stack holds 64 KB by default, so the buffer goes on the heap
+	std::vector<char> buf(1 << 16);
+	for (size_t n; (n = std::fread(buf.data(), 1, buf.size(), f)) != 0; )
+		text.append(buf.data(), n);
+	const bool failed = std::ferror(f) != 0;
+	std::fclose(f);
+	if (failed) {
+		return r.with_error(diagnostics::code::io_error,
+			"failed to read the file", {{label::path, to_utf8(p)}});
+	}
+	return r.with_value(std::move(text));
+}
+
 inline result<bool> write(const path& p, std::string_view content) {
 	using label = idni::parser_strings::label;
 	result<bool> r;
-#ifdef _MSC_VER
-	FILE* f = nullptr;
-	::_wfopen_s(&f, p.c_str(), L"wb");
-#elif defined(_WIN32)
-	FILE* f = ::_wfopen(p.c_str(), L"wb");
-#else
-	FILE* f = std::fopen(p.c_str(), "wb");
-#endif
+	FILE* f = open_stream(p, "wb");
 	if (!f) {
 		return r.with_error(diagnostics::code::io_error,
 			"failed to open the file for writing",
