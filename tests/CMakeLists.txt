@@ -145,6 +145,7 @@ set(DOCTESTS
 	tgf_json_api
 	grammar_ownership
 	options
+	program_args
 )
 
 # The serve and connect tests need Boost.Asio. They run on every platform;
@@ -252,7 +253,8 @@ foreach(X IN LISTS DOCTESTS)
 	endif()
 	# The options tests run a few threads. A wasm build without
 	# TAU_PARSER_WASM_PTHREADS skips its thread cases instead.
-	if(${N} STREQUAL "doctest_options"
+	if((${N} STREQUAL "doctest_options"
+			OR ${N} STREQUAL "doctest_program_args")
 			AND (NOT EMSCRIPTEN OR TAU_PARSER_WASM_PTHREADS))
 		find_package(Threads REQUIRED)
 		target_link_libraries(${N} PRIVATE Threads::Threads)
