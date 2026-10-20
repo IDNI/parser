@@ -193,6 +193,44 @@ TEST_SUITE("json tree: integers") {
 		CHECK(jt::get(parsed("1000000e-000006")).get_integer() == 1);
 	}
 
+	TEST_CASE("a value below the smallest double reads as 0") {
+		const std::string tiny = "0." + std::string(400, '0') + "1";
+		for (const std::string& s : { std::string("1e-400"),
+				std::string("-1e-400"), std::string("123.45E-500"),
+				tiny, "1" + std::string(400, '0') + "e-800" })
+		{
+			CAPTURE(s);
+			tref t = parsed(s);
+			CHECK(jt::get(t).get_number() == 0);
+			CHECK(jt::get(t).to_str() == "0");
+		}
+	}
+
+	TEST_CASE("a value above the largest double is an error") {
+		for (const std::string& s : { std::string("1e400"),
+				std::string("-1e400"), "1" + std::string(400, '0') + ".5",
+				std::string("0.0001e500") })
+		{
+			CAPTURE(s);
+			CHECK_FALSE(jt::get(s).has_value());
+		}
+	}
+
+	TEST_CASE("number_below_one reads the digits") {
+		using idni::format::json::detail::number_below_one;
+		CHECK(number_below_one("0.5"));
+		CHECK(number_below_one("-5e-1"));
+		CHECK(number_below_one("10e-2"));
+		CHECK_FALSE(number_below_one("1"));
+		CHECK_FALSE(number_below_one("10e-1"));
+		CHECK_FALSE(number_below_one("0"));
+		CHECK_FALSE(number_below_one("0.000"));
+		CHECK_FALSE(number_below_one("1e" + std::string(30, '9')));
+		CHECK(number_below_one("1e-" + std::string(30, '9')));
+		CHECK_FALSE(number_below_one("1e"));
+		CHECK_FALSE(number_below_one("abc"));
+	}
+
 	TEST_CASE("split_decimal gives the sign, the digits and the exponent") {
 		using idni::format::json::detail::split_decimal;
 		const auto p = split_decimal("-12.50e-3");

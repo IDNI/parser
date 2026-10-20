@@ -319,6 +319,8 @@ template <typename T> std::optional<T> from_json(const value& v);
 
 value build_string(const trv& t, result& R);
 
+/// Read the JSON number @p s. A value below the smallest double reads as 0.
+/// A value above the largest double is an error.
 bool parse_number(const std::string& s, double& d);
 
 /// @p t is a "value" node; it always has exactly one child, the actual
