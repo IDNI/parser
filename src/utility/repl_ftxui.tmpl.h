@@ -10,6 +10,7 @@
 #include <chrono>
 #include <concepts>
 #include <iostream>
+#include <iterator>
 #include <mutex>
 #include <sstream>
 #include <streambuf>
@@ -607,14 +608,15 @@ void repl_eval_widget<evaluator_t>::drain_output(bool flush_partial) {
 	{
 		std::lock_guard<std::mutex> lock(written_mutex_);
 		if (flush_partial) ready.swap(written_);
-		else for (size_t i = written_.size(); i-- > 0;) {
-			size_t newline = written_[i].second.rfind('\n');
+		else for (auto it = written_.rbegin(); it != written_.rend(); ++it) {
+			size_t newline = it->second.rfind('\n');
 			if (newline == std::string::npos) continue;
-			ready.assign(written_.begin(), written_.begin() + i);
-			ready.emplace_back(written_[i].first,
-				written_[i].second.substr(0, newline + 1));
-			written_[i].second.erase(0, newline + 1);
-			written_.erase(written_.begin(), written_.begin() + i);
+			auto last = std::prev(it.base());
+			ready.assign(written_.begin(), last);
+			ready.emplace_back(last->first,
+				last->second.substr(0, newline + 1));
+			last->second.erase(0, newline + 1);
+			written_.erase(written_.begin(), last);
 			break;
 		}
 	}
