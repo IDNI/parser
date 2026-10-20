@@ -329,7 +329,10 @@ import them, the test configure runs `dep-test-python`. That script uses `uv`
 to make a Python 3.12 venv in
 `<TAU_SHARED_PREFIX>/parser-test-python/<hash>`, and the tests run with it.
 The hash comes from `tests/requirements.txt`, so a changed pin makes a new
-venv. A test configure without `uv` and without the modules fails.
+venv. When the venv cannot be made, for example without `uv` or without the
+network, the configure warns and does not build the REPL and schema tests.
+`-DTAU_PARSER_TEST_PYTHON_REQUIRED=ON` makes this a configure error. The CI
+test jobs set it.
 
 - `dep-test-python` — make the test venv, or print it when it exists. The
   last line is `test python: <interpreter>`.

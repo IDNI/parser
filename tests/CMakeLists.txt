@@ -425,6 +425,8 @@ endif()
 
 # The REPL and schema tests need the modules of tests/requirements.txt. When
 # the configure interpreter lacks them, dep-test-python makes a venv with them.
+# Without the venv these tests are not built, or with
+# TAU_PARSER_TEST_PYTHON_REQUIRED the configure fails.
 if(TARGET tgf AND NOT WIN32)
 	set(TAU_PARSER_TEST_PYTHON "${Python3_EXECUTABLE}")
 	set(_py_deps_missing 1)
@@ -436,24 +438,32 @@ if(TARGET tgf AND NOT WIN32)
 			OUTPUT_QUIET ERROR_QUIET)
 	endif()
 	if(_py_deps_missing)
-		if(NOT TAU_PARSER_BASH)
-			message(FATAL_ERROR "the parser tests need bash to make the test Python venv")
+		set(TAU_PARSER_TEST_PYTHON "")
+		set(_out "")
+		if(TAU_PARSER_BASH)
+			execute_process(
+				COMMAND "${TAU_PARSER_BASH}"
+					"${PROJECT_SOURCE_DIR}/scripts/dep-test-python.sh"
+				RESULT_VARIABLE _rc
+				OUTPUT_VARIABLE _out)
+			if(_rc EQUAL 0 AND _out MATCHES "test python: ([^\n]*)")
+				set(TAU_PARSER_TEST_PYTHON "${CMAKE_MATCH_1}")
+			endif()
 		endif()
-		execute_process(
-			COMMAND "${TAU_PARSER_BASH}"
-				"${PROJECT_SOURCE_DIR}/scripts/dep-test-python.sh"
-			RESULT_VARIABLE _rc
-			OUTPUT_VARIABLE _out)
-		if(NOT _rc EQUAL 0 OR NOT _out MATCHES "test python: ([^\n]*)")
-			message(FATAL_ERROR "cannot make the test Python venv; see the output above.\n${_out}")
+		if(NOT TAU_PARSER_TEST_PYTHON)
+			# a host without uv or without the network still builds the
+			# other tests; CI sets the option, so there it is an error
+			if(TAU_PARSER_TEST_PYTHON_REQUIRED)
+				message(FATAL_ERROR "cannot make the test Python venv; see the output above.\n${_out}")
+			endif()
+			message(WARNING "cannot make the test Python venv, so the REPL and schema tests are not built; see the output above.\n${_out}")
 		endif()
-		set(TAU_PARSER_TEST_PYTHON "${CMAKE_MATCH_1}")
 	endif()
 	message(STATUS "Test Python: ${TAU_PARSER_TEST_PYTHON}")
 endif()
 
 # Native REPL tests - python3 + pexpect/pyte.
-if(TARGET tgf AND NOT WIN32)
+if(TARGET tgf AND NOT WIN32 AND TAU_PARSER_TEST_PYTHON)
 	# Legacy (-X) REPL keybindings - no FTXUI required.
 	add_test(NAME repl_keybindings_test
 		COMMAND "${TAU_PARSER_TEST_PYTHON}"
@@ -487,7 +497,7 @@ if(TARGET tgf AND NOT WIN32)
 endif()
 
 # Validate real tgf JSON output against the AST schema and the API schema.
-if(TARGET tgf AND NOT WIN32)
+if(TARGET tgf AND NOT WIN32 AND TAU_PARSER_TEST_PYTHON)
 	add_test(NAME ast_schema_check
 		COMMAND "${TAU_PARSER_TEST_PYTHON}"
 			"${CMAKE_CURRENT_SOURCE_DIR}/schema_check.py"

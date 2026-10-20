@@ -323,7 +323,7 @@ jobs:
       - name: Build and test
         run: |
           ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
-            -DTAU_PARSER_DEPS_FROM_STORE=ON
+            -DTAU_PARSER_DEPS_FROM_STORE=ON -DTAU_PARSER_TEST_PYTHON_REQUIRED=ON
 
   # The darwin-arm64 environment: resolves and publishes the store and saves
   # it for the tests job below. The key names the arch, so the two macOS
@@ -419,7 +419,7 @@ jobs:
       - name: Build and test
         run: |
           ./dev preset release-all run -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} \
-            -DTAU_PARSER_DEPS_FROM_STORE=ON
+            -DTAU_PARSER_DEPS_FROM_STORE=ON -DTAU_PARSER_TEST_PYTHON_REQUIRED=ON
 
   # The Windows x86_64 environment: the windows-x86_64-msvc store. It resolves
   # both presets, cl.exe and clang-cl; the test matrix below needs it and
