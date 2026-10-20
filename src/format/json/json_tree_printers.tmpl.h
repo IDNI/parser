@@ -110,6 +110,12 @@ inline std::ostream& tree::print(std::ostream& os, const print_options& o)
 		case json_parser::number: {
 			if (!t.value.str.empty()) { os << t.value.str; return; }
 			const double d = t.get_number();
+			if (!std::isfinite(d)) {
+				if (o.nonfinite) os << (std::isnan(d) ? "NaN"
+					: d < 0 ? "-Infinity" : "Infinity");
+				else os << "null";
+				return;
+			}
 			if (o.floats == print_options::float_format::repr) {
 				os << float_repr(d);
 				return;

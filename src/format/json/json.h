@@ -146,6 +146,10 @@ struct print_options {
 	float_format floats = float_format::shortest;
 	/// False writes U+007F raw. With ascii_only it is always `\u007f`.
 	bool escape_delete = true;
+	/// On: a NaN or an infinity prints as NaN, Infinity or -Infinity, as
+	/// the grammar variant nonfinite reads them. Off: it prints as null,
+	/// so the text stays JSON.
+	bool nonfinite = false;
 
 	/// One line with no spaces: the default fields.
 	static print_options minified();

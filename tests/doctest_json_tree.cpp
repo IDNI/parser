@@ -534,6 +534,15 @@ TEST_SUITE("json tree: escape_delete") {
 	}
 }
 
+TEST_SUITE("json tree: the print field nonfinite") {
+	TEST_CASE("the default read makes no such node") {
+		CHECK(jt::get(jt::build_number(
+			std::numeric_limits<double>::quiet_NaN())).to_str() == "null");
+		CHECK_FALSE(jt::get("NaN").has_value());
+		CHECK_FALSE(jt::get("1e400").has_value());
+	}
+}
+
 TEST_SUITE("json tree: report") {
 	using idni::diagnostics::code;
 	using idni::diagnostics::report;
@@ -1073,5 +1082,38 @@ TEST_SUITE("json tree: the float format of the profiles") {
 		CHECK(jt::get(t).to_str({ .floats =
 			print_options::float_format::repr }) == "[0.0001,1.5,2]");
 		CHECK(jt::get(t).to_str() == "[1e-04,1.5,2]");
+	}
+}
+
+TEST_SUITE("json tree: the print field nonfinite of a parse") {
+	// The tree of a text that the nonfinite grammar parses.
+	static tref nonfinite_tree(std::string_view text) {
+		json_parser::parse_options po{ .start = json_parser::start };
+		auto r = idni::format::json::detail::nonfinite_parser().parse(
+			text.data(), text.size(), po);
+		auto t = jt::get(r);
+		REQUIRE(t.has_value());
+		return t.value();
+	}
+
+	// The expected bytes come from Python json.dumps.
+	TEST_CASE("on: NaN, Infinity and -Infinity") {
+		const tref t = nonfinite_tree("[NaN,Infinity,-Infinity,1.5]");
+		auto o = print_options::normal();
+		o.nonfinite = true;
+		CHECK(jt::get(t).to_str(o) == "[NaN, Infinity, -Infinity, 1.5]");
+		print_options m;
+		m.nonfinite = true;
+		CHECK(jt::get(t).to_str(m) == "[NaN,Infinity,-Infinity,1.5]");
+	}
+
+	TEST_CASE("off: the print writes null") {
+		const tref t = nonfinite_tree(R"({"a":NaN,"b":[-Infinity],"c":1})");
+		CHECK(jt::get(t).to_str() == R"({"a":null,"b":[null],"c":1})");
+		CHECK(jt::get(t).to_str(print_options::normal())
+			== R"({"a": null, "b": [null], "c": 1})");
+		for (const auto& o : { print_options{}, print_options::minified(),
+				print_options::normal(), print_options::pretty(2) })
+			CHECK_FALSE(o.nonfinite);
 	}
 }
