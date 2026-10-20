@@ -130,6 +130,38 @@ TEST_SUITE("unicode properties") {
 		CHECK(one == std::u32string{ 0x03C3 });
 	}
 
+	TEST_CASE("to_upper") {
+		CHECK(to_upper(U'a') == U'A');
+		CHECK(to_upper(U'A') == U'A');
+		CHECK(to_upper(0x01C5) == 0x01C4);
+		CHECK(to_upper(0x00E9) == 0x00C9);
+		CHECK(to_upper(0x00DF) == 0x00DF);
+		CHECK(to_upper(U'1') == U'1');
+		CHECK(to_upper(0x110000) == 0x110000);
+	}
+
+	// The expected strings come from Python str.upper.
+	TEST_CASE("to_upper_full") {
+		const std::pair<char32_t, std::u32string> cases[] = {
+			{ U'a', U"A" },
+			{ 0x00DF, U"SS" },
+			{ 0xFB01, U"FI" },
+			{ 0x0149, U"\u02BCN" },
+			{ 0x01C5, U"\u01C4" },
+			{ 0x0390, U"\u0399\u0308\u0301" },
+			{ U'1', U"1" },
+		};
+		for (const auto& [cp, expected] : cases) {
+			CAPTURE(static_cast<uint32_t>(cp));
+			std::u32string out;
+			to_upper_full(cp, out);
+			CHECK(out == expected);
+		}
+		std::u32string text;
+		to_upper_full(U"a\u00DF\uFB01!", text);
+		CHECK(text == U"ASSFI!");
+	}
+
 	TEST_CASE("is_letter and has_numeric_value") {
 		// a code point, Python str.isalpha and str.isnumeric of it
 		const struct { char32_t cp; bool letter, numeric_value; } cases[] = {

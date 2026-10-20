@@ -130,6 +130,27 @@ inline void to_lower_full(std::u32string_view text, std::u32string& out) {
 	}
 }
 
+/// The simple uppercase mapping of UnicodeData.txt, or @p cp itself.
+/// U+01C5 gives U+01C4.
+inline char32_t to_upper(char32_t cp) {
+	return detail::simple_mapping(tables::upper_simple, cp);
+}
+
+/// Append the full uppercase mapping of @p cp to @p out: the
+/// unconditional mapping of SpecialCasing.txt, else the simple one.
+/// U+00DF gives U+0053 U+0053, and U+FB01 gives U+0046 U+0049.
+inline void to_upper_full(char32_t cp, std::u32string& out) {
+	if (const uint32_t* e = detail::full_mapping(tables::upper_full, cp))
+		out.append(e + 2, e + 2 + e[1]);
+	else out.push_back(to_upper(cp));
+}
+
+/// Append the full uppercase mapping of each code point of @p text to
+/// @p out. No uppercase mapping needs the context.
+inline void to_upper_full(std::u32string_view text, std::u32string& out) {
+	for (char32_t cp : text) to_upper_full(cp, out);
+}
+
 } // namespace idni::charclasses::unicode
 
 #endif // __IDNI__PARSER__UTILITY__UNICODE_PROPERTIES_H__

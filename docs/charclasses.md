@@ -95,12 +95,17 @@ A value above U+10FFFF has no property.
 | `to_lower(cp)` | The simple lowercase mapping, or `cp` |
 | `to_lower_full(cp, out)` | Appends the unconditional full lowercase mapping to `out`, else the simple one |
 | `to_lower_full(text, out)` | Appends the full lowercase mapping of each code point of `text` to `out`, with the Final_Sigma rule |
+| `to_upper(cp)` | The simple uppercase mapping, or `cp` |
+| `to_upper_full(cp, out)` | Appends the unconditional full uppercase mapping to `out`, else the simple one. U+00DF gives `SS` |
+| `to_upper_full(text, out)` | Appends the full uppercase mapping of each code point of `text` to `out` |
 
 The section [Python string classes](#python-string-classes) uses these functions for the rules of the Python `str` methods.
 The one code point form of `to_lower_full` has no mapping that needs the
 context. The text form has the one rule of the full mapping that needs
 the context and no language: U+03A3 gives U+03C2 at the end of a word.
 The rules for one language, such as Turkish or Lithuanian, are not here.
+No uppercase mapping needs the context, so both forms of `to_upper_full`
+give the same mapping for each code point.
 
 The tables are Unicode 17.0.0. A program that must match another Unicode
 version can differ for the code points that are new or changed after that

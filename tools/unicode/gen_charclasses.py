@@ -9,7 +9,7 @@ Database (UCD).
 The first header holds a two-stage lookup table that maps each code point to
 a bitmask of the 12 <cctype> classes. The second holds a two-stage table of
 the digit value, the space and the printable properties, and the lowercase
-mappings. Do not edit the headers by hand: change this script and run it
+mappings and the uppercase mappings. Do not edit the headers by hand: change this script and run it
 again.
 """
 
@@ -124,18 +124,19 @@ def parse_unicode_fields(path):
 	return fields_of
 
 
-def parse_special_lower(path):
-	"""Return a dict that maps a code point to its unconditional full
-	lowercase mapping, a tuple of code points."""
-	lower = {}
+def parse_special_casing(path):
+	"""Return two dicts that map a code point to its unconditional full
+	lowercase and uppercase mappings, each a tuple of code points."""
+	lower, upper = {}, {}
 	for line in data_lines(path):
 		fields = [f.strip() for f in line.split(";")]
 		# A condition field (for example Final_Sigma) makes a sixth field.
 		if len(fields) != 5 or fields[4]:
 			continue
-		lower[int(fields[0], 16)] = tuple(
-			int(c, 16) for c in fields[1].split())
-	return lower
+		cp = int(fields[0], 16)
+		lower[cp] = tuple(int(c, 16) for c in fields[1].split())
+		upper[cp] = tuple(int(c, 16) for c in fields[3].split())
+	return lower, upper
 
 
 def parse_range_file(path):
@@ -250,17 +251,23 @@ def compute_unicode_properties(fields_of, proplist, derived, numeric_type):
 	return words
 
 
-def compute_lower(fields_of, special_lower):
-	"""Return the simple lowercase pairs and the full mappings that differ
-	from the simple one, each sorted by code point."""
+# The fields of UnicodeData.txt that hold the simple case mappings.
+SIMPLE_UPPER_FIELD = 12
+SIMPLE_LOWER_FIELD = 13
+
+
+def compute_case(fields_of, special, field):
+	"""Return the simple pairs of the UnicodeData.txt field @p field and
+	the full mappings of @p special that differ from the simple one, each
+	sorted by code point."""
 	simple = []
 	for cp in sorted(fields_of):
-		if fields_of[cp][13]:
-			simple.append((cp, int(fields_of[cp][13], 16)))
+		if fields_of[cp][field]:
+			simple.append((cp, int(fields_of[cp][field], 16)))
 	simple_of = dict(simple)
 	full = []
-	for cp in sorted(special_lower):
-		mapping = special_lower[cp]
+	for cp in sorted(special):
+		mapping = special[cp]
 		if mapping != (simple_of.get(cp, cp),):
 			full.append((cp, mapping))
 	return simple, full
@@ -424,25 +431,30 @@ def emit_hex32(out, values, per_row):
 	out.append(",\n".join(rows))
 
 
-def render_properties_header(version, stage1, stage2, blocks, simple, full):
+def emit_case_tables(out, case, simple, full):
+	out.append(f"\n}};\n\n// The simple {case}case mapping: pairs of a code point "
+		f"and its {case}case,\n// sorted by code point. A code point that is not "
+		"here maps to itself.\n"
+		f"inline constexpr uint32_t {case}_simple[{2 * len(simple)}] = {{\n")
+	emit_hex32(out, [v for pair in simple for v in pair], 8)
+	flat = []
+	for cp, mapping in full:
+		flat.extend((cp, len(mapping)) + mapping + (0,) * (3 - len(mapping)))
+	out.append(f"\n}};\n\n// The unconditional full {case}case mapping that "
+		"differs from the simple one:\n// a code point, the length of its "
+		"mapping and three code points, sorted\n// by code point.\n"
+		f"inline constexpr uint32_t {case}_full[{len(flat)}] = {{\n")
+	emit_hex32(out, flat, 5)
+
+
+def render_properties_header(version, stage1, stage2, blocks, lower, upper):
 	out = [PROPERTIES_TOP.format(version=version, stage1_len=len(stage1),
 		blocks=blocks)]
 	emit_array(out, stage1)
 	out.append(f"\n}};\n\ninline constexpr uint16_t props_stage2[{len(stage2)}] = {{\n")
 	emit_array(out, stage2)
-	out.append("\n};\n\n// The simple lowercase mapping: pairs of a code point "
-		"and its lowercase,\n// sorted by code point. A code point that is not "
-		"here maps to itself.\n"
-		f"inline constexpr uint32_t lower_simple[{2 * len(simple)}] = {{\n")
-	emit_hex32(out, [v for pair in simple for v in pair], 8)
-	flat = []
-	for cp, mapping in full:
-		flat.extend((cp, len(mapping)) + mapping + (0,) * (3 - len(mapping)))
-	out.append("\n};\n\n// The unconditional full lowercase mapping that "
-		"differs from the simple one:\n// a code point, the length of its "
-		"mapping and three code points, sorted\n// by code point.\n"
-		f"inline constexpr uint32_t lower_full[{len(flat)}] = {{\n")
-	emit_hex32(out, flat, 5)
+	emit_case_tables(out, "lower", *lower)
+	emit_case_tables(out, "upper", *upper)
 	out.append("\n};\n\n} // namespace idni::charclasses::unicode::tables\n\n"
 		"#endif //__IDNI__PARSER__UTILITY__UNICODE_PROPERTIES_GENERATED_H__\n")
 	return "".join(out)
@@ -538,7 +550,8 @@ def selftest(props, stage1, stage2, gc, derived, proplist):
 
 
 def properties_selftest(words, stage1, stage2, fields_of, proplist, derived,
-		numeric_type, simple, full, special_lower):
+		numeric_type, lower, upper, special_lower, special_upper):
+	simple, full = lower
 	errors = []
 	for cp in range(MAX_CP):
 		got = stage2[stage1[cp >> 8] * BLOCK_SIZE + (cp & (BLOCK_SIZE - 1))]
@@ -587,8 +600,23 @@ def properties_selftest(words, stage1, stage2, fields_of, proplist, derived,
 		errors.append("the simple lowercase of U+0130 or U+0041 differs")
 	if dict(full).get(0x0130) != (0x0069, 0x0307):
 		errors.append("the full lowercase of U+0130 differs")
-	if any(len(m) > 3 for m in special_lower.values()):
+	if any(len(m) > 3 for m in list(special_lower.values())
+			+ list(special_upper.values())):
 		errors.append("a full mapping has more than three code points")
+	upper_simple, upper_full = (dict(m) for m in upper)
+	for cp, mapped in ((0x0061, 0x0041), (0x01C5, 0x01C4), (0x00E9, 0x00C9)):
+		if upper_simple.get(cp) != mapped:
+			errors.append(f"the simple uppercase of U+{cp:04X} differs")
+	for cp in (0x0041, 0x00DF, 0x0031):
+		if cp in upper_simple:
+			errors.append(f"U+{cp:04X} has a simple uppercase")
+	for cp, mapped in ((0x00DF, (0x0053, 0x0053)), (0xFB01, (0x0046, 0x0049)),
+			(0x0149, (0x02BC, 0x004E)), (0x0390, (0x0399, 0x0308, 0x0301))):
+		if upper_full.get(cp) != mapped:
+			errors.append(f"the full uppercase of U+{cp:04X} differs")
+	for cp, mapping in upper[1]:
+		if mapping == (upper_simple.get(cp, cp),):
+			errors.append(f"U+{cp:04X}: a full uppercase equals the simple one")
 	report_errors(errors)
 	return not errors
 
@@ -627,18 +655,21 @@ def main():
 	props = compute_props(gc, derived, proplist)
 	stage1, stage2, blocks = build_two_stage(props)
 	fields_of = parse_unicode_fields(Path(ucd_dir) / "UnicodeData.txt")
-	special_lower = parse_special_lower(Path(ucd_dir) / "SpecialCasing.txt")
+	special_lower, special_upper = parse_special_casing(
+		Path(ucd_dir) / "SpecialCasing.txt")
 	numeric_type = parse_range_file(
 		Path(ucd_dir) / "extracted" / "DerivedNumericType.txt")
 	words = compute_unicode_properties(fields_of, proplist, derived,
 		numeric_type)
 	p_stage1, p_stage2, p_blocks = build_two_stage(words)
-	simple, full = compute_lower(fields_of, special_lower)
+	lower = compute_case(fields_of, special_lower, SIMPLE_LOWER_FIELD)
+	upper = compute_case(fields_of, special_upper, SIMPLE_UPPER_FIELD)
 
 	if args.selftest:
 		ok = selftest(props, stage1, stage2, gc, derived, proplist)
 		ok = properties_selftest(words, p_stage1, p_stage2, fields_of,
-			proplist, derived, numeric_type, simple, full, special_lower) and ok
+			proplist, derived, numeric_type, lower, upper, special_lower,
+			special_upper) and ok
 		return 0 if ok else 1
 
 	text = render_header(args.unicode_version, stage1, stage2, blocks)
@@ -646,12 +677,13 @@ def main():
 		f.write(text)
 	print(f"wrote {args.output}: {blocks} unique blocks", file=sys.stderr)
 	text = render_properties_header(args.unicode_version, p_stage1, p_stage2,
-		p_blocks, simple, full)
+		p_blocks, lower, upper)
 	with open(args.properties_output, "w", encoding="utf-8",
 			newline="\n") as f:
 		f.write(text)
 	print(f"wrote {args.properties_output}: {p_blocks} unique blocks, "
-		f"{len(simple)} simple and {len(full)} full lowercase mappings",
+		f"{len(lower[0])} simple and {len(lower[1])} full lowercase mappings, "
+		f"{len(upper[0])} simple and {len(upper[1])} full uppercase mappings",
 		file=sys.stderr)
 	return 0
 
