@@ -114,6 +114,16 @@ TEST_SUITE("diagnostics: first error") {
 		CHECK(r.format_message(*i) == "Port is in use (port=41137)");
 	}
 
+	TEST_CASE("the label index gives the position of a list item") {
+		using idni::parser_strings::label;
+		report r;
+		r.error(code::invalid_argument, "the argument is empty",
+			{ { label::index, size_t{ 2 } } });
+		const auto i = r.first_error_index();
+		REQUIRE(i.has_value());
+		CHECK(r.format_message(*i) == "the argument is empty (index=2)");
+	}
+
 	TEST_CASE("a report without an error gives no message and unknown") {
 		report r;
 		CHECK_FALSE(r.first_error_index().has_value());

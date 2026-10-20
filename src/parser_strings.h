@@ -100,7 +100,8 @@ using id_t = idni::int_t;
 	X(offset,             "offset") \
 	X(byte,               "byte") \
 	X(port,               "port") \
-	X(error_number,       "errno")
+	X(error_number,       "errno") \
+	X(index,              "index")
 
 // The labels whose attr value holds interned text, not a number. A
 // separate list, so LABELS keeps its two-argument shape and every
