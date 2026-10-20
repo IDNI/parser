@@ -190,6 +190,32 @@ TEST_SUITE("escape_delete") {
 }
 
 // ---------------------------------------------------------------------------
+TEST_SUITE("wtf8_surrogates on encode") {
+
+	TEST_CASE("the three bytes of a surrogate give an escape") {
+		CHECK(encode(std::string_view("a\xED\xA0\x80" "b"), json_wtf8)
+			== "a\\ud800b");
+		CHECK(encode(std::string_view("\xED\xBF\xBF\xC3\xA9"), json_wtf8)
+			== "\\udfff\xC3\xA9");
+		profile p = json_ascii;
+		p.wtf8_surrogates = true;
+		CHECK(encode(std::string_view("\xED\xB8\x80\xED\xA0\xBD\xC3\xA9"), p)
+			== "\\ude00\\ud83d\\u00e9");
+	}
+	TEST_CASE("without the flag the bytes stay") {
+		CHECK(encode(std::string_view("\xED\xA0\x80"), json)
+			== "\xED\xA0\x80");
+		CHECK(encode(std::string_view("\xED\xA0\x80"), json_ascii)
+			== "\xED\xA0\x80");
+	}
+	TEST_CASE("a short or a bad surrogate stays a byte") {
+		CHECK(encode(std::string_view("\xED\xA0"), json_wtf8) == "\xED\xA0");
+		CHECK(encode(std::string_view("\xED\x9F\xBF"), json_wtf8)
+			== "\xED\x9F\xBF");
+	}
+}
+
+// ---------------------------------------------------------------------------
 TEST_SUITE("built-in profile spot-checks") {
 
 	TEST_CASE("JSON rejects \\x") {

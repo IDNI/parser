@@ -855,6 +855,48 @@ TEST_SUITE("json tree: escape_delete") {
 	}
 }
 
+TEST_SUITE("json tree: the lone surrogate policy") {
+	using policy = print_options::lone_surrogate_policy;
+
+	static tref lone_read(std::string_view text) {
+		auto r = jt::get(text, read_options{ .lone_surrogates = true });
+		REQUIRE(r.has_value());
+		return r.value();
+	}
+
+	// The expected bytes come from Python json.dumps.
+	TEST_CASE("escape writes each lone surrogate as an escape") {
+		print_options o{ .sorted_keys = true, .ascii_only = true,
+			.lone_surrogate = policy::escape };
+		CHECK(jt::get(lone_read(R"("\ud800")")).to_str(o)
+			== R"("\ud800")");
+		CHECK(jt::get(lone_read(R"("\udfff")")).to_str(o)
+			== R"("\udfff")");
+		CHECK(jt::get(lone_read(R"("\ude00\ud83d")")).to_str(o)
+			== R"("\ude00\ud83d")");
+		CHECK(jt::get(lone_read(R"("\ud83dA")")).to_str(o)
+			== R"("\ud83dA")");
+		CHECK(jt::get(lone_read(R"({"\ud800":1,"\ue000":2,"a":3})"))
+			.to_str(o) == R"({"a":3,"\ud800":1,"\ue000":2})");
+		CHECK(jt::get(lone_read(R"(["\ud800","\ud83d\ude00"])"))
+			.to_str(print_options::normal())
+			== R"(["\ud800", "\ud83d\ude00"])");
+	}
+
+	TEST_CASE("escape without ascii_only escapes the surrogate only") {
+		print_options o{ .lone_surrogate = policy::escape };
+		CHECK(jt::get(lone_read("\"\\ud800\xc3\xa9\"")).to_str(o)
+			== "\"\\ud800\xc3\xa9\"");
+	}
+
+	TEST_CASE("keep_bytes writes the bytes as they are") {
+		const tref t = lone_read(R"("a\ud800")");
+		CHECK(jt::get(t).to_str() == "\"a\xED\xA0\x80\"");
+		CHECK(jt::get(t).to_str({ .ascii_only = true })
+			== "\"a\xED\xA0\x80\"");
+	}
+}
+
 TEST_SUITE("json tree: the print field nonfinite") {
 	TEST_CASE("the default read makes no such node") {
 		CHECK(jt::get(jt::build_number(

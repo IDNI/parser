@@ -146,6 +146,11 @@ struct print_options {
 	float_format floats = float_format::shortest;
 	/// False writes U+007F raw. With ascii_only it is always `\u007f`.
 	bool escape_delete = true;
+	/// What the printer does with the three bytes of a lone surrogate in
+	/// a str (WTF-8, see read_options::lone_surrogates). keep_bytes: the
+	/// bytes as they are. escape: `\udXXX`.
+	enum class lone_surrogate_policy { keep_bytes, escape };
+	lone_surrogate_policy lone_surrogate = lone_surrogate_policy::keep_bytes;
 	/// On: a NaN or an infinity prints as NaN, Infinity or -Infinity, as
 	/// the grammar variant nonfinite reads them. Off: it prints as null,
 	/// so the text stays JSON.

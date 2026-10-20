@@ -45,7 +45,8 @@ struct profile {
 	bool	    ascii_only = false;
 	/// With hex_u4 utf16, a lone surrogate escape gives the three bytes
 	/// of its code point (WTF-8). A high escape with no low escape after
-	/// it leaves the text after it.
+	/// it leaves the text after it. An encode of bytes writes the three
+	/// bytes of a surrogate as a `\uXXXX` escape.
 	bool	    wtf8_surrogates = false;
 	/// False writes U+007F raw. An encode escapes it by default.
 	bool	    escape_delete = true;

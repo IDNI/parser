@@ -99,6 +99,15 @@ inline void emit_ascii_escape(std::string& out, char32_t cp, const profile& p) {
 	u4(0xDC00 + (v & 0x3FF));
 }
 
+// The code point of the three bytes of a surrogate at s, which UTF-8 refuses.
+inline size_t peek_wtf8_surrogate(const utf8char* s, size_t n, char32_t& cp) {
+	if (n < 3 || s[0] != 0xED || s[1] < 0xA0 || s[1] > 0xBF
+			|| s[2] < 0x80 || s[2] > 0xBF)
+		return 0;
+	cp = 0xD000 | (char32_t)((s[1] & 0x3F) << 6) | (char32_t)(s[2] & 0x3F);
+	return 3;
+}
+
 // Codepoint-domain output sink: collects char32_t scalars.
 struct u32sink {
 	std::u32string out;
@@ -354,7 +363,9 @@ inline std::string encode_(const std::basic_string<C>& units,
 			continue;
 		}
 		// the byte path decodes the UTF-8 first, so a unit here is a code point
-		if (!is_byte && has_prefix && p.ascii_only && cp >= 0x80) {
+		const bool surrogate = cp >= 0xD800 && cp <= 0xDFFF;
+		if (!is_byte && has_prefix && ((p.ascii_only && cp >= 0x80)
+				|| (p.wtf8_surrogates && surrogate))) {
 			emit_ascii_escape(out, cp, p);
 			continue;
 		}
@@ -395,7 +406,8 @@ inline decoded utf8encode(std::string_view utf8, const profile& p) {
 }
 
 inline std::string encode(std::string_view bytes, const profile& p) {
-	if (!p.ascii_only) return encode_<char>(std::string(bytes), p);
+	if (!p.ascii_only && !p.wtf8_surrogates)
+		return encode_<char>(std::string(bytes), p);
 	// an invalid byte stays as it is, between runs of valid code points
 	const auto* src = reinterpret_cast<const idni::utf8char*>(bytes.data());
 	const size_t len = bytes.size();
@@ -404,6 +416,8 @@ inline std::string encode(std::string_view bytes, const profile& p) {
 	for (size_t i = 0; i < len; ) {
 		char32_t cp = 0;
 		size_t n = idni::peek_codepoint(src + i, len - i, cp);
+		if ((n == (size_t)-1 || n == 0) && p.wtf8_surrogates)
+			n = peek_wtf8_surrogate(src + i, len - i, cp);
 		if (n == (size_t)-1 || n == 0) {
 			out += encode_<char32_t>(run, p);
 			run.clear();

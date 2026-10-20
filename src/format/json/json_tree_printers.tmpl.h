@@ -23,13 +23,15 @@ inline print_options print_options::minified() { return {}; }
 
 inline print_options print_options::normal() {
 	return { .ascii_only = true, .item_separator = ", ",
-		.key_separator = ": ", .floats = float_format::repr };
+		.key_separator = ": ", .floats = float_format::repr,
+		.lone_surrogate = lone_surrogate_policy::escape };
 }
 
 inline print_options print_options::pretty(size_t n) {
 	return { .ascii_only = true, .item_separator = ",",
 		.key_separator = ": ", .indent = n,
-		.floats = float_format::repr };
+		.floats = float_format::repr,
+		.lone_surrogate = lone_surrogate_policy::escape };
 }
 
 inline std::string float_repr(double d) {
@@ -76,9 +78,11 @@ inline std::string tree::to_str() const { return to_str(print_options{}); }
 inline std::ostream& tree::print(std::ostream& os, const print_options& o)
 	const
 {
+	using policy = print_options::lone_surrogate_policy;
 	auto prof = o.ascii_only ? idni::escapes::json_ascii
 		: idni::escapes::json;
 	prof.escape_delete = o.escape_delete || o.ascii_only;
+	prof.wtf8_surrogates = o.lone_surrogate != policy::keep_bytes;
 	auto text = [&](const std::string& s) {
 		os << '"' << idni::escapes::encode(s, prof) << '"';
 	};
