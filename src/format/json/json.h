@@ -233,6 +233,9 @@ struct tree : public lcrs_tree<node> {
 	/// An integral @p n with |n| < 2^63 keeps its decimal text.
 	static tref build_number(double n);
 	static tref build_integer(int64_t n);
+	/// A float node of @p d with no text, so -0.0 and an integer value
+	/// stay floats. Every NaN gives the one quiet NaN node.
+	static tref build_float(double d);
 	static tref build_string(std::string_view s);
 	static tref build_array(const trefs& elements);
 	static tref build_pair(std::string_view key, tref v);

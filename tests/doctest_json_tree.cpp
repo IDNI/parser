@@ -543,6 +543,27 @@ TEST_SUITE("json tree: the print field nonfinite") {
 	}
 }
 
+TEST_SUITE("json tree: the float and integer builders") {
+	TEST_CASE("build_float gives float nodes apart from the integers") {
+		CHECK(jt::build_float(-0.0) != jt::build_integer(int64_t{ 0 }));
+		CHECK(jt::build_float(1.0) != jt::build_integer(int64_t{ 1 }));
+		CHECK(jt::build_float(-0.0) != jt::build_float(0.0));
+		CHECK(jt::build_float(1.0) == jt::build_float(1.0));
+		CHECK(std::signbit(jt::get(jt::build_float(-0.0)).get_number()));
+		CHECK(jt::get(jt::build_float(1.0)).value.str.empty());
+		CHECK(jt::build_number(1.0) == jt::build_integer(int64_t{ 1 }));
+		CHECK(jt::build_number(-0.0) == jt::build_integer(int64_t{ 0 }));
+	}
+
+	TEST_CASE("the profiles print a built float as repr") {
+		const tref t = jt::build_array({ jt::build_float(1.0),
+			jt::build_float(-0.0), jt::build_integer(int64_t{ 1 }) });
+		CHECK(jt::get(t).to_str(print_options::normal())
+			== "[1.0, -0.0, 1]");
+		CHECK(jt::get(t).to_str() == "[1,-0,1]");
+	}
+}
+
 TEST_SUITE("json tree: report") {
 	using idni::diagnostics::code;
 	using idni::diagnostics::report;

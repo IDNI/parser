@@ -7,6 +7,7 @@
 #include <bit>
 #include <charconv>
 #include <cmath>
+#include <limits>
 #include <optional>
 #include <unordered_map>
 
@@ -41,6 +42,11 @@ inline tref tree::build_integer(int64_t n) {
 	return get(node(json_parser::number,
 		std::bit_cast<uint64_t>(static_cast<double>(n)),
 		std::string(buf, r.ptr)));
+}
+
+inline tref tree::build_float(double d) {
+	if (std::isnan(d)) d = std::numeric_limits<double>::quiet_NaN();
+	return get(node(json_parser::number, std::bit_cast<uint64_t>(d)));
 }
 
 inline tref tree::build_string(std::string_view s) {
