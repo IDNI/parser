@@ -375,6 +375,59 @@ TEST_SUITE("json tree: print options") {
 		CHECK(jt::get(t).to_str()
 			== "\"\xc3\xa9\xe2\x82\xac\xf0\x9f\x98\x80\"");
 	}
+
+	// The expected bytes come from Python json.dumps.
+	TEST_CASE("the profiles print the layout of Python json.dumps") {
+		tref t = parsed(R"({"a": [1, 2], "b": {}})");
+		CHECK(jt::get(t).to_str(print_options::minified())
+			== R"({"a":[1,2],"b":{}})");
+		CHECK(jt::get(t).to_str(print_options::normal())
+			== R"({"a": [1, 2], "b": {}})");
+		CHECK(jt::get(t).to_str(print_options::pretty(2))
+			== "{\n  \"a\": [\n    1,\n    2\n  ],\n  \"b\": {}\n}");
+		CHECK(jt::get(t).to_str(print_options::pretty(4))
+			== "{\n    \"a\": [\n        1,\n        2\n    ],\n"
+			"    \"b\": {}\n}");
+	}
+
+	TEST_CASE("pretty keeps an empty array or object on one line") {
+		tref t = parsed(R"({"x":[[],{}],"y":[{}],"z":{"e":[]}})");
+		CHECK(jt::get(t).to_str(print_options::normal())
+			== R"({"x": [[], {}], "y": [{}], "z": {"e": []}})");
+		CHECK(jt::get(t).to_str(print_options::pretty(2))
+			== "{\n  \"x\": [\n    [],\n    {}\n  ],\n  \"y\": [\n"
+			"    {}\n  ],\n  \"z\": {\n    \"e\": []\n  }\n}");
+		CHECK(jt::get(parsed("[]")).to_str(print_options::pretty(2))
+			== "[]");
+		CHECK(jt::get(parsed("{}")).to_str(print_options::pretty(2))
+			== "{}");
+		CHECK(jt::get(parsed("1")).to_str(print_options::pretty(2))
+			== "1");
+	}
+
+	TEST_CASE("normal and pretty escape every non-ASCII character") {
+		tref t = parsed("{\"k\":\"caf\xc3\xa9 \xf0\x9f\x98\x80\"}");
+		CHECK(jt::get(t).to_str(print_options::normal())
+			== R"({"k": "caf\u00e9 \ud83d\ude00"})");
+		CHECK(jt::get(t).to_str(print_options::pretty(2))
+			== "{\n  \"k\": \"caf\\u00e9 \\ud83d\\ude00\"\n}");
+	}
+
+	TEST_CASE("a profile takes a change of a single field") {
+		auto o = print_options::normal();
+		o.sorted_keys = true;
+		CHECK(jt::get(parsed(R"({"b":1,"a":[2,3]})")).to_str(o)
+			== R"({"a": [2, 3], "b": 1})");
+	}
+
+	TEST_CASE("the default options equal minified") {
+		tref t = parsed(R"({"b":{"z":1,"a":[{"y":2},[]]},"a":"\u00e9"})");
+		const std::string m = jt::get(t).to_str(print_options::minified());
+		CHECK(jt::get(t).to_str() == m);
+		CHECK(jt::get(t).to_str(print_options{}) == m);
+		CHECK(m == "{\"b\":{\"z\":1,\"a\":[{\"y\":2},[]]},"
+			"\"a\":\"\xc3\xa9\"}");
+	}
 }
 
 TEST_SUITE("json tree: report") {

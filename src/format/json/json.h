@@ -118,7 +118,12 @@ struct node {
 	bool operator==(const node& that) const;
 };
 
-/// How tree::print writes a document.
+/// How tree::print writes a document. A profile fills every field, and a
+/// caller can then change single fields. The default is minified(). With
+/// sorted_keys and ascii_only, a document of strings and integers prints
+/// the bytes of Python json.dumps with sort_keys, ensure_ascii and the
+/// separators "," and ":". A number that is no integer prints its
+/// shortest round trip text, which can differ from Python repr.
 struct print_options {
 	/// Keys of every object in code point order. UTF-8 byte order is
 	/// code point order, so std::string compare sorts them.
@@ -134,6 +139,15 @@ struct print_options {
 	/// 0: one line. n > 0: a new line for each item, n spaces for each
 	/// level. An empty array or object stays on one line.
 	size_t indent = 0;
+
+	/// One line with no spaces: the default fields.
+	static print_options minified();
+	/// One line with a space after each separator. The bytes of Python
+	/// json.dumps(v).
+	static print_options normal();
+	/// The bytes of Python json.dumps(v, indent=n). Python writes a new
+	/// line for each item with indent=0, but pretty(0) gives one line.
+	static print_options pretty(size_t n);
 };
 
 /// A JSON document as an interned lcrs tree. A tref of it is valid until

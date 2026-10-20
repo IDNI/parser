@@ -18,6 +18,18 @@
 
 namespace idni::format::json {
 
+inline print_options print_options::minified() { return {}; }
+
+inline print_options print_options::normal() {
+	return { .ascii_only = true, .item_separator = ", ",
+		.key_separator = ": " };
+}
+
+inline print_options print_options::pretty(size_t n) {
+	return { .ascii_only = true, .item_separator = ",",
+		.key_separator = ": ", .indent = n };
+}
+
 inline std::ostream& tree::print(std::ostream& os) const {
 	return print(os, print_options{});
 }
