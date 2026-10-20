@@ -311,7 +311,8 @@ TEST_CASE("a child program does not inherit the stream") {
 	DWORD flags = 0;
 	REQUIRE(::GetHandleInformation(os.native_handle(), &flags));
 	CHECK((flags & HANDLE_FLAG_INHERIT) == 0);
-#else
+// Emscripten runs no child program, and its F_GETFD gives 0
+#elif !defined(__EMSCRIPTEN__)
 	CHECK((::fcntl(os.native_handle(), F_GETFD) & FD_CLOEXEC) != 0);
 #endif
 }
@@ -371,11 +372,15 @@ TEST_CASE("an open file closes in a child program") {
 	const fs::path p = t.file("data.bin");
 	auto created = fs::create(p, fs::MMAP_WRITE);
 	REQUIRE(created.has_value());
+#ifndef __EMSCRIPTEN__
 	CHECK((::fcntl(created.value(), F_GETFD) & FD_CLOEXEC) != 0);
+#endif
 	REQUIRE(fs::close(created.value()).has_value());
 	auto opened = fs::open(p, fs::MMAP_READ);
 	REQUIRE(opened.has_value());
+#ifndef __EMSCRIPTEN__
 	CHECK((::fcntl(opened.value(), F_GETFD) & FD_CLOEXEC) != 0);
+#endif
 	REQUIRE(fs::close(opened.value()).has_value());
 }
 }
