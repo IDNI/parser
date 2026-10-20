@@ -623,8 +623,11 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 		if (cat.command(opt)) return 2;
 		bool is_short = false;
 		if (!detail::option_prefix(opt, is_short)) {
-			if (opt == "-" || std::ifstream(opt).good()
-				|| detail::is_url(opt))
+			const command_spec* c = has_cmd ? cat.command(surface)
+				: nullptr;
+			if (opt == "-" || (c && c->free_inputs)
+				|| (!has_cmd && cfg.free_inputs)
+				|| std::ifstream(opt).good() || detail::is_url(opt))
 			{
 				out.inputs.push_back(opt);
 				++arg;

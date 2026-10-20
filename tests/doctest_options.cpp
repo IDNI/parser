@@ -1139,3 +1139,35 @@ TEST_CASE("the help shows the declared default and no trailing space") {
 }
 
 } // TEST_SUITE
+
+TEST_SUITE("options free inputs") {
+
+TEST_CASE("a command with free_inputs takes a word that names no file as an input") {
+	option_set s = tool_set();
+	s.commands[1].free_inputs = true;
+	options_repository repo;
+	REQUIRE(repo.declare(s).has_value());
+	argv_of show{ "tool", "show", "no such word" };
+	auto r = repo.parse_args(show.argc(), show.argv(), tool_config());
+	REQUIRE(r.has_value());
+	CHECK(r.value().command == "show");
+	CHECK(r.value().inputs == vector<string>{ "no such word" });
+	argv_of run{ "tool", "run", "no such word" };
+	CHECK_FALSE(repo.parse_args(run.argc(), run.argv(), tool_config())
+		.has_value());
+}
+
+TEST_CASE("args_config free_inputs takes a word before the command as an input") {
+	fixture f;
+	args_config cfg = tool_config();
+	cfg.free_inputs = true;
+	argv_of a{ "tool", "no such word", "run" };
+	auto r = f.repo.parse_args(a.argc(), a.argv(), cfg);
+	REQUIRE(r.has_value());
+	CHECK(r.value().command == "run");
+	CHECK(r.value().inputs == vector<string>{ "no such word" });
+	CHECK_FALSE(f.repo.parse_args(a.argc(), a.argv(), tool_config())
+		.has_value());
+}
+
+} // TEST_SUITE

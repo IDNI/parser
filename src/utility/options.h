@@ -72,6 +72,9 @@ struct args_config {
 	std::string default_command_when_inputs;
 	/// The surface of the options given before the command.
 	std::string global_surface;
+	/// True takes each positional argument before the command as it is,
+	/// also one that names no file and looks like no URL.
+	bool free_inputs = false;
 };
 
 /// One value per option. A later write replaces the value.

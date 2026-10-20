@@ -48,6 +48,9 @@ struct option_spec {
 struct command_spec {
 	std::string name;
 	std::string help;
+	/// True takes each positional argument of the command as it is, also
+	/// one that names no file and looks like no URL.
+	bool free_inputs = false;
 	bool operator==(const command_spec&) const = default;
 };
 
