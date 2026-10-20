@@ -561,7 +561,8 @@ inline result<bool> unmap(mapping& r_map) {
 inline result<file_handle> open(const path& p, mmap_mode m) {
 	using label = idni::parser_strings::label;
 	result<file_handle> r;
-	int fd = ::open(p.c_str(), m == MMAP_READ ? O_RDONLY : O_RDWR, 0600);
+	int fd = ::open(p.c_str(),
+		(m == MMAP_READ ? O_RDONLY : O_RDWR) | O_CLOEXEC, 0600);
 	if (fd == -1)
 		return r.with_error(diagnostics::code::io_error,
 			"failed to open file",
@@ -574,7 +575,7 @@ inline result<file_handle> create(const path& p, mmap_mode m) {
 	(void)m;
 	using label = idni::parser_strings::label;
 	result<file_handle> r;
-	int fd = ::open(p.c_str(), O_CREAT|O_RDWR, 0600);
+	int fd = ::open(p.c_str(), O_CREAT | O_RDWR | O_CLOEXEC, 0600);
 	if (fd == -1)
 		return r.with_error(diagnostics::code::io_error,
 			"failed to create file",

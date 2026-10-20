@@ -233,6 +233,23 @@ TEST_CASE("the error of a missing folder is an io_error") {
 
 }
 
+#ifndef _WIN32
+TEST_SUITE("fs::open and fs::create") {
+TEST_CASE("an open file closes in a child program") {
+	temp_folder t("doctest_filesystem_cloexec.tmp");
+	const fs::path p = t.file("data.bin");
+	auto created = fs::create(p, fs::MMAP_WRITE);
+	REQUIRE(created.has_value());
+	CHECK((::fcntl(created.value(), F_GETFD) & FD_CLOEXEC) != 0);
+	REQUIRE(fs::close(created.value()).has_value());
+	auto opened = fs::open(p, fs::MMAP_READ);
+	REQUIRE(opened.has_value());
+	CHECK((::fcntl(opened.value(), F_GETFD) & FD_CLOEXEC) != 0);
+	REQUIRE(fs::close(opened.value()).has_value());
+}
+}
+#endif
+
 TEST_SUITE("fs::read and fs::open_stream") {
 
 TEST_CASE("read gives back each byte that write wrote") {
