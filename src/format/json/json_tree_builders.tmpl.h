@@ -5,6 +5,7 @@
 #define __IDNI__PARSER__FORMAT__JSON_TREE_BUILDERS_TMPL_H__
 
 #include <bit>
+#include <charconv>
 #include <cmath>
 #include <unordered_map>
 
@@ -21,9 +22,22 @@ inline tref tree::_false() { return get(json_parser::false_sym); }
 inline tref tree::build_bool(bool b) { return b ? _true() : _false(); }
 
 inline tref tree::build_number(double n) {
-	// -0 and 0 compare equal, so one node holds both
-	if (std::fpclassify(n) == FP_ZERO) n = 0;
+	// 2^63 is exact as a double, and every double below it in magnitude
+	// converts to int64 without overflow
+	// exact: only a whole double is an integer
+	if (std::bit_cast<uint64_t>(std::trunc(n))
+			== std::bit_cast<uint64_t>(n) && std::fabs(n) < 0x1p63)
+		return build_integer(static_cast<int64_t>(n));
 	return get(node(json_parser::number, std::bit_cast<uint64_t>(n)));
+}
+
+inline tref tree::build_integer(int64_t n) {
+	char buf[24];
+	auto r = std::to_chars(buf, buf + sizeof(buf), n);
+	// the double of the text, so a parse of the same text is one node
+	return get(node(json_parser::number,
+		std::bit_cast<uint64_t>(static_cast<double>(n)),
+		std::string(buf, r.ptr)));
 }
 
 inline tref tree::build_string(std::string_view s) {

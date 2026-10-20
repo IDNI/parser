@@ -5,6 +5,7 @@
 #define __IDNI__PARSER__FORMAT__JSON_TREE_TMPL_H__
 
 #include <bit>
+#include <charconv>
 #include <cstddef>
 #include <vector>
 
@@ -125,6 +126,16 @@ inline bool tree::get_bool() const {
 inline double tree::get_number() const {
 	DBG(assert(is_number());)
 	return std::bit_cast<double>(value.data);
+}
+
+inline std::optional<int64_t> tree::get_integer() const {
+	if (!is_number() || value.str.empty()) return std::nullopt;
+	const char* b = value.str.data();
+	const char* e = b + value.str.size();
+	int64_t n = 0;
+	auto r = std::from_chars(b, e, n);
+	if (r.ec != std::errc{} || r.ptr != e) return std::nullopt;
+	return n;
 }
 
 inline const std::string& tree::get_string() const {

@@ -89,7 +89,10 @@ using trv  = parse_tree::traverser;
 
 /// A node of a JSON document tree. The kind is a json_parser nonterminal:
 /// null_sym, true_sym, false_sym, number, str, arr, object or object_pair.
-/// A number keeps the bits of its double in `data`. A str
+/// A number keeps the bits of its double in `data`. An integer value
+/// below 2^63 in magnitude keeps its decimal text in `str` too, and so
+/// does an integer literal outside that range, so a value above 2^53
+/// prints exactly. A str
 /// keeps its decoded text in `str`. An object_pair keeps its
 /// key in `str` and has one child, the value. An arr has its elements as children, an
 /// object its object_pair nodes, both in order.
@@ -161,6 +164,9 @@ struct tree : public lcrs_tree<node> {
 	type get_type() const;
 	bool get_bool() const;
 	double get_number() const;
+	/// The exact integer of a number node, from its text. No value for a
+	/// number that is not an integer or that is outside int64.
+	std::optional<int64_t> get_integer() const;
 	/// The text of a str node, or the key of an object_pair node.
 	const std::string& get_string() const;
 	/// The value of an object_pair node.
@@ -176,7 +182,9 @@ struct tree : public lcrs_tree<node> {
 	static tref _false();
 	static tref build_bool(bool b);
 	/// -0 becomes 0, so both are one node and print as 0.
+	/// An integral @p n with |n| < 2^63 keeps its decimal text.
 	static tref build_number(double n);
+	static tref build_integer(int64_t n);
 	static tref build_string(std::string_view s);
 	static tref build_array(const trefs& elements);
 	static tref build_pair(std::string_view key, tref v);

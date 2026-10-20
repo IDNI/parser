@@ -37,6 +37,7 @@ inline std::ostream& tree::print(std::ostream& os) const {
 		case json_parser::true_sym:  os << "true"; return;
 		case json_parser::false_sym: os << "false"; return;
 		case json_parser::number: {
+			if (!t.value.str.empty()) { os << t.value.str; return; }
 			const double d = t.get_number();
 			char buf[32];
 			auto r = std::to_chars(buf, buf + sizeof(buf), d);
@@ -94,7 +95,9 @@ inline std::string tree::dump_to_str(bool subtree) const {
 
 inline std::ostream& operator<<(std::ostream& os, const node& n) {
 	os << n.name();
-	if (n.nt == json_parser::number)
+	if (n.nt == json_parser::number && !n.str.empty())
+		os << ' ' << n.str;
+	else if (n.nt == json_parser::number)
 		os << ' ' << std::bit_cast<double>(n.data);
 	else if (n.nt == json_parser::str || n.nt == json_parser::object_pair)
 		escape(os << ' ', n.str);

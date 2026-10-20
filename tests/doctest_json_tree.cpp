@@ -138,6 +138,65 @@ TEST_SUITE("json tree: values") {
 	}
 }
 
+TEST_SUITE("json tree: integers") {
+	TEST_CASE("an integer above 2^53 prints as it was read") {
+		for (const char* s : { "9007199254740993",
+				"9223372036854775807", "-9223372036854775808" })
+		{
+			CAPTURE(s);
+			tref t = parsed(s);
+			CHECK(jt::get(t).to_str() == s);
+			REQUIRE(jt::get(t).get_integer().has_value());
+			CHECK(std::to_string(*jt::get(t).get_integer()) == s);
+		}
+		CHECK(*jt::get(parsed("9007199254740993")).get_integer()
+			== 9007199254740993);
+	}
+
+	TEST_CASE("-0 prints 0 and has the integer 0") {
+		CHECK(jt::get(parsed("-0")).to_str() == "0");
+		CHECK(jt::get(parsed("-0")).get_integer() == 0);
+	}
+
+	TEST_CASE("a fraction has no integer") {
+		CHECK_FALSE(jt::get(parsed("1.5")).get_integer().has_value());
+		CHECK_FALSE(jt::get(parsed("2.5e-1")).get_integer().has_value());
+		CHECK_FALSE(jt::get(jt::build_number(1.5)).get_integer()
+			.has_value());
+	}
+
+	TEST_CASE("an exponent form with an integer value is that integer") {
+		CHECK(jt::get(parsed("1e3")).get_integer() == 1000);
+		CHECK(jt::get(parsed("1e3")).to_str() == "1000");
+		CHECK(parsed("1e3") == parsed("1000"));
+		CHECK(parsed("-1.5e2") == jt::build_integer(-150));
+		CHECK(parsed("2.0") == parsed("2"));
+		CHECK(parsed("-0.0") == parsed("0"));
+	}
+
+	TEST_CASE("an integer outside int64 prints its text and has no integer") {
+		tref t = parsed("18446744073709551616");
+		CHECK(jt::get(t).to_str() == "18446744073709551616");
+		CHECK_FALSE(jt::get(t).get_integer().has_value());
+		CHECK(jt::get(t).get_number() == 0x1p64);
+	}
+
+	TEST_CASE("the builders and the parse of an integer give one node") {
+		CHECK(parsed("1") == jt::build_number(1.0));
+		CHECK(parsed("1") == jt::build_integer(1));
+		CHECK(parsed("9007199254740993")
+			== jt::build_integer(9007199254740993));
+		CHECK(jt::get(jt::build_integer(-7)).to_str() == "-7");
+		CHECK(jt::get(jt::build_integer(-7)).get_integer() == -7);
+		CHECK(jt::get(jt::build_number(0x1p63)).to_str()
+			== "9223372036854775808");
+		CHECK_FALSE(jt::get(jt::build_number(0x1p63)).get_integer()
+			.has_value());
+		CHECK(jt::get(jt::build_string("12")).get_integer()
+			== std::nullopt);
+	}
+}
+
 TEST_SUITE("json tree: AST JSON") {
 	using p_t = idni::parser<char, char32_t>;
 	using lit_t = idni::lit<char, char32_t>;

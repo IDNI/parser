@@ -4,6 +4,8 @@
 #ifndef __IDNI__PARSER__FORMAT__JSON_TREE_FROM_PARSER_TMPL_H__
 #define __IDNI__PARSER__FORMAT__JSON_TREE_FROM_PARSER_TMPL_H__
 
+#include <bit>
+#include <cmath>
 #include <string>
 #include <string_view>
 
@@ -51,7 +53,16 @@ inline diagnostics::result<tref> tree::get(const parse_tree& t) {
 					{{label::value, s}});
 				return false;
 			}
-			x = build_number(d);
+			// -0 and 0 compare equal, so one node holds both
+			if (std::fpclassify(d) == FP_ZERO) d = 0;
+			if (s.find_first_of(".eE") != std::string::npos) {
+				x = build_number(d);
+				break;
+			}
+			// an integer literal outside int64 keeps its text too, so
+			// it prints exactly
+			x = get(node(json_parser::number, std::bit_cast<uint64_t>(d),
+				s == "-0" ? "0" : s));
 			break;
 		}
 		case json_parser::str: {
