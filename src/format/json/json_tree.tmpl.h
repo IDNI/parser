@@ -149,6 +149,12 @@ inline std::optional<int64_t> tree::get_integer() const {
 	return n;
 }
 
+// only an integer number node keeps a text, and that text is canonical
+inline std::optional<std::string_view> tree::get_integer_text() const {
+	if (!is_number() || value.str.empty()) return std::nullopt;
+	return std::string_view(value.str);
+}
+
 inline const std::string& tree::get_string() const {
 	DBG(assert(is_string() || is(json_parser::object_pair));)
 	return value.str;

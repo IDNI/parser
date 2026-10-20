@@ -281,6 +281,27 @@ TEST_SUITE("json tree: integers") {
 		CHECK(jt::get(t).get_number() == 0x1p64);
 	}
 
+	TEST_CASE("get_integer_text gives the text of an integer of any size") {
+		for (const char* s : { "0", "-7", "9223372036854775807",
+				"18446744073709551615", "-18446744073709551616" })
+		{
+			CAPTURE(s);
+			CHECK(jt::get(parsed(s)).get_integer_text() == s);
+		}
+		const std::string big = "1" + std::string(40, '0');
+		CHECK(jt::get(jt::build_integer(std::string_view(big)).value())
+			.get_integer_text() == big);
+		CHECK(jt::get(jt::build_integer(-150)).get_integer_text() == "-150");
+		CHECK(jt::get(parsed("-0")).get_integer_text() == "0");
+		CHECK(jt::get(parsed("1e3")).get_integer_text() == "1000");
+		CHECK_FALSE(jt::get(parsed("1.5")).get_integer_text().has_value());
+		CHECK_FALSE(jt::get(jt::build_float(2.0)).get_integer_text()
+			.has_value());
+		CHECK_FALSE(jt::get(jt::build_string("12")).get_integer_text()
+			.has_value());
+		CHECK_FALSE(jt::get(jt::_null()).get_integer_text().has_value());
+	}
+
 	TEST_CASE("the builders and the parse of an integer give one node") {
 		CHECK(parsed("1") == jt::build_number(1.0));
 		CHECK(parsed("1") == jt::build_integer(1));

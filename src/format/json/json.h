@@ -227,6 +227,9 @@ struct tree : public lcrs_tree<node> {
 	/// The exact integer of a number node, from its text. No value for a
 	/// number that is not an integer or that is outside int64.
 	std::optional<int64_t> get_integer() const;
+	/// The canonical decimal text of an integer number node of any size.
+	/// No value for a float node, also for one with a whole value.
+	std::optional<std::string_view> get_integer_text() const;
 	/// The text of a str node, or the key of an object_pair node.
 	const std::string& get_string() const;
 	/// The value of an object_pair node.
