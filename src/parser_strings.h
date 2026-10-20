@@ -98,7 +98,8 @@ using id_t = idni::int_t;
 	X(inline_paths,       "inline paths") \
 	X(trim_terminals,     "trim terminals") \
 	X(offset,             "offset") \
-	X(byte,               "byte")
+	X(byte,               "byte") \
+	X(port,               "port")
 
 // The labels whose attr value holds interned text, not a number. A
 // separate list, so LABELS keeps its two-argument shape and every

@@ -564,6 +564,22 @@ inline bool report::has_error() const {
 	return has_error_;
 }
 
+inline std::optional<size_t> report::first_error_index() const {
+	for (size_t i = 0; i != nodes_.size(); ++i)
+		if (is_error(nodes_[i].tag)) return i;
+	return std::nullopt;
+}
+
+inline std::string_view report::first_error_message() const {
+	const auto i = first_error_index();
+	return i ? str(nodes_[*i].key) : std::string_view{};
+}
+
+inline code report::first_error_code() const {
+	const auto i = first_error_index();
+	return i ? nodes_[*i].tag : code::unknown;
+}
+
 inline void report::demote_errors_to_warnings() {
 	for (auto& n : nodes_)
 		if (is_error(n.tag)) n.tag = code::warning;

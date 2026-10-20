@@ -320,6 +320,16 @@ struct report {
 
 	[[nodiscard]] bool has_error() const;
 
+	/// The index in @ref nodes() of the first error node, or nullopt when
+	/// no node is an error. @ref format_message of it gives the message
+	/// with the attributes of the node.
+	[[nodiscard]] std::optional<size_t> first_error_index() const;
+	/// The message of the first error node in the order of @ref nodes(),
+	/// or "" when no node is an error.
+	[[nodiscard]] std::string_view first_error_message() const;
+	/// The code of the first error node, or code::unknown.
+	[[nodiscard]] code first_error_code() const;
+
 	/// Rewrite every error-tagged node to @ref code::warning in place,
 	/// keeping its message and attrs, and clear @ref has_error() to
 	/// false. Used to keep failure history visible after a recovery

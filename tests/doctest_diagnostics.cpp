@@ -76,6 +76,56 @@ TEST_SUITE("diagnostics: measure()") {
 	}
 }
 
+TEST_SUITE("diagnostics: first error") {
+
+	TEST_CASE("the first error, not a note before it or a later error") {
+		report r;
+		r.info("Opened the store");
+		r.warning("The cache is cold");
+		r.error(code::io_error, "Port is in use");
+		r.error(code::parse_error, "Bad header");
+		CHECK(r.first_error_message() == "Port is in use");
+		CHECK(r.first_error_code() == code::io_error);
+		const auto i = r.first_error_index();
+		REQUIRE(i.has_value());
+		CHECK(r.str(r.nodes()[*i].key) == "Port is in use");
+		CHECK(r.nodes()[*i].tag == code::io_error);
+	}
+
+	TEST_CASE("format_message of the first error index holds the attributes") {
+		using idni::parser_strings::label;
+		report r;
+		r.warning("Port is in use", { { label::port, size_t{ 1 } } });
+		r.error(code::io_error, "Port is in use",
+			{ { label::port, size_t{ 41137 } } });
+		r.error(code::io_error, "Bad header");
+		const auto i = r.first_error_index();
+		REQUIRE(i.has_value());
+		CHECK(r.nodes()[*i].tag == code::io_error);
+		CHECK(r.format_message(*i) == "Port is in use (port=41137)");
+	}
+
+	TEST_CASE("a report without an error gives no message and unknown") {
+		report r;
+		CHECK_FALSE(r.first_error_index().has_value());
+		CHECK(r.first_error_message().empty());
+		CHECK(r.first_error_code() == code::unknown);
+		r.info("Opened the store");
+		r.warning("The cache is cold");
+		CHECK(r.first_error_message() == "");
+		CHECK(r.first_error_code() == code::unknown);
+	}
+
+	TEST_CASE("a demoted error is no first error") {
+		report r;
+		r.error(code::io_error, "Port is in use");
+		r.demote_errors_to_warnings();
+		CHECK_FALSE(r.first_error_index().has_value());
+		CHECK(r.first_error_message().empty());
+		CHECK(r.first_error_code() == code::unknown);
+	}
+}
+
 TEST_SUITE("diagnostics: null pointer is a value") {
 
 	TEST_CASE("operator= with a null pointer stores it as a value") {
