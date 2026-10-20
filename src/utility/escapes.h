@@ -6,6 +6,7 @@
 
 #include <string>
 #include <string_view>
+#include "characters.h"
 #include "diagnostics.h"
 
 namespace idni::escapes {
@@ -135,6 +136,10 @@ inline constexpr profile c_like {
 
 using u32decoded = diagnostics::result<std::u32string>;
 using decoded    = diagnostics::result<std::string>;
+
+/// The three bytes of a surrogate code point (WTF-8) at @p s, which UTF-8
+/// refuses: 3 with the code point in @p cp, else 0. @p n is the length.
+size_t        peek_wtf8_surrogate(const utf8char* s, size_t n, char32_t& cp);
 
 /// The offset of the first three bytes of a surrogate code point (WTF-8)
 /// in @p bytes, or npos.

@@ -99,7 +99,6 @@ inline void emit_ascii_escape(std::string& out, char32_t cp, const profile& p) {
 	u4(0xDC00 + (v & 0x3FF));
 }
 
-// The code point of the three bytes of a surrogate at s, which UTF-8 refuses.
 inline size_t peek_wtf8_surrogate(const utf8char* s, size_t n, char32_t& cp) {
 	if (n < 3 || s[0] != 0xED || s[1] < 0xA0 || s[1] > 0xBF
 			|| s[2] < 0x80 || s[2] > 0xBF)

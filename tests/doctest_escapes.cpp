@@ -213,6 +213,19 @@ TEST_SUITE("wtf8_surrogates on encode") {
 		CHECK(encode(std::string_view("\xED\x9F\xBF"), json_wtf8)
 			== "\xED\x9F\xBF");
 	}
+	TEST_CASE("peek_wtf8_surrogate reads the three bytes of one surrogate") {
+		const idni::utf8char high[] = { 0xED, 0xA0, 0x80, 'a' };
+		const idni::utf8char low[] = { 0xED, 0xBF, 0xBF };
+		const idni::utf8char bmp[] = { 0xED, 0x9F, 0xBF };
+		char32_t cp = 0;
+		CHECK(peek_wtf8_surrogate(high, sizeof high, cp) == 3);
+		CHECK(cp == 0xD800);
+		CHECK(peek_wtf8_surrogate(low, sizeof low, cp) == 3);
+		CHECK(cp == 0xDFFF);
+		CHECK(peek_wtf8_surrogate(bmp, sizeof bmp, cp) == 0);
+		CHECK(peek_wtf8_surrogate(high, 2, cp) == 0);
+		CHECK(peek_wtf8_surrogate(high + 3, 1, cp) == 0);
+	}
 	TEST_CASE("wtf8_surrogate_offset finds the first one") {
 		CHECK(wtf8_surrogate_offset("ab\xED\xA0\x80") == 2);
 		CHECK(wtf8_surrogate_offset("\xF0\x9F\x98\x80\xED\x9F\xBF")
