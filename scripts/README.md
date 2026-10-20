@@ -324,11 +324,12 @@ previously built `*_grammar` executables remain in the build tree until
 ## Python test modules
 
 The schema checks and the REPL tests import `jsonschema`, `pexpect` and
-`pyte`. Ubuntu's `python3-jsonschema` is too old for `tests/schema_check.py`,
-so build the venv from `tests/requirements.txt`:
+`pyte` from `tests/requirements.txt`. When the configure interpreter cannot
+import them, the test configure runs `dep-test-python`. That script uses `uv`
+to make a Python 3.12 venv in
+`<TAU_SHARED_PREFIX>/parser-test-python/<hash>`, and the tests run with it.
+The hash comes from `tests/requirements.txt`, so a changed pin makes a new
+venv. A test configure without `uv` and without the modules fails.
 
-```bash
-uv venv --python 3.12 build/tau-python
-uv pip install --python build/tau-python/bin/python -r tests/requirements.txt
-export PATH="$PWD/build/tau-python/bin:$PATH"
-```
+- `dep-test-python` — make the test venv, or print it when it exists. The
+  last line is `test python: <interpreter>`.

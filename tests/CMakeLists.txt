@@ -423,74 +423,87 @@ if(TARGET tgf AND NOT WIN32)
 	endif()
 endif()
 
-# Native REPL tests - python3 + pexpect/pyte; skip if modules absent.
+# The REPL and schema tests need the modules of tests/requirements.txt. When
+# the configure interpreter lacks them, dep-test-python makes a venv with them.
 if(TARGET tgf AND NOT WIN32)
-	if(Python3_EXECUTABLE)
+	set(TAU_PARSER_TEST_PYTHON "${Python3_EXECUTABLE}")
+	set(_py_deps_missing 1)
+	if(TAU_PARSER_TEST_PYTHON)
 		execute_process(
-			COMMAND "${Python3_EXECUTABLE}" -c "import pexpect, pyte"
-			RESULT_VARIABLE _py_deps_missing)
-		if(NOT _py_deps_missing)
-			# Legacy (-X) REPL keybindings - no FTXUI required.
-			add_test(NAME repl_keybindings_test
-				COMMAND "${Python3_EXECUTABLE}"
-					"${CMAKE_CURRENT_SOURCE_DIR}/repl/test_repl_keybindings.py"
-					$<TARGET_FILE:tgf>
-					"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tau.tgf")
-			if(TAU_PARSER_HAS_FTXUI_DEP)
-				add_test(NAME repl_ftxui_test
-					COMMAND "${Python3_EXECUTABLE}"
-						"${CMAKE_CURRENT_SOURCE_DIR}/repl/test_repl_ftxui.py"
-						$<TARGET_FILE:tgf>
-						"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tau.tgf")
-				add_test(NAME repl_ftxui_async_test
-					COMMAND "${Python3_EXECUTABLE}"
-						"${CMAKE_CURRENT_SOURCE_DIR}/repl/test_repl_ftxui_async.py"
-						$<TARGET_FILE:repl_ftxui_async_fixture>)
-				add_test(NAME repl_ftxui_drain_test
-					COMMAND "${Python3_EXECUTABLE}"
-						"${CMAKE_CURRENT_SOURCE_DIR}/repl/test_repl_ftxui_drain.py"
-						$<TARGET_FILE:tgf>
-						"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tau.tgf")
-			endif()
-			# tau.tgf is large; serialize REPL tests and allow generous load time.
-			set_tests_properties(repl_keybindings_test
-				PROPERTIES TIMEOUT 300 RESOURCE_LOCK repl_tau)
-			if(TAU_PARSER_HAS_FTXUI_DEP)
-				set_tests_properties(repl_ftxui_test repl_ftxui_async_test
-						repl_ftxui_drain_test
-					PROPERTIES TIMEOUT 300 RESOURCE_LOCK repl_tau)
-			endif()
+			COMMAND "${TAU_PARSER_TEST_PYTHON}" -c
+				"import pexpect, pyte, jsonschema, referencing"
+			RESULT_VARIABLE _py_deps_missing
+			OUTPUT_QUIET ERROR_QUIET)
+	endif()
+	if(_py_deps_missing)
+		if(NOT TAU_PARSER_BASH)
+			message(FATAL_ERROR "the parser tests need bash to make the test Python venv")
 		endif()
+		execute_process(
+			COMMAND "${TAU_PARSER_BASH}"
+				"${PROJECT_SOURCE_DIR}/scripts/dep-test-python.sh"
+			RESULT_VARIABLE _rc
+			OUTPUT_VARIABLE _out)
+		if(NOT _rc EQUAL 0 OR NOT _out MATCHES "test python: ([^\n]*)")
+			message(FATAL_ERROR "cannot make the test Python venv; see the output above.\n${_out}")
+		endif()
+		set(TAU_PARSER_TEST_PYTHON "${CMAKE_MATCH_1}")
+	endif()
+	message(STATUS "Test Python: ${TAU_PARSER_TEST_PYTHON}")
+endif()
+
+# Native REPL tests - python3 + pexpect/pyte.
+if(TARGET tgf AND NOT WIN32)
+	# Legacy (-X) REPL keybindings - no FTXUI required.
+	add_test(NAME repl_keybindings_test
+		COMMAND "${TAU_PARSER_TEST_PYTHON}"
+			"${CMAKE_CURRENT_SOURCE_DIR}/repl/test_repl_keybindings.py"
+			$<TARGET_FILE:tgf>
+			"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tau.tgf")
+	if(TAU_PARSER_HAS_FTXUI_DEP)
+		add_test(NAME repl_ftxui_test
+			COMMAND "${TAU_PARSER_TEST_PYTHON}"
+				"${CMAKE_CURRENT_SOURCE_DIR}/repl/test_repl_ftxui.py"
+				$<TARGET_FILE:tgf>
+				"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tau.tgf")
+		add_test(NAME repl_ftxui_async_test
+			COMMAND "${TAU_PARSER_TEST_PYTHON}"
+				"${CMAKE_CURRENT_SOURCE_DIR}/repl/test_repl_ftxui_async.py"
+				$<TARGET_FILE:repl_ftxui_async_fixture>)
+		add_test(NAME repl_ftxui_drain_test
+			COMMAND "${TAU_PARSER_TEST_PYTHON}"
+				"${CMAKE_CURRENT_SOURCE_DIR}/repl/test_repl_ftxui_drain.py"
+				$<TARGET_FILE:tgf>
+				"${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tau.tgf")
+	endif()
+	# tau.tgf is large; serialize REPL tests and allow generous load time.
+	set_tests_properties(repl_keybindings_test
+		PROPERTIES TIMEOUT 300 RESOURCE_LOCK repl_tau)
+	if(TAU_PARSER_HAS_FTXUI_DEP)
+		set_tests_properties(repl_ftxui_test repl_ftxui_async_test
+				repl_ftxui_drain_test
+			PROPERTIES TIMEOUT 300 RESOURCE_LOCK repl_tau)
 	endif()
 endif()
 
-# Validate real tgf JSON output against the AST schema and the API schema
-# when the Python jsonschema module is available.
+# Validate real tgf JSON output against the AST schema and the API schema.
 if(TARGET tgf AND NOT WIN32)
-	if(Python3_EXECUTABLE)
-		execute_process(
-			COMMAND "${Python3_EXECUTABLE}" -c
-				"import jsonschema, referencing"
-			RESULT_VARIABLE _jsonschema_missing)
-		if(NOT _jsonschema_missing)
-			add_test(NAME ast_schema_check
-				COMMAND "${Python3_EXECUTABLE}"
-					"${CMAKE_CURRENT_SOURCE_DIR}/schema_check.py"
-					"--ast"
-					"$<TARGET_FILE:tgf>"
-					"${PROJECT_SOURCE_DIR}/tests/fixtures/ambig.tgf"
-					"${PROJECT_SOURCE_DIR}/src/format/ast.json/ast.schema.json")
-			add_test(NAME tgf_api_schema_check
-				COMMAND "${Python3_EXECUTABLE}"
-					"${CMAKE_CURRENT_SOURCE_DIR}/schema_check.py"
-					"--api"
-					"$<TARGET_FILE:tgf>"
-					"${PROJECT_SOURCE_DIR}/tests/fixtures/ambig.tgf"
-					"${PROJECT_SOURCE_DIR}/src/format/tgf_api.json/tgf_api.schema.json"
-					"${PROJECT_SOURCE_DIR}/src/format/json/report.schema.json"
-					"${PROJECT_SOURCE_DIR}/src/format/ast.json/ast.schema.json")
-		endif()
-	endif()
+	add_test(NAME ast_schema_check
+		COMMAND "${TAU_PARSER_TEST_PYTHON}"
+			"${CMAKE_CURRENT_SOURCE_DIR}/schema_check.py"
+			"--ast"
+			"$<TARGET_FILE:tgf>"
+			"${PROJECT_SOURCE_DIR}/tests/fixtures/ambig.tgf"
+			"${PROJECT_SOURCE_DIR}/src/format/ast.json/ast.schema.json")
+	add_test(NAME tgf_api_schema_check
+		COMMAND "${TAU_PARSER_TEST_PYTHON}"
+			"${CMAKE_CURRENT_SOURCE_DIR}/schema_check.py"
+			"--api"
+			"$<TARGET_FILE:tgf>"
+			"${PROJECT_SOURCE_DIR}/tests/fixtures/ambig.tgf"
+			"${PROJECT_SOURCE_DIR}/src/format/tgf_api.json/tgf_api.schema.json"
+			"${PROJECT_SOURCE_DIR}/src/format/json/report.schema.json"
+			"${PROJECT_SOURCE_DIR}/src/format/ast.json/ast.schema.json")
 endif()
 
 add_test(NAME tau_manifest_input_id
