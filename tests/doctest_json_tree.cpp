@@ -511,6 +511,29 @@ TEST_SUITE("json tree: the float format repr") {
 	}
 }
 
+TEST_SUITE("json tree: escape_delete") {
+	// The expected bytes come from Python json.dumps.
+	TEST_CASE("U+007F is raw with escape_delete off and ascii_only off") {
+		const tref t = jt::build_string("a\x7f" "b");
+		CHECK(jt::get(t).to_str() == R"("a\u007fb")");
+		print_options o;
+		o.escape_delete = false;
+		CHECK(jt::get(t).to_str(o) == "\"a\x7f" "b\"");
+		o.ascii_only = true;
+		CHECK(jt::get(t).to_str(o) == R"("a\u007fb")");
+		CHECK(jt::get(t).to_str(print_options::normal())
+			== R"("a\u007fb")");
+	}
+
+	TEST_CASE("a control character stays an escape") {
+		const tref t = parsed("{\"k\":\"\\u0000\\u001f\\u007f\\u0080\"}");
+		print_options o;
+		o.escape_delete = false;
+		CHECK(jt::get(t).to_str(o)
+			== "{\"k\":\"\\u0000\\u001f\x7f\xc2\x80\"}");
+	}
+}
+
 TEST_SUITE("json tree: report") {
 	using idni::diagnostics::code;
 	using idni::diagnostics::report;

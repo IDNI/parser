@@ -78,6 +78,7 @@ inline std::ostream& tree::print(std::ostream& os, const print_options& o)
 {
 	auto prof = o.ascii_only ? idni::escapes::json_ascii
 		: idni::escapes::json;
+	prof.escape_delete = o.escape_delete || o.ascii_only;
 	auto text = [&](const std::string& s) {
 		os << '"' << idni::escapes::encode(s, prof) << '"';
 	};

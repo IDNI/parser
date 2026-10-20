@@ -43,6 +43,8 @@ struct profile {
 	/// UTF-16 pair above U+FFFF when hex_u4 is utf16. A byte that is not
 	/// valid UTF-8 has no code point, so it stays as it is.
 	bool	    ascii_only = false;
+	/// False writes U+007F raw. An encode escapes it by default.
+	bool	    escape_delete = true;
 };
 
 // Built-in profiles

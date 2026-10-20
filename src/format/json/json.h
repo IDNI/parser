@@ -144,6 +144,8 @@ struct print_options {
 	/// The text of a number node with no decimal text. shortest: the
 	/// shortest round trip text of to_chars. repr: float_repr().
 	float_format floats = float_format::shortest;
+	/// False writes U+007F raw. With ascii_only it is always `\u007f`.
+	bool escape_delete = true;
 
 	/// One line with no spaces: the default fields.
 	static print_options minified();

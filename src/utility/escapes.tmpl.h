@@ -324,7 +324,7 @@ inline std::string encode_(const std::basic_string<C>& units,
 				continue;
 			}
 		}
-		if (cp < 0x20 || cp == 0x7F) {
+		if (cp < 0x20 || (cp == 0x7F && p.escape_delete)) {
 			if (!has_prefix || !emit_escaped_value(out,
 				(unsigned)cp, p))
 				append_unit(cp);

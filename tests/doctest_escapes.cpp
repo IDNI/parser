@@ -133,6 +133,21 @@ TEST_SUITE("hex_u4_mode::utf16 (json)") {
 }
 
 // ---------------------------------------------------------------------------
+TEST_SUITE("escape_delete") {
+
+	TEST_CASE("the default escapes U+007F") {
+		CHECK(encode(std::string_view("a\x7f" "b"), json) == "a\\u007fb");
+	}
+	TEST_CASE("off writes U+007F raw and keeps the other escapes") {
+		profile p = json;
+		p.escape_delete = false;
+		CHECK(encode(std::string_view("a\x7f" "b"), p) == "a\x7f" "b");
+		CHECK(encode(std::string_view("\x1f\x7f"), p) == "\\u001f\x7f");
+		CHECK(encode(std::u32string_view(U"\x7f"), p) == "\x7f");
+	}
+}
+
+// ---------------------------------------------------------------------------
 TEST_SUITE("built-in profile spot-checks") {
 
 	TEST_CASE("JSON rejects \\x") {
