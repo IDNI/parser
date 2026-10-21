@@ -6,6 +6,7 @@
 
 #include <string>
 
+#include "utility/diagnostics.h"
 #include "utility/repl_evaluator_base.h"
 #include "utility/repl_json.h"
 #include "format/json/json.h"
@@ -79,6 +80,15 @@ struct tgf_repl_evaluator_base : repl_evaluator_base<tgf_repl_parser,
 	tgf_repl_parser::statement, tgf_repl_options>
 {
 	explicit tgf_repl_evaluator_base(options o);
+
+	/// The option name of a get, set, add, delete or toggle statement.
+	static std::string option_name(const trv& s);
+	/// The option value text of a set, add or delete statement.
+	static std::string option_text(const trv& s);
+	/// Decode the quoted TGF string @p s. A text without quotes stays as
+	/// it is. A bad escape goes to @p rep and gives an empty text.
+	static std::string unquote(const std::string& s,
+		diagnostics::report& rep);
 
 protected:
 	/// The {"grammar","start","char_classes"} state of the session.

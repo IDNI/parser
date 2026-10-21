@@ -267,33 +267,6 @@ static void print_license() {
 	std::cout << tauparser::license << "\n";
 }
 
-static string statement_option_name(const tt& s) {
-	auto n = s | tgf_repl_parser::option_name;
-	return n.has_value() ? n | tt::terminals : string();
-}
-
-// The grammar trims the whitespace between the words of a value, so one
-// space joins them again.
-static string statement_option_text(const tt& s) {
-	string text;
-	for (const auto& w : (s | tgf_repl_parser::option_value
-		|| tgf_repl_parser::option_word)())
-			text += (text.empty() ? "" : " ")
-				+ string(w | tt::terminals);
-	return text;
-}
-
-static string unquote(const string& s, diagnostics::report& report) {
-	if (s.size() < 2 || s[0] != '"' || s[s.size() - 1] != '"') return s;
-	auto dec = escapes::decode(
-		s.substr(1, s.size() - 2), escapes::tgf_string);
-	if (!dec.has_value()) {
-		report.append(std::move(dec.report()));
-		return {};
-	}
-	return std::move(dec).value();
-}
-
 const std::string& tgf_repl_evaluator::filename() const noexcept {
 	return tgf_filename;
 }
@@ -1036,31 +1009,31 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			break;
 		}
 		case p::get_cmd:
-			data = get_cmd(statement_option_name(s));
+			data = get_cmd(option_name(s));
 			break;
 		case p::set_cmd:
-			data = set_cmd(statement_option_name(s),
-				statement_option_text(s));
+			data = set_cmd(option_name(s),
+				option_text(s));
 			break;
 		case p::toggle_cmd:
-			data = flag_cmd(statement_option_name(s),
+			data = flag_cmd(option_name(s),
 				[](bool b) { return !b; });
 			break;
 		case p::enable_cmd:
-			data = flag_cmd(statement_option_name(s),
+			data = flag_cmd(option_name(s),
 				[](bool) { return true; });
 			break;
 		case p::disable_cmd:
-			data = flag_cmd(statement_option_name(s),
+			data = flag_cmd(option_name(s),
 				[](bool) { return false; });
 			break;
 		case p::add_cmd:
-			data = list_cmd(statement_option_name(s),
-				statement_option_text(s), true);
+			data = list_cmd(option_name(s),
+				option_text(s), true);
 			break;
 		case p::del_cmd:
-			data = list_cmd(statement_option_name(s),
-				statement_option_text(s), false);
+			data = list_cmd(option_name(s),
+				option_text(s), false);
 			break;
 		case p::reload_cmd:
 			if (fixed_grammar) {
@@ -1570,6 +1543,7 @@ void tgf_repl_evaluator::render_text(const cmd_result& res,
 
 tref statement_request(const tgf_repl_evaluator::trv& n) {
 	using p = tgf_repl_parser;
+	using base = tgf_repl_evaluator_base;
 	const auto nt = n | tt::nonterminal;
 	trefs req{ jt::build_pair(tp::cmd, jt::build_string(command_name(nt))) };
 	auto add = [&req](const char* key, std::string_view v) {
@@ -1583,7 +1557,7 @@ tref statement_request(const tgf_repl_evaluator::trv& n) {
 			input = seq | tt::terminals;
 		else if (auto qs = i | p::quoted_string; qs.has_value()) {
 			diagnostics::report rep;
-			input = unquote(qs | tt::terminals, rep);
+			input = base::unquote(qs | tt::terminals, rep);
 		}
 		add(tp::input, input);
 		break;
@@ -1592,7 +1566,7 @@ tref statement_request(const tgf_repl_evaluator::trv& n) {
 	case p::load_cmd: {
 		auto fn = n | p::filename;
 		diagnostics::report rep;
-		add(tp::file, unquote(fn | tt::terminals, rep));
+		add(tp::file, base::unquote(fn | tt::terminals, rep));
 		break;
 	}
 	case p::start_cmd:
@@ -1609,20 +1583,20 @@ tref statement_request(const tgf_repl_evaluator::trv& n) {
 		break;
 	}
 	case p::get_cmd:
-		if (auto name = statement_option_name(n); !name.empty())
+		if (auto name = base::option_name(n); !name.empty())
 			add(tp::option, name);
 		break;
 	// The client knows no option kind, so the server reads the text.
 	case p::set_cmd:
 	case p::add_cmd:
 	case p::del_cmd:
-		add(tp::option, statement_option_name(n));
-		add(tp::text, statement_option_text(n));
+		add(tp::option, base::option_name(n));
+		add(tp::text, base::option_text(n));
 		break;
 	case p::toggle_cmd:
 	case p::enable_cmd:
 	case p::disable_cmd:
-		add(tp::option, statement_option_name(n));
+		add(tp::option, base::option_name(n));
 		break;
 	default:
 		// grammar, reload, version, license, quit and clear carry no
