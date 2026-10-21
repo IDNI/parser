@@ -229,6 +229,10 @@ struct line_server_options {
 	/// A local_socket or tcp line over max_line. Beast closes a websocket
 	/// with a message over max_line in each policy.
 	oversize_policy when_too_long = oversize_policy::keep_open;
+	/// local_socket and tcp: at the end of the input, the rest with no
+	/// newline is one more line. The server then closes after the queued
+	/// answers. False drops the rest and closes at once.
+	bool eof_ends_line = false;
 	/// Close a connection that makes no write progress. 0 turns it off.
 	size_t write_timeout_seconds = 30;
 	/// Folder of the logs, with no "~" left. Empty writes no log.

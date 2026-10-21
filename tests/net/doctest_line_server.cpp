@@ -1762,6 +1762,89 @@ TEST_SUITE("line server: peer address") {
 	}
 }
 
+// The client sends @p bytes and ends its output.
+static void send_and_end(tcp_client& c, const std::string& bytes) {
+	c.send_raw(bytes);
+	boost::system::error_code ec;
+	c.sock.shutdown(tcp::socket::shutdown_send, ec);
+	REQUIRE_FALSE(ec);
+}
+
+TEST_SUITE("line server: the end of the input") {
+	TEST_CASE("the default drops the rest with no newline") {
+		CHECK_FALSE(line_server_options{}.eof_ends_line);
+		std::atomic<int> json_lines{ 0 };
+		server_thread s(raw_options(tcp_options(), json_lines));
+		tcp_client c(loopback(s.tcp_port()));
+		send_and_end(c, "a\nrest");
+		CHECK(read_to_close(c) == "got:a\n");
+	}
+	TEST_CASE("eof_ends_line: the rest is one more line, then the close") {
+		std::atomic<int> json_lines{ 0 };
+		auto o = raw_options(tcp_options(), json_lines);
+		o.eof_ends_line = true;
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		send_and_end(c, "a\nrest");
+		CHECK(read_to_close(c) == "got:a\ngot:rest\n");
+	}
+	TEST_CASE("eof_ends_line: the answers of the last full line still go out") {
+		std::atomic<int> json_lines{ 0 };
+		auto o = raw_options(tcp_options(), json_lines);
+		o.eof_ends_line = true;
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		send_and_end(c, "a\n");
+		CHECK(read_to_close(c) == "got:a\n");
+	}
+	TEST_CASE("eof_ends_line in the JSON mode: the rest is parsed") {
+		auto o = tcp_options();
+		o.eof_ends_line = true;
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		send_and_end(c, "{\"id\":1}");
+		CHECK(read_to_close(c) == "{\"id\":1,\"status\":\"ok\"}\n");
+		CHECK(wait_for(s.closes, 1));
+	}
+}
+
+#ifdef _WIN32
+// Records each raw line, for a client that ends before it reads.
+struct record_handler : session_handler {
+	explicit record_handler(std::shared_ptr<std::atomic<int>> r)
+		: rests(std::move(r)) {}
+	std::shared_ptr<std::atomic<int>> rests;
+	void on_text(std::string_view line, reply_sink&) override {
+		if (line == "rest") ++*rests;
+	}
+};
+
+TEST_SUITE("line server: the end of the input on a named pipe") {
+	TEST_CASE("eof_ends_line: the rest of a pipe client that ends is a line") {
+		const std::string name = std::string("\\\\.\\pipe\\line_server_eof_")
+			+ std::to_string(::GetCurrentProcessId());
+		auto rests = std::make_shared<std::atomic<int>>(0);
+		line_server_options o;
+		o.listen = { { line_transport_kind::local_socket, name, 0 } };
+		o.json = true;
+		o.raw_lines = true;
+		o.eof_ends_line = true;
+		o.make_handler = [rests](const line_session&) {
+			return std::make_unique<record_handler>(rests);
+		};
+		server_thread s(o);
+		REQUIRE_FALSE(s.wait_listening(1).empty());
+		HANDLE h = ::CreateFileA(name.c_str(), GENERIC_READ | GENERIC_WRITE,
+			0, nullptr, OPEN_EXISTING, 0, nullptr);
+		REQUIRE(h != INVALID_HANDLE_VALUE);
+		DWORD written = 0;
+		CHECK(::WriteFile(h, "rest", 4, &written, nullptr));
+		::CloseHandle(h);
+		CHECK(wait_for(*rests, 1));
+	}
+}
+#endif
+
 TEST_SUITE("line server: loopback peer") {
 	TEST_CASE("127.0.0.1 is a loopback peer") {
 		server_thread s(peer_options(tcp_options()));

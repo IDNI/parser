@@ -207,6 +207,7 @@ struct server_connection : std::enable_shared_from_this<server_connection> {
 	void start();
 	void read_some();
 	void on_read(error_code ec, size_t n);
+	bool input_ended(const error_code& ec) const;
 	void on_ws_read(error_code ec);
 	void handle_line(std::string& l);
 	void handle_first_line(std::string& l);
@@ -384,6 +385,15 @@ void server_connection::read_some() {
 void server_connection::on_read(error_code ec, size_t n) {
 	reading = false;
 	if (closed) return;
+	if (srv->opt.eof_ends_line && input_ended(ec)) {
+		if (!dropping && !line.empty()) {
+			handle_line(line);
+			line.clear();
+			jt::gc_if_grown();
+		}
+		close_after_flush();
+		return;
+	}
 	if (ec) { close(); return; }
 	feed_lines(line, dropping, srv->opt.max_line, read_buf.data(), n,
 		[this](std::string& l) { handle_line(l); },
@@ -391,6 +401,17 @@ void server_connection::on_read(error_code ec, size_t n) {
 	// The lines are answered and logged, so no JSON tref is left.
 	jt::gc_if_grown();
 	if (!closed && !close_when_drained && !read_paused) read_some();
+}
+
+bool server_connection::input_ended(const error_code& ec) const {
+	if (ec == ba::error::eof) return true;
+#ifdef _WIN32
+	// A named pipe client that ends gives broken_pipe, not eof.
+	return ec == ba::error::broken_pipe
+		&& session.peer.kind == line_transport_kind::local_socket;
+#else
+	return false;
+#endif
 }
 
 // One websocket message is one line. Beast refuses a message over
