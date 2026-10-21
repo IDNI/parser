@@ -145,6 +145,7 @@ struct connection_sink : reply_sink {
 	void write(tref reply) override;
 	void write(std::string line) override;
 	void close() override;
+	void pause_read(bool paused) override;
 	void log(tref event) override;
 };
 
@@ -158,10 +159,14 @@ struct server_connection : std::enable_shared_from_this<server_connection> {
 	std::string line;
 	bool dropping = false;
 	std::deque<std::string> out;
+	size_t out_bytes = 0;
 	// Closes a connection that does not drain its output in time.
 	ba::steady_timer write_timer;
 	bool closed = false;
 	bool close_when_drained = false;
+	bool read_paused = false;
+	// set by the handler through reply_sink::pause_read
+	bool handler_paused = false;
 	bool reading = false;
 	// True while on_open or on_line runs, so a close waits for its return.
 	bool in_handler = false;
@@ -194,6 +199,7 @@ struct server_connection : std::enable_shared_from_this<server_connection> {
 	void close();
 	void close_after_flush();
 	void arm_write_timer();
+	void update_read_state();
 	void log_write(tref v);
 	void log_store(tref v);
 	void log_session_event(std::string_view event);
@@ -318,7 +324,7 @@ void server_connection::start() {
 }
 
 void server_connection::read_some() {
-	if (closed || reading) return;
+	if (closed || read_paused || reading) return;
 	reading = true;
 	auto self = shared_from_this();
 	std::visit([this, self](auto& s) {
@@ -339,7 +345,7 @@ void server_connection::on_read(error_code ec, size_t n) {
 		[this] { handle_too_long(); });
 	// The lines are answered and logged, so no JSON tref is left.
 	jt::gc_if_grown();
-	if (!closed && !close_when_drained) read_some();
+	if (!closed && !close_when_drained && !read_paused) read_some();
 }
 
 // One websocket message is one line. Beast refuses a message over
@@ -360,7 +366,7 @@ void server_connection::on_ws_read(error_code ec) {
 	ws_buf.consume(ws_buf.size());
 	line.clear();
 	jt::gc_if_grown();
-	if (!closed && !close_when_drained) read_some();
+	if (!closed && !close_when_drained && !read_paused) read_some();
 }
 
 void server_connection::handle_line(std::string& l) {
@@ -453,11 +459,13 @@ void server_connection::refuse(diagnostics::code c, std::string_view msg,
 
 void server_connection::send(std::string text) {
 	if (closed) return;
+	out_bytes += text.size();
 	out.push_back(std::move(text));
 	if (out.size() == 1) {
 		arm_write_timer();
 		write_next();
 	}
+	update_read_state();
 }
 
 void server_connection::send_line(tref v) {
@@ -477,11 +485,13 @@ void server_connection::write_next() {
 	auto self = shared_from_this();
 	auto on_written = [self](error_code ec, size_t) {
 		if (ec) { self->close(); return; }
+		self->out_bytes -= self->out.front().size();
 		self->out.pop_front();
 		if (self->out.empty() && self->close_when_drained) {
 			self->close();
 			return;
 		}
+		self->update_read_state();
 		// The write made progress, so the deadline starts again.
 		self->arm_write_timer();
 		self->write_next();
@@ -518,6 +528,18 @@ void server_connection::arm_write_timer() {
 		if (ec) return;
 		self->close();
 	});
+}
+
+// Read from a client only while its output has room.
+void server_connection::update_read_state() {
+	if (closed) return;
+	if (out_bytes >= srv->opt.max_output_bytes || handler_paused) {
+		read_paused = true;
+		return;
+	}
+	if (!read_paused) return;
+	read_paused = false;
+	read_some();
 }
 
 void server_connection::close() {
@@ -568,6 +590,11 @@ void connection_sink::write(std::string line) {
 }
 
 void connection_sink::close() { c.close_after_flush(); }
+
+void connection_sink::pause_read(bool paused) {
+	c.handler_paused = paused;
+	c.update_read_state();
+}
 
 void connection_sink::log(tref event) {
 	c.srv->log_event(event, &c);

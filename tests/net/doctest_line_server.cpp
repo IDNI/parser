@@ -958,6 +958,18 @@ TEST_SUITE("line server: named pipe") {
 }
 #endif
 
+// Answers each line with a JSON string of @p size bytes and counts the lines.
+struct big_reply_handler : session_handler {
+	big_reply_handler(std::atomic<int>& l, size_t size)
+		: lines(l), reply("\"" + std::string(size, 'x') + "\"") {}
+	std::atomic<int>& lines;
+	std::string reply;
+	void on_line(tref, reply_sink& out) override {
+		++lines;
+		out.write(reply);
+	}
+};
+
 // Asks for the close in on_line and records whether on_close ran inside.
 struct closing_handler : session_handler {
 	explicit closing_handler(std::atomic<int>& r) : result(r) {}
@@ -1043,6 +1055,34 @@ TEST_SUITE("line server: limits") {
 			if (close_time) CHECK(took < std::chrono::seconds(4));
 			else CHECK(took >= std::chrono::seconds(4));
 		}
+	}
+	TEST_CASE("a client that does not read stops the read of its lines") {
+		std::atomic<int> lines{ 0 };
+		auto o = tcp_options();
+		o.max_output_bytes = 64 * 1024;
+		o.write_timeout_seconds = 0;
+		o.make_handler = [&lines](const line_session&) {
+			return std::make_unique<big_reply_handler>(lines,
+				256 * 1024);
+		};
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("{\"cmd\":\"open\"}");
+		// The lines span many reads, and the pause holds between two reads.
+		std::string many;
+		const std::string pad(1000, 'p');
+		for (int i = 0; i != 100; ++i)
+			many += "{\"cmd\":\"x\",\"pad\":\"" + pad + "\"}\n";
+		c.send_raw(many);
+		std::this_thread::sleep_for(std::chrono::milliseconds(500));
+		CHECK(lines.load() < 100);
+		auto deadline = std::chrono::steady_clock::now()
+			+ std::chrono::seconds(30);
+		size_t got = 0;
+		while (got != 100 && std::chrono::steady_clock::now() < deadline)
+			if (!c.read_line(1000).empty()) ++got;
+		CHECK(got == 100);
+		CHECK(lines.load() == 100);
 	}
 	TEST_CASE("a close asked in on_line runs on_close after on_line") {
 		std::atomic<int> result{ 0 };
@@ -1308,3 +1348,46 @@ TEST_SUITE("line server: require_same_user") {
 	}
 }
 #endif
+
+// Pauses the read in on_open. The test starts it again through the sink.
+struct pausing_handler : session_handler {
+	pausing_handler(std::atomic<int>& l,
+		std::shared_ptr<std::atomic<reply_sink*>> s)
+		: lines(l), sink(std::move(s)) {}
+	std::atomic<int>& lines;
+	std::shared_ptr<std::atomic<reply_sink*>> sink;
+	void on_open(tref, reply_sink& out) override {
+		out.pause_read(true);
+		*sink = &out;
+	}
+	void on_line(tref, reply_sink&) override { ++lines; }
+	void on_close() override { *sink = nullptr; }
+};
+
+TEST_SUITE("line server: pause_read") {
+	TEST_CASE("pause_read true stops the read, false starts it again") {
+		std::atomic<int> lines{ 0 };
+		auto sink = std::make_shared<std::atomic<reply_sink*>>(nullptr);
+		auto o = tcp_options();
+		o.make_handler = [&lines, sink](const line_session&) {
+			return std::make_unique<pausing_handler>(lines, sink);
+		};
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("{\"cmd\":\"open\"}");
+		// The pause holds between two reads, so the lines come after it.
+		const auto deadline = std::chrono::steady_clock::now()
+			+ std::chrono::seconds(10);
+		while (!sink->load() && std::chrono::steady_clock::now() < deadline)
+			std::this_thread::sleep_for(std::chrono::milliseconds(5));
+		REQUIRE(sink->load());
+		c.send("{\"id\":1}");
+		c.send("{\"id\":2}");
+		std::this_thread::sleep_for(std::chrono::milliseconds(300));
+		CHECK(lines.load() == 0);
+		CHECK(line_server_post([sink] {
+			if (reply_sink* out = sink->load()) out->pause_read(false);
+		}));
+		CHECK(wait_for(lines, 2));
+	}
+}

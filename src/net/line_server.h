@@ -30,6 +30,9 @@ struct reply_sink {
 	virtual void write(std::string line) = 0;
 	/// Ends the connection after the queued lines are written.
 	virtual void close() = 0;
+	/// True stops the read of new request lines, false starts it again.
+	/// A handler whose own queue is full uses it as back pressure.
+	virtual void pause_read(bool paused) = 0;
 	/// Write one event of the handler into the server log and the session
 	/// log, in the shape of the server events.
 	virtual void log(tref event) = 0;
@@ -110,6 +113,8 @@ struct line_server_options {
 	/// websocket: the time of the close handshake. The socket closes when
 	/// the client does not answer the close frame in this time.
 	std::optional<size_t> close_timeout_seconds{};
+	/// Stop the read of a client while this many bytes of its output wait.
+	size_t max_output_bytes = 1u * 1024 * 1024;
 	/// The wait after a failed accept, so a lack of file descriptors does
 	/// not keep the loop busy.
 	size_t accept_retry_ms = 100;
