@@ -429,6 +429,47 @@ TEST_SUITE("line server: tcp") {
 #endif
 }
 
+static line_server_options ws_options(std::string ws_path = "/ws") {
+	line_server_options o;
+	o.listen = { { .kind = line_transport_kind::websocket, .port = 0,
+		.ws_path = std::move(ws_path) } };
+	o.json = true;
+	return o;
+}
+
+static std::unique_ptr<line_transport> ws_connect(uint16_t port,
+	size_t max_line = 0)
+{
+	auto t = line_connect({ .kind = line_transport_kind::websocket,
+		.host = "127.0.0.1", .port = port, .ws_path = "/ws" },
+		{ .max_line = max_line, .timeout_seconds = 10 });
+	REQUIRE(t.has_value());
+	return std::move(t.value());
+}
+
+// A raw upgrade request, so the test sees the HTTP answer of a refusal.
+static std::string upgrade_request(std::string_view target,
+	std::string_view origin)
+{
+	std::string r = "GET " + std::string(target) + " HTTP/1.1\r\n"
+		"Host: 127.0.0.1\r\n"
+		"Upgrade: websocket\r\n"
+		"Connection: Upgrade\r\n"
+		"Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+		"Sec-WebSocket-Version: 13\r\n";
+	if (!origin.empty()) r += "Origin: " + std::string(origin) + "\r\n";
+	return r + "\r\n";
+}
+
+// The rest of an HTTP answer, up to the close of the server.
+// One masked text frame of up to 125 bytes. The mask key 0 leaves the
+// payload as it is.
+static std::string text_frame(const std::string& payload) {
+	REQUIRE(payload.size() <= 125);
+	return std::string{ char(0x81), char(0x80 | payload.size()),
+		0, 0, 0, 0 } + payload;
+}
+
 // Answers each line with the request and a large "pad" member.
 struct large_reply_handler : session_handler {
 	explicit large_reply_handler(std::atomic<int>& c) : closes(c) {}
@@ -439,6 +480,123 @@ struct large_reply_handler : session_handler {
 	}
 	void on_close() override { ++closes; }
 };
+
+static std::string read_to_close(tcp_client& c) {
+	const auto deadline = std::chrono::steady_clock::now()
+		+ std::chrono::seconds(10);
+	while (c.read_until(deadline)) {}
+	return c.in_buf;
+}
+
+TEST_SUITE("line server: websocket") {
+	TEST_CASE("an echo session: the listening line, the open answer and two lines") {
+		server_thread s(ws_options());
+		const uint16_t port = s.tcp_port();
+		const auto lines = s.wait_listening(1);
+		REQUIRE_FALSE(lines.empty());
+		CHECK(lines[0] == "{\"listening\":{\"kind\":\"websocket\",\"port\":"
+			+ std::to_string(port) + ",\"path\":\"/ws\"}}");
+		auto t = ws_connect(port);
+		std::string l;
+		CHECK(t->send_line("{\"id\":1,\"cmd\":\"open\"}"));
+		REQUIRE(t->read_line(l) == read_status::ok);
+		CHECK(l == "{\"id\":1,\"cmd\":\"open\",\"status\":\"ok\"}");
+		CHECK(t->send_line("{\"id\":2,\"cmd\":\"a\"}"));
+		CHECK(t->send_line("{\"id\":3,\"cmd\":\"b\"}"));
+		REQUIRE(t->read_line(l) == read_status::ok);
+		CHECK(l == "{\"id\":2,\"cmd\":\"a\",\"status\":\"ok\"}");
+		REQUIRE(t->read_line(l) == read_status::ok);
+		CHECK(l == "{\"id\":3,\"cmd\":\"b\",\"status\":\"ok\"}");
+		t->close();
+		CHECK(wait_for(s.closes, 1));
+	}
+	TEST_CASE("the listening line as text") {
+		auto o = ws_options();
+		o.json = false;
+		server_thread s(o);
+		const auto lines = s.wait_listening(1);
+		REQUIRE_FALSE(lines.empty());
+		CHECK(has(lines[0], " listening on ws://127.0.0.1:"));
+		CHECK(has(lines[0], "/ws"));
+	}
+	TEST_CASE("an allowed origin passes, the handler sees it") {
+		auto o = ws_options();
+		o.allowed_origins = { "http://good.example" };
+		std::atomic<bool> seen{ false };
+		o.authenticate = [&seen](tref, const peer_info& peer) {
+			seen = peer.kind == line_transport_kind::websocket
+				&& peer.origin == "http://good.example";
+			return true;
+		};
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send_raw(upgrade_request("/ws", "http://good.example"));
+		CHECK(c.read_line() == "HTTP/1.1 101 Switching Protocols");
+		c.send_raw(text_frame("{\"cmd\":\"open\"}"));
+		auto deadline = std::chrono::steady_clock::now()
+			+ std::chrono::seconds(10);
+		while (!seen && std::chrono::steady_clock::now() < deadline)
+			std::this_thread::sleep_for(std::chrono::milliseconds(5));
+		CHECK(seen.load());
+	}
+	TEST_CASE("an origin that is not allowed gets 403 and the close") {
+		auto o = ws_options();
+		o.allowed_origins = { "http://good.example" };
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send_raw(upgrade_request("/ws", "http://evil.example"));
+		CHECK(c.read_line() == "HTTP/1.1 403 Forbidden");
+		CHECK(has(read_to_close(c), "The WebSocket origin is not allowed"));
+		CHECK(c.eof_seen);
+	}
+	TEST_CASE("an empty allowed_origins refuses every browser origin") {
+		server_thread s(ws_options());
+		tcp_client c(loopback(s.tcp_port()));
+		c.send_raw(upgrade_request("/ws", "http://127.0.0.1"));
+		CHECK(c.read_line() == "HTTP/1.1 403 Forbidden");
+	}
+	TEST_CASE("a target that is not ws_path gets 404") {
+		server_thread s(ws_options());
+		tcp_client c(loopback(s.tcp_port()));
+		c.send_raw(upgrade_request("/other", ""));
+		CHECK(c.read_line() == "HTTP/1.1 404 Not Found");
+		read_to_close(c);
+		CHECK(c.eof_seen);
+	}
+	TEST_CASE("a client that never reads: the write timer closes it") {
+		auto o = ws_options();
+		o.write_timeout_seconds = 1;
+		std::atomic<int> closes{ 0 };
+		o.make_handler = [&closes](const line_session&) {
+			return std::make_unique<large_reply_handler>(closes);
+		};
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send_raw(upgrade_request("/ws", ""));
+		CHECK(c.read_line() == "HTTP/1.1 101 Switching Protocols");
+		c.send_raw(text_frame("{\"cmd\":\"open\"}"));
+		// 256 answers of 64 KiB fill the socket buffers and the output
+		// queue, so the writes stall.
+		std::string frames;
+		for (int i = 0; i != 256; ++i)
+			frames += text_frame("{\"id\":" + std::to_string(i) + "}");
+		c.send_raw(frames);
+		CHECK(wait_for(closes, 1));
+	}
+	TEST_CASE("a message over max_line closes the connection") {
+		auto o = ws_options();
+		o.max_line = 32;
+		server_thread s(o);
+		auto t = ws_connect(s.tcp_port());
+		std::string l;
+		CHECK(t->send_line("{\"cmd\":\"open\"}"));
+		REQUIRE(t->read_line(l) == read_status::ok);
+		CHECK(has(l, "\"status\":\"ok\""));
+		t->send_line("{\"cmd\":\"" + std::string(100, 'x') + "\"}");
+		CHECK(t->read_line(l) == read_status::closed);
+		CHECK(wait_for(s.closes, 1));
+	}
+}
 
 #ifndef _WIN32
 TEST_SUITE("line server: local socket") {
@@ -593,6 +751,12 @@ struct closing_handler : session_handler {
 	void on_close() override { result = inside ? 1 : 2; }
 };
 
+static std::string binary_frame(const std::string& payload) {
+	REQUIRE(payload.size() <= 125);
+	return std::string{ char(0x82), char(0x80 | payload.size()),
+		0, 0, 0, 0 } + payload;
+}
+
 TEST_SUITE("line server: limits") {
 	TEST_CASE("idle_timeout_seconds ends a quiet session") {
 		auto o = tcp_options();
@@ -616,6 +780,18 @@ TEST_SUITE("line server: limits") {
 		c.send("{\"cmd\":\"bye\"}");
 		CHECK(c.at_eof(5000));
 		CHECK(wait_for(result, 2));
+	}
+	TEST_CASE("a binary websocket message gets the error and the close") {
+		server_thread s(ws_options());
+		tcp_client c(loopback(s.tcp_port()));
+		c.send_raw(upgrade_request("/ws", ""));
+		CHECK(c.read_line() == "HTTP/1.1 101 Switching Protocols");
+		c.send_raw(text_frame("{\"cmd\":\"open\"}"));
+		c.send_raw(binary_frame("{\"cmd\":\"x\"}"));
+		const std::string rest = read_to_close(c);
+		CHECK(has(rest, "\"status\":\"error\""));
+		// the close frame of the server
+		CHECK(rest.find(char(0x88)) != std::string::npos);
 	}
 #ifndef _WIN32
 	TEST_CASE("the run gives the SIGPIPE handler of the program back") {

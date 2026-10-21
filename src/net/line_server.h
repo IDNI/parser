@@ -57,6 +57,8 @@ struct peer_info {
 	/// local_socket only: the peer process user, from SO_PEERCRED on
 	/// Linux or getpeereid on macOS.
 	std::optional<uint64_t> user_id{};
+	/// websocket only: the Origin header of the upgrade request.
+	std::string origin{};
 };
 
 /// One connection on the server.
@@ -79,8 +81,15 @@ struct line_server_options {
 	/// local_socket: refuse a peer of another user than the server. On
 	/// Windows the pipe access list allows only the user.
 	bool require_same_user = true;
+	/// websocket: the Origin values that the server accepts. Empty
+	/// refuses every browser origin, because any web page can open a
+	/// WebSocket to 127.0.0.1.
+	std::vector<std::string> allowed_origins{};
 	/// At this count the server refuses a new connection with busy_message.
 	size_t max_sessions = 16;
+	/// websocket: close a client that sends no complete upgrade request in
+	/// this time. The same time bounds the websocket close handshake.
+	size_t upgrade_timeout_seconds = 30;
 	/// The wait after a failed accept, so a lack of file descriptors does
 	/// not keep the loop busy.
 	size_t accept_retry_ms = 100;

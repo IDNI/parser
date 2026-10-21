@@ -316,6 +316,8 @@ struct messages {
 		"Could not bind the listen address";
 	static constexpr sv net_peer_refused       =
 		"The peer user is not the server user";
+	static constexpr sv net_origin_refused     =
+		"The WebSocket origin is not allowed";
 	static constexpr sv net_login_refused      =
 		"Login refused";
 	static constexpr sv net_line_too_long      =

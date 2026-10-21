@@ -16,6 +16,7 @@
 #include "line_support.h"
 #include "utility/filesystem.h"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -54,6 +55,9 @@
 #include <boost/asio.hpp>
 #include <boost/asio/signal_set.hpp>
 #include <boost/asio/steady_timer.hpp>
+#include <boost/beast/core.hpp>
+#include <boost/beast/http.hpp>
+#include <boost/beast/websocket.hpp>
 #ifdef _WIN32
 #include <boost/asio/windows/overlapped_ptr.hpp>
 #include <boost/asio/windows/stream_handle.hpp>
@@ -66,17 +70,24 @@ namespace idni {
 namespace {
 
 namespace ba = boost::asio;
+namespace beast = boost::beast;
+namespace http = beast::http;
 using ba::ip::tcp;
 using boost::system::error_code;
 using jt = format::json::tree;
 using format::json::string_member;
+using ws_stream = beast::websocket::stream<tcp::socket>;
 
 #ifdef _WIN32
-using conn_socket = std::variant<tcp::socket, ba::windows::stream_handle>;
+using conn_socket = std::variant<tcp::socket, ba::windows::stream_handle,
+	ws_stream>;
 #else
 using local = ba::local::stream_protocol;
-using conn_socket = std::variant<tcp::socket, local::socket>;
+using conn_socket = std::variant<tcp::socket, local::socket, ws_stream>;
 #endif
+
+template <typename S>
+inline constexpr bool is_ws_v = std::is_same_v<std::decay_t<S>, ws_stream>;
 
 // The idle timer ticks at this interval.
 inline constexpr int tick_ms = 200;
@@ -153,6 +164,8 @@ struct server_connection : std::enable_shared_from_this<server_connection> {
 	// True while on_open or on_line runs, so a close waits for its return.
 	bool in_handler = false;
 	std::array<char, 8192> read_buf{};
+	// websocket: one message
+	beast::flat_buffer ws_buf;
 	fs::file_ostream log;
 	bool log_ok = false;
 	connection_sink sink{ *this };
@@ -160,6 +173,7 @@ struct server_connection : std::enable_shared_from_this<server_connection> {
 	void start();
 	void read_some();
 	void on_read(error_code ec, size_t n);
+	void on_ws_read(error_code ec);
 	void handle_line(std::string& l);
 	void handle_first_line(std::string& l);
 	bool start_session();
@@ -201,6 +215,29 @@ struct pipe_listener {
 	void accept_or_retry();
 };
 #endif
+
+// The HTTP upgrade of one websocket connection. The checks run before
+// the upgrade, so a refused client gets a plain HTTP answer.
+struct ws_upgrade : std::enable_shared_from_this<ws_upgrade> {
+	ws_upgrade(line_server* s, tcp::socket so, const listen_address& a);
+	ws_upgrade(const ws_upgrade&) = delete;
+	ws_upgrade& operator=(const ws_upgrade&) = delete;
+
+	line_server* srv;
+	tcp::socket sock;
+	std::string ws_path;
+	peer_info peer;
+	ba::steady_timer timer;
+	beast::flat_buffer buf;
+	http::request<http::empty_body> req;
+	http::response<http::string_body> res;
+	std::optional<ws_stream> ws;
+
+	void start();
+	void on_read(error_code ec);
+	void answer(http::status status, std::string_view text);
+	void upgrade();
+};
 
 struct tcp_listener {
 	std::unique_ptr<tcp::acceptor> acceptor;
@@ -280,7 +317,10 @@ void server_connection::read_some() {
 	reading = true;
 	auto self = shared_from_this();
 	std::visit([this, self](auto& s) {
-		s.async_read_some(ba::buffer(read_buf),
+		if constexpr (is_ws_v<decltype(s)>)
+			s.async_read(ws_buf,
+				[self](error_code ec, size_t) { self->on_ws_read(ec); });
+		else s.async_read_some(ba::buffer(read_buf),
 			[self](error_code ec, size_t n) { self->on_read(ec, n); });
 	}, socket);
 }
@@ -293,6 +333,27 @@ void server_connection::on_read(error_code ec, size_t n) {
 		[this](std::string& l) { handle_line(l); },
 		[this] { handle_too_long(); });
 	// The lines are answered and logged, so no JSON tref is left.
+	jt::gc_if_grown();
+	if (!closed && !close_when_drained) read_some();
+}
+
+// One websocket message is one line. Beast refuses a message over
+// read_message_max with a close frame, so the read reports an error.
+void server_connection::on_ws_read(error_code ec) {
+	reading = false;
+	if (closed) return;
+	if (ec) { close(); return; }
+	if (!std::get<ws_stream>(socket).got_text()) {
+		ws_buf.consume(ws_buf.size());
+		refuse(diagnostics::code::invalid_argument,
+			diagnostics::code_name(diagnostics::code::invalid_argument));
+		return;
+	}
+	const auto data = ws_buf.data();
+	line.assign(static_cast<const char*>(data.data()), data.size());
+	handle_line(line);
+	ws_buf.consume(ws_buf.size());
+	line.clear();
 	jt::gc_if_grown();
 	if (!closed && !close_when_drained) read_some();
 }
@@ -394,7 +455,8 @@ void server_connection::send_line(tref v) {
 void server_connection::send_text(std::string text) {
 	session.last_traffic = std::chrono::steady_clock::now();
 	if (session.authenticated) log_write(line_log::text("out", text));
-	text += '\n';
+	// A websocket message needs no line end.
+	if (session.peer.kind != line_transport_kind::websocket) text += '\n';
 	send(std::move(text));
 }
 
@@ -413,7 +475,9 @@ void server_connection::write_next() {
 		self->write_next();
 	};
 	std::visit([this, &on_written](auto& s) {
-		ba::async_write(s, ba::buffer(out.front()),
+		if constexpr (is_ws_v<decltype(s)>)
+			s.async_write(ba::buffer(out.front()), std::move(on_written));
+		else ba::async_write(s, ba::buffer(out.front()),
 			std::move(on_written));
 	}, socket);
 }
@@ -450,13 +514,30 @@ void server_connection::close() {
 	line.clear();
 	// Some Boost versions have no cancel(ec), and a timer cancel reports no error.
 	write_timer.cancel();
-	std::visit([](auto& s) {
+	std::visit([this](auto& s) {
 		error_code ec;
 		using socket_t = std::decay_t<decltype(s)>;
-		if constexpr (requires {
-				s.shutdown(socket_t::shutdown_both, ec); })
-			s.shutdown(socket_t::shutdown_both, ec);
-		s.close(ec);
+		if constexpr (is_ws_v<socket_t>) {
+			auto& lowest = beast::get_lowest_layer(s);
+			// The close frame needs the io loop, which is gone at a stop.
+			// Beast takes no close while a write waits, so then the
+			// socket closes, which cancels the write.
+			if (s.is_open() && !srv->stopping && out.empty()) {
+				s.async_close(beast::websocket::close_code::normal,
+					[self = shared_from_this()](error_code) {
+						error_code e;
+						beast::get_lowest_layer(std::get<ws_stream>(
+							self->socket)).close(e);
+					});
+				return;
+			}
+			lowest.close(ec);
+		} else {
+			if constexpr (requires {
+					s.shutdown(socket_t::shutdown_both, ec); })
+				s.shutdown(socket_t::shutdown_both, ec);
+			s.close(ec);
+		}
 	}, socket);
 	if (session.handler) {
 		session.handler->on_close();
@@ -759,7 +840,7 @@ bool pipe_listener::accept_next() {
 		[this, pipe](error_code ec, size_t) {
 			if (srv->stopping) return;
 			if (!ec) srv->on_accept(conn_socket(std::move(*pipe)),
-				peer_info{ line_transport_kind::local_socket, {} });
+				peer_info{ line_transport_kind::local_socket, {}, {} });
 			accept_or_retry();
 		});
 	const BOOL ok = ::ConnectNamedPipe(h, op.get());
@@ -800,10 +881,102 @@ void line_server::accept_tcp(size_t i) {
 				retry_accept([this, i] { accept_tcp(i); });
 				return;
 			}
-			on_accept(conn_socket(std::move(s)),
-				peer_info{ .kind = line_transport_kind::tcp });
+			const listen_address& a = tcp_listeners[i].address;
+			if (a.kind == line_transport_kind::websocket) {
+				auto u = std::make_shared<ws_upgrade>(this,
+					std::move(s), a);
+				u->start();
+			} else {
+				on_accept(conn_socket(std::move(s)),
+					peer_info{ .kind = line_transport_kind::tcp });
+			}
 			accept_tcp(i);
 		});
+}
+
+ws_upgrade::ws_upgrade(line_server* s, tcp::socket so,
+	const listen_address& a)
+	: srv(s), sock(std::move(so)), ws_path(a.ws_path),
+	peer{ .kind = line_transport_kind::websocket }, timer(s->io)
+{
+}
+
+void ws_upgrade::start() {
+	auto self = shared_from_this();
+	timer.expires_after(std::chrono::seconds(
+		srv->opt.upgrade_timeout_seconds));
+	timer.async_wait([self](error_code ec) {
+		if (ec) return;
+		error_code e;
+		self->sock.close(e);
+	});
+	http::async_read(sock, buf, req, [self](error_code ec, size_t) {
+		self->on_read(ec);
+	});
+}
+
+void ws_upgrade::on_read(error_code ec) {
+	if (srv->stopping) return;
+	if (ec) {
+		timer.cancel();
+		error_code e;
+		sock.close(e);
+		return;
+	}
+	// A client that is no browser sends no Origin, so it passes.
+	if (auto it = req.find(http::field::origin); it != req.end()) {
+		peer.origin.assign(it->value().data(), it->value().size());
+		const auto& o = srv->opt;
+		if (std::find(o.allowed_origins.begin(), o.allowed_origins.end(),
+				peer.origin) == o.allowed_origins.end())
+			return answer(http::status::forbidden,
+				parser_strings::messages::net_origin_refused);
+	}
+	if (std::string_view(req.target().data(), req.target().size())
+			!= ws_path)
+		return answer(http::status::not_found,
+			diagnostics::code_name(diagnostics::code::not_found));
+	if (!beast::websocket::is_upgrade(req))
+		return answer(http::status::bad_request,
+			diagnostics::code_name(diagnostics::code::invalid_argument));
+	upgrade();
+}
+
+void ws_upgrade::answer(http::status status, std::string_view text) {
+	res.version(req.version());
+	res.result(status);
+	res.set(http::field::content_type, "text/plain; charset=utf-8");
+	res.keep_alive(false);
+	res.body() = std::string(text) + "\n";
+	res.prepare_payload();
+	auto self = shared_from_this();
+	http::async_write(sock, res, [self](error_code, size_t) {
+		self->timer.cancel();
+		error_code e;
+		self->sock.shutdown(tcp::socket::shutdown_both, e);
+		self->sock.close(e);
+	});
+}
+
+void ws_upgrade::upgrade() {
+	timer.cancel();
+	ws.emplace(std::move(sock));
+	// The handshake timeout bounds the accept and the close handshake.
+	beast::websocket::stream_base::timeout t{};
+	t.handshake_timeout = std::chrono::seconds(
+		srv->opt.upgrade_timeout_seconds);
+	t.idle_timeout = beast::websocket::stream_base::none();
+	t.keep_alive_pings = false;
+	ws->set_option(t);
+	ws->read_message_max(srv->opt.max_line);
+	ws->auto_fragment(false);
+	ws->text(true);
+	auto self = shared_from_this();
+	ws->async_accept(req, [self](error_code ec) {
+		if (ec || self->srv->stopping) return;
+		self->srv->on_accept(conn_socket(std::move(*self->ws)),
+			std::move(self->peer));
+	});
 }
 
 #ifndef _WIN32
@@ -817,7 +990,7 @@ void line_server::accept_local(size_t i) {
 			}
 			auto uid = peer_user(s.native_handle());
 			on_accept(conn_socket(std::move(s)), peer_info{
-				line_transport_kind::local_socket, uid });
+				line_transport_kind::local_socket, uid, {} });
 			accept_local(i);
 		});
 }
