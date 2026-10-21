@@ -67,6 +67,7 @@ set(TAU_PARSER_HEADERS
 	utility/tree.h
 	utility/tree.tmpl.h
 	utility/utf8char_traits.h
+	net/line_support.h
 	CACHE STRING "Tau Parser headers files"
 )
 
@@ -132,6 +133,10 @@ else()
 	elseif(TAU_PARSER_BUILD_SHARED_LIBRARY)
 		add_library(tauparser ALIAS tauparser_shared)
 	endif()
+endif()
+
+if(TAU_PARSER_BUILD_NET)
+	add_subdirectory(net)
 endif()
 
 # install targets

@@ -255,6 +255,13 @@
 			}
 		},
 		{
+			"name": "_build-net",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_PARSER_BUILD_NET": "ON"
+			}
+		},
+		{
 			"name": "_build-fuzz",
 			"hidden": true,
 			"cacheVariables": {
@@ -503,10 +510,12 @@
 			"inherits": [
 				"release-w64",
 				"_build-tests",
-				"_build-tgf"
+				"_build-tgf",
+				"_build-net"
 			],
 			"cacheVariables": {
-				"CMAKE_CROSSCOMPILING_EMULATOR": "wine"
+				"CMAKE_CROSSCOMPILING_EMULATOR": "wine",
+				"TAU_PARSER_DEPS_FROM_STORE": "ON"
 			}
 		},
 		{
@@ -514,10 +523,12 @@
 			"inherits": [
 				"debug-w64",
 				"_build-tests",
-				"_build-tgf"
+				"_build-tgf",
+				"_build-net"
 			],
 			"cacheVariables": {
-				"CMAKE_CROSSCOMPILING_EMULATOR": "wine"
+				"CMAKE_CROSSCOMPILING_EMULATOR": "wine",
+				"TAU_PARSER_DEPS_FROM_STORE": "ON"
 			}
 		},
 		{
@@ -525,10 +536,12 @@
 			"inherits": [
 				"devel-w64",
 				"_build-tests",
-				"_build-tgf"
+				"_build-tgf",
+				"_build-net"
 			],
 			"cacheVariables": {
-				"CMAKE_CROSSCOMPILING_EMULATOR": "wine"
+				"CMAKE_CROSSCOMPILING_EMULATOR": "wine",
+				"TAU_PARSER_DEPS_FROM_STORE": "ON"
 			}
 		},
 		{
@@ -588,7 +601,8 @@
 			"inherits": [
 				"release-arm64",
 				"_build-tests",
-				"_build-tgf"
+				"_build-tgf",
+				"_build-net"
 			]
 		},
 		{
@@ -596,7 +610,8 @@
 			"inherits": [
 				"debug-arm64",
 				"_build-tests",
-				"_build-tgf"
+				"_build-tgf",
+				"_build-net"
 			]
 		},
 		{
@@ -604,7 +619,8 @@
 			"inherits": [
 				"devel-arm64",
 				"_build-tests",
-				"_build-tgf"
+				"_build-tgf",
+				"_build-net"
 			]
 		},
 		{
@@ -646,21 +662,24 @@
 			"displayName": "Release all targets (clang-cl / Ninja / x64)",
 			"inherits": [
 				"release-msvc-clang-cl",
-				"_build-all"
+				"_build-all",
+				"_build-net"
 			]
 		},
 		{
 			"name": "debug-msvc-all-clang-cl",
 			"inherits": [
 				"debug-msvc-clang-cl",
-				"_build-all"
+				"_build-all",
+				"_build-net"
 			]
 		},
 		{
 			"name": "devel-msvc-all-clang-cl",
 			"inherits": [
 				"devel-msvc-clang-cl",
-				"_build-all"
+				"_build-all",
+				"_build-net"
 			]
 		},
 		{
@@ -870,21 +889,24 @@
 			"displayName": "Release all targets (MSVC cl / Ninja / x64)",
 			"inherits": [
 				"release-msvc-cl",
-				"_build-all"
+				"_build-all",
+				"_build-net"
 			]
 		},
 		{
 			"name": "debug-msvc-cl-all",
 			"inherits": [
 				"debug-msvc-cl",
-				"_build-all"
+				"_build-all",
+				"_build-net"
 			]
 		},
 		{
 			"name": "devel-msvc-cl-all",
 			"inherits": [
 				"devel-msvc-cl",
-				"_build-all"
+				"_build-all",
+				"_build-net"
 			]
 		},
 		{
@@ -980,7 +1002,8 @@
 			"inherits": [
 				"release",
 				"_build-tests",
-				"_build-tgf"
+				"_build-tgf",
+				"_build-net"
 			]
 		},
 		{
@@ -989,6 +1012,7 @@
 				"debug",
 				"_build-tests",
 				"_build-tgf",
+				"_build-net",
 				"_build-type-debug"
 			]
 		},
@@ -997,7 +1021,8 @@
 			"inherits": [
 				"devel",
 				"_build-tests",
-				"_build-tgf"
+				"_build-tgf",
+				"_build-net"
 			]
 		},
 		{
@@ -1011,7 +1036,8 @@
 			"name": "release-all",
 			"inherits": [
 				"release",
-				"_build-all"
+				"_build-all",
+				"_build-net"
 			]
 		},
 		{
@@ -1019,14 +1045,16 @@
 			"inherits": [
 				"debug",
 				"_build-all",
-				"_build-type-debug"
+				"_build-type-debug",
+				"_build-net"
 			]
 		},
 		{
 			"name": "devel-all",
 			"inherits": [
 				"devel",
-				"_build-all"
+				"_build-all",
+				"_build-net"
 			]
 		},
 		{
