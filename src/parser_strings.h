@@ -312,6 +312,8 @@ struct messages {
 		"a socket path or ws://<host>[:<port>][/<path>]";
 	static constexpr sv net_path_too_long      =
 		"The socket path is over the system limit";
+	static constexpr sv net_login_refused      =
+		"Login refused";
 	static constexpr sv net_line_too_long      =
 		"The line is over the limit";
 	static constexpr sv net_connection_lost    =

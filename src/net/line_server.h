@@ -73,6 +73,10 @@ struct line_server_options {
 	/// The lines of on_output as JSON: first one {"listening":..} line
 	/// for each address.
 	bool json = false;
+	/// Checks the first line of a connection after the peer check. False
+	/// counts a failed login and closes it. Empty accepts.
+	std::function<bool(tref first_line, const peer_info& peer)>
+		authenticate{};
 	/// Makes the handler of a new session. Must be set.
 	std::function<std::unique_ptr<session_handler>(
 		const line_session& session)> make_handler{};

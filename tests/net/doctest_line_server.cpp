@@ -185,6 +185,35 @@ TEST_SUITE("line server: tcp") {
 		CHECK(c.read_line() == "{\"id\":2,\"cmd\":\"a\",\"status\":\"ok\"}");
 		CHECK(c.read_line() == "{\"id\":3,\"cmd\":\"b\",\"status\":\"ok\"}");
 	}
+	TEST_CASE("authenticate refuses: one error line, then the close") {
+		auto o = tcp_options();
+		o.authenticate = [](tref, const peer_info&) {
+			return false;
+		};
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("{\"cmd\":\"open\",\"token\":\"x\"}");
+		const std::string l = c.read_line();
+		CHECK(has(l, "\"status\":\"error\""));
+		CHECK(has(l, "Login refused"));
+		CHECK(c.at_eof(5000));
+		CHECK(s.closes.load() == 0);
+	}
+	TEST_CASE("authenticate accepts: the handler gets on_open") {
+		auto o = tcp_options();
+		std::atomic<bool> seen{ false };
+		o.authenticate = [&seen](tref first, const peer_info& peer)
+		{
+			seen = peer.kind == line_transport_kind::tcp
+				&& jt::get(first).find("token");
+			return true;
+		};
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("{\"cmd\":\"open\",\"token\":\"x\"}");
+		CHECK(has(c.read_line(), "\"status\":\"ok\""));
+		CHECK(seen.load());
+	}
 	TEST_CASE("a line over max_line: the error, the next line works") {
 		auto o = tcp_options();
 		o.max_line = 32;

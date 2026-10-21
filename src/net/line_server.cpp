@@ -222,7 +222,15 @@ void server_connection::handle_first_line(std::string& l) {
 		close_after_flush();
 		return;
 	}
+	const auto& opt = srv->opt;
 	const tref first = req.value();
+	if (opt.authenticate
+		&& !opt.authenticate(first, session.peer))
+	{
+		refuse(diagnostics::code::invalid_argument,
+			parser_strings::messages::net_login_refused);
+		return;
+	}
 	if (!start_session()) return;
 	in_handler = true;
 	session.handler->on_open(first, sink);
