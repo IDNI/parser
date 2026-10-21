@@ -146,6 +146,16 @@ static tcp::endpoint loopback(uint16_t port) {
 	return { ba::ip::make_address("127.0.0.1"), port };
 }
 
+static bool wait_for(const std::atomic<int>& v, int want) {
+	auto deadline = std::chrono::steady_clock::now()
+		+ std::chrono::seconds(10);
+	while (v.load() != want) {
+		if (std::chrono::steady_clock::now() > deadline) return false;
+		std::this_thread::sleep_for(std::chrono::milliseconds(5));
+	}
+	return true;
+}
+
 static bool has(const std::string& line, std::string_view part) {
 	return line.find(part) != std::string::npos;
 }
@@ -165,6 +175,60 @@ TEST_SUITE("line reader") {
 }
 
 TEST_SUITE("line server: tcp") {
+	TEST_CASE("an echo session: the open answer and two lines") {
+		server_thread s(tcp_options());
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("{\"id\":1,\"cmd\":\"open\"}");
+		CHECK(c.read_line() == "{\"id\":1,\"cmd\":\"open\",\"status\":\"ok\"}");
+		c.send("{\"id\":2,\"cmd\":\"a\"}");
+		c.send("{\"id\":3,\"cmd\":\"b\"}");
+		CHECK(c.read_line() == "{\"id\":2,\"cmd\":\"a\",\"status\":\"ok\"}");
+		CHECK(c.read_line() == "{\"id\":3,\"cmd\":\"b\",\"status\":\"ok\"}");
+	}
+	TEST_CASE("a line over max_line: the error, the next line works") {
+		auto o = tcp_options();
+		o.max_line = 32;
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("{\"cmd\":\"open\"}");
+		CHECK(has(c.read_line(), "\"status\":\"ok\""));
+		c.send("{\"cmd\":\"" + std::string(100, 'x') + "\"}");
+		CHECK(has(c.read_line(), "Line is longer than the limit"));
+		c.send("{\"id\":2}");
+		CHECK(c.read_line() == "{\"id\":2,\"status\":\"ok\"}");
+	}
+	TEST_CASE("a line that is no JSON: the error, the connection stays") {
+		server_thread s(tcp_options());
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("{\"cmd\":\"open\"}");
+		CHECK(has(c.read_line(), "\"status\":\"ok\""));
+		c.send("no json");
+		CHECK(has(c.read_line(), "\"status\":\"error\""));
+		c.send("{\"id\":3}");
+		CHECK(c.read_line() == "{\"id\":3,\"status\":\"ok\"}");
+	}
+	TEST_CASE("on_close runs once when the client closes") {
+		server_thread s(tcp_options());
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("{\"cmd\":\"open\"}");
+		CHECK(has(c.read_line(), "\"status\":\"ok\""));
+		c.close();
+		CHECK(wait_for(s.closes, 1));
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		s.stop();
+		CHECK(s.closes.load() == 1);
+	}
+	TEST_CASE("a stop with one open connection: on_close, the value 0") {
+		server_thread s(tcp_options());
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("{\"cmd\":\"open\"}");
+		CHECK(has(c.read_line(), "\"status\":\"ok\""));
+		s.stop();
+		CHECK(s.closes.load() == 1);
+		REQUIRE(s.value.has_value());
+		CHECK(*s.value == 0);
+		CHECK(c.at_eof(5000));
+	}
 	TEST_CASE("no make_handler is an error") {
 		line_server_options o = tcp_options();
 		std::ostringstream sink;
@@ -206,7 +270,33 @@ TEST_SUITE("line server: tcp") {
 	}
 }
 
+// Asks for the close in on_line and records whether on_close ran inside.
+struct closing_handler : session_handler {
+	explicit closing_handler(std::atomic<int>& r) : result(r) {}
+	std::atomic<int>& result;
+	bool inside = false;
+	void on_line(tref, reply_sink& out) override {
+		inside = true;
+		out.close();
+		inside = false;
+	}
+	void on_close() override { result = inside ? 1 : 2; }
+};
+
 TEST_SUITE("line server: limits") {
+	TEST_CASE("a close asked in on_line runs on_close after on_line") {
+		std::atomic<int> result{ 0 };
+		auto o = tcp_options();
+		o.make_handler = [&result](const line_session&) {
+			return std::make_unique<closing_handler>(result);
+		};
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("{\"cmd\":\"open\"}");
+		c.send("{\"cmd\":\"bye\"}");
+		CHECK(c.at_eof(5000));
+		CHECK(wait_for(result, 2));
+	}
 #ifndef _WIN32
 	TEST_CASE("the run gives the SIGPIPE handler of the program back") {
 		auto mine = +[](int) {};

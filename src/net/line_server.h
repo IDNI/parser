@@ -4,6 +4,7 @@
 #ifndef __IDNI__PARSER__NET__LINE_SERVER_H__
 #define __IDNI__PARSER__NET__LINE_SERVER_H__
 
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <string>
@@ -21,6 +22,8 @@ struct reply_sink {
 	virtual ~reply_sink() = default;
 	/// The sink prints @p reply before it returns, so a tref is enough.
 	virtual void write(tref reply) = 0;
+	/// Ends the connection after the queued lines are written.
+	virtual void close() = 0;
 };
 
 /// The program part of one session. The server runs the JSON gc between
@@ -42,14 +45,31 @@ struct session_handler {
 	virtual void on_close() {}
 };
 
+/// What the server knows about the other end of a connection.
+struct peer_info {
+	line_transport_kind kind = line_transport_kind::local_socket;
+};
+
 /// One connection on the server.
 struct line_session {
+	/// 128 random bits as 32 lowercase hex characters.
+	std::string id;
+	peer_info peer{};
+	/// True after the peer check and authenticate accepted it.
+	bool authenticated = false;
+	std::unique_ptr<session_handler> handler;
 };
 
 /// The settings of the line server. One server listens on all
 /// addresses at once.
 struct line_server_options {
 	std::vector<listen_address> listen{};
+	/// The wait after a failed accept, so a lack of file descriptors does
+	/// not keep the loop busy.
+	size_t accept_retry_ms = 100;
+	/// Largest request line or message. The tail of a longer line is
+	/// dropped.
+	size_t max_line = 16u * 1024 * 1024;
 	/// The lines of on_output as JSON: first one {"listening":..} line
 	/// for each address.
 	bool json = false;
