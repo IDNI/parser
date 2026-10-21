@@ -1187,7 +1187,8 @@ void line_server::on_accept(conn_socket sock, peer_info peer) {
 		return;
 	}
 	if (full(c->session.peer.kind) || pending() >= opt.max_pending) {
-		c->refuse(diagnostics::code::out_of_range, opt.busy_message);
+		if (opt.when_full == full_policy::close_silent) c->close();
+		else c->refuse(diagnostics::code::out_of_range, opt.busy_message);
 		return;
 	}
 #ifndef _WIN32

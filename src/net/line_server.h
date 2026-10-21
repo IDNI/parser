@@ -114,6 +114,15 @@ enum class oversize_policy {
 	reply_and_close,
 };
 
+/// What the server does with a new connection at max_sessions or
+/// max_pending.
+enum class full_policy {
+	/// Answer with busy_message, then close.
+	busy_message,
+	/// Close with no answer.
+	close_silent,
+};
+
 /// The bytes that the server writes after each reply line, for each
 /// transport kind.
 struct reply_line_ends {
@@ -174,6 +183,8 @@ struct line_server_options {
 	/// not keep the loop busy.
 	size_t accept_retry_ms = 100;
 	std::string busy_message = "the server takes no more sessions";
+	/// A websocket upgrade over max_pending gets the HTTP answer 503.
+	full_policy when_full = full_policy::busy_message;
 	login_limits logins{};
 	/// End a session with no traffic. 0 turns the timeout off.
 	size_t idle_timeout_seconds = 30 * 60;

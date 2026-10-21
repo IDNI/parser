@@ -1517,6 +1517,11 @@ TEST_SUITE("line server: reply line end") {
 }
 
 TEST_SUITE("line server: policies") {
+	TEST_CASE("the defaults: keep_open and busy_message") {
+		const line_server_options o;
+		CHECK(o.when_too_long == oversize_policy::keep_open);
+		CHECK(o.when_full == full_policy::busy_message);
+	}
 	TEST_CASE("keep_open: the handler answers a long line, the next works") {
 		std::atomic<int> json_lines{ 0 };
 		auto o = raw_options(tcp_options(), json_lines);
@@ -1561,6 +1566,21 @@ TEST_SUITE("line server: policies") {
 		c.send(std::string(20, 'x'));
 		CHECK(has(c.read_line(), "Line is longer than the limit"));
 		CHECK(c.at_eof(5000));
+	}
+	TEST_CASE("close_silent: the second connection closes with no answer") {
+		std::atomic<int> json_lines{ 0 };
+		auto o = raw_options(tcp_options(), json_lines);
+		o.max_sessions = 1;
+		o.when_full = full_policy::close_silent;
+		server_thread s(o);
+		tcp_client c1(loopback(s.tcp_port()));
+		c1.send("a");
+		CHECK(c1.read_line() == "got:a");
+		tcp_client c2(loopback(s.tcp_port()));
+		CHECK(c2.at_eof(5000));
+		CHECK(c2.in_buf.empty());
+		c1.send("b");
+		CHECK(c1.read_line() == "got:b");
 	}
 }
 
