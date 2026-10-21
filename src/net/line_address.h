@@ -35,6 +35,10 @@ struct listen_address {
 	uint16_t port = 0;
 	/// websocket: the HTTP path of the upgrade request, for example "/".
 	std::string ws_path = "/";
+	/// tcp and websocket: the IPv4 or IPv6 address to bind, with no
+	/// brackets. An address other than the loopback opens the server to
+	/// the network, so the caller chooses it.
+	std::string host = "127.0.0.1";
 };
 
 /// The address of a server, for a client.

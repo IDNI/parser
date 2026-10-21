@@ -766,8 +766,14 @@ void line_server::print_start() {
 			if (a.kind == line_transport_kind::local_socket)
 				m.push_back(jt::build_pair("path",
 					jt::build_string(a.path)));
-			else m.push_back(jt::build_pair("port", jt::build_number(
-				static_cast<double>(a.port))));
+			else {
+				// The default host stays out, so the default line keeps its form.
+				if (a.host != listen_address{}.host)
+					m.push_back(jt::build_pair("host",
+						jt::build_string(a.host)));
+				m.push_back(jt::build_pair("port", jt::build_number(
+					static_cast<double>(a.port))));
+			}
 			if (a.kind == line_transport_kind::websocket)
 				m.push_back(jt::build_pair("path",
 					jt::build_string(a.ws_path)));
@@ -779,8 +785,9 @@ void line_server::print_start() {
 	}
 	const std::string t = line_log::timestamp();
 	for (const auto& a : bound) {
-		const std::string host_port = "127.0.0.1:"
-			+ std::to_string(a.port);
+		const bool v6 = a.host.find(':') != std::string::npos;
+		const std::string host_port = (v6 ? '[' + a.host + ']' : a.host)
+			+ ':' + std::to_string(a.port);
 		if (a.kind == line_transport_kind::local_socket)
 			output(t + " listening on " + a.path);
 		else if (a.kind == line_transport_kind::websocket)
@@ -800,7 +807,13 @@ void line_server::open_session_log(server_connection& c) {
 
 bool line_server::listen_tcp(const listen_address& a) {
 	error_code ec;
-	tcp::endpoint ep(ba::ip::address_v4::loopback(), a.port);
+	tcp::endpoint ep(ba::ip::make_address(a.host, ec), a.port);
+	if (ec) {
+		report.error(diagnostics::code::invalid_argument,
+			parser_strings::messages::bad_address,
+			{ { parser_strings::label::value, a.host } });
+		return false;
+	}
 	auto acc = std::make_unique<tcp::acceptor>(io);
 	acc->open(ep.protocol(), ec);
 	if (ec) {

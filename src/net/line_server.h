@@ -104,7 +104,8 @@ struct login_limits {
 /// The settings of the line server. One server listens on all
 /// addresses at once.
 struct line_server_options {
-	/// Default: one local_socket address.
+	/// Default: one local_socket address. TCP and WebSocket bind the host
+	/// of the address, 127.0.0.1 by default.
 	std::vector<listen_address> listen{};
 	/// local_socket: refuse a peer of another user than the server. On
 	/// Windows the pipe access list allows only the user.

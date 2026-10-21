@@ -1407,6 +1407,59 @@ TEST_SUITE("line server: raw lines") {
 	}
 }
 
+TEST_SUITE("line server: listen host") {
+	TEST_CASE("the default host: 127.0.0.1, no host in the listening line") {
+		CHECK(listen_address{}.host == "127.0.0.1");
+		server_thread s(tcp_options());
+		const uint16_t port = s.tcp_port();
+		const auto lines = s.wait_listening(1);
+		REQUIRE_FALSE(lines.empty());
+		CHECK(lines[0] == "{\"listening\":{\"kind\":\"tcp\",\"port\":"
+			+ std::to_string(port) + "}}");
+		tcp_client c(loopback(port));
+		c.send("{\"id\":1}");
+		CHECK(c.read_line() == "{\"id\":1,\"status\":\"ok\"}");
+	}
+	TEST_CASE("an IPv6 host: the server binds it and names it") {
+		auto o = tcp_options();
+		o.listen[0].host = "::1";
+		server_thread s(o);
+		const auto lines = s.wait_listening(1);
+		if (s.done) {
+			MESSAGE("no IPv6 loopback: " << s.report_text);
+			return;
+		}
+		REQUIRE_FALSE(lines.empty());
+		CHECK(has(lines[0], "\"host\":\"::1\""));
+		tcp_client c({ ba::ip::make_address("::1"), s.tcp_port() });
+		c.send("{\"id\":1}");
+		CHECK(c.read_line() == "{\"id\":1,\"status\":\"ok\"}");
+	}
+	TEST_CASE("an IPv6 host as text has brackets") {
+		auto o = tcp_options();
+		o.json = false;
+		o.listen[0].host = "::1";
+		server_thread s(o);
+		const auto lines = s.wait_listening(1);
+		if (s.done) return;
+		REQUIRE_FALSE(lines.empty());
+		CHECK(has(lines[0], " listening on [::1]:"));
+	}
+	TEST_CASE("a host that is no IP address is an error that names it") {
+		auto o = tcp_options();
+		o.listen[0].host = "no.such.host";
+		o.make_handler = [](const line_session&) {
+			return std::unique_ptr<session_handler>{};
+		};
+		auto r = line_server_run(o);
+		REQUIRE_FALSE(r.has_value());
+		std::ostringstream os;
+		r.report().print(os, term::colors(false));
+		CHECK(has(os.str(), "Invalid listen address"));
+		CHECK(has(os.str(), "no.such.host"));
+	}
+}
+
 TEST_SUITE("line server: start and stop") {
 	TEST_CASE("the JSON listening line names the bound port, a stop gives 0") {
 		server_thread s(tcp_options());
