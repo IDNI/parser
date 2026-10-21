@@ -647,4 +647,43 @@ TEST_SUITE("tgf cli: the REPL on the evaluator base") {
 	}
 }
 
+TEST_SUITE("tgf cli: the REPL words parse_file and igrammar") {
+
+	static string tiny_path() {
+		return string(PROJECT_SOURCE_DIR) + "/tests/fixtures/tiny.tgf";
+	}
+
+	TEST_CASE("igrammar prints what internal-grammar prints") {
+		options_repository mine;
+		options_scope scope(mine);
+		auto old_word = capture_tgf_run({ "tgf", tiny_path(), "repl",
+			"-c", "false", "-e", "internal-grammar" });
+		auto new_word = capture_tgf_run({ "tgf", tiny_path(), "repl",
+			"-c", "false", "-e", "igrammar" });
+		REQUIRE(old_word.out.find("start") != string::npos);
+		CHECK(new_word.code == 0);
+		CHECK(new_word.out == old_word.out);
+	}
+
+	TEST_CASE("parse_file parses what parse file parses") {
+		options_repository mine;
+		options_scope scope(mine);
+		const auto path = std::filesystem::temp_directory_path()
+			/ "tgf_cli_parse_file_input.txt";
+		{
+			std::ofstream f(path, std::ios::binary);
+			f << "123";
+		}
+		const string quoted = "\"" + path.generic_string() + "\"";
+		auto old_word = capture_tgf_run({ "tgf", tiny_path(), "repl",
+			"-c", "false", "-e", "parse file " + quoted });
+		auto new_word = capture_tgf_run({ "tgf", tiny_path(), "repl",
+			"-c", "false", "-e", "parse_file " + quoted });
+		std::filesystem::remove(path);
+		REQUIRE(old_word.out.find("parsed graph:") != string::npos);
+		CHECK(new_word.code == 0);
+		CHECK(new_word.out == old_word.out);
+	}
+}
+
 #endif // TAU_TEST_HAS_TGF_CLI && PROJECT_SOURCE_DIR

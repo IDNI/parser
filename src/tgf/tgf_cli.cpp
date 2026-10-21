@@ -811,7 +811,8 @@ static std::string help_text(const tgf_repl_evaluator& re, size_t nt,
 		<< "\n"
 		<< "grammar commands:\n"
 		<< "  grammar or g                 show TGF grammar\n"
-		<< "  internal-grammar or ig or i  show TGF grammar\n"
+		<< "  internal-grammar, igrammar, ig or i\n"
+		<< "                               show TGF grammar\n"
 		<< "  start or s                   show or change start symbol\n"
 		<< "  unreachable or u             show unreachable productions\n"
 		<< "\n"
@@ -821,7 +822,8 @@ static std::string help_text(const tgf_repl_evaluator& re, size_t nt,
 			: "")
 		<< "parsing commands:\n"
 		<< "  parse or p                   parse input\n"
-		<< "  parse file or pf or f        parse input file\n"
+		<< "  parse file, parse_file, pf or f\n"
+		<< "                               parse input file\n"
 		<< "\n";
 		break;
 	case p::version_sym: os
@@ -902,6 +904,7 @@ static std::string help_text(const tgf_repl_evaluator& re, size_t nt,
 		break;
 	case p::igrammar_sym: os
 		<< "command: internal-grammar [<start symbol>]\n"
+		<< "or: igrammar\n"
 		<< "short: ig or i\n"
 		<< "\tprints the internal grammar\n"
 		<< "\tif start symbol provided prints the internal sub-grammar\n";
@@ -919,6 +922,7 @@ static std::string help_text(const tgf_repl_evaluator& re, size_t nt,
 		break;
 	case p::parse_file_sym: os
 		<< "command: parse file \"<input file>\"\n"
+		<< "or: parse_file\n"
 		<< "short: pf or f\n"
 		<< "\tparse the given input file\n";
 		break;

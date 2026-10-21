@@ -280,12 +280,13 @@ l "csv.tgf"
 
 ### internal-grammar
 
-`internal-grammar` or `ig` or `i` prints internal grammar loaded into the parser. It prints all reachable productions from a starting symbol set by grammar, settings or it is `start` by default. If a symbol is provided, this command prints reachable productions from the provided symbol.
+`internal-grammar` or `igrammar` or `ig` or `i` prints internal grammar loaded into the parser. It prints all reachable productions from a starting symbol set by grammar, settings or it is `start` by default. If a symbol is provided, this command prints reachable productions from the provided symbol.
 
 Usage:
 ```
 # print internal grammar (reachable rules from starting symbol)
 internal-grammar
+igrammar
 ig
 i
 
@@ -332,12 +333,13 @@ p "4*5\n3-2"       # runs parser with input string: 4*5\n3-2
 
 ### parse file
 
-`parse file "filepath"` or `pf "filepath"` or `f "filepath"` runs parser with the content of the file as an input.
+`parse file "filepath"` or `parse_file "filepath"` or `pf "filepath"` or `f "filepath"` runs parser with the content of the file as an input.
 
 Usage:
 ```
 # runs parser with file input.txt content as an input
 parse file "input.txt"
+parse_file "input.txt"
 pf "input.txt"
 f "input.txt"
 ```

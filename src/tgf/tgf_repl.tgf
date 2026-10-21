@@ -23,9 +23,11 @@ statement              => grammar_cmd | igrammar_cmd | unreachable_cmd
                         | parse_cmd.
 
 parse_cmd      => ("p" | "parse")                :parse_sym __ parse_input.
-parse_file_cmd => ("f" | "pf" | "parse file")    :parse_file_sym __ filename.
+parse_file_cmd => ("f" | "pf" | "parse file" | "parse_file")
+                                                 :parse_file_sym __ filename.
 grammar_cmd    => ("g" | "grammar")              :grammar_sym. # [ __ symbol ].
-igrammar_cmd   => ("i" | "ig" | "internal-grammar"):igrammar_sym [ __ symbol ].
+igrammar_cmd   => ("i" | "ig" | "internal-grammar" | "igrammar")
+                                                 :igrammar_sym [ __ symbol ].
 start_cmd      => ("s" | "start")                :start_sym [ __ symbol ].
 unreachable_cmd=> ("u" | "unreachable")          :unreachable_sym [ __ symbol ].
 reload_cmd     => ("r" | "reload")               :reload_sym.
