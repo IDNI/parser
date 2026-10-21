@@ -119,6 +119,17 @@ result<bool> write(const path& p, std::string_view content);
  */
 result<bool> replace(const path& p, std::string_view content);
 
+/**
+ * @brief Creates every missing folder of a path.
+ * A folder that this call creates gets mode 0700 on POSIX. A folder
+ * that exists keeps its mode.
+ * @param p the folder path.
+ * @return on success, true. On failure, an error with code::io_error,
+ * the failing path in label::path and the system error number in
+ * label::error_number.
+ */
+result<bool> create_private_dirs(const path& p);
+
 class file_ostream;
 
 /**

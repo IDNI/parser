@@ -745,6 +745,37 @@ inline result<bool> unmap(mapping& r_map) {
 }
 #endif
 
+inline result<bool> create_private_dirs(const path& p) {
+	result<bool> r;
+	std::error_code ec;
+	const std::filesystem::path root(p);
+	std::vector<std::filesystem::path> made;
+	for (auto d = root; !d.empty() && !std::filesystem::exists(d, ec)
+			&& !ec; d = d.parent_path())
+		made.push_back(d);
+	std::filesystem::create_directories(root, ec);
+	if (ec) {
+		detail::private_path_error(r.report(),
+			"failed to create the folder", p, ec.value());
+		return r;
+	}
+#ifndef _WIN32
+	for (const auto& d : made) {
+		std::filesystem::permissions(d, std::filesystem::perms::owner_all,
+			std::filesystem::perm_options::replace, ec);
+		if (ec) {
+			detail::private_path_error(r.report(),
+				"failed to set the folder mode", d.native(), ec.value());
+			return r;
+		}
+	}
+#else
+	// Windows keeps the ACL that a new folder inherits, no mode is set.
+	(void)made;
+#endif
+	return r.with_value(true);
+}
+
 inline file_outbuf::file_outbuf(file_handle f) : f_(f) {
 	setp(buf_.data(), buf_.data() + buf_.size());
 }

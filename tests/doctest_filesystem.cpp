@@ -232,6 +232,43 @@ TEST_CASE("the error of a missing folder is an io_error") {
 
 }
 
+TEST_SUITE("fs::create_private_dirs") {
+#ifndef _WIN32
+TEST_CASE("each new part of the path gets mode 0700") {
+	temp_folder t("doctest_filesystem_private_dirs.tmp");
+	const fs::path outer = t.file("a");
+	const fs::path inner = t.file("a/b");
+	auto r = fs::create_private_dirs(inner);
+	REQUIRE(r.has_value());
+	CHECK(mode_of(outer) == 0700);
+	CHECK(mode_of(inner) == 0700);
+}
+
+TEST_CASE("an existing folder keeps its mode") {
+	temp_folder t("doctest_filesystem_kept_dir.tmp");
+	const fs::path outer = t.file("a");
+	REQUIRE(fs::create_private_dirs(outer).has_value());
+	REQUIRE(::chmod(outer.c_str(), 0755) == 0);
+	const fs::path inner = t.file("a/b");
+	REQUIRE(fs::create_private_dirs(inner).has_value());
+	CHECK(mode_of(outer) == 0755);
+	CHECK(mode_of(inner) == 0700);
+}
+#endif
+
+TEST_CASE("a file in the way is an error that names the path") {
+	temp_folder t("doctest_filesystem_dir_blocked.tmp");
+	REQUIRE(fs::write(t.file("plain"), "x").has_value());
+	const fs::path p = t.file("plain/sub");
+	auto r = fs::create_private_dirs(p);
+	CHECK_FALSE(r.has_value());
+	CHECK(has_io_error(r.report()));
+	std::ostringstream os;
+	r.report().print(os);
+	CHECK(os.str().find("plain") != std::string::npos);
+}
+}
+
 TEST_SUITE("fs::open_private_append") {
 #ifndef _WIN32
 TEST_CASE("a new file gets mode 0600") {
