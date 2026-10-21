@@ -4,6 +4,7 @@
 #ifndef __IDNI__PARSER__NET__LINE_SERVER_H__
 #define __IDNI__PARSER__NET__LINE_SERVER_H__
 
+#include <chrono>
 #include <cstddef>
 #include <functional>
 #include <memory>
@@ -57,6 +58,8 @@ struct line_session {
 	peer_info peer{};
 	/// True after the peer check and authenticate accepted it.
 	bool authenticated = false;
+	/// Time of the last line in or out, for the idle timeout.
+	std::chrono::steady_clock::time_point last_traffic{};
 	std::unique_ptr<session_handler> handler;
 };
 
@@ -70,6 +73,8 @@ struct line_server_options {
 	/// not keep the loop busy.
 	size_t accept_retry_ms = 100;
 	std::string busy_message = "the server takes no more sessions";
+	/// End a session with no traffic. 0 turns the timeout off.
+	size_t idle_timeout_seconds = 30 * 60;
 	/// Largest request line or message. The tail of a longer line is
 	/// dropped.
 	size_t max_line = 16u * 1024 * 1024;

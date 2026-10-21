@@ -60,6 +60,9 @@ using jt = format::json::tree;
 
 using conn_socket = std::variant<tcp::socket>;
 
+// The idle timer ticks at this interval.
+inline constexpr int tick_ms = 200;
+
 std::string_view kind_name(line_transport_kind k) {
 	switch (k) {
 	case line_transport_kind::local_socket: return "local_socket";
@@ -148,6 +151,8 @@ struct line_server {
 	void on_accept(conn_socket sock, peer_info peer);
 	void retry_accept(std::function<void()> accept);
 	bool full(line_transport_kind k) const;
+	void start_idle_timer();
+	void check_idle();
 
 	void output(const std::string& line) const;
 	void print_start();
@@ -158,10 +163,13 @@ struct line_server {
 	std::vector<listen_address> bound;
 	// tcp and websocket
 	std::vector<tcp_listener> tcp_listeners;
+	ba::steady_timer idle_timer;
 	ba::signal_set signals;
 	std::map<std::string, std::shared_ptr<server_connection>> connections;
 	diagnostics::report report;
 	bool stopping = false;
+	// True while a tick is scheduled, so a new connection only arms it once.
+	bool idle_tick_running = false;
 };
 
 std::mutex running_mutex;
@@ -172,6 +180,7 @@ server_connection::server_connection(line_server* s, conn_socket sock,
 	: srv(s), socket(std::move(sock)), write_timer(s->io)
 {
 	session.peer = std::move(peer);
+	session.last_traffic = std::chrono::steady_clock::now();
 }
 
 void server_connection::start() {
@@ -204,6 +213,7 @@ void server_connection::handle_line(std::string& l) {
 	if (closed || close_when_drained) return;
 	if (!l.empty() && l.back() == '\r') l.pop_back();
 	if (l.empty()) return;
+	session.last_traffic = std::chrono::steady_clock::now();
 	if (!session.authenticated) { handle_first_line(l); return; }
 	auto req = parse_line(l);
 	if (!req.has_value()) {
@@ -285,6 +295,7 @@ void server_connection::send_line(tref v) {
 }
 
 void server_connection::send_text(std::string text) {
+	session.last_traffic = std::chrono::steady_clock::now();
 	text += '\n';
 	send(std::move(text));
 }
@@ -360,7 +371,7 @@ void connection_sink::write(tref reply) { c.send_line(reply); }
 void connection_sink::close() { c.close_after_flush(); }
 
 line_server::line_server(const line_server_options& o)
-	: opt(o), io(), signals(io)
+	: opt(o), io(), idle_timer(io), signals(io)
 {
 	if (opt.max_sessions == 0) opt.max_sessions = 1;
 }
@@ -499,6 +510,7 @@ void line_server::on_accept(conn_socket sock, peer_info peer) {
 	}
 	c->session.id = std::move(*sid);
 	connections[c->session.id] = c;
+	start_idle_timer();
 	c->start();
 }
 
@@ -541,6 +553,32 @@ void line_server::close_all() {
 	for (auto& c : live) c->close();
 	error_code ec;
 	for (auto& l : tcp_listeners) l.acceptor->close(ec);
+}
+
+void line_server::start_idle_timer() {
+	if (idle_tick_running) return;
+	idle_tick_running = true;
+	idle_timer.expires_after(std::chrono::milliseconds(tick_ms));
+	idle_timer.async_wait([this](error_code ec) {
+		idle_tick_running = false;
+		if (ec) return;
+		check_idle();
+		// No connection means no tick; the next connection arms it again.
+		if (!connections.empty()) start_idle_timer();
+	});
+}
+
+void line_server::check_idle() {
+	auto now = std::chrono::steady_clock::now();
+	std::vector<std::shared_ptr<server_connection>> idle;
+	for (auto& kv : connections) {
+		const auto& se = kv.second->session;
+		const auto quiet = now - se.last_traffic;
+		if (se.authenticated && opt.idle_timeout_seconds != 0
+				&& quiet >= std::chrono::seconds(opt.idle_timeout_seconds))
+			idle.push_back(kv.second);
+	}
+	for (auto& c : idle) c->close();
 }
 
 diagnostics::result<int> run_server(const line_server_options& opt) {

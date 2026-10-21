@@ -420,3 +420,25 @@ TEST_SUITE("line server: write timeout") {
 		CHECK(wait_for(closes, 1));
 	}
 }
+
+TEST_SUITE("line server: idle timeout") {
+	TEST_CASE("a quiet tcp session ends after idle_timeout_seconds") {
+		auto o = tcp_options();
+		o.idle_timeout_seconds = 1;
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("{\"cmd\":\"open\"}");
+		CHECK(has(c.read_line(), "\"status\":\"ok\""));
+		CHECK(c.at_eof(5000));
+		CHECK(wait_for(s.closes, 1));
+	}
+	TEST_CASE("idle_timeout_seconds 0 keeps a quiet session") {
+		auto o = tcp_options();
+		o.idle_timeout_seconds = 0;
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("{\"cmd\":\"open\"}");
+		CHECK(has(c.read_line(), "\"status\":\"ok\""));
+		CHECK_FALSE(c.at_eof(1500));
+	}
+}
