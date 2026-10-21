@@ -6,6 +6,7 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "tgf_test_parser.generated.h"
 #include "grammar_inspector.h"
@@ -33,11 +34,24 @@ struct tgf_test {
 		size_t failed = 0;
 	};
 
+	/// One test item: its matcher, its input, the outcome and the text
+	/// the runner prints for it ("OK", "OK (negated)" or "FAIL (...)").
+	struct case_result {
+		std::string matcher;
+		std::string input;
+		bool passed = false;
+		std::string message;
+	};
+
+	/// Run the tests of @p s. With @p cases the runner prints nothing on
+	/// stdout and appends one entry per test item instead.
 	template <typename Parser>
-	static result run_from_string(Parser& p, const std::basic_string<C>& s);
+	static result run_from_string(Parser& p, const std::basic_string<C>& s,
+		std::vector<case_result>* cases = nullptr);
 
 	template <typename Parser>
-	static result run_from_file(Parser& p, const std::string& filename);
+	static result run_from_file(Parser& p, const std::string& filename,
+		std::vector<case_result>* cases = nullptr);
 
 private:
 	// Shared per-run state: grammar_inspector and compiled matcher
@@ -46,6 +60,7 @@ private:
 		grammar_inspector<C, T> gi;
 		std::map<std::string, treemr::compiled_pattern> compiled;
 		size_t passed = 0, failed = 0;
+		std::vector<case_result>* cases = nullptr;
 		explicit run_ctx(grammar<C, T>& g) : gi(g) {}
 	};
 

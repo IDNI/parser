@@ -3,7 +3,8 @@
 `tgf <grammar> repl --json` turns the TGF REPL into a request and
 response API on stdin and stdout. One JSON object goes on each line.
 `tgf <grammar> parse --json`, `grammar --json` and `gen --json` run one
-command and print one response.
+command and print one response. `tgf test --json` writes JSON lines of its
+own.
 
 Each message ends with one `\n`, on every platform. A request line may
 end with `\r\n`, and CR counts as whitespace wherever the JSON reader
@@ -315,6 +316,17 @@ A null node is skipped. The schema is
 - `gen --json` data is `{"files":["..."]}`, the paths it wrote.
 
 The exit code is `1` when the status is `error`, else `0`.
+
+## Test
+
+- `test --json <file>...` writes one line per test item,
+  `{"test_case":{"file":..,"matcher":..,"input":..,"passed":true,
+  "message":"OK"}}`, and one summary line at the end,
+  `{"test_summary":{"files":1,"passed":12,"failed":0,"ok":true}}`.
+  `message` is the text that the runner prints without `--json`: `OK`,
+  `OK (negated)` or the `FAIL` reason. `ok` is false when a test fails
+  or when a test file cannot be read or parsed. Errors of the tool report
+  go under `report` in the summary. The exit code does not change.
 
 ## No grammar
 

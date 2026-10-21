@@ -24,7 +24,8 @@ namespace idni {
 template <typename C, typename T>
 template <typename Parser>
 typename tgf_test<C, T>::result
-tgf_test<C, T>::run_from_string(Parser& p, const std::basic_string<C>& s)
+tgf_test<C, T>::run_from_string(Parser& p, const std::basic_string<C>& s,
+	std::vector<case_result>* cases)
 {
 	auto& tp = tgf_test_parser::instance();
 	auto r = tp.parse(s.c_str(), s.size());
@@ -37,6 +38,7 @@ tgf_test<C, T>::run_from_string(Parser& p, const std::basic_string<C>& s)
 	tref root = r.get_shaped_tree2();
 
 	run_ctx ctx(p.get_grammar());
+	ctx.cases = cases;
 	int ret = 0;
 	auto entries = trv(root) || tgf_test_nt::entry;
 	for (const auto& entry : entries()) {
@@ -45,7 +47,7 @@ tgf_test<C, T>::run_from_string(Parser& p, const std::basic_string<C>& s)
 			/*inherited_raw*/ false, /*inherited_negate*/ false))
 			ret = 1;
 	}
-	std::cout << ctx.passed << " passed, " << ctx.failed
+	if (!cases) std::cout << ctx.passed << " passed, " << ctx.failed
 		<< " failed\n";
 	return { ret, ctx.passed, ctx.failed };
 }
@@ -53,8 +55,10 @@ tgf_test<C, T>::run_from_string(Parser& p, const std::basic_string<C>& s)
 template <typename C, typename T>
 template <typename Parser>
 typename tgf_test<C, T>::result
-tgf_test<C, T>::run_from_file(Parser& p, const std::string& filename) {
-	std::cout << "opening file: " << filename << std::endl;
+tgf_test<C, T>::run_from_file(Parser& p, const std::string& filename,
+	std::vector<case_result>* cases)
+{
+	if (!cases) std::cout << "opening file: " << filename << std::endl;
 	std::ifstream ifs(filename);
 	if (!ifs) {
 		std::cerr << "cannot open file: " << filename << std::endl;
@@ -62,7 +66,7 @@ tgf_test<C, T>::run_from_file(Parser& p, const std::string& filename) {
 	}
 	return run_from_string(p, std::string(
 		std::istreambuf_iterator<C>(ifs),
-		std::istreambuf_iterator<C>()));
+		std::istreambuf_iterator<C>()), cases);
 }
 
 template <typename C, typename T>
@@ -151,18 +155,19 @@ int tgf_test<C, T>::run_item(Parser& p, run_ctx& ctx, const trv& item,
 		? entry_text + " > " + matcher_text(per_item)
 		: entry_text;
 
-	std::cout << "\t\"" << input << "\"\t\t";
+	if (!ctx.cases) std::cout << "\t\"" << input << "\"\t\t";
+	auto finish = [&](bool passed, const std::string& message) {
+		if (ctx.cases) ctx.cases->push_back(
+			{ full_text, input, passed, message });
+		else std::cout << message << "\n";
+		if (passed) ++ctx.passed;
+		else ++ctx.failed;
+		return passed ? 0 : 1;
+	};
 
-	if (winfo.conflict) {
-		std::cout << "test item: conflicting words\n";
-		++ctx.failed;
-		return 1;
-	}
-	if (!err.empty()) {
-		std::cout << "FAIL (bad escape in input: " << err << ")\n";
-		++ctx.failed;
-		return 1;
-	}
+	if (winfo.conflict) return finish(false, "test item: conflicting words");
+	if (!err.empty())
+		return finish(false, "FAIL (bad escape in input: " + err + ")");
 
 	using parse_options = typename Parser::parse_options;
 	parse_options ppo{ .start = start_nt };
@@ -188,7 +193,8 @@ int tgf_test<C, T>::run_item(Parser& p, run_ctx& ctx, const trv& item,
 				auto cr = treemr::compile(full_text);
 				if (!cr.has_value()) {
 					std::ostringstream oss;
-					cr.report().print(oss);
+					// The text goes into a message, also a JSON one.
+					cr.report().print(oss, term::colors(false));
 					fail_reason = "FAIL (matcher compile "
 						"error for \"" + full_text +
 						"\": " + oss.str() + ")";
@@ -210,31 +216,15 @@ int tgf_test<C, T>::run_item(Parser& p, run_ctx& ctx, const trv& item,
 
 	// A compile error or missing tree fails outright: `~` inverts a
 	// parse/shape mismatch only, never a setup failure.
-	if (hard_error) {
-		std::cout << fail_reason << "\n";
-		++ctx.failed;
-		return 1;
-	}
+	if (hard_error) return finish(false, fail_reason);
 
 	if (negate) {
-		if (positive) {
-			std::cout << "FAIL (negated, but parsed and "
-				"matched)\n";
-			++ctx.failed;
-			return 1;
-		}
-		std::cout << "OK (negated)\n";
-		++ctx.passed;
-		return 0;
+		if (positive) return finish(false,
+			"FAIL (negated, but parsed and matched)");
+		return finish(true, "OK (negated)");
 	}
-	if (positive) {
-		std::cout << "OK\n";
-		++ctx.passed;
-		return 0;
-	}
-	std::cout << fail_reason << "\n";
-	++ctx.failed;
-	return 1;
+	if (positive) return finish(true, "OK");
+	return finish(false, fail_reason);
 }
 
 // `words => word (__ word)*`
@@ -354,7 +344,7 @@ std::string tgf_test<C, T>::decode_escape(const std::string& raw,
 		idni::escapes::tgf_string);
 	if (!dec.has_value()) {
 		std::ostringstream oss;
-		dec.report().print(oss);
+		dec.report().print(oss, term::colors(false));
 		err = oss.str();
 		return {};
 	}

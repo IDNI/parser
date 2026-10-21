@@ -270,6 +270,7 @@ inline const std::vector<std::pair<std::string_view, option_surface>>
 	{ "json", { "parse", 'J' } },
 	{ "json", { "gen", 'J' } },
 	{ "json", { "repl", 'J' } },
+	{ "json", { "test", 'J' } },
 };
 
 /// The program data of the command line of the tool.

@@ -1211,21 +1211,53 @@ tgf_repl_evaluator::~tgf_repl_evaluator() {
 			idni::options().unbind(o.name);
 }
 
-static int run_tests(
-	tgf_repl_evaluator::parser_type& p,
-	const vector<string>& files)
+// With @p json, one JSON line per test item and one summary line, which
+// carries the errors of the evaluator report.
+static int run_tests(tgf_repl_evaluator& re, const vector<string>& files,
+	bool json)
 {
+	auto& p = re.p();
+	bintree<format::json::node>::gc_pause pause;
 	using char_t = tgf_repl_evaluator::char_type;
 	using term_t = tgf_repl_evaluator::terminal_type;
-	tgf_test<char_t, term_t> t;
+	using test_t = tgf_test<char_t, term_t>;
+	test_t t;
 	int ret = 0;
 	size_t total_passed = 0, total_failed = 0;
 	for (const auto& file : files) {
-		cout << "running test: " << file << endl;
-		auto r = t.run_from_file(p, file);
+		vector<test_t::case_result> cases;
+		if (!json) cout << "running test: " << file << endl;
+		auto r = t.run_from_file(p, file, json ? &cases : nullptr);
 		if (r.ret) ret = r.ret;
 		total_passed += r.passed;
 		total_failed += r.failed;
+		for (const auto& c : cases) {
+			tref tc = jt::build_object({
+				jt::build_pair("file", jt::build_string(file)),
+				jt::build_pair("matcher",
+					jt::build_string(c.matcher)),
+				jt::build_pair("input", jt::build_string(c.input)),
+				jt::build_pair("passed", jt::build_bool(c.passed)),
+				jt::build_pair("message",
+					jt::build_string(c.message)) });
+			format::json::write_line(jt::build_object({
+				jt::build_pair("test_case", tc) }), cout);
+		}
+	}
+	if (json) {
+		auto n = [](size_t x) {
+			return jt::build_number(static_cast<double>(x)); };
+		trefs s{ jt::build_pair("files", n(files.size())),
+			jt::build_pair("passed", n(total_passed)),
+			jt::build_pair("failed", n(total_failed)),
+			jt::build_pair("ok", jt::build_bool(ret == 0)) };
+		if (auto rep = re.take_report(); rep.has_error())
+			s.push_back(jt::build_pair("report",
+				jt::build_report(rep, true)));
+		format::json::write_line(jt::build_object({
+			jt::build_pair("test_summary", jt::build_object(s)) }),
+			cout);
+		return ret;
 	}
 	if (files.size() > 1)
 		cout << "total: " << total_passed << " passed, "
@@ -1515,7 +1547,7 @@ static int run_command(const parsed_args& args, tgf_tool& tool,
 	if (is(tgf_command::test)) {
 		if (args.inputs.empty()) return command_line_error(
 			"test command needs at least one file as an argument");
-		int ret = run_tests(re.p(), args.inputs);
+		int ret = run_tests(re, args.inputs, opts.get<bool>("json"));
 		re.flush_report();
 		return ret;
 	}
