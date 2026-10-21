@@ -4,7 +4,12 @@
 #ifndef __IDNI__PARSER__TGF__TGF_REPL_EVALUATOR_BASE_H__
 #define __IDNI__PARSER__TGF__TGF_REPL_EVALUATOR_BASE_H__
 
+#include <string>
+
+#include "utility/repl_evaluator_base.h"
 #include "utility/repl_json.h"
+#include "format/json/json.h"
+#include "tgf_repl_parser.generated.h"
 
 namespace idni {
 
@@ -53,6 +58,33 @@ struct tgf_protocol : repl_json_keys {
 	static constexpr const char* new_session = "new";
 	static constexpr const char* attach = "attach";
 	static constexpr const char* end_session = "end-session";
+};
+
+/// The options of a REPL evaluator, local or remote.
+struct tgf_repl_options : repl_base_options {
+	bool print_input        = false;
+	bool print_terminals    = true;
+	bool print_graphs       = true;
+	bool print_ambiguity    = true;
+	bool tml_rules          = false;
+	bool tml_facts          = false;
+	/// True when the evaluator refuses commands that read a file path.
+	bool no_server_paths    = false;
+};
+
+/// The part of a tgf REPL evaluator that does not depend on where a
+/// statement runs: the REPL language, the prompt and the text of an answer.
+/// repl<> and repl_ftxui<> run a derived class.
+struct tgf_repl_evaluator_base : repl_evaluator_base<tgf_repl_parser,
+	tgf_repl_parser::statement, tgf_repl_options>
+{
+	explicit tgf_repl_evaluator_base(options o);
+
+protected:
+	/// The {"grammar","start","char_classes"} state of the session.
+	virtual tref state() const = 0;
+	/// The status of state() and "tgf>".
+	std::string prompt_text() const override;
 };
 
 } // namespace idni

@@ -16,12 +16,7 @@
 #include "utility/diagnostics.h"
 #include "utility/options.h"
 #include "utility/repl_json.h"
-#include "utility/repl.h"
-#include "utility/repl_result.h"
 #include "utility/term_colors.h"
-#ifdef TAU_PARSER_HAS_FTXUI
-#include "../utility/repl_ftxui.h"
-#endif
 #include "format/json/json.h"
 #include "tgf_repl_parser.generated.h"
 #include "tgf_repl_evaluator_base.h"
@@ -51,37 +46,15 @@ inline const option_set tgf_repl_option_set = { .options = {
 	{ "json", "cli", false, "print and read JSON", {} },
 } };
 
-struct tgf_repl_evaluator {
-	friend struct repl<tgf_repl_evaluator>;
-#ifdef TAU_PARSER_HAS_FTXUI
-	friend struct repl_ftxui<tgf_repl_evaluator>;
-#endif
-
+/// The evaluator of repl<> and repl_ftxui<> that runs each statement on a
+/// grammar it loads itself.
+struct tgf_repl_evaluator : tgf_repl_evaluator_base {
 	using parser_type = tgf_repl_parser::parser_type;
 	using char_type = parser_type::char_type;
 	using terminal_type = parser_type::terminal_type;
 	using nonterminals_type = nonterminals<char_type, terminal_type>;
 	using grammar_type = parser_type::grammar_type;
 	using tree = tgf_repl_parser::tree;
-	using trv  = tree::traverser;
-
-	struct options {
-		options() = default;
-
-		bool status             = true;
-		bool continue_on_eof    = true;
-		bool colors             = true;
-		bool print_input        = false;
-		bool print_terminals    = true;
-		bool print_graphs       = true;
-		bool print_ambiguity    = true;
-		bool tml_rules          = false;
-		bool tml_facts          = false;
-		/// Print and read JSON: no colors, no output on cout or cerr.
-		bool json               = false;
-		/// True when the evaluator refuses commands that read a file path.
-		bool no_server_paths    = false;
-	};
 
 	explicit tgf_repl_evaluator(std::string tgf_file);
 	tgf_repl_evaluator(std::string tgf_file, options opt);
@@ -136,10 +109,6 @@ struct tgf_repl_evaluator {
 	/// colors, no file paths, and the given session id.
 	void begin_server_session(const std::string& id);
 
-	/// Move the pending report out and clear it. The JSON front end uses
-	/// it for the hello line, which carries the grammar-load report.
-	diagnostics::report take_report();
-
 	/// True when the option @p name exists and a REPL and a session see
 	/// it: its owner is one of tgf_session_owners.
 	[[nodiscard]] bool session_option(std::string_view name) const;
@@ -159,22 +128,14 @@ struct tgf_repl_evaluator {
 	/// Data of the reload command for a grammar loaded from source text.
 	tref reload_source_data();
 
-	void flush_report();
-	void set_repl(repl<tgf_repl_evaluator>& r_);
-	void reprompt();
-
 	/// Run one statement and return its data. Writes nothing to cout or
 	/// cerr; errors and warnings go into the returned report.
 	cmd_result run(const trv& n);
-	/// Run one request text. @p each runs after each statement, so the
-	/// text REPL prints and flushes in the current order.
-	eval_result run(const std::string& src,
-		const std::function<void(cmd_result&)>& each = {});
+	/// Run one request text and return the data of each statement.
+	eval_result run(const std::string& src);
 
 	/// Render @p r as text. Success output is byte-identical to REPL text.
 	void render_text(const cmd_result& r, std::ostream& os) const;
-
-	idni::diagnostics::result<int> eval(const std::string& src);
 
 	/// Every session option and its value as one object, in the order
 	/// of the declaration.
@@ -228,9 +189,6 @@ struct tgf_repl_evaluator {
 	/// repository. An error goes to report.
 	void write_argv_values();
 
-	std::ostream& pretty_print(std::ostream& os, tref n,
-		std::set<size_t> skip, bool nulls, size_t l);
-
 	std::string nt_name(size_t id) const;
 
 	/// One string for the production at index @p p, with no colors and
@@ -246,7 +204,6 @@ struct tgf_repl_evaluator {
 		const std::string& symbol, const std::set<size_t>& ps) const;
 
 private:
-	options opt;
 	bool fixed_grammar = false;
 	bool grammar_loaded = false;
 	/// True when the options of tgf_repl_option_set are bound to opt.
@@ -255,13 +212,6 @@ private:
 	bool grammar_from_source = false;
 	std::string tgf_filename;
 	std::string grammar_source;
-
-	repl<tgf_repl_evaluator>* r = nullptr;
-#ifdef TAU_PARSER_HAS_FTXUI
-	repl_ftxui<tgf_repl_evaluator>* r_ftx = nullptr;
-#endif
-	term::colors TC;
-	idni::diagnostics::report report;
 
 	std::unique_ptr<nonterminals_type> owned_nts;
 	std::unique_ptr<grammar_type> owned_g;
@@ -280,6 +230,11 @@ private:
 	/// The {"grammar", "loaded"} data of a load of @p name.
 	tref load_answer(bool loaded,
 		const std::string& name) const;
+
+	tref state() const override;
+	cmd_result run_statement(const trv& s) override;
+	void on_parsed(tgf_repl_parser::result& r) override;
+	void end_answer() override;
 };
 
 /// Specialized parser entry point (compiled-in grammar; no load/reload)
@@ -302,14 +257,6 @@ void json_write_line(std::ostream& os, const format::json::value& v);
 
 /// The {"grammar","start"} state object that every response carries.
 tref state_value(const tgf_repl_evaluator& re);
-
-/// Print @p report the way the text REPL does. With @p json true, print it
-/// as one JSON line (with the code names when @p print_names is true).
-/// Otherwise route errors and warnings to stderr and info to stdout, which
-/// is @ref diagnostics::report::print. The client of `tgf serve` rebuilds a
-/// report from its JSON and calls this too, so both print the same text.
-void print_diagnostics_report(const diagnostics::report& report,
-	bool json, bool print_names = true);
 
 /// Text of one command result from its data only. The local REPL and the
 /// remote evaluator of `tgf connect` share it, so the remote text matches

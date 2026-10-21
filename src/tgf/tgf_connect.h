@@ -12,6 +12,10 @@
 
 #include "tgf_cli.h"
 #include "utility/diagnostics.h"
+#include "utility/repl.h"
+#ifdef TAU_PARSER_HAS_FTXUI
+#include "utility/repl_ftxui.h"
+#endif
 
 namespace idni {
 

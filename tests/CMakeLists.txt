@@ -334,6 +334,13 @@ if(TARGET tgf AND TAU_PARSER_HAS_FTXUI_DEP)
 	endif()
 endif()
 
+if(TARGET tgf AND NOT CMAKE_HOST_WIN32)
+	add_test(NAME tgf_repl_prompt
+		COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/parity/tgf_repl_prompt.sh"
+			${CMAKE_CROSSCOMPILING_EMULATOR}
+			$<TARGET_FILE:tgf>)
+endif()
+
 # WASM parity test - compare native tgf output against tgf.js (Node.js)
 # for a grammar file and REPL commands. Requires the tgf tool, Node.js and
 # a configured wasm tree, whose tgf.js the dev run builds before ctest.

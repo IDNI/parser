@@ -266,6 +266,8 @@ struct messages {
 	static constexpr sv incomplete_input       = "incomplete input";
 	static constexpr sv no_grammar_loaded      =
 		"no grammar loaded, use load";
+	// the status part of the REPL prompt without a grammar
+	static constexpr sv prompt_no_grammar      = "(no grammar loaded)";
 	static constexpr sv server_path_forbidden  =
 		"File paths are not allowed in a server session";
 	static constexpr sv line_too_long          =

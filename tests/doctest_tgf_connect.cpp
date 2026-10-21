@@ -72,7 +72,12 @@ static std::string local_repl_text(const std::string& grammar,
 	tgf_repl_evaluator::options opt;
 	opt.json = false;
 	opt.colors = colors;
+	options_repository mine;
+	options_scope scope(mine);
 	tgf_repl_evaluator local(grammar, opt);
+	// the remote text has colors in a pipe too, so the user gives colors
+	if (colors)
+		REQUIRE(idni::options().set_text("colors", "true").has_value());
 	eval_result last;
 	for (const auto& src : srcs) {
 		last = local.run(src);

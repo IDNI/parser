@@ -8,6 +8,7 @@
 #include "quiet_doctest.h"
 #include "../src/tgf/tgf_cli.h"
 #include "../src/tgf/parser_gen.h"
+#include "../src/parser_strings.h"
 #include "test_env.h"
 #include "tgf_run_capture.h"
 
@@ -581,6 +582,68 @@ TEST_SUITE("tgf cli: render_command_text") {
 		os.flush();
 		CHECK(buf.lines == depth + 1);
 		CHECK(buf.bad == 0);
+	}
+}
+
+TEST_SUITE("tgf cli: the REPL on the evaluator base") {
+
+	static string tiny_grammar() {
+		return string(PROJECT_SOURCE_DIR) + "/tests/fixtures/tiny.tgf";
+	}
+
+	TEST_CASE("a cut text gives the info incomplete input") {
+		options_repository mine;
+		options_scope scope(mine);
+		tgf_repl_evaluator::options opt;
+		opt.colors = false;
+		tgf_repl_evaluator re(tiny_grammar(), opt);
+		auto r = re.eval("p");
+		REQUIRE(r.has_value());
+		CHECK(r.value() == 2);
+		CHECK(r.report().nodes().size() == 1);
+		std::ostringstream os;
+		r.report().print(os, term::colors(false));
+		CHECK(os.str().find(parser_strings::messages::incomplete_input)
+			!= string::npos);
+	}
+
+	TEST_CASE("an answer and a report have colors only on a terminal") {
+		options_repository mine;
+		options_scope scope(mine);
+		auto ok = capture_tgf_run({ "tgf", tiny_grammar(), "repl",
+			"-e", "parse 1" }, "", false);
+		REQUIRE(ok.out.find("parsed graph:") != string::npos);
+		CHECK((ok.out.find('\x1b') != string::npos)
+			== term::is_tty(stdout));
+		auto bad = capture_tgf_run({ "tgf", tiny_grammar(), "repl",
+			"-e", "parse 1x" }, "", false);
+		REQUIRE_FALSE(bad.err.empty());
+		CHECK((bad.err.find('\x1b') != string::npos)
+			== term::is_tty(stderr));
+	}
+
+	TEST_CASE("a colors option of the user gives colors in a pipe") {
+		options_repository mine;
+		options_scope scope(mine);
+		auto r = capture_tgf_run({ "tgf", tiny_grammar(), "repl",
+			"-c", "true", "-e", "parse 1x" }, "", false);
+		CHECK(r.err.find('\x1b') != string::npos);
+	}
+
+	TEST_CASE("the debug graph prints with the tree renderer") {
+		options_repository mine;
+		options_scope scope(mine);
+		tgf_repl_evaluator::options opt;
+		opt.colors = false;
+		tgf_repl_evaluator re(tiny_grammar(), opt);
+		std::ostringstream out;
+		std::streambuf* old = cout.rdbuf(out.rdbuf());
+		re.eval("set debug true");
+		out.str("");
+		re.eval("parse 1");
+		cout.rdbuf(old);
+		CHECK(out.str().find("input command graph:\nparsed graph:\n\tstart(")
+			!= string::npos);
 	}
 }
 

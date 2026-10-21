@@ -163,8 +163,9 @@ bool tgf_remote_evaluator::connect(const std::string& host, uint16_t port,
 		const bool is_error = st && *st == "error";
 		if (is_error && !rt.find("state") && !rt.find("cmd")) {
 			if (tref rep = rt.find("report"); rep)
-				print_diagnostics_report(
-					format::json::report_of(rep), false);
+				tgf_repl_evaluator_base::print_report(
+					format::json::report_of(rep), false,
+					idni::TC);
 			report.error(diagnostics::code::invalid_argument,
 				parser_strings::messages::connect_failed);
 			return false;
@@ -214,8 +215,8 @@ cmd_status tgf_remote_evaluator::render_response(tref resp,
 	auto print_report = [](tref r) {
 		if (tref rep = jt::get(r).find("report");
 				rep && jt::get(rep).is_object())
-			print_diagnostics_report(format::json::report_of(rep),
-				false);
+			tgf_repl_evaluator_base::print_report(
+				format::json::report_of(rep), false, idni::TC);
 	};
 	auto render_one = [this, &print_report](tref r,
 		const std::string& cmd0)

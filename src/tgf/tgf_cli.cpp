@@ -23,6 +23,7 @@
 #include "tgf_serve.h"
 #include "tgf_connect.h"
 #endif
+#include "utility/repl_run.h"
 #include "utility/win_args.h"
 #include "format/tgf.test/tgf_test.h"
 #ifndef DEBUG
@@ -119,16 +120,6 @@ static const char* help_arg_name(size_t nt) {
 	case p::disable_sym:     return "disable";
 	default:                 return "help";
 	}
-}
-
-void print_diagnostics_report(const idni::diagnostics::report& report,
-	bool json, bool print_names)
-{
-	if (report.nodes().empty()) return;
-	if (json) {
-		bintree<format::json::node>::gc_pause pause;
-		format::json::print(report, std::cout, print_names) << '\n';
-	} else report.print();
 }
 
 // bintree<pnode>::M() and its hit/miss/geth counters are process-wide
@@ -364,13 +355,7 @@ void tgf_repl_evaluator::begin_server_session(const std::string& id) {
 	opt.no_server_paths = true;
 	opt.json = true;
 	opt.colors = false;
-	TC.set(false);
-}
-
-diagnostics::report tgf_repl_evaluator::take_report() {
-	diagnostics::report res = std::move(report);
-	report.clear();
-	return res;
+	set_colors();
 }
 
 // A text stream adds the CR of a CRLF back on Windows, so drop it here.
@@ -393,53 +378,6 @@ static void print_grammar_source(ostream& os, const string& src) {
 	if (s.empty()) { os << "\n"; return; }
 	if (s.back() == '\n') s.pop_back();
 	os << s << "\n\n";
-}
-
-void tgf_repl_evaluator::reprompt() {
-	stringstream ss;
-	if (opt.status) {
-		ss << TC_STATUS << "[ ";
-		if (has_grammar())
-			ss << TC_STATUS_FILE << "\"" << tgf_filename
-				<< "\"" << TC.CLEAR() << TC_STATUS << " ";
-		if (has_grammar())
-			ss << TC_STATUS_START << start_symbol()
-				<< TC.CLEAR() << TC_STATUS << " ]"
-				<< TC.CLEAR() << " ";
-		else
-			ss << "]" << TC.CLEAR() << " ";
-	}
-	ss << TC_PROMPT << "tgf>" << TC.CLEAR() << " ";
-	if (r) r->set_prompt(ss.str());
-#ifdef TAU_PARSER_HAS_FTXUI
-	if (r_ftx) r_ftx->set_prompt(ss.str());
-#endif
-}
-
-ostream& tgf_repl_evaluator::pretty_print(ostream& os, tref n,
-	set<size_t> skip, bool nulls, size_t l)
-{
-	const auto& t = tree::get(n);
-	if (skip.size() && t.value.first.nt() &&
-		skip.find(t.value.first.n()) != skip.end())
-			return os;
-	if (!nulls && t.value.first.is_null()) return os;
-	for (size_t i = 0; i < l; i++) os << "\t";
-	if (t.value.first.nt())
-		os << TC_NT << t.value.first << TC.CLEAR() << TC_NT_ID
-			<< "(" << t.value.first.n() << ")" << TC.CLEAR();
-	else if (t.value.first.is_null())
-		os << TC_NULL << "null" << TC.CLEAR();
-	else os << TC_T << t.value.first << TC.CLEAR();
-	os << TC_RANGE << "[" << t.value.second[0] << ", "
-		<< t.value.second[1] << "]" << TC.CLEAR() << "\n";
-	for (tref d : t.children()) pretty_print(os, d, skip, nulls, l + 1);
-	return os;
-}
-
-void tgf_repl_evaluator::flush_report() {
-	print_diagnostics_report(report, opt.json);
-	report.clear();
 }
 
 // The text stays, so a session and a source-backed reload use the bytes of
@@ -559,9 +497,9 @@ void tgf_repl_evaluator::bind_repl_options() {
 	bind(opts.bind("print-tml-rules", opt.tml_rules));
 	bind(opts.bind("print-tml-facts", opt.tml_facts));
 	bind(opts.bind("print-input", opt.print_input));
-	auto set_colors = [this] { TC.set(!opt.json && opt.colors); };
-	bind(opts.bind("colors", opt.colors, set_colors));
-	bind(opts.bind("json", opt.json, set_colors));
+	auto colors = [this] { set_colors(); };
+	bind(opts.bind("colors", opt.colors, colors));
+	bind(opts.bind("json", opt.json, colors));
 }
 
 void tgf_repl_evaluator::reset_parse_options() {
@@ -570,11 +508,6 @@ void tgf_repl_evaluator::reset_parse_options() {
 	// a load keeps the parse options, a new evaluator starts from the
 	// defaults
 	opts.reset("parse");
-}
-
-void tgf_repl_evaluator::set_repl(repl<tgf_repl_evaluator>& r_) {
-	r = &r_;
-	reprompt();
 }
 
 tref tgf_repl_evaluator::parsed(parser_type::result& res) {
@@ -1076,10 +1009,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			res.status = cmd_status::quit;
 			break;
 		case p::clear_cmd:
-			if (r) r->clear();
-#ifdef TAU_PARSER_HAS_FTXUI
-			else if (r_ftx) r_ftx->clear();
-#endif
+			if (front) front->clear();
 			break;
 		case p::help_cmd: {
 			auto optarg = s | p::help_arg
@@ -1235,44 +1165,39 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 	return res;
 }
 
-eval_result tgf_repl_evaluator::run(const std::string& src,
-	const std::function<void(cmd_result&)>& each)
-{
-	eval_result er;
-	static tgf_repl_parser rp;
-	auto res = rp.parse(src.c_str(), src.size());
-	if (!res.found) {
-		if (opt.continue_on_eof && res.parse_error.at_eof()) {
-			er.status = cmd_status::incomplete;
-			res.report().demote_errors_to_warnings();
-			er.report.append(std::move(res.report()));
-			return er;
-		}
-		er.status = cmd_status::error;
-		er.report.append(std::move(res.report()));
-		return er;
+eval_result tgf_repl_evaluator::run(const std::string& src) {
+	return run_statements(src, [this](const trv& s) { return run(s); });
+}
+
+void tgf_repl_evaluator::on_parsed(tgf_repl_parser::result& res) {
+	if (opt.json) return;
+	res.print_ambiguous_nodes(cout);
+	if (idni::options().get<bool>("debug")) {
+		bintree<format::json::node>::gc_pause pause;
+		cmd_result graph;
+		graph.cmd = command_name(tgf_repl_parser::parse_cmd);
+		graph.data = jt::geth(jt::build_object({
+			jt::build_pair(tp::tree, format::ast_json::node_to_tree<
+				tgf_repl_parser::tree>(res.get_shaped_tree2())) }));
+		cout << "input command graph:\n";
+		render_text(graph, cout);
 	}
-	if (!opt.json) {
-		res.print_ambiguous_nodes(cout);
-		if (idni::options().get<bool>("debug"))
-			pretty_print(cout << "input command graph:\n",
-				res.get_shaped_tree2(), {}, false, 1);
-	}
-	tref ref = res.get_shaped_tree2();
-	auto t = tt(ref);
-	auto statements = t || tgf_repl_parser::statement;
-	for (const auto& statement : statements()) {
-		er.results.push_back(run(statement | tt::only_child));
-		cmd_result& cr = er.results.back();
-		if (each) each(cr);
-		if (cr.status == cmd_status::quit) {
-			er.status = cmd_status::quit;
-			break;
-		}
-		if (cr.status == cmd_status::error)
-			er.status = cmd_status::error;
-	}
-	return er;
+}
+
+cmd_result tgf_repl_evaluator::run_statement(const trv& s) {
+	cmd_result r = run(s);
+	render_text(r, cout);
+	report.append(std::move(r.report));
+	flush_report();
+	return r;
+}
+
+void tgf_repl_evaluator::end_answer() {
+	cout << endl;
+}
+
+tref tgf_repl_evaluator::state() const {
+	return state_value(*this);
 }
 
 // A terminal in the quotes and escapes of the grammar text.
@@ -1707,53 +1632,22 @@ tref statement_request(const tgf_repl_evaluator::trv& n) {
 	return jt::build_object(req);
 }
 
-idni::diagnostics::result<int> tgf_repl_evaluator::eval(const string& src) {
-	eval_result er;
-	{
-		bintree<format::json::node>::gc_pause pause;
-		er = run(src, [this](cmd_result& r) {
-			render_text(r, cout);
-			report.append(std::move(r.report));
-			flush_report();
-		});
-	}
-	// The answers are printed, and only the handles in er hold data.
-	jt::gc_if_grown();
-	if (er.status == cmd_status::incomplete) {
-		idni::diagnostics::result<int> res(2);
-		res.append(std::move(er.report));
-		return res;
-	}
-	if (er.status == cmd_status::quit) {
-		return idni::diagnostics::result<int>(1);
-	}
-	if (er.report.nodes().size()) {
-		report.append(std::move(er.report));
-		flush_report();
-	}
-	cout << endl;
-	reprompt();
-	return idni::diagnostics::result<int>(0);
-}
-
 tgf_repl_evaluator::tgf_repl_evaluator(std::string tgf_file)
 	: tgf_repl_evaluator(std::move(tgf_file), options{})
 {
 }
 
 tgf_repl_evaluator::tgf_repl_evaluator(std::string tgf_file, options opt)
-	: opt(opt), tgf_filename(std::move(tgf_file))
+	: tgf_repl_evaluator_base(opt), tgf_filename(std::move(tgf_file))
 {
-	TC.set(!opt.json && opt.colors);
 	reset_parse_options();
 	load_file(tgf_filename);
 	bind_repl_options();
 }
 
 tgf_repl_evaluator::tgf_repl_evaluator(options opt)
-	: opt(opt)
+	: tgf_repl_evaluator_base(opt)
 {
-	TC.set(!opt.json && opt.colors);
 	reset_parse_options();
 	owned_nts = make_unique<nonterminals_type>();
 	owned_g = make_unique<grammar_type>(*owned_nts);
@@ -1779,14 +1673,13 @@ tgf_repl_evaluator::tgf_repl_evaluator(
 	std::string display_name,
 	std::string grammar_source,
 	options opt)
-	: opt(opt),
+	: tgf_repl_evaluator_base(opt),
 	  fixed_grammar(true),
 	  grammar_loaded(true),
 	  tgf_filename(std::move(display_name)),
 	  grammar_source(std::move(grammar_source)),
 	  p_(&parser)
 {
-	TC.set(!opt.json && opt.colors);
 	reset_parse_options();
 	bind_grammar_options();
 	report.append(p().bind_options().report());
@@ -1893,7 +1786,7 @@ static int gen_command(tgf_tool& tool, tgf_repl_evaluator& re) {
 			cmd_status::error,
 			tgf_command_spec(tgf_command::gen).name,
 			jt::build_object({}), state_value(re), rep), cout);
-		else print_diagnostics_report(rep, false);
+		else tgf_repl_evaluator_base::print_report(rep, false, TC);
 		return 1;
 	};
 	if (!re.require_grammar()) return fail(re.take_report());
@@ -1934,7 +1827,7 @@ static int gen_command(tgf_tool& tool, tgf_repl_evaluator& re) {
 			state_value(re), rep), cout);
 		return st == cmd_status::error ? 1 : 0;
 	}
-	print_diagnostics_report(rep, false);
+	tgf_repl_evaluator_base::print_report(rep, false, TC);
 	return gr.has_value() ? 0 : 1;
 }
 
@@ -2036,7 +1929,7 @@ static int serve_command(tgf_tool& tool, tgf_repl_evaluator& re) {
 	auto r = tgf_serve_run(opt);
 	// A warning (for example the Windows session memory note) is not an
 	// error, so print the report even on a clean stop.
-	print_diagnostics_report(r.report(), false);
+	tgf_repl_evaluator_base::print_report(r.report(), false, TC);
 	return r.has_value() ? r.value() : 1;
 #endif
 }
@@ -2078,7 +1971,7 @@ static int connect_command(const vector<string>& inputs) {
 	opt.legacy_repl = idni::options().get<bool>("legacy-repl");
 	auto r = tgf_connect_run(opt);
 	if (!r.has_value()) {
-		print_diagnostics_report(r.report(), false);
+		tgf_repl_evaluator_base::print_report(r.report(), false, TC);
 		return 1;
 	}
 	return r.value();
@@ -2134,33 +2027,16 @@ static int run_command(const parsed_args& args, tgf_tool& tool,
 			re.flush_report();
 			return ret;
 		};
-		auto exit_code = [](const diagnostics::result<int>& run) {
-			print_diagnostics_report(run.report(), false);
-			return run.has_value() ? run.value() : 1;
-		};
-		auto run_legacy = [&] {
-			repl<tgf_repl_evaluator> r(re, "tgf> ", { ".tgf_history" });
-			re.set_repl(r);
-			return exit_code(r.run());
-		};
-		auto run_default = [&] {
-#ifdef TAU_PARSER_HAS_FTXUI
-			repl_ftxui<tgf_repl_evaluator> rftx(
-				re, "tgf> ", { ".tgf_history" });
-			return exit_code(rftx.run()); // ctor sets re.r_ftx
-#else
-			// FTXUI not available: silently fall back to legacy REPL
-			return run_legacy();
-#endif
-		};
-
 		if (eval.size())
 			return with_report_flush([&] {
 				return re.eval(eval).value_or(0);
 			});
-		if (opts.get<bool>("legacy-repl"))
-			return with_report_flush(run_legacy);
-		return with_report_flush(run_default);
+		return with_report_flush([&] {
+			auto run = run_repl(re, opts.get<bool>("legacy-repl"),
+				re.history);
+			re.print_report(run.report());
+			return run.has_value() ? run.value() : 1;
+		});
 	}
 
 	if (is(tgf_command::parse)) {
@@ -2206,7 +2082,7 @@ static int run_command(const parsed_args& args, tgf_tool& tool,
 		re.render_text(parse_result, cout);
 		// A failed parse leaves its error in the report, as in --json.
 		auto rep = re.take_report();
-		print_diagnostics_report(rep, false);
+		tgf_repl_evaluator_base::print_report(rep, false, TC);
 		if (opts.get<bool>("measure")) print_bintree_process_totals();
 		return rep.has_error() || !re.has_grammar() ? 1 : 0;
 	}
@@ -2243,7 +2119,8 @@ static int run_tool(int argc, char** argv, const args_config& cfg,
 	auto parsed = env_ok ? opts.parse_args(argc, argv, cfg)
 		: diagnostics::result<parsed_args>{};
 	if (env_ok) rep.append(parsed.report());
-	if (!rep.nodes().empty()) print_diagnostics_report(rep, false);
+	if (!rep.nodes().empty())
+		tgf_repl_evaluator_base::print_report(rep, false, TC);
 	if (!env_ok || !parsed.has_value()) return 1;
 	parsed_args args = std::move(parsed).value();
 
@@ -2272,10 +2149,11 @@ int tgf_specialized_run(int argc, char** argv,
 	const string grammar_source = grammar_source_c ? grammar_source_c : "";
 	const string tgf_label = display_name ? display_name : "<compiled>";
 	if (auto r = declare_tgf_options(idni::options()); r.has_error())
-		return print_diagnostics_report(r.report(), false), 1;
+		return tgf_repl_evaluator_base::print_report(r.report(), false,
+			TC), 1;
 	tgf_tool tool;
 	if (!tool.report.nodes().empty())
-		print_diagnostics_report(tool.report, false);
+		tgf_repl_evaluator_base::print_report(tool.report, false, TC);
 	if (tool.report.has_error()) return 1;
 
 	args_config cfg = tgf_args_config;
@@ -2289,10 +2167,11 @@ int tgf_specialized_run(int argc, char** argv,
 
 int tgf_run(int argc, char** argv) {
 	if (auto r = declare_tgf_options(idni::options()); r.has_error())
-		return print_diagnostics_report(r.report(), false), 1;
+		return tgf_repl_evaluator_base::print_report(r.report(), false,
+			TC), 1;
 	tgf_tool tool;
 	if (!tool.report.nodes().empty())
-		print_diagnostics_report(tool.report, false);
+		tgf_repl_evaluator_base::print_report(tool.report, false, TC);
 	if (tool.report.has_error()) return 1;
 
 	// The first argument names the grammar file unless it is a command

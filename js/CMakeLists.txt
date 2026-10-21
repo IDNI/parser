@@ -16,6 +16,7 @@ set(JSLIB_SOURCES
 	../src/format/treemr/treemr_parser.generated.cpp
 	../src/tgf/tgf_repl_parser.generated.cpp
 	../src/tgf/tgf_cli.cpp
+	../src/tgf/tgf_repl_evaluator_base.cpp
 	../src/tgf/tgf_json_api.cpp
         embindings.cpp
 )
@@ -109,6 +110,7 @@ add_custom_command(TARGET tauparser POST_BUILD
 # the factory, which the parity tests use.
 set(TGF_NODE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/tgf/tgf_cli.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/tgf/tgf_repl_evaluator_base.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/tgf/tgf_json_api.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/tgf/main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/format/tgf/tgf_parser.generated.cpp
