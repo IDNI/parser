@@ -624,7 +624,7 @@ inline std::string report::format_message(size_t node_idx) const {
 	return out;
 }
 
-inline void report::print_tree(const sinks& s, const term::colors& tc,
+inline void report::print_tree(const sinks& s, const sink_colors& tc,
 	bool again) const
 {
 	// scope_guard::close() writes the time of a timed scope, so an open one
@@ -656,6 +656,19 @@ inline void report::print_tree(const sinks& s, const term::colors& tc,
 }
 
 inline void report::print(const sinks& s, const term::colors& tc) const {
+	print_tree(s, { tc, tc, tc }, false);
+}
+
+inline sink_colors output_colors(color_mode m) {
+	auto of = [m](std::FILE* f) {
+		return term::colors(m == color_mode::always
+			|| (m == color_mode::terminal && term::is_tty(f)));
+	};
+	const term::colors err = of(stderr);
+	return { err, err, of(stdout) };
+}
+
+inline void report::print(const sinks& s, const sink_colors& tc) const {
 	print_tree(s, tc, false);
 }
 
@@ -679,7 +692,7 @@ inline void report::print_pending(const sinks& s,
 	for (size_t i = 0; i < nodes_.size(); ++i) {
 		const auto& n = nodes_[i];
 		if (!n.printed && (is_error(n.tag) || is_warning(n.tag)))
-			print_message(s, i, tc);
+			print_message(s, i, { tc, tc, tc });
 	}
 }
 
@@ -701,7 +714,7 @@ inline void report::print_pending() const {
 }
 
 inline void report::reprint(const sinks& s, const term::colors& tc) const {
-	print_tree(s, tc, true);
+	print_tree(s, { tc, tc, tc }, true);
 }
 
 inline void report::reprint(std::ostream& os, const term::colors& tc) const {
@@ -973,20 +986,21 @@ inline std::string report::color_info_line(const node& n, size_t level,
 }
 
 inline void report::print_message(const sinks& s, size_t idx,
-	const term::colors& tc) const
+	const sink_colors& tc) const
 {
 	const auto& n = nodes_[idx];
 	if (is_error(n.tag))
-		s.error(tc.RED() + format_message(idx) + tc.CLEAR());
+		s.error(tc.error.RED() + format_message(idx) + tc.error.CLEAR());
 	else
-		s.warning(tc.YELLOW() + format_message(idx) + tc.CLEAR());
+		s.warning(tc.warning.YELLOW() + format_message(idx)
+			+ tc.warning.CLEAR());
 	n.printed = true;
 }
 
 inline void report::print_node(const sinks& s,
 	const std::vector<std::vector<size_t>>& children, size_t idx,
 	size_t level, size_t label_w, value_columns cols,
-	const term::colors& tc, bool again) const
+	const sink_colors& tc, bool again) const
 {
 	const auto& n = nodes_[idx];
 	if (is_error(n.tag) || is_warning(n.tag)) {
@@ -997,7 +1011,7 @@ inline void report::print_node(const sinks& s,
 		&& children[idx].empty()) {
 		// silent container with nothing to show — skip
 	} else {
-		s.info(color_info_line(n, level, label_w, cols, tc));
+		s.info(color_info_line(n, level, label_w, cols, tc.info));
 	}
 }
 

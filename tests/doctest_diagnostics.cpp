@@ -1225,6 +1225,37 @@ TEST_SUITE("diagnostics: an info message prints as a message line") {
 	}
 }
 
+TEST_SUITE("diagnostics: one color set per output") {
+
+	TEST_CASE("colors on for stderr only color only the error line") {
+		report r;
+		r.error(code::parse_error, "boom");
+		r.info("Grammar reloaded");
+		std::vector<std::string> err, out;
+		r.print({ .error = [&err](std::string_view l) { err.emplace_back(l); },
+			.warning = [&err](std::string_view l) { err.emplace_back(l); },
+			.info = [&out](std::string_view l) { out.emplace_back(l); } },
+			sink_colors{ idni::term::colors(true), idni::term::colors(true),
+				idni::term::colors(false) });
+		REQUIRE(err.size() == 1);
+		REQUIRE(out.size() == 1);
+		CHECK(err[0].find('\x1b') != std::string::npos);
+		CHECK(out[0].find('\x1b') == std::string::npos);
+		CHECK(out[0] == "Grammar reloaded");
+	}
+
+	TEST_CASE("output_colors follows the color mode") {
+		const sink_colors off = output_colors(color_mode::off);
+		CHECK_FALSE(off.error.enabled);
+		CHECK_FALSE(off.warning.enabled);
+		CHECK_FALSE(off.info.enabled);
+		const sink_colors always = output_colors(color_mode::always);
+		CHECK(always.error.enabled);
+		CHECK(always.warning.enabled);
+		CHECK(always.info.enabled);
+	}
+}
+
 TEST_SUITE("diagnostics: a deep report prints") {
 
 	TEST_CASE("a chain of 1000000 nested errors prints each line in order") {

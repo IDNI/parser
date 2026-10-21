@@ -122,6 +122,25 @@ struct sinks {
 	sink info;      // tab-indented per tree depth; info+metric+scope
 };
 
+/// One color set per band of @ref sinks, since the bands can go to
+/// streams of which only one is a terminal.
+struct sink_colors {
+	term::colors error;
+	term::colors warning;
+	term::colors info;
+};
+
+/// Which outputs of a program have colors.
+enum class color_mode {
+	off,      // no output
+	terminal, // only an output that is a terminal
+	always,   // each output, a pipe included
+};
+
+/// The colors of the outputs of a program in mode @p m: errors and
+/// warnings on stderr, info on stdout.
+sink_colors output_colors(color_mode m);
+
 int64_t checked_i64(size_t v);
 int64_t saturating_i64(size_t v);
 
@@ -355,6 +374,8 @@ struct report {
 	/// binding filling structured fields, a log file) passes a disabled
 	/// term::colors rather than mutating the global one.
 	void print(const sinks&, const term::colors& tc = TC) const;
+	/// Render each band through its own color set of @p tc.
+	void print(const sinks&, const sink_colors& tc) const;
 	/// Route all bands to @p os.
 	void print(std::ostream& os, const term::colors& tc = TC) const;
 	/// Route all bands to @p s.
@@ -472,17 +493,17 @@ private:
 
 	// The walk of print() and reprint(). With @p again a node that a
 	// print already wrote prints once more.
-	void print_tree(const sinks& s, const term::colors& tc,
+	void print_tree(const sinks& s, const sink_colors& tc,
 		bool again) const;
 
 	void print_node(const sinks& s,
 		const std::vector<std::vector<size_t>>& children, size_t idx,
 		size_t level, size_t label_w, value_columns cols,
-		const term::colors& tc, bool again) const;
+		const sink_colors& tc, bool again) const;
 
 	// Write the line of the error or warning node @p idx and mark it.
 	void print_message(const sinks& s, size_t idx,
-		const term::colors& tc) const;
+		const sink_colors& tc) const;
 
 	std::string color_info_line(const node& n, size_t level,
 		size_t label_w, value_columns cols,
