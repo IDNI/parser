@@ -168,7 +168,7 @@ open a new session, and only the session id protects an attached session.
 The id is a secret of the server and of the client: the server logs it and
 the client prints it, so do not share them.
 
-A session refuses `parse file` and `load` with `file` with the
+A session refuses `parse_file` and `load` with `file` with the
 diagnostics code `server_path`. `load` with `name` and `source` works.
 `reload` reloads the stored text of the session grammar, also for a
 session that the server started with a grammar file.

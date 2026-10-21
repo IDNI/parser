@@ -1298,7 +1298,7 @@
 				},
 				"cmd": {
 					"enum": [
-						"parse file",
+						"parse_file",
 						"load"
 					]
 				},
@@ -1408,7 +1408,7 @@
 				"cmd": {
 					"enum": [
 						"start",
-						"internal-grammar",
+						"igrammar",
 						"unreachable"
 					]
 				},
@@ -1526,7 +1526,7 @@
 				"cmd": {
 					"enum": [
 						"add",
-						"delete"
+						"del"
 					]
 				},
 				"option": {
@@ -1865,7 +1865,7 @@
 							"cmd": {
 								"enum": [
 									"parse",
-									"parse file"
+									"parse_file"
 								]
 							}
 						},
@@ -1904,7 +1904,7 @@
 					"if": {
 						"properties": {
 							"cmd": {
-								"const": "internal-grammar"
+								"const": "igrammar"
 							}
 						},
 						"required": [
@@ -2087,7 +2087,7 @@
 									"enable",
 									"disable",
 									"add",
-									"delete"
+									"del"
 								]
 							}
 						},
@@ -2108,9 +2108,9 @@
 		"command_name": {
 			"enum": [
 				"parse",
-				"parse file",
+				"parse_file",
 				"grammar",
-				"internal-grammar",
+				"igrammar",
 				"start",
 				"unreachable",
 				"reload",
@@ -2126,7 +2126,7 @@
 				"enable",
 				"disable",
 				"add",
-				"delete"
+				"del"
 			]
 		},
 		"oneshot_command_name": {

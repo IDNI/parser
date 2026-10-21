@@ -1,6 +1,7 @@
 // To view the license please visit
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
+#include <algorithm>
 #include <iostream>
 #include <set>
 #include <sstream>
@@ -42,6 +43,41 @@ std::string tgf_repl_evaluator_base::prompt_text() const {
 	}
 	ss << TC_PROMPT << "tgf>" << TC.CLEAR() << " ";
 	return ss.str();
+}
+
+using rp = tgf_repl_parser;
+
+// The name of the nonterminal @p nt without @p suffix. Empty when the name
+// does not end with the suffix.
+static std::string_view name_without(size_t nt, std::string_view suffix) {
+	const auto& nts = tgf_repl_parser_data::nts();
+	if (nt == 0 || nt >= nts.size()) return {};
+	std::string_view name = nts.get(nt);
+	if (name.size() <= suffix.size() || !name.ends_with(suffix)) return {};
+	return name.substr(0, name.size() - suffix.size());
+}
+
+// The nonterminal named @p name with @p suffix, 0 when there is none.
+static size_t nonterminal_with(std::string_view name, std::string_view suffix)
+{
+	if (name.empty()) return 0;
+	// find, not get: get would add an unknown name to the table
+	auto nt = tgf_repl_parser_data::nts().find(
+		std::string(name) + std::string(suffix));
+	return nt ? *nt : 0;
+}
+
+std::string_view tgf_repl_evaluator_base::name_of(size_t nt) {
+	std::string_view name = name_without(nt, "_cmd");
+	return name.empty() ? name_without(nt, "_sym") : name;
+}
+
+size_t tgf_repl_evaluator_base::command_of(std::string_view name) {
+	return nonterminal_with(name, "_cmd");
+}
+
+size_t tgf_repl_evaluator_base::help_argument_of(std::string_view name) {
+	return nonterminal_with(name, "_sym");
 }
 
 string tgf_repl_evaluator_base::option_name(const trv& s) {
@@ -362,9 +398,10 @@ static void render_data_productions(const cmd_result& r, std::ostream& os,
 	const jtt data(r.data);
 	auto prods = data | jtt::member(tp::productions);
 	auto pids = data | jtt::member(tp::production_ids);
-	const bool unreachable = r.cmd == "unreachable";
-	std::string s = data | jtt::member(unreachable ? tp::symbol : tp::start)
-		| jtt::string;
+	const bool unreachable = tgf_repl_evaluator_base::command_of(r.cmd)
+		== rp::unreachable_cmd;
+	std::string s = data | jtt::member(unreachable ? tp::symbol
+		: tp::start) | jtt::string;
 	const trefs prod_list = prods.is(json_parser::arr)
 		? (prods | jtt::children | jtt::refs) : trefs{};
 	const trefs pid_list = pids.is(json_parser::arr)
@@ -396,34 +433,35 @@ static void render_data_productions(const cmd_result& r, std::ostream& os,
 void render_command_text(const cmd_result& r, std::ostream& os,
 	const term::colors& TC, const std::set<size_t>* char_classes)
 {
-	if (r.cmd == "parse" || r.cmd == "parse file") {
+	const size_t nt = tgf_repl_evaluator_base::command_of(r.cmd);
+	if (nt == rp::parse_cmd || nt == rp::parse_file_cmd) {
 		render_data_parse(r, os, TC);
 		return;
 	}
-	if (r.cmd == "grammar") { render_data_grammar(r, os); return; }
-	if (r.cmd == "internal-grammar" || r.cmd == "unreachable") {
+	if (nt == rp::grammar_cmd) { render_data_grammar(r, os); return; }
+	if (nt == rp::igrammar_cmd || nt == rp::unreachable_cmd) {
 		render_data_productions(r, os, TC, char_classes);
 		return;
 	}
-	if (r.cmd == "quit") { os << "Quit.\n"; return; }
-	if (r.cmd == "clear") return;
+	if (nt == rp::quit_cmd) { os << "Quit.\n"; return; }
+	if (nt == rp::clear_cmd) return;
 	const jtt data(r.data);
-	if (r.cmd == "version") {
+	if (nt == rp::version_cmd) {
 		if (auto v = data | jtt::member(tp::version); v)
 			os << (v | jtt::string) << "\n";
 		return;
 	}
-	if (r.cmd == "license") {
+	if (nt == rp::license_cmd) {
 		if (auto v = data | jtt::member(tp::license); v)
 			os << (v | jtt::string) << "\n";
 		return;
 	}
-	if (r.cmd == "help") {
+	if (nt == rp::help_cmd) {
 		if (auto v = data | jtt::member(tp::text); v)
 			os << (v | jtt::string);
 		return;
 	}
-	if (r.cmd == "start") {
+	if (nt == rp::start_cmd) {
 		auto s = data | jtt::member(tp::start);
 		auto ch = data | jtt::member(tp::changed);
 		if (!s || !ch) return;
@@ -433,7 +471,7 @@ void render_command_text(const cmd_result& r, std::ostream& os,
 			<< TC_DEFAULT << "\n";
 		return;
 	}
-	if (r.cmd == "load" || r.cmd == "reload") {
+	if (nt == rp::load_cmd || nt == rp::reload_cmd) {
 		auto l = data | jtt::member(tp::loaded);
 		if (!l) return;   // fixed grammar: only the warning
 		auto name = data | jtt::member(tp::grammar) | jtt::string;
@@ -466,7 +504,8 @@ void tgf_repl_evaluator_base::render_text(const cmd_result& res,
 {
 	// A character class nonterminal takes its own color.
 	std::set<size_t> char_classes;
-	if (res.cmd == "internal-grammar" || res.cmd == "unreachable") {
+	const size_t nt = command_of(res.cmd);
+	if (nt == rp::igrammar_cmd || nt == rp::unreachable_cmd) {
 		auto cc = jtt(state()) | jtt::member(tp::char_classes);
 		if (cc.is(json_parser::arr))
 			for (tref n : (cc | jtt::children | jtt::refs))

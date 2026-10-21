@@ -482,7 +482,7 @@ TEST_SUITE("tgf serve: no server paths") {
 		serve_client c(f.bound_port());
 		c.send(R"({"cmd":"new"})");
 		REQUIRE(parse_line(c.read_line()).find("hello") != nullptr);
-		c.send(R"({"id":1,"cmd":"parse file","file":"/etc/passwd"})");
+		c.send(R"({"id":1,"cmd":"parse_file","file":"/etc/passwd"})");
 		auto e = parse_line(c.read_line());
 		CHECK(e.find("status")->as_string() == "error");
 		CHECK(report_contains_key(e,

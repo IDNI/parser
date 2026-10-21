@@ -254,7 +254,7 @@ int tgf_remote_evaluator::send_statement(tref req) {
 	std::string name = cmd ? *cmd : "";
 	// load and parse file carry the file text, not a path: the server
 	// never reads a path a client gives.
-	if (name == "load" || name == "parse file") {
+	if (name == "load" || name == "parse_file") {
 		const std::string* f = string_member(req, "file");
 		std::string path = f ? *f : "";
 		std::string text;

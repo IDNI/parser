@@ -141,6 +141,14 @@ TEST_CASE("connect: grammar, load, parse, quit and attach again") {
 
 	sink.str("");
 	sink.clear();
+	auto ig = remote.eval("igrammar");
+	REQUIRE(ig.has_value());
+	CHECK(ig.value() == 0);
+	CHECK(sink.str() == local_repl_text(gpath,
+		{ "parse \"123\"", "igrammar" }, true));
+
+	sink.str("");
+	sink.clear();
 	auto ur = remote.eval("unreachable");
 	REQUIRE(ur.has_value());
 	CHECK(ur.value() == 0);

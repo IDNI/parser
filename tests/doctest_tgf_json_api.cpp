@@ -443,6 +443,96 @@ TEST_SUITE("tgf json api: invalid and unknown requests") {
 	}
 }
 
+TEST_SUITE("tgf json api: command names") {
+	static const std::string unknown_command(
+		parser_strings::messages::unknown_command);
+
+	TEST_CASE("name_of drops the _cmd or _sym suffix") {
+		using rp = tgf_repl_parser;
+		using base = tgf_repl_evaluator_base;
+		CHECK(base::name_of(rp::parse_file_cmd) == "parse_file");
+		CHECK(base::name_of(rp::parse_file_sym) == "parse_file");
+		CHECK(base::name_of(rp::help_arg).empty());
+		CHECK(base::name_of(0).empty());
+	}
+
+	TEST_CASE("the old long names are unknown commands") {
+		scratch_file in("tgf_json_api_names.txt", "123");
+		auto r = run_repl({
+			file_request(1, "parse file", in.path),
+			R"({"id":2,"cmd":"internal-grammar"})",
+			R"({"id":3,"cmd":"delete","option":"trim","value":["num"]})" });
+		REQUIRE(r.responses.size() == 3);
+		for (const auto& resp : r.responses) {
+			CHECK(member(resp, "status")->get_string() == "error");
+			CHECK(member(resp, "result") == nullptr);
+			CHECK(report_contains_key(resp, unknown_command));
+		}
+	}
+
+	TEST_CASE("a structured request with a new name runs") {
+		scratch_file in("tgf_json_api_names.txt", "123");
+		auto r = run_repl({
+			file_request(1, "parse_file", in.path),
+			R"({"id":2,"cmd":"igrammar"})",
+			R"({"id":3,"cmd":"igrammar","symbol":"num"})",
+			R"({"id":4,"cmd":"add","option":"trim","value":["num"]})",
+			R"({"id":5,"cmd":"del","option":"trim","value":["num"]})" });
+		REQUIRE(r.responses.size() == 5);
+		const char* cmds[] = { "parse_file", "igrammar", "igrammar",
+			"add", "del" };
+		for (size_t i = 0; i != r.responses.size(); ++i) {
+			CHECK(member(r.responses[i], "status")->get_string()
+				== "ok");
+			CHECK(member(r.responses[i], "cmd")->get_string()
+				== cmds[i]);
+		}
+	}
+
+	TEST_CASE("help takes a new name and gives it back") {
+		auto r = run_repl({
+			R"({"id":1,"cmd":"help","command":"parse_file"})",
+			R"({"id":2,"cmd":"help","command":"igrammar"})",
+			R"({"id":3,"cmd":"help","command":"del"})",
+			R"({"id":4,"cmd":"help","command":"parse file"})",
+			R"({"id":5,"cmd":"help","command":"internal-grammar"})" });
+		REQUIRE(r.responses.size() == 5);
+		const char* names[] = { "parse_file", "igrammar", "del" };
+		for (size_t i = 0; i != 3; ++i) {
+			CHECK(member(r.responses[i], "status")->get_string()
+				== "ok");
+			const jt* data = result_of(r.responses[i]);
+			REQUIRE(data != nullptr);
+			CHECK(member(data, "command")->get_string() == names[i]);
+		}
+		CHECK(member(r.responses[3], "status")->get_string() == "error");
+		CHECK(member(r.responses[4], "status")->get_string() == "error");
+	}
+
+	TEST_CASE("the REPL accepts the new names as words") {
+		scratch_file in("tgf_json_api_names.txt", "123");
+		auto r = run_repl({
+			eval_request(1, "parse_file " + repl_string(in.path)),
+			eval_request(2, "igrammar"),
+			eval_request(3, "igrammar num"),
+			eval_request(4, "help parse_file"),
+			eval_request(5, "help igrammar"),
+			eval_request(6, "add trim num"),
+			eval_request(7, "delete trim num") });
+		REQUIRE(r.responses.size() == 7);
+		const char* cmds[] = { "parse_file", "igrammar", "igrammar",
+			"help", "help", "add", "del" };
+		for (size_t i = 0; i != r.responses.size(); ++i) {
+			const auto& resp = r.responses[i];
+			auto res = member(resp, "results");
+			REQUIRE(res != nullptr);
+			REQUIRE(res->children_size() == 1);
+			CHECK(member((*res)[0], "cmd")->get_string() == cmds[i]);
+			CHECK(member((*res)[0], "status")->get_string() == "ok");
+		}
+	}
+}
+
 TEST_SUITE("tgf json api: option values as JSON") {
 
 	// The option value of the JSON text @p text.
@@ -616,7 +706,7 @@ TEST_SUITE("tgf json api: options") {
 		auto r = run_repl({
 			R"({"id":1,"cmd":"set","option":"trim","value":["num"]})",
 			R"({"id":2,"cmd":"add","option":"trim","value":["start"]})",
-			R"({"id":3,"cmd":"delete","option":"trim","value":["num"]})"});
+			R"({"id":3,"cmd":"del","option":"trim","value":["num"]})"});
 		REQUIRE(r.responses.size() == 3);
 		REQUIRE(result_of(r.responses[1]) != nullptr);
 		REQUIRE(member(result_of(r.responses[1]), "value") != nullptr);
@@ -738,7 +828,7 @@ TEST_SUITE("tgf json api: parse file") {
 		auto res = member(r.responses[0], "results");
 		REQUIRE(res != nullptr);
 		REQUIRE(res->children_size() == 1);
-		CHECK(member((*res)[0], "cmd")->get_string() == "parse file");
+		CHECK(member((*res)[0], "cmd")->get_string() == "parse_file");
 		CHECK(member((*res)[0], "status")->get_string() == "ok");
 		const jt* data = response_data(r.responses[0]);
 		REQUIRE(data != nullptr);
@@ -749,7 +839,7 @@ TEST_SUITE("tgf json api: parse file") {
 
 	TEST_CASE("structured form parses an input file") {
 		scratch_file in("tgf_json_api_input.txt", "123");
-		auto r = run_repl({ file_request(1, "parse file", in.path) });
+		auto r = run_repl({ file_request(1, "parse_file", in.path) });
 		REQUIRE(r.responses.size() == 1);
 		CHECK(member(r.responses[0], "status")->get_string() == "ok");
 		const jt* data = response_data(r.responses[0]);
@@ -780,9 +870,9 @@ TEST_SUITE("tgf json api: grammar commands") {
 
 	TEST_CASE("internal-grammar gives productions with and without a symbol") {
 		auto r = run_repl({
-			R"({"id":1,"cmd":"internal-grammar"})",
+			R"({"id":1,"cmd":"igrammar"})",
 			eval_request(2, "internal-grammar"),
-			R"({"id":3,"cmd":"internal-grammar","symbol":"num"})",
+			R"({"id":3,"cmd":"igrammar","symbol":"num"})",
 			eval_request(4, "internal-grammar num") });
 		REQUIRE(r.responses.size() == 4);
 		for (size_t i = 0; i != r.responses.size(); ++i) {
@@ -897,7 +987,7 @@ TEST_SUITE("tgf json api: CRLF text") {
 		scratch_file in("tgf_json_api_crlf_input.txt", "123\r\n");
 		auto r = run_repl({
 			file_request(1, "load", g.path),
-			file_request(2, "parse file", in.path) });
+			file_request(2, "parse_file", in.path) });
 		REQUIRE(r.responses.size() == 2);
 		CHECK(member(r.responses[1], "status")->get_string() == "ok");
 		const jt* data = response_data(r.responses[1]);
@@ -1054,7 +1144,7 @@ TEST_SUITE("tgf json api: option commands") {
 		auto r = run_repl({
 			R"({"id":1,"cmd":"set","option":"inline","value":["start > num"]})",
 			R"({"id":2,"cmd":"add","option":"inline","value":["num > digit"]})",
-			R"({"id":3,"cmd":"delete","option":"inline","value":["start > num"]})",
+			R"({"id":3,"cmd":"del","option":"inline","value":["start > num"]})",
 			eval_request(4, "set inline start > num"),
 			eval_request(5, "add inline num > digit"),
 			eval_request(6, "delete inline start > num") });
@@ -1187,7 +1277,7 @@ TEST_SUITE("tgf json api: state") {
 TEST_SUITE("tgf json api: production ids") {
 	TEST_CASE("production_ids matches productions on tiny.tgf") {
 		auto r = run_repl({
-			R"({"id":1,"cmd":"internal-grammar"})"});
+			R"({"id":1,"cmd":"igrammar"})"});
 		REQUIRE(r.responses.size() == 1);
 		const jt* data = response_data(r.responses[0]);
 		REQUIRE(data != nullptr);
@@ -1221,7 +1311,7 @@ TEST_SUITE("tgf json api: production ids") {
 
 	TEST_CASE("a guarded production carries its guard") {
 		auto r = run_repl_on(csv_grammar_path(), {
-			R"({"id":1,"cmd":"internal-grammar"})"});
+			R"({"id":1,"cmd":"igrammar"})"});
 		REQUIRE(r.responses.size() == 1);
 		const jt* data = response_data(r.responses[0]);
 		REQUIRE(data != nullptr);
@@ -1241,7 +1331,7 @@ TEST_SUITE("tgf json api: production ids") {
 
 	TEST_CASE("a conjunctive production has two conjuncts") {
 		auto r = run_repl_on(json_grammar_path(), {
-			R"({"id":1,"cmd":"internal-grammar"})"});
+			R"({"id":1,"cmd":"igrammar"})"});
 		REQUIRE(r.responses.size() == 1);
 		const jt* data = response_data(r.responses[0]);
 		REQUIRE(data != nullptr);
@@ -1301,12 +1391,12 @@ TEST_SUITE("tgf json api: cmd echo") {
 	TEST_CASE("a structured response carries the canonical cmd") {
 		auto r = run_repl({
 			R"({"id":1,"cmd":"set","option":"trim","value":["a"]})",
-			R"({"id":2,"cmd":"internal-grammar"})",
+			R"({"id":2,"cmd":"igrammar"})",
 			eval_request(3, "p 12") });
 		REQUIRE(r.responses.size() == 3);
 		CHECK(member(r.responses[0], "cmd")->get_string() == "set");
 		CHECK(member(r.responses[1], "cmd")->get_string()
-			== "internal-grammar");
+			== "igrammar");
 		std::vector<std::string> keys;
 		for (const jt& kv : jt::get(r.responses[0]).children_trees())
 			keys.push_back(kv.get_string());
@@ -1410,7 +1500,7 @@ TEST_SUITE("tgf json api: no grammar") {
 	TEST_CASE("commands that need a grammar report the error") {
 		auto r = run_repl_no_grammar({
 			R"({"id":1,"cmd":"parse","input":"1"})",
-			R"({"id":2,"cmd":"internal-grammar"})",
+			R"({"id":2,"cmd":"igrammar"})",
 			R"({"id":3,"cmd":"unreachable"})",
 			R"({"id":4,"cmd":"grammar"})",
 			R"({"id":5,"cmd":"reload"})" });
@@ -1825,7 +1915,7 @@ TEST_SUITE("tgf json api: server paths") {
 		scratch_file in("tgf_json_api_server_input.txt", "123");
 		tgf_repl_evaluator re(grammar_path(), no_paths_options());
 		auto r = run_repl_re(re, {
-			file_request(1, "parse file", in.path),
+			file_request(1, "parse_file", in.path),
 			file_request(2, "load", grammar_path()),
 			R"({"id":3,"cmd":"reload"})",
 			eval_request(4, "parse file " + repl_string(in.path)),

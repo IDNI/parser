@@ -33,6 +33,7 @@ namespace idni {
 
 using jt = format::json::tree;
 using diagnostics::code;
+using rp = tgf_repl_parser;
 using tp = tgf_protocol;
 
 // Success result carrying @p v. result<std::string> has no value
@@ -57,24 +58,6 @@ static bool is_symbol(std::string_view s) {
 
 static std::string quote(std::string_view s) {
 	return "\"" + escapes::encode(s, escapes::tgf_string) + "\"";
-}
-
-static bool known_command(const std::string& c) {
-	static const std::set<std::string> names = {
-		"parse", "parse file", "grammar", "internal-grammar",
-		"start", "unreachable", "reload", "load", "help",
-		"version", "license", "quit", "clear", "get", "set",
-		"toggle", "enable", "disable", "add", "delete" };
-	return names.count(c) != 0;
-}
-
-static bool known_help_argument(const std::string& c) {
-	static const std::set<std::string> names = {
-		"grammar", "internal-grammar", "unreachable", "start",
-		"parse", "parse file", "load", "reload", "clear", "help",
-		"quit", "version", "license", "get", "set", "add",
-		"delete", "toggle", "enable", "disable" };
-	return names.count(c) != 0;
 }
 
 // An absent field gives an empty text, a field of another type an error.
@@ -114,17 +97,19 @@ static diagnostics::result<std::string> request_to_src(
 			parser_strings::messages::option_not_found,
 			{ { parser_strings::label::name, name } });
 	};
-	if (!known_command(cmd)) return unknown();
+	const size_t nt = tgf_repl_evaluator_base::command_of(cmd);
+	if (!nt) return unknown();
 
-	if (cmd == "parse" || cmd == "parse file" || cmd == "load") {
-		const char* field = cmd == "parse" ? tp::input : tp::file;
+	if (nt == rp::parse_cmd || nt == rp::parse_file_cmd
+			|| nt == rp::load_cmd) {
+		const char* field = nt == rp::parse_cmd ? tp::input : tp::file;
 		auto s = required_string_field(q, field);
 		if (!s.has_value()) return s;
 		return ok_result(cmd + " " + quote(s.value()));
 	}
 
-	if (cmd == "start" || cmd == "internal-grammar"
-			|| cmd == "unreachable") {
+	if (nt == rp::start_cmd || nt == rp::igrammar_cmd
+			|| nt == rp::unreachable_cmd) {
 		auto sym = optional_string_field(q, tp::symbol);
 		if (!sym.has_value()) return sym;
 		if (sym.value().empty()) return ok_result(cmd);
@@ -135,11 +120,11 @@ static diagnostics::result<std::string> request_to_src(
 		return ok_result(cmd + " " + sym.value());
 	}
 
-	if (cmd == "help") {
+	if (nt == rp::help_cmd) {
 		auto c = optional_string_field(q, tp::command);
 		if (!c.has_value()) return c;
 		if (c.value().empty()) return ok_result(cmd);
-		if (!known_help_argument(c.value()))
+		if (!tgf_repl_evaluator_base::help_argument_of(c.value()))
 			return diagnostics::error<std::string>(
 				code::invalid_argument,
 				parser_strings::messages::invalid_help_argument);
@@ -148,7 +133,7 @@ static diagnostics::result<std::string> request_to_src(
 
 	// A declared name is the only text of the option that reaches the
 	// REPL text. set, add and delete run without REPL text.
-	if (cmd == "get") {
+	if (nt == rp::get_cmd) {
 		auto name = optional_string_field(q, tp::option);
 		if (!name.has_value()) return name;
 		if (name.value().empty()) return ok_result(cmd);
@@ -157,7 +142,8 @@ static diagnostics::result<std::string> request_to_src(
 		return ok_result(cmd + " " + name.value());
 	}
 
-	if (cmd == "toggle" || cmd == "enable" || cmd == "disable") {
+	if (nt == rp::toggle_cmd || nt == rp::enable_cmd
+			|| nt == rp::disable_cmd) {
 		auto name = required_string_field(q, tp::option);
 		if (!name.has_value()) return name;
 		if (!re.session_option(name.value()))
@@ -276,7 +262,7 @@ static tref hello(tgf_repl_evaluator& re,
 // so no value text is parsed as REPL text. The field text holds the value
 // as the REPL writes it, the field value holds it as JSON.
 static std::pair<tref, diagnostics::report> option_request(
-	tgf_repl_evaluator& re, const std::string& cmd, tref q)
+	tgf_repl_evaluator& re, size_t nt, tref q)
 {
 	auto fail = [](std::string_view msg) {
 		diagnostics::report rep;
@@ -287,7 +273,7 @@ static std::pair<tref, diagnostics::report> option_request(
 	auto name = required_string_field(q, tp::option);
 	if (!name.has_value())
 		return { jt::build_object({}), name.report() };
-	const bool add = cmd == "add";
+	const bool add = nt == rp::add_cmd;
 	tref data = nullptr;
 	if (req.find(tp::text) && req.find(tp::value))
 		return fail(parser_strings::messages::invalid_field_type);
@@ -295,7 +281,7 @@ static std::pair<tref, diagnostics::report> option_request(
 		auto t = required_string_field(q, tp::text);
 		if (!t.has_value())
 			return { jt::build_object({}), t.report() };
-		data = cmd == "set" ? re.set_cmd(name.value(), t.value())
+		data = nt == rp::set_cmd ? re.set_cmd(name.value(), t.value())
 			: re.list_cmd(name.value(), t.value(), add);
 		return { data, re.take_report() };
 	}
@@ -303,7 +289,8 @@ static std::pair<tref, diagnostics::report> option_request(
 	if (!f) return fail(parser_strings::messages::missing_field);
 	auto v = option_of(f);
 	if (!v) return fail(parser_strings::messages::invalid_field_type);
-	if (cmd == "set") data = re.set_option(name.value(), std::move(*v));
+	if (nt == rp::set_cmd)
+		data = re.set_option(name.value(), std::move(*v));
 	else if (const auto* entries = std::get_if<option_list>(&*v))
 		data = re.edit_option_list(name.value(), *entries, add);
 	else return fail(parser_strings::messages::invalid_field_type);
@@ -336,7 +323,8 @@ static std::pair<tref, cmd_status> handle_request(
 	}
 	// The load form with source text carries no path, so it runs the
 	// evaluator directly instead of going through the REPL text.
-	if (cmd.value() == "load" && jt::get(q).find(tp::source)) {
+	const size_t nt = tgf_repl_evaluator_base::command_of(cmd.value());
+	if (nt == rp::load_cmd && jt::get(q).find(tp::source) != nullptr) {
 		auto name = required_string_field(q, tp::name);
 		if (!name.has_value())
 			return { json_error_response(id, state_value(re),
@@ -347,17 +335,13 @@ static std::pair<tref, cmd_status> handle_request(
 				source.report()), cmd_status::error };
 		auto data = re.load_source_data(name.value(), source.value());
 		auto rep = re.take_report();
-		cmd_status st = rep.has_error()
-			? cmd_status::error : cmd_status::ok;
+		cmd_status st = tgf_repl_evaluator_base::report_status(rep);
 		return { json_result_response(st, cmd.value(), data,
 			state_value(re), rep, id), st };
 	}
-	if (cmd.value() == "set" || cmd.value() == "add"
-		|| cmd.value() == "delete")
-	{
-		auto [data, rep] = option_request(re, cmd.value(), q);
-		cmd_status st = rep.has_error()
-			? cmd_status::error : cmd_status::ok;
+	if (nt == rp::set_cmd || nt == rp::add_cmd || nt == rp::del_cmd) {
+		auto [data, rep] = option_request(re, nt, q);
+		cmd_status st = tgf_repl_evaluator_base::report_status(rep);
 		return { json_result_response(st, cmd.value(), data,
 			state_value(re), rep, id), st };
 	}

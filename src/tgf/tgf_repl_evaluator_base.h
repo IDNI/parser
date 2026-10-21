@@ -8,6 +8,7 @@
 #include <ostream>
 #include <set>
 #include <string>
+#include <string_view>
 
 #include "utility/diagnostics.h"
 #include "utility/repl_evaluator_base.h"
@@ -88,6 +89,16 @@ struct tgf_repl_evaluator_base : repl_evaluator_base<tgf_repl_parser,
 	/// The text of one answer, from its data only, so a local and a
 	/// remote answer print the same text.
 	void render_text(const cmd_result& r, std::ostream& os) const;
+
+	/// The name of a command or help argument nonterminal without its
+	/// "_cmd" or "_sym", for example "parse_file". Empty for any other
+	/// nonterminal.
+	static std::string_view name_of(size_t nt);
+	/// The command nonterminal named @p name, 0 for an unknown name.
+	static size_t command_of(std::string_view name);
+	/// The help argument nonterminal named @p name, 0 for an unknown
+	/// name.
+	static size_t help_argument_of(std::string_view name);
 
 	/// The option name of a get, set, add, delete or toggle statement.
 	static std::string option_name(const trv& s);

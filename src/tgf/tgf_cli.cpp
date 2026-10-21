@@ -48,62 +48,6 @@ static tref range_value(const std::array<size_t, 2>& range) {
 		jt::build_number(static_cast<double>(range[1])) });
 }
 
-// Long command name for a command nonterminal.
-static const char* command_name(size_t nt) {
-	using p = tgf_repl_parser;
-	switch (nt) {
-	case p::parse_cmd:       return "parse";
-	case p::parse_file_cmd:  return "parse file";
-	case p::grammar_cmd:     return "grammar";
-	case p::igrammar_cmd:    return "internal-grammar";
-	case p::start_cmd:       return "start";
-	case p::unreachable_cmd: return "unreachable";
-	case p::reload_cmd:      return "reload";
-	case p::load_cmd:        return "load";
-	case p::help_cmd:        return "help";
-	case p::version_cmd:     return "version";
-	case p::license_cmd:     return "license";
-	case p::quit_cmd:        return "quit";
-	case p::clear_cmd:       return "clear";
-	case p::get_cmd:         return "get";
-	case p::set_cmd:         return "set";
-	case p::toggle_cmd:      return "toggle";
-	case p::enable_cmd:      return "enable";
-	case p::disable_cmd:     return "disable";
-	case p::add_cmd:         return "add";
-	case p::del_cmd:         return "delete";
-	default:                 return "";
-	}
-}
-
-// Long command name for a help argument nonterminal.
-static const char* help_arg_name(size_t nt) {
-	using p = tgf_repl_parser;
-	switch (nt) {
-	case p::grammar_sym:     return "grammar";
-	case p::igrammar_sym:    return "internal-grammar";
-	case p::unreachable_sym: return "unreachable";
-	case p::start_sym:       return "start";
-	case p::parse_sym:       return "parse";
-	case p::parse_file_sym:  return "parse file";
-	case p::load_sym:        return "load";
-	case p::reload_sym:      return "reload";
-	case p::clear_sym:       return "clear";
-	case p::help_sym:        return "help";
-	case p::quit_sym:        return "quit";
-	case p::version_sym:     return "version";
-	case p::license_sym:     return "license";
-	case p::get_sym:         return "get";
-	case p::set_sym:         return "set";
-	case p::add_sym:         return "add";
-	case p::del_sym:         return "delete";
-	case p::toggle_sym:      return "toggle";
-	case p::enable_sym:      return "enable";
-	case p::disable_sym:     return "disable";
-	default:                 return "help";
-	}
-}
-
 // bintree<pnode>::M() and its hit/miss/geth counters are process-wide
 // statics (shared by grammar loading, the target parse and post-parse
 // tree shaping), so they are read here once, not folded into per-parse
@@ -934,7 +878,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 	using p = tgf_repl_parser;
 	const auto nt = s | tt::nonterminal;
 	cmd_result res;
-	res.cmd = command_name(nt);
+	res.cmd = name_of(nt);
 	tref data = nullptr;
 	{
 		auto _ = report.open_if(
@@ -956,7 +900,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 				: static_cast<size_t>(p::help_sym);
 			data = jt::build_object({
 				jt::build_pair(tp::command,
-					jt::build_string(help_arg_name(target))),
+					jt::build_string(name_of(target))),
 				jt::build_pair(tp::text, jt::build_string(
 					help_text(*this, target,
 						!fixed_grammar))) });
@@ -1111,7 +1055,7 @@ void tgf_repl_evaluator::on_parsed(tgf_repl_parser::result& res) {
 	if (idni::options().get<bool>("debug")) {
 		bintree<format::json::node>::gc_pause pause;
 		cmd_result graph;
-		graph.cmd = command_name(tgf_repl_parser::parse_cmd);
+		graph.cmd = name_of(tgf_repl_parser::parse_cmd);
 		graph.data = jt::geth(jt::build_object({
 			jt::build_pair(tp::tree, format::ast_json::node_to_tree<
 				tgf_repl_parser::tree>(res.get_shaped_tree2())) }));
@@ -1140,7 +1084,7 @@ tref statement_request(const tgf_repl_evaluator::trv& n) {
 	using p = tgf_repl_parser;
 	using base = tgf_repl_evaluator_base;
 	const auto nt = n | tt::nonterminal;
-	trefs req{ jt::build_pair(tp::cmd, jt::build_string(command_name(nt))) };
+	trefs req{ jt::build_pair(tp::cmd, jt::build_string(base::name_of(nt))) };
 	auto add = [&req](const char* key, std::string_view v) {
 		req.push_back(jt::build_pair(key, jt::build_string(v)));
 	};
@@ -1173,7 +1117,7 @@ tref statement_request(const tgf_repl_evaluator::trv& n) {
 	}
 	case p::help_cmd: {
 		auto h = n | p::help_arg;
-		if (h.has_value()) add(tp::command, help_arg_name(
+		if (h.has_value()) add(tp::command, base::name_of(
 			h | tt::only_child | tt::nonterminal));
 		break;
 	}
@@ -1642,7 +1586,8 @@ static int run_command(const parsed_args& args, tgf_tool& tool,
 		}
 		if (opts.get<bool>("grammar")) re.eval("i");
 		cmd_result parse_result;
-		parse_result.cmd = command_name(tgf_repl_parser::parse_cmd);
+		parse_result.cmd = tgf_repl_evaluator_base::name_of(
+			tgf_repl_parser::parse_cmd);
 		tref data = nullptr;
 		if (infile == "-") data = re.parse(cin);
 		else if (infile.size()) data = re.parse(infile);

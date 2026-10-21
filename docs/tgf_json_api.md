@@ -63,17 +63,24 @@ Structured fields:
 | cmd | fields |
 |---|---|
 | `parse` | `input` (string) |
-| `parse file` | `file` (string) |
+| `parse_file` | `file` (string) |
 | `load` | `file` (string), or `name` and `source` (strings) |
-| `start`, `internal-grammar`, `unreachable` | `symbol` (string, optional) |
+| `start`, `igrammar`, `unreachable` | `symbol` (string, optional) |
 | `help` | `command` (string, optional) |
 | `get` | `option` (string, optional) |
 | `set` | `option`, and `value` (bool, number, string or string array) or `text` (string) |
 | `toggle`, `enable`, `disable` | `option` |
-| `add`, `delete` | `option`, and `value` (string array) or `text` (string) |
+| `add`, `del` | `option`, and `value` (string array) or `text` (string) |
 | `grammar`, `reload`, `version`, `license`, `quit`, `clear`, `hello` | none |
 
-`set`, `add` and `delete` take the value as JSON in `value`, or as the
+The name of a command is the name of its nonterminal in
+`src/tgf/tgf_repl.tgf` without `_cmd`, for example `parse_file` for
+`parse_file_cmd`. A `help` argument is a command name too. The REPL
+accepts each command name as a word, and also its other words, for
+example `parse file` and `pf`. A request with another name is an unknown
+command.
+
+`set`, `add` and `del` take the value as JSON in `value`, or as the
 REPL writes it in `text`, for example `"a > b"` for `inline`. A request
 has one of the two fields. An empty array for `set` clears a list option.
 Every option name is checked against the session options, every symbol
@@ -149,9 +156,9 @@ message with the value 0 has no `value`, and a missing `value` is 0.
 
 | Command | `result` data |
 |---|---|
-| `parse`, `parse file` | `{"input"?,"ambiguous"?,"terminals"?,"tml_rules"?,"tml_facts"?,"tree"?}` |
+| `parse`, `parse_file` | `{"input"?,"ambiguous"?,"terminals"?,"tml_rules"?,"tml_facts"?,"tree"?}` |
 | `grammar` | `{"file":"...","source":"..."}` |
-| `internal-grammar` | `{"start":"...","productions":["..."],"production_ids":[{...}]}` |
+| `igrammar` | `{"start":"...","productions":["..."],"production_ids":[{...}]}` |
 | `start` | `{"start":"..." or null,"changed":true}` |
 | `unreachable` | `{"symbol":"...","productions":["..."],"production_ids":[{...}]}` |
 | `load`, `reload` | `{"grammar":"...","loaded":true}` |
@@ -161,7 +168,7 @@ message with the value 0 has no `value`, and a missing `value` is 0.
 | `quit` | `{}` with status `quit` |
 | `clear` | `{}` |
 | `get` | `{"options":{"name":value,...}}` or `{"option":"name","value":v}` |
-| `set`, `toggle`, `enable`, `disable`, `add`, `delete` | same as `get` for that option |
+| `set`, `toggle`, `enable`, `disable`, `add`, `del` | same as `get` for that option |
 
 An option value is a bool for a flag, a number for a numeric option, a
 string for a text option, and an array of strings for a list option. An
@@ -209,7 +216,7 @@ ids carry what the text shows as `sym(5)` and `G0`:
 - `conjunctive`: true when the production has more than one conjunct.
   The text shows it as `# conjunctive`.
 
-The arrays appear on `internal-grammar`, `unreachable`,
+The arrays appear on `igrammar`, `unreachable`,
 `grammar --json` and the `internal_grammar` of
 `parse --json --grammar`.
 
@@ -292,7 +299,7 @@ A null node is skipped. The schema is
   `{"cmd":..,"status":..,"result":..,"state":{...},"report":..}` and
   exit. No `hello` line and no `id`.
 - `parse --json --grammar` adds the internal grammar under
-  `internal_grammar`, in the shape of the `internal-grammar` command.
+  `internal_grammar`, in the shape of the `igrammar` command.
 - `parse --json --measure` writes no text and adds the bintree totals
   under `bintree_totals` as numbers, plus `chain_length_histogram` (the
   eight bins of the text), `top_hash_groups`
@@ -319,10 +326,10 @@ symbol is set, `hello.start`, `state.start`, the `start` option and the
 `start` command give it, also with no grammar.
 
 Commands that need productions report the error
-`no grammar loaded, use load`: `parse`, `parse file`,
-`internal-grammar`, `unreachable`, `grammar` and `reload`. `load`
+`no grammar loaded, use load`: `parse`, `parse_file`,
+`igrammar`, `unreachable`, `grammar` and `reload`. `load`
 installs a grammar. `get`, `set`, `toggle`, `enable`, `disable`, `add`,
-`delete`, `help`, `version`, `license`, `quit` and `clear` work as
+`del`, `help`, `version`, `license`, `quit` and `clear` work as
 usual. `set start foo` stores the start symbol, and the later `load`
 uses it.
 
