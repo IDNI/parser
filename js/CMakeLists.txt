@@ -29,6 +29,7 @@ endif()
 set(JSLIB_COMPILE_OPTIONS
 	"$<$<CONFIG:DEBUG>:-O0;-DDEBUG;-gsource-map;-fno-exceptions>"
 	"$<$<CONFIG:RELEASE>:-O3;-DNDEBUG;-g0;-fno-exceptions>"
+	"$<$<CONFIG:DEVEL>:-O0;-DDEBUG;-g0;-fno-exceptions>"
 )
 set(JSLIB_LINK_OPTIONS "--bind --no-entry -lnodefs.js")
 string(APPEND JSLIB_LINK_OPTIONS " -s EXPORT_NAME='tauparser'")
