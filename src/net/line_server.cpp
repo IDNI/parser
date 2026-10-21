@@ -144,6 +144,7 @@ struct line_server {
 	void accept_tcp(size_t i);
 	void on_accept(conn_socket sock, peer_info peer);
 	void retry_accept(std::function<void()> accept);
+	bool full(line_transport_kind k) const;
 
 	void output(const std::string& line) const;
 	void print_start();
@@ -335,6 +336,7 @@ void connection_sink::close() { c.close_after_flush(); }
 line_server::line_server(const line_server_options& o)
 	: opt(o), io(), signals(io)
 {
+	if (opt.max_sessions == 0) opt.max_sessions = 1;
 }
 
 void line_server::output(const std::string& line) const {
@@ -435,6 +437,11 @@ void line_server::retry_accept(std::function<void()> accept) {
 	});
 }
 
+// True when a new connection is over the session limit.
+bool line_server::full(line_transport_kind) const {
+	return connections.size() >= opt.max_sessions;
+}
+
 void line_server::accept_tcp(size_t i) {
 	tcp_listeners[i].acceptor->async_accept(
 		[this, i](error_code ec, tcp::socket s) {
@@ -452,6 +459,10 @@ void line_server::accept_tcp(size_t i) {
 void line_server::on_accept(conn_socket sock, peer_info peer) {
 	auto c = std::make_shared<server_connection>(this, std::move(sock),
 		std::move(peer));
+	if (full(c->session.peer.kind)) {
+		c->refuse(diagnostics::code::out_of_range, opt.busy_message);
+		return;
+	}
 	std::optional<std::string> sid = new_session_id();
 	while (sid.has_value() && connections.find(*sid) != connections.end())
 		sid = new_session_id();

@@ -64,9 +64,12 @@ struct line_session {
 /// addresses at once.
 struct line_server_options {
 	std::vector<listen_address> listen{};
+	/// At this count the server refuses a new connection with busy_message.
+	size_t max_sessions = 16;
 	/// The wait after a failed accept, so a lack of file descriptors does
 	/// not keep the loop busy.
 	size_t accept_retry_ms = 100;
+	std::string busy_message = "the server takes no more sessions";
 	/// Largest request line or message. The tail of a longer line is
 	/// dropped.
 	size_t max_line = 16u * 1024 * 1024;

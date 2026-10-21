@@ -214,6 +214,20 @@ TEST_SUITE("line server: tcp") {
 		CHECK(has(c.read_line(), "\"status\":\"ok\""));
 		CHECK(seen.load());
 	}
+	TEST_CASE("max_sessions 1: the second connection gets the busy answer") {
+		auto o = tcp_options();
+		o.max_sessions = 1;
+		server_thread s(o);
+		tcp_client c1(loopback(s.tcp_port()));
+		c1.send("{\"cmd\":\"open\"}");
+		CHECK(has(c1.read_line(), "\"status\":\"ok\""));
+		tcp_client c2(loopback(s.tcp_port()));
+		const std::string l = c2.read_line();
+		CHECK(has(l, "\"status\":\"error\""));
+		CHECK(has(l, o.busy_message));
+		CHECK(c2.at_eof(5000));
+		CHECK_FALSE(c1.at_eof(200));
+	}
 	TEST_CASE("a line over max_line: the error, the next line works") {
 		auto o = tcp_options();
 		o.max_line = 32;
@@ -360,5 +374,18 @@ TEST_SUITE("line server: start and stop") {
 		const auto lines = s.wait_listening(1);
 		REQUIRE_FALSE(lines.empty());
 		CHECK(has(lines[0], " listening on 127.0.0.1:"));
+	}
+}
+
+TEST_SUITE("line server: max_sessions 0") {
+	TEST_CASE("max_sessions 0 takes one session") {
+		auto o = tcp_options();
+		o.max_sessions = 0;
+		server_thread s(o);
+		tcp_client c1(loopback(s.tcp_port()));
+		c1.send("{\"cmd\":\"open\"}");
+		CHECK(has(c1.read_line(), "\"status\":\"ok\""));
+		tcp_client c2(loopback(s.tcp_port()));
+		CHECK(has(c2.read_line(), o.busy_message));
 	}
 }
