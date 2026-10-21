@@ -247,6 +247,16 @@ inline diagnostics::result<void> options_repository::store(std::size_t i,
 	return r;
 }
 
+inline diagnostics::result<void> options_repository::store_given(
+	std::size_t i, option_value v)
+{
+	const bool was = given_[i];
+	given_[i] = true;
+	auto r = store(i, std::move(v));
+	if (r.has_error()) given_[i] = was;
+	return r;
+}
+
 inline diagnostics::result<void> options_repository::declare(
 	const option_set& set)
 {
@@ -281,6 +291,7 @@ inline diagnostics::result<void> options_repository::declare(
 	if (r.has_error()) return r;
 	values_.resize(cat->specs.size());
 	bindings_.resize(cat->specs.size());
+	given_.resize(cat->specs.size());
 	cat_ = std::move(cat);
 	return r;
 }
@@ -354,7 +365,7 @@ inline diagnostics::result<void> options_repository::set(
 		return r.with_error(diagnostics::code::type_error,
 			ps::messages::option_value_kind,
 			{ { ps::label::name, name } });
-	r.merge(store(*i, std::move(value)));
+	r.merge(store_given(*i, std::move(value)));
 	return r;
 }
 
@@ -466,7 +477,7 @@ inline diagnostics::result<void> options_repository::set_text(
 		ps::messages::option_not_found, { { ps::label::name, name } });
 	auto v = r.merge_take(detail::parse_value(cat_->specs[*i], text));
 	if (!v) return r;
-	r.merge(store(*i, std::move(*v)));
+	r.merge(store_given(*i, std::move(*v)));
 	return r;
 }
 
@@ -490,6 +501,11 @@ inline std::vector<std::string> options_repository::names() const {
 	std::vector<std::string> out;
 	for (const auto& o : cat_->specs) out.push_back(o.name);
 	return out;
+}
+
+inline bool options_repository::given(std::string_view name) const {
+	const auto i = cat_->find(name);
+	return i && given_[*i];
 }
 
 inline std::shared_ptr<const option_spec> options_repository::find(
@@ -537,7 +553,7 @@ inline diagnostics::result<void> options_repository::load_env(
 			continue;
 		}
 		// a codec error names only the option, so the variable goes first
-		auto stored = store(i, std::move(v.value()));
+		auto stored = store_given(i, std::move(v.value()));
 		if (stored.has_error())
 			r.error(diagnostics::code::invalid_argument,
 				ps::messages::option_env_bad_value,
@@ -762,7 +778,7 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 	if (r.has_error()) return r;
 	command_ = out.command;
 	for (auto& [i, v] : pending) {
-		r.merge(store(i, v));
+		r.merge(store_given(i, v));
 		out.values.emplace_back(cat.specs[i].name, std::move(v));
 	}
 	return r.with_value(std::move(out));

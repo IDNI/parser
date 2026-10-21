@@ -969,6 +969,26 @@ TEST_CASE("a word that is no file and no URL is an error") {
 	}
 }
 
+TEST_CASE("given names the options that argv or the environment wrote") {
+	fixture f;
+	CHECK_FALSE(f.repo.given("verbose"));
+	CHECK_FALSE(f.repo.given("no such option"));
+	test_setenv("GIVEN_TEST_QUIET", "true");
+	REQUIRE(f.repo.load_env("GIVEN_TEST_").has_value());
+	test_unsetenv("GIVEN_TEST_QUIET");
+	CHECK(f.repo.given("quiet"));
+	argv_of a{ "tool", "-v" };
+	REQUIRE(f.repo.parse_args(a.argc(), a.argv(), tool_config())
+		.has_value());
+	CHECK(f.repo.given("verbose"));
+	CHECK_FALSE(f.repo.given("help"));
+	// a typed set is a write of the program, set_text one of the user
+	f.repo.set("force", true);
+	CHECK_FALSE(f.repo.given("force"));
+	REQUIRE(f.repo.set_text("force", "false").has_value());
+	CHECK(f.repo.given("force"));
+}
+
 TEST_CASE("--help sets the help option") {
 	fixture f;
 	argv_of a{ "tool", "-h" };

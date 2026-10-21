@@ -139,6 +139,11 @@ struct options_repository {
 	[[nodiscard]] diagnostics::result<std::string> get_text(
 		std::string_view name) const;
 	std::vector<std::string> names() const;
+	/// True when the environment, the command line, set() of an
+	/// option_value or set_text() gave a value for @p name. A typed
+	/// set<T>() is a write of the program and does not count. An unknown
+	/// name gives false.
+	bool given(std::string_view name) const;
 	/// The declared option @p name, or null when no option has the name.
 	/// The spec stays valid after a later declare().
 	std::shared_ptr<const option_spec> find(std::string_view name) const;
@@ -178,6 +183,12 @@ private:
 	std::shared_ptr<const detail::options_catalog> cat_;
 	std::vector<std::optional<option_value>> values_;
 	std::vector<std::optional<detail::option_binding>> bindings_;
+	// the options that a user wrote, see given()
+	std::vector<bool> given_;
+	/// Store @p v as a value of the user: given() is true already when
+	/// the hook of the option runs.
+	[[nodiscard]] diagnostics::result<void> store_given(std::size_t i,
+		option_value v);
 	// an owner can outlive the repository, as a static one does a thread local
 	std::vector<std::pair<const void*, std::function<void()>>> detach_;
 	/// The command of the last parse_args(), which selects the surface
