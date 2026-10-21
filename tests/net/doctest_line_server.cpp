@@ -835,6 +835,28 @@ TEST_SUITE("line server: limits") {
 		CHECK(c.at_eof(5000));
 		CHECK(has(s.out.text(), "\"event\":\"idle-timeout\""));
 	}
+	TEST_CASE("close_timeout_seconds bounds the close handshake") {
+		for (const bool close_time : { true, false }) {
+			CAPTURE(close_time);
+			auto o = ws_options();
+			o.idle_timeout_seconds = 1;
+			o.upgrade_timeout_seconds = close_time ? 30 : 4;
+			if (close_time) o.close_timeout_seconds = 1;
+			server_thread s(o);
+			tcp_client c(loopback(s.tcp_port()));
+			c.send_raw(upgrade_request("/ws", ""));
+			CHECK(c.read_line() == "HTTP/1.1 101 Switching Protocols");
+			c.send_raw(text_frame("{\"cmd\":\"open\"}"));
+			// The client never answers the close frame of the idle end.
+			const auto start = std::chrono::steady_clock::now();
+			const std::string rest = read_to_close(c);
+			const auto took = std::chrono::steady_clock::now() - start;
+			CHECK(c.eof_seen);
+			CHECK(rest.find(char(0x88)) != std::string::npos);
+			if (close_time) CHECK(took < std::chrono::seconds(4));
+			else CHECK(took >= std::chrono::seconds(4));
+		}
+	}
 	TEST_CASE("a close asked in on_line runs on_close after on_line") {
 		std::atomic<int> result{ 0 };
 		auto o = tcp_options();

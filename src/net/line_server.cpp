@@ -979,6 +979,14 @@ void ws_upgrade::upgrade() {
 	auto self = shared_from_this();
 	ws->async_accept(req, [self](error_code ec) {
 		if (ec || self->srv->stopping) return;
+		// After the accept the handshake timeout bounds the close only.
+		if (const auto& close = self->srv->opt.close_timeout_seconds) {
+			beast::websocket::stream_base::timeout c{};
+			c.handshake_timeout = std::chrono::seconds(*close);
+			c.idle_timeout = beast::websocket::stream_base::none();
+			c.keep_alive_pings = false;
+			self->ws->set_option(c);
+		}
 		if (self->refused_origin) return self->send_refusal();
 		self->srv->on_accept(conn_socket(std::move(*self->ws)),
 			std::move(self->peer));

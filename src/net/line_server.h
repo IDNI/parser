@@ -96,8 +96,12 @@ struct line_server_options {
 	/// At this count the server refuses a new connection with busy_message.
 	size_t max_sessions = 16;
 	/// websocket: close a client that sends no complete upgrade request in
-	/// this time. The same time bounds the websocket close handshake.
+	/// this time. The same time bounds the websocket close handshake when
+	/// close_timeout_seconds has no value.
 	size_t upgrade_timeout_seconds = 30;
+	/// websocket: the time of the close handshake. The socket closes when
+	/// the client does not answer the close frame in this time.
+	std::optional<size_t> close_timeout_seconds{};
 	/// The wait after a failed accept, so a lack of file descriptors does
 	/// not keep the loop busy.
 	size_t accept_retry_ms = 100;
