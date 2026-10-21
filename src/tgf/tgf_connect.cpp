@@ -29,7 +29,8 @@ namespace idni {
 namespace ba = boost::asio;
 using ba::ip::tcp;
 using boost::system::error_code;
-using format::json::value;
+using jt = format::json::tree;
+using jtt = format::json::tt;
 
 using tt = tgf_repl_parser::tree::traverser;
 
@@ -47,10 +48,9 @@ struct tgf_remote_client {
 		return !ec;
 	}
 
-	bool send_line(const value& v) {
+	bool send_line(tref v) {
 		std::ostringstream os;
-		format::json::print(v, os);
-		os << '\n';
+		format::json::write_line(v, os);
 		std::string s = os.str();
 		error_code ec;
 		ba::write(sock, ba::buffer(s), ec);
@@ -91,23 +91,24 @@ diagnostics::report tgf_remote_evaluator::take_report() {
 	return rep;
 }
 
-void tgf_remote_evaluator::apply_state(const value& state) {
-	if (auto g = state.find("grammar"); g) {
-		state_grammar_set = g->is_string();
-		if (state_grammar_set) state_grammar = g->as_string();
+void tgf_remote_evaluator::apply_state(tref state) {
+	const jt& st = jt::get(state);
+	if (tref g = st.find("grammar"); g) {
+		state_grammar_set = jt::get(g).is_string();
+		if (state_grammar_set) state_grammar = jt::get(g).get_string();
 	}
-	if (auto s = state.find("start"); s) {
-		state_start_set = s->is_string();
-		if (state_start_set) state_start = s->as_string();
+	if (tref s = st.find("start"); s) {
+		state_start_set = jt::get(s).is_string();
+		if (state_start_set) state_start = jt::get(s).get_string();
 	}
 	// The client colors a nonterminal name from this list, so the text
 	// matches the local printer's character class color.
-	if (auto c = state.find("char_classes"); c && c->is_array()) {
+	if (tref c = st.find("char_classes"); c && jt::get(c).is_array()) {
 		state_char_classes.clear();
-		for (const auto& n : *c)
+		for (const jt& n : jt::get(c).children_trees())
 			if (n.is_number())
 				state_char_classes.insert(
-					static_cast<size_t>(n.as_number()));
+					static_cast<size_t>(n.get_number()));
 	}
 }
 
@@ -120,10 +121,12 @@ bool tgf_remote_evaluator::connect(const std::string& host, uint16_t port,
 			parser_strings::messages::connect_failed);
 		return false;
 	}
-	value req = value::object();
-	if (session.empty()) req.set("cmd", value::string("new"));
-	else req.set("cmd", value::string("attach"))
-		.set("session", value::string(session));
+	tref req = session.empty()
+		? jt::build_object({
+			jt::build_pair("cmd", jt::build_string("new")) })
+		: jt::build_object({
+			jt::build_pair("cmd", jt::build_string("attach")),
+			jt::build_pair("session", jt::build_string(session)) });
 	if (!client->send_line(req)) {
 		report.error(diagnostics::code::io_error,
 			parser_strings::messages::connect_failed);
@@ -140,29 +143,28 @@ bool tgf_remote_evaluator::connect(const std::string& host, uint16_t port,
 				parser_strings::messages::connect_failed);
 			return false;
 		}
-		auto v = format::json::parse(line);
+		auto v = jt::get(std::string_view(line));
 		if (!v.has_value()) continue;
-		const value& resp = v.value();
-		auto hello = resp.find("hello");
-		if (hello) {
-			if (auto s = hello->find("session"); s && s->is_string())
-				session_id_ = s->as_string();
-			if (auto s = resp.find("state"); s && s->is_object())
-				apply_state(*s);
+		const tref resp = v.value();
+		const jt& rt = jt::get(resp);
+		if (tref hello = rt.find("hello"); hello) {
+			if (auto s = format::json::string_member(hello,
+					"session"); s)
+				session_id_ = *s;
+			if (tref s = rt.find("state"); s && jt::get(s).is_object())
+				apply_state(s);
 			reprompt();
 			return true;
 		}
 		// No hello before this line: it is a buffered answer or the
 		// attach error. The server error carries no state and no cmd.
-		bool is_error = false;
-		if (auto st = resp.find("status"); st && st->is_string())
-			is_error = st->as_string() == "error";
-		if (is_error && !resp.find("state")
-				&& !resp.find("cmd")) {
-			if (auto rep = resp.find("report"); rep)
+		const std::string* st = format::json::string_member(resp,
+			"status");
+		const bool is_error = st && *st == "error";
+		if (is_error && !rt.find("state") && !rt.find("cmd")) {
+			if (tref rep = rt.find("report"); rep)
 				print_diagnostics_report(
-					format::json::report_from_value(*rep),
-					false);
+					format::json::report_of(rep), false);
 			report.error(diagnostics::code::invalid_argument,
 				parser_strings::messages::connect_failed);
 			return false;
@@ -202,35 +204,42 @@ static cmd_status status_from_name(const std::string& st) {
 
 // Render one response object the way a normal answer is rendered. The
 // reply of an `eval` request carries one entry per statement in `results`.
-cmd_status tgf_remote_evaluator::render_response(const value& resp,
+cmd_status tgf_remote_evaluator::render_response(tref resp,
 	const std::string& fallback_cmd)
 {
-	if (auto st = resp.find("state"); st && st->is_object())
-		apply_state(*st);
-	auto render_one = [this](const value& r, const std::string& cmd0) {
+	using format::json::string_member;
+	const jt& rt = jt::get(resp);
+	if (tref st = rt.find("state"); st && jt::get(st).is_object())
+		apply_state(st);
+	auto print_report = [](tref r) {
+		if (tref rep = jt::get(r).find("report");
+				rep && jt::get(rep).is_object())
+			print_diagnostics_report(format::json::report_of(rep),
+				false);
+	};
+	auto render_one = [this, &print_report](tref r,
+		const std::string& cmd0)
+	{
 		cmd_result cr;
 		cr.cmd = cmd0;
-		if (auto c = r.find("cmd"); c && c->is_string())
-			cr.cmd = c->as_string();
-		if (auto s = r.find("status"); s && s->is_string())
-			cr.status = status_from_name(s->as_string());
-		if (auto d = r.find("result"); d) cr.data = *d;
+		if (auto c = string_member(r, "cmd"); c) cr.cmd = *c;
+		if (auto s = string_member(r, "status"); s)
+			cr.status = status_from_name(*s);
+		if (tref d = jt::get(r).find("result"); d)
+			cr.data = jt::geth(d);
 		render_command_text(cr, out, TC, &state_char_classes);
 		// The client prints the whole report through the text printer
 		// of the local REPL, so its info and timing nodes appear in
 		// the same cases.
-		if (auto rep = r.find("report"); rep && rep->is_object())
-			print_diagnostics_report(
-				format::json::report_from_value(*rep), false);
+		print_report(r);
 	};
 	cmd_status top = cmd_status::ok;
-	if (auto s = resp.find("status"); s && s->is_string())
-		top = status_from_name(s->as_string());
-	if (auto rs = resp.find("results"); rs && rs->is_array()) {
-		for (const auto& e : *rs) render_one(e, "");
-		if (auto rep = resp.find("report"); rep && rep->is_object())
-			print_diagnostics_report(
-				format::json::report_from_value(*rep), false);
+	if (auto s = string_member(resp, "status"); s)
+		top = status_from_name(*s);
+	if (tref rs = rt.find("results"); rs && jt::get(rs).is_array()) {
+		for (tref e : (jtt(rs) | jtt::children | jtt::refs))
+			render_one(e, "");
+		print_report(resp);
 	} else render_one(resp, fallback_cmd);
 	out.flush();
 	return top;
@@ -238,28 +247,27 @@ cmd_status tgf_remote_evaluator::render_response(const value& resp,
 
 // Send one structured request and render the answer. 0 continues, 1 is
 // quit and 2 is incomplete.
-int tgf_remote_evaluator::send_statement(value req) {
-	auto cmd = req.find("cmd");
-	std::string name = cmd && cmd->is_string() ? cmd->as_string() : "";
+int tgf_remote_evaluator::send_statement(tref req) {
+	using format::json::string_member;
+	const std::string* cmd = string_member(req, "cmd");
+	std::string name = cmd ? *cmd : "";
 	// load and parse file carry the file text, not a path: the server
 	// never reads a path a client gives.
 	if (name == "load" || name == "parse file") {
-		auto f = req.find("file");
-		std::string path = f && f->is_string() ? f->as_string() : "";
+		const std::string* f = string_member(req, "file");
+		std::string path = f ? *f : "";
 		std::string text;
 		if (!read_file(path, text)) {
 			out << "error: could not open file: " << path << "\n";
 			return 0;
 		}
-		value r2 = value::object();
-		if (name == "load")
-			r2.set("cmd", value::string("load"))
-			  .set("name", value::string(path))
-			  .set("source", value::string(text));
-		else
-			r2.set("cmd", value::string("parse"))
-			  .set("input", value::string(text));
-		req = std::move(r2);
+		if (name == "load") req = jt::build_object({
+			jt::build_pair("cmd", jt::build_string("load")),
+			jt::build_pair("name", jt::build_string(path)),
+			jt::build_pair("source", jt::build_string(text)) });
+		else req = jt::build_object({
+			jt::build_pair("cmd", jt::build_string("parse")),
+			jt::build_pair("input", jt::build_string(text)) });
 	}
 	if (!client || !client->send_line(req)) {
 		out << "error: the connection is gone\n";
@@ -270,13 +278,12 @@ int tgf_remote_evaluator::send_statement(value req) {
 		out << "error: the connection is gone\n";
 		return 1;
 	}
-	auto p = format::json::parse(line);
+	auto p = jt::get(std::string_view(line));
 	if (!p.has_value()) {
 		out << "error: the server sent an unreadable response\n";
 		return 0;
 	}
-	const value& resp = p.value();
-	cmd_status status = render_response(resp, name);
+	cmd_status status = render_response(p.value(), name);
 	reprompt();
 	if (status == cmd_status::quit) return 1;
 	if (status == cmd_status::incomplete) return 2;
@@ -308,7 +315,7 @@ diagnostics::result<int> tgf_remote_evaluator::eval(const std::string& src) {
 	auto statements = t || tgf_repl_parser::statement;
 	for (const auto& statement : statements()) {
 		auto req = statement_request(statement | tt::only_child);
-		int rc = send_statement(std::move(req));
+		int rc = send_statement(req);
 		if (rc == 1) { res.emplace(1); return res; }
 		if (rc == 2) { res.emplace(2); return res; }
 	}

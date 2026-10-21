@@ -994,7 +994,9 @@ static value serve_init_line(const tgf_repl_evaluator& re,
 	}
 	init.set("start", re.start_symbol().empty() ? value::null()
 		: value::string(re.start_symbol()));
-	init.set("options", re.option_values());
+	// The option values are a json::tree, and this line is a json::value.
+	init.set("options", format::json::parse(format::json::tree::get(
+		re.option_values()).to_str()).value());
 	init.set("max_line", value::number(
 		static_cast<double>(max_line)));
 	value v = value::object();

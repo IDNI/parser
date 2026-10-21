@@ -76,14 +76,14 @@ private:
 	std::set<size_t> state_char_classes;
 	diagnostics::report report;
 
-	void apply_state(const format::json::value& state);
+	void apply_state(tref state);
 	/// Render one response object as text and return its command status.
 	/// @p fallback_cmd names the command when the response carries none.
-	cmd_status render_response(const format::json::value& resp,
+	cmd_status render_response(tref resp,
 		const std::string& fallback_cmd);
 	// Send one structured request and render the answer. 0 continues, 1 is
 	// quit and 2 is incomplete.
-	int send_statement(format::json::value req);
+	int send_statement(tref req);
 };
 
 /// Run `tgf connect`: connect, run the text REPL with a remote evaluator and

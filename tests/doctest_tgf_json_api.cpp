@@ -320,7 +320,8 @@ TEST_SUITE("tgf json api: hello") {
 			CHECK(data->find("loaded")->as_bool());
 			CHECK(data->find("directives") == nullptr);
 		}
-		return re.option_values();
+		return json::parse(json::tree::get(re.option_values()).to_str())
+			.value();
 	}
 
 	// The entries of the list option @p name in @p o.

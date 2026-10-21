@@ -37,28 +37,30 @@ namespace idni {
 using namespace std;
 
 using tt = tgf_repl_parser::tree::traverser;
+using jt = format::json::tree;
+using jtt = format::json::tt;
 
-static format::json::value range_value(const std::array<size_t, 2>& range) {
-	using value = format::json::value;
-	value v = value::array();
-	v.push_back(value::number(static_cast<double>(range[0])));
-	v.push_back(value::number(static_cast<double>(range[1])));
-	return v;
+static tref range_value(const std::array<size_t, 2>& range) {
+	return jt::build_array({
+		jt::build_number(static_cast<double>(range[0])),
+		jt::build_number(static_cast<double>(range[1])) });
 }
 
 // Text form of an option value: on/off, a number, a text, or a list
 // joined with ", ".
-static std::string option_text(const format::json::value& v) {
-	if (v.is_bool()) return v.as_bool() ? "on" : "off";
-	if (v.is_number()) return std::to_string(
-		static_cast<size_t>(v.as_number()));
-	if (v.is_string()) return v.as_string();
-	if (!v.is_array()) return {};
-	if (v.size() == 0) return "(empty)";
+static std::string option_text(const jtt& v) {
+	if (!v) return {};
+	const jt& t = v.value_tree();
+	if (t.is_bool()) return t.get_bool() ? "on" : "off";
+	if (t.is_number()) return std::to_string(
+		static_cast<size_t>(t.get_number()));
+	if (t.is_string()) return t.get_string();
+	if (!t.is_array()) return {};
+	if (t.children_size() == 0) return "(empty)";
 	std::stringstream ss;
 	bool first = true;
-	for (const auto& e : v)
-		ss << (first ? first = false, "" : ", ") << e.as_string();
+	for (const auto& e : (v | jtt::children)())
+		ss << (first ? first = false, "" : ", ") << (e | jtt::string);
 	return ss.str();
 }
 
@@ -200,9 +202,8 @@ static void print_bintree_process_totals() {
 
 // The same bintree counters as print_bintree_process_totals(), as JSON
 // numbers for the --json data under bintree_totals.
-static format::json::value bintree_process_totals_value() {
+static tref bintree_process_totals_value() {
 	using tree_t = tgf_repl_evaluator::parser_type::tree;
-	using value = format::json::value;
 	size_t buckets = 0, entries = 0, max_chain = 0;
 	double load_factor = 0.0, mean_chain = 0.0;
 	std::array<size_t, 8> chain_len_histogram{};
@@ -219,58 +220,59 @@ static format::json::value bintree_process_totals_value() {
 		distinct_child_pairs, leaf_count, samples,
 		stale_hash_count, largest_group_hash,
 		largest_group_stale_count);
-	auto n = [](size_t x) { return value::number(
+	auto n = [](size_t x) { return jt::build_number(
 		static_cast<double>(x)); };
 	// A 64-bit hash exceeds the exact JSON number range, so it is text.
 	auto h = [](std::uint64_t x) {
-		return value::string(std::to_string(x)); };
+		return jt::build_string(std::to_string(x)); };
 	static constexpr const char* bin_names[8] = {
 		"0", "1", "2", "3", "4-7", "8-15", "16-63", "64+" };
-	auto histogram = value::object();
-	for (size_t i = 0; i != 8; ++i)
-		histogram.set(bin_names[i], n(chain_len_histogram[i]));
-	auto top_groups = value::array();
+	trefs histogram;
+	for (size_t i = 0; i != 8; ++i) histogram.push_back(
+		jt::build_pair(bin_names[i], n(chain_len_histogram[i])));
+	trefs top_groups;
 	for (size_t i = 0; i != 5; ++i)
-		top_groups.push_back(value::object()
-			.set("size", n(top_group_sizes[i]))
-			.set("triples", n(top_group_triples[i])));
-	auto sample_arr = value::array();
-	for (const auto& s : samples) {
-		auto e = value::object();
-		e.set("value", value::string(s.value.first.to_std_string()));
-		auto range = value::array();
-		range.push_back(n(s.value.second[0]));
-		range.push_back(n(s.value.second[1]));
-		e.set("range", std::move(range));
-		e.set("left", s.left == nullptr ? value::null()
-			: h(tree_t::get(s.left).hash));
-		e.set("right", s.right == nullptr ? value::null()
-			: h(tree_t::get(s.right).hash));
-		e.set("stored_hash", h(s.stored_hash));
-		e.set("recomputed_hash", h(s.recomputed_hash));
-		sample_arr.push_back(std::move(e));
-	}
-	value v = value::object();
-	v.set("get_hits", n(tree_t::get_hits()))
-	 .set("get_misses", n(tree_t::get_misses()))
-	 .set("geth_calls", n(tree_t::geth_calls()))
-	 .set("buckets", n(buckets))
-	 .set("entries", n(entries))
-	 .set("load_factor", value::number(load_factor))
-	 .set("max_chain", n(max_chain))
-	 .set("mean_chain", value::number(mean_chain))
-	 .set("distinct_hashes", n(distinct_hashes))
-	 .set("largest_group_size", n(largest_group_size))
-	 .set("distinct_values", n(distinct_values))
-	 .set("distinct_child_pairs", n(distinct_child_pairs))
-	 .set("leaf_count", n(leaf_count))
-	 .set("stale_hash_count", n(stale_hash_count))
-	 .set("largest_group_hash", h(largest_group_hash))
-	 .set("largest_group_stale_count", n(largest_group_stale_count))
-	 .set("chain_length_histogram", std::move(histogram))
-	 .set("top_hash_groups", std::move(top_groups))
-	 .set("largest_group_samples", std::move(sample_arr));
-	return v;
+		top_groups.push_back(jt::build_object({
+			jt::build_pair("size", n(top_group_sizes[i])),
+			jt::build_pair("triples", n(top_group_triples[i])) }));
+	trefs sample_arr;
+	for (const auto& s : samples)
+		sample_arr.push_back(jt::build_object({
+			jt::build_pair("value", jt::build_string(
+				s.value.first.to_std_string())),
+			jt::build_pair("range", jt::build_array({
+				n(s.value.second[0]), n(s.value.second[1]) })),
+			jt::build_pair("left", s.left == nullptr ? jt::_null()
+				: h(tree_t::get(s.left).hash)),
+			jt::build_pair("right", s.right == nullptr
+				? jt::_null() : h(tree_t::get(s.right).hash)),
+			jt::build_pair("stored_hash", h(s.stored_hash)),
+			jt::build_pair("recomputed_hash",
+				h(s.recomputed_hash)) }));
+	return jt::build_object({
+		jt::build_pair("get_hits", n(tree_t::get_hits())),
+		jt::build_pair("get_misses", n(tree_t::get_misses())),
+		jt::build_pair("geth_calls", n(tree_t::geth_calls())),
+		jt::build_pair("buckets", n(buckets)),
+		jt::build_pair("entries", n(entries)),
+		jt::build_pair("load_factor", jt::build_number(load_factor)),
+		jt::build_pair("max_chain", n(max_chain)),
+		jt::build_pair("mean_chain", jt::build_number(mean_chain)),
+		jt::build_pair("distinct_hashes", n(distinct_hashes)),
+		jt::build_pair("largest_group_size", n(largest_group_size)),
+		jt::build_pair("distinct_values", n(distinct_values)),
+		jt::build_pair("distinct_child_pairs",
+			n(distinct_child_pairs)),
+		jt::build_pair("leaf_count", n(leaf_count)),
+		jt::build_pair("stale_hash_count", n(stale_hash_count)),
+		jt::build_pair("largest_group_hash", h(largest_group_hash)),
+		jt::build_pair("largest_group_stale_count",
+			n(largest_group_stale_count)),
+		jt::build_pair("chain_length_histogram",
+			jt::build_object(histogram)),
+		jt::build_pair("top_hash_groups", jt::build_array(top_groups)),
+		jt::build_pair("largest_group_samples",
+			jt::build_array(sample_arr)) });
 }
 
 static void print_version() {
@@ -586,13 +588,12 @@ void tgf_repl_evaluator::set_repl(repl<tgf_repl_evaluator>& r_) {
 	reprompt();
 }
 
-format::json::value tgf_repl_evaluator::parsed(parser_type::result& res,
+tref tgf_repl_evaluator::parsed(parser_type::result& res,
 	std::string& text)
 {
-	using value = format::json::value;
 	if (!res.good() || !res.found) {
 		report.append(std::move(res.report()));
-		return value::object();
+		return jt::build_object({});
 	}
 	auto f = res.get_forest();
 	using c_t = parser_type::char_type;
@@ -618,43 +619,44 @@ format::json::value tgf_repl_evaluator::parsed(parser_type::result& res,
 			res.get_shaped_tree2(shaping()), {}, false, 1);
 		text = ss.str();
 		report.append(std::move(res.report()));
-		return value::object();
+		return jt::build_object({});
 	}
-	auto v = value::object();
-	if (opt.print_input) v.set("input", value::string(res.get_input()));
+	trefs v;
+	if (opt.print_input) v.push_back(jt::build_pair("input",
+		jt::build_string(res.get_input())));
 	if (opt.print_ambiguity) {
-		auto amb = value::object();
-		amb.set("trees", value::number(
-			static_cast<double>(res.count_trees())));
-		auto nodes = value::array();
+		trefs nodes;
 		for (const auto& [n, alts] : res.ambiguous_nodes()) {
-			auto a = value::object();
-			a.set("symbol", value::string(
-				n.first.to_std_string()))
-			 .set("id", value::number(
-				static_cast<double>(n.first.n())))
-			 .set("range", range_value(n.second));
-			auto alts_arr = value::array();
+			trefs alts_arr;
 			for (const auto& ns : alts) {
-				auto alt = value::object();
-				auto children = value::array();
+				trefs children;
 				for (const auto& child : ns) {
 					tref t = res.get_tree2(child);
 					if (t) children.push_back(
 						format::ast_json::
-							node_to_value<tree>(t));
+							node_to_tree<tree>(t));
 				}
-				alt.set("children", std::move(children));
-				alts_arr.push_back(std::move(alt));
+				alts_arr.push_back(jt::build_object({
+					jt::build_pair("children",
+						jt::build_array(children)) }));
 			}
-			a.set("alternatives", std::move(alts_arr));
-			nodes.push_back(std::move(a));
+			nodes.push_back(jt::build_object({
+				jt::build_pair("symbol", jt::build_string(
+					n.first.to_std_string())),
+				jt::build_pair("id", jt::build_number(
+					static_cast<double>(n.first.n()))),
+				jt::build_pair("range",
+					range_value(n.second)),
+				jt::build_pair("alternatives",
+					jt::build_array(alts_arr)) }));
 		}
-		amb.set("nodes", std::move(nodes));
-		v.set("ambiguous", std::move(amb));
+		v.push_back(jt::build_pair("ambiguous", jt::build_object({
+			jt::build_pair("trees", jt::build_number(
+				static_cast<double>(res.count_trees()))),
+			jt::build_pair("nodes", jt::build_array(nodes)) })));
 	}
-	if (opt.print_terminals) v.set("terminals",
-		value::string(to_std_string(res.get_terminals())));
+	if (opt.print_terminals) v.push_back(jt::build_pair("terminals",
+		jt::build_string(to_std_string(res.get_terminals()))));
 	if (opt.tml_rules) {
 		stringstream ss;
 		auto cb_next_g = [&res, &ss](parser_type::pgraph& g) {
@@ -664,43 +666,45 @@ format::json::value tgf_repl_evaluator::parsed(parser_type::result& res,
 			return true;
 		};
 		f->extract_graphs(f->root(), cb_next_g);
-		v.set("tml_rules", value::string(ss.str()));
+		v.push_back(jt::build_pair("tml_rules",
+			jt::build_string(ss.str())));
 	}
 	if (opt.tml_facts) {
 		stringstream ss;
 		to_tml_facts<c_t, t_t>(ss << "TML facts:\n", res);
-		v.set("tml_facts", value::string(ss.str()));
+		v.push_back(jt::build_pair("tml_facts",
+			jt::build_string(ss.str())));
 	}
-	if (opt.print_graphs) v.set("tree",
-		format::ast_json::node_to_value<tree>(
-			res.get_shaped_tree2(shaping())));
+	if (opt.print_graphs) v.push_back(jt::build_pair("tree",
+		format::ast_json::node_to_tree<tree>(
+			res.get_shaped_tree2(shaping()))));
 	report.append(std::move(res.report()));
-	return v;
+	return jt::build_object(v);
 }
 
-format::json::value tgf_repl_evaluator::parse(const char* input, size_t size,
+tref tgf_repl_evaluator::parse(const char* input, size_t size,
 	std::string& text)
 {
-	if (!require_grammar()) return format::json::value::object();
-	if (!good()) return format::json::value::object();
+	if (!require_grammar()) return jt::build_object({});
+	if (!good()) return jt::build_object({});
 	auto res = p().parse(input, size);
 	return parsed(res, text);
 }
 
-format::json::value tgf_repl_evaluator::parse(istream& instream,
+tref tgf_repl_evaluator::parse(istream& instream,
 	std::string& text)
 {
-	if (!require_grammar()) return format::json::value::object();
-	if (!good()) return format::json::value::object();
+	if (!require_grammar()) return jt::build_object({});
+	if (!good()) return jt::build_object({});
 	auto res = p().parse(instream);
 	return parsed(res, text);
 }
 
-format::json::value tgf_repl_evaluator::parse(const string& infile,
+tref tgf_repl_evaluator::parse(const string& infile,
 	std::string& text)
 {
-	if (!require_grammar()) return format::json::value::object();
-	if (!good()) return format::json::value::object();
+	if (!require_grammar()) return jt::build_object({});
+	if (!good()) return jt::build_object({});
 	auto res = p().parse(infile);
 	return parsed(res, text);
 }
@@ -728,29 +732,40 @@ std::string tgf_repl_evaluator::production_string(size_t p) const {
 	return s;
 }
 
-format::json::value tgf_repl_evaluator::production_id_entry(
-	size_t p) const
-{
-	using value = format::json::value;
-	auto v = value::object();
-	v.set("index", value::number(static_cast<double>(p)));
-	v.set("head", value::number(
-		static_cast<double>(g()(p).n())));
-	auto body = value::array();
+tref tgf_repl_evaluator::production_id_entry(size_t p) const {
+	trefs body;
 	for (const auto& c : g()[p]) {
-		auto conj = value::array();
-		for (const auto& l : c) {
-			if (l.nt()) conj.push_back(value::number(
-				static_cast<double>(l.n())));
-			else conj.push_back(value::null());
-		}
-		body.push_back(std::move(conj));
+		trefs conj;
+		for (const auto& l : c)
+			conj.push_back(l.nt() ? jt::build_number(
+				static_cast<double>(l.n())) : jt::_null());
+		body.push_back(jt::build_array(conj));
 	}
-	v.set("body", std::move(body));
 	const std::string* guard = g().production_guard(p);
-	v.set("guard", guard ? value::string(*guard) : value::null());
-	v.set("conjunctive", value::boolean(g().conjunctive(p)));
-	return v;
+	return jt::build_object({
+		jt::build_pair("index",
+			jt::build_number(static_cast<double>(p))),
+		jt::build_pair("head", jt::build_number(
+			static_cast<double>(g()(p).n()))),
+		jt::build_pair("body", jt::build_array(body)),
+		jt::build_pair("guard",
+			guard ? jt::build_string(*guard) : jt::_null()),
+		jt::build_pair("conjunctive",
+			jt::build_bool(g().conjunctive(p))) });
+}
+
+tref tgf_repl_evaluator::productions_value(const char* key,
+	const std::string& symbol, const std::set<size_t>& ps) const
+{
+	trefs prods, pids;
+	for (size_t p : ps) {
+		prods.push_back(jt::build_string(production_string(p)));
+		pids.push_back(production_id_entry(p));
+	}
+	return jt::build_object({
+		jt::build_pair(key, jt::build_string(symbol)),
+		jt::build_pair("productions", jt::build_array(prods)),
+		jt::build_pair("production_ids", jt::build_array(pids)) });
 }
 
 bool tgf_repl_evaluator::reload(const string& new_tgf_file) {
@@ -785,77 +800,62 @@ bool tgf_repl_evaluator::reload(const string& new_tgf_file) {
 	return true;
 }
 
+tref tgf_repl_evaluator::load_answer(bool loaded,
+	const std::string& name) const
+{
+	return jt::build_object({
+		jt::build_pair("grammar", jt::build_string(name)),
+		jt::build_pair("loaded", jt::build_bool(loaded)) });
+}
+
 // Data of the load and reload commands. @p new_tgf_file is the file to
 // load; on success tgf_filename names it. The caller checked fixed_grammar.
-format::json::value tgf_repl_evaluator::reload_data(
-	const std::string& new_tgf_file)
-{
-	using value = format::json::value;
-	auto v = value::object();
-	if (!load_file(new_tgf_file))
-		return v.set("grammar", value::string(new_tgf_file))
-			.set("loaded", value::boolean(false));
-	return v.set("grammar", value::string(tgf_filename))
-		.set("loaded", value::boolean(true));
+tref tgf_repl_evaluator::reload_data(const std::string& new_tgf_file) {
+	if (!load_file(new_tgf_file)) return load_answer(false, new_tgf_file);
+	return load_answer(true, tgf_filename);
 }
 
-format::json::value tgf_repl_evaluator::load_source_data(
-	const std::string& name, const std::string& text)
+tref tgf_repl_evaluator::load_source_data(const std::string& name,
+	const std::string& text)
 {
-	using value = format::json::value;
-	auto v = value::object();
 	if (fixed_grammar) {
 		report.warning(parser_strings::messages::loading_grammars_unavailable);
-		return v.set("grammar", value::string(name))
-			.set("loaded", value::boolean(false));
+		return load_answer(false, name);
 	}
-	if (!load_source(name, text))
-		return v.set("grammar", value::string(name))
-			.set("loaded", value::boolean(false));
-	return v.set("grammar", value::string(tgf_filename))
-		.set("loaded", value::boolean(true));
+	if (!load_source(name, text)) return load_answer(false, name);
+	return load_answer(true, tgf_filename);
 }
 
-format::json::value tgf_repl_evaluator::reload_source_data() {
-	using value = format::json::value;
-	auto v = value::object();
+tref tgf_repl_evaluator::reload_source_data() {
 	std::string name = tgf_filename;
 	std::string text = grammar_source;
-	if (!load_source(name, text))
-		return v.set("grammar", value::string(name))
-			.set("loaded", value::boolean(false));
-	return v.set("grammar", value::string(tgf_filename))
-		.set("loaded", value::boolean(true));
+	if (!load_source(name, text)) return load_answer(false, name);
+	return load_answer(true, tgf_filename);
 }
 
-format::json::value tgf_repl_evaluator::get_cmd(std::string_view name) {
+tref tgf_repl_evaluator::get_cmd(std::string_view name) {
 	namespace ps = parser_strings;
-	using value = format::json::value;
-	if (name.empty()) {
-		auto v = value::object();
-		v.set("options", option_values());
-		return v;
-	}
+	if (name.empty()) return jt::build_object({
+		jt::build_pair("options", option_values()) });
 	if (!session_option(name)) {
 		report.error(diagnostics::code::not_found,
 			ps::messages::option_not_found,
 			{ { ps::label::name, name } });
-		return value::object();
+		return jt::build_object({});
 	}
-	auto v = value::object();
-	v.set("option", value::string(std::string(name)))
-	 .set("value", format::json::to_json(idni::options().value(name)));
-	return v;
+	return jt::build_object({
+		jt::build_pair("option", jt::build_string(name)),
+		jt::build_pair("value",
+			build_option(idni::options().value(name))) });
 }
 
-format::json::value tgf_repl_evaluator::option_values() const {
-	using value = format::json::value;
+tref tgf_repl_evaluator::option_values() const {
 	const auto& opts = idni::options();
-	auto v = value::object();
+	trefs v;
 	for (const auto& name : opts.names())
-		if (session_option(name))
-			v.set(name, format::json::to_json(opts.value(name)));
-	return v;
+		if (session_option(name)) v.push_back(
+			jt::build_pair(name, build_option(opts.value(name))));
+	return jt::build_object(v);
 }
 
 bool tgf_repl_evaluator::session_option(std::string_view name) const {
@@ -864,27 +864,25 @@ bool tgf_repl_evaluator::session_option(std::string_view name) const {
 		!= tgf_session_owners.end();
 }
 
-format::json::value tgf_repl_evaluator::set_cmd(std::string_view name,
+tref tgf_repl_evaluator::set_cmd(std::string_view name,
 	std::string_view text)
 {
-	if (!option_of_kind(name, std::nullopt))
-		return format::json::value::object();
+	if (!option_of_kind(name, std::nullopt)) return jt::build_object({});
 	auto res = idni::options().set_text(name, text);
 	const bool ok = !res.has_error();
 	report.append(res.report());
-	if (!ok) return format::json::value::object();
+	if (!ok) return jt::build_object({});
 	return get_cmd(name);
 }
 
-format::json::value tgf_repl_evaluator::set_option(std::string_view name,
+tref tgf_repl_evaluator::set_option(std::string_view name,
 	idni::option_value v)
 {
-	if (!option_of_kind(name, std::nullopt))
-		return format::json::value::object();
+	if (!option_of_kind(name, std::nullopt)) return jt::build_object({});
 	auto res = idni::options().set(name, std::move(v));
 	const bool ok = !res.has_error();
 	report.append(res.report());
-	if (!ok) return format::json::value::object();
+	if (!ok) return jt::build_object({});
 	return get_cmd(name);
 }
 
@@ -906,26 +904,26 @@ bool tgf_repl_evaluator::option_of_kind(std::string_view name,
 	return false;
 }
 
-format::json::value tgf_repl_evaluator::list_cmd(std::string_view name,
+tref tgf_repl_evaluator::list_cmd(std::string_view name,
 	std::string_view text, bool add)
 {
 	if (!option_of_kind(name, option_kind::list))
-		return format::json::value::object();
+		return jt::build_object({});
 	auto entries = idni::detail::parse_value(option_kind::list, text,
 		name);
 	if (!entries.has_value()) {
 		report.append(entries.report());
-		return format::json::value::object();
+		return jt::build_object({});
 	}
 	return edit_option_list(name,
 		std::get<option_list>(entries.value()), add);
 }
 
-format::json::value tgf_repl_evaluator::edit_option_list(
-	std::string_view name, const option_list& entries, bool add)
+tref tgf_repl_evaluator::edit_option_list(std::string_view name,
+	const option_list& entries, bool add)
 {
 	if (!option_of_kind(name, option_kind::list))
-		return format::json::value::object();
+		return jt::build_object({});
 	auto list = idni::options().get<option_list>(name);
 	for (const auto& e : entries) {
 		auto it = std::find(list.begin(), list.end(), e);
@@ -935,11 +933,11 @@ format::json::value tgf_repl_evaluator::edit_option_list(
 	return set_option(name, std::move(list));
 }
 
-format::json::value tgf_repl_evaluator::flag_cmd(std::string_view name,
+tref tgf_repl_evaluator::flag_cmd(std::string_view name,
 	const function<bool(bool)>& update)
 {
 	if (!option_of_kind(name, option_kind::flag))
-		return format::json::value::object();
+		return jt::build_object({});
 	auto& opts = idni::options();
 	opts.set(name, update(opts.get<bool>(name)));
 	return get_cmd(name);
@@ -1106,10 +1104,10 @@ static std::string help_text(const tgf_repl_evaluator& re, size_t nt,
 
 cmd_result tgf_repl_evaluator::run(const trv& s) {
 	using p = tgf_repl_parser;
-	using value = format::json::value;
 	const auto nt = s | tt::nonterminal;
 	cmd_result res;
 	res.cmd = command_name(nt);
+	tref data = nullptr;
 	{
 		auto _ = report.open_if(
 			idni::options().get<bool>("measure") || nt == p::parse_cmd,
@@ -1131,50 +1129,49 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			size_t target = optarg
 				? static_cast<size_t>(optarg)
 				: static_cast<size_t>(p::help_sym);
-			auto v = value::object();
-			v.set("command", value::string(help_arg_name(target)))
-			 .set("text", value::string(
-				help_text(*this, target, !fixed_grammar)));
-			res.data = std::move(v);
+			data = jt::build_object({
+				jt::build_pair("command",
+					jt::build_string(help_arg_name(target))),
+				jt::build_pair("text", jt::build_string(
+					help_text(*this, target,
+						!fixed_grammar))) });
 			break;
 		}
 		case p::version_cmd: {
-			auto v = value::object();
-			v.set("version", value::string(tauparser::full_version));
-			res.data = std::move(v);
+			data = jt::build_object({ jt::build_pair("version",
+				jt::build_string(tauparser::full_version)) });
 			break;
 		}
 		case p::license_cmd: {
-			auto v = value::object();
-			v.set("license", value::string(tauparser::license));
-			res.data = std::move(v);
+			data = jt::build_object({ jt::build_pair("license",
+				jt::build_string(tauparser::license)) });
 			break;
 		}
 		case p::get_cmd:
-			res.data = get_cmd(statement_option_name(s));
+			data = get_cmd(statement_option_name(s));
 			break;
 		case p::set_cmd:
-			res.data = set_cmd(statement_option_name(s),
+			data = set_cmd(statement_option_name(s),
 				statement_option_text(s));
 			break;
 		case p::toggle_cmd:
-			res.data = flag_cmd(statement_option_name(s),
+			data = flag_cmd(statement_option_name(s),
 				[](bool b) { return !b; });
 			break;
 		case p::enable_cmd:
-			res.data = flag_cmd(statement_option_name(s),
+			data = flag_cmd(statement_option_name(s),
 				[](bool) { return true; });
 			break;
 		case p::disable_cmd:
-			res.data = flag_cmd(statement_option_name(s),
+			data = flag_cmd(statement_option_name(s),
 				[](bool) { return false; });
 			break;
 		case p::add_cmd:
-			res.data = list_cmd(statement_option_name(s),
+			data = list_cmd(statement_option_name(s),
 				statement_option_text(s), true);
 			break;
 		case p::del_cmd:
-			res.data = list_cmd(statement_option_name(s),
+			data = list_cmd(statement_option_name(s),
 				statement_option_text(s), false);
 			break;
 		case p::reload_cmd:
@@ -1187,7 +1184,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			// A file-backed grammar needs a path; a source-backed one
 			// reloads from the text it was loaded from.
 			if (!grammar_from_source && !paths_allowed()) break;
-			res.data = grammar_from_source
+			data = grammar_from_source
 				? reload_source_data() : reload_data(tgf_filename);
 			break;
 		case p::load_cmd: {
@@ -1200,7 +1197,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			auto n = s | p::filename;
 			auto filename = unquote(n | tt::terminals, report);
 			if (report.has_error()) break;
-			res.data = reload_data(filename);
+			data = reload_data(filename);
 			break;
 		}
 		case p::start_cmd: {
@@ -1213,11 +1210,11 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 				report.append(written.report());
 			}
 			const string start = start_symbol();
-			auto v = value::object();
-			v.set("start", start.empty() ? value::null()
-				: value::string(start))
-			 .set("changed", value::boolean(changed));
-			res.data = std::move(v);
+			data = jt::build_object({
+				jt::build_pair("start", start.empty()
+					? jt::_null() : jt::build_string(start)),
+				jt::build_pair("changed",
+					jt::build_bool(changed)) });
 			break;
 		}
 		case p::igrammar_cmd: {
@@ -1225,17 +1222,8 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			auto n = s | p::symbol;
 			string start = n.has_value()
 				? n | tt::terminals : start_symbol();
-			auto v = value::object();
-			v.set("start", value::string(start));
-			auto prods = value::array();
-			auto pids = value::array();
-			for (size_t p : g().reachable_productions(g().nt(start))) {
-				prods.push_back(value::string(production_string(p)));
-				pids.push_back(production_id_entry(p));
-			}
-			v.set("productions", std::move(prods));
-			v.set("production_ids", std::move(pids));
-			res.data = std::move(v);
+			data = productions_value("start", start,
+				g().reachable_productions(g().nt(start)));
 			if (!opt.json) {
 				ostringstream ts;
 				g().print_internal_grammar_for(ts
@@ -1248,10 +1236,11 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 		}
 		case p::grammar_cmd: {
 			if (!require_grammar()) break;
-			auto v = value::object();
-			v.set("file", value::string(tgf_filename));
-			v.set("source", value::string(grammar_source));
-			res.data = std::move(v);
+			data = jt::build_object({
+				jt::build_pair("file",
+					jt::build_string(tgf_filename)),
+				jt::build_pair("source",
+					jt::build_string(grammar_source)) });
 			break;
 		}
 		case p::unreachable_cmd: {
@@ -1261,17 +1250,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 				? n | tt::terminals : start_symbol();
 			auto unreachable = g().unreachable_productions(
 				g().nt(start));
-			auto v = value::object();
-			v.set("symbol", value::string(start));
-			auto prods = value::array();
-			auto pids = value::array();
-			for (size_t p : unreachable) {
-				prods.push_back(value::string(production_string(p)));
-				pids.push_back(production_id_entry(p));
-			}
-			v.set("productions", std::move(prods));
-			v.set("production_ids", std::move(pids));
-			res.data = std::move(v);
+			data = productions_value("symbol", start, unreachable);
 			if (!opt.json) {
 				ostringstream ts;
 				if (unreachable.size()) {
@@ -1295,8 +1274,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			else if (auto qstr = i | p::quoted_string;
 				qstr.has_value()) input = unquote(
 					qstr | tt::terminals, report);
-			res.data = parse(input.c_str(), input.size(),
-				res.text);
+			data = parse(input.c_str(), input.size(), res.text);
 			break;
 		}
 		case p::parse_file_cmd: {
@@ -1304,7 +1282,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			auto n = s | p::filename;
 			auto filename = unquote(n | tt::terminals, report);
 			if (report.has_error()) break;
-			res.data = parse(filename, res.text);
+			data = parse(filename, res.text);
 			break;
 		}
 		default:
@@ -1313,6 +1291,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			break;
 		}
 	}
+	if (data) res.data = jt::geth(data);
 	res.report = std::move(report);
 	report.clear();
 	if (res.report.has_error()) res.status = cmd_status::error;
@@ -1359,36 +1338,34 @@ eval_result tgf_repl_evaluator::run(const std::string& src,
 	return er;
 }
 
+// The range of an AST JSON node: "[<begin><sep><end>]".
+static void print_range(std::ostream& os, const jtt& node, const char* sep) {
+	os << "[";
+	auto r = node | jtt::member("range");
+	if (r.is(json_parser::arr) && r.value_tree().children_size() >= 2)
+		os << static_cast<long long>(r | jtt::first | jtt::number)
+			<< sep << static_cast<long long>(
+				r | jtt::second | jtt::number);
+	os << "]";
+}
+
 // One ambiguous node of a parse, from its data only.
-static void render_data_ambiguous_node(std::ostream& os,
-	const format::json::value& node)
-{
-	auto sym = node.find("symbol");
-	std::string symbol = sym && sym->is_string() ? sym->as_string() : "";
-	auto range = node.find("range");
-	os << "\t `" << symbol << "` [";
-	if (range && range->is_array() && range->size() >= 2)
-		os << static_cast<long long>((*range)[0].as_number()) << ","
-			<< static_cast<long long>((*range)[1].as_number());
-	os << "]\n";
+static void render_data_ambiguous_node(std::ostream& os, const jtt& node) {
+	os << "\t `" << (node | jtt::member("symbol") | jtt::string) << "` ";
+	print_range(os, node, ",");
+	os << "\n";
 	size_t d = 0;
-	if (auto alts = node.find("alternatives"); alts && alts->is_array())
-		for (const auto& alt : *alts) {
+	auto alts = node | jtt::member("alternatives");
+	if (alts.is(json_parser::arr))
+		for (const auto& alt : (alts | jtt::children)()) {
 			os << "\t\t " << d++ << "\t";
-			if (auto ch = alt.find("children");
-					ch && ch->is_array())
-				for (const auto& c : *ch) {
-					auto s = c.find("symbol");
-					auto rg = c.find("range");
-					os << " `" << (s && s->is_string()
-						? s->as_string() : "") << "`[";
-					if (rg && rg->is_array()
-							&& rg->size() >= 2)
-						os << static_cast<long long>(
-							(*rg)[0].as_number()) << ","
-							<< static_cast<long long>(
-							(*rg)[1].as_number());
-					os << "] ";
+			auto ch = alt | jtt::member("children");
+			if (ch.is(json_parser::arr))
+				for (const auto& c : (ch | jtt::children)()) {
+					os << " `" << (c | jtt::member("symbol")
+						| jtt::string) << "`";
+					print_range(os, c, ",");
+					os << " ";
 				}
 			os << "\n";
 		}
@@ -1400,71 +1377,69 @@ static void render_data_ambiguous_node(std::ostream& os,
 #	pragma warning(disable : 4459)
 #endif
 // One AST JSON node in the shape of the text tree printer.
-static void render_data_tree(std::ostream& os,
-	const format::json::value& node, size_t l,
+static void render_data_tree(std::ostream& os, const jtt& node, size_t l,
 	const term::colors& TC)
 {
 	for (size_t i = 0; i != l; ++i) os << "\t";
-	auto sym = node.find("symbol");
-	std::string symbol = sym && sym->is_string() ? sym->as_string() : "";
-	auto id = node.find("id");
-	auto range = node.find("range");
+	const std::string symbol = node | jtt::member("symbol") | jtt::string;
 	if (!symbol.empty()) {
 		os << TC_NT << symbol << TC.CLEAR() << TC_NT_ID << "(";
-		if (id && id->is_number())
-			os << static_cast<long long>(id->as_number());
+		if (auto id = node | jtt::member("id");
+				id.is(json_parser::number))
+			os << static_cast<long long>(id | jtt::number);
 		os << ")" << TC.CLEAR();
-	} else if (auto text = node.find("text");
-			text && text->is_string())
-		os << TC_T << text->as_string() << TC.CLEAR();
-	os << TC_RANGE << "[";
-	if (range && range->is_array() && range->size() >= 2)
-		os << static_cast<long long>((*range)[0].as_number()) << ", "
-			<< static_cast<long long>((*range)[1].as_number());
-	os << "]" << TC.CLEAR() << "\n";
-	if (auto ch = node.find("children"); ch && ch->is_array())
-		for (const auto& c : *ch) render_data_tree(os, c, l + 1, TC);
+	} else if (auto text = node | jtt::member("text");
+			text && text.value_tree().is_string())
+		os << TC_T << (text | jtt::string) << TC.CLEAR();
+	os << TC_RANGE;
+	print_range(os, node, ", ");
+	os << TC.CLEAR() << "\n";
+	if (auto ch = node | jtt::member("children"); ch.is(json_parser::arr))
+		for (const auto& c : (ch | jtt::children)())
+			render_data_tree(os, c, l + 1, TC);
 }
 
 // The parse text from the response data.
 static void render_data_parse(const cmd_result& r, std::ostream& os,
 	const term::colors& TC)
 {
-	if (auto in = r.data.find("input"); in && in->is_string())
-		os << "input: \"" << in->as_string() << "\"\n";
-	if (auto amb = r.data.find("ambiguous"); amb && amb->is_object()) {
-		auto trees = amb->find("trees");
-		double n = trees && trees->is_number()
-			? trees->as_number() : 0;
+	using format::json::string_member;
+	const jtt data(r.data);
+	const tref d = r.data->get();
+	if (auto in = string_member(d, "input"); in)
+		os << "input: \"" << *in << "\"\n";
+	if (auto amb = data | jtt::member("ambiguous");
+			amb.is(json_parser::object)) {
+		double n = amb | jtt::member("trees") | jtt::number;
 		// The text printer stays silent for an unambiguous parse.
 		if (n > 1) {
 			os << "# n trees: " << static_cast<long long>(n)
 				<< "\n# ambiguous nodes:\n";
-			if (auto nodes = amb->find("nodes");
-					nodes && nodes->is_array())
-				for (const auto& node : *nodes)
+			if (auto nodes = amb | jtt::member("nodes");
+					nodes.is(json_parser::arr))
+				for (const auto& node : (nodes
+						| jtt::children)())
 					render_data_ambiguous_node(os, node);
 		}
 	}
-	if (auto t = r.data.find("terminals"); t && t->is_string())
-		os << "parsed terminals: " << TC_T << t->as_string()
+	if (auto t = string_member(d, "terminals"); t)
+		os << "parsed terminals: " << TC_T << *t
 			<< TC_CLEARED_DEFAULT << "\n";
-	if (auto tml = r.data.find("tml_rules");
-			tml && tml->is_string()) os << tml->as_string();
-	if (auto tml = r.data.find("tml_facts");
-			tml && tml->is_string()) os << tml->as_string();
-	if (auto tree = r.data.find("tree"); tree && tree->is_object()) {
+	if (auto tml = string_member(d, "tml_rules"); tml)
+		os << *tml;
+	if (auto tml = string_member(d, "tml_facts"); tml)
+		os << *tml;
+	if (auto tree = data | jtt::member("tree");
+			tree.is(json_parser::object)) {
 		os << "parsed graph:\n";
-		render_data_tree(os, *tree, 1, TC);
+		render_data_tree(os, tree, 1, TC);
 	}
 }
 
 // The grammar source text from the response data.
 static void render_data_grammar(const cmd_result& r, std::ostream& os) {
-	std::string src;
-	if (auto v = r.data.find("source"); v && v->is_string())
-		src = v->as_string();
-	print_grammar_source(os, src);
+	print_grammar_source(os, jtt(r.data) | jtt::member("source")
+		| jtt::string);
 }
 
 // The production list of internal-grammar and unreachable, from data.
@@ -1487,10 +1462,9 @@ static std::vector<std::string> split_production_body(const std::string& s) {
 // production string and its production_ids entry. The literal names come
 // from the string and the nonterminal ids from production_ids.
 static void render_data_production(std::ostream& os,
-	const std::string& pstr, const format::json::value* pid,
+	const std::string& pstr, const jtt& pid,
 	const term::colors& TC, const std::set<size_t>* char_classes)
 {
-	using value = format::json::value;
 	const size_t id_width = 6;
 	const size_t head_width = 20;
 	size_t arrow = pstr.find(" =>");
@@ -1503,22 +1477,24 @@ static void render_data_production(std::ostream& os,
 	size_t index = 0;
 	long long head_id = 0;
 	bool have_head = false;
-	const value* body_ids = nullptr;
+	jtt body_ids;
 	bool conjunctive = false;
 	std::string guard;
-	if (pid && pid->is_object()) {
-		if (auto i = pid->find("index"); i && i->is_number())
-			index = static_cast<size_t>(i->as_number());
-		if (auto h = pid->find("head"); h && h->is_number()) {
-			head_id = static_cast<long long>(h->as_number());
+	if (pid.is(json_parser::object)) {
+		if (auto i = pid | jtt::member("index");
+				i.is(json_parser::number))
+			index = static_cast<size_t>(i | jtt::number);
+		if (auto h = pid | jtt::member("head");
+				h.is(json_parser::number)) {
+			head_id = static_cast<long long>(h | jtt::number);
 			have_head = true;
 		}
-		if (auto b = pid->find("body"); b && b->is_array())
+		if (auto b = pid | jtt::member("body");
+				b.is(json_parser::arr))
 			body_ids = b;
-		if (auto c = pid->find("conjunctive"); c && c->is_bool())
-			conjunctive = c->as_bool();
-		if (auto g = pid->find("guard"); g && g->is_string())
-			guard = g->as_string();
+		conjunctive = pid | jtt::member("conjunctive")
+			| jtt::boolean;
+		guard = pid | jtt::member("guard") | jtt::string;
 	}
 	// "G<p>:" padded to id_width, then the head with its id padded to
 	// head_width, then " =>".
@@ -1542,7 +1518,8 @@ static void render_data_production(std::ostream& os,
 	// the same order, so they walk in parallel.
 	std::vector<std::string> tok = split_production_body(body);
 	size_t t = 0;
-	size_t nconj = body_ids ? body_ids->size() : 0;
+	const trefs conjs = (body_ids | jtt::children | jtt::refs);
+	const size_t nconj = conjs.size();
 	if (!body_ids && !body.empty()) os << " " << body;
 	for (size_t j = 0; j != nconj; ++j) {
 		if (j != 0) {
@@ -1551,17 +1528,17 @@ static void render_data_production(std::ostream& os,
 		}
 		bool neg = t != tok.size() && tok[t] == "~(";
 		if (neg) { os << " " << TC_NEG << "~("; ++t; }
-		const value& conj = (*body_ids)[j];
-		for (size_t k = 0; k != conj.size() && t != tok.size(); ++k) {
+		const trefs lits = (jtt(conjs[j]) | jtt::children).values();
+		for (size_t k = 0; k != lits.size() && t != tok.size(); ++k) {
 			os << " ";
 			const std::string& name = tok[t++];
-			if (conj[k].is_number())
+			if (jt::get(lits[k]).is_number())
 				os << nt_begin(static_cast<long long>(
-					conj[k].as_number())) << name
+					jt::get(lits[k]).get_number())) << name
 					<< TC_DEFAULT << TC_NT_ID
 					<< "(" << static_cast<long long>(
-						conj[k].as_number()) << ")"
-					<< TC_DEFAULT;
+						jt::get(lits[k]).get_number())
+					<< ")" << TC_DEFAULT;
 			else if (name == "null")
 				os << TC_NULL << "null" << TC_DEFAULT;
 			else {
@@ -1585,15 +1562,18 @@ static void render_data_production(std::ostream& os,
 static void render_data_productions(const cmd_result& r, std::ostream& os,
 	const term::colors& TC, const std::set<size_t>* char_classes)
 {
-	auto prods = r.data.find("productions");
-	auto pids = r.data.find("production_ids");
-	auto sym = r.data.find("symbol");
-	auto start = r.data.find("start");
-	auto name = r.cmd == "unreachable" ? sym : start;
-	std::string s = name && name->is_string() ? name->as_string() : "";
-	if (r.cmd == "unreachable") {
-		bool any = prods && prods->is_array()
-			&& prods->size() != 0;
+	const jtt data(r.data);
+	auto prods = data | jtt::member("productions");
+	auto pids = data | jtt::member("production_ids");
+	const bool unreachable = r.cmd == "unreachable";
+	std::string s = data | jtt::member(unreachable ? "symbol" : "start")
+		| jtt::string;
+	const trefs prod_list = prods.is(json_parser::arr)
+		? (prods | jtt::children | jtt::refs) : trefs{};
+	const trefs pid_list = pids.is(json_parser::arr)
+		? (pids | jtt::children | jtt::refs) : trefs{};
+	if (unreachable) {
+		bool any = !prod_list.empty();
 		if (any)
 			os << "unreachable production rules for symbol: "
 				<< TC_NT << s << TC_DEFAULT << "\n";
@@ -1605,14 +1585,13 @@ static void render_data_productions(const cmd_result& r, std::ostream& os,
 		os << "\ninternal grammar for symbol " << TC_NT << s
 			<< TC_DEFAULT << ":\n";
 	}
-	if (!prods || !prods->is_array()) return;
-	for (size_t i = 0; i != prods->size(); ++i) {
-		const format::json::value* pid = nullptr;
-		if (pids && pids->is_array() && i < pids->size())
-			pid = &(*pids)[i];
+	if (!prods.is(json_parser::arr)) return;
+	for (size_t i = 0; i != prod_list.size(); ++i) {
+		jtt pid;
+		if (i < pid_list.size()) pid = jtt(pid_list[i]);
 		os << "  ";
-		render_data_production(os, (*prods)[i].as_string(), pid, TC,
-			char_classes);
+		render_data_production(os, jtt(prod_list[i]) | jtt::string,
+			pid, TC, char_classes);
 		os << "\n";
 	}
 }
@@ -1634,36 +1613,38 @@ void render_command_text(const cmd_result& r, std::ostream& os,
 	}
 	if (r.cmd == "quit") { os << "Quit.\n"; return; }
 	if (r.cmd == "clear") return;
+	const jtt data(r.data);
 	if (r.cmd == "version") {
-		if (auto v = r.data.find("version"); v)
-			os << v->as_string() << "\n";
+		if (auto v = data | jtt::member("version"); v)
+			os << (v | jtt::string) << "\n";
 		return;
 	}
 	if (r.cmd == "license") {
-		if (auto v = r.data.find("license"); v)
-			os << v->as_string() << "\n";
+		if (auto v = data | jtt::member("license"); v)
+			os << (v | jtt::string) << "\n";
 		return;
 	}
 	if (r.cmd == "help") {
-		if (auto v = r.data.find("text"); v) os << v->as_string();
+		if (auto v = data | jtt::member("text"); v)
+			os << (v | jtt::string);
 		return;
 	}
 	if (r.cmd == "start") {
-		auto s = r.data.find("start");
-		auto ch = r.data.find("changed");
+		auto s = data | jtt::member("start");
+		auto ch = data | jtt::member("changed");
 		if (!s || !ch) return;
-		if (ch->as_bool()) os << "start symbol set: " << TC_NT
-			<< s->as_string() << TC_DEFAULT << "\n";
-		else os << "start symbol: " << TC_NT << s->as_string()
+		if (ch | jtt::boolean) os << "start symbol set: " << TC_NT
+			<< (s | jtt::string) << TC_DEFAULT << "\n";
+		else os << "start symbol: " << TC_NT << (s | jtt::string)
 			<< TC_DEFAULT << "\n";
 		return;
 	}
 	if (r.cmd == "load" || r.cmd == "reload") {
-		auto l = r.data.find("loaded");
+		auto l = data | jtt::member("loaded");
 		if (!l) return;   // fixed grammar: only the warning
-		auto name = r.data.find("grammar");
-		if (l->as_bool()) os << "loaded: " << name->as_string() << "\n";
-		else os << "reload failed: " << name->as_string() << "\n";
+		auto name = data | jtt::member("grammar") | jtt::string;
+		if (l | jtt::boolean) os << "loaded: " << name << "\n";
+		else os << "reload failed: " << name << "\n";
 		return;
 	}
 	auto label = [](const std::string& name) {
@@ -1671,14 +1652,16 @@ void render_command_text(const cmd_result& r, std::ostream& os,
 		l.resize(std::max<size_t>(l.size(), 24), ' ');
 		return l;
 	};
-	if (auto o = r.data.find("option"); o) {
-		os << label(o->as_string())
-			<< option_text(*r.data.find("value")) << "\n";
+	if (auto o = data | jtt::member("option"); o) {
+		os << label(o | jtt::string)
+			<< option_text(data | jtt::member("value")) << "\n";
 		return;
 	}
-	if (auto opts = r.data.find("options"); opts) {
-		for (const auto& kv : opts->members())
-			os << label(kv.first) << option_text(kv.second) << "\n";
+	if (auto opts = data | jtt::member("options"); opts) {
+		for (tref kv : ((opts || json_parser::object_pair) | jtt::refs))
+			os << label(jt::get(kv).get_string())
+				<< option_text(jtt(kv) | jtt::only_child)
+				<< "\n";
 		return;
 	}
 }
@@ -1696,12 +1679,13 @@ void tgf_repl_evaluator::render_text(const cmd_result& res,
 	render_command_text(res, os, TC);
 }
 
-format::json::value statement_request(const tgf_repl_evaluator::trv& n) {
+tref statement_request(const tgf_repl_evaluator::trv& n) {
 	using p = tgf_repl_parser;
-	using format::json::value;
 	const auto nt = n | tt::nonterminal;
-	value req = value::object();
-	req.set("cmd", value::string(command_name(nt)));
+	trefs req{ jt::build_pair("cmd", jt::build_string(command_name(nt))) };
+	auto add = [&req](const char* key, std::string_view v) {
+		req.push_back(jt::build_pair(key, jt::build_string(v)));
+	};
 	switch (nt) {
 	case p::parse_cmd: {
 		auto i = n | p::parse_input;
@@ -1712,55 +1696,51 @@ format::json::value statement_request(const tgf_repl_evaluator::trv& n) {
 			diagnostics::report rep;
 			input = unquote(qs | tt::terminals, rep);
 		}
-		req.set("input", value::string(std::move(input)));
+		add("input", input);
 		break;
 	}
 	case p::parse_file_cmd:
 	case p::load_cmd: {
 		auto fn = n | p::filename;
 		diagnostics::report rep;
-		req.set("file", value::string(
-			unquote(fn | tt::terminals, rep)));
+		add("file", unquote(fn | tt::terminals, rep));
 		break;
 	}
 	case p::start_cmd:
 	case p::igrammar_cmd:
 	case p::unreachable_cmd: {
 		auto sym = n | p::symbol;
-		if (sym.has_value())
-			req.set("symbol", value::string(
-				sym | tt::terminals));
+		if (sym.has_value()) add("symbol", sym | tt::terminals);
 		break;
 	}
 	case p::help_cmd: {
 		auto h = n | p::help_arg;
-		if (h.has_value())
-			req.set("command", value::string(help_arg_name(
-				h | tt::only_child | tt::nonterminal)));
+		if (h.has_value()) add("command", help_arg_name(
+			h | tt::only_child | tt::nonterminal));
 		break;
 	}
 	case p::get_cmd:
 		if (auto name = statement_option_name(n); !name.empty())
-			req.set("option", value::string(std::move(name)));
+			add("option", name);
 		break;
 	// The client knows no option kind, so the server reads the text.
 	case p::set_cmd:
 	case p::add_cmd:
 	case p::del_cmd:
-		req.set("option", value::string(statement_option_name(n)));
-		req.set("text", value::string(statement_option_text(n)));
+		add("option", statement_option_name(n));
+		add("text", statement_option_text(n));
 		break;
 	case p::toggle_cmd:
 	case p::enable_cmd:
 	case p::disable_cmd:
-		req.set("option", value::string(statement_option_name(n)));
+		add("option", statement_option_name(n));
 		break;
 	default:
 		// grammar, reload, version, license, quit and clear carry no
 		// field beyond cmd.
 		break;
 	}
-	return req;
+	return jt::build_object(req);
 }
 
 idni::diagnostics::result<int> tgf_repl_evaluator::eval(const string& src) {
@@ -1936,12 +1916,12 @@ static int command_line_error(string_view msg) {
 }
 
 static int gen_command(tgf_tool& tool, tgf_repl_evaluator& re) {
-	using format::json::value;
 	const bool json = idni::options().get<bool>("json");
 	auto fail = [&](const diagnostics::report& rep) {
-		if (json) json_write_line(cout, json_result_response(
-			cmd_status::error, "gen", value::object(),
-			state_value(re), rep));
+		if (json) format::json::write_line(json_result_response(
+			cmd_status::error,
+			tgf_command_spec(tgf_command::gen).name,
+			jt::build_object({}), state_value(re), rep), cout);
 		else print_diagnostics_report(rep, false);
 		return 1;
 	};
@@ -1970,16 +1950,17 @@ static int gen_command(tgf_tool& tool, tgf_repl_evaluator& re) {
 	}
 	rep.append(gr.report());
 	if (json) {
-		auto data = value::object();
-		auto files = value::array();
+		trefs files;
 		if (gr.has_value())
 			for (const auto& f : gr.value())
-				files.push_back(value::string(f));
-		data.set("files", std::move(files));
+				files.push_back(jt::build_string(f));
+		tref data = jt::build_object({
+			jt::build_pair("files", jt::build_array(files)) });
 		cmd_status st = gr.has_value()
 			? cmd_status::ok : cmd_status::error;
-		json_write_line(cout, json_result_response(st, "gen", data,
-			state_value(re), rep));
+		format::json::write_line(json_result_response(st,
+			tgf_command_spec(tgf_command::gen).name, data,
+			state_value(re), rep), cout);
 		return st == cmd_status::error ? 1 : 0;
 	}
 	print_diagnostics_report(rep, false);
@@ -2017,14 +1998,15 @@ static void print_char_class_report(tgf_repl_evaluator& re) {
 }
 
 static int show_command(tgf_repl_evaluator& re) {
-	using format::json::value;
 	auto& opts = idni::options();
 	const bool json = opts.get<bool>("json");
 	if (!re.require_grammar()) {
 		if (json) {
-			json_write_line(cout, json_result_response(
-				cmd_status::error, "grammar", value::object(),
-				state_value(re), re.take_report()));
+			format::json::write_line(json_result_response(
+				cmd_status::error,
+				tgf_command_spec(tgf_command::grammar).name,
+				jt::build_object({}),
+				state_value(re), re.take_report()), cout);
 			return 1;
 		}
 		re.flush_report();
@@ -2032,36 +2014,27 @@ static int show_command(tgf_repl_evaluator& re) {
 	}
 	const string start = re.start_symbol();
 	if (json) {
-		auto v = value::object();
-		v.set("start", value::string(start));
-		auto prods = value::array();
-		auto pids = value::array();
-		for (size_t p : re.g().reachable_productions(re.g().nt(start))) {
-			prods.push_back(value::string(
-				re.production_string(p)));
-			pids.push_back(re.production_id_entry(p));
-		}
-		v.set("productions", std::move(prods));
-		v.set("production_ids", std::move(pids));
+		tref v = re.productions_value("start", start,
+			re.g().reachable_productions(re.g().nt(start)));
 		if (opts.get<bool>("nullable")) {
-			auto nl = value::array();
+			trefs nl;
 			for (const auto& [head, p] :
-					re.g().nullable_recursive_productions()) {
-				auto e = value::object();
-				e.set("symbol", value::string(
-					head.to_std_string()))
-				 .set("id", value::number(
-					static_cast<double>(head.n())))
-				 .set("index", value::number(
-					static_cast<double>(p)))
-				 .set("production", value::string(
-					re.production_string(p)));
-				nl.push_back(std::move(e));
-			}
-			v.set("nullable", std::move(nl));
+					re.g().nullable_recursive_productions())
+				nl.push_back(jt::build_object({
+					jt::build_pair("symbol", jt::build_string(
+						head.to_std_string())),
+					jt::build_pair("id", jt::build_number(
+						static_cast<double>(head.n()))),
+					jt::build_pair("index", jt::build_number(
+						static_cast<double>(p))),
+					jt::build_pair("production",
+						jt::build_string(
+						re.production_string(p))) }));
+			v = jt::set_member(v, "nullable", jt::build_array(nl));
 		}
-		json_write_line(cout, json_result_response(cmd_status::ok,
-			"grammar", v, state_value(re), re.take_report()));
+		format::json::write_line(json_result_response(cmd_status::ok,
+			tgf_command_spec(tgf_command::grammar).name, v,
+			state_value(re), re.take_report()), cout);
 		return 0;
 	}
 	if (opts.get<bool>("grammar")) re.g().print_internal_grammar_for(
@@ -2175,9 +2148,8 @@ static int run_command(const parsed_args& args, tgf_tool& tool,
 		if (json) {
 			if (eval.size()) {
 				auto er = re.run(eval);
-				json_write_line(cout, json_eval_response(
-					format::json::value::null(), er,
-					state_value(re)));
+				format::json::write_line(json_eval_response(
+					jt::_null(), er, state_value(re)), cout);
 				return er.status == cmd_status::error ? 1 : 0;
 			}
 			return tgf_json_loop(re, cin, cout, tgf_json_max_line,
@@ -2215,7 +2187,6 @@ static int run_command(const parsed_args& args, tgf_tool& tool,
 	}
 
 	if (is(tgf_command::parse)) {
-		using format::json::value;
 		const bool json = opts.get<bool>("json");
 		string infile = opts.get<string>("input");
 		string inexp  = opts.get<string>("input-expression");
@@ -2224,7 +2195,7 @@ static int run_command(const parsed_args& args, tgf_tool& tool,
 				"use either --input or --input-expression, not "
 				"both");
 		if (json) {
-			value data = value::object();
+			tref data = nullptr;
 			string text;
 			if (infile.size())
 				if (infile == "-")
@@ -2236,29 +2207,20 @@ static int run_command(const parsed_args& args, tgf_tool& tool,
 					text);
 			if (opts.get<bool>("grammar")) {
 				string start = re.start_symbol();
-				auto ig = value::object();
-				ig.set("start", value::string(start));
-				auto prods = value::array();
-				auto pids = value::array();
-				for (size_t p : re.g().reachable_productions(
-						re.g().nt(start))) {
-					prods.push_back(value::string(
-						re.production_string(p)));
-					pids.push_back(re.production_id_entry(p));
-				}
-				ig.set("productions", std::move(prods));
-				ig.set("production_ids", std::move(pids));
-				data.set("internal_grammar", std::move(ig));
+				auto prods = re.g().reachable_productions(
+					re.g().nt(start));
+				data = jt::set_member(data, "internal_grammar",
+					re.productions_value("start", start, prods));
 			}
 			if (opts.get<bool>("measure"))
-				data.set("bintree_totals",
+				data = jt::set_member(data, "bintree_totals",
 					bintree_process_totals_value());
 			auto rep = re.take_report();
 			cmd_status st = rep.has_error()
 				? cmd_status::error : cmd_status::ok;
-			json_write_line(cout,
-				json_result_response(st, "parse", data,
-					state_value(re), rep));
+			format::json::write_line(json_result_response(st,
+				tgf_command_spec(tgf_command::parse).name, data,
+				state_value(re), rep), cout);
 			return st == cmd_status::error ? 1 : 0;
 		}
 		if (opts.get<bool>("grammar")) re.eval("i");

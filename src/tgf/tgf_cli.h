@@ -43,7 +43,9 @@ const char* cmd_status_name(cmd_status s);
 struct cmd_result {
 	std::string cmd;                        // long name: "set", "parse file"
 	cmd_status status = cmd_status::ok;
-	format::json::value data = format::json::value::object();
+	/// The data outlives the command, so a handle holds it.
+	htref data = format::json::tree::geth(
+		format::json::tree::build_object({}));
 	std::string text;   // text mode only: colored output of parse,
 			    // internal-grammar and unreachable
 	diagnostics::report report;
@@ -174,10 +176,10 @@ struct tgf_repl_evaluator {
 	/// bytes of the load, not a later change of the file.
 	bool load_file_source(const std::string& filename);
 	/// Data of the load command from source text: {"grammar", "loaded"}.
-	format::json::value load_source_data(const std::string& name,
+	tref load_source_data(const std::string& name,
 		const std::string& text);
 	/// Data of the reload command for a grammar loaded from source text.
-	format::json::value reload_source_data();
+	tref reload_source_data();
 
 	void flush_report();
 	void set_repl(repl<tgf_repl_evaluator>& r_);
@@ -198,33 +200,31 @@ struct tgf_repl_evaluator {
 
 	/// Every session option and its value as one object, in the order
 	/// of the declaration.
-	format::json::value option_values() const;
+	tref option_values() const;
 
-	format::json::value parsed(parser_type::result& r, std::string& text);
-	format::json::value parse(const char* input, size_t size,
-		std::string& text);
-	format::json::value parse(std::istream& instream, std::string& text);
-	format::json::value parse(const std::string& infile,
-		std::string& text);
+	tref parsed(parser_type::result& r, std::string& text);
+	tref parse(const char* input, size_t size, std::string& text);
+	tref parse(std::istream& instream, std::string& text);
+	tref parse(const std::string& infile, std::string& text);
 
 	/// Data of get: the option @p name, or every option when it is empty.
-	format::json::value get_cmd(std::string_view name);
+	tref get_cmd(std::string_view name);
 	/// Data of set: write the text @p text to the option @p name.
-	format::json::value set_cmd(std::string_view name,
+	tref set_cmd(std::string_view name,
 		std::string_view text);
 	/// Data of set: write @p v to the option @p name.
-	format::json::value set_option(std::string_view name,
+	tref set_option(std::string_view name,
 		idni::option_value v);
 	/// Data of add or delete: the entries of the list text @p text.
-	format::json::value list_cmd(std::string_view name,
+	tref list_cmd(std::string_view name,
 		std::string_view text, bool add);
 	/// Data of add or delete: add @p entries to the list option @p name,
 	/// or remove them.
-	format::json::value edit_option_list(std::string_view name,
+	tref edit_option_list(std::string_view name,
 		const idni::option_list& entries, bool add);
 	/// Data of toggle, enable and disable: the flag @p name gets
 	/// @p update of its value.
-	format::json::value flag_cmd(std::string_view name,
+	tref flag_cmd(std::string_view name,
 		const std::function<bool(bool)>& update);
 	/// True when @p name is a session option of the kind @p kind, or of
 	/// any kind without one. Else an error goes to report.
@@ -261,7 +261,11 @@ struct tgf_repl_evaluator {
 	/// One entry of the production_ids array that parallels a
 	/// productions array: index, head id, conjunct literal ids, guard
 	/// and conjunctive.
-	format::json::value production_id_entry(size_t p) const;
+	tref production_id_entry(size_t p) const;
+	/// The {key: @p symbol, "productions", "production_ids"} data of the
+	/// productions @p ps.
+	tref productions_value(const char* key,
+		const std::string& symbol, const std::set<size_t>& ps) const;
 
 private:
 	options opt;
@@ -294,7 +298,10 @@ private:
 	/// Report "server path" and return false when paths are forbidden.
 	bool paths_allowed();
 	/// Data of the load and reload commands: {"grammar", "loaded"}.
-	format::json::value reload_data(const std::string& new_tgf_file);
+	tref reload_data(const std::string& new_tgf_file);
+	/// The {"grammar", "loaded"} data of a load of @p name.
+	tref load_answer(bool loaded,
+		const std::string& name) const;
 	void print_source(std::ostream& os) const;
 };
 
@@ -317,7 +324,7 @@ int tgf_json_loop(tgf_repl_evaluator& re, std::istream& in,
 void json_write_line(std::ostream& os, const format::json::value& v);
 
 /// The {"grammar","start"} state object that every response carries.
-format::json::value state_value(const tgf_repl_evaluator& re);
+tref state_value(const tgf_repl_evaluator& re);
 
 /// Print @p report the way the text REPL does. With @p json true, print it
 /// as one JSON line (with the code names when @p print_names is true).
@@ -337,20 +344,16 @@ void render_command_text(const cmd_result& r, std::ostream& os,
 /// One structured JSON request for one parsed REPL statement. A `load`
 /// carries the field `file` and a `parse file` keeps that command name;
 /// the client of `tgf serve` reads the file and rewrites both.
-format::json::value statement_request(const tgf_repl_evaluator::trv& n);
+tref statement_request(const tgf_repl_evaluator::trv& n);
 
 /// Response of one eval request: {"id","status","results":[...],
 /// "state":{...},"report"}.
-format::json::value json_eval_response(const format::json::value& id,
-	const eval_result& er, const format::json::value& state);
+tref json_eval_response(tref id, const eval_result& er, tref state);
 
 /// Response of one one-shot CLI command: {"cmd","status","result",
 /// "state":{...},"report"}.
-format::json::value json_result_response(cmd_status status,
-	const std::string& cmd,
-	const format::json::value& result,
-	const format::json::value& state,
-	const diagnostics::report& report);
+tref json_result_response(cmd_status status, const std::string& cmd,
+	tref result, tref state, const diagnostics::report& report);
 
 /// The JSON form of an option value: a bool, a number, a string or an
 /// array of strings.
