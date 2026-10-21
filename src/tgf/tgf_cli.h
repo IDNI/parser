@@ -16,7 +16,6 @@
 #include "utility/diagnostics.h"
 #include "utility/options.h"
 #include "utility/repl_json.h"
-#include "utility/term_colors.h"
 #include "format/json/json.h"
 #include "tgf_repl_parser.generated.h"
 #include "tgf_repl_evaluator_base.h"
@@ -133,9 +132,6 @@ struct tgf_repl_evaluator : tgf_repl_evaluator_base {
 	cmd_result run(const trv& n);
 	/// Run one request text and return the data of each statement.
 	eval_result run(const std::string& src);
-
-	/// Render @p r as text. Success output is byte-identical to REPL text.
-	void render_text(const cmd_result& r, std::ostream& os) const;
 
 	/// Every session option and its value as one object, in the order
 	/// of the declaration.
@@ -257,13 +253,6 @@ void json_write_line(std::ostream& os, const format::json::value& v);
 
 /// The {"grammar","start"} state object that every response carries.
 tref state_value(const tgf_repl_evaluator& re);
-
-/// Text of one command result from its data only. The local REPL and the
-/// remote evaluator of `tgf connect` share it, so the remote text matches
-/// the local text.
-void render_command_text(const cmd_result& r, std::ostream& os,
-	const term::colors& TC,
-	const std::set<size_t>* char_classes = nullptr);
 
 /// One structured JSON request for one parsed REPL statement. A `load`
 /// carries the field `file` and a `parse file` keeps that command name;

@@ -4,11 +4,15 @@
 #ifndef __IDNI__PARSER__TGF__TGF_REPL_EVALUATOR_BASE_H__
 #define __IDNI__PARSER__TGF__TGF_REPL_EVALUATOR_BASE_H__
 
+#include <cstddef>
+#include <ostream>
+#include <set>
 #include <string>
 
 #include "utility/diagnostics.h"
 #include "utility/repl_evaluator_base.h"
 #include "utility/repl_json.h"
+#include "utility/term_colors.h"
 #include "format/json/json.h"
 #include "tgf_repl_parser.generated.h"
 
@@ -81,6 +85,10 @@ struct tgf_repl_evaluator_base : repl_evaluator_base<tgf_repl_parser,
 {
 	explicit tgf_repl_evaluator_base(options o);
 
+	/// The text of one answer, from its data only, so a local and a
+	/// remote answer print the same text.
+	void render_text(const cmd_result& r, std::ostream& os) const;
+
 	/// The option name of a get, set, add, delete or toggle statement.
 	static std::string option_name(const trv& s);
 	/// The option value text of a set, add or delete statement.
@@ -96,6 +104,13 @@ protected:
 	/// The status of state() and "tgf>".
 	std::string prompt_text() const override;
 };
+
+/// Text of one command result from its data only. The local REPL and the
+/// remote evaluator of `tgf connect` share it, so the remote text matches
+/// the local text.
+void render_command_text(const cmd_result& r, std::ostream& os,
+	const term::colors& TC,
+	const std::set<size_t>* char_classes = nullptr);
 
 } // namespace idni
 
