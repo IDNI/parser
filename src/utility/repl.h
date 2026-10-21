@@ -4,19 +4,24 @@
 #ifndef __IDNI__PARSER__UTILITY__REPL_H__
 #define __IDNI__PARSER__UTILITY__REPL_H__
 
+#include <cctype>
 #include <csignal>
 #include <iostream>
 #include <filesystem>
+#include <optional>
 #include <vector>
 #include <string>
+#include <string_view>
 #include <climits>
 #include <stdio.h>
 #ifndef _WIN32
 #include <unistd.h>
 #endif
 
+#include "characters.h"
 #include "term.h"
 #include "repl_history.h"
+#include "../parser_strings.h"
 
 namespace idni {
 
@@ -29,6 +34,11 @@ struct repl_front {
 	/// incomplete. A front with no such lines ignores it.
 	virtual void set_continuation_prompt(const std::string&) {}
 	virtual void clear() = 0;
+	/// Ask a yes or no question while the REPL runs. A line that is no
+	/// answer asks again. The question and the answer stay out of the
+	/// history. The end of the input is an error.
+	virtual diagnostics::result<bool> ask_yes_no(
+		const std::string& prompt) = 0;
 	/// True after the user asked to stop the command that runs now. A
 	/// loop of an evaluator asks it between two steps. The next command
 	/// starts with false.
@@ -56,6 +66,16 @@ struct repl_stop_signal {
 		scope& operator=(const scope&) = delete;
 	private:
 		void (*old_)(int);
+	};
+	/// Gives a question of the command the raw keys, Ctrl-C included,
+	/// until the scope ends.
+	struct raw_keys {
+		raw_keys() : was_(key_on) { interrupt_key(false); }
+		~raw_keys() { interrupt_key(was_); }
+		raw_keys(const raw_keys&) = delete;
+		raw_keys& operator=(const raw_keys&) = delete;
+	private:
+		bool was_;
 	};
 	static bool requested() { return flag != 0; }
 	static inline volatile std::sig_atomic_t flag = 0;
@@ -98,6 +118,42 @@ template <typename evaluator_t, typename fallback_t>
 void link_front(evaluator_t& re, repl_front* f, fallback_t fallback) {
 	if constexpr (requires { re.front; }) re.front = f;
 	else fallback(re);
+}
+
+/// Remove one trailing '\r' of @p line, the rest of a CRLF line end.
+inline void drop_cr(std::string& line) {
+	if (!line.empty() && line.back() == '\r') line.pop_back();
+}
+
+/// The answer of one line to a yes or no question: y or yes is true, n or
+/// no is false, in any case and with the spaces around it ignored. Any
+/// other line is no answer.
+inline std::optional<bool> parse_yes_no(std::string_view line) {
+	const size_t first = line.find_first_not_of(" \t");
+	if (first == std::string_view::npos) return std::nullopt;
+	const size_t last = line.find_last_not_of(" \t");
+	const std::string word =
+		ascii_to_lower(line.substr(first, last - first + 1));
+	if (word == "y" || word == "yes") return true;
+	if (word == "n" || word == "no") return false;
+	return std::nullopt;
+}
+
+/// Ask @p prompt on stderr and read lines of std::cin until one is an
+/// answer (see parse_yes_no).
+inline diagnostics::result<bool> read_yes_no(std::string_view prompt) {
+	diagnostics::result<bool> r;
+	for (std::string line;;) {
+		std::cerr << prompt << std::flush;
+		if (!std::getline(std::cin, line)) {
+			std::cerr << '\n';
+			return r.with_error(diagnostics::code::io_error, std::cin.bad()
+				? parser_strings::messages::answer_read_failed
+				: parser_strings::messages::answer_input_ended);
+		}
+		drop_cr(line);
+		if (auto answer = parse_yes_no(line)) return r.with_value(*answer);
+	}
 }
 
 /// evaluator_t must be a class with:
@@ -261,6 +317,49 @@ struct repl : repl_front {
 		continuation_prompt_ = p;
 	}
 	void clear() override { if (!is_pipe_) term::clear(); }
+	/// The terminal is raw here, so the keys come one by one and the
+	/// question echoes them itself.
+	diagnostics::result<bool> ask_yes_no(const std::string& prompt) override
+	{
+		diagnostics::result<bool> r;
+		repl_stop_signal::raw_keys keys;
+		for (;;) {
+			std::cerr << prompt << std::flush;
+			std::string line;
+			bool ended = false;
+			for (char ch = 0;;) {
+				const std::ptrdiff_t read = term::in(ch);
+				if (read < 0) {
+					std::cerr << '\n';
+					return r.with_error(diagnostics::code::io_error,
+						parser_strings::messages::answer_read_failed);
+				}
+				// a raw terminal gives 0 when no key comes in time
+				if (read == 0) {
+					if (is_pipe_) { ended = true; break; }
+					continue;
+				}
+				if (ch == 3 || ch == 4) { ended = true; break; }
+				// as in run(): an empty line end, also the LF of a CR LF,
+				// asks nothing
+				if ((ch == 10 || ch == 13) && line.empty()) continue;
+				if (ch == 10 || ch == 13) break;
+				if (ch == 8 || ch == 127) {
+					if (line.empty()) continue;
+					line.pop_back();
+					if (!is_pipe_) std::cerr << "\b \b" << std::flush;
+				} else {
+					line.push_back(ch);
+					if (!is_pipe_) std::cerr << ch << std::flush;
+				}
+			}
+			std::cerr << '\n';
+			if (auto answer = parse_yes_no(line))
+				return r.with_value(*answer);
+			if (ended) return r.with_error(diagnostics::code::io_error,
+				parser_strings::messages::answer_input_ended);
+		}
+	}
 	/// A SIGINT, or Ctrl-C on a terminal, during the current command.
 	bool stop_requested() override { return repl_stop_signal::requested(); }
 	/// Returns the current prompt

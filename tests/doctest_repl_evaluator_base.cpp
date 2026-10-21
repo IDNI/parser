@@ -48,6 +48,9 @@ struct test_front : repl_front {
 	bool cleared = false;
 	void set_prompt(const string& p) override { prompt = p; }
 	void clear() override { cleared = true; }
+	diagnostics::result<bool> ask_yes_no(const string&) override {
+		return diagnostics::result<bool>(true);
+	}
 	bool stop_requested() override { return false; }
 };
 

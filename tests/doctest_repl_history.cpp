@@ -14,6 +14,7 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -99,6 +100,61 @@ std::vector<std::string> run_repl_on(const std::string& input,
 	return ev.seen;
 }
 
+// An evaluator that asks a yes or no question for the command "ask.".
+struct asking_evaluator {
+	repl<asking_evaluator>* r = nullptr;
+	std::vector<std::optional<bool>> answers;
+	diagnostics::result<int> eval(const std::string& s) {
+		if (s == "ask.") {
+			auto a = r->ask_yes_no("Sure? ");
+			answers.push_back(a.has_value()
+				? std::optional<bool>(a.value()) : std::nullopt);
+			if (!a.has_value()) CHECK(a.report().has_error());
+		}
+		diagnostics::result<int> res;
+		res = 0;
+		return res;
+	}
+};
+
+struct ask_run {
+	std::vector<std::optional<bool>> answers;
+	std::string err;
+	std::string stored;
+};
+
+// Runs the plain REPL with @p input as its stdin file and the error stream
+// captured, so a test sees each prompt of the question.
+ask_run run_ask_on(const std::string& input, const std::string& history) {
+	const std::string in_path = cleaned("doctest_repl_ask_input.tmp");
+	std::ofstream(in_path, std::ios::binary) << input;
+	const int saved = dup_fd(0);
+	const int in = open_read(in_path.c_str());
+	REQUIRE(saved >= 0);
+	REQUIRE(in >= 0);
+	REQUIRE(dup2_fd(in, 0) == 0);
+	close_fd(in);
+	asking_evaluator ev;
+	std::ostringstream err;
+	auto old = std::cerr.rdbuf(err.rdbuf());
+	{
+		repl<asking_evaluator> r(ev, "> ", { history });
+		r.echo = false;
+		r.run();
+	}
+	std::cerr.rdbuf(old);
+	dup2_fd(saved, 0);
+	close_fd(saved);
+	std::filesystem::remove(in_path);
+	ask_run out{ ev.answers, err.str(), {} };
+	std::ifstream f(history, std::ios::binary);
+	out.stored.assign(std::istreambuf_iterator<char>(f),
+		std::istreambuf_iterator<char>());
+	f.close();
+	std::filesystem::remove(history);
+	return out;
+}
+
 // An evaluator whose command "loop." runs up to 20 steps and asks for a
 // stop between two steps. The first loop raises SIGINT at its third step.
 struct looping_evaluator {
@@ -122,7 +178,46 @@ struct looping_evaluator {
 	}
 };
 
+size_t count_of(const std::string& text, const std::string& part) {
+	size_t n = 0;
+	for (size_t p = text.find(part); p != std::string::npos;
+			p = text.find(part, p + 1)) ++n;
+	return n;
+}
+
 } // namespace
+
+TEST_SUITE("repl: ask_yes_no") {
+
+	TEST_CASE("a line that is no answer asks again, YES is true") {
+		auto run = run_ask_on("ask.\nmaybe\n  YES \n",
+			cleaned("doctest_repl_ask_yes.tmp"));
+		REQUIRE(run.answers.size() == 1);
+		REQUIRE(run.answers[0].has_value());
+		CHECK(*run.answers[0]);
+		CHECK(count_of(run.err, "Sure? ") == 2);
+		CHECK(run.stored.find("ask.") != std::string::npos);
+		CHECK(run.stored.find("maybe") == std::string::npos);
+		CHECK(run.stored.find("YES") == std::string::npos);
+	}
+
+	TEST_CASE("n is false, a CR LF line end is one line end") {
+		auto run = run_ask_on("ask.\r\nn\r\n",
+			cleaned("doctest_repl_ask_no.tmp"));
+		REQUIRE(run.answers.size() == 1);
+		REQUIRE(run.answers[0].has_value());
+		CHECK_FALSE(*run.answers[0]);
+		CHECK(count_of(run.err, "Sure? ") == 1);
+		CHECK(run.stored.find("\nn\n") == std::string::npos);
+	}
+
+	TEST_CASE("the end of the input gives no answer and an error") {
+		auto run = run_ask_on("ask.\n",
+			cleaned("doctest_repl_ask_end.tmp"));
+		REQUIRE(run.answers.size() == 1);
+		CHECK_FALSE(run.answers[0].has_value());
+	}
+}
 
 TEST_SUITE("repl: stop_requested") {
 
@@ -152,6 +247,19 @@ TEST_SUITE("repl: stop_requested") {
 		CHECK(after == +marker);
 		CHECK(ev.steps == std::vector<int>{ 3, 20 });
 		CHECK(ev.stop_at_start == std::vector<bool>{ false, false });
+	}
+}
+
+TEST_SUITE("parse_yes_no") {
+
+	TEST_CASE("y, yes, n and no in any case, with spaces around") {
+		CHECK(parse_yes_no("y") == true);
+		CHECK(parse_yes_no(" Yes\t") == true);
+		CHECK(parse_yes_no("N") == false);
+		CHECK(parse_yes_no("nO ") == false);
+		CHECK_FALSE(parse_yes_no("").has_value());
+		CHECK_FALSE(parse_yes_no("ye s").has_value());
+		CHECK_FALSE(parse_yes_no("yess").has_value());
 	}
 }
 
@@ -362,6 +470,9 @@ TEST_SUITE("repl_front") {
 		int clears = 0;
 		void set_prompt(const std::string& p) override { prompt = p; }
 		void clear() override { ++clears; }
+		diagnostics::result<bool> ask_yes_no(const std::string&) override {
+			return diagnostics::result<bool>(true);
+		}
 		bool stop_requested() override { return false; }
 	};
 	struct front_evaluator { idni::repl_front* front = nullptr; };

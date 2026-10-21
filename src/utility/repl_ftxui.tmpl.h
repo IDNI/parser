@@ -9,6 +9,8 @@
 #include <cctype>
 #include <chrono>
 #include <concepts>
+#include <functional>
+#include <future>
 #include <iostream>
 #include <iterator>
 #include <mutex>
@@ -654,13 +656,43 @@ void repl_eval_widget<evaluator_t>::drain_output(bool flush_partial) {
 }
 
 template <typename evaluator_t>
+void repl_eval_widget<evaluator_t>::post_and_wait(
+	const std::function<void()>& task)
+{
+	std::promise<void> done;
+	std::future<void> finished = done.get_future();
+	{
+		std::lock_guard<std::mutex> lock(screen_io_mutex_);
+		ticker_paused_.store(true, std::memory_order_relaxed);
+		// The FTXUI senders and its exit stack are not thread safe, so
+		// only the loop thread may uninstall and install the screen.
+		screen_->Post([&task, &done] {
+			task();
+			done.set_value();
+		});
+	}
+	finished.wait();
+	ticker_paused_.store(false, std::memory_order_relaxed);
+}
+
+template <typename evaluator_t>
+void repl_eval_widget<evaluator_t>::run_on_loop(
+	const std::function<void()>& fn)
+{
+	post_and_wait([this, &fn] {
+		drain_output(true);
+		fn();
+	});
+}
+
+template <typename evaluator_t>
 void repl_eval_widget<evaluator_t>::post_event(
 	ftxui::ScreenInteractive* screen, bool from_ticker)
 {
 	// The loop thread resets the sender that PostEvent reads in each restore.
 	std::lock_guard<std::mutex> lock(screen_io_mutex_);
-	if (from_ticker && !ticker_running_.load(std::memory_order_relaxed))
-		return;
+	if (from_ticker && (!ticker_running_.load(std::memory_order_relaxed)
+		|| ticker_paused_.load(std::memory_order_relaxed))) return;
 	if (screen) screen->PostEvent(ftxui::Event::Custom);
 }
 
@@ -761,10 +793,76 @@ void repl_ftxui<evaluator_t>::clear() {
 	screen_->WithRestoredIO([] { term::clear(); })();
 }
 
+// A modal dialog below the last output: @p content draws the inside of
+// the box, @p key takes every key and returns true to close. The box needs
+// no alternate screen, which some terminals lack, and its rows clear at the
+// end, so the prompt comes back to its row.
+inline void run_screen_dialog(const std::function<ftxui::Element()>& content,
+	const std::function<bool(const ftxui::Event&)>& key)
+{
+	using namespace ftxui;
+	auto screen = ScreenInteractive::TerminalOutput();
+	screen.TrackMouse(false);
+	screen.ForceHandleCtrlC(false);
+	Component box = Renderer([&] { return content() | border | center; });
+	Component root = CatchEvent(box, [&](Event e) {
+		if (key(e)) screen.Exit();
+		return true;
+	});
+	screen.Loop(root);
+}
+
 template <typename evaluator_t>
 bool repl_ftxui<evaluator_t>::stop_requested() {
 	if (!screen_) return repl_stop_signal::requested();
 	return eval_widget_.stop_requested();
+}
+
+// The dialog of ask_yes_no.
+inline diagnostics::result<bool> ask_yes_no_in_dialog(
+	const std::string& prompt)
+{
+	using namespace ftxui;
+	diagnostics::result<bool> r;
+	std::optional<bool> answer;
+	bool yes_selected = false;
+	auto button = [](const char* label, bool selected) {
+		Element b = text(label);
+		return selected ? b | inverted : b;
+	};
+	run_screen_dialog([&] {
+		return vbox({ text(prompt),
+			hbox({ button("[ Yes ]", yes_selected), text(" "),
+				button("[ No ]", !yes_selected) }) });
+	}, [&](const Event& e) {
+		if (e == Event::Character('y') || e == Event::Character('Y'))
+			return answer = true, true;
+		if (e == Event::Character('n') || e == Event::Character('N'))
+			return answer = false, true;
+		if (e == Event::Return) return answer = yes_selected, true;
+		if (e == Event::Escape || e == Event::CtrlC) return true;
+		if (e == Event::ArrowLeft || e == Event::ArrowRight
+				|| e == Event::Tab || e == Event::TabReverse)
+			yes_selected = !yes_selected;
+		return false;
+	});
+	if (!answer) return r.with_error(diagnostics::code::io_error,
+		parser_strings::messages::answer_cancelled);
+	return r.with_value(*answer);
+}
+
+template <typename evaluator_t>
+diagnostics::result<bool> repl_ftxui<evaluator_t>::ask_yes_no(
+	const std::string& prompt)
+{
+	if (!screen_) return read_yes_no(prompt);
+	diagnostics::result<bool> r;
+	auto ask = [&] { r = ask_yes_no_in_dialog(prompt); };
+	// The nested loop of the dialog suspends this screen itself, so the
+	// terminal must not be restored around it.
+	if (eval_widget_.active()) eval_widget_.run_on_loop(ask);
+	else ask();
+	return r;
 }
 
 } // namespace idni

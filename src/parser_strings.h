@@ -245,6 +245,13 @@ struct messages {
 		"Conjunct has too many literals";
 	// REPL command errors
 	static constexpr sv unknown_command        = "Unknown command";
+	// a yes or no question of the REPL front
+	static constexpr sv answer_read_failed     =
+		"Cannot read the answer from stdin";
+	static constexpr sv answer_input_ended     =
+		"The input ended before an answer";
+	static constexpr sv answer_cancelled       =
+		"The question was closed without an answer";
 	static constexpr sv json_int_too_long       =
 		"A JSON integer has more digits than the limit";
 	static constexpr sv json_too_deep           =

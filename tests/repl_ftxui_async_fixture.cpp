@@ -18,6 +18,8 @@ using namespace std::chrono_literals;
 
 struct slow_evaluator {
 	idni::repl_front* front = nullptr;
+	// the number of the question, so a test tells two equal answers apart
+	int asks = 0;
 
 	void reprompt() {
 		front->set_prompt("test> ");
@@ -33,6 +35,15 @@ struct slow_evaluator {
 			std::this_thread::sleep_for(400ms);
 			std::cout << "partial output";
 			std::this_thread::sleep_for(200ms);
+			result = 0;
+		} else if (text == "ask") {
+			auto answer = front->ask_yes_no("Sure? ");
+			++asks;
+			if (!answer.has_value())
+				std::cout << "answer: none, stop: " << stop_text()
+					<< ", ask " << asks << "\n";
+			else std::cout << "answer: "
+				<< (answer.value() ? "yes" : "no") << "\n";
 			result = 0;
 		} else if (text == "loop") {
 			// a step of 50 ms gives a test 5 s to stop it

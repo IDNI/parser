@@ -26,6 +26,20 @@ def fail(message, tester):
     raise SystemExit(1)
 
 
+def check_prompt_below_answer(tester):
+    """The dialog keeps the text above it, and the prompt comes back on
+    the row below the answer, as on a terminal with no alternate screen."""
+    lines = tester.render()
+    rows = [i for i, line in enumerate(lines) if "answer: yes" in line]
+    if not rows:
+        fail("the answer of the dialog is not on the screen", tester)
+    row = rows[-1]
+    if row == 0 or not lines[row - 1].rstrip().endswith("test> ask"):
+        fail("the text above the dialog is gone", tester)
+    if row + 1 >= len(lines) or not lines[row + 1].startswith("test>"):
+        fail("the prompt is not on the row below the answer", tester)
+
+
 def check_plain_stop(fixture_bin):
     """Ctrl-C stops a loop of the plain REPL, which goes on."""
     child = pexpect.spawn(fixture_bin, ["--plain"], timeout=10,
@@ -100,6 +114,46 @@ def main():
                 for line in tester.render()):
             fail("the continuation line shows no continuation prompt", tester)
         tester.send_ctrl("c")
+        tester.send("ask")
+        if not wait_for(tester, lambda lines: any("Sure?" in line
+                for line in lines) and any("[ Yes ]" in line
+                for line in lines)):
+            fail("the yes or no dialog did not appear", tester)
+        tester.send_text("y")
+        if not wait_for(tester,
+                lambda lines: any("answer: yes" in line for line in lines)):
+            fail("y in the dialog gave no yes", tester)
+        if not wait_for(tester, lambda lines: not any("[ Yes ]" in line
+                for line in lines)):
+            fail("the dialog stayed after the answer", tester)
+        tester._stabilize(0.2)
+        check_prompt_below_answer(tester)
+        tester.send("ask")
+        if not wait_for(tester,
+                lambda lines: any("[ Yes ]" in line for line in lines)):
+            fail("the second dialog did not appear", tester)
+        tester.send_text("\x1b")
+        if not wait_for(tester,
+                lambda lines: any("answer: none" in line for line in lines)):
+            fail("Esc in the dialog gave an answer", tester)
+        tester.send("ask")
+        if not wait_for(tester,
+                lambda lines: any("[ Yes ]" in line for line in lines)):
+            fail("the third dialog did not appear", tester)
+        tester.send_ctrl("c")
+        if not wait_for(tester,
+                lambda lines: any("ask 3" in line for line in lines)):
+            fail("Ctrl-C in the dialog gave no answer line", tester)
+        if not any("answer: none, stop: no, ask 3" in line
+                for line in tester.render()):
+            fail("Ctrl-C in the dialog was a stop of the command", tester)
+        tester._stabilize(0.2)
+        tester.send_text("\x1b[A")
+        tester._stabilize(0.1)
+        recalled = tester.get_input_line()
+        if not recalled.endswith("ask"):
+            fail("Up did not recall the command of the question", tester)
+        tester.send_ctrl("u")
         tester.send("loop")
         # the output of a command shows only at its end, so the spinner
         # tells that the loop runs

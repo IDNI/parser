@@ -38,6 +38,10 @@ struct repl_eval_widget {
 	void handle_custom_event();
 	void request_clear();
 	void shutdown();
+	/// Run @p fn on the loop thread after the output so far is printed,
+	/// and wait for it. @p fn may run a nested FTXUI loop, which suspends
+	/// this screen itself.
+	void run_on_loop(const std::function<void()>& fn);
 	/// Ask @p screen to draw again. Any thread may call it.
 	void request_redraw(ftxui::ScreenInteractive* screen);
 	/// Ask the evaluation that runs now to stop. The next one starts
@@ -47,8 +51,11 @@ struct repl_eval_widget {
 
 private:
 	void finish();
+	/// Post @p task to the loop thread with the ticker paused, and wait.
+	void post_and_wait(const std::function<void()>& task);
 	void post_event(ftxui::ScreenInteractive* screen,
 		bool from_ticker = false);
+	/// Print what the worker wrote, with the terminal restored.
 	void drain_output(bool flush_partial);
 
 	evaluator_t& evaluator_;
@@ -59,6 +66,8 @@ private:
 	std::atomic<bool> ticker_running_{false};
 	std::atomic<bool> clear_requested_{false};
 	std::atomic<bool> stop_requested_{false};
+	// The ticker posts no event while the terminal is restored.
+	std::atomic<bool> ticker_paused_{false};
 	// Held around each post from another thread and each restore of the
 	// terminal, because Uninstall resets the sender that a post reads.
 	std::mutex screen_io_mutex_;
@@ -125,6 +134,11 @@ struct repl_ftxui : repl_front {
 
 	/// Clears the terminal while the interactive screen is temporarily restored.
 	void clear() override;
+
+	/// Asks in a dialog on the alternate screen, which gives the original
+	/// screen back after the answer, or reads a line with read_yes_no() in
+	/// pipe mode.
+	diagnostics::result<bool> ask_yes_no(const std::string& prompt) override;
 
 	/// Ctrl-C during the current command, or a SIGINT in pipe mode.
 	bool stop_requested() override;
