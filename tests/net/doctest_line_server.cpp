@@ -1308,6 +1308,87 @@ TEST_SUITE("line server: limits") {
 #endif
 }
 
+// Answers each raw line with "got:" and the line, and counts on_line.
+struct text_handler : session_handler {
+	explicit text_handler(std::atomic<int>& j) : json_lines(j) {}
+	std::atomic<int>& json_lines;
+	void on_line(tref, reply_sink&) override { ++json_lines; }
+	void on_text(std::string_view line, reply_sink& out) override {
+		out.write("got:" + std::string(line));
+	}
+};
+
+static line_server_options raw_options(line_server_options o,
+	std::atomic<int>& json_lines)
+{
+	o.raw_lines = true;
+	o.make_handler = [&json_lines](const line_session&) {
+		return std::make_unique<text_handler>(json_lines);
+	};
+	return o;
+}
+
+TEST_SUITE("line server: raw lines") {
+	TEST_CASE("raw_lines: no login line, each line reaches on_text as text") {
+		std::atomic<int> json_lines{ 0 };
+		server_thread s(raw_options(tcp_options(), json_lines));
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("hello version=1");
+		CHECK(c.read_line() == "got:hello version=1");
+		c.send_raw("{\"id\":1}\r\n\nno json\n");
+		CHECK(c.read_line() == "got:{\"id\":1}");
+		CHECK(c.read_line() == "got:");
+		CHECK(c.read_line() == "got:no json");
+		CHECK(json_lines.load() == 0);
+	}
+	TEST_CASE("raw_lines: no first line timeout") {
+		std::atomic<int> json_lines{ 0 };
+		auto o = raw_options(tcp_options(), json_lines);
+		o.first_line_timeout_seconds = 1;
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		CHECK_FALSE(c.at_eof(1500));
+		c.send("late");
+		CHECK(c.read_line() == "got:late");
+	}
+	TEST_CASE("raw_lines over websocket: one message is one line") {
+		std::atomic<int> json_lines{ 0 };
+		server_thread s(raw_options(ws_options(), json_lines));
+		auto t = ws_connect(s.tcp_port());
+		std::string l;
+		CHECK(t->send_line("getmempool"));
+		REQUIRE(t->read_line(l) == read_status::ok);
+		CHECK(l == "got:getmempool");
+	}
+	TEST_CASE("raw_lines with authenticate: the start fails") {
+		std::atomic<int> json_lines{ 0 };
+		auto o = raw_options(tcp_options(), json_lines);
+		o.authenticate = [](tref, const peer_info&) {
+			return true;
+		};
+		auto r = line_server_run(o);
+		REQUIRE_FALSE(r.has_value());
+		std::ostringstream os;
+		r.report().print(os, term::colors(false));
+		CHECK(has(os.str(), "raw_lines and authenticate"));
+	}
+	TEST_CASE("raw_lines logs each line as text") {
+		std::atomic<int> json_lines{ 0 };
+		auto o = raw_options(tcp_options(), json_lines);
+		o.debug_sessions = true;
+		server_thread s(o);
+		{
+			tcp_client c(loopback(s.tcp_port()));
+			c.send("getmempool");
+			CHECK(c.read_line() == "got:getmempool");
+		}
+		s.stop();
+		const std::string out = s.out.text();
+		CHECK(has(out, "\"event\":\"new\""));
+		CHECK(has(out, R"("dir":"in","line":"getmempool")"));
+	}
+}
+
 TEST_SUITE("line server: start and stop") {
 	TEST_CASE("the JSON listening line names the bound port, a stop gives 0") {
 		server_thread s(tcp_options());

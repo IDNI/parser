@@ -46,6 +46,11 @@ struct session_handler {
 	/// One parsed request. The default does nothing.
 	virtual void on_line([[maybe_unused]] tref request,
 		[[maybe_unused]] reply_sink& out) {}
+	/// raw_lines: one request line as it came, with no line end. The view
+	/// ends with the call, so the handler copies what it keeps. The
+	/// default does nothing.
+	virtual void on_text([[maybe_unused]] std::string_view line,
+		[[maybe_unused]] reply_sink& out) {}
 	/// The first line of the connection, after the peer check and
 	/// authenticate accepted it. The default does nothing. The sink stays
 	/// valid until on_close returns.
@@ -160,6 +165,14 @@ struct line_server_options {
 	/// and no in or out line. server.log, the listening lines and the
 	/// events of reply_sink::log stay.
 	bool handler_logs = false;
+	/// Give each line to session_handler::on_text as text, with no JSON
+	/// parse. Raw lines have no login line, so a tcp or websocket host
+	/// other than the loopback makes a server open to the network. The
+	/// caller chooses this. authenticate, the login limits and
+	/// first_line_timeout_seconds do not apply, and on_open does not run.
+	/// An empty line also reaches the handler. The start refuses
+	/// raw_lines with authenticate.
+	bool raw_lines = false;
 	/// Checks the first line of a connection after the peer check. False
 	/// counts a failed login and closes it. Empty accepts.
 	std::function<bool(tref first_line, const peer_info& peer)>

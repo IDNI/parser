@@ -195,6 +195,7 @@ struct server_connection : std::enable_shared_from_this<server_connection> {
 	void on_ws_read(error_code ec);
 	void handle_line(std::string& l);
 	void handle_first_line(std::string& l);
+	void handle_text(std::string& l);
 	bool start_session();
 	diagnostics::result<tref> parse_line(std::string& l);
 	bool logs_lines() const;
@@ -401,6 +402,7 @@ void server_connection::on_ws_read(error_code ec) {
 void server_connection::handle_line(std::string& l) {
 	if (closed || close_when_drained) return;
 	if (!l.empty() && l.back() == '\r') l.pop_back();
+	if (srv->opt.raw_lines) { handle_text(l); return; }
 	if (l.empty()) return;
 	session.last_traffic = std::chrono::steady_clock::now();
 	if (!session.authenticated) { handle_first_line(l); return; }
@@ -421,6 +423,14 @@ diagnostics::result<tref> server_connection::parse_line(std::string& l) {
 	if (!req.has_value() && session.authenticated)
 		log_write(line_log::text("in", l));
 	return req;
+}
+
+void server_connection::handle_text(std::string& l) {
+	session.last_traffic = std::chrono::steady_clock::now();
+	if (logs_lines()) log_write(line_log::text("in", l));
+	in_handler = true;
+	session.handler->on_text(l, sink);
+	in_handler = false;
 }
 
 void server_connection::handle_first_line(std::string& l) {
@@ -1179,10 +1189,18 @@ void line_server::on_accept(conn_socket sock, peer_info peer) {
 	c->session.id = std::move(*sid);
 	connections[c->session.id] = c;
 	start_idle_timer();
+	if (opt.raw_lines) {
+		if (!c->start_session()) return;
+		c->log_session_event("new");
+	}
 	c->start();
 }
 
 bool line_server::start() {
+	// A wrong setting must not open a server with no login.
+	if (opt.raw_lines && opt.authenticate)
+		report.error(diagnostics::code::invalid_argument,
+			parser_strings::messages::net_raw_lines_authenticate);
 	if (report.has_error()) return false;
 	if (opt.listen.empty())
 		opt.listen.push_back(listen_address{});
