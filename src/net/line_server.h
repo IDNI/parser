@@ -84,6 +84,18 @@ struct line_session {
 	std::unique_ptr<session_handler> handler;
 };
 
+/// Limits of failed logins, for each transport kind. A wrong token
+/// counts as one failure. The wait refuses every client of that kind,
+/// also a client with the right token, and also a connection that was
+/// open before the limit was reached.
+struct login_limits {
+	/// After this many failures the server refuses new connections of
+	/// that kind for the wait time.
+	size_t max_failures = 5;
+	std::chrono::seconds window{ 60 };
+	std::chrono::seconds wait{ 60 };
+};
+
 /// The settings of the line server. One server listens on all
 /// addresses at once.
 struct line_server_options {
@@ -126,6 +138,7 @@ struct line_server_options {
 	/// not keep the loop busy.
 	size_t accept_retry_ms = 100;
 	std::string busy_message = "the server takes no more sessions";
+	login_limits logins{};
 	/// End a session with no traffic. 0 turns the timeout off.
 	size_t idle_timeout_seconds = 30 * 60;
 	/// Largest request line or message. The tail of a longer line is

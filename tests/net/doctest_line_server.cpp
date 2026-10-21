@@ -958,6 +958,127 @@ TEST_SUITE("line server: named pipe") {
 }
 #endif
 
+// The token check of a program.
+static void token_login(line_server_options& o, const std::string& token) {
+	o.authenticate = [&token](tref first, const peer_info&) {
+		const std::string* t = format::json::string_member(first, "token");
+		return t && *t == token;
+	};
+}
+
+static line_server_options login_options(const std::string& token) {
+	auto o = tcp_options();
+	o.logins = { .max_failures = 3, .window = std::chrono::seconds(1),
+		.wait = std::chrono::seconds(1) };
+	token_login(o, token);
+	return o;
+}
+
+// A first line with @p token, and the answer of the server.
+template <typename Client>
+static std::string login(Client& c, std::string_view token) {
+	c.send("{\"cmd\":\"open\",\"token\":\"" + std::string(token) + "\"}");
+	return c.read_line();
+}
+
+static void fail_logins(uint16_t port, int count) {
+	for (int i = 0; i != count; ++i) {
+		tcp_client c(loopback(port));
+		CHECK(has(login(c, "wrong"), "Login refused"));
+		CHECK(c.at_eof(5000));
+	}
+}
+
+TEST_SUITE("line server: login limits") {
+	TEST_CASE("three failures: the next connection waits, then a login passes") {
+		const std::string token = "s3cret";
+		server_thread s(login_options(token));
+		const uint16_t port = s.tcp_port();
+		fail_logins(port, 3);
+		{
+			tcp_client c(loopback(port));
+			const std::string l = c.read_line();
+			CHECK(has(l, "\"status\":\"error\""));
+			CHECK(has(l, "Too many failed logins"));
+			CHECK(c.at_eof(5000));
+		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(1200));
+		tcp_client c(loopback(port));
+		CHECK(has(login(c, "s3cret"), "\"status\":\"ok\""));
+		const std::string out = s.out.text();
+		CHECK(has(out, "\"event\":\"login-refused\""));
+		CHECK(has(out, "\"event\":\"login-wait\""));
+		CHECK(has(out, "\"kind\":\"tcp\""));
+	}
+	TEST_CASE("connections opened before the limit cannot guess after it") {
+		const std::string token = "s3cret";
+		server_thread s(login_options(token));
+		const uint16_t port = s.tcp_port();
+		std::vector<std::unique_ptr<tcp_client>> open;
+		for (size_t i = 0; i != 4; ++i)
+			open.push_back(std::make_unique<tcp_client>(loopback(port)));
+		for (size_t i = 0; i != 3; ++i)
+			CHECK(has(login(*open[i], "wrong"), "Login refused"));
+		const std::string l = login(*open[3], "s3cret");
+		CHECK(has(l, "\"status\":\"error\""));
+		CHECK(has(l, "Too many failed logins"));
+		CHECK(open[3]->at_eof(5000));
+	}
+	TEST_CASE("max_failures 0 never refuses") {
+		const std::string token = "s3cret";
+		auto o = login_options(token);
+		o.logins.max_failures = 0;
+		server_thread s(o);
+		const uint16_t port = s.tcp_port();
+		fail_logins(port, 5);
+		tcp_client c(loopback(port));
+		CHECK(has(login(c, "s3cret"), "\"status\":\"ok\""));
+	}
+	TEST_CASE("the events as text name the kind") {
+		const std::string token = "s3cret";
+		auto o = login_options(token);
+		o.json = false;
+		server_thread s(o);
+		const auto lines = s.wait_listening(1);
+		REQUIRE_FALSE(lines.empty());
+		const auto at = lines[0].rfind(':');
+		REQUIRE(at != std::string::npos);
+		const auto port = static_cast<uint16_t>(
+			std::stoi(lines[0].substr(at + 1)));
+		fail_logins(port, 3);
+		{
+			tcp_client c(loopback(port));
+			CHECK(has(c.read_line(), "Too many failed logins"));
+		}
+		const std::string out = s.out.text();
+		CHECK(has(out, " login-refused tcp\n"));
+		CHECK(has(out, " login-wait tcp\n"));
+	}
+#ifndef _WIN32
+	TEST_CASE("the tcp counter does not block the local socket") {
+		const std::string token = "s3cret";
+		const std::string path = (std::filesystem::temp_directory_path()
+			/ ("line_server_login_" + std::to_string(::getpid())
+				+ ".sock")).string();
+		std::filesystem::remove(path);
+		auto o = login_options(token);
+		o.listen = { { line_transport_kind::local_socket, path, 0 },
+			{ line_transport_kind::tcp, "", 0 } };
+		server_thread s(o);
+		REQUIRE(s.wait_listening(2).size() >= 2);
+		const uint16_t port = s.tcp_port();
+		fail_logins(port, 3);
+		{
+			tcp_client c(loopback(port));
+			CHECK(has(c.read_line(), "Too many failed logins"));
+		}
+		line_client_test::local_client c{
+			ba::local::stream_protocol::endpoint(path) };
+		CHECK(has(login(c, "s3cret"), "\"status\":\"ok\""));
+	}
+#endif
+}
+
 // Answers each line with a JSON string of @p size bytes and counts the lines.
 struct big_reply_handler : session_handler {
 	big_reply_handler(std::atomic<int>& l, size_t size)

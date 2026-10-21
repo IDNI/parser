@@ -320,6 +320,8 @@ struct messages {
 		"The WebSocket origin is not allowed";
 	static constexpr sv net_login_refused      =
 		"Login refused";
+	static constexpr sv net_login_wait         =
+		"Too many failed logins, try again later";
 	static constexpr sv net_line_too_long      =
 		"The line is over the limit";
 	static constexpr sv net_connection_lost    =

@@ -324,6 +324,17 @@ struct line_server {
 	bool idle_tick_running = false;
 	// websocket upgrades in flight
 	size_t upgrades = 0;
+
+	// The failed logins of one transport kind.
+	struct failure_window {
+		std::deque<std::chrono::steady_clock::time_point> at;
+		std::chrono::steady_clock::time_point wait_until{};
+	};
+	// by line_transport_kind
+	std::array<failure_window, 3> failures;
+
+	void count_failure(line_transport_kind k);
+	bool refusing(line_transport_kind k) const;
 };
 
 std::mutex running_mutex;
@@ -421,9 +432,20 @@ void server_connection::handle_first_line(std::string& l) {
 	}
 	const auto& opt = srv->opt;
 	const tref first = req.value();
+	// A connection opened before the limit was reached must not guess.
+	if (opt.authenticate && srv->refusing(session.peer.kind)) {
+		srv->log_event(login_event("login-wait", session.peer.kind,
+			session.id), nullptr);
+		refuse(diagnostics::code::out_of_range,
+			parser_strings::messages::net_login_wait);
+		return;
+	}
 	if (opt.authenticate
 		&& !opt.authenticate(first, session.peer))
 	{
+		srv->count_failure(session.peer.kind);
+		srv->log_event(login_event("login-refused", session.peer.kind,
+			session.id), nullptr);
 		refuse(diagnostics::code::invalid_argument,
 			parser_strings::messages::net_login_refused);
 		return;
@@ -1105,9 +1127,32 @@ void line_server::accept_local(size_t i) {
 }
 #endif
 
+void line_server::count_failure(line_transport_kind k) {
+	if (opt.logins.max_failures == 0) return;
+	auto& w = failures[static_cast<size_t>(k)];
+	const auto now = std::chrono::steady_clock::now();
+	w.at.push_back(now);
+	while (!w.at.empty() && now - w.at.front() > opt.logins.window)
+		w.at.pop_front();
+	if (w.at.size() >= opt.logins.max_failures)
+		w.wait_until = now + opt.logins.wait;
+}
+
+bool line_server::refusing(line_transport_kind k) const {
+	return std::chrono::steady_clock::now()
+		< failures[static_cast<size_t>(k)].wait_until;
+}
+
 void line_server::on_accept(conn_socket sock, peer_info peer) {
 	auto c = std::make_shared<server_connection>(this, std::move(sock),
 		std::move(peer));
+	if (refusing(c->session.peer.kind)) {
+		log_event(login_event("login-wait", c->session.peer.kind, ""),
+			nullptr);
+		c->refuse(diagnostics::code::out_of_range,
+			parser_strings::messages::net_login_wait);
+		return;
+	}
 	if (full(c->session.peer.kind) || pending() >= opt.max_pending) {
 		c->refuse(diagnostics::code::out_of_range, opt.busy_message);
 		return;
