@@ -51,6 +51,7 @@ set(TAU_PARSER_HEADERS
 	utility/repl.h
 	utility/repl_ftxui.h
 	utility/repl_ftxui.tmpl.h
+	utility/repl_result.h
 	utility/temp_file.h
 	utility/temp_file.tmpl.h
 	utility/term.h

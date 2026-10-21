@@ -16,6 +16,7 @@
 #include "utility/diagnostics.h"
 #include "utility/options.h"
 #include "utility/repl.h"
+#include "utility/repl_result.h"
 #include "utility/term_colors.h"
 #ifdef TAU_PARSER_HAS_FTXUI
 #include "../utility/repl_ftxui.h"
@@ -33,28 +34,8 @@ int tgf_run(int argc, char** argv);
 /// reads the arguments from the command line of the process.
 int tgf_main(int argc, char** argv);
 
-/// Status of one command, or of one request text as a whole.
-enum class cmd_status { ok, error, incomplete, quit };
-
 /// Symbolic name of @p s: "ok", "error", "incomplete" or "quit".
 const char* cmd_status_name(cmd_status s);
-
-/// Result of one statement.
-struct cmd_result {
-	std::string cmd;                        // long name: "set", "parse file"
-	cmd_status status = cmd_status::ok;
-	/// The data outlives the command, so a handle holds it.
-	htref data = format::json::tree::geth(
-		format::json::tree::build_object({}));
-	diagnostics::report report;
-};
-
-/// Result of one request text (one or more statements).
-struct eval_result {
-	cmd_status status = cmd_status::ok;
-	std::vector<cmd_result> results;
-	diagnostics::report report;   // errors in the command text itself
-};
 
 /// The options of tgf_repl_evaluator::options.
 inline const option_set tgf_repl_option_set = { .options = {
