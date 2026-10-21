@@ -236,7 +236,7 @@ repl_ftxui<evaluator_t>::repl_ftxui(evaluator_t& re, std::string prompt,
           eval_widget_(re),
           prompt_(std::move(prompt)),
           history_(std::move(history_file)) {
-	re_.r_ftx = this; // link evaluator to this repl
+	link_front(re_, this, [this](auto& e) { e.r_ftx = this; });
 }
 
 template <typename evaluator_t>

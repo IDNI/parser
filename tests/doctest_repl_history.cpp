@@ -12,6 +12,7 @@
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <type_traits>
 #include <vector>
 #ifdef _WIN32
 #include <fcntl.h>
@@ -155,5 +156,48 @@ TEST_SUITE("repl_history: prev/next draft stash") {
 		REQUIRE(down2.has_value());
 		CHECK(*down2 == "d");
 		CHECK(h.size() == 2);
+	}
+}
+
+TEST_SUITE("repl_front") {
+	struct counting_front : idni::repl_front {
+		std::string prompt;
+		int clears = 0;
+		void set_prompt(const std::string& p) override { prompt = p; }
+		void clear() override { ++clears; }
+	};
+	struct front_evaluator { idni::repl_front* front = nullptr; };
+	struct typed_evaluator { idni::repl<typed_evaluator>* r = nullptr; };
+
+	TEST_CASE("link_front sets the member front and calls no fallback") {
+		counting_front f;
+		front_evaluator e;
+		bool fell_back = false;
+		idni::link_front(e, &f, [&](auto&) { fell_back = true; });
+		REQUIRE(e.front == &f);
+		CHECK_FALSE(fell_back);
+		e.front->set_prompt("tgf> ");
+		e.front->clear();
+		CHECK(f.prompt == "tgf> ");
+		CHECK(f.clears == 1);
+	}
+
+	TEST_CASE("link_front calls the fallback when the evaluator has no front") {
+		counting_front f;
+		typed_evaluator e;
+		int calls = 0;
+		idni::link_front(e, &f, [&](typed_evaluator& x) {
+			CHECK(&x == &e);
+			++calls;
+		});
+		CHECK(calls == 1);
+		CHECK(e.r == nullptr);
+	}
+
+	TEST_CASE("repl is a repl_front") {
+		CHECK(std::is_base_of_v<idni::repl_front,
+			idni::repl<typed_evaluator>>);
+		CHECK(std::is_base_of_v<idni::repl_front,
+			idni::repl<front_evaluator>>);
 	}
 }

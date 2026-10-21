@@ -14,6 +14,7 @@
 #include <utility>
 #include <vector>
 
+#include "repl.h"
 #include "repl_history.h"
 
 namespace ftxui { class ScreenInteractive; }
@@ -83,8 +84,8 @@ struct repl_key_action {
 /// evaluator_t must provide `idni::diagnostics::result<int> eval(const std::string&)`,
 /// with a status code always carried as a value (0 = ok, 1 = exit,
 /// 2 = incomplete) and a valueless result meaning the command failed; and a
-/// `repl_ftxui<evaluator_t>* r_ftx` back-pointer (declare this struct a
-/// friend if it is private).
+/// `repl_front* front` or a `repl_ftxui<evaluator_t>* r_ftx` back-pointer
+/// (declare this struct a friend if it is private).
 ///
 /// Optionally, evaluator_t may provide
 /// `repl_key_action on_repl_key(const std::string& key)`: when present it is
@@ -96,7 +97,7 @@ struct repl_key_action {
 /// Interactive evaluation runs on a worker thread so the FTXUI loop can show
 /// progress and live output. Pipe mode remains synchronous.
 template <typename evaluator_t>
-struct repl_ftxui {
+struct repl_ftxui : repl_front {
 	repl_ftxui(evaluator_t& re, std::string prompt = "> ",
 	           std::string history_file = ".history");
 
@@ -104,13 +105,13 @@ struct repl_ftxui {
 	int run();
 
 	/// Sets the prompt (used by the evaluator's reprompt()).
-	void set_prompt(const std::string& p);
+	void set_prompt(const std::string& p) override;
 	/// Sets the prompt of the lines after the first while the input is
 	/// incomplete; empty (the default) indents them under the prompt.
 	void set_continuation_prompt(const std::string& p);
 
 	/// Clears the terminal while the interactive screen is temporarily restored.
-	void clear();
+	void clear() override;
 
 private:
 	int run_interactive();

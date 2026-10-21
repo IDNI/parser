@@ -19,25 +19,42 @@
 
 namespace idni {
 
+/// The calls an evaluator makes on the front end that runs it, so one
+/// pointer serves repl<> and repl_ftxui<>.
+struct repl_front {
+	virtual ~repl_front() = default;
+	virtual void set_prompt(const std::string& p) = 0;
+	virtual void clear() = 0;
+};
+
+/// Link the evaluator @p re to the front end @p f through its member
+/// front, or call @p fallback with @p re when it has no such member.
+template <typename evaluator_t, typename fallback_t>
+void link_front(evaluator_t& re, repl_front* f, fallback_t fallback) {
+	if constexpr (requires { re.front; }) re.front = f;
+	else fallback(re);
+}
+
 /// evaluator_t must be a class with:
 /// - a method idni::diagnostics::result<int> eval(const std::string&)
 ///         which allows to plug own evaluation logic.
 ///         A status code is always a value: 0 for normal operation, 1 if
 ///         the repl should exit, 2 if the input was incomplete. A
 ///         valueless result means the command failed.
-/// - a member repl<evaluator_t>* r = 0; accessible to this struct
-///         if r is private, add friend struct repl<evaluator_t>;
+/// - a member repl_front* front = nullptr, or a member
+///         repl<evaluator_t>* r = 0; accessible to this struct
+///         if it is private, add friend struct repl<evaluator_t>;
 template <typename evaluator_t>
-struct repl {
+struct repl : repl_front {
 	repl(evaluator_t& re, std::string prompt = "> ",
 		std::string history_file = ".history")
 		: re_(re), prompt_(prompt),
 		  history_(std::move(history_file))
 	{
-		re.r = this; // link evaluator to this repl
+		link_front(re, this, [this](auto& e) { e.r = this; });
 		term::open();
 	}
-	~repl() { term::close(); }
+	~repl() override { term::close(); }
 	bool echo = true;
 	int run() {
 		clear_input();
@@ -165,13 +182,13 @@ struct repl {
 		else c_++, term::cursor_right();
 		TDBG(print_debug();)
 	}
-	void set_prompt(const std::string& p) { prompt_ = p; }
+	void set_prompt(const std::string& p) override { prompt_ = p; }
 	/// Sets the prompt of the lines after the first while the input is
 	/// incomplete (pipe mode only); empty by default
 	void set_continuation_prompt(const std::string& p) {
 		continuation_prompt_ = p;
 	}
-	void clear() { if (!is_pipe_) term::clear(); }
+	void clear() override { if (!is_pipe_) term::clear(); }
 	/// Returns the current prompt
 	std::string prompt() const { return prompt_; }
 private:
