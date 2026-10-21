@@ -1888,3 +1888,48 @@ TEST_SUITE("tgf json api: line limit") {
 		CHECK(!std::getline(ls, line));   // no more output
 	}
 }
+
+TEST_SUITE("tgf json api: a line of only whitespace") {
+	TEST_CASE("a request line of only whitespace gets no answer") {
+		tgf_repl_evaluator re(grammar_path(), json_options());
+		std::istringstream in(
+			"{\"id\":1,\"cmd\":\"version\"}\n"
+			"  \t\n"
+			" \r\n"
+			"{\"id\":2,\"cmd\":\"version\"}\n");
+		std::ostringstream out;
+		tgf_json_loop(re, in, out);
+		std::istringstream ls(out.str());
+		std::string line;
+		REQUIRE(static_cast<bool>(std::getline(ls, line)));   // hello
+		for (double id : { 1.0, 2.0 }) {
+			REQUIRE(static_cast<bool>(std::getline(ls, line)));
+			auto v = parse_line(line);
+			CHECK(member(v, "status")->get_string() == "ok");
+			const jt* got = member(v, "id");
+			REQUIRE(got != nullptr);
+			REQUIRE(got->is_number());
+			CHECK(got->get_number() == id);
+		}
+		CHECK(!std::getline(ls, line));   // no more output
+	}
+
+	TEST_CASE("an init line of only whitespace is a missing field") {
+		tgf_repl_evaluator re(grammar_path(), json_options());
+		std::istringstream in(" \t\n{\"id\":1,\"cmd\":\"version\"}\n");
+		std::ostringstream out;
+		tgf_json_loop(re, in, out, tgf_json_max_line, true);
+		std::istringstream ls(out.str());
+		std::string line;
+		REQUIRE(static_cast<bool>(std::getline(ls, line)));   // hello
+		auto h = parse_line(line);
+		const jt* rep = member(member(h, "hello"), "report");
+		REQUIRE(rep != nullptr);
+		const jt* nodes = member(rep, "nodes");
+		REQUIRE(nodes != nullptr);
+		bool missing = false;
+		for (const jt& n : nodes->children_trees())
+			if (json_node_has_key(n, "Missing field")) missing = true;
+		CHECK(missing);
+	}
+}

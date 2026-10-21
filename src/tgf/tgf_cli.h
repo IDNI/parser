@@ -15,6 +15,7 @@
 
 #include "utility/diagnostics.h"
 #include "utility/options.h"
+#include "utility/repl_json.h"
 #include "utility/repl.h"
 #include "utility/repl_result.h"
 #include "utility/term_colors.h"
@@ -33,9 +34,6 @@ int tgf_run(int argc, char** argv);
 /// The main of the tgf program. Only main calls it, because on Windows it
 /// reads the arguments from the command line of the process.
 int tgf_main(int argc, char** argv);
-
-/// Symbolic name of @p s: "ok", "error", "incomplete" or "quit".
-const char* cmd_status_name(cmd_status s);
 
 /// The options of tgf_repl_evaluator::options.
 inline const option_set tgf_repl_option_set = { .options = {
@@ -292,7 +290,7 @@ int tgf_specialized_run(int argc, char** argv,
 /// Run the JSON request loop on @p in until end of input or a quit
 /// request. With @p init_stdin, one init line is read first and applied
 /// before the first hello. @p extra is appended to the first hello report.
-inline constexpr size_t tgf_json_max_line = 16u * 1024 * 1024;
+inline constexpr size_t tgf_json_max_line = repl_json_max_line;
 int tgf_json_loop(tgf_repl_evaluator& re, std::istream& in,
 	std::ostream& out, size_t max_line = tgf_json_max_line,
 	bool init_stdin = false,
@@ -323,15 +321,6 @@ void render_command_text(const cmd_result& r, std::ostream& os,
 /// carries the field `file` and a `parse file` keeps that command name;
 /// the client of `tgf serve` reads the file and rewrites both.
 tref statement_request(const tgf_repl_evaluator::trv& n);
-
-/// Response of one eval request: {"id","status","results":[...],
-/// "state":{...},"report"}.
-tref json_eval_response(tref id, const eval_result& er, tref state);
-
-/// Response of one one-shot CLI command: {"cmd","status","result",
-/// "state":{...},"report"}.
-tref json_result_response(cmd_status status, const std::string& cmd,
-	tref result, tref state, const diagnostics::report& report);
 
 /// The JSON form of an option value: a bool, a number, a string or an
 /// array of strings.

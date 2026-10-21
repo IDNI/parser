@@ -168,10 +168,6 @@ static diagnostics::result<std::string> request_to_src(
 	return ok_result(cmd);
 }
 
-static tref report_value(const diagnostics::report& r) {
-	return jt::build_report(r, true);
-}
-
 tref build_option(const option_value& v) {
 	return std::visit([](const auto& x) -> tref {
 		using T = std::decay_t<decltype(x)>;
@@ -236,69 +232,6 @@ tref state_value(const tgf_repl_evaluator& re) {
 		jt::build_pair("char_classes", jt::build_array(cc)) });
 }
 
-static tref status_value(cmd_status s) {
-	return jt::build_string(cmd_status_name(s));
-}
-
-static tref error_response(tref id, tref state, const diagnostics::report& r)
-{
-	return jt::build_object({
-		jt::build_pair("id", id),
-		jt::build_pair("status", status_value(cmd_status::error)),
-		jt::build_pair("state", state),
-		jt::build_pair("report", report_value(r)) });
-}
-
-static tref incomplete_response(tref id, tref state,
-	const diagnostics::report& r)
-{
-	return jt::build_object({
-		jt::build_pair("id", id),
-		jt::build_pair("status", status_value(cmd_status::incomplete)),
-		jt::build_pair("state", state),
-		jt::build_pair("report", report_value(r)) });
-}
-
-tref json_result_response(cmd_status status, const std::string& cmd,
-	tref result, tref state, const diagnostics::report& r)
-{
-	return jt::build_object({
-		jt::build_pair("cmd", jt::build_string(cmd)),
-		jt::build_pair("status", status_value(status)),
-		jt::build_pair("result", result),
-		jt::build_pair("state", state),
-		jt::build_pair("report", report_value(r)) });
-}
-
-static tref json_id_response(tref id, const std::string& cmd,
-	cmd_status status, tref result, tref state,
-	const diagnostics::report& r)
-{
-	return jt::build_object({
-		jt::build_pair("id", id),
-		jt::build_pair("cmd", jt::build_string(cmd)),
-		jt::build_pair("status", status_value(status)),
-		jt::build_pair("result", result),
-		jt::build_pair("state", state),
-		jt::build_pair("report", report_value(r)) });
-}
-
-tref json_eval_response(tref id, const eval_result& er, tref state) {
-	trefs arr;
-	for (const auto& e : er.results)
-		arr.push_back(jt::build_object({
-			jt::build_pair("cmd", jt::build_string(e.cmd)),
-			jt::build_pair("status", status_value(e.status)),
-			jt::build_pair("result", e.data->get()),
-			jt::build_pair("report", report_value(e.report)) }));
-	return jt::build_object({
-		jt::build_pair("id", id),
-		jt::build_pair("status", status_value(er.status)),
-		jt::build_pair("results", jt::build_array(arr)),
-		jt::build_pair("state", state),
-		jt::build_pair("report", report_value(er.report)) });
-}
-
 void json_write_line(std::ostream& os, const format::json::value& v) {
 #ifdef _WIN32
 	// A JSON message ends with one '\n', so stdout must not add a '\r'.
@@ -327,16 +260,15 @@ static tref hello_object(tgf_repl_evaluator& re,
 	h.push_back(jt::build_pair("options", re.option_values()));
 	diagnostics::report r = re.take_report();
 	r.append(extra);
-	h.push_back(jt::build_pair("report", report_value(r)));
+	h.push_back(jt::build_pair("report", jt::build_report(r, true)));
 	return jt::build_object(h);
 }
 
 static tref hello(tgf_repl_evaluator& re,
 	const diagnostics::report& extra = diagnostics::report{})
 {
-	return jt::build_object({
-		jt::build_pair("hello", hello_object(re, extra)),
-		jt::build_pair("state", state_value(re)) });
+	const tref h = hello_object(re, extra);
+	return json_hello_line(h, state_value(re));
 }
 
 // A set, add or delete request writes the option through the repository,
@@ -378,23 +310,18 @@ static std::pair<tref, diagnostics::report> option_request(
 }
 
 static std::pair<tref, cmd_status> handle_request(
-	tgf_repl_evaluator& re, const std::string& line)
+	tgf_repl_evaluator& re, tref q)
 {
-	auto req = jt::get(line);
-	if (!req.has_value())
-		return { error_response(jt::_null(), state_value(re),
-			req.report()), cmd_status::error };
-	tref q = req.value();
 	tref id = jt::_null();
 	if (tref i = jt::get(q).find("id"); i) id = i;
 	auto cmd = required_string_field(q, "cmd");
 	if (!cmd.has_value())
-		return { error_response(id, state_value(re), cmd.report()),
+		return { json_error_response(id, state_value(re), cmd.report()),
 			cmd_status::error };
 	if (cmd.value() == "eval") {
 		auto src = required_string_field(q, "src");
 		if (!src.has_value())
-			return { error_response(id, state_value(re),
+			return { json_error_response(id, state_value(re),
 				src.report()), cmd_status::error };
 		auto er = re.run(src.value());
 		cmd_status st = er.status == cmd_status::quit
@@ -403,12 +330,7 @@ static std::pair<tref, cmd_status> handle_request(
 	}
 	if (cmd.value() == "hello") {
 		const tref h = hello_object(re);
-		return { jt::build_object({
-			jt::build_pair("id", id),
-			jt::build_pair("cmd", jt::build_string("hello")),
-			jt::build_pair("status", status_value(cmd_status::ok)),
-			jt::build_pair("hello", h),
-			jt::build_pair("state", state_value(re)) }),
+		return { json_hello_response(id, h, state_value(re)),
 			cmd_status::ok };
 	}
 	// The load form with source text carries no path, so it runs the
@@ -416,18 +338,18 @@ static std::pair<tref, cmd_status> handle_request(
 	if (cmd.value() == "load" && jt::get(q).find("source")) {
 		auto name = required_string_field(q, "name");
 		if (!name.has_value())
-			return { error_response(id, state_value(re),
+			return { json_error_response(id, state_value(re),
 				name.report()), cmd_status::error };
 		auto source = required_string_field(q, "source");
 		if (!source.has_value())
-			return { error_response(id, state_value(re),
+			return { json_error_response(id, state_value(re),
 				source.report()), cmd_status::error };
 		auto data = re.load_source_data(name.value(), source.value());
 		auto rep = re.take_report();
 		cmd_status st = rep.has_error()
 			? cmd_status::error : cmd_status::ok;
-		return { json_id_response(id, "load", st, data,
-			state_value(re), rep), st };
+		return { json_result_response(st, cmd.value(), data,
+			state_value(re), rep, id), st };
 	}
 	if (cmd.value() == "set" || cmd.value() == "add"
 		|| cmd.value() == "delete")
@@ -435,25 +357,25 @@ static std::pair<tref, cmd_status> handle_request(
 		auto [data, rep] = option_request(re, cmd.value(), q);
 		cmd_status st = rep.has_error()
 			? cmd_status::error : cmd_status::ok;
-		return { json_id_response(id, cmd.value(), st, data,
-			state_value(re), rep), st };
+		return { json_result_response(st, cmd.value(), data,
+			state_value(re), rep, id), st };
 	}
 	auto src = request_to_src(re, cmd.value(), q);
 	if (!src.has_value())
-		return { error_response(id, state_value(re), src.report()),
+		return { json_error_response(id, state_value(re), src.report()),
 			cmd_status::error };
 	auto er = re.run(src.value());
 	if (er.status == cmd_status::incomplete)
-		return { incomplete_response(id, state_value(re),
-			er.report), cmd_status::ok };
+		return { json_status_response(id, cmd_status::incomplete,
+			state_value(re), er.report), cmd_status::ok };
 	if (er.results.empty())
-		return { error_response(id, state_value(re), er.report),
+		return { json_error_response(id, state_value(re), er.report),
 			cmd_status::error };
 	const cmd_result& r = er.results.front();
 	cmd_status st = r.status == cmd_status::quit
 		? cmd_status::quit : cmd_status::ok;
-	return { json_id_response(id, r.cmd, r.status, r.data->get(),
-		state_value(re), r.report), st };
+	return { json_result_response(r.status, r.cmd, r.data->get(),
+		state_value(re), r.report, id), st };
 }
 
 // Apply one element of the init option values. A bad value reports an
@@ -534,35 +456,6 @@ static diagnostics::report apply_init(tgf_repl_evaluator& re,
 	return r;
 }
 
-// Read one line into @p line without ever holding more than @p max_line
-// bytes. Bytes past the limit are dropped up to the next newline. The
-// return value is false only at end of input; @p too_long marks a line
-// that was cut at the limit.
-static bool json_read_line(std::istream& in, std::string& line,
-	size_t max_line, bool& too_long)
-{
-	line.clear();
-	too_long = false;
-	std::streambuf* sb = in.rdbuf();
-	if (!sb) return false;
-	for (;;) {
-		std::streambuf::int_type ci = sb->sbumpc();
-		if (ci == std::streambuf::traits_type::eof()) {
-			in.setstate(std::ios::eofbit);
-			return !line.empty() || too_long;
-		}
-		char c = static_cast<char>(ci);
-		if (c == '\n') return true;
-		if (line.size() >= max_line) {
-			// The bytes past the limit are dropped, so a long
-			// line never sits whole in memory.
-			too_long = true;
-			continue;
-		}
-		line.push_back(c);
-	}
-}
-
 int tgf_json_loop(tgf_repl_evaluator& re, std::istream& in,
 	std::ostream& out, size_t max_line, bool init_stdin,
 	diagnostics::report extra)
@@ -574,29 +467,22 @@ int tgf_json_loop(tgf_repl_evaluator& re, std::istream& in,
 		std::string init_line;
 		bool too_long = false;
 		if (json_read_line(in, init_line, limit, too_long)) {
-			if (!init_line.empty() && init_line.back() == '\r')
-				init_line.pop_back();
+			auto parsed = too_long ? diagnostics::result<tref>{}
+				: json_parse_line(init_line);
+			tref node = parsed.has_value() && parsed.value()
+				? jt::get(parsed.value()).find("init")
+				: nullptr;
 			if (too_long)
 				init_report.error(
 					diagnostics::code::out_of_range,
 					parser_strings::messages::line_too_long);
-			else if (init_line.empty())
+			else if (!parsed.has_value())
+				init_report.append(parsed.report());
+			else if (!node)
 				init_report.error(
 					diagnostics::code::invalid_argument,
 					parser_strings::messages::missing_field);
-			else {
-				auto parsed = jt::get(init_line);
-				tref node = parsed.has_value()
-					? jt::get(parsed.value()).find("init")
-					: nullptr;
-				if (!parsed.has_value())
-					init_report.append(parsed.report());
-				else if (!node)
-					init_report.error(
-						diagnostics::code::invalid_argument,
-						parser_strings::messages::missing_field);
-				else init_report.append(apply_init(re, node, limit));
-			}
+			else init_report.append(apply_init(re, node, limit));
 		} else init_report.error(
 			diagnostics::code::invalid_argument,
 			parser_strings::messages::missing_field);
@@ -608,8 +494,6 @@ int tgf_json_loop(tgf_repl_evaluator& re, std::istream& in,
 	for (std::string line; ; ) {
 		bool too_long = false;
 		if (!json_read_line(in, line, limit, too_long)) break;
-		if (!line.empty() && line.back() == '\r') line.pop_back();
-		if (!too_long && line.empty()) continue;
 		cmd_status st = cmd_status::ok;
 		{
 			bintree<format::json::node>::gc_pause pause;
@@ -619,10 +503,16 @@ int tgf_json_loop(tgf_repl_evaluator& re, std::istream& in,
 				diagnostics::report rep;
 				rep.error(diagnostics::code::out_of_range,
 					parser_strings::messages::line_too_long);
-				format::json::write_line(error_response(
+				format::json::write_line(json_error_response(
 					jt::_null(), state_value(re), rep), out);
-			} else {
-				auto [resp, s] = handle_request(re, line);
+			} else if (auto req = json_parse_line(line);
+					!req.has_value()) {
+				format::json::write_line(json_error_response(
+					jt::_null(), state_value(re), req.report()),
+					out);
+			} else if (req.value()) {
+				// A line of only whitespace gets no answer.
+				auto [resp, s] = handle_request(re, req.value());
 				format::json::write_line(resp, out);
 				st = s;
 			}

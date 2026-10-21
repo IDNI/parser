@@ -120,16 +120,6 @@ static const char* help_arg_name(size_t nt) {
 	}
 }
 
-const char* cmd_status_name(cmd_status s) {
-	switch (s) {
-	case cmd_status::ok:         return "ok";
-	case cmd_status::error:      return "error";
-	case cmd_status::incomplete: return "incomplete";
-	case cmd_status::quit:       return "quit";
-	}
-	return "ok";
-}
-
 void print_diagnostics_report(const idni::diagnostics::report& report,
 	bool json, bool print_names)
 {
