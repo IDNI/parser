@@ -22,6 +22,7 @@
 #include <csignal>
 #include <deque>
 #include <exception>
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -34,6 +35,12 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#else
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/un.h>
+#include <unistd.h>
 #endif
 
 // The dep script ships headers only, so Boost.System must stay header-only.
@@ -60,7 +67,12 @@ using boost::system::error_code;
 using jt = format::json::tree;
 using format::json::string_member;
 
+#ifdef _WIN32
 using conn_socket = std::variant<tcp::socket>;
+#else
+using local = ba::local::stream_protocol;
+using conn_socket = std::variant<tcp::socket, local::socket>;
+#endif
 
 // The idle timer ticks at this interval.
 inline constexpr int tick_ms = 200;
@@ -81,6 +93,24 @@ tref error_response(const diagnostics::report& rep) {
 		jt::build_pair("status", jt::build_string("error")),
 		jt::build_pair("report", jt::build_report(rep, true)) });
 }
+
+#ifndef _WIN32
+// The user of the peer process of a Unix domain socket.
+std::optional<uint64_t> peer_user(int fd) {
+#if defined(__linux__)
+	ucred cred{};
+	socklen_t len = sizeof cred;
+	if (::getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &cred, &len) != 0)
+		return std::nullopt;
+	return static_cast<uint64_t>(cred.uid);
+#else
+	uid_t uid = 0;
+	gid_t gid = 0;
+	if (::getpeereid(fd, &uid, &gid) != 0) return std::nullopt;
+	return static_cast<uint64_t>(uid);
+#endif
+}
+#endif
 
 // The text of a log field, empty when the field is absent.
 std::string field_text(tref v, std::string_view key) {
@@ -163,7 +193,11 @@ struct line_server {
 	void close_all();
 
 	bool listen_tcp(const listen_address& a);
+	bool listen_local(const listen_address& a);
 	void accept_tcp(size_t i);
+#ifndef _WIN32
+	void accept_local(size_t i);
+#endif
 	void on_accept(conn_socket sock, peer_info peer);
 	void retry_accept(std::function<void()> accept);
 	bool full(line_transport_kind k) const;
@@ -185,6 +219,10 @@ struct line_server {
 	std::vector<listen_address> bound;
 	// tcp and websocket
 	std::vector<tcp_listener> tcp_listeners;
+#ifndef _WIN32
+	std::vector<std::unique_ptr<local::acceptor>> local_acceptors;
+	std::vector<std::string> socket_files;
+#endif
 	ba::steady_timer idle_timer;
 	ba::signal_set signals;
 	std::map<std::string, std::shared_ptr<server_connection>> connections;
@@ -614,6 +652,47 @@ bool line_server::listen_tcp(const listen_address& a) {
 	return true;
 }
 
+#ifndef _WIN32
+bool line_server::listen_local(const listen_address& a) {
+	const std::string& path = a.path;
+	auto failed = [this, &path](std::string_view msg) {
+		report.error(diagnostics::code::io_error, msg,
+			{ { parser_strings::label::path, path } });
+		return false;
+	};
+	// The endpoint of Asio throws on a path over the limit, so check first.
+	if (path.empty() || path.size() >= sizeof(sockaddr_un{}.sun_path))
+		return failed(parser_strings::messages::net_path_too_long);
+	std::error_code fec;
+	const auto st = std::filesystem::symlink_status(path, fec);
+	if (std::filesystem::exists(st)) {
+		if (!std::filesystem::is_socket(st))
+			return failed(parser_strings::messages::net_bind_failed);
+		// A socket file that no process answers is left by a stopped
+		// server, so it goes. A live server keeps it.
+		local::socket probe(io);
+		error_code ec;
+		probe.connect(local::endpoint(path), ec);
+		if (ec != ba::error::connection_refused)
+			return failed(parser_strings::messages::net_bind_failed);
+		std::filesystem::remove(path, fec);
+	}
+	auto acc = std::make_unique<local::acceptor>(io);
+	error_code ec;
+	acc->open(local::endpoint(path).protocol(), ec);
+	if (!ec) acc->bind(local::endpoint(path), ec);
+	if (ec) return failed(parser_strings::messages::net_bind_failed);
+	socket_files.push_back(path);
+	if (::chmod(path.c_str(), S_IRUSR | S_IWUSR) != 0)
+		return failed(parser_strings::messages::net_bind_failed);
+	acc->listen(ba::socket_base::max_listen_connections, ec);
+	if (ec) return failed(parser_strings::messages::net_bind_failed);
+	bound.push_back(a);
+	local_acceptors.push_back(std::move(acc));
+	return true;
+}
+#endif
+
 void line_server::retry_accept(std::function<void()> accept) {
 	auto t = std::make_shared<ba::steady_timer>(io,
 		std::chrono::milliseconds(opt.accept_retry_ms));
@@ -641,6 +720,23 @@ void line_server::accept_tcp(size_t i) {
 		});
 }
 
+#ifndef _WIN32
+void line_server::accept_local(size_t i) {
+	local_acceptors[i]->async_accept(
+		[this, i](error_code ec, local::socket s) {
+			if (stopping) return;
+			if (ec) {
+				retry_accept([this, i] { accept_local(i); });
+				return;
+			}
+			auto uid = peer_user(s.native_handle());
+			on_accept(conn_socket(std::move(s)), peer_info{
+				line_transport_kind::local_socket, uid });
+			accept_local(i);
+		});
+}
+#endif
+
 void line_server::on_accept(conn_socket sock, peer_info peer) {
 	auto c = std::make_shared<server_connection>(this, std::move(sock),
 		std::move(peer));
@@ -648,6 +744,17 @@ void line_server::on_accept(conn_socket sock, peer_info peer) {
 		c->refuse(diagnostics::code::out_of_range, opt.busy_message);
 		return;
 	}
+#ifndef _WIN32
+	// The access list of a named pipe checks the user on Windows.
+	if (c->session.peer.kind == line_transport_kind::local_socket
+			&& opt.require_same_user
+			&& c->session.peer.user_id
+				!= static_cast<uint64_t>(::getuid())) {
+		c->refuse(diagnostics::code::invalid_argument,
+			parser_strings::messages::net_peer_refused);
+		return;
+	}
+#endif
 	std::optional<std::string> sid = new_session_id();
 	while (sid.has_value() && connections.find(*sid) != connections.end())
 		sid = new_session_id();
@@ -664,6 +771,8 @@ void line_server::on_accept(conn_socket sock, peer_info peer) {
 
 bool line_server::start() {
 	if (report.has_error()) return false;
+	if (opt.listen.empty())
+		opt.listen.push_back(listen_address{});
 	for (const auto& a : opt.listen) {
 		switch (a.kind) {
 		case line_transport_kind::tcp:
@@ -671,6 +780,9 @@ bool line_server::start() {
 			if (!listen_tcp(a)) return false;
 			break;
 		case line_transport_kind::local_socket:
+#ifndef _WIN32
+			if (!listen_local(a)) return false;
+#endif
 			break;
 		}
 	}
@@ -679,6 +791,9 @@ bool line_server::start() {
 
 void line_server::run() {
 	for (size_t i = 0; i != tcp_listeners.size(); ++i) accept_tcp(i);
+#ifndef _WIN32
+	for (size_t i = 0; i != local_acceptors.size(); ++i) accept_local(i);
+#endif
 	error_code ec;
 	signals.add(SIGINT, ec);
 	signals.add(SIGTERM, ec);
@@ -702,6 +817,11 @@ void line_server::close_all() {
 	for (auto& c : live) c->close();
 	error_code ec;
 	for (auto& l : tcp_listeners) l.acceptor->close(ec);
+#ifndef _WIN32
+	for (auto& a : local_acceptors) a->close(ec);
+	std::error_code fec;
+	for (const auto& f : socket_files) std::filesystem::remove(f, fec);
+#endif
 	log_ok = false;
 	server_log.close();
 }

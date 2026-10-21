@@ -23,6 +23,11 @@
 #include <thread>
 #include <vector>
 
+#ifndef _WIN32
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
+
 using namespace idni;
 using jt = format::json::tree;
 using line_client_test::tcp_client;
@@ -432,6 +437,97 @@ struct large_reply_handler : session_handler {
 	void on_close() override { ++closes; }
 };
 
+#ifndef _WIN32
+TEST_SUITE("line server: local socket") {
+	using line_client_test::local_client;
+	using local = ba::local::stream_protocol;
+
+	static std::string socket_path(const char* tag) {
+		return (std::filesystem::temp_directory_path()
+			/ (std::string("line_server_") + tag + "_"
+				+ std::to_string(::getpid()) + ".sock")).string();
+	}
+
+	TEST_CASE("an echo session, the mode 0600 and the listening lines") {
+		const std::string path = socket_path("echo");
+		std::filesystem::remove(path);
+		line_server_options o;
+		o.listen = { { line_transport_kind::local_socket, path, 0 },
+			{ line_transport_kind::tcp, "", 0 } };
+		o.json = true;
+		server_thread s(o);
+		const auto lines = s.wait_listening(2);
+		REQUIRE(lines.size() >= 2);
+		CHECK(lines[0] == "{\"listening\":{\"kind\":\"local_socket\","
+			"\"path\":\"" + path + "\"}}");
+		CHECK(has(lines[1], "{\"listening\":{\"kind\":\"tcp\",\"port\":"));
+		struct stat st{};
+		REQUIRE(::stat(path.c_str(), &st) == 0);
+		CHECK((st.st_mode & 0777) == 0600);
+		{
+			local_client c{ local::endpoint(path) };
+			c.send("{\"id\":1,\"cmd\":\"open\"}");
+			CHECK(c.read_line()
+				== "{\"id\":1,\"cmd\":\"open\",\"status\":\"ok\"}");
+			c.send("{\"id\":2}");
+			CHECK(c.read_line() == "{\"id\":2,\"status\":\"ok\"}");
+		}
+		s.stop();
+		CHECK_FALSE(std::filesystem::exists(path));
+	}
+	TEST_CASE("the listening line of a socket as text") {
+		const std::string path = socket_path("text");
+		line_server_options o;
+		o.listen = { { line_transport_kind::local_socket, path, 0 } };
+		server_thread s(o);
+		const auto lines = s.wait_listening(1);
+		REQUIRE_FALSE(lines.empty());
+		CHECK(has(lines[0], " listening on " + path));
+	}
+	TEST_CASE("a stale socket file goes, a live server keeps its file") {
+		const std::string path = socket_path("stale");
+		std::filesystem::remove(path);
+		{
+			// a bound socket that nobody accepts on leaves the file
+			ba::io_context io;
+			local::acceptor a(io, local::endpoint(path));
+		}
+		REQUIRE(std::filesystem::exists(path));
+		line_server_options o;
+		o.listen = { { line_transport_kind::local_socket, path, 0 } };
+		o.json = true;
+		server_thread s(o);
+		REQUIRE(s.wait_listening(1).size() >= 1);
+		line_server_options o2 = o;
+		o2.make_handler = [](const line_session&) {
+			return std::unique_ptr<session_handler>{};
+		};
+		std::ostringstream sink;
+		auto old = std::cout.rdbuf(sink.rdbuf());
+		auto r = line_server_run(o2);
+		std::cout.rdbuf(old);
+		CHECK_FALSE(r.has_value());
+	}
+	TEST_CASE("a path over the system limit names the path") {
+		const std::string path = "/tmp/" + std::string(200, 'x');
+		line_server_options o;
+		o.listen = { { line_transport_kind::local_socket, path, 0 } };
+		o.make_handler = [](const line_session&) {
+			return std::unique_ptr<session_handler>{};
+		};
+		std::ostringstream sink;
+		auto old = std::cout.rdbuf(sink.rdbuf());
+		auto r = line_server_run(o);
+		std::cout.rdbuf(old);
+		REQUIRE_FALSE(r.has_value());
+		std::ostringstream os;
+		r.report().print(os, term::colors(false));
+		CHECK(has(os.str(), "over the system limit"));
+		CHECK(has(os.str(), path));
+	}
+}
+#endif
+
 // Asks for the close in on_line and records whether on_close ran inside.
 struct closing_handler : session_handler {
 	explicit closing_handler(std::atomic<int>& r) : result(r) {}
@@ -656,3 +752,25 @@ TEST_SUITE("line server: line_server_log") {
 		std::filesystem::remove_all(dir);
 	}
 }
+
+#ifndef _WIN32
+TEST_SUITE("line server: require_same_user") {
+	TEST_CASE("require_same_user false: a peer of the same user passes") {
+		const std::string path = (std::filesystem::temp_directory_path()
+			/ ("line_server_any_user_" + std::to_string(::getpid())
+				+ ".sock")).string();
+		std::filesystem::remove(path);
+		line_server_options o;
+		o.listen = { { line_transport_kind::local_socket, path, 0 } };
+		o.require_same_user = false;
+		o.json = true;
+		server_thread s(o);
+		REQUIRE_FALSE(s.wait_listening(1).empty());
+		line_client_test::local_client c{
+			ba::local::stream_protocol::endpoint(path) };
+		c.send("{\"id\":1,\"cmd\":\"open\"}");
+		CHECK(c.read_line()
+			== "{\"id\":1,\"cmd\":\"open\",\"status\":\"ok\"}");
+	}
+}
+#endif

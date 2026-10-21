@@ -6,8 +6,10 @@
 
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -52,6 +54,9 @@ struct session_handler {
 /// What the server knows about the other end of a connection.
 struct peer_info {
 	line_transport_kind kind = line_transport_kind::local_socket;
+	/// local_socket only: the peer process user, from SO_PEERCRED on
+	/// Linux or getpeereid on macOS.
+	std::optional<uint64_t> user_id{};
 };
 
 /// One connection on the server.
@@ -69,7 +74,10 @@ struct line_session {
 /// The settings of the line server. One server listens on all
 /// addresses at once.
 struct line_server_options {
+	/// Default: one local_socket address.
 	std::vector<listen_address> listen{};
+	/// local_socket: refuse a peer of another user than the server.
+	bool require_same_user = true;
 	/// At this count the server refuses a new connection with busy_message.
 	size_t max_sessions = 16;
 	/// The wait after a failed accept, so a lack of file descriptors does

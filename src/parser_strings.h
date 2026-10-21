@@ -312,6 +312,10 @@ struct messages {
 		"a socket path or ws://<host>[:<port>][/<path>]";
 	static constexpr sv net_path_too_long      =
 		"The socket path is over the system limit";
+	static constexpr sv net_bind_failed        =
+		"Could not bind the listen address";
+	static constexpr sv net_peer_refused       =
+		"The peer user is not the server user";
 	static constexpr sv net_login_refused      =
 		"Login refused";
 	static constexpr sv net_line_too_long      =
