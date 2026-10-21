@@ -1,7 +1,23 @@
-# libFuzzer ships with clang only.
-if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR MSVC)
+# Emscripten and AppleClang report Clang but have no libFuzzer runtime.
+if(EMSCRIPTEN OR NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 	message(WARNING
-		"TAU_PARSER_BUILD_FUZZ needs clang, so the fuzz targets are not built")
+		"TAU_PARSER_BUILD_FUZZ needs clang with libFuzzer, so the fuzz targets are not built")
+	return()
+endif()
+# libFuzzer brings its own main, so the probe has the fuzz entry only.
+include(CheckCXXSourceCompiles)
+include(CMakePushCheckState)
+cmake_push_check_state(RESET)
+set(CMAKE_REQUIRED_LINK_OPTIONS "-fsanitize=fuzzer")
+check_cxx_source_compiles([[
+#include <cstddef>
+#include <cstdint>
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t*, size_t) { return 0; }
+]] TAU_PARSER_HAS_LIBFUZZER)
+cmake_pop_check_state()
+if(NOT TAU_PARSER_HAS_LIBFUZZER)
+	message(WARNING
+		"The compiler links no libFuzzer, so the fuzz targets are not built")
 	return()
 endif()
 
