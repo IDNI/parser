@@ -183,7 +183,8 @@ struct line_server_options {
 	/// not keep the loop busy.
 	size_t accept_retry_ms = 100;
 	std::string busy_message = "the server takes no more sessions";
-	/// A websocket upgrade over max_pending gets the HTTP answer 503.
+	/// A websocket upgrade over max_pending gets the HTTP answer 503. With
+	/// close_silent an upgrade at max_sessions also gets it.
 	full_policy when_full = full_policy::busy_message;
 	login_limits logins{};
 	/// End a session with no traffic. 0 turns the timeout off.

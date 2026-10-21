@@ -1009,7 +1009,10 @@ void line_server::accept_tcp(size_t i) {
 			if (a.kind == line_transport_kind::websocket) {
 				auto u = std::make_shared<ws_upgrade>(this,
 					std::move(s), a);
-				if (pending() > opt.max_pending)
+				// close_silent refuses a full server before the upgrade.
+				if (pending() > opt.max_pending
+						|| (opt.when_full == full_policy::close_silent
+							&& full(line_transport_kind::websocket)))
 					u->answer(http::status::service_unavailable,
 						opt.busy_message);
 				else u->start();

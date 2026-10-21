@@ -1567,6 +1567,40 @@ TEST_SUITE("line server: policies") {
 		CHECK(has(c.read_line(), "Line is longer than the limit"));
 		CHECK(c.at_eof(5000));
 	}
+	TEST_CASE("busy_message: a websocket at max_sessions gets the busy line") {
+		std::atomic<int> json_lines{ 0 };
+		auto o = raw_options(ws_options(), json_lines);
+		o.max_sessions = 1;
+		server_thread s(o);
+		auto t1 = ws_connect(s.tcp_port());
+		std::string l;
+		CHECK(t1->send_line("a"));
+		REQUIRE(t1->read_line(l) == read_status::ok);
+		CHECK(l == "got:a");
+		auto t2 = ws_connect(s.tcp_port());
+		REQUIRE(t2->read_line(l) == read_status::ok);
+		CHECK(has(l, o.busy_message));
+		CHECK(t2->read_line(l) == read_status::closed);
+	}
+	TEST_CASE("close_silent: a websocket at max_sessions gets 503, no upgrade") {
+		std::atomic<int> json_lines{ 0 };
+		auto o = raw_options(ws_options(), json_lines);
+		o.max_sessions = 1;
+		o.when_full = full_policy::close_silent;
+		server_thread s(o);
+		auto t1 = ws_connect(s.tcp_port());
+		std::string l;
+		CHECK(t1->send_line("a"));
+		REQUIRE(t1->read_line(l) == read_status::ok);
+		CHECK(l == "got:a");
+		tcp_client c(loopback(s.tcp_port()));
+		c.send_raw(upgrade_request("/ws", ""));
+		CHECK(c.read_line() == "HTTP/1.1 503 Service Unavailable");
+		CHECK(has(read_to_close(c), o.busy_message));
+		CHECK(t1->send_line("b"));
+		REQUIRE(t1->read_line(l) == read_status::ok);
+		CHECK(l == "got:b");
+	}
 	TEST_CASE("close_silent: the second connection closes with no answer") {
 		std::atomic<int> json_lines{ 0 };
 		auto o = raw_options(tcp_options(), json_lines);
