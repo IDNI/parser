@@ -298,6 +298,11 @@ struct messages {
 	// client errors
 	static constexpr sv connect_failed         =
 		"Could not connect to the session";
+	// line net
+	static constexpr sv net_bad_address        =
+		"Invalid server address, use <scheme>://<host>[:<port>], "
+		"<host>[:<port>], [<ipv6>][:<port>], <scheme>+unix://<path>, "
+		"a socket path or ws://<host>[:<port>][/<path>]";
 	// load and reload command results
 	static constexpr sv reload_succeeded       = "Grammar reloaded";
 	static constexpr sv reload_failed          = "Grammar reload failed";
