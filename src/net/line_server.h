@@ -65,6 +65,11 @@ struct session_handler {
 	/// the handler can copy it into its session log. The default does
 	/// nothing.
 	virtual void on_server_event([[maybe_unused]] tref event) {}
+	/// A request line over max_line. True: the handler wrote the answer.
+	/// False: the server writes its error line. The default is false.
+	virtual bool on_line_too_long([[maybe_unused]] reply_sink& out) {
+		return false;
+	}
 };
 
 /// What the server knows about the other end of a connection.
@@ -99,6 +104,14 @@ struct login_limits {
 	size_t max_failures = 5;
 	std::chrono::seconds window{ 60 };
 	std::chrono::seconds wait{ 60 };
+};
+
+/// What the server does after it answers a request line over max_line.
+enum class oversize_policy {
+	/// Drop the tail of the line and read the next line.
+	keep_open,
+	/// Close the connection after the answer.
+	reply_and_close,
 };
 
 /// The bytes that the server writes after each reply line, for each
@@ -169,6 +182,9 @@ struct line_server_options {
 	/// Largest request line or message. The tail of a longer line is
 	/// dropped.
 	size_t max_line = 16u * 1024 * 1024;
+	/// A local_socket or tcp line over max_line. Beast closes a websocket
+	/// with a message over max_line in each policy.
+	oversize_policy when_too_long = oversize_policy::keep_open;
 	/// Close a connection that makes no write progress. 0 turns it off.
 	size_t write_timeout_seconds = 30;
 	/// Folder of the logs, with no "~" left. Empty writes no log.

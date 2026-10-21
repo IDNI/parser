@@ -1316,6 +1316,10 @@ struct text_handler : session_handler {
 	void on_text(std::string_view line, reply_sink& out) override {
 		out.write("got:" + std::string(line));
 	}
+	bool on_line_too_long(reply_sink& out) override {
+		out.write("too long");
+		return true;
+	}
 };
 
 static line_server_options raw_options(line_server_options o,
@@ -1509,6 +1513,54 @@ TEST_SUITE("line server: reply line end") {
 		CHECK(t->send_line("{\"id\":1}"));
 		REQUIRE(t->read_line(l) == read_status::ok);
 		CHECK(l == "{\"id\":1,\"status\":\"ok\"}\n");
+	}
+}
+
+TEST_SUITE("line server: policies") {
+	TEST_CASE("keep_open: the handler answers a long line, the next works") {
+		std::atomic<int> json_lines{ 0 };
+		auto o = raw_options(tcp_options(), json_lines);
+		o.max_line = 8;
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send(std::string(20, 'x'));
+		CHECK(c.read_line() == "too long");
+		c.send("short");
+		CHECK(c.read_line() == "got:short");
+	}
+	TEST_CASE("reply_and_close: one answer of the handler, then the close") {
+		std::atomic<int> json_lines{ 0 };
+		auto o = raw_options(tcp_options(), json_lines);
+		o.max_line = 8;
+		o.when_too_long = oversize_policy::reply_and_close;
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send_raw(std::string(20, 'x') + "\nshort\n");
+		CHECK(c.read_line() == "too long");
+		CHECK(c.at_eof(5000));
+	}
+	TEST_CASE("reply_and_close: the server error with no handler answer") {
+		auto o = tcp_options();
+		o.max_line = 32;
+		o.when_too_long = oversize_policy::reply_and_close;
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("{\"cmd\":\"open\"}");
+		CHECK(has(c.read_line(), "\"status\":\"ok\""));
+		c.send("{\"cmd\":\"" + std::string(100, 'x') + "\"}");
+		CHECK(has(c.read_line(), "Line is longer than the limit"));
+		CHECK(c.at_eof(5000));
+		CHECK(wait_for(s.closes, 1));
+	}
+	TEST_CASE("reply_and_close before the first line: the error, the close") {
+		auto o = tcp_options();
+		o.max_line = 8;
+		o.when_too_long = oversize_policy::reply_and_close;
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send(std::string(20, 'x'));
+		CHECK(has(c.read_line(), "Line is longer than the limit"));
+		CHECK(c.at_eof(5000));
 	}
 }
 

@@ -493,10 +493,20 @@ void server_connection::handle_too_long() {
 			session.handler->on_server_event(ev);
 		} else log_session_event("line-too-long");
 	}
-	diagnostics::report rep;
-	rep.error(diagnostics::code::out_of_range,
-		parser_strings::messages::line_too_long);
-	send_line(error_response(rep));
+	bool answered = false;
+	if (session.handler) {
+		in_handler = true;
+		answered = session.handler->on_line_too_long(sink);
+		in_handler = false;
+	}
+	if (!answered) {
+		diagnostics::report rep;
+		rep.error(diagnostics::code::out_of_range,
+			parser_strings::messages::line_too_long);
+		send_line(error_response(rep));
+	}
+	if (srv->opt.when_too_long == oversize_policy::reply_and_close)
+		close_after_flush();
 }
 
 void server_connection::refuse(diagnostics::code c, std::string_view msg,
