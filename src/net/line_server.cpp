@@ -232,11 +232,14 @@ struct ws_upgrade : std::enable_shared_from_this<ws_upgrade> {
 	http::request<http::empty_body> req;
 	http::response<http::string_body> res;
 	std::optional<ws_stream> ws;
+	// the origin is refused, and the refusal goes after the upgrade
+	bool refused_origin = false;
 
 	void start();
 	void on_read(error_code ec);
 	void answer(http::status status, std::string_view text);
 	void upgrade();
+	void send_refusal();
 };
 
 struct tcp_listener {
@@ -927,10 +930,10 @@ void ws_upgrade::on_read(error_code ec) {
 	if (auto it = req.find(http::field::origin); it != req.end()) {
 		peer.origin.assign(it->value().data(), it->value().size());
 		const auto& o = srv->opt;
-		const bool refused = o.accept_origin ? !o.accept_origin(peer.origin)
+		refused_origin = o.accept_origin ? !o.accept_origin(peer.origin)
 			: std::find(o.allowed_origins.begin(), o.allowed_origins.end(),
 				peer.origin) == o.allowed_origins.end();
-		if (refused)
+		if (refused_origin && !o.origin_refusal_message)
 			return answer(http::status::forbidden,
 				parser_strings::messages::net_origin_refused);
 	}
@@ -976,9 +979,25 @@ void ws_upgrade::upgrade() {
 	auto self = shared_from_this();
 	ws->async_accept(req, [self](error_code ec) {
 		if (ec || self->srv->stopping) return;
+		if (self->refused_origin) return self->send_refusal();
 		self->srv->on_accept(conn_socket(std::move(*self->ws)),
 			std::move(self->peer));
 	});
+}
+
+// The refusal holds the stream until the close handshake ends.
+void ws_upgrade::send_refusal() {
+	auto self = shared_from_this();
+	ws->async_write(ba::buffer(*srv->opt.origin_refusal_message),
+		[self](error_code ec, size_t) {
+			if (ec || self->srv->stopping) return;
+			self->ws->async_close(
+				beast::websocket::close_code::policy_error,
+				[self](error_code) {
+					error_code e;
+					beast::get_lowest_layer(*self->ws).close(e);
+				});
+		});
 }
 
 #ifndef _WIN32

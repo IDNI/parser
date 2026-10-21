@@ -89,6 +89,10 @@ struct line_server_options {
 	/// replaces allowed_origins. True accepts the upgrade. A request with
 	/// no Origin header passes without a call.
 	std::function<bool(std::string_view origin)> accept_origin{};
+	/// websocket: with a value, a refused origin gets the upgrade, this
+	/// one text message and the close, and no session. No value answers
+	/// a refused origin with the HTTP answer 403.
+	std::optional<std::string> origin_refusal_message{};
 	/// At this count the server refuses a new connection with busy_message.
 	size_t max_sessions = 16;
 	/// websocket: close a client that sends no complete upgrade request in

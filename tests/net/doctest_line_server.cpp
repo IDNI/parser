@@ -582,6 +582,40 @@ TEST_SUITE("line server: websocket") {
 			"http://localhost:51234", "http://listed.example",
 			"http://evil.example" });
 	}
+	TEST_CASE("origin_refusal_message: the upgrade, one message, the close") {
+		auto o = ws_options();
+		o.allowed_origins = { "http://good.example" };
+		o.origin_refusal_message = "error disallowed_origin";
+		std::atomic<int> sessions{ 0 };
+		o.make_handler = [&sessions](const line_session&) {
+			++sessions;
+			return std::make_unique<session_handler>();
+		};
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send_raw(upgrade_request("/ws", "http://evil.example"));
+		CHECK(c.read_line() == "HTTP/1.1 101 Switching Protocols");
+		const auto deadline = std::chrono::steady_clock::now()
+			+ std::chrono::seconds(10);
+		while (c.in_buf.find(char(0x88)) == std::string::npos
+			&& c.read_until(deadline)) {}
+		// a browser answers the close frame with its own
+		c.send_raw(std::string{ char(0x88), char(0x80), 0, 0, 0, 0 });
+		const std::string rest = read_to_close(c);
+		const std::string text = "error disallowed_origin";
+		// the header of one unmasked text frame, then the text
+		CHECK(has(rest, std::string{ char(0x81), char(text.size()) } + text));
+		const size_t close_at = rest.find(char(0x88));
+		REQUIRE(close_at != std::string::npos);
+		CHECK(close_at > rest.find(text));
+		CHECK(c.eof_seen);
+		tcp_client good(loopback(s.tcp_port()));
+		good.send_raw(upgrade_request("/ws", "http://good.example"));
+		CHECK(good.read_line() == "HTTP/1.1 101 Switching Protocols");
+		good.send_raw(text_frame("{\"cmd\":\"open\"}"));
+		CHECK(wait_for(sessions, 1));
+		CHECK(sessions.load() == 1);
+	}
 	TEST_CASE("an empty allowed_origins refuses every browser origin") {
 		server_thread s(ws_options());
 		tcp_client c(loopback(s.tcp_port()));
