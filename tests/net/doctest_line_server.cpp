@@ -181,6 +181,24 @@ static line_server_options tcp_options() {
 	return o;
 }
 
+// The port of the listener of the kind @p kind, among @p listeners.
+static uint16_t listening_port(server_thread& s, std::string_view kind,
+	size_t listeners = 2)
+{
+	for (const auto& l : s.wait_listening(listeners)) {
+		auto v = jt::get(std::string_view(l));
+		if (!v.has_value()) continue;
+		tref li = jt::get(v.value()).find("listening");
+		const std::string* k = li ? format::json::string_member(li, "kind")
+			: nullptr;
+		if (!k || *k != kind) continue;
+		if (tref p = jt::get(li).find("port"))
+			return static_cast<uint16_t>(jt::get(p).get_number());
+	}
+	FAIL("no listening port of the kind " << kind);
+	return 0;
+}
+
 static tcp::endpoint loopback(uint16_t port) {
 	return { ba::ip::make_address("127.0.0.1"), port };
 }
@@ -1600,6 +1618,42 @@ TEST_SUITE("line server: policies") {
 		CHECK(t1->send_line("b"));
 		REQUIRE(t1->read_line(l) == read_status::ok);
 		CHECK(l == "got:b");
+	}
+	TEST_CASE("max_sessions_by_kind: a full kind refuses, another kind passes") {
+		for (const full_policy policy : { full_policy::close_silent,
+				full_policy::busy_message })
+		{
+			CAPTURE(static_cast<int>(policy));
+			std::atomic<int> json_lines{ 0 };
+			auto o = raw_options(tcp_options(), json_lines);
+			o.listen.push_back({ .kind = line_transport_kind::websocket,
+				.port = 0, .ws_path = "/ws" });
+			o.when_full = policy;
+			o.max_sessions_by_kind.websocket = 1;
+			server_thread s(o);
+			const uint16_t tcp_port = listening_port(s, "tcp");
+			const uint16_t ws_port = listening_port(s, "websocket");
+			auto w1 = ws_connect(ws_port);
+			std::string l;
+			CHECK(w1->send_line("a"));
+			REQUIRE(w1->read_line(l) == read_status::ok);
+			CHECK(l == "got:a");
+			if (policy == full_policy::close_silent) {
+				tcp_client c(loopback(ws_port));
+				c.send_raw(upgrade_request("/ws", ""));
+				CHECK(c.read_line() == "HTTP/1.1 503 Service Unavailable");
+			} else {
+				auto w2 = ws_connect(ws_port);
+				REQUIRE(w2->read_line(l) == read_status::ok);
+				CHECK(has(l, o.busy_message));
+				CHECK(w2->read_line(l) == read_status::closed);
+			}
+			tcp_client t1(loopback(tcp_port)), t2(loopback(tcp_port));
+			t1.send("b");
+			CHECK(t1.read_line() == "got:b");
+			t2.send("c");
+			CHECK(t2.read_line() == "got:c");
+		}
 	}
 	TEST_CASE("close_silent: the second connection closes with no answer") {
 		std::atomic<int> json_lines{ 0 };

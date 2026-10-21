@@ -140,6 +140,22 @@ struct reply_line_ends {
 	}
 };
 
+/// An optional value for each transport kind. No value takes the value
+/// of the whole server.
+struct kind_values {
+	std::optional<size_t> local_socket{};
+	std::optional<size_t> tcp{};
+	std::optional<size_t> websocket{};
+	std::optional<size_t> of(line_transport_kind kind) const {
+		switch (kind) {
+		case line_transport_kind::tcp: return tcp;
+		case line_transport_kind::websocket: return websocket;
+		case line_transport_kind::local_socket: break;
+		}
+		return local_socket;
+	}
+};
+
 /// The settings of the line server. One server listens on all
 /// addresses at once.
 struct line_server_options {
@@ -163,6 +179,10 @@ struct line_server_options {
 	std::optional<std::string> origin_refusal_message{};
 	/// At this count the server refuses a new connection with busy_message.
 	size_t max_sessions = 16;
+	/// At this count of connections of one transport kind the server
+	/// refuses a new connection of that kind, as at max_sessions.
+	/// max_sessions stays the limit of all kinds together.
+	kind_values max_sessions_by_kind{};
 	/// At this count of connections with no accepted first line, and of
 	/// websocket upgrades in flight, the server refuses a new connection
 	/// with busy_message.
@@ -184,7 +204,8 @@ struct line_server_options {
 	size_t accept_retry_ms = 100;
 	std::string busy_message = "the server takes no more sessions";
 	/// A websocket upgrade over max_pending gets the HTTP answer 503. With
-	/// close_silent an upgrade at max_sessions also gets it.
+	/// close_silent an upgrade at max_sessions or at the websocket value
+	/// of max_sessions_by_kind also gets it.
 	full_policy when_full = full_policy::busy_message;
 	login_limits logins{};
 	/// End a session with no traffic. 0 turns the timeout off.

@@ -992,9 +992,14 @@ size_t line_server::pending() const {
 	return n;
 }
 
-// True when a new connection is over the session limit.
-bool line_server::full(line_transport_kind) const {
-	return connections.size() >= opt.max_sessions;
+// True when a new connection of the kind @p k is over a session limit.
+bool line_server::full(line_transport_kind k) const {
+	if (connections.size() >= opt.max_sessions) return true;
+	const auto limit = opt.max_sessions_by_kind.of(k);
+	if (!limit) return false;
+	return static_cast<size_t>(std::count_if(connections.begin(),
+		connections.end(), [k](const auto& kv) {
+			return kv.second->session.peer.kind == k; })) >= *limit;
 }
 
 void line_server::accept_tcp(size_t i) {
