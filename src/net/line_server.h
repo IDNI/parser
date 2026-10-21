@@ -49,6 +49,11 @@ struct session_handler {
 	/// the handler asks for in on_line or on_open runs after that call
 	/// returns.
 	virtual void on_close() {}
+	/// With handler_logs, an event of the server about this session, for
+	/// example "line-too-long". The server writes it into server.log, and
+	/// the handler can copy it into its session log. The default does
+	/// nothing.
+	virtual void on_server_event([[maybe_unused]] tref event) {}
 };
 
 /// What the server knows about the other end of a connection.
@@ -122,6 +127,11 @@ struct line_server_options {
 	bool json = false;
 	/// Also give each logged line to on_output.
 	bool debug_sessions = false;
+	/// True: the handler writes the session events and the session
+	/// logs itself. The server writes no session event, no session log
+	/// and no in or out line. server.log, the listening lines and the
+	/// events of reply_sink::log stay.
+	bool handler_logs = false;
 	/// Checks the first line of a connection after the peer check. False
 	/// counts a failed login and closes it. Empty accepts.
 	std::function<bool(tref first_line, const peer_info& peer)>
@@ -143,6 +153,11 @@ diagnostics::result<int> line_server_run(const line_server_options& opt);
 /// Stop the server that runs in this process, from any thread. The
 /// run returns after the connections are closed.
 void line_server_stop();
+
+/// Run @p fn on the io loop of the server that runs in this process, from
+/// any thread. A handler that waits for work of its own gives the result
+/// to its sink this way. False when no server runs.
+bool line_server_post(std::function<void()> fn);
 
 /// Write one event into server.log and give it to on_output, for the
 /// server that runs in this process. Call it on the io loop of the

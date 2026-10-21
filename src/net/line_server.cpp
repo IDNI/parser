@@ -63,6 +63,7 @@
 #include <boost/asio/windows/stream_handle.hpp>
 #endif
 
+#include "line_server_asio.h"
 #include "parser_strings.h"
 
 namespace idni {
@@ -426,7 +427,14 @@ bool server_connection::start_session() {
 
 void server_connection::handle_too_long() {
 	if (closed || close_when_drained) return;
-	if (session.authenticated) log_session_event("line-too-long");
+	if (session.authenticated) {
+		if (srv->opt.handler_logs) {
+			// The handler owns the session log, so it gets the event.
+			tref ev = line_log::session_event("line-too-long", session.id);
+			srv->log_event(ev, nullptr);
+			session.handler->on_server_event(ev);
+		} else log_session_event("line-too-long");
+	}
 	diagnostics::report rep;
 	rep.error(diagnostics::code::out_of_range,
 		parser_strings::messages::line_too_long);
@@ -561,11 +569,12 @@ void connection_sink::log(tref event) {
 }
 
 void server_connection::log_session_event(std::string_view event) {
+	if (srv->opt.handler_logs) return;
 	srv->log_event(line_log::session_event(event, session.id), this);
 }
 
 bool server_connection::logs_lines() const {
-	return srv->opt.log_lines;
+	return srv->opt.log_lines && !srv->opt.handler_logs;
 }
 
 void server_connection::log_request(tref request) {
@@ -699,7 +708,7 @@ void line_server::print_start() {
 }
 
 void line_server::open_session_log(server_connection& c) {
-	if (opt.log_dir.empty()) return;
+	if (opt.log_dir.empty() || opt.handler_logs) return;
 	auto opened = line_log::open_session(opt.log_dir, c.session.id);
 	c.log_ok = opened.has_value();
 	if (c.log_ok) c.log = std::move(opened).value();
@@ -1203,6 +1212,19 @@ diagnostics::result<int> line_server_run(const line_server_options& opt) {
 			parser_strings::messages::serve_failed);
 		return res;
 	}
+}
+
+boost::asio::io_context& line_server_io() {
+	// The caller is a handler, so a server runs.
+	return running.load()->io;
+}
+
+bool line_server_post(std::function<void()> fn) {
+	std::lock_guard lock(running_mutex);
+	line_server* s = running.load();
+	if (!s) return false;
+	ba::post(s->io, std::move(fn));
+	return true;
 }
 
 void line_server_stop() {

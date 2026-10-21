@@ -14,6 +14,8 @@ target_include_directories(tauparser_net PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
 	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}>
 )
+# Only the private line_server_asio.h includes Boost, and a program outside
+# this repository uses line_server_post, so only this build reads Boost.
 target_include_directories(tauparser_net SYSTEM PUBLIC
 	$<BUILD_INTERFACE:${TAU_BOOST_INCLUDE_DIR_RESOLVED}>)
 find_package(Threads REQUIRED)

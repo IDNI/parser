@@ -5,6 +5,7 @@
 #include "quiet_doctest.h"
 #include "net/line_reader.h"
 #include "net/line_server.h"
+#include "net/line_server_asio.h"
 #include "net/line_transport.h"
 #include "net/line_client_test.h"
 
@@ -69,6 +70,33 @@ struct echo_handler : session_handler {
 			jt::build_string("ok")));
 	}
 	void on_close() override { ++closes; }
+};
+
+// Keeps the sink of on_open and answers each line 50 ms later, from a
+// timer on the io loop of the server.
+struct deferred_handler : session_handler {
+	explicit deferred_handler(std::atomic<int>& c) : closes(c) {}
+	std::atomic<int>& closes;
+	reply_sink* sink = nullptr;
+	ba::steady_timer timer{ line_server_io() };
+	void on_open(tref first_line, reply_sink& out) override {
+		sink = &out;
+		out.write(jt::set_member(first_line, "status",
+			jt::build_string("ok")));
+	}
+	void on_line(tref, reply_sink&) override {
+		timer.expires_after(std::chrono::milliseconds(50));
+		timer.async_wait([this](boost::system::error_code ec) {
+			if (ec) return;
+			sink->write(jt::build_object({ jt::build_pair("deferred",
+				jt::build_string("yes")) }));
+		});
+	}
+	void on_close() override {
+		timer.cancel();
+		sink = nullptr;
+		++closes;
+	}
 };
 
 // A server on a thread of the test, with its output lines captured.
@@ -308,6 +336,61 @@ TEST_SUITE("line server: tcp") {
 		REQUIRE(lines.size() >= 2);
 		CHECK(has(lines[0], " listening on 127.0.0.1:"));
 		CHECK(has(lines[1], " logs off"));
+	}
+	TEST_CASE("a handler keeps the sink and answers from a timer") {
+		auto o = tcp_options();
+		std::atomic<int> closes{ 0 };
+		o.make_handler = [&closes](const line_session&) {
+			return std::make_unique<deferred_handler>(closes);
+		};
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("{\"cmd\":\"open\"}");
+		CHECK(has(c.read_line(), "\"status\":\"ok\""));
+		c.send("{\"id\":2}");
+		CHECK(c.read_line() == "{\"deferred\":\"yes\"}");
+		c.close();
+		CHECK(wait_for(closes, 1));
+	}
+	TEST_CASE("handler_logs: no session event, no session log") {
+		const auto dir = std::filesystem::temp_directory_path()
+			/ ("line_server_logs_" + std::to_string(
+				std::chrono::steady_clock::now()
+					.time_since_epoch().count()));
+		std::filesystem::remove_all(dir);
+		auto o = tcp_options();
+		o.json = false;
+		o.log_dir = dir.string();
+		o.debug_sessions = true;
+		o.handler_logs = true;
+		server_thread s(o);
+		const auto lines = s.wait_listening(1);
+		REQUIRE_FALSE(lines.empty());
+		uint16_t port = 0;
+		const auto at = lines[0].rfind(':');
+		REQUIRE(at != std::string::npos);
+		port = static_cast<uint16_t>(std::stoi(lines[0].substr(at + 1)));
+		{
+			tcp_client c(loopback(port));
+			c.send("{\"cmd\":\"open\"}");
+			CHECK(has(c.read_line(), "\"status\":\"ok\""));
+			c.send("{\"id\":2}");
+			CHECK(c.read_line() == "{\"id\":2,\"status\":\"ok\"}");
+		}
+		CHECK(wait_for(s.closes, 1));
+		s.stop();
+		std::istringstream is(s.out.text());
+		size_t listening = 0;
+		for (std::string l; std::getline(is, l); ) {
+			if (has(l, " listening on ")) ++listening;
+			CHECK_FALSE(has(l, " session "));
+		}
+		CHECK(listening == 1);
+		std::vector<std::string> files;
+		for (const auto& e : std::filesystem::directory_iterator(dir))
+			files.push_back(e.path().filename().string());
+		CHECK(files == std::vector<std::string>{ "server.log" });
+		std::filesystem::remove_all(dir);
 	}
 	TEST_CASE("a line that does not parse is logged raw") {
 		const auto dir = std::filesystem::temp_directory_path()
@@ -818,6 +901,40 @@ struct closing_handler : session_handler {
 	void on_close() override { result = inside ? 1 : 2; }
 };
 
+// Answers each line from a thread of its own through line_server_post.
+struct posting_handler : session_handler {
+	std::shared_ptr<std::atomic<reply_sink*>> sink
+		= std::make_shared<std::atomic<reply_sink*>>(nullptr);
+	std::vector<std::thread> workers;
+	void on_open(tref, reply_sink& out) override {
+		*sink = &out;
+	}
+	void on_line(tref, reply_sink&) override {
+		workers.emplace_back([s = sink] {
+			std::this_thread::sleep_for(std::chrono::milliseconds(20));
+			line_server_post([s] {
+				if (reply_sink* o = s->load()) o->write(
+					jt::build_object({ jt::build_pair("posted",
+						jt::build_string("yes")) }));
+			});
+		});
+	}
+	void on_close() override { *sink = nullptr; }
+	~posting_handler() override {
+		for (auto& w : workers) w.join();
+	}
+};
+
+// Records the events that the server gives with handler_logs.
+struct event_handler : session_handler {
+	explicit event_handler(std::atomic<int>& e) : events(e) {}
+	std::atomic<int>& events;
+	void on_server_event(tref ev) override {
+		const std::string* name = format::json::string_member(ev, "event");
+		if (name && *name == "line-too-long") ++events;
+	}
+};
+
 static std::string binary_frame(const std::string& payload) {
 	REQUIRE(payload.size() <= 125);
 	return std::string{ char(0x82), char(0x80 | payload.size()),
@@ -869,6 +986,36 @@ TEST_SUITE("line server: limits") {
 		c.send("{\"cmd\":\"bye\"}");
 		CHECK(c.at_eof(5000));
 		CHECK(wait_for(result, 2));
+	}
+	TEST_CASE("line_server_post answers from another thread") {
+		auto o = tcp_options();
+		o.make_handler = [](const line_session&) {
+			return std::make_unique<posting_handler>();
+		};
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("{\"cmd\":\"open\"}");
+		c.send("{\"cmd\":\"work\"}");
+		CHECK(c.read_line() == "{\"posted\":\"yes\"}");
+	}
+	TEST_CASE("line_server_post with no running server is false") {
+		CHECK_FALSE(line_server_post([] {}));
+	}
+	TEST_CASE("handler_logs: a long line reaches the handler as an event") {
+		std::atomic<int> events{ 0 };
+		auto o = tcp_options();
+		o.handler_logs = true;
+		o.max_line = 16;
+		o.make_handler = [&events](const line_session&) {
+			return std::make_unique<event_handler>(events);
+		};
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("{\"cmd\":\"open\"}");
+		c.send(std::string(64, 'x'));
+		CHECK(has(c.read_line(), "\"status\":\"error\""));
+		CHECK(wait_for(events, 1));
+		CHECK(has(s.out.text(), "\"event\":\"line-too-long\""));
 	}
 	TEST_CASE("a binary websocket message gets the error and the close") {
 		server_thread s(ws_options());
