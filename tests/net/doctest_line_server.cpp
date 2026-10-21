@@ -1208,6 +1208,30 @@ TEST_SUITE("line server: limits") {
 		CHECK(c.at_eof(5000));
 		CHECK(has(s.out.text(), "\"event\":\"idle-timeout\""));
 	}
+	TEST_CASE("idle_timeout_by_kind: a quiet websocket ends, tcp has none") {
+		auto o = tcp_options();
+		o.listen.push_back({ .kind = line_transport_kind::websocket,
+			.port = 0, .ws_path = "/ws" });
+		o.idle_timeout_seconds = 1;
+		o.idle_timeout_by_kind.tcp = 0;
+		o.idle_timeout_by_kind.websocket = 2;
+		server_thread s(o);
+		tcp_client c(loopback(listening_port(s, "tcp")));
+		c.send("{\"cmd\":\"open\"}");
+		CHECK(has(c.read_line(), "\"status\":\"ok\""));
+		auto w = ws_connect(listening_port(s, "websocket"));
+		std::string l;
+		CHECK(w->send_line("{\"cmd\":\"open\"}"));
+		REQUIRE(w->read_line(l) == read_status::ok);
+		const auto start = std::chrono::steady_clock::now();
+		CHECK(w->read_line(l) == read_status::closed);
+		const auto quiet = std::chrono::steady_clock::now() - start;
+		CHECK(quiet >= std::chrono::milliseconds(1500));
+		CHECK(quiet < std::chrono::seconds(8));
+		// past the one second of idle_timeout_seconds, tcp stays open
+		c.send("{\"id\":2}");
+		CHECK(has(c.read_line(), "\"id\":2"));
+	}
 	TEST_CASE("close_timeout_seconds bounds the close handshake") {
 		for (const bool close_time : { true, false }) {
 			CAPTURE(close_time);

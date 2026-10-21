@@ -1316,8 +1316,9 @@ void line_server::check_idle() {
 					>= std::chrono::seconds(
 						opt.first_line_timeout_seconds))
 				silent.push_back(kv.second);
-		} else if (opt.idle_timeout_seconds != 0
-				&& quiet >= std::chrono::seconds(opt.idle_timeout_seconds))
+		} else if (const size_t limit = opt.idle_timeout_by_kind
+				.of(se.peer.kind).value_or(opt.idle_timeout_seconds);
+				limit != 0 && quiet >= std::chrono::seconds(limit))
 			idle.push_back(kv.second);
 	}
 	for (auto& c : silent) {

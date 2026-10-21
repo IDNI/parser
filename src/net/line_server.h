@@ -210,6 +210,9 @@ struct line_server_options {
 	login_limits logins{};
 	/// End a session with no traffic. 0 turns the timeout off.
 	size_t idle_timeout_seconds = 30 * 60;
+	/// The idle timeout of each transport kind, in seconds. A kind with no
+	/// value takes idle_timeout_seconds. 0 turns it off for that kind.
+	kind_values idle_timeout_by_kind{};
 	/// Also ends each error line of the server.
 	reply_line_ends reply_line_end{};
 	/// Largest request line or message. The tail of a longer line is
