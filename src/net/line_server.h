@@ -1,0 +1,76 @@
+// To view the license please visit
+// https://github.com/IDNI/parser/blob/main/LICENSE.md
+
+#ifndef __IDNI__PARSER__NET__LINE_SERVER_H__
+#define __IDNI__PARSER__NET__LINE_SERVER_H__
+
+#include <functional>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include "net/line_address.h"
+#include "utility/diagnostics.h"
+#include "format/json/json.h"
+
+namespace idni {
+
+/// Where a session handler writes its replies. One call is one line.
+struct reply_sink {
+	virtual ~reply_sink() = default;
+	/// The sink prints @p reply before it returns, so a tref is enough.
+	virtual void write(tref reply) = 0;
+};
+
+/// The program part of one session. The server runs the JSON gc between
+/// two reads, so a handler keeps a JSON value from one call to the next
+/// only through an htref.
+struct session_handler {
+	virtual ~session_handler() = default;
+	/// One parsed request. The default does nothing.
+	virtual void on_line([[maybe_unused]] tref request,
+		[[maybe_unused]] reply_sink& out) {}
+	/// The first line of the connection, after the peer check and
+	/// authenticate accepted it. The default does nothing. The sink stays
+	/// valid until on_close returns.
+	virtual void on_open([[maybe_unused]] tref first_line,
+		[[maybe_unused]] reply_sink& out) {}
+	/// The connection ended. The handler clears its state. A close that
+	/// the handler asks for in on_line or on_open runs after that call
+	/// returns.
+	virtual void on_close() {}
+};
+
+/// One connection on the server.
+struct line_session {
+};
+
+/// The settings of the line server. One server listens on all
+/// addresses at once.
+struct line_server_options {
+	std::vector<listen_address> listen{};
+	/// The lines of on_output as JSON: first one {"listening":..} line
+	/// for each address.
+	bool json = false;
+	/// Makes the handler of a new session. Must be set.
+	std::function<std::unique_ptr<session_handler>(
+		const line_session& session)> make_handler{};
+	/// Gets each output line of the server, with no newline: the
+	/// listening lines at the start, the events and the debug lines. The
+	/// program prints them. Empty prints nothing. The call runs on the io
+	/// loop.
+	std::function<void(std::string_view line)> on_output{};
+};
+
+/// Run the server until a stop signal. The value is 0 after a clean
+/// stop. The report holds every server error.
+diagnostics::result<int> line_server_run(const line_server_options& opt);
+
+/// Stop the server that runs in this process, from any thread. The
+/// run returns after the connections are closed.
+void line_server_stop();
+
+} // namespace idni
+
+#endif // __IDNI__PARSER__NET__LINE_SERVER_H__

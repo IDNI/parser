@@ -287,6 +287,7 @@ struct messages {
 		"Invalid listen address";
 	static constexpr sv bind_failed            =
 		"Could not bind the listen port";
+	static constexpr sv port_in_use            = "Port is in use";
 	static constexpr sv listen_failed          =
 		"Could not listen on the port";
 	static constexpr sv log_write_failed       =
