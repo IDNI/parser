@@ -9,6 +9,7 @@
 #include "../src/tgf/tgf_cli.h"
 #include "../src/tgf/parser_gen.h"
 #include "test_env.h"
+#include "tgf_run_capture.h"
 
 #include <filesystem>
 #include <fstream>
@@ -183,31 +184,23 @@ TEST_SUITE("tgf cli: global options") {
 
 #if defined(TAU_TEST_HAS_TGF_CLI) && defined(PROJECT_SOURCE_DIR)
 
-// Runs the TGF CLI with args and returns what it wrote to stdout and
-// stderr. The parse error report writes errors to stderr, so a test that
-// reads only stdout would see an empty string for a rejected input.
-static string capture_tgf_run(const vector<string>& args) {
-	vector<string> a = args;
-	vector<char*> argv;
-	for (auto& s : a) argv.push_back(s.data());
-	ostringstream os;
-	streambuf* old_out = cout.rdbuf(os.rdbuf());
-	streambuf* old_err = cerr.rdbuf(os.rdbuf());
-	tgf_run((int)argv.size(), argv.data());
-	cout.rdbuf(old_out);
-	cerr.rdbuf(old_err);
-	return os.str();
+static string csv_path() {
+	return string(PROJECT_SOURCE_DIR) + "/src/format/csv/csv.tgf";
+}
+
+static string json_path() {
+	return string(PROJECT_SOURCE_DIR) + "/src/format/json/json.tgf";
 }
 
 TEST_SUITE("tgf cli: help") {
 
 	TEST_CASE("-h with no command prints the program help") {
-		string out = capture_tgf_run({ "tgf", "-h" });
+		string out = capture_tgf_run({ "tgf", "-h" }).out;
 		CHECK(out.find("Commands:") != string::npos);
 	}
 
 	TEST_CASE("parse -h prints the help of the command") {
-		string out = capture_tgf_run({ "tgf", "parse", "-h" });
+		string out = capture_tgf_run({ "tgf", "parse", "-h" }).out;
 		CHECK(out.find("Command options:") != string::npos);
 		CHECK(out.find("Commands:") == string::npos);
 	}
@@ -224,15 +217,12 @@ static string last_line_with(const string& out, const string& prefix) {
 
 TEST_SUITE("tgf cli: a load writes the command line again") {
 
-	static string csv_path() {
-		return string(PROJECT_SOURCE_DIR) + "/src/format/csv/csv.tgf";
-	}
 
 	TEST_CASE("-G holds over the directives of a loaded grammar") {
 		// csv.tgf enables comma, crlf and no_header itself
 		string out = capture_tgf_run({ "tgf", csv_path(), "repl",
 			"-c", "false", "-G", "tab", "-e",
-			"load \"" + csv_path() + "\" . get enabled-productions" });
+			"load \"" + csv_path() + "\" . get enabled-productions" }).out;
 		string ep = last_line_with(out, "enabled-productions:");
 		CHECK(ep.find("tab") != string::npos);
 		CHECK(ep.find("comma") == string::npos);
@@ -243,7 +233,7 @@ TEST_SUITE("tgf cli: a load writes the command line again") {
 		string out = capture_tgf_run({ "tgf", csv_path(), "repl",
 			"-c", "false", "--variant", "tab", "-e",
 			"get variant . get enabled-productions . load \""
-			+ csv_path() + "\" . get variant" });
+			+ csv_path() + "\" . get variant" }).out;
 		string first = last_line_with(out, "enabled-productions:");
 		CHECK(first.find("tab") != string::npos);
 		CHECK(first.find("comma") == string::npos);
@@ -255,7 +245,7 @@ TEST_SUITE("tgf cli: a load writes the command line again") {
 	TEST_CASE("set variant in the REPL selects a profile of csv.tgf") {
 		string out = capture_tgf_run({ "tgf", csv_path(), "repl",
 			"-c", "false", "-e",
-			"set variant tab_lf . get enabled-productions" });
+			"set variant tab_lf . get enabled-productions" }).out;
 		string ep = last_line_with(out, "enabled-productions:");
 		CHECK(ep.find("tab") != string::npos);
 		CHECK(ep.find("lf") != string::npos);
@@ -269,7 +259,7 @@ TEST_SUITE("tgf cli: a load writes the command line again") {
 			"-c", "false", "-p", "false", "-e",
 			"set gc false . set trim record . set print-graphs true . "
 			"load \"" + csv_path() + "\" . get gc . get trim . "
-			"get print-graphs" });
+			"get print-graphs" }).out;
 		CHECK(last_line_with(out, "gc:").find("off") != string::npos);
 		// csv.tgf trims EOL, SEP and DQUOTE itself
 		string trim = last_line_with(out, "trim:");
@@ -283,11 +273,10 @@ TEST_SUITE("tgf cli: a load writes the command line again") {
 TEST_SUITE("tgf cli: environment") {
 
 	TEST_CASE("TGF_MAX_LENGTH sets max-length") {
-		const string csv = string(PROJECT_SOURCE_DIR)
-			+ "/src/format/csv/csv.tgf";
+		const string csv = csv_path();
 		test_setenv("TGF_MAX_LENGTH", "7");
 		string out = capture_tgf_run({ "tgf", csv, "repl",
-			"-c", "false", "-e", "get max-length" });
+			"-c", "false", "-e", "get max-length" }).out;
 		test_unsetenv("TGF_MAX_LENGTH");
 		CHECK(last_line_with(out, "max-length:").find("7")
 			!= string::npos);
@@ -305,9 +294,9 @@ TEST_SUITE("tgf cli: grammar options") {
 			f << "start => alpha+.\n";
 		}
 		string without = capture_tgf_run({ "tgf", path, "parse",
-			"-e", "ab", "-c", "false" });
+			"-e", "ab", "-c", "false" }).out;
 		string with = capture_tgf_run({ "tgf", path, "parse",
-			"-e", "ab", "-c", "false", "--char-classes", "alpha" });
+			"-e", "ab", "-c", "false", "--char-classes", "alpha" }).out;
 		CHECK(without.find("parsed terminals: ab") == string::npos);
 		CHECK(with.find("parsed terminals: ab") != string::npos);
 		fs::remove(path);
@@ -377,7 +366,7 @@ TEST_SUITE("tgf cli: grammar options") {
 		fs::remove(header);
 		string out = capture_tgf_run({ "tgf", path, "gen", "-O", dir,
 			"-o", "tgf_cli_gen_empty.generated.h",
-			"-n", "tgf_cli_gen_empty_parser" });
+			"-n", "tgf_cli_gen_empty_parser" }).out;
 		CHECK(out.find(parser_strings::messages::empty_grammar)
 			!= string::npos);
 		CHECK_FALSE(fs::exists(header));
@@ -388,35 +377,32 @@ TEST_SUITE("tgf cli: grammar options") {
 TEST_SUITE("tgf cli: derived character classes") {
 
 	TEST_CASE("grammar --char-class-report lists unescaped as derived") {
-		string json = string(PROJECT_SOURCE_DIR)
-			+ "/src/format/json/json.tgf";
+		string json = json_path();
 		string out = capture_tgf_run({ "tgf", json, "grammar",
-			"--char-class-report" });
+			"--char-class-report" }).out;
 		CHECK(out.find("derived:") != string::npos);
 		CHECK(out.find("unescaped") != string::npos);
 		CHECK(out.find("rejected:") != string::npos);
 	}
 
 	TEST_CASE("parse --derive-char-classes false matches the default") {
-		string json = string(PROJECT_SOURCE_DIR)
-			+ "/src/format/json/json.tgf";
+		string json = json_path();
 		string on = capture_tgf_run({ "tgf", json, "parse",
-			"-e", "\"a\"", "-c", "false" });
+			"-e", "\"a\"", "-c", "false" }).out;
 		string off = capture_tgf_run({ "tgf", json, "parse",
 			"-e", "\"a\"", "-c", "false",
-			"--derive-char-classes", "false" });
+			"--derive-char-classes", "false" }).out;
 		CHECK(!on.empty());
 		CHECK(on == off);
 	}
 
 	TEST_CASE("parse --derive-char-classes false turns the classes off") {
-		string json = string(PROJECT_SOURCE_DIR)
-			+ "/src/format/json/json.tgf";
+		string json = json_path();
 		string on = capture_tgf_run({ "tgf", json, "parse",
-			"-e", "\"a", "-v", "detailed" });
+			"-e", "\"a", "-v", "detailed" }).out;
 		string off = capture_tgf_run({ "tgf", json, "parse",
 			"-e", "\"a", "-v", "detailed",
-			"--derive-char-classes", "false" });
+			"--derive-char-classes", "false" }).out;
 		CHECK(on.find("expecting unescaped") != string::npos);
 		CHECK(off.find("expecting unescaped") == string::npos);
 		CHECK(on != off);
@@ -434,7 +420,7 @@ TEST_SUITE("tgf cli: trim keeps the root") {
 			f << "start => 'a'.\n";
 		}
 		string out = capture_tgf_run({ "tgf", path, "parse", "--trim",
-			"start", "-e", "a", "-c", "false" });
+			"start", "-e", "a", "-c", "false" }).out;
 		CHECK(out.find("parsed graph:\n\tstart(") != string::npos);
 		CHECK(out.find("\t\t'a'[0, 1]") != string::npos);
 		fs::remove(path);
@@ -444,7 +430,7 @@ TEST_SUITE("tgf cli: trim keeps the root") {
 		const string tiny = string(PROJECT_SOURCE_DIR)
 			+ "/tests/fixtures/tiny.tgf";
 		string out = capture_tgf_run({ "tgf", tiny, "repl", "-c", "false",
-			"-e", "set trim start . parse 123" });
+			"-e", "set trim start . parse 123" }).out;
 		CHECK(out.find("parsed graph:\n\tstart(") != string::npos);
 		CHECK(out.find("\t\tnum(") != string::npos);
 	}

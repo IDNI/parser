@@ -7,6 +7,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "quiet_doctest.h"
 #include "../src/tgf/tgf_cli.h"
+#include "tgf_run_capture.h"
 #include "format/json/json.h"
 
 #include <filesystem>
@@ -190,26 +191,6 @@ static bool report_contains_key(const json::value& resp,
 			if (auto rep = e.find("report"); rep && has_key(*rep))
 				return true;
 	return false;
-}
-
-// Run tgf_run with @p input on stdin and capture stdout. Only the repl
-// --json path reads stdin.
-static std::string capture_run_with_stdin(
-	const std::vector<std::string>& args, const std::string& input,
-	int& code)
-{
-	std::vector<char*> argv;
-	argv.reserve(args.size());
-	for (const auto& a : args)
-		argv.push_back(const_cast<char*>(a.c_str()));
-	std::istringstream in(input);
-	auto* old_in = std::cin.rdbuf(in.rdbuf());
-	std::ostringstream cap;
-	auto* old_out = std::cout.rdbuf(cap.rdbuf());
-	code = tgf_run(static_cast<int>(argv.size()), argv.data());
-	std::cout.rdbuf(old_out);
-	std::cin.rdbuf(old_in);
-	return cap.str();
 }
 
 static std::string read_file(const std::string& path) {
@@ -1363,20 +1344,6 @@ TEST_SUITE("tgf json api: no grammar") {
 }
 
 TEST_SUITE("tgf json api: one-shot CLI") {
-	static std::string capture_run(const std::vector<std::string>& args,
-		int& code)
-	{
-		std::vector<char*> argv;
-		argv.reserve(args.size());
-		for (const auto& a : args)
-			argv.push_back(const_cast<char*>(a.c_str()));
-		std::ostringstream cap;
-		auto* old = std::cout.rdbuf(cap.rdbuf());
-		code = tgf_run(static_cast<int>(argv.size()), argv.data());
-		std::cout.rdbuf(old);
-		return cap.str();
-	}
-
 	static std::vector<json::value> lines_of(const std::string& s) {
 		std::vector<json::value> out;
 		std::istringstream ls(s);
@@ -1389,9 +1356,9 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 	}
 
 	TEST_CASE("parse --json writes one response") {
-		int code = -1;
-		auto text = capture_run({ "tgf", grammar_path(), "parse",
-			"--json", "-e", "123" }, code);
+		auto [code, text, text_err] =
+			capture_tgf_run({ "tgf", grammar_path(), "parse",
+				"--json", "-e", "123" }, "", false);
 		auto vs = lines_of(text);
 		REQUIRE(vs.size() == 1);
 		CHECK(vs[0].find("status")->as_string() == "ok");
@@ -1408,9 +1375,9 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 	}
 
 	TEST_CASE("grammar --json writes one response") {
-		int code = -1;
-		auto text = capture_run({ "tgf", grammar_path(), "grammar",
-			"--json" }, code);
+		auto [code, text, text_err] =
+			capture_tgf_run({ "tgf", grammar_path(), "grammar",
+				"--json" }, "", false);
 		auto vs = lines_of(text);
 		REQUIRE(vs.size() == 1);
 		CHECK(vs[0].find("cmd")->as_string() == "grammar");
@@ -1431,10 +1398,10 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 		auto dir = std::filesystem::temp_directory_path()
 			/ "tgf_json_api_gen";
 		std::filesystem::create_directories(dir);
-		int code = -1;
-		auto text = capture_run({ "tgf", grammar_path(), "gen",
-			"--json", "--name", "tiny", "--header-only", "false",
-			"--output-dir", dir.string() }, code);
+		auto [code, text, text_err] =
+			capture_tgf_run({ "tgf", grammar_path(), "gen",
+				"--json", "--name", "tiny", "--header-only", "false",
+				"--output-dir", dir.string() }, "", false);
 		auto vs = lines_of(text);
 		REQUIRE(vs.size() == 1);
 		CHECK(vs[0].find("status")->as_string() == "ok");
@@ -1449,9 +1416,9 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 	}
 
 	TEST_CASE("repl --json --evaluate writes one response and no hello") {
-		int code = -1;
-		auto text = capture_run({ "tgf", grammar_path(), "repl",
-			"--json", "--evaluate", "version" }, code);
+		auto [code, text, text_err] =
+			capture_tgf_run({ "tgf", grammar_path(), "repl",
+				"--json", "--evaluate", "version" }, "", false);
 		auto vs = lines_of(text);
 		REQUIRE(vs.size() == 1);
 		CHECK(vs[0].find("hello") == nullptr);
@@ -1468,9 +1435,9 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 	}
 
 	TEST_CASE("parse --json --grammar adds internal_grammar") {
-		int code = -1;
-		auto text = capture_run({ "tgf", grammar_path(), "parse",
-			"--json", "--grammar", "-e", "123" }, code);
+		auto [code, text, text_err] =
+			capture_tgf_run({ "tgf", grammar_path(), "parse",
+				"--json", "--grammar", "-e", "123" }, "", false);
 		auto vs = lines_of(text);
 		REQUIRE(vs.size() == 1);
 		CHECK(vs[0].find("status")->as_string() == "ok");
@@ -1489,9 +1456,9 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 	}
 
 	TEST_CASE("parse --json --measure adds bintree_totals and no text") {
-		int code = -1;
-		auto text = capture_run({ "tgf", grammar_path(), "parse",
-			"--json", "--measure", "-e", "123" }, code);
+		auto [code, text, text_err] =
+			capture_tgf_run({ "tgf", grammar_path(), "parse",
+				"--json", "--measure", "-e", "123" }, "", false);
 		auto vs = lines_of(text);
 		REQUIRE(vs.size() == 1);
 		CHECK(vs[0].find("status")->as_string() == "ok");
@@ -1521,9 +1488,9 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 	TEST_CASE("grammar --json --nullable adds symbol id and index") {
 		scratch_file g("tgf_json_api_nullable.tgf",
 			"start => a.\na => a b | 'x'.\nb => [ 'y' ].\n");
-		int code = -1;
-		auto text = capture_run({ "tgf", g.path, "grammar",
-			"--json", "--nullable" }, code);
+		auto [code, text, text_err] =
+			capture_tgf_run({ "tgf", g.path, "grammar",
+				"--json", "--nullable" }, "", false);
 		auto vs = lines_of(text);
 		REQUIRE(vs.size() == 1);
 		CHECK(vs[0].find("cmd")->as_string() == "grammar");
@@ -1544,10 +1511,11 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 	}
 
 	TEST_CASE("JSON mode writes only JSON objects, one per line") {
-		int code = -1;
-		auto text = capture_run({ "tgf", grammar_path(), "parse",
-			"--json", "--print-input", "--print-tml-rules",
-			"--print-tml-facts", "--measure", "-e", "123" }, code);
+		auto [code, text, text_err] =
+			capture_tgf_run({ "tgf", grammar_path(), "parse",
+				"--json", "--print-input", "--print-tml-rules",
+				"--print-tml-facts", "--measure", "-e", "123" },
+				"", false);
 		std::istringstream ls(text);
 		std::string l;
 		size_t lines = 0;
@@ -1563,9 +1531,9 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 	}
 
 	TEST_CASE("one-shot JSON commands with no grammar report the error") {
-		int code = -1;
-		auto text = capture_run({ "tgf", "parse", "--json", "-e",
-			"1" }, code);
+		auto [code, text, text_err] =
+			capture_tgf_run({ "tgf", "parse", "--json", "-e",
+				"1" }, "", false);
 		auto vs = lines_of(text);
 		REQUIRE(vs.size() == 1);
 		CHECK(vs[0].find("status")->as_string() == "error");
@@ -1579,9 +1547,8 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 			== "no grammar loaded, use load");
 		CHECK(code == 1);
 
-		int gcode = -1;
-		auto gtext = capture_run({ "tgf", "grammar", "--json" },
-			gcode);
+		auto [gcode, gtext, gtext_err] =
+			capture_tgf_run({ "tgf", "grammar", "--json" }, "", false);
 		auto gvs = lines_of(gtext);
 		REQUIRE(gvs.size() == 1);
 		CHECK(gvs[0].find("status")->as_string() == "error");
@@ -1591,10 +1558,10 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 		auto dir = std::filesystem::temp_directory_path()
 			/ "tgf_json_api_nogen";
 		std::filesystem::create_directories(dir);
-		int ncode = -1;
-		auto ntext = capture_run({ "tgf", "gen", "--json", "--name",
-			"nogen", "--header-only", "false", "--output-dir",
-			dir.string() }, ncode);
+		auto [ncode, ntext, ntext_err] =
+			capture_tgf_run({ "tgf", "gen", "--json", "--name",
+				"nogen", "--header-only", "false", "--output-dir",
+				dir.string() }, "", false);
 		auto nvs = lines_of(ntext);
 		REQUIRE(nvs.size() == 1);
 		CHECK(nvs[0].find("status")->as_string() == "error");
@@ -1604,20 +1571,20 @@ TEST_SUITE("tgf json api: one-shot CLI") {
 	}
 
 	TEST_CASE("one-shot text commands with no grammar exit 1") {
-		int code = -1;
-		auto text = capture_run({ "tgf", "parse", "-e", "1" }, code);
+		auto [code, text, text_err] =
+			capture_tgf_run({ "tgf", "parse", "-e", "1" }, "", false);
 		CHECK(code == 1);
 		CHECK(text.empty());   // the error goes to stderr, no help text
-		int gcode = -1;
-		auto gtext = capture_run({ "tgf", "grammar" }, gcode);
+		auto [gcode, gtext, gtext_err] =
+			capture_tgf_run({ "tgf", "grammar" }, "", false);
 		CHECK(gcode == 1);
 		CHECK(gtext.empty());
 	}
 
 	TEST_CASE("text repl set start and get start") {
-		int code = -1;
-		auto text = capture_run({ "tgf", grammar_path(), "repl",
-			"--evaluate", "set start num . get start" }, code);
+		auto [code, text, text_err] =
+			capture_tgf_run({ "tgf", grammar_path(), "repl",
+				"--evaluate", "set start num . get start" }, "", false);
 		CHECK(code == 0);
 		CHECK(text.find("start:") != std::string::npos);
 		CHECK(text.find("num") != std::string::npos);
@@ -1666,10 +1633,10 @@ TEST_SUITE("tgf json api: hello request") {
 	}
 
 	TEST_CASE("--session sets the hello session id") {
-		int code = -1;
-		auto text = capture_run_with_stdin({ "tgf", grammar_path(),
-			"repl", "--json", "--session", "deadbeef" },
-			"{\"id\":1,\"cmd\":\"hello\"}\n", code);
+		auto [code, text, text_err] =
+			capture_tgf_run({ "tgf", grammar_path(),
+				"repl", "--json", "--session", "deadbeef" },
+				"{\"id\":1,\"cmd\":\"hello\"}\n", false);
 		REQUIRE(code == 0);
 		std::istringstream ls(text);
 		std::string line;
