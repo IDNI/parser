@@ -1696,6 +1696,70 @@ TEST_SUITE("line server: policies") {
 	}
 }
 
+// Answers each raw line with the peer address and port of its session.
+struct peer_handler : session_handler {
+	explicit peer_handler(peer_info p) : peer(std::move(p)) {}
+	peer_info peer;
+	void on_text(std::string_view, reply_sink& out) override {
+		out.write(peer.address + " " + std::to_string(peer.port));
+	}
+};
+
+static line_server_options peer_options(line_server_options o) {
+	o.raw_lines = true;
+	o.make_handler = [](const line_session& se) {
+		return std::make_unique<peer_handler>(se.peer);
+	};
+	return o;
+}
+
+TEST_SUITE("line server: peer address") {
+	TEST_CASE("the default peer_info has no address") {
+		const peer_info p;
+		CHECK(p.address.empty());
+		CHECK(p.port == 0);
+	}
+	TEST_CASE("a tcp peer: its address and port") {
+		server_thread s(peer_options(tcp_options()));
+		tcp_client c(loopback(s.tcp_port()));
+		const uint16_t port = c.sock.local_endpoint().port();
+		c.send("who");
+		CHECK(c.read_line()
+			== "127.0.0.1 " + std::to_string(port));
+	}
+	TEST_CASE("an IPv4 peer of an IPv6 listener shows in the IPv4 form") {
+		auto o = peer_options(tcp_options());
+		o.listen[0].host = "::ffff:127.0.0.1";
+		server_thread s(o);
+		s.wait_listening(1);
+		if (s.done) {
+			MESSAGE("no IPv4 mapped bind: " << s.report_text);
+			return;
+		}
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("who");
+		CHECK(c.read_line().starts_with("127.0.0.1 "));
+	}
+	TEST_CASE("an IPv6 peer: ::1") {
+		auto o = peer_options(tcp_options());
+		o.listen[0].host = "::1";
+		server_thread s(o);
+		s.wait_listening(1);
+		if (s.done) return;
+		tcp_client c({ ba::ip::make_address("::1"), s.tcp_port() });
+		c.send("who");
+		CHECK(has(c.read_line(), "::1 "));
+	}
+	TEST_CASE("a websocket peer: its address") {
+		server_thread s(peer_options(ws_options()));
+		auto t = ws_connect(s.tcp_port());
+		std::string l;
+		CHECK(t->send_line("who"));
+		REQUIRE(t->read_line(l) == read_status::ok);
+		CHECK(has(l, "127.0.0.1 "));
+	}
+}
+
 TEST_SUITE("line server: start and stop") {
 	TEST_CASE("the JSON listening line names the bound port, a stop gives 0") {
 		server_thread s(tcp_options());

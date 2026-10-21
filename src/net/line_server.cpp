@@ -122,6 +122,20 @@ tref error_response(const diagnostics::report& rep) {
 		jt::build_pair("report", jt::build_report(rep, true)) });
 }
 
+// The IP address and the port of the peer of @p s.
+peer_info tcp_peer(line_transport_kind kind, const tcp::socket& s) {
+	peer_info p{ .kind = kind };
+	error_code ec;
+	const auto ep = s.remote_endpoint(ec);
+	if (ec) return p;
+	auto a = ep.address();
+	if (a.is_v6() && a.to_v6().is_v4_mapped())
+		a = ba::ip::make_address_v4(ba::ip::v4_mapped, a.to_v6());
+	p.address = a.to_string();
+	p.port = ep.port();
+	return p;
+}
+
 #ifndef _WIN32
 // The user of the peer process of a Unix domain socket.
 std::optional<uint64_t> peer_user(int fd) {
@@ -1022,8 +1036,8 @@ void line_server::accept_tcp(size_t i) {
 						opt.busy_message);
 				else u->start();
 			} else {
-				on_accept(conn_socket(std::move(s)),
-					peer_info{ .kind = line_transport_kind::tcp });
+				peer_info peer = tcp_peer(line_transport_kind::tcp, s);
+				on_accept(conn_socket(std::move(s)), std::move(peer));
 			}
 			accept_tcp(i);
 		});
@@ -1032,7 +1046,7 @@ void line_server::accept_tcp(size_t i) {
 ws_upgrade::ws_upgrade(line_server* s, tcp::socket so,
 	const listen_address& a)
 	: srv(s), sock(std::move(so)), ws_path(a.ws_path),
-	peer{ .kind = line_transport_kind::websocket }, timer(s->io)
+	peer(tcp_peer(line_transport_kind::websocket, sock)), timer(s->io)
 {
 	++srv->upgrades;
 }

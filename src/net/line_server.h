@@ -80,6 +80,11 @@ struct peer_info {
 	std::optional<uint64_t> user_id{};
 	/// websocket only: the Origin header of the upgrade request.
 	std::string origin{};
+	/// tcp and websocket: the IP address of the peer, with no brackets.
+	/// An IPv4 address mapped into IPv6 shows in the IPv4 form.
+	std::string address{};
+	/// tcp and websocket: the port of the peer.
+	uint16_t port = 0;
 };
 
 /// One connection on the server.
