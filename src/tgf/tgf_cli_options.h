@@ -15,6 +15,9 @@
 
 namespace idni {
 
+/// The commands of the tool, in the order of tgf_option_set.commands.
+enum class tgf_command { grammar, parse, gen, repl, serve, connect, test };
+
 /// The commands of the tool and the options that only the tool declares.
 inline const option_set tgf_option_set = {
 	.options = {
@@ -119,6 +122,11 @@ inline const option_set tgf_option_set = {
 		{ "test", "run tester (with provided tgf.test file)" },
 	},
 };
+
+/// The entry of command @p c in tgf_option_set.commands.
+inline const command_spec& tgf_command_spec(tgf_command c) {
+	return tgf_option_set.commands[static_cast<size_t>(c)];
+}
 
 /// The owners whose options a REPL and a session see.
 inline const std::array<std::string_view, 4> tgf_session_owners = {
@@ -268,8 +276,9 @@ inline const args_config tgf_args_config = {
 	.name = "tgf",
 	.help_header = "tgf <TGF file>",
 	.description = "Tau Grammar Format (TGF) tool",
-	.default_command = "repl",
-	.default_command_when_inputs = "repl",
+	.default_command = tgf_command_spec(tgf_command::repl).name,
+	.default_command_when_inputs =
+		tgf_command_spec(tgf_command::repl).name,
 	.global_surface = "",
 };
 

@@ -2145,21 +2145,23 @@ static int run_command(const parsed_args& args, tgf_tool& tool,
 	tgf_repl_evaluator& re)
 {
 	auto& opts = idni::options();
-	const string& command = args.command;
+	auto is = [&args](tgf_command c) {
+		return args.command == tgf_command_spec(c).name;
+	};
 	// A session child runs the JSON API for `tgf serve`, so it sets
 	// no_server_paths itself and refuses a path a client sends.
 	if (string sid = opts.get<string>("session"); !sid.empty())
 		re.begin_server_session(sid);
 
-	if (command == "grammar") return show_command(re);
+	if (is(tgf_command::grammar)) return show_command(re);
 
-	if (command == "serve") return serve_command(tool, re);
+	if (is(tgf_command::serve)) return serve_command(tool, re);
 
-	if (command == "connect") return connect_command(args.inputs);
+	if (is(tgf_command::connect)) return connect_command(args.inputs);
 
-	if (command == "gen") return gen_command(tool, re);
+	if (is(tgf_command::gen)) return gen_command(tool, re);
 
-	if (command == "test") {
+	if (is(tgf_command::test)) {
 		if (args.inputs.empty()) return command_line_error(
 			"test command needs at least one file as an argument");
 		int ret = run_tests(re.p(), args.inputs);
@@ -2167,7 +2169,7 @@ static int run_command(const parsed_args& args, tgf_tool& tool,
 		return ret;
 	}
 
-	if (command == "repl") {
+	if (is(tgf_command::repl)) {
 		const bool json = opts.get<bool>("json");
 		const string eval = opts.get<string>("evaluate");
 		if (json) {
@@ -2212,7 +2214,7 @@ static int run_command(const parsed_args& args, tgf_tool& tool,
 		return with_report_flush(run_default);
 	}
 
-	if (command == "parse") {
+	if (is(tgf_command::parse)) {
 		using format::json::value;
 		const bool json = opts.get<bool>("json");
 		string infile = opts.get<string>("input");
@@ -2322,7 +2324,8 @@ static int run_tool(int argc, char** argv, const args_config& cfg,
 		args.inputs.erase(args.inputs.begin());
 	// A server keeps the bytes it loaded, so a session and a reload see
 	// the bytes of the load, not a later file change.
-	if (args.command == "serve") re.make_grammar_source_backed();
+	if (args.command == tgf_command_spec(tgf_command::serve).name)
+		re.make_grammar_source_backed();
 	return run_command(args, tool, re);
 }
 

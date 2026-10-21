@@ -13,7 +13,9 @@
 #include <filesystem>
 #include <fstream>
 #include <initializer_list>
+#include <iterator>
 #include <sstream>
+#include <utility>
 
 using namespace std;
 using namespace idni;
@@ -464,5 +466,27 @@ TEST_SUITE("tgf cli: tgf_main") {
 	}
 }
 #endif // _WIN32
+
+TEST_SUITE("tgf cli: tgf_command") {
+
+	TEST_CASE("tgf_command_spec gives the entry of each command") {
+		const std::pair<tgf_command, string> names[] = {
+			{ tgf_command::grammar, "grammar" },
+			{ tgf_command::parse, "parse" },
+			{ tgf_command::gen, "gen" },
+			{ tgf_command::repl, "repl" },
+			{ tgf_command::serve, "serve" },
+			{ tgf_command::connect, "connect" },
+			{ tgf_command::test, "test" },
+		};
+		CHECK(tgf_option_set.commands.size() == std::size(names));
+		for (const auto& [c, name] : names) {
+			CAPTURE(name);
+			CHECK(tgf_command_spec(c).name == name);
+		}
+		CHECK(tgf_args_config.default_command == "repl");
+		CHECK(tgf_args_config.default_command_when_inputs == "repl");
+	}
+}
 
 #endif // TAU_TEST_HAS_TGF_CLI && PROJECT_SOURCE_DIR
