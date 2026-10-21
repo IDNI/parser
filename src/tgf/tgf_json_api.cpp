@@ -77,22 +77,31 @@ static bool known_help_argument(const std::string& c) {
 	return names.count(c) != 0;
 }
 
-static diagnostics::result<std::string> string_field(
-	const value& q, const char* name)
+// An absent field gives an empty text, a field of another type an error.
+static diagnostics::result<std::string> optional_string_field(
+	tref q, const char* name)
 {
-	auto f = q.find(name);
-	if (!f) return diagnostics::error<std::string>(code::invalid_argument,
-		parser_strings::messages::missing_field);
-	if (!f->is_string()) return diagnostics::error<std::string>(
+	if (!jt::get(q).find(name)) return ok_result(std::string());
+	const std::string* f = format::json::string_member(q, name);
+	if (!f) return diagnostics::error<std::string>(
 		code::invalid_argument,
 		parser_strings::messages::invalid_field_type);
-	return ok_result(std::string(f->as_string()));
+	return ok_result(std::string(*f));
+}
+
+// A missing field and a field of another type are different errors.
+static diagnostics::result<std::string> required_string_field(
+	tref q, const char* name)
+{
+	if (!jt::get(q).find(name)) return diagnostics::error<std::string>(
+		code::invalid_argument, parser_strings::messages::missing_field);
+	return optional_string_field(q, name);
 }
 
 // Convert a structured request into the canonical REPL text. Every field
 // check runs before any text is built.
 static diagnostics::result<std::string> request_to_src(
-	const tgf_repl_evaluator& re, const std::string& cmd, const value& q)
+	const tgf_repl_evaluator& re, const std::string& cmd, tref q)
 {
 	auto unknown = [] {
 		return diagnostics::error<std::string>(
@@ -105,67 +114,51 @@ static diagnostics::result<std::string> request_to_src(
 			parser_strings::messages::option_not_found,
 			{ { parser_strings::label::name, name } });
 	};
-	auto bad_type = [] {
-		return diagnostics::error<std::string>(
-			code::invalid_argument,
-			parser_strings::messages::invalid_field_type);
-	};
 	if (!known_command(cmd)) return unknown();
 
 	if (cmd == "parse" || cmd == "parse file" || cmd == "load") {
 		const char* field = cmd == "parse" ? "input" : "file";
-		auto s = string_field(q, field);
+		auto s = required_string_field(q, field);
 		if (!s.has_value()) return s;
 		return ok_result(cmd + " " + quote(s.value()));
 	}
 
 	if (cmd == "start" || cmd == "internal-grammar"
 			|| cmd == "unreachable") {
-		auto f = q.find("symbol");
-		std::string sym;
-		if (f) {
-			if (!f->is_string()) return bad_type();
-			sym = f->as_string();
-		}
-		if (sym.empty()) return ok_result(cmd);
-		if (!is_symbol(sym))
+		auto sym = optional_string_field(q, "symbol");
+		if (!sym.has_value()) return sym;
+		if (sym.value().empty()) return ok_result(cmd);
+		if (!is_symbol(sym.value()))
 			return diagnostics::error<std::string>(
 				code::invalid_argument,
 				parser_strings::messages::invalid_symbol);
-		return ok_result(cmd + " " + sym);
+		return ok_result(cmd + " " + sym.value());
 	}
 
 	if (cmd == "help") {
-		auto f = q.find("command");
-		std::string c;
-		if (f) {
-			if (!f->is_string()) return bad_type();
-			c = f->as_string();
-		}
-		if (c.empty()) return ok_result(std::string("help"));
-		if (!known_help_argument(c))
+		auto c = optional_string_field(q, "command");
+		if (!c.has_value()) return c;
+		if (c.value().empty()) return ok_result(cmd);
+		if (!known_help_argument(c.value()))
 			return diagnostics::error<std::string>(
 				code::invalid_argument,
 				parser_strings::messages::invalid_help_argument);
-		return ok_result("help " + c);
+		return ok_result(cmd + " " + c.value());
 	}
 
 	// A declared name is the only text of the option that reaches the
 	// REPL text. set, add and delete run without REPL text.
 	if (cmd == "get") {
-		auto f = q.find("option");
-		std::string name;
-		if (f) {
-			if (!f->is_string()) return bad_type();
-			name = f->as_string();
-		}
-		if (name.empty()) return ok_result(std::string("get"));
-		if (!re.session_option(name)) return unknown_opt(name);
-		return ok_result("get " + name);
+		auto name = optional_string_field(q, "option");
+		if (!name.has_value()) return name;
+		if (name.value().empty()) return ok_result(cmd);
+		if (!re.session_option(name.value()))
+			return unknown_opt(name.value());
+		return ok_result(cmd + " " + name.value());
 	}
 
 	if (cmd == "toggle" || cmd == "enable" || cmd == "disable") {
-		auto name = string_field(q, "option");
+		auto name = required_string_field(q, "option");
 		if (!name.has_value()) return name;
 		if (!re.session_option(name.value()))
 			return unknown_opt(name.value());
@@ -362,67 +355,56 @@ static value hello(tgf_repl_evaluator& re,
 // so no value text is parsed as REPL text. The field text holds the value
 // as the REPL writes it, the field value holds it as JSON.
 static std::pair<value, diagnostics::report> option_request(
-	tgf_repl_evaluator& re, const std::string& cmd, const value& q)
+	tgf_repl_evaluator& re, const std::string& cmd, tref q)
 {
-	diagnostics::report rep;
-	auto name = string_field(q, "option");
+	auto fail = [](std::string_view msg) {
+		diagnostics::report rep;
+		rep.error(code::invalid_argument, msg);
+		return std::pair{ value::object(), std::move(rep) };
+	};
+	const jt& req = jt::get(q);
+	auto name = required_string_field(q, "option");
 	if (!name.has_value()) return { value::object(), name.report() };
 	const bool add = cmd == "add";
 	value data = value::object();
-	if (q.find("text") && q.find("value")) {
-		rep.error(code::invalid_argument,
-			parser_strings::messages::invalid_field_type);
-		return { std::move(data), std::move(rep) };
-	}
-	if (auto t = q.find("text"); t) {
-		if (!t->is_string()) {
-			rep.error(code::invalid_argument,
-				parser_strings::messages::invalid_field_type);
-			return { std::move(data), std::move(rep) };
-		}
-		data = cmd == "set" ? re.set_cmd(name.value(), t->as_string())
-			: re.list_cmd(name.value(), t->as_string(), add);
+	if (req.find("text") && req.find("value"))
+		return fail(parser_strings::messages::invalid_field_type);
+	if (req.find("text")) {
+		auto t = required_string_field(q, "text");
+		if (!t.has_value()) return { value::object(), t.report() };
+		data = cmd == "set" ? re.set_cmd(name.value(), t.value())
+			: re.list_cmd(name.value(), t.value(), add);
 		return { std::move(data), re.take_report() };
 	}
-	auto f = q.find("value");
-	if (!f) {
-		rep.error(code::invalid_argument,
-			parser_strings::messages::missing_field);
-		return { std::move(data), std::move(rep) };
-	}
-	auto v = format::json::from_json<option_value>(*f);
-	if (!v) {
-		rep.error(code::invalid_argument,
-			parser_strings::messages::invalid_field_type);
-		return { std::move(data), std::move(rep) };
-	}
+	tref f = req.find("value");
+	if (!f) return fail(parser_strings::messages::missing_field);
+	auto v = option_of(f);
+	if (!v) return fail(parser_strings::messages::invalid_field_type);
 	if (cmd == "set") data = re.set_option(name.value(), std::move(*v));
 	else if (const auto* entries = std::get_if<option_list>(&*v))
 		data = re.edit_option_list(name.value(), *entries, add);
-	else {
-		rep.error(code::invalid_argument,
-			parser_strings::messages::invalid_field_type);
-		return { std::move(data), std::move(rep) };
-	}
+	else return fail(parser_strings::messages::invalid_field_type);
 	return { std::move(data), re.take_report() };
 }
 
 static std::pair<value, cmd_status> handle_request(
 	tgf_repl_evaluator& re, const std::string& line)
 {
-	auto req = format::json::parse(line);
+	auto req = jt::get(line);
 	if (!req.has_value())
 		return { error_response(value::null(), state_value(re),
 			req.report()), cmd_status::error };
-	const value& q = req.value();
+	tref q = req.value();
 	value id = value::null();
-	if (auto i = q.find("id"); i) id = *i;
-	auto cmd = string_field(q, "cmd");
+	// The answers are json::value, so the id goes over as its JSON text.
+	if (tref i = jt::get(q).find("id"); i)
+		id = format::json::parse(jt::get(i).to_str()).value();
+	auto cmd = required_string_field(q, "cmd");
 	if (!cmd.has_value())
 		return { error_response(id, state_value(re), cmd.report()),
 			cmd_status::error };
 	if (cmd.value() == "eval") {
-		auto src = string_field(q, "src");
+		auto src = required_string_field(q, "src");
 		if (!src.has_value())
 			return { error_response(id, state_value(re),
 				src.report()), cmd_status::error };
@@ -442,12 +424,12 @@ static std::pair<value, cmd_status> handle_request(
 	}
 	// The load form with source text carries no path, so it runs the
 	// evaluator directly instead of going through the REPL text.
-	if (cmd.value() == "load" && q.find("source") != nullptr) {
-		auto name = string_field(q, "name");
+	if (cmd.value() == "load" && jt::get(q).find("source")) {
+		auto name = required_string_field(q, "name");
 		if (!name.has_value())
 			return { error_response(id, state_value(re),
 				name.report()), cmd_status::error };
-		auto source = string_field(q, "source");
+		auto source = required_string_field(q, "source");
 		if (!source.has_value())
 			return { error_response(id, state_value(re),
 				source.report()), cmd_status::error };
@@ -488,9 +470,9 @@ static std::pair<value, cmd_status> handle_request(
 // Apply one element of the init option values. A bad value reports an
 // error; the rest of the init stays applied.
 static void apply_init_option(tgf_repl_evaluator& re,
-	const std::string& name, const value& val, diagnostics::report& r)
+	const std::string& name, tref val, diagnostics::report& r)
 {
-	auto v = format::json::from_json<option_value>(val);
+	auto v = option_of(val);
 	if (!v) {
 		r.error(diagnostics::code::invalid_argument,
 			parser_strings::messages::invalid_field_type);
@@ -504,9 +486,10 @@ static void apply_init_option(tgf_repl_evaluator& re,
 // the option values and the line limit. A bad part reports an error and
 // the child goes on with what it could apply.
 static diagnostics::report apply_init(tgf_repl_evaluator& re,
-	const value& init, size_t& max_line)
+	tref init_ref, size_t& max_line)
 {
 	diagnostics::report r;
+	const jt& init = jt::get(init_ref);
 	if (!init.is_object()) {
 		r.error(diagnostics::code::invalid_argument,
 			parser_strings::messages::invalid_field_type);
@@ -514,21 +497,21 @@ static diagnostics::report apply_init(tgf_repl_evaluator& re,
 	}
 	// The line limit applies to the lines after the init line, which was
 	// already read with the limit the caller passed.
-	if (auto m = init.find("max_line"); m && !m->is_null()) {
-		if (!m->is_number())
+	if (tref m = init.find("max_line"); m && !jt::get(m).is_null()) {
+		if (!jt::get(m).is_number())
 			r.error(diagnostics::code::invalid_argument,
 				parser_strings::messages::invalid_field_type);
-		else max_line = static_cast<size_t>(m->as_number());
+		else max_line = static_cast<size_t>(jt::get(m).get_number());
 	}
 	// The grammar key is null with no grammar and absent for a built-in
 	// grammar, which the child already has and keeps.
-	if (auto g = init.find("grammar"); g && !g->is_null()) {
-		if (!g->is_object()) {
+	if (tref g = init.find("grammar"); g && !jt::get(g).is_null()) {
+		if (!jt::get(g).is_object()) {
 			r.error(diagnostics::code::invalid_argument,
 				parser_strings::messages::invalid_field_type);
 		} else {
-			auto name = string_field(*g, "name");
-			auto source = string_field(*g, "source");
+			auto name = required_string_field(g, "name");
+			auto source = required_string_field(g, "source");
 			if (!name.has_value()) r.append(name.report());
 			else if (!source.has_value())
 				r.append(source.report());
@@ -543,19 +526,20 @@ static diagnostics::report apply_init(tgf_repl_evaluator& re,
 			}
 		}
 	}
-	if (auto s = init.find("start"); s && !s->is_null()) {
-		if (!s->is_string()) {
+	if (tref s = init.find("start"); s && !jt::get(s).is_null()) {
+		if (!jt::get(s).is_string()) {
 			r.error(diagnostics::code::invalid_argument,
 				parser_strings::messages::invalid_field_type);
-		} else apply_init_option(re, "start", *s, r);
+		} else apply_init_option(re, "start", s, r);
 	}
-	if (auto o = init.find("options"); o && !o->is_null()) {
-		if (!o->is_object()) {
+	if (tref o = init.find("options"); o && !jt::get(o).is_null()) {
+		if (!jt::get(o).is_object()) {
 			r.error(diagnostics::code::invalid_argument,
 				parser_strings::messages::invalid_field_type);
 		} else {
-			for (const auto& kv : o->members())
-				apply_init_option(re, kv.first, kv.second, r);
+			for (const jt& kv : jt::get(o).children_trees())
+				apply_init_option(re, kv.get_string(),
+					kv.first(), r);
 		}
 	}
 	return r;
@@ -611,16 +595,17 @@ int tgf_json_loop(tgf_repl_evaluator& re, std::istream& in,
 					diagnostics::code::invalid_argument,
 					parser_strings::messages::missing_field);
 			else {
-				auto parsed = format::json::parse(init_line);
-				auto node = parsed.has_value()
-					? parsed.value().find("init") : nullptr;
+				auto parsed = jt::get(init_line);
+				tref node = parsed.has_value()
+					? jt::get(parsed.value()).find("init")
+					: nullptr;
 				if (!parsed.has_value())
 					init_report.append(parsed.report());
 				else if (!node)
 					init_report.error(
 						diagnostics::code::invalid_argument,
 						parser_strings::messages::missing_field);
-				else init_report.append(apply_init(re, *node, limit));
+				else init_report.append(apply_init(re, node, limit));
 			}
 		} else init_report.error(
 			diagnostics::code::invalid_argument,
