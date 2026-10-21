@@ -114,6 +114,11 @@ diagnostics::result<int> line_server_run(const line_server_options& opt);
 /// run returns after the connections are closed.
 void line_server_stop();
 
+/// Write one event into server.log and give it to on_output, for the
+/// server that runs in this process. Call it on the io loop of the
+/// server.
+void line_server_log(tref event);
+
 /// Give the session log line @p line of @p session to on_output, in the
 /// form of the debug lines, for the server that runs in this process.
 /// Call it on the io loop of the server.

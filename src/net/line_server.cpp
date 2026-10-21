@@ -802,6 +802,11 @@ void line_server_stop() {
 		ba::post(s->io, [s] { s->stop(); });
 }
 
+void line_server_log(tref event) {
+	std::lock_guard lock(running_mutex);
+	if (line_server* s = running.load()) s->log_event(event, nullptr);
+}
+
 void line_server_debug(tref line, const std::string& session) {
 	std::lock_guard lock(running_mutex);
 	if (line_server* s = running.load()) s->print_debug(line, session);

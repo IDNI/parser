@@ -329,6 +329,14 @@ TEST_SUITE("line server: tcp") {
 		CHECK_FALSE(has(session_log, "unparsed"));
 		std::filesystem::remove_all(dir);
 	}
+	TEST_CASE("line_server_log with no running server prints and writes nothing") {
+		std::ostringstream sink;
+		auto old = std::cout.rdbuf(sink.rdbuf());
+		line_server_log(jt::build_object({ jt::build_pair(
+			"event", jt::build_string("lost")) }));
+		std::cout.rdbuf(old);
+		CHECK(sink.str().empty());
+	}
 	TEST_CASE("no make_handler is an error") {
 		line_server_options o = tcp_options();
 		std::ostringstream sink;
@@ -613,5 +621,38 @@ TEST_SUITE("line server: logs") {
 		s.stop();
 		CHECK(has(s.out.text(), "T session "));
 		CHECK(has(s.out.text(), " in  hello"));
+	}
+}
+
+TEST_SUITE("line server: line_server_log") {
+	TEST_CASE("an event of the handler goes into server.log and to on_output") {
+		struct logging_handler : session_handler {
+			void on_line(tref, reply_sink& out) override {
+				line_server_log(jt::build_object({ jt::build_pair(
+					"event", jt::build_string("handler-event")) }));
+				out.write(jt::build_object({ jt::build_pair("status",
+					jt::build_string("ok")) }));
+			}
+		};
+		const auto dir = unique_temp_dir("line_server_log_tref_");
+		auto o = tcp_options();
+		o.log_dir = dir.string();
+		o.make_handler = [](const line_session&) {
+			return std::make_unique<logging_handler>();
+		};
+		server_thread s(o);
+		{
+			tcp_client c(loopback(s.tcp_port()));
+			c.send("{\"cmd\":\"open\"}");
+			c.send("{\"id\":1}");
+			CHECK(c.read_line() == "{\"status\":\"ok\"}");
+		}
+		s.stop();
+		std::ifstream is(dir / "server.log");
+		const std::string log((std::istreambuf_iterator<char>(is)), {});
+		CHECK(has(log, "\"event\":\"new\""));
+		CHECK(has(log, "\"event\":\"handler-event\""));
+		CHECK(has(s.out.text(), "handler-event"));
+		std::filesystem::remove_all(dir);
 	}
 }
