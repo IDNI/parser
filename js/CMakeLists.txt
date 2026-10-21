@@ -16,6 +16,7 @@ set(JSLIB_SOURCES
 	../src/format/treemr/treemr_parser.generated.cpp
 	../src/tgf/tgf_repl_parser.generated.cpp
 	../src/tgf/tgf_cli.cpp
+	../src/tgf/tgf_json_api.cpp
         embindings.cpp
 )
 
