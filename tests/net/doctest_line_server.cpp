@@ -11,6 +11,9 @@
 #include <csignal>
 #include <cstring>
 #include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -160,6 +163,23 @@ static bool has(const std::string& line, std::string_view part) {
 	return line.find(part) != std::string::npos;
 }
 
+// A fresh folder name under the temp folder. The folder does not exist.
+static std::filesystem::path unique_temp_dir(const std::string& prefix) {
+	auto dir = std::filesystem::temp_directory_path() / (prefix
+		+ std::to_string(std::chrono::steady_clock::now()
+			.time_since_epoch().count()));
+	std::filesystem::remove_all(dir);
+	return dir;
+}
+
+#ifndef _WIN32
+// The permission bits of @p p.
+static unsigned mode_of(const std::filesystem::path& p) {
+	return static_cast<unsigned>(std::filesystem::status(p).permissions())
+		& 0777u;
+}
+#endif
+
 TEST_SUITE("line reader") {
 	TEST_CASE("feed_lines gives each line and drops a line over the limit") {
 		std::string line;
@@ -272,6 +292,43 @@ TEST_SUITE("line server: tcp") {
 		CHECK(*s.value == 0);
 		CHECK(c.at_eof(5000));
 	}
+	TEST_CASE("the listening line as text") {
+		auto o = tcp_options();
+		o.json = false;
+		server_thread s(o);
+		const auto lines = s.wait_listening(1);
+		REQUIRE(lines.size() >= 2);
+		CHECK(has(lines[0], " listening on 127.0.0.1:"));
+		CHECK(has(lines[1], " logs off"));
+	}
+	TEST_CASE("a line that does not parse is logged raw") {
+		const auto dir = std::filesystem::temp_directory_path()
+			/ ("line_server_raw_" + std::to_string(
+				std::chrono::steady_clock::now()
+					.time_since_epoch().count()));
+		std::filesystem::remove_all(dir);
+		auto o = tcp_options();
+		o.log_dir = dir.string();
+		server_thread s(o);
+		{
+			tcp_client c(loopback(s.tcp_port()));
+			c.send("{\"cmd\":\"hi\"}");
+			CHECK(has(c.read_line(), "\"status\":\"ok\""));
+			c.send("{\"x\":");
+			CHECK(has(c.read_line(), "Unexpected end of file at 1:6 (6)"));
+		}
+		CHECK(wait_for(s.closes, 1));
+		s.stop();
+		std::string session_log;
+		for (const auto& e : std::filesystem::directory_iterator(dir))
+			if (e.path().filename() != "server.log") {
+				std::ifstream is(e.path());
+				session_log.assign(std::istreambuf_iterator<char>(is), {});
+			}
+		CHECK(has(session_log, R"("line":"{\"x\":")"));
+		CHECK_FALSE(has(session_log, "unparsed"));
+		std::filesystem::remove_all(dir);
+	}
 	TEST_CASE("no make_handler is an error") {
 		line_server_options o = tcp_options();
 		std::ostringstream sink;
@@ -311,6 +368,49 @@ TEST_SUITE("line server: tcp") {
 		}
 		CHECK(found);
 	}
+#ifndef _WIN32
+	TEST_CASE("logs: a new folder gets 0700, each log gets 0600") {
+		const auto dir = unique_temp_dir("line_server_modes_");
+		const auto sub = dir / "logs";
+		auto o = tcp_options();
+		o.log_dir = sub.string();
+		server_thread s(o);
+		{
+			tcp_client c(loopback(s.tcp_port()));
+			c.send("{\"cmd\":\"open\"}");
+			CHECK(has(c.read_line(), "\"status\":\"ok\""));
+		}
+		CHECK(wait_for(s.closes, 1));
+		s.stop();
+		CHECK(mode_of(dir) == 0700);
+		CHECK(mode_of(sub) == 0700);
+		size_t logs = 0;
+		for (const auto& e : std::filesystem::directory_iterator(sub)) {
+			++logs;
+			CHECK(mode_of(e.path()) == 0600);
+		}
+		CHECK(logs == 2);
+		std::filesystem::remove_all(dir);
+	}
+	TEST_CASE("logs: a server.log with 0644 gets 0600, the folder keeps its mode") {
+		const auto dir = unique_temp_dir("line_server_narrow_");
+		std::filesystem::create_directories(dir);
+		std::filesystem::permissions(dir, std::filesystem::perms(0755),
+			std::filesystem::perm_options::replace);
+		const auto log = dir / "server.log";
+		std::ofstream(log) << "{}\n";
+		std::filesystem::permissions(log, std::filesystem::perms(0644),
+			std::filesystem::perm_options::replace);
+		auto o = tcp_options();
+		o.log_dir = dir.string();
+		server_thread s(o);
+		REQUIRE(s.wait_listening(1).size() >= 1);
+		s.stop();
+		CHECK(mode_of(log) == 0600);
+		CHECK(mode_of(dir) == 0755);
+		std::filesystem::remove_all(dir);
+	}
+#endif
 }
 
 // Answers each line with the request and a large "pad" member.
@@ -338,6 +438,16 @@ struct closing_handler : session_handler {
 };
 
 TEST_SUITE("line server: limits") {
+	TEST_CASE("idle_timeout_seconds ends a quiet session") {
+		auto o = tcp_options();
+		o.idle_timeout_seconds = 1;
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("{\"cmd\":\"open\"}");
+		CHECK(has(c.read_line(), "\"status\":\"ok\""));
+		CHECK(c.at_eof(5000));
+		CHECK(has(s.out.text(), "\"event\":\"idle-timeout\""));
+	}
 	TEST_CASE("a close asked in on_line runs on_close after on_line") {
 		std::atomic<int> result{ 0 };
 		auto o = tcp_options();
@@ -440,5 +550,68 @@ TEST_SUITE("line server: idle timeout") {
 		c.send("{\"cmd\":\"open\"}");
 		CHECK(has(c.read_line(), "\"status\":\"ok\""));
 		CHECK_FALSE(c.at_eof(1500));
+	}
+}
+
+TEST_SUITE("line server: logs") {
+	TEST_CASE("log_lines false: no in or out line, the events stay") {
+		const auto dir = unique_temp_dir("line_server_no_lines_");
+		auto o = tcp_options();
+		o.log_dir = dir.string();
+		o.log_lines = false;
+		o.debug_sessions = true;
+		server_thread s(o);
+		{
+			tcp_client c(loopback(s.tcp_port()));
+			c.send("{\"cmd\":\"open\"}");
+			CHECK(has(c.read_line(), "\"status\":\"ok\""));
+		}
+		CHECK(wait_for(s.closes, 1));
+		s.stop();
+		std::string session_log;
+		for (const auto& e : std::filesystem::directory_iterator(dir))
+			if (e.path().filename() != "server.log") {
+				std::ifstream is(e.path());
+				session_log.assign(std::istreambuf_iterator<char>(is), {});
+			}
+		CHECK(has(session_log, "\"event\":\"new\""));
+		CHECK_FALSE(has(session_log, "\"dir\":\"in\""));
+		CHECK_FALSE(has(session_log, "\"dir\":\"out\""));
+		CHECK_FALSE(has(s.out.text(), "\"dir\":\"in\""));
+		std::filesystem::remove_all(dir);
+	}
+	TEST_CASE("line_server_debug gives a line to on_output") {
+		struct debug_handler : session_handler {
+			std::string id;
+			explicit debug_handler(std::string i) : id(std::move(i)) {}
+			void on_line(tref, reply_sink& out) override {
+				line_server_debug(jt::build_object({
+					jt::build_pair("t", jt::build_string("T")),
+					jt::build_pair("dir", jt::build_string("in")),
+					jt::build_pair("line", jt::build_string("hello")) }),
+					id);
+				out.write(jt::build_object({ jt::build_pair("status",
+					jt::build_string("ok")) }));
+			}
+		};
+		auto o = tcp_options();
+		o.json = false;
+		o.make_handler = [](const line_session& se) {
+			return std::make_unique<debug_handler>(se.id);
+		};
+		server_thread s(o);
+		const auto lines = s.wait_listening(1);
+		REQUIRE_FALSE(lines.empty());
+		const auto at = lines[0].rfind(':');
+		REQUIRE(at != std::string::npos);
+		const auto port = static_cast<uint16_t>(
+			std::stoi(lines[0].substr(at + 1)));
+		tcp_client c(loopback(port));
+		c.send("{\"cmd\":\"open\"}");
+		c.send("{\"id\":1}");
+		CHECK(c.read_line() == "{\"status\":\"ok\"}");
+		s.stop();
+		CHECK(has(s.out.text(), "T session "));
+		CHECK(has(s.out.text(), " in  hello"));
 	}
 }

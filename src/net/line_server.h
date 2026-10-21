@@ -25,6 +25,9 @@ struct reply_sink {
 	virtual void write(tref reply) = 0;
 	/// Ends the connection after the queued lines are written.
 	virtual void close() = 0;
+	/// Write one event of the handler into the server log and the session
+	/// log, in the shape of the server events.
+	virtual void log(tref event) = 0;
 };
 
 /// The program part of one session. The server runs the JSON gc between
@@ -80,9 +83,15 @@ struct line_server_options {
 	size_t max_line = 16u * 1024 * 1024;
 	/// Close a connection that makes no write progress. 0 turns it off.
 	size_t write_timeout_seconds = 30;
+	/// Folder of the logs, with no "~" left. Empty writes no log.
+	std::string log_dir{};
+	/// Also log each request and reply line.
+	bool log_lines = true;
 	/// The lines of on_output as JSON: first one {"listening":..} line
 	/// for each address.
 	bool json = false;
+	/// Also give each logged line to on_output.
+	bool debug_sessions = false;
 	/// Checks the first line of a connection after the peer check. False
 	/// counts a failed login and closes it. Empty accepts.
 	std::function<bool(tref first_line, const peer_info& peer)>
@@ -104,6 +113,11 @@ diagnostics::result<int> line_server_run(const line_server_options& opt);
 /// Stop the server that runs in this process, from any thread. The
 /// run returns after the connections are closed.
 void line_server_stop();
+
+/// Give the session log line @p line of @p session to on_output, in the
+/// form of the debug lines, for the server that runs in this process.
+/// Call it on the io loop of the server.
+void line_server_debug(tref line, const std::string& session);
 
 } // namespace idni
 

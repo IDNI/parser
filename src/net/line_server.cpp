@@ -14,6 +14,7 @@
 #include "line_server.h"
 #include "line_reader.h"
 #include "line_support.h"
+#include "utility/filesystem.h"
 
 #include <array>
 #include <atomic>
@@ -57,6 +58,7 @@ namespace ba = boost::asio;
 using ba::ip::tcp;
 using boost::system::error_code;
 using jt = format::json::tree;
+using format::json::string_member;
 
 using conn_socket = std::variant<tcp::socket>;
 
@@ -80,6 +82,12 @@ tref error_response(const diagnostics::report& rep) {
 		jt::build_pair("report", jt::build_report(rep, true)) });
 }
 
+// The text of a log field, empty when the field is absent.
+std::string field_text(tref v, std::string_view key) {
+	const std::string* f = string_member(v, key);
+	return f ? *f : std::string();
+}
+
 struct line_server;
 struct server_connection;
 
@@ -90,6 +98,7 @@ struct connection_sink : reply_sink {
 	server_connection& c;
 	void write(tref reply) override;
 	void close() override;
+	void log(tref event) override;
 };
 
 // One connection is one session.
@@ -110,6 +119,8 @@ struct server_connection : std::enable_shared_from_this<server_connection> {
 	// True while on_open or on_line runs, so a close waits for its return.
 	bool in_handler = false;
 	std::array<char, 8192> read_buf{};
+	fs::file_ostream log;
+	bool log_ok = false;
 	connection_sink sink{ *this };
 
 	void start();
@@ -119,6 +130,8 @@ struct server_connection : std::enable_shared_from_this<server_connection> {
 	void handle_first_line(std::string& l);
 	bool start_session();
 	diagnostics::result<tref> parse_line(std::string& l);
+	bool logs_lines() const;
+	void log_request(tref request);
 	void handle_too_long();
 	void send(std::string text);
 	void send_line(tref v);
@@ -131,6 +144,9 @@ struct server_connection : std::enable_shared_from_this<server_connection> {
 	void close();
 	void close_after_flush();
 	void arm_write_timer();
+	void log_write(tref v);
+	void log_store(tref v);
+	void log_session_event(std::string_view event);
 };
 
 struct tcp_listener {
@@ -151,10 +167,16 @@ struct line_server {
 	void on_accept(conn_socket sock, peer_info peer);
 	void retry_accept(std::function<void()> accept);
 	bool full(line_transport_kind k) const;
+	void open_session_log(server_connection& c);
 	void start_idle_timer();
 	void check_idle();
 
+	void log_failure(diagnostics::report detail = {});
+	void log_event(tref v, server_connection* c);
+
 	void output(const std::string& line) const;
+	void print_event(tref v);
+	void print_debug(tref v, const std::string& session);
 	void print_start();
 
 	line_server_options opt;
@@ -166,6 +188,9 @@ struct line_server {
 	ba::steady_timer idle_timer;
 	ba::signal_set signals;
 	std::map<std::string, std::shared_ptr<server_connection>> connections;
+	fs::file_ostream server_log;
+	bool log_ok = false;
+	bool log_failure_reported = false;
 	diagnostics::report report;
 	bool stopping = false;
 	// True while a tick is scheduled, so a new connection only arms it once.
@@ -220,13 +245,18 @@ void server_connection::handle_line(std::string& l) {
 		send_line(error_response(req.report()));
 		return;
 	}
+	log_request(req.value());
 	in_handler = true;
 	session.handler->on_line(req.value(), sink);
 	in_handler = false;
 }
 
+// A line that does not parse is logged as it came.
 diagnostics::result<tref> server_connection::parse_line(std::string& l) {
-	return jt::get(std::string_view(l));
+	auto req = jt::get(std::string_view(l));
+	if (!req.has_value() && session.authenticated)
+		log_write(line_log::text("in", l));
+	return req;
 }
 
 void server_connection::handle_first_line(std::string& l) {
@@ -246,6 +276,8 @@ void server_connection::handle_first_line(std::string& l) {
 		return;
 	}
 	if (!start_session()) return;
+	log_request(first);
+	log_session_event("new");
 	in_handler = true;
 	session.handler->on_open(first, sink);
 	in_handler = false;
@@ -261,11 +293,13 @@ bool server_connection::start_session() {
 			parser_strings::messages::session_start_failed);
 		return false;
 	}
+	srv->open_session_log(*this);
 	return true;
 }
 
 void server_connection::handle_too_long() {
 	if (closed || close_when_drained) return;
+	if (session.authenticated) log_session_event("line-too-long");
 	diagnostics::report rep;
 	rep.error(diagnostics::code::out_of_range,
 		parser_strings::messages::line_too_long);
@@ -296,6 +330,7 @@ void server_connection::send_line(tref v) {
 
 void server_connection::send_text(std::string text) {
 	session.last_traffic = std::chrono::steady_clock::now();
+	if (session.authenticated) log_write(line_log::text("out", text));
 	text += '\n';
 	send(std::move(text));
 }
@@ -360,7 +395,11 @@ void server_connection::close() {
 			s.shutdown(socket_t::shutdown_both, ec);
 		s.close(ec);
 	}, socket);
-	if (session.handler) session.handler->on_close();
+	if (session.handler) {
+		session.handler->on_close();
+		log_session_event("detach");
+	}
+	log.close();
 	// the map can hold the last reference
 	auto keep = shared_from_this();
 	srv->connections.erase(session.id);
@@ -370,14 +409,114 @@ void connection_sink::write(tref reply) { c.send_line(reply); }
 
 void connection_sink::close() { c.close_after_flush(); }
 
+void connection_sink::log(tref event) {
+	c.srv->log_event(event, &c);
+}
+
+void server_connection::log_session_event(std::string_view event) {
+	srv->log_event(line_log::session_event(event, session.id), this);
+}
+
+bool server_connection::logs_lines() const {
+	return srv->opt.log_lines;
+}
+
+void server_connection::log_request(tref request) {
+	if (logs_lines()) log_write(line_log::text("in", jt::get(request).to_str()));
+}
+
+void server_connection::log_write(tref v) {
+	// The copy runs also with no log folder, so it comes before the check.
+	if (!logs_lines()) return;
+	if (srv->opt.debug_sessions) srv->print_debug(v, session.id);
+	log_store(v);
+}
+
+void server_connection::log_store(tref v) {
+	if (!log_ok) return;
+	if (!line_log::append(log, v)) {
+		log_ok = false;
+		srv->log_failure();
+	}
+}
+
 line_server::line_server(const line_server_options& o)
 	: opt(o), io(), idle_timer(io), signals(io)
 {
 	if (opt.max_sessions == 0) opt.max_sessions = 1;
+	if (opt.log_dir.empty()) return;
+	// A log line holds private request data, so the folder and the logs
+	// are readable by the owner only.
+	auto dirs = fs::create_private_dirs(fs::to_path(opt.log_dir));
+	if (!dirs.has_value()) {
+		log_failure(std::move(dirs).report());
+		return;
+	}
+	auto opened = fs::open_private_append(
+		fs::to_path(opt.log_dir + "/server.log"));
+	if (!opened.has_value()) {
+		log_failure(std::move(opened).report());
+		return;
+	}
+	server_log = std::move(opened).value();
+	log_ok = true;
+}
+
+void line_server::log_failure(diagnostics::report detail) {
+	if (log_failure_reported) return;
+	log_failure_reported = true;
+	if (detail.has_error()) {
+		report.append(std::move(detail));
+		return;
+	}
+	report.error(diagnostics::code::io_error,
+		parser_strings::messages::log_write_failed);
+}
+
+void line_server::log_event(tref v, server_connection* c) {
+	if (log_ok && !line_log::append(server_log, v)) {
+		log_ok = false;
+		log_failure();
+	}
+	if (c) c->log_store(v);
+	print_event(v);
+}
+
+// The start of a text line about a session, shared by events and the
+// session log copy, so both sort and read alike.
+std::string session_prefix(tref v, const std::string& session) {
+	return field_text(v, "t") + " session " + session + ' ';
 }
 
 void line_server::output(const std::string& line) const {
 	if (opt.on_output) opt.on_output(line);
+}
+
+void line_server::print_event(tref v) {
+	if (opt.json) { output(jt::get(v).to_str()); return; }
+	const std::string session = field_text(v, "session");
+	std::string l = session.empty() ? field_text(v, "t") + ' '
+		: session_prefix(v, session);
+	l += field_text(v, "event");
+	if (const std::string kind = field_text(v, "kind"); !kind.empty())
+		l += ' ' + kind;
+	for (std::string_view key : { "exit", "count" })
+		if (tref f = jt::get(v).find(key); f && jt::get(f).is_number())
+			l += ' ' + std::to_string(static_cast<long long>(
+				jt::get(f).get_number()));
+	output(l);
+}
+
+void line_server::print_debug(tref v, const std::string& session) {
+	if (opt.json) {
+		output(jt::get(jt::set_member(v, "session",
+			jt::build_string(session))).to_str());
+		return;
+	}
+	std::string dir = field_text(v, "dir");
+	// "in" pads to the width of "out", so the payloads line up.
+	if (dir.size() < 3) dir.resize(3, ' ');
+	output(session_prefix(v, session) + dir + ' ' + field_text(v, "line"));
 }
 
 void line_server::print_start() {
@@ -409,6 +548,15 @@ void line_server::print_start() {
 			output(t + " listening on ws://" + host_port + a.ws_path);
 		else output(t + " listening on " + host_port);
 	}
+	output(log_ok ? t + " logs in " + opt.log_dir : t + " logs off");
+}
+
+void line_server::open_session_log(server_connection& c) {
+	if (opt.log_dir.empty()) return;
+	auto opened = line_log::open_session(opt.log_dir, c.session.id);
+	c.log_ok = opened.has_value();
+	if (c.log_ok) c.log = std::move(opened).value();
+	else log_failure(std::move(opened).report());
 }
 
 bool line_server::listen_tcp(const listen_address& a) {
@@ -515,6 +663,7 @@ void line_server::on_accept(conn_socket sock, peer_info peer) {
 }
 
 bool line_server::start() {
+	if (report.has_error()) return false;
 	for (const auto& a : opt.listen) {
 		switch (a.kind) {
 		case line_transport_kind::tcp:
@@ -553,6 +702,8 @@ void line_server::close_all() {
 	for (auto& c : live) c->close();
 	error_code ec;
 	for (auto& l : tcp_listeners) l.acceptor->close(ec);
+	log_ok = false;
+	server_log.close();
 }
 
 void line_server::start_idle_timer() {
@@ -578,7 +729,10 @@ void line_server::check_idle() {
 				&& quiet >= std::chrono::seconds(opt.idle_timeout_seconds))
 			idle.push_back(kv.second);
 	}
-	for (auto& c : idle) c->close();
+	for (auto& c : idle) {
+		c->log_session_event("idle-timeout");
+		c->close();
+	}
 }
 
 diagnostics::result<int> run_server(const line_server_options& opt) {
@@ -646,6 +800,11 @@ void line_server_stop() {
 	std::lock_guard lock(running_mutex);
 	if (line_server* s = running.load())
 		ba::post(s->io, [s] { s->stop(); });
+}
+
+void line_server_debug(tref line, const std::string& session) {
+	std::lock_guard lock(running_mutex);
+	if (line_server* s = running.load()) s->print_debug(line, session);
 }
 
 } // namespace idni
