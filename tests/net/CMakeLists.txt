@@ -1,5 +1,6 @@
 set(NET_DOCTESTS
 	line_address
+	line_transport
 	line_server
 	line_support
 )

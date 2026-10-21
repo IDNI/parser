@@ -1,6 +1,7 @@
 # The line server and client. Only this library includes Boost.Asio and
 # Boost.Beast, so the parser core stays free of Boost.
 add_library(tauparser_net STATIC
+	"${CMAKE_CURRENT_SOURCE_DIR}/line_transport.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/line_support.cpp")
 tauparser_setup(tauparser_net PUBLIC tauparser)
 if(NOT WIN32)
@@ -11,6 +12,8 @@ target_include_directories(tauparser_net PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
 	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}>
 )
+target_include_directories(tauparser_net SYSTEM PUBLIC
+	$<BUILD_INTERFACE:${TAU_BOOST_INCLUDE_DIR_RESOLVED}>)
 find_package(Threads REQUIRED)
 target_link_libraries(tauparser_net PUBLIC Threads::Threads)
 if(WIN32)

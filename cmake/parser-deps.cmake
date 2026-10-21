@@ -157,8 +157,8 @@ if(TAU_PARSER_DEPS_FROM_STORE)
 		_parser_deps_ensure(ftxui ftxui TAU_PARSER_FTXUI_PREFIX)
 	endif()
 	# The headers are identical on every target, so the producer needs no
-	# compiler. Only serve and connect read them.
-	if(TAU_PARSER_BUILD_SERVE)
+	# compiler. Only serve, connect and net read them.
+	if(TAU_PARSER_BUILD_SERVE OR TAU_PARSER_BUILD_NET)
 		_parser_deps_ensure(boost_headers boost-headers
 			TAU_PARSER_BOOST_HEADERS_PREFIX)
 	endif()

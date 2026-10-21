@@ -83,9 +83,9 @@ else()
 endif()
 option(TAU_PARSER_BUILD_SERVE          "Build tgf serve and tgf connect (needs the Boost headers)" OFF)
 option(TAU_PARSER_BUILD_NET            "Build the line server and client library (needs the Boost headers)" OFF)
-set(TAU_BOOST_INCLUDE_DIR "" CACHE PATH
-	"Boost headers for TAU_PARSER_BUILD_SERVE (empty tries the store, then the system)")
 option(TAU_PARSER_BUILD_FUZZ           "Build the libFuzzer targets (clang only)" OFF)
+set(TAU_BOOST_INCLUDE_DIR "" CACHE PATH
+	"Boost headers for TAU_PARSER_BUILD_SERVE and TAU_PARSER_BUILD_NET (empty tries the store, then the system)")
 option(TAU_RUN_GRAMMAR_TESTS           "Run the .tgf.test grammar suites"   OFF)
 option(TAU_PARSER_TEST_PYTHON_REQUIRED "Fail the configure when the REPL and schema tests get no Python venv" OFF)
 option(TAU_PARSER_BUILD_BROWSER_TESTS  "Run WASM tests in headless Chrome (Emscripten only)" OFF)
@@ -450,11 +450,11 @@ endfunction()
 # system-package / FetchContent fallbacks.
 include(parser-deps)
 
-# Resolve the Boost include directory for the serve targets. The store prefix
+# Resolve the Boost include directory for the serve and net targets. The store prefix
 # wins over a system package, because a store build must use the headers it
 # resolved. The check fails early with a fix instead of a compiler error.
 set(TAU_BOOST_INCLUDE_DIR_RESOLVED "")
-if(TAU_PARSER_BUILD_SERVE)
+if(TAU_PARSER_BUILD_SERVE OR TAU_PARSER_BUILD_NET)
 	if(TAU_BOOST_INCLUDE_DIR)
 		set(TAU_BOOST_INCLUDE_DIR_RESOLVED "${TAU_BOOST_INCLUDE_DIR}")
 	elseif(TAU_PARSER_DEPS_FROM_STORE AND TAU_PARSER_BOOST_HEADERS_PREFIX)
@@ -468,7 +468,8 @@ if(TAU_PARSER_BUILD_SERVE)
 	endif()
 	if(NOT EXISTS "${TAU_BOOST_INCLUDE_DIR_RESOLVED}/boost/version.hpp")
 		message(FATAL_ERROR
-			"TAU_PARSER_BUILD_SERVE needs the Boost headers, but no "
+			"TAU_PARSER_BUILD_SERVE and "
+			"TAU_PARSER_BUILD_NET need the Boost headers, but no "
 			"boost/version.hpp was found. Set -DTAU_BOOST_INCLUDE_DIR=<dir>, "
 			"enable -DTAU_PARSER_DEPS_FROM_STORE=ON, or install Boost 1.86.")
 	endif()
