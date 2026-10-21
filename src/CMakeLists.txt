@@ -49,8 +49,11 @@ set(TAU_PARSER_HEADERS
 	utility/program_codes.h
 	utility/program_codes.tmpl.h
 	utility/repl.h
+	utility/repl_evaluator_base.h
+	utility/repl_evaluator_base.tmpl.h
 	utility/repl_ftxui.h
 	utility/repl_ftxui.tmpl.h
+	utility/repl_history_policy.h
 	utility/repl_json.h
 	utility/repl_json.tmpl.h
 	utility/repl_result.h

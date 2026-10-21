@@ -126,6 +126,7 @@ set(DOCTESTS
 	json
 	measure
 	repl_history
+	repl_evaluator_base
 	repl_json
 	tree
 	tree_traversal1
@@ -240,6 +241,15 @@ foreach(X IN LISTS DOCTESTS)
 			"${PROJECT_SOURCE_DIR}/src/format/treemr/treemr_parser.generated.cpp")
 		set_source_files_properties(
 			"${PROJECT_SOURCE_DIR}/src/format/treemr/treemr_parser.generated.cpp"
+			PROPERTIES COMPILE_OPTIONS "${TAU_PARSER_DATA_SOURCE_OPTIONS}")
+	endif()
+	# the generic REPL base runs on the tgf REPL parser
+	if(${N} STREQUAL "doctest_repl_evaluator_base" AND NOT EMSCRIPTEN
+			AND NOT TAU_PARSER_BUILD_HEADER_ONLY)
+		target_sources(${N} PRIVATE
+			"${PROJECT_SOURCE_DIR}/src/tgf/tgf_repl_parser.generated.cpp")
+		set_source_files_properties(
+			"${PROJECT_SOURCE_DIR}/src/tgf/tgf_repl_parser.generated.cpp"
 			PROPERTIES COMPILE_OPTIONS "${TAU_PARSER_DATA_SOURCE_OPTIONS}")
 	endif()
 	if(${N} STREQUAL "doctest_tgf_cli" AND NOT EMSCRIPTEN)

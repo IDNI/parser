@@ -255,6 +255,8 @@ struct messages {
 		"A JSON number is NaN or an infinity";
 	static constexpr sv json_integer_text       =
 		"The text is no canonical decimal integer";
+	// a REPL text that goes on in the next line
+	static constexpr sv incomplete_input       = "incomplete input";
 	static constexpr sv no_grammar_loaded      =
 		"no grammar loaded, use load";
 	static constexpr sv server_path_forbidden  =
