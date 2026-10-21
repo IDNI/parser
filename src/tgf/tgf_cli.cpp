@@ -404,10 +404,6 @@ static void print_grammar_source(ostream& os, const string& src) {
 	os << s << "\n\n";
 }
 
-void tgf_repl_evaluator::print_source(ostream& os) const {
-	print_grammar_source(os, grammar_source);
-}
-
 void tgf_repl_evaluator::reprompt() {
 	stringstream ss;
 	if (opt.status) {
@@ -590,9 +586,7 @@ void tgf_repl_evaluator::set_repl(repl<tgf_repl_evaluator>& r_) {
 	reprompt();
 }
 
-tref tgf_repl_evaluator::parsed(parser_type::result& res,
-	std::string& text)
-{
+tref tgf_repl_evaluator::parsed(parser_type::result& res) {
 	if (!res.good() || !res.found) {
 		report.append(std::move(res.report()));
 		return jt::build_object({});
@@ -600,29 +594,6 @@ tref tgf_repl_evaluator::parsed(parser_type::result& res,
 	auto f = res.get_forest();
 	using c_t = parser_type::char_type;
 	using t_t = parser_type::terminal_type;
-	if (!opt.json) {
-		stringstream ss;
-		if (opt.print_input) ss << "input: \"" << res.get_input() << "\"\n";
-		if (opt.print_ambiguity) res.print_ambiguous_nodes(ss);
-		if (opt.print_terminals) ss << "parsed terminals: "
-			<< TC_T << to_std_string(res.get_terminals())
-			<< TC_CLEARED_DEFAULT << "\n";
-		auto cb_next_g = [&res, &ss, this](parser_type::pgraph& g) {
-			res.inline_grammar_transformations(g);
-			if (opt.tml_rules) to_tml_rules<c_t, t_t,
-				parser_type::pgraph>(ss << "TML rules:\n", g),
-				ss << "\n";
-			return true;
-		};
-		if (opt.tml_rules) f->extract_graphs(f->root(), cb_next_g);
-		if (opt.tml_facts) to_tml_facts<c_t, t_t>(
-			ss << "TML facts:\n", res);
-		if (opt.print_graphs) pretty_print(ss << "parsed graph:\n",
-			res.get_shaped_tree2(shaping()), {}, false, 1);
-		text = ss.str();
-		report.append(std::move(res.report()));
-		return jt::build_object({});
-	}
 	trefs v;
 	if (opt.print_input) v.push_back(jt::build_pair("input",
 		jt::build_string(res.get_input())));
@@ -684,31 +655,25 @@ tref tgf_repl_evaluator::parsed(parser_type::result& res,
 	return jt::build_object(v);
 }
 
-tref tgf_repl_evaluator::parse(const char* input, size_t size,
-	std::string& text)
-{
+tref tgf_repl_evaluator::parse(const char* input, size_t size) {
 	if (!require_grammar()) return jt::build_object({});
 	if (!good()) return jt::build_object({});
 	auto res = p().parse(input, size);
-	return parsed(res, text);
+	return parsed(res);
 }
 
-tref tgf_repl_evaluator::parse(istream& instream,
-	std::string& text)
-{
+tref tgf_repl_evaluator::parse(istream& instream) {
 	if (!require_grammar()) return jt::build_object({});
 	if (!good()) return jt::build_object({});
 	auto res = p().parse(instream);
-	return parsed(res, text);
+	return parsed(res);
 }
 
-tref tgf_repl_evaluator::parse(const string& infile,
-	std::string& text)
-{
+tref tgf_repl_evaluator::parse(const std::string& infile) {
 	if (!require_grammar()) return jt::build_object({});
 	if (!good()) return jt::build_object({});
 	auto res = p().parse(infile);
-	return parsed(res, text);
+	return parsed(res);
 }
 
 shaping_options tgf_repl_evaluator::shaping() {
@@ -1226,14 +1191,6 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 				? n | tt::terminals : start_symbol();
 			data = productions_value("start", start,
 				g().reachable_productions(g().nt(start)));
-			if (!opt.json) {
-				ostringstream ts;
-				g().print_internal_grammar_for(ts
-					<< "\ninternal grammar for symbol "
-					<< TC_NT << start << TC_DEFAULT << ":\n",
-					start, "  ", true, TC);
-				res.text = ts.str();
-			}
 			break;
 		}
 		case p::grammar_cmd: {
@@ -1253,19 +1210,6 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			auto unreachable = g().unreachable_productions(
 				g().nt(start));
 			data = productions_value("symbol", start, unreachable);
-			if (!opt.json) {
-				ostringstream ts;
-				if (unreachable.size()) {
-					ts << "unreachable production rules for symbol: "
-						<< TC_NT << start << TC_DEFAULT << "\n";
-					for (auto& p : unreachable) g().print_production(
-						ts << "  ", p, true, TC) << "\n";
-				}
-				else ts << "all production rules reachable for "
-					"symbol: " << TC_NT << start
-					<< TC_DEFAULT << "\n";
-				res.text = ts.str();
-			}
 			break;
 		}
 		case p::parse_cmd: {
@@ -1276,7 +1220,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			else if (auto qstr = i | p::quoted_string;
 				qstr.has_value()) input = unquote(
 					qstr | tt::terminals, report);
-			data = parse(input.c_str(), input.size(), res.text);
+			data = parse(input.c_str(), input.size());
 			break;
 		}
 		case p::parse_file_cmd: {
@@ -1284,7 +1228,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			auto n = s | p::filename;
 			auto filename = unquote(n | tt::terminals, report);
 			if (report.has_error()) break;
-			data = parse(filename, res.text);
+			data = parse(filename);
 			break;
 		}
 		default:
@@ -1340,6 +1284,22 @@ eval_result tgf_repl_evaluator::run(const std::string& src,
 	return er;
 }
 
+// A terminal in the quotes and escapes of the grammar text.
+static std::string quoted_terminal(const std::string& text) {
+	return "'" + escapes::encode(to_u32string(text), escapes::tgf_char)
+		+ "'";
+}
+
+// The symbol of an AST JSON node, or its quoted terminal text.
+static std::string node_label(tref node) {
+	if (auto s = format::json::string_member(node, "symbol");
+			s && !s->empty())
+		return *s;
+	if (auto t = format::json::string_member(node, "text"); t)
+		return quoted_terminal(*t);
+	return {};
+}
+
 // The range of an AST JSON node: "[<begin><sep><end>]".
 static void print_range(std::ostream& os, const jtt& node, const char* sep) {
 	os << "[";
@@ -1353,7 +1313,7 @@ static void print_range(std::ostream& os, const jtt& node, const char* sep) {
 
 // One ambiguous node of a parse, from its data only.
 static void render_data_ambiguous_node(std::ostream& os, const jtt& node) {
-	os << "\t `" << (node | jtt::member("symbol") | jtt::string) << "` ";
+	os << "\t `" << node_label(node.value()) << "` ";
 	print_range(os, node, ",");
 	os << "\n";
 	size_t d = 0;
@@ -1364,8 +1324,7 @@ static void render_data_ambiguous_node(std::ostream& os, const jtt& node) {
 			auto ch = alt | jtt::member("children");
 			if (ch.is(json_parser::arr))
 				for (const auto& c : (ch | jtt::children)()) {
-					os << " `" << (c | jtt::member("symbol")
-						| jtt::string) << "`";
+					os << " `" << node_label(c.value()) << "`";
 					print_range(os, c, ",");
 					os << " ";
 				}
@@ -1395,17 +1354,13 @@ static void render_data_tree(std::ostream& os, tref root, size_t l,
 		const jtt node(n);
 		for (size_t i = 0; i != l; ++i) os << "\t";
 		++l;
-		const std::string symbol = node | jtt::member("symbol")
-			| jtt::string;
-		if (!symbol.empty()) {
-			os << TC_NT << symbol << TC.CLEAR() << TC_NT_ID << "(";
-			if (auto id = node | jtt::member("id");
-					id.is(json_parser::number))
-				os << static_cast<long long>(id | jtt::number);
-			os << ")" << TC.CLEAR();
-		} else if (auto text = node | jtt::member("text");
-				text && text.value_tree().is_string())
-			os << TC_T << (text | jtt::string) << TC.CLEAR();
+		const std::string label = node_label(n);
+		if (auto id = node | jtt::member("id");
+				id.is(json_parser::number))
+			os << TC_NT << label << TC.CLEAR() << TC_NT_ID << "("
+				<< static_cast<long long>(id | jtt::number)
+				<< ")" << TC.CLEAR();
+		else os << TC_T << label << TC.CLEAR();
 		os << TC_RANGE;
 		print_range(os, node, ", ");
 		os << TC.CLEAR() << "\n";
@@ -1614,9 +1569,6 @@ static void render_data_productions(const cmd_result& r, std::ostream& os,
 void render_command_text(const cmd_result& r, std::ostream& os,
 	const term::colors& TC, const std::set<size_t>* char_classes)
 {
-	// A text result the evaluator built from live objects wins; the data
-	// renderer covers the client, which holds only the response data.
-	if (!r.text.empty()) { os << r.text; return; }
 	if (r.cmd == "parse" || r.cmd == "parse file") {
 		render_data_parse(r, os, TC);
 		return;
@@ -1687,11 +1639,17 @@ void render_command_text(const cmd_result& r, std::ostream& os,
 void tgf_repl_evaluator::render_text(const cmd_result& res,
 	std::ostream& os) const
 {
-	// The live evaluator prints the loaded source, so its text matches
-	// the REPL text. A client with no evaluator renders the grammar from
-	// data only.
-	if (res.cmd == "grammar") { print_source(os); return; }
-	render_command_text(res, os, TC);
+	// A character class nonterminal takes its own color.
+	std::set<size_t> char_classes;
+	if (res.cmd == "internal-grammar" || res.cmd == "unreachable") {
+		auto cc = jtt(state_value(*this)) | jtt::member("char_classes");
+		if (cc.is(json_parser::arr))
+			for (tref n : (cc | jtt::children | jtt::refs))
+				if (jt::get(n).is_number()) char_classes.insert(
+					static_cast<size_t>(
+						jt::get(n).get_number()));
+	}
+	render_command_text(res, os, TC, &char_classes);
 }
 
 tref statement_request(const tgf_repl_evaluator::trv& n) {
@@ -2221,15 +2179,9 @@ static int run_command(const parsed_args& args, tgf_tool& tool,
 				"both");
 		if (json) {
 			tref data = nullptr;
-			string text;
-			if (infile.size())
-				if (infile == "-")
-					data = re.parse(cin, text);
-				else
-					data = re.parse(infile, text);
-			else
-				data = re.parse(inexp.c_str(), inexp.size(),
-					text);
+			if (infile == "-") data = re.parse(cin);
+			else if (infile.size()) data = re.parse(infile);
+			else data = re.parse(inexp.c_str(), inexp.size());
 			if (opts.get<bool>("grammar")) {
 				string start = re.start_symbol();
 				auto prods = re.g().reachable_productions(
@@ -2249,15 +2201,14 @@ static int run_command(const parsed_args& args, tgf_tool& tool,
 			return st == cmd_status::error ? 1 : 0;
 		}
 		if (opts.get<bool>("grammar")) re.eval("i");
-		string text;
-		if (infile.size())
-			if (infile == "-")
-				re.parse(cin, text);
-			else
-				re.parse(infile, text);
-		else
-			re.parse(inexp.c_str(), inexp.size(), text);
-		cout << text;
+		cmd_result parse_result;
+		parse_result.cmd = command_name(tgf_repl_parser::parse_cmd);
+		tref data = nullptr;
+		if (infile == "-") data = re.parse(cin);
+		else if (infile.size()) data = re.parse(infile);
+		else data = re.parse(inexp.c_str(), inexp.size());
+		parse_result.data = jt::geth(data);
+		re.render_text(parse_result, cout);
 		// A failed parse leaves its error in the report, as in --json.
 		auto rep = re.take_report();
 		print_diagnostics_report(rep, false);

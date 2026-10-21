@@ -46,8 +46,6 @@ struct cmd_result {
 	/// The data outlives the command, so a handle holds it.
 	htref data = format::json::tree::geth(
 		format::json::tree::build_object({}));
-	std::string text;   // text mode only: colored output of parse,
-			    // internal-grammar and unreachable
 	diagnostics::report report;
 };
 
@@ -202,10 +200,10 @@ struct tgf_repl_evaluator {
 	/// of the declaration.
 	tref option_values() const;
 
-	tref parsed(parser_type::result& r, std::string& text);
-	tref parse(const char* input, size_t size, std::string& text);
-	tref parse(std::istream& instream, std::string& text);
-	tref parse(const std::string& infile, std::string& text);
+	tref parsed(parser_type::result& r);
+	tref parse(const char* input, size_t size);
+	tref parse(std::istream& instream);
+	tref parse(const std::string& infile);
 
 	/// Data of get: the option @p name, or every option when it is empty.
 	tref get_cmd(std::string_view name);
@@ -302,7 +300,6 @@ private:
 	/// The {"grammar", "loaded"} data of a load of @p name.
 	tref load_answer(bool loaded,
 		const std::string& name) const;
-	void print_source(std::ostream& os) const;
 };
 
 /// Specialized parser entry point (compiled-in grammar; no load/reload)
