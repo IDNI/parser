@@ -129,9 +129,9 @@ static std::string node_label(tref node) {
 }
 
 // The range of an AST JSON node: "[<begin><sep><end>]".
-static void print_range(std::ostream& os, const jtt& node, const char* sep) {
+static void print_range(std::ostream& os, tref node, const char* sep) {
 	os << "[";
-	auto r = node | jtt::member(tp::range);
+	auto r = jtt(node) | jtt::member(tp::range);
 	if (r.is(json_parser::arr) && r.value_tree().children_size() >= 2)
 		os << static_cast<long long>(r | jtt::first | jtt::number)
 			<< sep << static_cast<long long>(
@@ -140,19 +140,19 @@ static void print_range(std::ostream& os, const jtt& node, const char* sep) {
 }
 
 // One ambiguous node of a parse, from its data only.
-static void render_data_ambiguous_node(std::ostream& os, const jtt& node) {
-	os << "\t `" << node_label(node.value()) << "` ";
+static void render_data_ambiguous_node(std::ostream& os, tref node) {
+	os << "\t `" << node_label(node) << "` ";
 	print_range(os, node, ",");
 	os << "\n";
 	size_t d = 0;
-	auto alts = node | jtt::member(tp::alternatives);
+	auto alts = jtt(node) | jtt::member(tp::alternatives);
 	if (alts.is(json_parser::arr))
 		for (const auto& alt : (alts | jtt::children)()) {
 			os << "\t\t " << d++ << "\t";
 			auto ch = alt | jtt::member(tp::children);
 			if (ch.is(json_parser::arr))
-				for (const auto& c : (ch | jtt::children)()) {
-					os << " `" << node_label(c.value()) << "`";
+				for (tref c : (ch | jtt::children | jtt::refs)) {
+					os << " `" << node_label(c) << "`";
 					print_range(os, c, ",");
 					os << " ";
 				}
@@ -177,13 +177,12 @@ static void render_data_tree(std::ostream& os, tref root, size_t l,
 		return !t.is(json_parser::object_pair)
 			|| t.get_string() == tp::children;
 	};
-	auto enter = [&](tref n) {
-		if (!jt::get(n).is_object()) return;
-		const jtt node(n);
+	auto enter = [&](tref node) {
+		if (!jt::get(node).is_object()) return;
 		for (size_t i = 0; i != l; ++i) os << "\t";
 		++l;
-		const std::string label = node_label(n);
-		if (auto id = node | jtt::member(tp::id);
+		const std::string label = node_label(node);
+		if (auto id = jtt(node) | jtt::member(tp::id);
 				id.is(json_parser::number))
 			os << TC_NT << label << TC.CLEAR() << TC_NT_ID << "("
 				<< static_cast<long long>(id | jtt::number)
@@ -193,7 +192,7 @@ static void render_data_tree(std::ostream& os, tref root, size_t l,
 		print_range(os, node, ", ");
 		os << TC.CLEAR() << "\n";
 	};
-	auto leave = [&l](tref n) { if (jt::get(n).is_object()) --l; };
+	auto leave = [&l](tref node) { if (jt::get(node).is_object()) --l; };
 	pre_order<format::json::node>(root).visit(enter, into, leave);
 }
 
@@ -215,8 +214,8 @@ static void render_data_parse(const cmd_result& r, std::ostream& os,
 				<< "\n# ambiguous nodes:\n";
 			if (auto nodes = amb | jtt::member(tp::nodes);
 					nodes.is(json_parser::arr))
-				for (const auto& node : (nodes
-						| jtt::children)())
+				for (tref node : nodes | jtt::children
+						| jtt::refs)
 					render_data_ambiguous_node(os, node);
 		}
 	}

@@ -1061,9 +1061,8 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			auto n = s | p::symbol;
 			string start = n.has_value()
 				? n | tt::terminals : start_symbol();
-			auto unreachable = g().unreachable_productions(
-				g().nt(start));
-			data = productions_value(tp::symbol, start, unreachable);
+			data = productions_value(tp::symbol, start,
+				g().unreachable_productions(g().nt(start)));
 			break;
 		}
 		case p::parse_cmd: {
