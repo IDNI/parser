@@ -99,6 +99,8 @@ struct server_connection : std::enable_shared_from_this<server_connection> {
 	std::string line;
 	bool dropping = false;
 	std::deque<std::string> out;
+	// Closes a connection that does not drain its output in time.
+	ba::steady_timer write_timer;
 	bool closed = false;
 	bool close_when_drained = false;
 	bool reading = false;
@@ -125,6 +127,7 @@ struct server_connection : std::enable_shared_from_this<server_connection> {
 	void write_next();
 	void close();
 	void close_after_flush();
+	void arm_write_timer();
 };
 
 struct tcp_listener {
@@ -166,7 +169,7 @@ std::atomic<line_server*> running{ nullptr };
 
 server_connection::server_connection(line_server* s, conn_socket sock,
 	peer_info peer)
-	: srv(s), socket(std::move(sock))
+	: srv(s), socket(std::move(sock)), write_timer(s->io)
 {
 	session.peer = std::move(peer);
 }
@@ -271,7 +274,10 @@ void server_connection::refuse(diagnostics::code c, std::string_view msg,
 void server_connection::send(std::string text) {
 	if (closed) return;
 	out.push_back(std::move(text));
-	if (out.size() == 1) write_next();
+	if (out.size() == 1) {
+		arm_write_timer();
+		write_next();
+	}
 }
 
 void server_connection::send_line(tref v) {
@@ -293,6 +299,8 @@ void server_connection::write_next() {
 			self->close();
 			return;
 		}
+		// The write made progress, so the deadline starts again.
+		self->arm_write_timer();
 		self->write_next();
 	};
 	std::visit([this, &on_written](auto& s) {
@@ -311,10 +319,28 @@ void server_connection::close_after_flush() {
 	else close();
 }
 
+// A connection that makes no write progress for the deadline is closed,
+// so a stalled client cannot hold a queued answer open forever.
+void server_connection::arm_write_timer() {
+	if (closed) return;
+	// The deadline holds only while output waits, so an idle client stays.
+	if (out.empty()) { write_timer.cancel(); return; }
+	if (srv->opt.write_timeout_seconds == 0) return;
+	write_timer.expires_after(
+		std::chrono::seconds(srv->opt.write_timeout_seconds));
+	auto self = shared_from_this();
+	write_timer.async_wait([self](error_code ec) {
+		if (ec) return;
+		self->close();
+	});
+}
+
 void server_connection::close() {
 	if (closed) return;
 	closed = true;
 	line.clear();
+	// Some Boost versions have no cancel(ec), and a timer cancel reports no error.
+	write_timer.cancel();
 	std::visit([](auto& s) {
 		error_code ec;
 		using socket_t = std::decay_t<decltype(s)>;

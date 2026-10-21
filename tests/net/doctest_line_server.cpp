@@ -313,6 +313,17 @@ TEST_SUITE("line server: tcp") {
 	}
 }
 
+// Answers each line with the request and a large "pad" member.
+struct large_reply_handler : session_handler {
+	explicit large_reply_handler(std::atomic<int>& c) : closes(c) {}
+	std::atomic<int>& closes;
+	void on_line(tref request, reply_sink& out) override {
+		out.write(jt::set_member(request, "pad",
+			jt::build_string(std::string(64 * 1024, 'x'))));
+	}
+	void on_close() override { ++closes; }
+};
+
 // Asks for the close in on_line and records whether on_close ran inside.
 struct closing_handler : session_handler {
 	explicit closing_handler(std::atomic<int>& r) : result(r) {}
@@ -387,5 +398,25 @@ TEST_SUITE("line server: max_sessions 0") {
 		CHECK(has(c1.read_line(), "\"status\":\"ok\""));
 		tcp_client c2(loopback(s.tcp_port()));
 		CHECK(has(c2.read_line(), o.busy_message));
+	}
+}
+
+TEST_SUITE("line server: write timeout") {
+	TEST_CASE("a tcp client that never reads: the write timer closes it") {
+		auto o = tcp_options();
+		o.write_timeout_seconds = 1;
+		std::atomic<int> closes{ 0 };
+		o.make_handler = [&closes](const line_session&) {
+			return std::make_unique<large_reply_handler>(closes);
+		};
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("{\"cmd\":\"open\"}");
+		// 256 answers of 64 KiB fill the socket buffers, so the writes stall.
+		std::string lines;
+		for (int i = 0; i != 256; ++i)
+			lines += "{\"id\":" + std::to_string(i) + "}\n";
+		c.send_raw(lines);
+		CHECK(wait_for(closes, 1));
 	}
 }

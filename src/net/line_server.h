@@ -73,6 +73,8 @@ struct line_server_options {
 	/// Largest request line or message. The tail of a longer line is
 	/// dropped.
 	size_t max_line = 16u * 1024 * 1024;
+	/// Close a connection that makes no write progress. 0 turns it off.
+	size_t write_timeout_seconds = 30;
 	/// The lines of on_output as JSON: first one {"listening":..} line
 	/// for each address.
 	bool json = false;
