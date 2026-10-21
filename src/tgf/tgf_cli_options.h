@@ -114,7 +114,8 @@ inline const option_set tgf_option_set = {
 	},
 	.commands = {
 		{ "grammar", "show information about grammar" },
-		{ "parse", "parse an input string, file or stdin" },
+		{ "parse", "parse an input string, file or stdin, exit with 1 "
+			"when it does not parse" },
 		{ "gen", "generate a parser code" },
 		{ "repl", "run TGF repl" },
 		{ "serve", "serve TGF sessions on a TCP port" },

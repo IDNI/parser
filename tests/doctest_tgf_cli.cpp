@@ -409,6 +409,45 @@ TEST_SUITE("tgf cli: derived character classes") {
 	}
 }
 
+TEST_SUITE("tgf cli: parse exit code") {
+
+	TEST_CASE("-e: a valid input gives 0, a syntax error gives 1") {
+		CHECK(capture_tgf_run({ "tgf", json_path(), "parse", "-e",
+			"[1,2]" }).code == 0);
+		CHECK(capture_tgf_run({ "tgf", json_path(), "parse", "-e",
+			"[1," }).code == 1);
+	}
+
+	TEST_CASE("-i <file>: a valid input gives 0, a syntax error gives 1") {
+		namespace fs = std::filesystem;
+		const auto dir = fs::temp_directory_path();
+		const string good = (dir / "tgf_cli_exit_good.json").string();
+		const string bad = (dir / "tgf_cli_exit_bad.json").string();
+		ofstream(good) << "{\"a\":[1]}";
+		ofstream(bad) << "{\"a\":";
+		CHECK(capture_tgf_run({ "tgf", json_path(), "parse", "-i",
+			good }).code == 0);
+		CHECK(capture_tgf_run({ "tgf", json_path(), "parse", "-i",
+			bad }).code == 1);
+		fs::remove(good);
+		fs::remove(bad);
+	}
+
+	TEST_CASE("-i -: stdin gives the same exit codes") {
+		CHECK(capture_tgf_run({ "tgf", json_path(), "parse", "-i", "-" },
+			"true").code == 0);
+		CHECK(capture_tgf_run({ "tgf", json_path(), "parse", "-i", "-" },
+			"tru").code == 1);
+	}
+
+	TEST_CASE("--json gives the same exit codes") {
+		CHECK(capture_tgf_run({ "tgf", json_path(), "parse", "--json",
+			"-e", "null" }).code == 0);
+		CHECK(capture_tgf_run({ "tgf", json_path(), "parse", "--json",
+			"-e", "nul" }).code == 1);
+	}
+}
+
 TEST_SUITE("tgf cli: trim keeps the root") {
 
 	TEST_CASE("parse --trim start prints the tree with the root") {
@@ -419,20 +458,22 @@ TEST_SUITE("tgf cli: trim keeps the root") {
 			ofstream f(path);
 			f << "start => 'a'.\n";
 		}
-		string out = capture_tgf_run({ "tgf", path, "parse", "--trim",
-			"start", "-e", "a", "-c", "false" }).out;
-		CHECK(out.find("parsed graph:\n\tstart(") != string::npos);
-		CHECK(out.find("\t\t'a'[0, 1]") != string::npos);
+		auto r = capture_tgf_run({ "tgf", path, "parse", "--trim",
+			"start", "-e", "a", "-c", "false" });
+		CHECK(r.code == 0);
+		CHECK(r.out.find("parsed graph:\n\tstart(") != string::npos);
+		CHECK(r.out.find("\t\t'a'[0, 1]") != string::npos);
 		fs::remove(path);
 	}
 
 	TEST_CASE("set trim start in the REPL, then a parse") {
 		const string tiny = string(PROJECT_SOURCE_DIR)
 			+ "/tests/fixtures/tiny.tgf";
-		string out = capture_tgf_run({ "tgf", tiny, "repl", "-c", "false",
-			"-e", "set trim start . parse 123" }).out;
-		CHECK(out.find("parsed graph:\n\tstart(") != string::npos);
-		CHECK(out.find("\t\tnum(") != string::npos);
+		auto r = capture_tgf_run({ "tgf", tiny, "repl", "-c", "false",
+			"-e", "set trim start . parse 123" });
+		CHECK(r.code == 0);
+		CHECK(r.out.find("parsed graph:\n\tstart(") != string::npos);
+		CHECK(r.out.find("\t\tnum(") != string::npos);
 	}
 }
 

@@ -44,12 +44,14 @@ normalize() {
 		| sed '/^$/d'
 }
 
+# A rejected case exits with 1, and pipefail must not stop the comparison.
 run_spec_parse() {
-	"${SPEC_BIN}" parse -c false -e "$1" 2>/dev/null | normalize
+	{ "${SPEC_BIN}" parse -c false -e "$1" 2>/dev/null || true; } | normalize
 }
 
 run_tgf_parse() {
-	"${TGF_BIN}" "${TGF}" parse -c false -e "$1" 2>/dev/null | normalize
+	{ "${TGF_BIN}" "${TGF}" parse -c false -e "$1" 2>/dev/null || true; } \
+		| normalize
 }
 
 compare_case() {

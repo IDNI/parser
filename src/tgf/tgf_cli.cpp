@@ -2271,9 +2271,11 @@ static int run_command(const parsed_args& args, tgf_tool& tool,
 		else
 			re.parse(inexp.c_str(), inexp.size(), text);
 		cout << text;
-		re.flush_report();
+		// A failed parse leaves its error in the report, as in --json.
+		auto rep = re.take_report();
+		print_diagnostics_report(rep, false);
 		if (opts.get<bool>("measure")) print_bintree_process_totals();
-		return re.has_grammar() ? 0 : 1;
+		return rep.has_error() || !re.has_grammar() ? 1 : 0;
 	}
 	return 0;
 }

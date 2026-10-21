@@ -25,7 +25,7 @@ where command can be one of:
 ```
 repl       runs REPL UI (this is a default command if no command provided)
 gen        generate a parser code
-parse      parse an input string, file or stdin
+parse      parse an input string, file or stdin, exit with 1 when it does not parse
 grammar    show information about grammar
 test       run tester (requires a .tgf.test file)
 ```
@@ -162,6 +162,8 @@ tgf <tgf file> parse [ <options> ]
 ```
 
 `parse -e` and `repl -e` take their value as typed: the tool does not trim it and does not read quotes or escapes in it.
+
+`parse` exits with `1` when the input does not parse or when no grammar is loaded. Else it exits with `0`. This is the same for `-e`, `-i <file>`, `-i -` (stdin) and `--json`, and for a specialized binary.
 
 Options for `grammar` command:
 ```
