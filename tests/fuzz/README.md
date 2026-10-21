@@ -4,12 +4,18 @@ Each `fuzz_*.cpp` file is one libFuzzer target. Build the targets with
 clang and `-DTAU_PARSER_BUILD_FUZZ=ON`:
 
 ```bash
-./dev preset release-tests -DTAU_PARSER_BUILD_FUZZ=ON --target fuzz_json
+./dev preset release-tests -DTAU_PARSER_BUILD_FUZZ=ON --target fuzz_line_reader
 ```
 
 Give the fuzzer an empty work folder first and the seed corpus second.
 The fuzzer writes new inputs only to the first folder, so the seeds in the
 repository stay as they are.
+
+```bash
+mkdir -p build/fuzz/lines
+build/release/fuzz_line_reader build/fuzz/lines tests/fuzz/corpus/lines \
+	-max_total_time=120 -max_len=4096 -artifact_prefix=build/fuzz/
+```
 
 ```bash
 mkdir -p build/fuzz/json
