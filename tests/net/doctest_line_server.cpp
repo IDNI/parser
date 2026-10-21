@@ -328,6 +328,25 @@ TEST_SUITE("line server: tcp") {
 		CHECK(*s.value == 0);
 		CHECK(c.at_eof(5000));
 	}
+	TEST_CASE("on_stop runs once at the stop, after on_close") {
+		std::atomic<int> stops{ 0 };
+		std::atomic<int> closes_at_stop{ -1 };
+		auto o = tcp_options();
+		std::atomic<int>* closes = nullptr;
+		o.on_stop = [&] {
+			closes_at_stop = closes->load();
+			++stops;
+		};
+		server_thread s(o);
+		closes = &s.closes;
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("{\"cmd\":\"open\"}");
+		CHECK(has(c.read_line(), "\"status\":\"ok\""));
+		CHECK(stops.load() == 0);
+		s.stop();
+		CHECK(stops.load() == 1);
+		CHECK(closes_at_stop.load() == 1);
+	}
 	TEST_CASE("the listening line as text") {
 		auto o = tcp_options();
 		o.json = false;
@@ -351,6 +370,28 @@ TEST_SUITE("line server: tcp") {
 		CHECK(c.read_line() == "{\"deferred\":\"yes\"}");
 		c.close();
 		CHECK(wait_for(closes, 1));
+	}
+	TEST_CASE("a text reply goes out as it is and into the log") {
+		struct text_handler : session_handler {
+			void on_line(tref, reply_sink& out) override {
+				// not compact, so a parse and a print would change it
+				out.write(std::string("{\"a\" : 1}"));
+			}
+		};
+		auto o = tcp_options();
+		o.debug_sessions = true;
+		o.make_handler = [](const line_session&) {
+			return std::make_unique<text_handler>();
+		};
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("{\"cmd\":\"open\"}");
+		c.send("{\"id\":2}");
+		CHECK(c.read_line() == "{\"a\" : 1}");
+		c.close();
+		s.stop();
+		CHECK(has(s.out.text(), "\"dir\":\"out\""));
+		CHECK(has(s.out.text(), "{\\\"a\\\" : 1}"));
 	}
 	TEST_CASE("handler_logs: no session event, no session log") {
 		const auto dir = std::filesystem::temp_directory_path()
@@ -466,6 +507,35 @@ TEST_SUITE("line server: tcp") {
 			}
 		}
 		CHECK(found);
+	}
+	TEST_CASE("line_server_log: the event goes into server.log beside the server events") {
+		struct logging_handler : session_handler {
+			void on_line(tref, reply_sink& out) override {
+				line_server_log(jt::build_object({ jt::build_pair(
+					"event", jt::build_string("handler-event")) }));
+				out.write(std::string("{\"status\":\"ok\"}"));
+			}
+		};
+		const auto dir = unique_temp_dir("line_server_log_call_");
+		auto o = tcp_options();
+		o.log_dir = dir.string();
+		o.make_handler = [](const line_session&) {
+			return std::make_unique<logging_handler>();
+		};
+		server_thread s(o);
+		{
+			tcp_client c(loopback(s.tcp_port()));
+			c.send("{\"cmd\":\"open\"}");
+			c.send("{\"id\":1}");
+			CHECK(c.read_line() == "{\"status\":\"ok\"}");
+		}
+		s.stop();
+		std::ifstream is(dir / "server.log");
+		const std::string log((std::istreambuf_iterator<char>(is)), {});
+		CHECK(has(log, "\"event\":\"new\""));
+		CHECK(has(log, "\"event\":\"handler-event\""));
+		CHECK(has(s.out.text(), "handler-event"));
+		std::filesystem::remove_all(dir);
 	}
 #ifndef _WIN32
 	TEST_CASE("logs: a new folder gets 0700, each log gets 0600") {

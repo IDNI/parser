@@ -25,6 +25,9 @@ struct reply_sink {
 	virtual ~reply_sink() = default;
 	/// The sink prints @p reply before it returns, so a tref is enough.
 	virtual void write(tref reply) = 0;
+	/// A reply that is JSON text already, sent as it is with no parse
+	/// and no print.
+	virtual void write(std::string line) = 0;
 	/// Ends the connection after the queued lines are written.
 	virtual void close() = 0;
 	/// Write one event of the handler into the server log and the session
@@ -139,6 +142,10 @@ struct line_server_options {
 	/// Makes the handler of a new session. Must be set.
 	std::function<std::unique_ptr<session_handler>(
 		const line_session& session)> make_handler{};
+	/// Called at the stop, after the connections closed and before the
+	/// listeners close, so a handler can end work that lives outside a
+	/// connection.
+	std::function<void()> on_stop{};
 	/// Gets each output line of the server, with no newline: the
 	/// listening lines at the start, the events and the debug lines. The
 	/// program prints them. Empty prints nothing. The call runs on the io

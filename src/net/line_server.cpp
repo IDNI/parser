@@ -143,6 +143,7 @@ struct connection_sink : reply_sink {
 	explicit connection_sink(server_connection& conn) : c(conn) {}
 	server_connection& c;
 	void write(tref reply) override;
+	void write(std::string line) override;
 	void close() override;
 	void log(tref event) override;
 };
@@ -561,6 +562,10 @@ void server_connection::close() {
 }
 
 void connection_sink::write(tref reply) { c.send_line(reply); }
+
+void connection_sink::write(std::string line) {
+	c.send_text(std::move(line));
+}
 
 void connection_sink::close() { c.close_after_flush(); }
 
@@ -1110,6 +1115,7 @@ void line_server::close_all() {
 	std::vector<std::shared_ptr<server_connection>> live;
 	for (auto& kv : connections) live.push_back(kv.second);
 	for (auto& c : live) c->close();
+	if (opt.on_stop) opt.on_stop();
 	error_code ec;
 	for (auto& l : tcp_listeners) l.acceptor->close(ec);
 #ifdef _WIN32
@@ -1120,6 +1126,7 @@ void line_server::close_all() {
 	std::error_code fec;
 	for (const auto& f : socket_files) std::filesystem::remove(f, fec);
 #endif
+	// An on_stop event is in the log already, a later one fails no write.
 	log_ok = false;
 	server_log.close();
 }
