@@ -57,6 +57,7 @@ set(TAU_PARSER_HEADERS
 	utility/repl_json.h
 	utility/repl_json.tmpl.h
 	utility/repl_result.h
+	utility/repl_run.h
 	utility/temp_file.h
 	utility/temp_file.tmpl.h
 	utility/term.h

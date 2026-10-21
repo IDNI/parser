@@ -6,10 +6,12 @@
 #include "utility/diagnostics.h"
 #include "utility/repl.h"
 #include "utility/repl_history.h"
+#include "utility/repl_run.h"
 
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <iterator>
 #include <sstream>
 #include <string>
@@ -376,5 +378,52 @@ TEST_SUITE("repl: the history warnings of a run") {
 				p != std::string::npos;
 				p = text.find("Cannot write file", p + 1)) ++lost;
 		CHECK(lost == 2u);
+	}
+}
+
+TEST_SUITE("run_repl") {
+
+	// An evaluator that keeps one front end pointer and counts its prompts.
+	struct prompting_evaluator {
+		repl_front* front = nullptr;
+		int prompts = 0;
+		std::vector<std::string> seen;
+		void reprompt() { ++prompts; front->set_prompt("t> "); }
+		diagnostics::result<int> eval(const std::string& s) {
+			seen.push_back(s);
+			diagnostics::result<int> res;
+			res = 0;
+			return res;
+		}
+	};
+
+	TEST_CASE("the line REPL runs, sets the prompt and gives the history warnings") {
+		// This test has no FTXUI, so both values of legacy run the line REPL.
+		for (const bool legacy : { true, false }) {
+			CAPTURE(legacy);
+			const std::string in_path = cleaned("doctest_run_repl_input.tmp");
+			std::ofstream(in_path, std::ios::binary) << "a.\nb.\n";
+			const int saved = dup_fd(0);
+			const int in = open_read(in_path.c_str());
+			REQUIRE(saved >= 0);
+			REQUIRE(in >= 0);
+			REQUIRE(dup2_fd(in, 0) == 0);
+			close_fd(in);
+			prompting_evaluator ev;
+			std::ostringstream out;
+			auto old = std::cout.rdbuf(out.rdbuf());
+			auto run = run_repl(ev, legacy, repl_history_policy{
+				"doctest_repl_history_no_folder/history" });
+			std::cout.rdbuf(old);
+			dup2_fd(saved, 0);
+			close_fd(saved);
+			std::filesystem::remove(in_path);
+			CHECK(ev.prompts >= 1);
+			CHECK(ev.seen == std::vector<std::string>{ "a.", "b." });
+			REQUIRE(run.has_value());
+			CHECK(run.value() == 0);
+			CHECK_FALSE(run.report().has_error());
+			CHECK_FALSE(run.report().nodes().empty());
+		}
 	}
 }
