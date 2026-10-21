@@ -481,7 +481,11 @@ TEST_SUITE("json: report print and report nodes") {
 	TEST_CASE("a report value above 2^53 keeps its digits") {
 		constexpr int64_t big = 9007199254740993;
 		report r;
-		r.error(code::io_error, "big", 0, {{label::port, size_t(big)}});
+		// size_t is 32 bits on wasm32, so the number goes in an attr
+		diagnostics::attr port;
+		port.key = label::port;
+		port.value = big;
+		r.error(code::io_error, "big", 0, { port });
 		r.push_node(code::info_count, r.intern("n"), big, {});
 		const std::string text = printed(r, false);
 		CHECK(text.find(R"("value":9007199254740993)") != std::string::npos);
