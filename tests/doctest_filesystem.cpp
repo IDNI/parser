@@ -365,26 +365,32 @@ TEST_CASE("a prefix with a path separator is an invalid_argument") {
 }
 }
 
-#ifndef _WIN32
 TEST_SUITE("fs::open and fs::create") {
 TEST_CASE("an open file closes in a child program") {
 	temp_folder t("doctest_filesystem_cloexec.tmp");
 	const fs::path p = t.file("data.bin");
 	auto created = fs::create(p, fs::MMAP_WRITE);
 	REQUIRE(created.has_value());
-#ifndef __EMSCRIPTEN__
+#ifdef _WIN32
+	DWORD flags = 0;
+	REQUIRE(::GetHandleInformation(created.value(), &flags));
+	CHECK((flags & HANDLE_FLAG_INHERIT) == 0);
+// Emscripten runs no child program, and its F_GETFD gives 0
+#elif !defined(__EMSCRIPTEN__)
 	CHECK((::fcntl(created.value(), F_GETFD) & FD_CLOEXEC) != 0);
 #endif
 	REQUIRE(fs::close(created.value()).has_value());
 	auto opened = fs::open(p, fs::MMAP_READ);
 	REQUIRE(opened.has_value());
-#ifndef __EMSCRIPTEN__
+#ifdef _WIN32
+	REQUIRE(::GetHandleInformation(opened.value(), &flags));
+	CHECK((flags & HANDLE_FLAG_INHERIT) == 0);
+#elif !defined(__EMSCRIPTEN__)
 	CHECK((::fcntl(opened.value(), F_GETFD) & FD_CLOEXEC) != 0);
 #endif
 	REQUIRE(fs::close(opened.value()).has_value());
 }
 }
-#endif
 
 TEST_SUITE("fs::read and fs::open_stream") {
 
