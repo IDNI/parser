@@ -384,7 +384,8 @@ void server_connection::on_ws_read(error_code ec) {
 	reading = false;
 	if (closed) return;
 	if (ec) { close(); return; }
-	if (!std::get<ws_stream>(socket).got_text()) {
+	if (!std::get<ws_stream>(socket).got_text()
+			&& !srv->opt.binary_as_text) {
 		ws_buf.consume(ws_buf.size());
 		refuse(diagnostics::code::invalid_argument,
 			diagnostics::code_name(diagnostics::code::invalid_argument));

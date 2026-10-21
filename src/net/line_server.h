@@ -173,6 +173,10 @@ struct line_server_options {
 	/// An empty line also reaches the handler. The start refuses
 	/// raw_lines with authenticate.
 	bool raw_lines = false;
+	/// websocket: a binary message is one line as it came, as a text
+	/// message is. False refuses a binary message and closes. The bytes
+	/// need not be UTF-8, so a raw_lines handler decodes them itself.
+	bool binary_as_text = false;
 	/// Checks the first line of a connection after the peer check. False
 	/// counts a failed login and closes it. Empty accepts.
 	std::function<bool(tref first_line, const peer_info& peer)>

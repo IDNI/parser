@@ -1351,6 +1351,24 @@ TEST_SUITE("line server: raw lines") {
 		c.send("late");
 		CHECK(c.read_line() == "got:late");
 	}
+	TEST_CASE("binary_as_text: a binary message reaches on_text as it came") {
+		std::atomic<int> json_lines{ 0 };
+		auto o = raw_options(ws_options(), json_lines);
+		o.binary_as_text = true;
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send_raw(upgrade_request("/ws", ""));
+		CHECK(c.read_line() == "HTTP/1.1 101 Switching Protocols");
+		c.send_raw(binary_frame("b\xffn"));
+		c.send_raw(text_frame("t"));
+		const auto deadline = std::chrono::steady_clock::now()
+			+ std::chrono::seconds(10);
+		while (!has(c.in_buf, "got:t") && c.read_until(deadline)) {}
+		CHECK(has(c.in_buf, "got:b\xffn"));
+		CHECK(has(c.in_buf, "got:t"));
+		CHECK_FALSE(c.eof_seen);
+		CHECK(json_lines.load() == 0);
+	}
 	TEST_CASE("raw_lines over websocket: one message is one line") {
 		std::atomic<int> json_lines{ 0 };
 		server_thread s(raw_options(ws_options(), json_lines));
