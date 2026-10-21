@@ -2144,14 +2144,14 @@ static int run_command(const parsed_args& args, tgf_tool& tool,
 			return ret;
 		};
 		auto run_legacy = [&] {
-			repl<tgf_repl_evaluator> r(re, "tgf> ", ".tgf_history");
+			repl<tgf_repl_evaluator> r(re, "tgf> ", { ".tgf_history" });
 			re.set_repl(r);
 			return r.run();
 		};
 		auto run_default = [&] {
 #ifdef TAU_PARSER_HAS_FTXUI
 			repl_ftxui<tgf_repl_evaluator> rftx(
-				re, "tgf> ", ".tgf_history");
+				re, "tgf> ", { ".tgf_history" });
 			return rftx.run(); // ctor sets re.r_ftx
 #else
 			// FTXUI not available: silently fall back to legacy REPL

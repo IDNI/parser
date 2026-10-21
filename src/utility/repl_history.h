@@ -11,6 +11,8 @@
 #include <sstream>
 #include <filesystem>
 
+#include "repl_history_policy.h"
+
 namespace idni {
 
 // REPL command history with line-delimited file persistence. Each entry is
@@ -20,23 +22,27 @@ namespace idni {
 // display via std::optional (nullopt = no change, value = set input, empty
 // value = clear input).
 struct repl_history {
-	explicit repl_history(std::string file_path = ".repl_history")
-		: file_path_(std::move(file_path)) { load(); }
+	explicit repl_history(repl_history_policy policy = {})
+		: policy_(std::move(policy)) { load(); }
 
 	bool   empty() const { return entries_.empty(); }
 	size_t size()  const { return entries_.size(); }
 
 	// Append `s` (deduplicated against the most recent entry) and persist
-	// it to the file. Resets the navigation cursor to the end.
+	// it to the file, unless the policy drops it. Resets the navigation
+	// cursor to the end.
 	void store(const std::string& s) {
 		stash_.reset();
-		if (!entries_.empty() && entries_.back() == s) {
+		if ((policy_.keep && !policy_.keep(s))
+			|| (!entries_.empty() && entries_.back() == s))
+		{
 			hpos_ = entries_.size();
 			return;
 		}
 		entries_.push_back(s);
 		hpos_ = entries_.size();
-		std::ofstream f(file_path_, std::ios::app);
+		if (policy_.file.empty()) return;
+		std::ofstream f(policy_.file, std::ios::app);
 		if (f) f << escape(s) << '\n';
 	}
 
@@ -74,8 +80,9 @@ struct repl_history {
 
 private:
 	void load() {
-		if (!std::filesystem::exists(file_path_)) return;
-		std::ifstream f(file_path_);
+		if (policy_.file.empty()) return;
+		if (!std::filesystem::exists(policy_.file)) return;
+		std::ifstream f(policy_.file);
 		std::string line;
 		while (std::getline(f, line))
 			if (line.size()) entries_.push_back(unescape(line));
@@ -100,7 +107,7 @@ private:
 		return oss.str();
 	}
 
-	std::string                file_path_;
+	repl_history_policy        policy_;
 	std::vector<std::string>   entries_;
 	size_t                     hpos_ = 0; // navigation cursor, 0..size()
 	std::optional<std::string> stash_; // live edit buffer parked by prev()

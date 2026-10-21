@@ -106,7 +106,7 @@ struct repl_key_action {
 template <typename evaluator_t>
 struct repl_ftxui : repl_front {
 	repl_ftxui(evaluator_t& re, std::string prompt = "> ",
-	           std::string history_file = ".history");
+	           const repl_history_policy& history = {});
 
 	/// Runs the REPL.  Interactive on a TTY, plain getline loop otherwise.
 	int run();

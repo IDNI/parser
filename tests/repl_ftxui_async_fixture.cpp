@@ -66,6 +66,6 @@ int main(int argc, char** argv) {
 	if (argc > 1 && std::string(argv[1]) == "--hex")
 		return print_stdin_hex();
 	slow_evaluator evaluator;
-	idni::repl_ftxui repl(evaluator, "test> ", "");
+	idni::repl_ftxui repl(evaluator, "test> ", {});
 	return repl.run();
 }

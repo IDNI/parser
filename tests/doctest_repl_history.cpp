@@ -12,6 +12,7 @@
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <vector>
 #ifdef _WIN32
@@ -34,7 +35,8 @@ std::string cleaned(std::string p) { std::filesystem::remove(p); return p; }
 struct tmp_history : repl_history {
 	std::string path;
 	explicit tmp_history(std::string p)
-		: repl_history(cleaned(p)), path(std::move(p)) {}
+		: repl_history(repl_history_policy{ cleaned(p) }),
+		  path(std::move(p)) {}
 	~tmp_history() { std::filesystem::remove(path); }
 };
 
@@ -83,7 +85,7 @@ std::vector<std::string> run_repl_on(const std::string& input,
 	close_fd(in);
 	recording_evaluator ev;
 	{
-		repl<recording_evaluator> r(ev, "> ", history);
+		repl<recording_evaluator> r(ev, "> ", { history });
 		r.echo = false;
 		r.run();
 	}
@@ -156,6 +158,76 @@ TEST_SUITE("repl_history: prev/next draft stash") {
 		REQUIRE(down2.has_value());
 		CHECK(*down2 == "d");
 		CHECK(h.size() == 2);
+	}
+}
+
+TEST_SUITE("repl_history: policy") {
+
+	bool not_key_import(std::string_view line) {
+		return !line.starts_with("key import");
+	}
+
+	std::string file_text(const std::string& path) {
+		std::ifstream f(path, std::ios::binary);
+		return { std::istreambuf_iterator<char>(f),
+			std::istreambuf_iterator<char>() };
+	}
+
+	TEST_CASE("keep drops a line from the memory and from the file") {
+		const std::string path = cleaned("doctest_repl_history_keep.tmp");
+		{
+			repl_history h(repl_history_policy{ path, not_key_import });
+			h.store("cmd1");
+			h.store("key import secret");
+			CHECK(h.size() == 1);
+			h.store("cmd2");
+			CHECK(h.size() == 2);
+			auto up1 = h.prev("");
+			REQUIRE(up1.has_value());
+			CHECK(*up1 == "cmd2");
+			auto up2 = h.prev(*up1);
+			REQUIRE(up2.has_value());
+			CHECK(*up2 == "cmd1");
+			CHECK_FALSE(h.prev(*up2).has_value());
+		}
+		const std::string stored = file_text(path);
+		CHECK(stored == "cmd1\ncmd2\n");
+		CHECK(stored.find("key import") == std::string::npos);
+		repl_history again(repl_history_policy{ path, not_key_import });
+		CHECK(again.size() == 2);
+		std::filesystem::remove(path);
+	}
+
+	TEST_CASE("a dropped line moves the cursor to the end") {
+		repl_history h(repl_history_policy{ "", not_key_import });
+		h.store("cmd1");
+		h.store("cmd2");
+		REQUIRE(h.prev("").has_value());
+		h.store("key import secret");
+		auto up = h.prev("");
+		REQUIRE(up.has_value());
+		CHECK(*up == "cmd2");
+	}
+
+	TEST_CASE("an empty file keeps the history in memory only") {
+		namespace fs = std::filesystem;
+		std::error_code ec;
+		const fs::path home = fs::current_path(ec);
+		const fs::path dir = home / "doctest_repl_history_memory.tmp";
+		fs::remove_all(dir, ec);
+		REQUIRE(fs::create_directory(dir, ec));
+		fs::current_path(dir, ec);
+		REQUIRE_FALSE(ec);
+		{
+			repl_history h{};
+			h.store("cmd1");
+			h.store("cmd2");
+			CHECK(h.size() == 2);
+		}
+		const bool nothing_written = fs::is_empty(dir, ec);
+		fs::current_path(home, ec);
+		fs::remove_all(dir, ec);
+		CHECK(nothing_written);
 	}
 }
 

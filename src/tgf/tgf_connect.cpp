@@ -334,16 +334,16 @@ diagnostics::result<int> tgf_connect_run(const connect_options& opt) {
 	std::cout.flush();
 	int code = 0;
 	if (opt.legacy_repl) {
-		repl<tgf_remote_evaluator> front(re, "tgf> ", ".tgf_history");
+		repl<tgf_remote_evaluator> front(re, "tgf> ", { ".tgf_history" });
 		re.reprompt();
 		code = front.run();
 	} else {
 #ifdef TAU_PARSER_HAS_FTXUI
 		repl_ftxui<tgf_remote_evaluator> front(re, "tgf> ",
-			".tgf_history");
+			{ ".tgf_history" });
 		code = front.run();
 #else
-		repl<tgf_remote_evaluator> front(re, "tgf> ", ".tgf_history");
+		repl<tgf_remote_evaluator> front(re, "tgf> ", { ".tgf_history" });
 		re.reprompt();
 		code = front.run();
 #endif

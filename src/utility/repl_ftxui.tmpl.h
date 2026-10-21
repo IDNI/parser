@@ -231,11 +231,11 @@ static inline size_t visible_width(const std::string& s) {
 
 template <typename evaluator_t>
 repl_ftxui<evaluator_t>::repl_ftxui(evaluator_t& re, std::string prompt,
-                                    std::string history_file)
+                                    const repl_history_policy& history)
         : re_(re),
           eval_widget_(re),
           prompt_(std::move(prompt)),
-          history_(std::move(history_file)) {
+          history_(history) {
 	link_front(re_, this, [this](auto& e) { e.r_ftx = this; });
 }
 

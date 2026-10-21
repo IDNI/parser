@@ -47,9 +47,8 @@ void link_front(evaluator_t& re, repl_front* f, fallback_t fallback) {
 template <typename evaluator_t>
 struct repl : repl_front {
 	repl(evaluator_t& re, std::string prompt = "> ",
-		std::string history_file = ".history")
-		: re_(re), prompt_(prompt),
-		  history_(std::move(history_file))
+		const repl_history_policy& history = {})
+		: re_(re), prompt_(prompt), history_(history)
 	{
 		link_front(re, this, [this](auto& e) { e.r = this; });
 		term::open();
