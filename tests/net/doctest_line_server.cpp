@@ -1024,6 +1024,41 @@ static std::string binary_frame(const std::string& payload) {
 }
 
 TEST_SUITE("line server: limits") {
+	TEST_CASE("a connection with no first line is closed after the timeout") {
+		auto o = tcp_options();
+		o.first_line_timeout_seconds = 1;
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		CHECK(c.at_eof(5000));
+		CHECK(has(s.out.text(), "\"event\":\"first-line-timeout\""));
+	}
+	TEST_CASE("max_pending: a silent connection takes the place") {
+		auto o = tcp_options();
+		o.max_pending = 1;
+		server_thread s(o);
+		const uint16_t port = s.tcp_port();
+		tcp_client first(loopback(port));
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		tcp_client second(loopback(port));
+		CHECK(has(second.read_line(), "the server takes no more sessions"));
+		CHECK(second.at_eof(5000));
+		first.send("{\"cmd\":\"open\"}");
+		CHECK(has(first.read_line(), "\"status\":\"ok\""));
+		tcp_client third(loopback(port));
+		third.send("{\"cmd\":\"open\"}");
+		CHECK(has(third.read_line(), "\"status\":\"ok\""));
+	}
+	TEST_CASE("max_pending counts a websocket upgrade in flight") {
+		auto o = ws_options();
+		o.max_pending = 1;
+		server_thread s(o);
+		const uint16_t port = s.tcp_port();
+		tcp_client first(loopback(port));
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		tcp_client second(loopback(port));
+		second.send_raw(upgrade_request("/ws", ""));
+		CHECK(second.read_line() == "HTTP/1.1 503 Service Unavailable");
+	}
 	TEST_CASE("idle_timeout_seconds ends a quiet session") {
 		auto o = tcp_options();
 		o.idle_timeout_seconds = 1;

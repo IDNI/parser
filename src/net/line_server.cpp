@@ -102,6 +102,18 @@ std::string_view kind_name(line_transport_kind k) {
 	return "";
 }
 
+// A login event of the transport @p kind. A connection in the wait time
+// has no session yet, so @p session can be empty.
+tref login_event(std::string_view event, line_transport_kind kind,
+	const std::string& session)
+{
+	trefs ev = line_log::event_base(event);
+	ev.push_back(jt::build_pair("kind", jt::build_string(kind_name(kind))));
+	if (!session.empty())
+		ev.push_back(jt::build_pair("session", jt::build_string(session)));
+	return jt::build_object(ev);
+}
+
 // The error answer to a line that reaches no handler.
 tref error_response(const diagnostics::report& rep) {
 	return jt::build_object({
@@ -228,6 +240,7 @@ struct pipe_listener {
 // the upgrade, so a refused client gets a plain HTTP answer.
 struct ws_upgrade : std::enable_shared_from_this<ws_upgrade> {
 	ws_upgrade(line_server* s, tcp::socket so, const listen_address& a);
+	~ws_upgrade();
 	ws_upgrade(const ws_upgrade&) = delete;
 	ws_upgrade& operator=(const ws_upgrade&) = delete;
 
@@ -240,9 +253,12 @@ struct ws_upgrade : std::enable_shared_from_this<ws_upgrade> {
 	http::request<http::empty_body> req;
 	http::response<http::string_body> res;
 	std::optional<ws_stream> ws;
+	// true while the upgrade counts toward max_pending
+	bool counted = true;
 	// the origin is refused, and the refusal goes after the upgrade
 	bool refused_origin = false;
 
+	void uncount();
 	void start();
 	void on_read(error_code ec);
 	void answer(http::status status, std::string_view text);
@@ -271,6 +287,7 @@ struct line_server {
 #endif
 	void on_accept(conn_socket sock, peer_info peer);
 	void retry_accept(std::function<void()> accept);
+	size_t pending() const;
 	bool full(line_transport_kind k) const;
 	void open_session_log(server_connection& c);
 	void start_idle_timer();
@@ -278,7 +295,6 @@ struct line_server {
 
 	void log_failure(diagnostics::report detail = {});
 	void log_event(tref v, server_connection* c);
-
 	void output(const std::string& line) const;
 	void print_event(tref v);
 	void print_debug(tref v, const std::string& session);
@@ -306,6 +322,8 @@ struct line_server {
 	bool stopping = false;
 	// True while a tick is scheduled, so a new connection only arms it once.
 	bool idle_tick_running = false;
+	// websocket upgrades in flight
+	size_t upgrades = 0;
 };
 
 std::mutex running_mutex;
@@ -912,6 +930,13 @@ void line_server::retry_accept(std::function<void()> accept) {
 	});
 }
 
+size_t line_server::pending() const {
+	size_t n = upgrades;
+	for (const auto& kv : connections)
+		if (!kv.second->session.authenticated) ++n;
+	return n;
+}
+
 // True when a new connection is over the session limit.
 bool line_server::full(line_transport_kind) const {
 	return connections.size() >= opt.max_sessions;
@@ -929,7 +954,10 @@ void line_server::accept_tcp(size_t i) {
 			if (a.kind == line_transport_kind::websocket) {
 				auto u = std::make_shared<ws_upgrade>(this,
 					std::move(s), a);
-				u->start();
+				if (pending() > opt.max_pending)
+					u->answer(http::status::service_unavailable,
+						opt.busy_message);
+				else u->start();
 			} else {
 				on_accept(conn_socket(std::move(s)),
 					peer_info{ .kind = line_transport_kind::tcp });
@@ -943,6 +971,15 @@ ws_upgrade::ws_upgrade(line_server* s, tcp::socket so,
 	: srv(s), sock(std::move(so)), ws_path(a.ws_path),
 	peer{ .kind = line_transport_kind::websocket }, timer(s->io)
 {
+	++srv->upgrades;
+}
+
+ws_upgrade::~ws_upgrade() { uncount(); }
+
+void ws_upgrade::uncount() {
+	if (!counted) return;
+	counted = false;
+	--srv->upgrades;
 }
 
 void ws_upgrade::start() {
@@ -1029,6 +1066,8 @@ void ws_upgrade::upgrade() {
 			self->ws->set_option(c);
 		}
 		if (self->refused_origin) return self->send_refusal();
+		// the session counts itself from here on
+		self->uncount();
 		self->srv->on_accept(conn_socket(std::move(*self->ws)),
 			std::move(self->peer));
 	});
@@ -1069,7 +1108,7 @@ void line_server::accept_local(size_t i) {
 void line_server::on_accept(conn_socket sock, peer_info peer) {
 	auto c = std::make_shared<server_connection>(this, std::move(sock),
 		std::move(peer));
-	if (full(c->session.peer.kind)) {
+	if (full(c->session.peer.kind) || pending() >= opt.max_pending) {
 		c->refuse(diagnostics::code::out_of_range, opt.busy_message);
 		return;
 	}
@@ -1173,13 +1212,23 @@ void line_server::start_idle_timer() {
 
 void line_server::check_idle() {
 	auto now = std::chrono::steady_clock::now();
-	std::vector<std::shared_ptr<server_connection>> idle;
+	std::vector<std::shared_ptr<server_connection>> idle, silent;
 	for (auto& kv : connections) {
 		const auto& se = kv.second->session;
 		const auto quiet = now - se.last_traffic;
-		if (se.authenticated && opt.idle_timeout_seconds != 0
+		if (!se.authenticated) {
+			if (opt.first_line_timeout_seconds != 0 && quiet
+					>= std::chrono::seconds(
+						opt.first_line_timeout_seconds))
+				silent.push_back(kv.second);
+		} else if (opt.idle_timeout_seconds != 0
 				&& quiet >= std::chrono::seconds(opt.idle_timeout_seconds))
 			idle.push_back(kv.second);
+	}
+	for (auto& c : silent) {
+		log_event(login_event("first-line-timeout",
+			c->session.peer.kind, c->session.id), nullptr);
+		c->close();
 	}
 	for (auto& c : idle) {
 		c->log_session_event("idle-timeout");

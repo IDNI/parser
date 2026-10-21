@@ -106,6 +106,13 @@ struct line_server_options {
 	std::optional<std::string> origin_refusal_message{};
 	/// At this count the server refuses a new connection with busy_message.
 	size_t max_sessions = 16;
+	/// At this count of connections with no accepted first line, and of
+	/// websocket upgrades in flight, the server refuses a new connection
+	/// with busy_message.
+	size_t max_pending = 16;
+	/// Close a connection that sends no first line in this time. 0 turns
+	/// the timeout off.
+	size_t first_line_timeout_seconds = 30;
 	/// websocket: close a client that sends no complete upgrade request in
 	/// this time. The same time bounds the websocket close handshake when
 	/// close_timeout_seconds has no value.
