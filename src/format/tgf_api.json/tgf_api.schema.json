@@ -11,6 +11,12 @@
 			"$ref": "#/$defs/listening_line"
 		},
 		{
+			"$ref": "#/$defs/test_case_line"
+		},
+		{
+			"$ref": "#/$defs/test_summary_line"
+		},
+		{
 			"$ref": "#/$defs/init_line"
 		},
 		{
@@ -1167,6 +1173,86 @@
 			},
 			"required": [
 				"listening"
+			],
+			"additionalProperties": false
+		},
+		"test_case_line": {
+			"type": "object",
+			"description": "One test item of tgf test --json.",
+			"properties": {
+				"test_case": {
+					"type": "object",
+					"properties": {
+						"file": {
+							"type": "string"
+						},
+						"matcher": {
+							"type": "string"
+						},
+						"input": {
+							"type": "string"
+						},
+						"passed": {
+							"type": "boolean"
+						},
+						"message": {
+							"type": "string",
+							"description": "OK, OK (negated) or the FAIL reason."
+						}
+					},
+					"required": [
+						"file",
+						"matcher",
+						"input",
+						"passed",
+						"message"
+					],
+					"additionalProperties": false
+				}
+			},
+			"required": [
+				"test_case"
+			],
+			"additionalProperties": false
+		},
+		"test_summary_line": {
+			"type": "object",
+			"description": "The last line of tgf test --json.",
+			"properties": {
+				"test_summary": {
+					"type": "object",
+					"properties": {
+						"files": {
+							"type": "integer",
+							"minimum": 0
+						},
+						"passed": {
+							"type": "integer",
+							"minimum": 0
+						},
+						"failed": {
+							"type": "integer",
+							"minimum": 0
+						},
+						"ok": {
+							"type": "boolean",
+							"description": "False when a test failed or a test file could not be read or parsed."
+						},
+						"report": {
+							"$ref": "#/$defs/report"
+						}
+					},
+					"required": [
+						"files",
+						"passed",
+						"failed",
+						"ok"
+					],
+					"additionalProperties": false
+				}
+			},
+			"required": [
+				"test_summary"
 			],
 			"additionalProperties": false
 		},

@@ -328,6 +328,8 @@ The exit code is `1` when the status is `error`, else `0`.
   or when a test file cannot be read or parsed. Errors of the tool report
   go under `report` in the summary. The exit code does not change.
 
+The schema defines these lines as `test_case_line` and `test_summary_line`.
+
 ## No grammar
 
 `tgf`, `tgf repl` and `tgf repl --json` start with an empty grammar

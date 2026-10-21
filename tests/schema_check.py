@@ -269,6 +269,11 @@ def run_api(tgf, fixture, api_path, report_path, ast_path):
         ok &= run_oneshot(tgf, validator,
             [fixture, "gen", "--json", "--name", "schema_check",
              "--header-only", "false", "--output-dir", gen_dir], "gen")
+        test_path = os.path.join(tmp, "fixture.tgf.test")
+        with open(test_path, "w", encoding="utf-8") as f:
+            f.write('start : "12", "1", ~"x".\nstart : "x".\n')
+        ok &= run_oneshot(tgf, validator,
+            [fixture, "test", "--json", test_path], "test")
         ok &= check_report_sample(jsonschema, report_path)
 
     if not ok:
