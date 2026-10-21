@@ -11,11 +11,13 @@
 #include "test_env.h"
 #include "tgf_run_capture.h"
 
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <initializer_list>
 #include <iterator>
 #include <sstream>
+#include <streambuf>
 #include <utility>
 
 using namespace std;
@@ -513,6 +515,72 @@ TEST_SUITE("tgf cli: tgf_command") {
 		}
 		CHECK(tgf_args_config.default_command == "repl");
 		CHECK(tgf_args_config.default_command_when_inputs == "repl");
+	}
+}
+
+// Checks the lines of a rendered parse tree: after the header line, line k
+// has k + 1 tabs and the id depth - 1 - k. It keeps no copy of the text.
+struct tree_text_check_buf : std::streambuf {
+	explicit tree_text_check_buf(size_t depth) : depth(depth) {
+		setp(buf, buf + sizeof buf);
+	}
+	size_t depth, lines = 0, bad = 0, tabs = 0;
+	uint64_t id = 0;
+	bool in_id = false;
+	char buf[4096];
+	void scan() {
+		for (char* c = pbase(); c != pptr(); ++c) {
+			if (*c == '\t') ++tabs;
+			else if (*c == '(') in_id = true;
+			else if (*c == ')') in_id = false;
+			else if (in_id) id = id * 10 + uint64_t(*c - '0');
+			else if (*c == '\n') {
+				// line 0 is the header "parsed graph:"
+				if (lines != 0 && (tabs != lines
+						|| id != depth - lines))
+					++bad;
+				++lines, tabs = 0, id = 0;
+			}
+		}
+		setp(buf, buf + sizeof buf);
+	}
+	int overflow(int c) override {
+		scan();
+		if (c != traits_type::eof()) *pptr() = char(c), pbump(1);
+		return 0;
+	}
+	int sync() override { return scan(), 0; }
+};
+
+TEST_SUITE("tgf cli: render_command_text") {
+	TEST_CASE("the parse tree of a chain 30000 levels deep renders each "
+		"level on its own line with one more tab")
+	{
+		using jt = format::json::tree;
+		// the text grows with the square of the depth
+		constexpr size_t depth = 30000;
+		auto node = [](size_t id, tref child) {
+			trefs v{ jt::build_pair("symbol", jt::build_string("a")),
+				jt::build_pair("id", jt::build_number(
+					static_cast<double>(id))),
+				jt::build_pair("range", jt::build_array({
+					jt::build_number(0), jt::build_number(0) })) };
+			if (child) v.push_back(jt::build_pair("children",
+				jt::build_array({ child })));
+			return jt::build_object(v);
+		};
+		tref t = node(0, nullptr);
+		for (size_t i = 1; i != depth; ++i) t = node(i, t);
+		cmd_result r;
+		r.cmd = "parse";
+		r.data = jt::geth(jt::build_object({
+			jt::build_pair("tree", t) }));
+		tree_text_check_buf buf(depth);
+		std::ostream os(&buf);
+		render_command_text(r, os, term::colors(false));
+		os.flush();
+		CHECK(buf.lines == depth + 1);
+		CHECK(buf.bad == 0);
 	}
 }
 

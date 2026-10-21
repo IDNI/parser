@@ -1376,27 +1376,40 @@ static void render_data_ambiguous_node(std::ostream& os, const jtt& node) {
 #	pragma warning(push)
 #	pragma warning(disable : 4459)
 #endif
-// One AST JSON node in the shape of the text tree printer.
-static void render_data_tree(std::ostream& os, const jtt& node, size_t l,
+// An AST JSON tree in the shape of the text tree printer, @p l tabs deep
+// at its root.
+static void render_data_tree(std::ostream& os, tref root, size_t l,
 	const term::colors& TC)
 {
-	for (size_t i = 0; i != l; ++i) os << "\t";
-	const std::string symbol = node | jtt::member("symbol") | jtt::string;
-	if (!symbol.empty()) {
-		os << TC_NT << symbol << TC.CLEAR() << TC_NT_ID << "(";
-		if (auto id = node | jtt::member("id");
-				id.is(json_parser::number))
-			os << static_cast<long long>(id | jtt::number);
-		os << ")" << TC.CLEAR();
-	} else if (auto text = node | jtt::member("text");
-			text && text.value_tree().is_string())
-		os << TC_T << (text | jtt::string) << TC.CLEAR();
-	os << TC_RANGE;
-	print_range(os, node, ", ");
-	os << TC.CLEAR() << "\n";
-	if (auto ch = node | jtt::member("children"); ch.is(json_parser::arr))
-		for (const auto& c : (ch | jtt::children)())
-			render_data_tree(os, c, l + 1, TC);
+	// Only the children members are entered, so every object on the way
+	// is an AST node.
+	auto into = [](tref n) {
+		const jt& t = jt::get(n);
+		return !t.is(json_parser::object_pair)
+			|| t.get_string() == "children";
+	};
+	auto enter = [&](tref n) {
+		if (!jt::get(n).is_object()) return;
+		const jtt node(n);
+		for (size_t i = 0; i != l; ++i) os << "\t";
+		++l;
+		const std::string symbol = node | jtt::member("symbol")
+			| jtt::string;
+		if (!symbol.empty()) {
+			os << TC_NT << symbol << TC.CLEAR() << TC_NT_ID << "(";
+			if (auto id = node | jtt::member("id");
+					id.is(json_parser::number))
+				os << static_cast<long long>(id | jtt::number);
+			os << ")" << TC.CLEAR();
+		} else if (auto text = node | jtt::member("text");
+				text && text.value_tree().is_string())
+			os << TC_T << (text | jtt::string) << TC.CLEAR();
+		os << TC_RANGE;
+		print_range(os, node, ", ");
+		os << TC.CLEAR() << "\n";
+	};
+	auto leave = [&l](tref n) { if (jt::get(n).is_object()) --l; };
+	pre_order<format::json::node>(root).visit(enter, into, leave);
 }
 
 // The parse text from the response data.
@@ -1432,7 +1445,7 @@ static void render_data_parse(const cmd_result& r, std::ostream& os,
 	if (auto tree = data | jtt::member("tree");
 			tree.is(json_parser::object)) {
 		os << "parsed graph:\n";
-		render_data_tree(os, tree, 1, TC);
+		render_data_tree(os, tree.value(), 1, TC);
 	}
 }
 
