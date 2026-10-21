@@ -511,6 +511,49 @@ TEST_SUITE("tgf json api: option values as JSON") {
 	}
 }
 
+TEST_SUITE("tgf json api: gc") {
+	TEST_CASE("many requests keep the node cache small and the state") {
+		tgf_repl_evaluator re(grammar_path(), json_options());
+		std::vector<std::string> lines{
+			R"({"id":1,"cmd":"start","symbol":"num"})",
+			R"({"id":2,"cmd":"set","option":"print-ambiguity",)"
+			R"("value":false})" };
+		// Each answer has new nodes: its id, its input and its terminals.
+		const size_t n = 3000;
+		for (size_t i = 0; i != n; ++i)
+			lines.push_back(R"({"id":)" + std::to_string(10 + i)
+				+ R"(,"cmd":"parse","input":")"
+				+ std::to_string(100000 + i) + "\"}");
+		lines.push_back(R"({"id":5000,"cmd":"get",)"
+			R"("option":"print-ambiguity"})");
+		lines.push_back(R"({"id":5001,"cmd":"parse","input":"42"})");
+		std::string input;
+		for (const auto& l : lines) input += l + "\n";
+		std::istringstream in(input);
+		std::ostringstream out;
+		tgf_json_loop(re, in, out);
+		CHECK(jt::m_size() < 16384);
+		// Only the last two answers are read: the JSON parser is slow.
+		std::vector<std::string> answers;
+		std::istringstream ls(out.str());
+		for (std::string l; std::getline(ls, l); ) answers.push_back(l);
+		REQUIRE(answers.size() == lines.size() + 1);   // and hello
+		const htref get = parse_line(answers[n + 3]);
+		REQUIRE(result_of(get) != nullptr);
+		REQUIRE(member(result_of(get), "value") != nullptr);
+		CHECK_FALSE(member(result_of(get), "value")->get_bool());
+		const htref parse = parse_line(answers[n + 4]);
+		CHECK(member(parse, "status")->get_string() == "ok");
+		REQUIRE(member(parse, "state") != nullptr);
+		CHECK(member(member(parse, "state"), "start")->get_string() == "num");
+		REQUIRE(result_of(parse) != nullptr);
+		CHECK(member(result_of(parse), "ambiguous") == nullptr);
+		REQUIRE(member(result_of(parse), "tree") != nullptr);
+		CHECK(member(member(result_of(parse), "tree"), "symbol")
+			->get_string() == "num");
+	}
+}
+
 TEST_SUITE("tgf json api: options") {
 	TEST_CASE("set and get a list option") {
 		auto r = run_repl({

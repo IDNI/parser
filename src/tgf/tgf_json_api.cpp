@@ -570,6 +570,7 @@ int tgf_json_loop(tgf_repl_evaluator& re, std::istream& in,
 	diagnostics::report init_report = std::move(extra);
 	size_t limit = max_line;
 	if (init_stdin) {
+		bintree<format::json::node>::gc_pause pause;
 		std::string init_line;
 		bool too_long = false;
 		if (json_read_line(in, init_line, limit, too_long)) {
@@ -600,24 +601,34 @@ int tgf_json_loop(tgf_repl_evaluator& re, std::istream& in,
 			diagnostics::code::invalid_argument,
 			parser_strings::messages::missing_field);
 	}
-	format::json::write_line(hello(re, init_report), out);
+	{
+		bintree<format::json::node>::gc_pause pause;
+		format::json::write_line(hello(re, init_report), out);
+	}
 	for (std::string line; ; ) {
 		bool too_long = false;
 		if (!json_read_line(in, line, limit, too_long)) break;
 		if (!line.empty() && line.back() == '\r') line.pop_back();
-		if (too_long) {
-			// Parsing a huge line costs time and memory, so refuse
-			// it and go on with the next line.
-			diagnostics::report rep;
-			rep.error(diagnostics::code::out_of_range,
-				parser_strings::messages::line_too_long);
-			format::json::write_line(error_response(jt::_null(),
-				state_value(re), rep), out);
-			continue;
+		if (!too_long && line.empty()) continue;
+		cmd_status st = cmd_status::ok;
+		{
+			bintree<format::json::node>::gc_pause pause;
+			if (too_long) {
+				// Parsing a huge line costs time and memory, so
+				// refuse it and go on with the next line.
+				diagnostics::report rep;
+				rep.error(diagnostics::code::out_of_range,
+					parser_strings::messages::line_too_long);
+				format::json::write_line(error_response(
+					jt::_null(), state_value(re), rep), out);
+			} else {
+				auto [resp, s] = handle_request(re, line);
+				format::json::write_line(resp, out);
+				st = s;
+			}
 		}
-		if (line.empty()) continue;
-		auto [resp, st] = handle_request(re, line);
-		format::json::write_line(resp, out);
+		// The answer is written and no tref of it is left.
+		jt::gc_if_grown();
 		// The child of a server session stays alive after a quit: the
 		// parent owns the connection and closes it after this answer.
 		if (st == cmd_status::quit && re.session_id.empty()) break;

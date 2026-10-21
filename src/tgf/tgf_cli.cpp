@@ -134,8 +134,10 @@ void print_diagnostics_report(const idni::diagnostics::report& report,
 	bool json, bool print_names)
 {
 	if (report.nodes().empty()) return;
-	if (json) format::json::print(report, std::cout, print_names) << '\n';
-	else report.print();
+	if (json) {
+		bintree<format::json::node>::gc_pause pause;
+		format::json::print(report, std::cout, print_names) << '\n';
+	} else report.print();
 }
 
 // bintree<pnode>::M() and its hit/miss/geth counters are process-wide
@@ -1757,11 +1759,17 @@ tref statement_request(const tgf_repl_evaluator::trv& n) {
 }
 
 idni::diagnostics::result<int> tgf_repl_evaluator::eval(const string& src) {
-	auto er = run(src, [this](cmd_result& r) {
-		render_text(r, cout);
-		report.append(std::move(r.report));
-		flush_report();
-	});
+	eval_result er;
+	{
+		bintree<format::json::node>::gc_pause pause;
+		er = run(src, [this](cmd_result& r) {
+			render_text(r, cout);
+			report.append(std::move(r.report));
+			flush_report();
+		});
+	}
+	// The answers are printed, and only the handles in er hold data.
+	jt::gc_if_grown();
 	if (er.status == cmd_status::incomplete) {
 		idni::diagnostics::result<int> res(2);
 		res.append(std::move(er.report));
@@ -1929,6 +1937,7 @@ static int command_line_error(string_view msg) {
 }
 
 static int gen_command(tgf_tool& tool, tgf_repl_evaluator& re) {
+	bintree<format::json::node>::gc_pause pause;
 	const bool json = idni::options().get<bool>("json");
 	auto fail = [&](const diagnostics::report& rep) {
 		if (json) format::json::write_line(json_result_response(
@@ -2011,6 +2020,7 @@ static void print_char_class_report(tgf_repl_evaluator& re) {
 }
 
 static int show_command(tgf_repl_evaluator& re) {
+	bintree<format::json::node>::gc_pause pause;
 	auto& opts = idni::options();
 	const bool json = opts.get<bool>("json");
 	if (!re.require_grammar()) {
@@ -2160,6 +2170,7 @@ static int run_command(const parsed_args& args, tgf_tool& tool,
 		const string eval = opts.get<string>("evaluate");
 		if (json) {
 			if (eval.size()) {
+				bintree<format::json::node>::gc_pause pause;
 				auto er = re.run(eval);
 				format::json::write_line(json_eval_response(
 					jt::_null(), er, state_value(re)), cout);
@@ -2200,6 +2211,7 @@ static int run_command(const parsed_args& args, tgf_tool& tool,
 	}
 
 	if (is(tgf_command::parse)) {
+		bintree<format::json::node>::gc_pause pause;
 		const bool json = opts.get<bool>("json");
 		string infile = opts.get<string>("input");
 		string inexp  = opts.get<string>("input-expression");
