@@ -70,6 +70,7 @@ set(TAU_PARSER_HEADERS
 	net/line_address.h
 	net/line_address.tmpl.h
 	net/line_transport.h
+	net/line_client.h
 	net/line_reader.h
 	net/line_support.h
 	CACHE STRING "Tau Parser headers files"

@@ -311,6 +311,12 @@ struct messages {
 		"a socket path or ws://<host>[:<port>][/<path>]";
 	static constexpr sv net_path_too_long      =
 		"The socket path is over the system limit";
+	static constexpr sv net_line_too_long      =
+		"The line is over the limit";
+	static constexpr sv net_connection_lost    =
+		"The connection is gone";
+	static constexpr sv net_read_timeout       =
+		"No line arrived before the read timeout";
 	// load and reload command results
 	static constexpr sv reload_succeeded       = "Grammar reloaded";
 	static constexpr sv reload_failed          = "Grammar reload failed";
