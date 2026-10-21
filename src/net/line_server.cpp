@@ -526,8 +526,7 @@ void server_connection::send_line(tref v) {
 void server_connection::send_text(std::string text) {
 	session.last_traffic = std::chrono::steady_clock::now();
 	if (session.authenticated) log_write(line_log::text("out", text));
-	// A websocket message needs no line end.
-	if (session.peer.kind != line_transport_kind::websocket) text += '\n';
+	text += srv->opt.reply_line_end.of(session.peer.kind);
 	send(std::move(text));
 }
 

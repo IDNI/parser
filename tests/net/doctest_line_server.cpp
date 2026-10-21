@@ -1460,6 +1460,58 @@ TEST_SUITE("line server: listen host") {
 	}
 }
 
+TEST_SUITE("line server: reply line end") {
+	TEST_CASE("the default: a tcp reply ends with one newline") {
+		CHECK(reply_line_ends{}.local_socket == "\n");
+		CHECK(reply_line_ends{}.tcp == "\n");
+		CHECK(reply_line_ends{}.websocket.empty());
+		server_thread s(tcp_options());
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("{\"id\":1}");
+		const auto deadline = std::chrono::steady_clock::now()
+			+ std::chrono::seconds(10);
+		while (c.in_buf.find('\n') == std::string::npos
+			&& c.read_until(deadline)) {}
+		CHECK(c.in_buf == "{\"id\":1,\"status\":\"ok\"}\n");
+	}
+	TEST_CASE("a tcp line end of CR LF ends a raw reply") {
+		std::atomic<int> json_lines{ 0 };
+		auto o = raw_options(tcp_options(), json_lines);
+		o.reply_line_end.tcp = "\r\n";
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("a");
+		const auto deadline = std::chrono::steady_clock::now()
+			+ std::chrono::seconds(10);
+		while (c.in_buf.find('\n') == std::string::npos
+			&& c.read_until(deadline)) {}
+		CHECK(c.in_buf == "got:a\r\n");
+	}
+	TEST_CASE("a tcp line end of CR LF also ends a server error") {
+		auto o = tcp_options();
+		o.reply_line_end.tcp = "\r\n";
+		server_thread s(o);
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("no json");
+		const auto deadline = std::chrono::steady_clock::now()
+			+ std::chrono::seconds(10);
+		while (c.in_buf.find('\n') == std::string::npos
+			&& c.read_until(deadline)) {}
+		CHECK(has(c.in_buf, "\"status\":\"error\""));
+		CHECK(c.in_buf.ends_with("}\r\n"));
+	}
+	TEST_CASE("a websocket line end goes into each message") {
+		auto o = ws_options();
+		o.reply_line_end.websocket = "\n";
+		server_thread s(o);
+		auto t = ws_connect(s.tcp_port());
+		std::string l;
+		CHECK(t->send_line("{\"id\":1}"));
+		REQUIRE(t->read_line(l) == read_status::ok);
+		CHECK(l == "{\"id\":1,\"status\":\"ok\"}\n");
+	}
+}
+
 TEST_SUITE("line server: start and stop") {
 	TEST_CASE("the JSON listening line names the bound port, a stop gives 0") {
 		server_thread s(tcp_options());

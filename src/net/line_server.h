@@ -101,6 +101,23 @@ struct login_limits {
 	std::chrono::seconds wait{ 60 };
 };
 
+/// The bytes that the server writes after each reply line, for each
+/// transport kind.
+struct reply_line_ends {
+	std::string local_socket = "\n";
+	std::string tcp = "\n";
+	/// A websocket message needs no line end.
+	std::string websocket{};
+	const std::string& of(line_transport_kind kind) const {
+		switch (kind) {
+		case line_transport_kind::tcp: return tcp;
+		case line_transport_kind::websocket: return websocket;
+		case line_transport_kind::local_socket: break;
+		}
+		return local_socket;
+	}
+};
+
 /// The settings of the line server. One server listens on all
 /// addresses at once.
 struct line_server_options {
@@ -147,6 +164,8 @@ struct line_server_options {
 	login_limits logins{};
 	/// End a session with no traffic. 0 turns the timeout off.
 	size_t idle_timeout_seconds = 30 * 60;
+	/// Also ends each error line of the server.
+	reply_line_ends reply_line_end{};
 	/// Largest request line or message. The tail of a longer line is
 	/// dropped.
 	size_t max_line = 16u * 1024 * 1024;
