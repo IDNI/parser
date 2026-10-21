@@ -5,6 +5,7 @@
 #include "quiet_doctest.h"
 #include "net/line_reader.h"
 #include "net/line_server.h"
+#include "net/line_transport.h"
 #include "net/line_client_test.h"
 
 #include <atomic>
@@ -23,7 +24,9 @@
 #include <thread>
 #include <vector>
 
-#ifndef _WIN32
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <sys/stat.h>
 #include <unistd.h>
 #endif
@@ -524,6 +527,55 @@ TEST_SUITE("line server: local socket") {
 		r.report().print(os, term::colors(false));
 		CHECK(has(os.str(), "over the system limit"));
 		CHECK(has(os.str(), path));
+	}
+}
+#endif
+
+#ifdef _WIN32
+TEST_SUITE("line server: named pipe") {
+	static std::string pipe_name(const char* tag) {
+		return std::string("\\\\.\\pipe\\line_server_") + tag + "_"
+			+ std::to_string(::GetCurrentProcessId());
+	}
+
+	TEST_CASE("an echo session, then a second client on the same pipe") {
+		const std::string name = pipe_name("echo");
+		line_server_options o;
+		o.listen = { { line_transport_kind::local_socket, name, 0 } };
+		o.json = true;
+		server_thread s(o);
+		REQUIRE_FALSE(s.wait_listening(1).empty());
+		for (int i = 0; i != 2; ++i) {
+			auto t = line_connect({ .kind = line_transport_kind::local_socket,
+				.path = name }, { .timeout_seconds = 10 });
+			REQUIRE(t.has_value());
+			auto& link = *t.value();
+			std::string l;
+			CHECK(link.send_line("{\"id\":1,\"cmd\":\"open\"}"));
+			REQUIRE(link.read_line(l) == read_status::ok);
+			CHECK(l == "{\"id\":1,\"cmd\":\"open\",\"status\":\"ok\"}");
+			link.close();
+		}
+		CHECK(wait_for(s.closes, 2));
+	}
+
+	TEST_CASE("a pipe name that another process holds is refused") {
+		const std::string name = pipe_name("held");
+		HANDLE held = ::CreateNamedPipeA(name.c_str(),
+			PIPE_ACCESS_DUPLEX, PIPE_TYPE_BYTE | PIPE_WAIT,
+			PIPE_UNLIMITED_INSTANCES, 512, 512, 0, nullptr);
+		REQUIRE(held != INVALID_HANDLE_VALUE);
+		line_server_options o;
+		o.listen = { { line_transport_kind::local_socket, name, 0 } };
+		o.make_handler = [](const line_session&) {
+			return std::unique_ptr<session_handler>{};
+		};
+		auto r = line_server_run(o);
+		::CloseHandle(held);
+		CHECK_FALSE(r.has_value());
+		std::ostringstream os;
+		r.report().print(os, term::colors(false));
+		CHECK(has(os.str(), name));
 	}
 }
 #endif

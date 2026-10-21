@@ -76,7 +76,8 @@ struct line_session {
 struct line_server_options {
 	/// Default: one local_socket address.
 	std::vector<listen_address> listen{};
-	/// local_socket: refuse a peer of another user than the server.
+	/// local_socket: refuse a peer of another user than the server. On
+	/// Windows the pipe access list allows only the user.
 	bool require_same_user = true;
 	/// At this count the server refuses a new connection with busy_message.
 	size_t max_sessions = 16;

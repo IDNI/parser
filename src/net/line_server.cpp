@@ -54,6 +54,10 @@
 #include <boost/asio.hpp>
 #include <boost/asio/signal_set.hpp>
 #include <boost/asio/steady_timer.hpp>
+#ifdef _WIN32
+#include <boost/asio/windows/overlapped_ptr.hpp>
+#include <boost/asio/windows/stream_handle.hpp>
+#endif
 
 #include "parser_strings.h"
 
@@ -68,7 +72,7 @@ using jt = format::json::tree;
 using format::json::string_member;
 
 #ifdef _WIN32
-using conn_socket = std::variant<tcp::socket>;
+using conn_socket = std::variant<tcp::socket, ba::windows::stream_handle>;
 #else
 using local = ba::local::stream_protocol;
 using conn_socket = std::variant<tcp::socket, local::socket>;
@@ -179,6 +183,25 @@ struct server_connection : std::enable_shared_from_this<server_connection> {
 	void log_session_event(std::string_view event);
 };
 
+#ifdef _WIN32
+// A named pipe server: one ConnectNamedPipe in flight, a new pipe instance
+// after each accept. The access list allows only the current user.
+struct pipe_listener {
+	pipe_listener(line_server* s, std::wstring n) : srv(s),
+		name(std::move(n)) {}
+
+	line_server* srv;
+	std::wstring name;
+	user_only_security security;
+	bool first = true;
+	std::shared_ptr<ba::windows::stream_handle> pending;
+
+	bool accept_next();
+	/// accept_next, and on a failure again after the retry wait.
+	void accept_or_retry();
+};
+#endif
+
 struct tcp_listener {
 	std::unique_ptr<tcp::acceptor> acceptor;
 	listen_address address;
@@ -219,7 +242,9 @@ struct line_server {
 	std::vector<listen_address> bound;
 	// tcp and websocket
 	std::vector<tcp_listener> tcp_listeners;
-#ifndef _WIN32
+#ifdef _WIN32
+	std::vector<std::unique_ptr<pipe_listener>> pipes;
+#else
 	std::vector<std::unique_ptr<local::acceptor>> local_acceptors;
 	std::vector<std::string> socket_files;
 #endif
@@ -691,6 +716,67 @@ bool line_server::listen_local(const listen_address& a) {
 	local_acceptors.push_back(std::move(acc));
 	return true;
 }
+#else
+bool line_server::listen_local(const listen_address& a) {
+	const std::string& path = a.path;
+	auto failed = [this, &path](std::string_view msg) {
+		report.error(diagnostics::code::io_error, msg,
+			{ { parser_strings::label::path, path } });
+		return false;
+	};
+	// the system limit of a pipe name
+	if (path.empty() || path.size() > 256)
+		return failed(parser_strings::messages::net_path_too_long);
+	const int size = ::MultiByteToWideChar(CP_UTF8, 0, path.data(),
+		static_cast<int>(path.size()), nullptr, 0);
+	if (size == 0) return failed(parser_strings::messages::net_bind_failed);
+	std::wstring name(static_cast<size_t>(size), L'\0');
+	::MultiByteToWideChar(CP_UTF8, 0, path.data(),
+		static_cast<int>(path.size()), name.data(), size);
+	auto p = std::make_unique<pipe_listener>(this, std::move(name));
+	if (!p->security.descriptor() || !p->accept_next())
+		return failed(parser_strings::messages::net_bind_failed);
+	bound.push_back(a);
+	pipes.push_back(std::move(p));
+	return true;
+}
+
+bool pipe_listener::accept_next() {
+	SECURITY_ATTRIBUTES sa{ sizeof(SECURITY_ATTRIBUTES),
+		security.descriptor(), FALSE };
+	// The first instance refuses a name that another process holds.
+	const DWORD open_mode = PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED
+		| (first ? FILE_FLAG_FIRST_PIPE_INSTANCE : 0);
+	HANDLE h = ::CreateNamedPipeW(name.c_str(), open_mode,
+		PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT
+			| PIPE_REJECT_REMOTE_CLIENTS,
+		PIPE_UNLIMITED_INSTANCES, 65536, 65536, 0, &sa);
+	if (h == INVALID_HANDLE_VALUE) return false;
+	first = false;
+	pending = std::make_shared<ba::windows::stream_handle>(srv->io, h);
+	auto pipe = pending;
+	ba::windows::overlapped_ptr op(srv->io,
+		[this, pipe](error_code ec, size_t) {
+			if (srv->stopping) return;
+			if (!ec) srv->on_accept(conn_socket(std::move(*pipe)),
+				peer_info{ line_transport_kind::local_socket, {} });
+			accept_or_retry();
+		});
+	const BOOL ok = ::ConnectNamedPipe(h, op.get());
+	const DWORD err = ::GetLastError();
+	if (!ok && err != ERROR_IO_PENDING) {
+		// a client that connected between the create and the call
+		if (err == ERROR_PIPE_CONNECTED) op.complete(error_code(), 0);
+		else op.complete(error_code(static_cast<int>(err),
+			ba::error::get_system_category()), 0);
+	} else op.release();
+	return true;
+}
+
+void pipe_listener::accept_or_retry() {
+	if (!accept_next())
+		srv->retry_accept([this] { accept_or_retry(); });
+}
 #endif
 
 void line_server::retry_accept(std::function<void()> accept) {
@@ -780,9 +866,7 @@ bool line_server::start() {
 			if (!listen_tcp(a)) return false;
 			break;
 		case line_transport_kind::local_socket:
-#ifndef _WIN32
 			if (!listen_local(a)) return false;
-#endif
 			break;
 		}
 	}
@@ -817,7 +901,10 @@ void line_server::close_all() {
 	for (auto& c : live) c->close();
 	error_code ec;
 	for (auto& l : tcp_listeners) l.acceptor->close(ec);
-#ifndef _WIN32
+#ifdef _WIN32
+	for (auto& p : pipes)
+		if (p->pending) p->pending->close(ec);
+#else
 	for (auto& a : local_acceptors) a->close(ec);
 	std::error_code fec;
 	for (const auto& f : socket_files) std::filesystem::remove(f, fec);
