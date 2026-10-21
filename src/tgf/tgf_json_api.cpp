@@ -2,14 +2,18 @@
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 #include <cctype>
+#include <cmath>
 #include <iostream>
+#include <limits>
 #include <istream>
 #include <ostream>
 #include <set>
 #include <streambuf>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #ifdef _WIN32
@@ -28,6 +32,7 @@
 namespace idni {
 
 using format::json::value;
+using jt = format::json::tree;
 using diagnostics::code;
 
 // Success result carrying @p v. result<std::string> has no value
@@ -173,6 +178,52 @@ static diagnostics::result<std::string> request_to_src(
 
 static value report_value(const diagnostics::report& r) {
 	return format::json::to_value(r, true);
+}
+
+tref build_option(const option_value& v) {
+	return std::visit([](const auto& x) -> tref {
+		using T = std::decay_t<decltype(x)>;
+		if constexpr (std::is_same_v<T, bool>)
+			return jt::build_bool(x);
+		else if constexpr (std::is_same_v<T, std::size_t>)
+			return jt::build_number(static_cast<double>(x));
+		else if constexpr (std::is_same_v<T, std::string>)
+			return jt::build_string(x);
+		else {
+			trefs a;
+			for (const auto& e : x) a.push_back(jt::build_string(e));
+			return jt::build_array(a);
+		}
+	}, v);
+}
+
+std::optional<option_value> option_of(tref v) {
+	if (v == nullptr) return std::nullopt;
+	const jt& t = jt::get(v);
+	if (t.is_bool())
+		return option_value(std::in_place_type<bool>, t.get_bool());
+	if (t.is_number()) {
+		const double d = t.get_number();
+		// a double holds every whole number up to 2^53 exactly
+		constexpr double exact = 9007199254740992.0;
+		constexpr double max = static_cast<double>(
+			std::numeric_limits<std::size_t>::max());
+		if (!(d >= 0) || d > exact || d > max || std::trunc(d) < d)
+			return std::nullopt;
+		return option_value(std::in_place_type<std::size_t>,
+			static_cast<std::size_t>(d));
+	}
+	if (t.is_string())
+		return option_value(std::in_place_type<std::string>,
+			t.get_string());
+	if (!t.is_array()) return std::nullopt;
+	option_list entries;
+	for (const jt& e : t.children_trees()) {
+		if (!e.is_string()) return std::nullopt;
+		entries.push_back(e.get_string());
+	}
+	return option_value(std::in_place_type<option_list>,
+		std::move(entries));
 }
 
 format::json::value state_value(const tgf_repl_evaluator& re) {

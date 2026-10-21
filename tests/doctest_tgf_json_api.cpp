@@ -13,6 +13,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
+#include <optional>
 #include <set>
 #include <sstream>
 #include <string>
@@ -20,6 +22,8 @@
 
 using namespace idni;
 using namespace idni::format;
+
+using jt = json::tree;
 
 static std::string grammar_path() {
 	return std::string(PROJECT_SOURCE_DIR) + "/tests/fixtures/tiny.tgf";
@@ -434,6 +438,74 @@ TEST_SUITE("tgf json api: invalid and unknown requests") {
 		REQUIRE(r.responses.size() == 1);
 		CHECK(r.responses[0].find("status")->as_string() == "error");
 		CHECK(r.responses[0].find("id")->as_number() == 5);
+	}
+}
+
+TEST_SUITE("tgf json api: option values as JSON") {
+
+	// The option value of the JSON text @p text.
+	static std::optional<option_value> option_of_text(
+		std::string_view text)
+	{
+		auto t = jt::get(text);
+		REQUIRE(t.has_value());
+		return option_of(t.value());
+	}
+
+	TEST_CASE("each kind gives its JSON form") {
+		CHECK(jt::get(build_option(option_value(true))).to_str()
+			== "true");
+		CHECK(jt::get(build_option(option_value(false))).to_str()
+			== "false");
+		CHECK(jt::get(build_option(option_value(size_t{ 7 })))
+			.to_str() == "7");
+		CHECK(jt::get(build_option(option_value(std::string("x"))))
+			.to_str() == R"("x")");
+		CHECK(jt::get(build_option(option_value(
+			option_list{ "a > b", "c" }))).to_str()
+			== R"(["a > b","c"])");
+		CHECK(jt::get(build_option(option_value(option_list{})))
+			.to_str() == "[]");
+	}
+
+	TEST_CASE("each kind reads back from its JSON form") {
+		for (const option_value& v : { option_value(true),
+			option_value(size_t{ 0 }), option_value(size_t{ 42 }),
+			option_value(std::string("")),
+			option_value(std::string("x")),
+			option_value(option_list{}),
+			option_value(option_list{ "a", "b" }) })
+		{
+			auto back = option_of(build_option(v));
+			REQUIRE(back.has_value());
+			CHECK(*back == v);
+		}
+		auto big = option_of_text("9007199254740992");
+		REQUIRE(big.has_value());
+		CHECK(std::get<size_t>(*big) == size_t{ 9007199254740992u });
+		auto zero = option_of_text("-0");
+		REQUIRE(zero.has_value());
+		CHECK(std::get<size_t>(*zero) == 0);
+	}
+
+	TEST_CASE("a wrong kind, a negative number, a fraction or a number "
+		"over 2^53 gives nothing")
+	{
+		for (const char* text : { "null", "{}", R"({"a":1})", "[1]",
+			R"(["a",true])", "[[]]", "-1", "1.5", "-0.5",
+			"9007199254740994", "1e300" })
+		{
+			CAPTURE(text);
+			CHECK_FALSE(option_of_text(text).has_value());
+		}
+		CHECK_FALSE(option_of(nullptr).has_value());
+	}
+
+	TEST_CASE("a number over the largest size_t gives nothing") {
+		// 2^32 - 1 fits a 32-bit size_t, 2^32 fits only a 64-bit one
+		CHECK(option_of_text("4294967295").has_value());
+		CHECK(option_of_text("4294967296").has_value()
+			== (std::numeric_limits<size_t>::max() >= 4294967296ull));
 	}
 }
 

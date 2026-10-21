@@ -352,6 +352,13 @@ format::json::value json_result_response(cmd_status status,
 	const format::json::value& state,
 	const diagnostics::report& report);
 
+/// The JSON form of an option value: a bool, a number, a string or an
+/// array of strings.
+tref build_option(const option_value& v);
+/// The option value of the JSON @p v. Nothing for another kind, a
+/// negative number, a fraction or a number over 2^53 or the largest size_t.
+std::optional<option_value> option_of(tref v);
+
 } // namespace idni
 
 #endif // __IDNI__PARSER__TGF__TGF_CLI_H__
