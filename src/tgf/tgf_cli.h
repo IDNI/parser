@@ -24,6 +24,7 @@
 #endif
 #include "format/json/json.h"
 #include "tgf_repl_parser.generated.h"
+#include "tgf_repl_evaluator_base.h"
 #include "tgf_cli_options.h"
 
 namespace idni {

@@ -33,6 +33,7 @@ namespace idni {
 
 using jt = format::json::tree;
 using diagnostics::code;
+using tp = tgf_protocol;
 
 // Success result carrying @p v. result<std::string> has no value
 // constructor, so every string value goes through emplace().
@@ -116,7 +117,7 @@ static diagnostics::result<std::string> request_to_src(
 	if (!known_command(cmd)) return unknown();
 
 	if (cmd == "parse" || cmd == "parse file" || cmd == "load") {
-		const char* field = cmd == "parse" ? "input" : "file";
+		const char* field = cmd == "parse" ? tp::input : tp::file;
 		auto s = required_string_field(q, field);
 		if (!s.has_value()) return s;
 		return ok_result(cmd + " " + quote(s.value()));
@@ -124,7 +125,7 @@ static diagnostics::result<std::string> request_to_src(
 
 	if (cmd == "start" || cmd == "internal-grammar"
 			|| cmd == "unreachable") {
-		auto sym = optional_string_field(q, "symbol");
+		auto sym = optional_string_field(q, tp::symbol);
 		if (!sym.has_value()) return sym;
 		if (sym.value().empty()) return ok_result(cmd);
 		if (!is_symbol(sym.value()))
@@ -135,7 +136,7 @@ static diagnostics::result<std::string> request_to_src(
 	}
 
 	if (cmd == "help") {
-		auto c = optional_string_field(q, "command");
+		auto c = optional_string_field(q, tp::command);
 		if (!c.has_value()) return c;
 		if (c.value().empty()) return ok_result(cmd);
 		if (!known_help_argument(c.value()))
@@ -148,7 +149,7 @@ static diagnostics::result<std::string> request_to_src(
 	// A declared name is the only text of the option that reaches the
 	// REPL text. set, add and delete run without REPL text.
 	if (cmd == "get") {
-		auto name = optional_string_field(q, "option");
+		auto name = optional_string_field(q, tp::option);
 		if (!name.has_value()) return name;
 		if (name.value().empty()) return ok_result(cmd);
 		if (!re.session_option(name.value()))
@@ -157,7 +158,7 @@ static diagnostics::result<std::string> request_to_src(
 	}
 
 	if (cmd == "toggle" || cmd == "enable" || cmd == "disable") {
-		auto name = required_string_field(q, "option");
+		auto name = required_string_field(q, tp::option);
 		if (!name.has_value()) return name;
 		if (!re.session_option(name.value()))
 			return unknown_opt(name.value());
@@ -225,11 +226,11 @@ tref state_value(const tgf_repl_evaluator& re) {
 				jt::build_number(static_cast<double>(i)));
 	}
 	return jt::build_object({
-		jt::build_pair("grammar", re.has_grammar()
+		jt::build_pair(tp::grammar, re.has_grammar()
 			? jt::build_string(re.filename()) : jt::_null()),
-		jt::build_pair("start", re.start_symbol().empty()
+		jt::build_pair(tp::start, re.start_symbol().empty()
 			? jt::_null() : jt::build_string(re.start_symbol())),
-		jt::build_pair("char_classes", jt::build_array(cc)) });
+		jt::build_pair(tp::char_classes, jt::build_array(cc)) });
 }
 
 void json_write_line(std::ostream& os, const format::json::value& v) {
@@ -248,19 +249,19 @@ static tref hello_object(tgf_repl_evaluator& re,
 	const diagnostics::report& extra = diagnostics::report{})
 {
 	const jt& state = jt::get(state_value(re));
-	trefs h{ jt::build_pair("protocol", jt::build_number(1)),
-		jt::build_pair("version",
+	trefs h{ jt::build_pair(tp::protocol, jt::build_number(1)),
+		jt::build_pair(tp::version,
 			jt::build_string(tauparser::full_version)) };
 	if (!re.session_id.empty()) h.push_back(
-		jt::build_pair("session", jt::build_string(re.session_id)));
-	h.push_back(jt::build_pair("grammar", state.find("grammar")));
-	h.push_back(jt::build_pair("fixed_grammar",
+		jt::build_pair(tp::session, jt::build_string(re.session_id)));
+	h.push_back(jt::build_pair(tp::grammar, state.find(tp::grammar)));
+	h.push_back(jt::build_pair(tp::fixed_grammar,
 		jt::build_bool(re.has_fixed_grammar())));
-	h.push_back(jt::build_pair("start", state.find("start")));
-	h.push_back(jt::build_pair("options", re.option_values()));
+	h.push_back(jt::build_pair(tp::start, state.find(tp::start)));
+	h.push_back(jt::build_pair(tp::options, re.option_values()));
 	diagnostics::report r = re.take_report();
 	r.append(extra);
-	h.push_back(jt::build_pair("report", jt::build_report(r, true)));
+	h.push_back(jt::build_pair(tp::report, jt::build_report(r, true)));
 	return jt::build_object(h);
 }
 
@@ -283,22 +284,22 @@ static std::pair<tref, diagnostics::report> option_request(
 		return std::pair{ jt::build_object({}), std::move(rep) };
 	};
 	const jt& req = jt::get(q);
-	auto name = required_string_field(q, "option");
+	auto name = required_string_field(q, tp::option);
 	if (!name.has_value())
 		return { jt::build_object({}), name.report() };
 	const bool add = cmd == "add";
 	tref data = nullptr;
-	if (req.find("text") && req.find("value"))
+	if (req.find(tp::text) && req.find(tp::value))
 		return fail(parser_strings::messages::invalid_field_type);
-	if (req.find("text")) {
-		auto t = required_string_field(q, "text");
+	if (req.find(tp::text)) {
+		auto t = required_string_field(q, tp::text);
 		if (!t.has_value())
 			return { jt::build_object({}), t.report() };
 		data = cmd == "set" ? re.set_cmd(name.value(), t.value())
 			: re.list_cmd(name.value(), t.value(), add);
 		return { data, re.take_report() };
 	}
-	tref f = req.find("value");
+	tref f = req.find(tp::value);
 	if (!f) return fail(parser_strings::messages::missing_field);
 	auto v = option_of(f);
 	if (!v) return fail(parser_strings::messages::invalid_field_type);
@@ -313,13 +314,13 @@ static std::pair<tref, cmd_status> handle_request(
 	tgf_repl_evaluator& re, tref q)
 {
 	tref id = jt::_null();
-	if (tref i = jt::get(q).find("id"); i) id = i;
-	auto cmd = required_string_field(q, "cmd");
+	if (tref i = jt::get(q).find(tp::id); i) id = i;
+	auto cmd = required_string_field(q, tp::cmd);
 	if (!cmd.has_value())
 		return { json_error_response(id, state_value(re), cmd.report()),
 			cmd_status::error };
-	if (cmd.value() == "eval") {
-		auto src = required_string_field(q, "src");
+	if (cmd.value() == tp::eval) {
+		auto src = required_string_field(q, tp::src);
 		if (!src.has_value())
 			return { json_error_response(id, state_value(re),
 				src.report()), cmd_status::error };
@@ -328,19 +329,19 @@ static std::pair<tref, cmd_status> handle_request(
 			? cmd_status::quit : cmd_status::ok;
 		return { json_eval_response(id, er, state_value(re)), st };
 	}
-	if (cmd.value() == "hello") {
+	if (cmd.value() == tp::hello) {
 		const tref h = hello_object(re);
 		return { json_hello_response(id, h, state_value(re)),
 			cmd_status::ok };
 	}
 	// The load form with source text carries no path, so it runs the
 	// evaluator directly instead of going through the REPL text.
-	if (cmd.value() == "load" && jt::get(q).find("source")) {
-		auto name = required_string_field(q, "name");
+	if (cmd.value() == "load" && jt::get(q).find(tp::source)) {
+		auto name = required_string_field(q, tp::name);
 		if (!name.has_value())
 			return { json_error_response(id, state_value(re),
 				name.report()), cmd_status::error };
-		auto source = required_string_field(q, "source");
+		auto source = required_string_field(q, tp::source);
 		if (!source.has_value())
 			return { json_error_response(id, state_value(re),
 				source.report()), cmd_status::error };
@@ -408,7 +409,7 @@ static diagnostics::report apply_init(tgf_repl_evaluator& re,
 	}
 	// The line limit applies to the lines after the init line, which was
 	// already read with the limit the caller passed.
-	if (tref m = init.find("max_line"); m && !jt::get(m).is_null()) {
+	if (tref m = init.find(tp::max_line); m && !jt::get(m).is_null()) {
 		if (!jt::get(m).is_number())
 			r.error(diagnostics::code::invalid_argument,
 				parser_strings::messages::invalid_field_type);
@@ -416,13 +417,13 @@ static diagnostics::report apply_init(tgf_repl_evaluator& re,
 	}
 	// The grammar key is null with no grammar and absent for a built-in
 	// grammar, which the child already has and keeps.
-	if (tref g = init.find("grammar"); g && !jt::get(g).is_null()) {
+	if (tref g = init.find(tp::grammar); g && !jt::get(g).is_null()) {
 		if (!jt::get(g).is_object()) {
 			r.error(diagnostics::code::invalid_argument,
 				parser_strings::messages::invalid_field_type);
 		} else {
-			auto name = required_string_field(g, "name");
-			auto source = required_string_field(g, "source");
+			auto name = required_string_field(g, tp::name);
+			auto source = required_string_field(g, tp::source);
 			if (!name.has_value()) r.append(name.report());
 			else if (!source.has_value())
 				r.append(source.report());
@@ -437,13 +438,13 @@ static diagnostics::report apply_init(tgf_repl_evaluator& re,
 			}
 		}
 	}
-	if (tref s = init.find("start"); s && !jt::get(s).is_null()) {
+	if (tref s = init.find(tp::start); s && !jt::get(s).is_null()) {
 		if (!jt::get(s).is_string()) {
 			r.error(diagnostics::code::invalid_argument,
 				parser_strings::messages::invalid_field_type);
 		} else apply_init_option(re, "start", s, r);
 	}
-	if (tref o = init.find("options"); o && !jt::get(o).is_null()) {
+	if (tref o = init.find(tp::options); o && !jt::get(o).is_null()) {
 		if (!jt::get(o).is_object()) {
 			r.error(diagnostics::code::invalid_argument,
 				parser_strings::messages::invalid_field_type);
@@ -470,7 +471,7 @@ int tgf_json_loop(tgf_repl_evaluator& re, std::istream& in,
 			auto parsed = too_long ? diagnostics::result<tref>{}
 				: json_parse_line(init_line);
 			tref node = parsed.has_value() && parsed.value()
-				? jt::get(parsed.value()).find("init")
+				? jt::get(parsed.value()).find(tp::init)
 				: nullptr;
 			if (too_long)
 				init_report.error(

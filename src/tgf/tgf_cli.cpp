@@ -35,6 +35,7 @@
 namespace idni {
 
 using namespace std;
+using tp = tgf_protocol;
 
 using tt = tgf_repl_parser::tree::traverser;
 using jt = format::json::tree;
@@ -585,7 +586,7 @@ tref tgf_repl_evaluator::parsed(parser_type::result& res) {
 	using c_t = parser_type::char_type;
 	using t_t = parser_type::terminal_type;
 	trefs v;
-	if (opt.print_input) v.push_back(jt::build_pair("input",
+	if (opt.print_input) v.push_back(jt::build_pair(tp::input,
 		jt::build_string(res.get_input())));
 	if (opt.print_ambiguity) {
 		trefs nodes;
@@ -600,25 +601,25 @@ tref tgf_repl_evaluator::parsed(parser_type::result& res) {
 							node_to_tree<tree>(t));
 				}
 				alts_arr.push_back(jt::build_object({
-					jt::build_pair("children",
+					jt::build_pair(tp::children,
 						jt::build_array(children)) }));
 			}
 			nodes.push_back(jt::build_object({
-				jt::build_pair("symbol", jt::build_string(
+				jt::build_pair(tp::symbol, jt::build_string(
 					n.first.to_std_string())),
-				jt::build_pair("id", jt::build_number(
+				jt::build_pair(tp::id, jt::build_number(
 					static_cast<double>(n.first.n()))),
-				jt::build_pair("range",
+				jt::build_pair(tp::range,
 					range_value(n.second)),
-				jt::build_pair("alternatives",
+				jt::build_pair(tp::alternatives,
 					jt::build_array(alts_arr)) }));
 		}
-		v.push_back(jt::build_pair("ambiguous", jt::build_object({
-			jt::build_pair("trees", jt::build_number(
+		v.push_back(jt::build_pair(tp::ambiguous, jt::build_object({
+			jt::build_pair(tp::trees, jt::build_number(
 				static_cast<double>(res.count_trees()))),
-			jt::build_pair("nodes", jt::build_array(nodes)) })));
+			jt::build_pair(tp::nodes, jt::build_array(nodes)) })));
 	}
-	if (opt.print_terminals) v.push_back(jt::build_pair("terminals",
+	if (opt.print_terminals) v.push_back(jt::build_pair(tp::terminals,
 		jt::build_string(to_std_string(res.get_terminals()))));
 	if (opt.tml_rules) {
 		stringstream ss;
@@ -629,16 +630,16 @@ tref tgf_repl_evaluator::parsed(parser_type::result& res) {
 			return true;
 		};
 		f->extract_graphs(f->root(), cb_next_g);
-		v.push_back(jt::build_pair("tml_rules",
+		v.push_back(jt::build_pair(tp::tml_rules,
 			jt::build_string(ss.str())));
 	}
 	if (opt.tml_facts) {
 		stringstream ss;
 		to_tml_facts<c_t, t_t>(ss << "TML facts:\n", res);
-		v.push_back(jt::build_pair("tml_facts",
+		v.push_back(jt::build_pair(tp::tml_facts,
 			jt::build_string(ss.str())));
 	}
-	if (opt.print_graphs) v.push_back(jt::build_pair("tree",
+	if (opt.print_graphs) v.push_back(jt::build_pair(tp::tree,
 		format::ast_json::node_to_tree<tree>(
 			res.get_shaped_tree2(shaping()))));
 	report.append(std::move(res.report()));
@@ -700,14 +701,14 @@ tref tgf_repl_evaluator::production_id_entry(size_t p) const {
 	}
 	const std::string* guard = g().production_guard(p);
 	return jt::build_object({
-		jt::build_pair("index",
+		jt::build_pair(tp::index,
 			jt::build_number(static_cast<double>(p))),
-		jt::build_pair("head", jt::build_number(
+		jt::build_pair(tp::head, jt::build_number(
 			static_cast<double>(g()(p).n()))),
-		jt::build_pair("body", jt::build_array(body)),
-		jt::build_pair("guard",
+		jt::build_pair(tp::body, jt::build_array(body)),
+		jt::build_pair(tp::guard,
 			guard ? jt::build_string(*guard) : jt::_null()),
-		jt::build_pair("conjunctive",
+		jt::build_pair(tp::conjunctive,
 			jt::build_bool(g().conjunctive(p))) });
 }
 
@@ -721,8 +722,8 @@ tref tgf_repl_evaluator::productions_value(const char* key,
 	}
 	return jt::build_object({
 		jt::build_pair(key, jt::build_string(symbol)),
-		jt::build_pair("productions", jt::build_array(prods)),
-		jt::build_pair("production_ids", jt::build_array(pids)) });
+		jt::build_pair(tp::productions, jt::build_array(prods)),
+		jt::build_pair(tp::production_ids, jt::build_array(pids)) });
 }
 
 bool tgf_repl_evaluator::reload(const string& new_tgf_file) {
@@ -761,8 +762,8 @@ tref tgf_repl_evaluator::load_answer(bool loaded,
 	const std::string& name) const
 {
 	return jt::build_object({
-		jt::build_pair("grammar", jt::build_string(name)),
-		jt::build_pair("loaded", jt::build_bool(loaded)) });
+		jt::build_pair(tp::grammar, jt::build_string(name)),
+		jt::build_pair(tp::loaded, jt::build_bool(loaded)) });
 }
 
 // Data of the load and reload commands. @p new_tgf_file is the file to
@@ -793,7 +794,7 @@ tref tgf_repl_evaluator::reload_source_data() {
 tref tgf_repl_evaluator::get_cmd(std::string_view name) {
 	namespace ps = parser_strings;
 	if (name.empty()) return jt::build_object({
-		jt::build_pair("options", option_values()) });
+		jt::build_pair(tp::options, option_values()) });
 	if (!session_option(name)) {
 		report.error(diagnostics::code::not_found,
 			ps::messages::option_not_found,
@@ -801,8 +802,8 @@ tref tgf_repl_evaluator::get_cmd(std::string_view name) {
 		return jt::build_object({});
 	}
 	return jt::build_object({
-		jt::build_pair("option", jt::build_string(name)),
-		jt::build_pair("value",
+		jt::build_pair(tp::option, jt::build_string(name)),
+		jt::build_pair(tp::value,
 			build_option(idni::options().value(name))) });
 }
 
@@ -1087,20 +1088,20 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 				? static_cast<size_t>(optarg)
 				: static_cast<size_t>(p::help_sym);
 			data = jt::build_object({
-				jt::build_pair("command",
+				jt::build_pair(tp::command,
 					jt::build_string(help_arg_name(target))),
-				jt::build_pair("text", jt::build_string(
+				jt::build_pair(tp::text, jt::build_string(
 					help_text(*this, target,
 						!fixed_grammar))) });
 			break;
 		}
 		case p::version_cmd: {
-			data = jt::build_object({ jt::build_pair("version",
+			data = jt::build_object({ jt::build_pair(tp::version,
 				jt::build_string(tauparser::full_version)) });
 			break;
 		}
 		case p::license_cmd: {
-			data = jt::build_object({ jt::build_pair("license",
+			data = jt::build_object({ jt::build_pair(tp::license,
 				jt::build_string(tauparser::license)) });
 			break;
 		}
@@ -1168,9 +1169,9 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			}
 			const string start = start_symbol();
 			data = jt::build_object({
-				jt::build_pair("start", start.empty()
+				jt::build_pair(tp::start, start.empty()
 					? jt::_null() : jt::build_string(start)),
-				jt::build_pair("changed",
+				jt::build_pair(tp::changed,
 					jt::build_bool(changed)) });
 			break;
 		}
@@ -1179,16 +1180,16 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 			auto n = s | p::symbol;
 			string start = n.has_value()
 				? n | tt::terminals : start_symbol();
-			data = productions_value("start", start,
+			data = productions_value(tp::start, start,
 				g().reachable_productions(g().nt(start)));
 			break;
 		}
 		case p::grammar_cmd: {
 			if (!require_grammar()) break;
 			data = jt::build_object({
-				jt::build_pair("file",
+				jt::build_pair(tp::file,
 					jt::build_string(tgf_filename)),
-				jt::build_pair("source",
+				jt::build_pair(tp::source,
 					jt::build_string(grammar_source)) });
 			break;
 		}
@@ -1199,7 +1200,7 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 				? n | tt::terminals : start_symbol();
 			auto unreachable = g().unreachable_productions(
 				g().nt(start));
-			data = productions_value("symbol", start, unreachable);
+			data = productions_value(tp::symbol, start, unreachable);
 			break;
 		}
 		case p::parse_cmd: {
@@ -1282,10 +1283,10 @@ static std::string quoted_terminal(const std::string& text) {
 
 // The symbol of an AST JSON node, or its quoted terminal text.
 static std::string node_label(tref node) {
-	if (auto s = format::json::string_member(node, "symbol");
+	if (auto s = format::json::string_member(node, tp::symbol);
 			s && !s->empty())
 		return *s;
-	if (auto t = format::json::string_member(node, "text"); t)
+	if (auto t = format::json::string_member(node, tp::text); t)
 		return quoted_terminal(*t);
 	return {};
 }
@@ -1293,7 +1294,7 @@ static std::string node_label(tref node) {
 // The range of an AST JSON node: "[<begin><sep><end>]".
 static void print_range(std::ostream& os, const jtt& node, const char* sep) {
 	os << "[";
-	auto r = node | jtt::member("range");
+	auto r = node | jtt::member(tp::range);
 	if (r.is(json_parser::arr) && r.value_tree().children_size() >= 2)
 		os << static_cast<long long>(r | jtt::first | jtt::number)
 			<< sep << static_cast<long long>(
@@ -1307,11 +1308,11 @@ static void render_data_ambiguous_node(std::ostream& os, const jtt& node) {
 	print_range(os, node, ",");
 	os << "\n";
 	size_t d = 0;
-	auto alts = node | jtt::member("alternatives");
+	auto alts = node | jtt::member(tp::alternatives);
 	if (alts.is(json_parser::arr))
 		for (const auto& alt : (alts | jtt::children)()) {
 			os << "\t\t " << d++ << "\t";
-			auto ch = alt | jtt::member("children");
+			auto ch = alt | jtt::member(tp::children);
 			if (ch.is(json_parser::arr))
 				for (const auto& c : (ch | jtt::children)()) {
 					os << " `" << node_label(c.value()) << "`";
@@ -1337,7 +1338,7 @@ static void render_data_tree(std::ostream& os, tref root, size_t l,
 	auto into = [](tref n) {
 		const jt& t = jt::get(n);
 		return !t.is(json_parser::object_pair)
-			|| t.get_string() == "children";
+			|| t.get_string() == tp::children;
 	};
 	auto enter = [&](tref n) {
 		if (!jt::get(n).is_object()) return;
@@ -1345,7 +1346,7 @@ static void render_data_tree(std::ostream& os, tref root, size_t l,
 		for (size_t i = 0; i != l; ++i) os << "\t";
 		++l;
 		const std::string label = node_label(n);
-		if (auto id = node | jtt::member("id");
+		if (auto id = node | jtt::member(tp::id);
 				id.is(json_parser::number))
 			os << TC_NT << label << TC.CLEAR() << TC_NT_ID << "("
 				<< static_cast<long long>(id | jtt::number)
@@ -1366,30 +1367,30 @@ static void render_data_parse(const cmd_result& r, std::ostream& os,
 	using format::json::string_member;
 	const jtt data(r.data);
 	const tref d = r.data->get();
-	if (auto in = string_member(d, "input"); in)
+	if (auto in = string_member(d, tp::input); in)
 		os << "input: \"" << *in << "\"\n";
-	if (auto amb = data | jtt::member("ambiguous");
+	if (auto amb = data | jtt::member(tp::ambiguous);
 			amb.is(json_parser::object)) {
-		double n = amb | jtt::member("trees") | jtt::number;
+		double n = amb | jtt::member(tp::trees) | jtt::number;
 		// The text printer stays silent for an unambiguous parse.
 		if (n > 1) {
 			os << "# n trees: " << static_cast<long long>(n)
 				<< "\n# ambiguous nodes:\n";
-			if (auto nodes = amb | jtt::member("nodes");
+			if (auto nodes = amb | jtt::member(tp::nodes);
 					nodes.is(json_parser::arr))
 				for (const auto& node : (nodes
 						| jtt::children)())
 					render_data_ambiguous_node(os, node);
 		}
 	}
-	if (auto t = string_member(d, "terminals"); t)
+	if (auto t = string_member(d, tp::terminals); t)
 		os << "parsed terminals: " << TC_T << *t
 			<< TC_CLEARED_DEFAULT << "\n";
-	if (auto tml = string_member(d, "tml_rules"); tml)
+	if (auto tml = string_member(d, tp::tml_rules); tml)
 		os << *tml;
-	if (auto tml = string_member(d, "tml_facts"); tml)
+	if (auto tml = string_member(d, tp::tml_facts); tml)
 		os << *tml;
-	if (auto tree = data | jtt::member("tree");
+	if (auto tree = data | jtt::member(tp::tree);
 			tree.is(json_parser::object)) {
 		os << "parsed graph:\n";
 		render_data_tree(os, tree.value(), 1, TC);
@@ -1398,7 +1399,7 @@ static void render_data_parse(const cmd_result& r, std::ostream& os,
 
 // The grammar source text from the response data.
 static void render_data_grammar(const cmd_result& r, std::ostream& os) {
-	print_grammar_source(os, jtt(r.data) | jtt::member("source")
+	print_grammar_source(os, jtt(r.data) | jtt::member(tp::source)
 		| jtt::string);
 }
 
@@ -1441,20 +1442,20 @@ static void render_data_production(std::ostream& os,
 	bool conjunctive = false;
 	std::string guard;
 	if (pid.is(json_parser::object)) {
-		if (auto i = pid | jtt::member("index");
+		if (auto i = pid | jtt::member(tp::index);
 				i.is(json_parser::number))
 			index = static_cast<size_t>(i | jtt::number);
-		if (auto h = pid | jtt::member("head");
+		if (auto h = pid | jtt::member(tp::head);
 				h.is(json_parser::number)) {
 			head_id = static_cast<long long>(h | jtt::number);
 			have_head = true;
 		}
-		if (auto b = pid | jtt::member("body");
+		if (auto b = pid | jtt::member(tp::body);
 				b.is(json_parser::arr))
 			body_ids = b;
-		conjunctive = pid | jtt::member("conjunctive")
+		conjunctive = pid | jtt::member(tp::conjunctive)
 			| jtt::boolean;
-		guard = pid | jtt::member("guard") | jtt::string;
+		guard = pid | jtt::member(tp::guard) | jtt::string;
 	}
 	// "G<p>:" padded to id_width, then the head with its id padded to
 	// head_width, then " =>".
@@ -1523,10 +1524,10 @@ static void render_data_productions(const cmd_result& r, std::ostream& os,
 	const term::colors& TC, const std::set<size_t>* char_classes)
 {
 	const jtt data(r.data);
-	auto prods = data | jtt::member("productions");
-	auto pids = data | jtt::member("production_ids");
+	auto prods = data | jtt::member(tp::productions);
+	auto pids = data | jtt::member(tp::production_ids);
 	const bool unreachable = r.cmd == "unreachable";
-	std::string s = data | jtt::member(unreachable ? "symbol" : "start")
+	std::string s = data | jtt::member(unreachable ? tp::symbol : tp::start)
 		| jtt::string;
 	const trefs prod_list = prods.is(json_parser::arr)
 		? (prods | jtt::children | jtt::refs) : trefs{};
@@ -1572,23 +1573,23 @@ void render_command_text(const cmd_result& r, std::ostream& os,
 	if (r.cmd == "clear") return;
 	const jtt data(r.data);
 	if (r.cmd == "version") {
-		if (auto v = data | jtt::member("version"); v)
+		if (auto v = data | jtt::member(tp::version); v)
 			os << (v | jtt::string) << "\n";
 		return;
 	}
 	if (r.cmd == "license") {
-		if (auto v = data | jtt::member("license"); v)
+		if (auto v = data | jtt::member(tp::license); v)
 			os << (v | jtt::string) << "\n";
 		return;
 	}
 	if (r.cmd == "help") {
-		if (auto v = data | jtt::member("text"); v)
+		if (auto v = data | jtt::member(tp::text); v)
 			os << (v | jtt::string);
 		return;
 	}
 	if (r.cmd == "start") {
-		auto s = data | jtt::member("start");
-		auto ch = data | jtt::member("changed");
+		auto s = data | jtt::member(tp::start);
+		auto ch = data | jtt::member(tp::changed);
 		if (!s || !ch) return;
 		if (ch | jtt::boolean) os << "start symbol set: " << TC_NT
 			<< (s | jtt::string) << TC_DEFAULT << "\n";
@@ -1597,9 +1598,9 @@ void render_command_text(const cmd_result& r, std::ostream& os,
 		return;
 	}
 	if (r.cmd == "load" || r.cmd == "reload") {
-		auto l = data | jtt::member("loaded");
+		auto l = data | jtt::member(tp::loaded);
 		if (!l) return;   // fixed grammar: only the warning
-		auto name = data | jtt::member("grammar") | jtt::string;
+		auto name = data | jtt::member(tp::grammar) | jtt::string;
 		if (l | jtt::boolean) os << "loaded: " << name << "\n";
 		else os << "reload failed: " << name << "\n";
 		return;
@@ -1609,12 +1610,12 @@ void render_command_text(const cmd_result& r, std::ostream& os,
 		l.resize(std::max<size_t>(l.size(), 24), ' ');
 		return l;
 	};
-	if (auto o = data | jtt::member("option"); o) {
+	if (auto o = data | jtt::member(tp::option); o) {
 		os << label(o | jtt::string)
-			<< option_text(data | jtt::member("value")) << "\n";
+			<< option_text(data | jtt::member(tp::value)) << "\n";
 		return;
 	}
-	if (auto opts = data | jtt::member("options"); opts) {
+	if (auto opts = data | jtt::member(tp::options); opts) {
 		for (tref kv : ((opts || json_parser::object_pair) | jtt::refs))
 			os << label(jt::get(kv).get_string())
 				<< option_text(jtt(kv) | jtt::only_child)
@@ -1632,7 +1633,7 @@ void tgf_repl_evaluator::render_text(const cmd_result& res,
 	// A character class nonterminal takes its own color.
 	std::set<size_t> char_classes;
 	if (res.cmd == "internal-grammar" || res.cmd == "unreachable") {
-		auto cc = jtt(state_value(*this)) | jtt::member("char_classes");
+		auto cc = jtt(state_value(*this)) | jtt::member(tp::char_classes);
 		if (cc.is(json_parser::arr))
 			for (tref n : (cc | jtt::children | jtt::refs))
 				if (jt::get(n).is_number()) char_classes.insert(
@@ -1645,7 +1646,7 @@ void tgf_repl_evaluator::render_text(const cmd_result& res,
 tref statement_request(const tgf_repl_evaluator::trv& n) {
 	using p = tgf_repl_parser;
 	const auto nt = n | tt::nonterminal;
-	trefs req{ jt::build_pair("cmd", jt::build_string(command_name(nt))) };
+	trefs req{ jt::build_pair(tp::cmd, jt::build_string(command_name(nt))) };
 	auto add = [&req](const char* key, std::string_view v) {
 		req.push_back(jt::build_pair(key, jt::build_string(v)));
 	};
@@ -1659,44 +1660,44 @@ tref statement_request(const tgf_repl_evaluator::trv& n) {
 			diagnostics::report rep;
 			input = unquote(qs | tt::terminals, rep);
 		}
-		add("input", input);
+		add(tp::input, input);
 		break;
 	}
 	case p::parse_file_cmd:
 	case p::load_cmd: {
 		auto fn = n | p::filename;
 		diagnostics::report rep;
-		add("file", unquote(fn | tt::terminals, rep));
+		add(tp::file, unquote(fn | tt::terminals, rep));
 		break;
 	}
 	case p::start_cmd:
 	case p::igrammar_cmd:
 	case p::unreachable_cmd: {
 		auto sym = n | p::symbol;
-		if (sym.has_value()) add("symbol", sym | tt::terminals);
+		if (sym.has_value()) add(tp::symbol, sym | tt::terminals);
 		break;
 	}
 	case p::help_cmd: {
 		auto h = n | p::help_arg;
-		if (h.has_value()) add("command", help_arg_name(
+		if (h.has_value()) add(tp::command, help_arg_name(
 			h | tt::only_child | tt::nonterminal));
 		break;
 	}
 	case p::get_cmd:
 		if (auto name = statement_option_name(n); !name.empty())
-			add("option", name);
+			add(tp::option, name);
 		break;
 	// The client knows no option kind, so the server reads the text.
 	case p::set_cmd:
 	case p::add_cmd:
 	case p::del_cmd:
-		add("option", statement_option_name(n));
-		add("text", statement_option_text(n));
+		add(tp::option, statement_option_name(n));
+		add(tp::text, statement_option_text(n));
 		break;
 	case p::toggle_cmd:
 	case p::enable_cmd:
 	case p::disable_cmd:
-		add("option", statement_option_name(n));
+		add(tp::option, statement_option_name(n));
 		break;
 	default:
 		// grammar, reload, version, license, quit and clear carry no
@@ -1985,18 +1986,18 @@ static int show_command(tgf_repl_evaluator& re) {
 	}
 	const string start = re.start_symbol();
 	if (json) {
-		tref v = re.productions_value("start", start,
+		tref v = re.productions_value(tp::start, start,
 			re.g().reachable_productions(re.g().nt(start)));
 		if (opts.get<bool>("nullable")) {
 			trefs nl;
 			for (const auto& [head, p] :
 					re.g().nullable_recursive_productions())
 				nl.push_back(jt::build_object({
-					jt::build_pair("symbol", jt::build_string(
+					jt::build_pair(tp::symbol, jt::build_string(
 						head.to_std_string())),
-					jt::build_pair("id", jt::build_number(
+					jt::build_pair(tp::id, jt::build_number(
 						static_cast<double>(head.n()))),
-					jt::build_pair("index", jt::build_number(
+					jt::build_pair(tp::index, jt::build_number(
 						static_cast<double>(p))),
 					jt::build_pair("production",
 						jt::build_string(
@@ -2180,8 +2181,8 @@ static int run_command(const parsed_args& args, tgf_tool& tool,
 				string start = re.start_symbol();
 				auto prods = re.g().reachable_productions(
 					re.g().nt(start));
-				data = jt::set_member(data, "internal_grammar",
-					re.productions_value("start", start, prods));
+				data = jt::set_member(data, tp::internal_grammar,
+					re.productions_value(tp::start, start, prods));
 			}
 			if (opts.get<bool>("measure"))
 				data = jt::set_member(data, "bintree_totals",
