@@ -240,8 +240,10 @@ repl_ftxui<evaluator_t>::repl_ftxui(evaluator_t& re, std::string prompt,
 }
 
 template <typename evaluator_t>
-void repl_ftxui<evaluator_t>::store_history(const std::string& s) {
-	history_.store(s);
+diagnostics::result<void> repl_ftxui<evaluator_t>::store_history(
+	const std::string& s)
+{
+	return history_.store(s);
 }
 
 template <typename evaluator_t>
@@ -279,7 +281,7 @@ void repl_ftxui<evaluator_t>::history_last() {
 }
 
 template <typename evaluator_t>
-int repl_ftxui<evaluator_t>::run() {
+diagnostics::result<int> repl_ftxui<evaluator_t>::run() {
 #ifdef __EMSCRIPTEN__
 	return run_interactive();
 #else
@@ -288,8 +290,9 @@ int repl_ftxui<evaluator_t>::run() {
 }
 
 template <typename evaluator_t>
-int repl_ftxui<evaluator_t>::run_pipe() {
+diagnostics::result<int> repl_ftxui<evaluator_t>::run_pipe() {
 	using namespace std;
+	diagnostics::result<int> res;
 	re_.reprompt(); // populate prompt_
 	string acc, line;
 	bool first_line = true;
@@ -312,17 +315,18 @@ int repl_ftxui<evaluator_t>::run_pipe() {
 			cout.flush();
 			continue;
 		} // incomplete
-		store_history(full); // store on ok and quit (matches repl<>)
+		// store on ok and quit (matches repl<>)
+		res.merge(store_history(full));
 		acc.clear();
 		if (ret == 1) break;
 		cout << prompt_;
 		cout.flush();
 	}
-	return 0;
+	return res.with_value(0);
 }
 
 template <typename evaluator_t>
-int repl_ftxui<evaluator_t>::run_interactive() {
+diagnostics::result<int> repl_ftxui<evaluator_t>::run_interactive() {
 	using namespace ftxui;
 
 	auto screen = ScreenInteractive::TerminalOutput();
@@ -501,7 +505,10 @@ int repl_ftxui<evaluator_t>::run_interactive() {
 	screen.Loop(root);
 	eval_widget_.shutdown();
 	screen_ = nullptr;
-	return 0;
+	diagnostics::result<int> res;
+	res.report().append(std::move(history_report_));
+	history_report_ = {};
+	return res.with_value(0);
 }
 
 template <typename evaluator_t>
@@ -690,7 +697,8 @@ void repl_ftxui<evaluator_t>::apply_eval_result(int result,
 		input_text_.insert(cp, 1, '\n');
 		cursor_pos_ = static_cast<int>(cp) + 1;
 	} else {
-		if (store) store_history(text);
+		if (store)
+			history_report_.append(std::move(store_history(text)).report());
 		clear_input();
 	}
 	if (result == 1) screen_->Exit();

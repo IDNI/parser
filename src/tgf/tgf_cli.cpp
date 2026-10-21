@@ -2143,16 +2143,20 @@ static int run_command(const parsed_args& args, tgf_tool& tool,
 			re.flush_report();
 			return ret;
 		};
+		auto exit_code = [](const diagnostics::result<int>& run) {
+			print_diagnostics_report(run.report(), false);
+			return run.has_value() ? run.value() : 1;
+		};
 		auto run_legacy = [&] {
 			repl<tgf_repl_evaluator> r(re, "tgf> ", { ".tgf_history" });
 			re.set_repl(r);
-			return r.run();
+			return exit_code(r.run());
 		};
 		auto run_default = [&] {
 #ifdef TAU_PARSER_HAS_FTXUI
 			repl_ftxui<tgf_repl_evaluator> rftx(
 				re, "tgf> ", { ".tgf_history" });
-			return rftx.run(); // ctor sets re.r_ftx
+			return exit_code(rftx.run()); // ctor sets re.r_ftx
 #else
 			// FTXUI not available: silently fall back to legacy REPL
 			return run_legacy();

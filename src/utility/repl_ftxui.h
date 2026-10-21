@@ -109,7 +109,8 @@ struct repl_ftxui : repl_front {
 	           const repl_history_policy& history = {});
 
 	/// Runs the REPL.  Interactive on a TTY, plain getline loop otherwise.
-	int run();
+	/// The report holds every failed write of the history file.
+	diagnostics::result<int> run();
 
 	/// Sets the prompt (used by the evaluator's reprompt()).
 	void set_prompt(const std::string& p) override;
@@ -121,8 +122,8 @@ struct repl_ftxui : repl_front {
 	void clear() override;
 
 private:
-	int run_interactive();
-	int run_pipe();
+	diagnostics::result<int> run_interactive();
+	diagnostics::result<int> run_pipe();
 
 	void history_up();
 	void history_down();
@@ -132,7 +133,7 @@ private:
 	void set_input(const std::string& s); ///< replace input, cursor to end
 	void clear_input();                   ///< empty input, cursor to 0
 
-	void store_history(const std::string& s);
+	diagnostics::result<void> store_history(const std::string& s);
 	std::mutex& prompt_mutex() { return prompt_mutex_; }
 	/// Gutter of input row `row`: the prompt on the first, the continuation
 	/// prompt on the others, both padded to one width.
@@ -146,6 +147,9 @@ private:
 	std::string  continuation_prompt_;
 	mutable std::mutex prompt_mutex_;
 	repl_history history_;
+	// The failed history writes of the interactive loop, whose event
+	// handlers return no report.
+	diagnostics::report history_report_;
 
 	std::string input_text_;     ///< current edit buffer (may be multiline)
 	int         cursor_pos_ = 0; ///< cursor index within input_text_

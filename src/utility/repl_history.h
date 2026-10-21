@@ -12,6 +12,8 @@
 #include <filesystem>
 
 #include "repl_history_policy.h"
+#include "filesystem.h"
+#include "../parser_strings.h"
 
 namespace idni {
 
@@ -30,20 +32,21 @@ struct repl_history {
 
 	// Append `s` (deduplicated against the most recent entry) and persist
 	// it to the file, unless the policy drops it. Resets the navigation
-	// cursor to the end.
-	void store(const std::string& s) {
+	// cursor to the end. The report holds a failed write of the file.
+	diagnostics::result<void> store(const std::string& s) {
+		diagnostics::result<void> r;
 		stash_.reset();
 		if ((policy_.keep && !policy_.keep(s))
 			|| (!entries_.empty() && entries_.back() == s))
 		{
 			hpos_ = entries_.size();
-			return;
+			return r.with_value();
 		}
 		entries_.push_back(s);
 		hpos_ = entries_.size();
-		if (policy_.file.empty()) return;
-		std::ofstream f(policy_.file, std::ios::app);
-		if (f) f << escape(s) << '\n';
+		if (policy_.file.empty()) return r.with_value();
+		r.merge(append_line(s));
+		return r.with_value();
 	}
 
 	// Previous entry (↑). `current` is the live edit buffer; stepping up
@@ -79,10 +82,35 @@ struct repl_history {
 	}
 
 private:
+	// The command ran, so a lost history line is a warning. It names the
+	// file and the system error number of the failed open.
+	diagnostics::result<void> append_line(const std::string& s) {
+		using label = parser_strings::label;
+		diagnostics::result<void> r;
+		auto lost = [&r, this](std::optional<int64_t> err) {
+			if (err) r.warning(parser_strings::messages::cannot_write_file,
+				{ { label::path, policy_.file },
+				  { label::error_number, static_cast<int_t>(*err) } });
+			else r.warning(parser_strings::messages::cannot_write_file,
+				{ { label::path, policy_.file } });
+			return r.with_value();
+		};
+		// The file gets 0600 on POSIX, also when it exists with a wider
+		// mode, so no other user reads it.
+		auto opened = fs::open_private_append(fs::to_path(policy_.file));
+		if (!opened.has_value())
+			return lost(opened.report().error_attr(label::error_number));
+		fs::file_ostream f = std::move(opened).value();
+		f << escape(s) << '\n' << std::flush;
+		if (!f) return lost(std::nullopt);
+		return r.with_value();
+	}
 	void load() {
 		if (policy_.file.empty()) return;
-		if (!std::filesystem::exists(policy_.file)) return;
-		std::ifstream f(policy_.file);
+		const std::filesystem::path p(fs::to_path(policy_.file));
+		std::error_code ec;
+		if (!std::filesystem::exists(p, ec)) return;
+		std::ifstream f(p);
 		std::string line;
 		while (std::getline(f, line))
 			if (line.size()) entries_.push_back(unescape(line));

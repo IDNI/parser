@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -198,6 +199,73 @@ TEST_SUITE("repl_history: policy") {
 		std::filesystem::remove(path);
 	}
 
+#ifndef _WIN32
+	TEST_CASE("a store into a new history file makes it with mode 0600") {
+		namespace sfs = std::filesystem;
+		const std::string path = cleaned("doctest_repl_history_mode_new.tmp");
+		{
+			repl_history h(repl_history_policy{ path });
+			h.store("cmd1");
+		}
+		CHECK(file_text(path) == "cmd1\n");
+		CHECK((sfs::status(path).permissions() & sfs::perms::all)
+			== (sfs::perms::owner_read | sfs::perms::owner_write));
+		sfs::remove(path);
+	}
+
+	TEST_CASE("a store into an existing history file gives it mode 0600") {
+		namespace sfs = std::filesystem;
+		const std::string path = cleaned("doctest_repl_history_mode_old.tmp");
+		{ std::ofstream f(path); f << "cmd0\n"; }
+		const auto mode_0644 = sfs::perms::owner_read | sfs::perms::owner_write
+			| sfs::perms::group_read | sfs::perms::others_read;
+		sfs::permissions(path, mode_0644);
+		{
+			repl_history h(repl_history_policy{ path });
+			h.store("cmd1");
+		}
+		CHECK(file_text(path) == "cmd0\ncmd1\n");
+		CHECK((sfs::status(path).permissions() & sfs::perms::all)
+			== (sfs::perms::owner_read | sfs::perms::owner_write));
+		sfs::remove(path);
+	}
+#endif
+
+	TEST_CASE("a history file that cannot be written gives a warning") {
+		const std::string path = "doctest_repl_history_no_folder/history";
+		repl_history h(repl_history_policy{ path });
+		auto r = h.store("cmd1");
+		CHECK(r.has_value());
+		CHECK_FALSE(r.report().has_error());
+		std::ostringstream os;
+		r.report().print(os, term::colors(false));
+		CHECK(os.str().find("Cannot write file") != std::string::npos);
+		CHECK(os.str().find(path) != std::string::npos);
+		CHECK(os.str().find("errno=") != std::string::npos);
+		CHECK(h.size() == 1);
+		CHECK_FALSE(std::filesystem::exists(path));
+	}
+
+	TEST_CASE("a UTF-8 file name names one file to write and to read") {
+		namespace sfs = std::filesystem;
+		const std::string path = "doctest_repl_history_\xc3\xa9.tmp";
+		const sfs::path native(fs::to_path(path));
+		std::error_code ec;
+		sfs::remove(native, ec);
+		{
+			repl_history h(repl_history_policy{ path });
+			REQUIRE(h.store("cmd1").has_value());
+		}
+		std::ifstream f(native, std::ios::binary);
+		const std::string stored((std::istreambuf_iterator<char>(f)),
+			std::istreambuf_iterator<char>());
+		f.close();
+		CHECK(stored == "cmd1\n");
+		repl_history again(repl_history_policy{ path });
+		CHECK(again.size() == 1);
+		sfs::remove(native, ec);
+	}
+
 	TEST_CASE("a dropped line moves the cursor to the end") {
 		repl_history h(repl_history_policy{ "", not_key_import });
 		h.store("cmd1");
@@ -271,5 +339,42 @@ TEST_SUITE("repl_front") {
 			idni::repl<typed_evaluator>>);
 		CHECK(std::is_base_of_v<idni::repl_front,
 			idni::repl<front_evaluator>>);
+	}
+}
+
+TEST_SUITE("repl: the history warnings of a run") {
+
+	TEST_CASE("run gives the warning of each lost history line") {
+		const std::string in_path = cleaned("doctest_repl_run_input.tmp");
+		std::ofstream(in_path, std::ios::binary) << "a.\nb.\n";
+		const int saved = dup_fd(0);
+		const int in = open_read(in_path.c_str());
+		REQUIRE(saved >= 0);
+		REQUIRE(in >= 0);
+		REQUIRE(dup2_fd(in, 0) == 0);
+		close_fd(in);
+		recording_evaluator ev;
+		const std::string history = "doctest_repl_history_no_folder/history";
+		diagnostics::result<int> run;
+		{
+			repl<recording_evaluator> r(ev, "> ", { history });
+			r.echo = false;
+			run = r.run();
+		}
+		dup2_fd(saved, 0);
+		close_fd(saved);
+		std::filesystem::remove(in_path);
+		CHECK(ev.seen == std::vector<std::string>{ "a.", "b." });
+		REQUIRE(run.has_value());
+		CHECK(run.value() == 0);
+		CHECK_FALSE(run.report().has_error());
+		std::ostringstream os;
+		run.report().print(os, term::colors(false));
+		const std::string text = os.str();
+		size_t lost = 0;
+		for (size_t p = text.find("Cannot write file");
+				p != std::string::npos;
+				p = text.find("Cannot write file", p + 1)) ++lost;
+		CHECK(lost == 2u);
 	}
 }

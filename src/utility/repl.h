@@ -55,7 +55,9 @@ struct repl : repl_front {
 	}
 	~repl() override { term::close(); }
 	bool echo = true;
-	int run() {
+	/// The report holds every failed write of the history file.
+	diagnostics::result<int> run() {
+		diagnostics::result<int> res;
 		clear_input();
 		reset_input();
 		while (1) {
@@ -67,7 +69,8 @@ struct repl : repl_front {
 				TDBG(std::cerr << " <pressed '" << ch << "' = "
 						<< static_cast<int>(ch) << ">";)
 				// control characters
-				if (ch == 3 || ch == 4) return 0; // ctrl-c or d
+				if (ch == 3 || ch == 4) // ctrl-c or d
+					return res.with_value(0);
 				if      (ch == 1) home();
 				else if (ch == 5) end();
 				else if (ch == 8 || ch == 127) backspace();
@@ -116,14 +119,14 @@ struct repl : repl_front {
 				//TDBG(std::cerr << " <input_size(): " << input_.size() << " post: " << (pos_-1) << ">";)
 				//if (pos_ - 1 < input_.size()) split_line();
 				//else {
-					auto ret = evaluate(s);
+					auto ret = evaluate(s, res);
 					if (ret == 1) break;
 					if (ret == 2) continue;
 				//}
 			}
 			if (read == 0 && is_pipe_) break;
 		}
-		return 0;
+		return res.with_value(0);
 	}
 	void split_line() {
 		if (is_pipe_) return;
@@ -132,7 +135,8 @@ struct repl : repl_front {
 		input_.insert(it_at(pos_ - 1), '\n');
 		print_input(), go(r, 0);
 	}
-	int evaluate(const std::string& line) {
+	/// Merges the report of the history store into @p res.
+	int evaluate(const std::string& line, diagnostics::result<int>& res) {
 		std::string s = line;
 		// only the first command, maybe over several lines, starts the input
 		if (!input_started_) term::drop_utf8_bom(s);
@@ -147,7 +151,7 @@ struct repl : repl_front {
 				continuation_prompt_.size());
 			return ret;
 		}
-		history_.store(s);
+		res.merge(history_.store(s));
 		if (ret == 1) return ret; // exit loop if 1
 		reset_input();
 		return 0;
@@ -327,8 +331,8 @@ private:
 		if (auto t = history_.past_end()) set(*t);
 	}
 	/// Store the string (mostly the current input) in history
-	void store(const std::string& s) {
-		history_.store(s);
+	diagnostics::result<void> store(const std::string& s) {
+		return history_.store(s);
 	}
 	size_t printed_size(const std::string& s) const {
 		size_t size = 0;

@@ -333,19 +333,23 @@ diagnostics::result<int> tgf_connect_run(const connect_options& opt) {
 	std::cout << "session " << re.session_id() << "\n";
 	std::cout.flush();
 	int code = 0;
+	auto take = [&res](diagnostics::result<int> run) {
+		res.report().append(std::move(run).report());
+		return run.has_value() ? run.value() : 1;
+	};
 	if (opt.legacy_repl) {
 		repl<tgf_remote_evaluator> front(re, "tgf> ", { ".tgf_history" });
 		re.reprompt();
-		code = front.run();
+		code = take(front.run());
 	} else {
 #ifdef TAU_PARSER_HAS_FTXUI
 		repl_ftxui<tgf_remote_evaluator> front(re, "tgf> ",
 			{ ".tgf_history" });
-		code = front.run();
+		code = take(front.run());
 #else
 		repl<tgf_remote_evaluator> front(re, "tgf> ", { ".tgf_history" });
 		re.reprompt();
-		code = front.run();
+		code = take(front.run());
 #endif
 	}
 	res.report().append(re.take_report());

@@ -67,5 +67,8 @@ int main(int argc, char** argv) {
 		return print_stdin_hex();
 	slow_evaluator evaluator;
 	idni::repl_ftxui repl(evaluator, "test> ", {});
-	return repl.run();
+	auto run = repl.run();
+	if (run.report().has_error())
+		run.report().print(std::cerr, idni::term::colors(false));
+	return run.has_value() ? run.value() : 1;
 }
