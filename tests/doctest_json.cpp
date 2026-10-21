@@ -321,47 +321,47 @@ TEST_SUITE("ast_json: parser tree to AST JSON") {
 		tref root = tree_t::get(pnode_t(nts("start"), {0, 1}),
 			trefs{dig});
 
-		auto v = idni::format::ast_json::to_value<tree_t>(
+		tref v = idni::format::ast_json::to_tree<tree_t>(
 			root, "start", "1");
-		CHECK(v.find("format")->as_string() == "ast");
-		CHECK(v.find("start")->as_string() == "start");
-		CHECK(v.find("input")->as_string() == "1");
-		auto ast = v.find("ast");
-		REQUIRE(ast != nullptr);
-		CHECK(ast->find("symbol")->as_string() == "start");
-		REQUIRE(ast->find("id") != nullptr);
-		CHECK(ast->find("id")->as_number()
+		CHECK((tt(v) | tt::member("format") | tt::string) == "ast");
+		CHECK((tt(v) | tt::member("start") | tt::string) == "start");
+		CHECK((tt(v) | tt::member("input") | tt::string) == "1");
+		auto ast = tt(v) | tt::member("ast");
+		REQUIRE(ast.has_value());
+		CHECK((ast | tt::member("symbol") | tt::string) == "start");
+		REQUIRE((ast | tt::member("id")).has_value());
+		CHECK((ast | tt::member("id") | tt::number)
 			== static_cast<double>(nts("start").n()));
-		CHECK(ast->find("text") == nullptr);
-		auto kids = ast->find("children");
-		REQUIRE(kids != nullptr);
-		REQUIRE(kids->size() == 1);
-		const auto& digit = (*kids)[0];
-		CHECK(digit.find("symbol")->as_string() == "digit");
-		REQUIRE(digit.find("id") != nullptr);
-		CHECK(digit.find("id")->as_number()
+		CHECK_FALSE((ast | tt::member("text")).has_value());
+		auto kids = ast | tt::member("children");
+		REQUIRE(kids.has_value());
+		REQUIRE(kids.value_tree().children_size() == 1);
+		tt digit(kids.value_tree()[0]);
+		CHECK((digit | tt::member("symbol") | tt::string) == "digit");
+		REQUIRE((digit | tt::member("id")).has_value());
+		CHECK((digit | tt::member("id") | tt::number)
 			== static_cast<double>(nts("digit").n()));
-		CHECK(digit.find("text") == nullptr);
-		auto dk = digit.find("children");
-		REQUIRE(dk != nullptr);
-		REQUIRE(dk->size() == 1);
-		const auto& leaf = (*dk)[0];
-		CHECK(leaf.find("symbol")->as_string() == "");
-		CHECK(leaf.find("id") == nullptr);
-		CHECK(leaf.find("text")->as_string() == "1");
-		CHECK(leaf.find("children") == nullptr);
+		CHECK_FALSE((digit | tt::member("text")).has_value());
+		auto dk = digit | tt::member("children");
+		REQUIRE(dk.has_value());
+		REQUIRE(dk.value_tree().children_size() == 1);
+		tt leaf(dk.value_tree()[0]);
+		CHECK((leaf | tt::member("symbol") | tt::string) == "");
+		CHECK_FALSE((leaf | tt::member("id")).has_value());
+		CHECK((leaf | tt::member("text") | tt::string) == "1");
+		CHECK_FALSE((leaf | tt::member("children")).has_value());
 	}
 
 	TEST_CASE("range holds the code point offsets") {
 		tref term = term_node(char32_t('x'), 2, 3);
 		tref root = tree_t::get(pnode_t(nts("start"), {2, 3}),
 			trefs{term});
-		auto v = idni::format::ast_json::node_to_value<tree_t>(root);
-		auto range = v.find("range");
-		REQUIRE(range != nullptr);
-		REQUIRE(range->size() == 2);
-		CHECK((*range)[0].as_number() == 2);
-		CHECK((*range)[1].as_number() == 3);
+		tref v = idni::format::ast_json::node_to_tree<tree_t>(root);
+		auto range = tt(v) | tt::member("range");
+		REQUIRE(range.has_value());
+		REQUIRE(range.value_tree().children_size() == 2);
+		CHECK((range | tt::first | tt::number) == 2);
+		CHECK((range | tt::second | tt::number) == 3);
 	}
 }
 
