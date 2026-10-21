@@ -147,11 +147,11 @@ static const char* amb_tgf =
 
 static const set<string> json_derived = {
 	"unescaped", "nonzerodigit", "ascii_digit", "ascii_xdigit",
-	"esc", "__E____0", "__E_exponent_7"
+	"esc", "__E____1", "__E_exponent_8"
 };
 
 static const set<string> json_inner = {
-	"__N_2", "__E_unescaped_12", "__N_1", "__N_0", "zero"
+	"__N_2", "__E_unescaped_13", "__N_1", "__N_0", "zero"
 };
 
 // The JSON grammar from the TGF text and the generated grammar share the

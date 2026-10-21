@@ -19,183 +19,189 @@ idni::prods<char_type, terminal_type>& productions() {
 	#define NT(x) (idni::prods<char_type, terminal_type>{ ns(x) })
 //G0:   start(6)             => _(7) value(8) _(7).
 	p(NT(6), (NT(7)+NT(8)+NT(7)));
-//G1:   __E____0(10)         => ' '.
-	p(NT(10), (T(1)));
-//G2:   __E____0(10)         => '\t'.
-	p(NT(10), (T(2)));
-//G3:   __E____0(10)         => '\r'.
-	p(NT(10), (T(3)));
-//G4:   __E____0(10)         => '\n'.
-	p(NT(10), (T(4)));
-//G5:   __(9)                => __E____0(10) _(7).
+//G1:   __E_wire_line_0(10)  => _(7) value(8).
+	p(NT(10), (NT(7)+NT(8)));
+//G2:   __E_wire_line_0(10)  => null.
+	p(NT(10), (nul));
+//G3:   wire_line(9)         => __E_wire_line_0(10) _(7).
 	p(NT(9), (NT(10)+NT(7)));
-//G6:   __E___1(11)          => __(9).
-	p(NT(11), (NT(9)));
-//G7:   __E___1(11)          => null.
-	p(NT(11), (nul));
-//G8:   _(7)                 => __E___1(11).
-	p(NT(7), (NT(11)));
-//G9:   value(8)             => true_sym(12).
-	p(NT(8), (NT(12)));
-//G10:  value(8)             => false_sym(13).
-	p(NT(8), (NT(13)));
-//G11:  value(8)             => null_sym(14).
+//G4:   __E____1(12)         => ' '.
+	p(NT(12), (T(1)));
+//G5:   __E____1(12)         => '\t'.
+	p(NT(12), (T(2)));
+//G6:   __E____1(12)         => '\r'.
+	p(NT(12), (T(3)));
+//G7:   __E____1(12)         => '\n'.
+	p(NT(12), (T(4)));
+//G8:   __(11)               => __E____1(12) _(7).
+	p(NT(11), (NT(12)+NT(7)));
+//G9:   __E___2(13)          => __(11).
+	p(NT(13), (NT(11)));
+//G10:  __E___2(13)          => null.
+	p(NT(13), (nul));
+//G11:  _(7)                 => __E___2(13).
+	p(NT(7), (NT(13)));
+//G12:  value(8)             => true_sym(14).
 	p(NT(8), (NT(14)));
-//G12:  value(8)             => number(15).
+//G13:  value(8)             => false_sym(15).
 	p(NT(8), (NT(15)));
-//G13:  value(8)             => q_str(16).
+//G14:  value(8)             => null_sym(16).
 	p(NT(8), (NT(16)));
-//G14:  value(8)             => arr(17).
+//G15:  value(8)             => number(17).
 	p(NT(8), (NT(17)));
-//G15:  value(8)             => object(18).
+//G16:  value(8)             => q_str(18).
 	p(NT(8), (NT(18)));
-//G16:  value(8)             => nonfinite(19).	 # guarded: nonfinite
+//G17:  value(8)             => arr(19).
 	p(NT(8), (NT(19)));
+//G18:  value(8)             => object(20).
+	p(NT(8), (NT(20)));
+//G19:  value(8)             => nonfinite(21).	 # guarded: nonfinite
+	p(NT(8), (NT(21)));
 	p.back().guard = "nonfinite";
-//G17:  true_sym(12)         => 't' 'r' 'u' 'e'.
-	p(NT(12), (T(5)+T(6)+T(7)+T(8)));
-//G18:  false_sym(13)        => 'f' 'a' 'l' 's' 'e'.
-	p(NT(13), (T(9)+T(10)+T(11)+T(12)+T(8)));
-//G19:  null_sym(14)         => 'n' 'u' 'l' 'l'.
-	p(NT(14), (T(13)+T(7)+T(11)+T(11)));
-//G20:  nonfinite(19)        => 'N' 'a' 'N'.
-	p(NT(19), (T(14)+T(10)+T(14)));
-//G21:  nonfinite(19)        => 'I' 'n' 'f' 'i' 'n' 'i' 't' 'y'.
-	p(NT(19), (T(15)+T(13)+T(9)+T(16)+T(13)+T(16)+T(5)+T(17)));
-//G22:  nonfinite(19)        => '-' 'I' 'n' 'f' 'i' 'n' 'i' 't' 'y'.
-	p(NT(19), (T(18)+T(15)+T(13)+T(9)+T(16)+T(13)+T(16)+T(5)+T(17)));
-//G23:  __E_number_2(20)     => '-'.
-	p(NT(20), (T(18)));
-//G24:  __E_number_2(20)     => null.
-	p(NT(20), (nul));
-//G25:  __E_number_3(23)     => fractional(22).
-	p(NT(23), (NT(22)));
-//G26:  __E_number_3(23)     => null.
-	p(NT(23), (nul));
-//G27:  __E_number_4(25)     => exponent(24).
+//G20:  true_sym(14)         => 't' 'r' 'u' 'e'.
+	p(NT(14), (T(5)+T(6)+T(7)+T(8)));
+//G21:  false_sym(15)        => 'f' 'a' 'l' 's' 'e'.
+	p(NT(15), (T(9)+T(10)+T(11)+T(12)+T(8)));
+//G22:  null_sym(16)         => 'n' 'u' 'l' 'l'.
+	p(NT(16), (T(13)+T(7)+T(11)+T(11)));
+//G23:  nonfinite(21)        => 'N' 'a' 'N'.
+	p(NT(21), (T(14)+T(10)+T(14)));
+//G24:  nonfinite(21)        => 'I' 'n' 'f' 'i' 'n' 'i' 't' 'y'.
+	p(NT(21), (T(15)+T(13)+T(9)+T(16)+T(13)+T(16)+T(5)+T(17)));
+//G25:  nonfinite(21)        => '-' 'I' 'n' 'f' 'i' 'n' 'i' 't' 'y'.
+	p(NT(21), (T(18)+T(15)+T(13)+T(9)+T(16)+T(13)+T(16)+T(5)+T(17)));
+//G26:  __E_number_3(22)     => '-'.
+	p(NT(22), (T(18)));
+//G27:  __E_number_3(22)     => null.
+	p(NT(22), (nul));
+//G28:  __E_number_4(25)     => fractional(24).
 	p(NT(25), (NT(24)));
-//G28:  __E_number_4(25)     => null.
+//G29:  __E_number_4(25)     => null.
 	p(NT(25), (nul));
-//G29:  number(15)           => __E_number_2(20) integral(21) __E_number_3(23) __E_number_4(25).
-	p(NT(15), (NT(20)+NT(21)+NT(23)+NT(25)));
-//G30:  zero(26)             => '0'.
-	p(NT(26), (T(19)));
-//G31:  __N_0(53)            => zero(26).
-	p(NT(53), (NT(26)));
-//G32:  nonzerodigit(27)     => digit(1) & ascii(3) & ~( __N_0(53) ).	 # conjunctive
-	p(NT(27), (NT(1)) & (NT(3)) & ~(NT(53)));
-//G33:  __E_nzintegral_5(30) => null.
-	p(NT(30), (nul));
-//G34:  __E_nzintegral_5(30) => __E_nzintegral_5(30) ascii_digit(29).
-	p(NT(30), (NT(30)+NT(29)));
-//G35:  nzintegral(28)       => nonzerodigit(27) __E_nzintegral_5(30).
-	p(NT(28), (NT(27)+NT(30)));
-//G36:  integral(21)         => '0'.
-	p(NT(21), (T(19)));
-//G37:  integral(21)         => nzintegral(28).
-	p(NT(21), (NT(28)));
-//G38:  __E_fractional_6(31) => ascii_digit(29).
-	p(NT(31), (NT(29)));
-//G39:  __E_fractional_6(31) => __E_fractional_6(31) ascii_digit(29).
-	p(NT(31), (NT(31)+NT(29)));
-//G40:  fractional(22)       => '.' __E_fractional_6(31).
-	p(NT(22), (T(20)+NT(31)));
-//G41:  __E_exponent_7(32)   => 'e'.
-	p(NT(32), (T(8)));
-//G42:  __E_exponent_7(32)   => 'E'.
-	p(NT(32), (T(21)));
-//G43:  __E_exponent_8(33)   => '+'.
-	p(NT(33), (T(22)));
-//G44:  __E_exponent_8(33)   => '-'.
-	p(NT(33), (T(18)));
-//G45:  __E_exponent_8(33)   => null.
-	p(NT(33), (nul));
-//G46:  __E_exponent_9(34)   => ascii_digit(29).
-	p(NT(34), (NT(29)));
-//G47:  __E_exponent_9(34)   => __E_exponent_9(34) ascii_digit(29).
-	p(NT(34), (NT(34)+NT(29)));
-//G48:  exponent(24)         => __E_exponent_7(32) __E_exponent_8(33) __E_exponent_9(34).
-	p(NT(24), (NT(32)+NT(33)+NT(34)));
-//G49:  ascii_digit(29)      => digit(1) & ascii(3).	 # conjunctive
-	p(NT(29), (NT(1)) & (NT(3)));
-//G50:  __E_q_str_10(36)     => unescaped(37).
-	p(NT(36), (NT(37)));
-//G51:  __E_q_str_10(36)     => escaped(38).
-	p(NT(36), (NT(38)));
-//G52:  __E_q_str_11(39)     => null.
-	p(NT(39), (nul));
-//G53:  __E_q_str_11(39)     => __E_q_str_11(39) __E_q_str_10(36).
-	p(NT(39), (NT(39)+NT(36)));
-//G54:  str(35)              => __E_q_str_11(39).
-	p(NT(35), (NT(39)));
-//G55:  q_str(16)            => '"' str(35) '"'.
-	p(NT(16), (T(23)+NT(35)+T(23)));
-//G56:  __E_unescaped_12(40) => '"'.
-	p(NT(40), (T(23)));
-//G57:  __E_unescaped_12(40) => '\\'.
-	p(NT(40), (T(24)));
-//G58:  __N_1(54)            => '\x7f'.
-	p(NT(54), (T(25)));
-//G59:  __E_unescaped_12(40) => ~( __N_1(54) ) & ascii(3) & cntrl(5).	 # conjunctive
-	p(NT(40), ~(NT(54)) & (NT(3)) & (NT(5)));
-//G60:  __N_2(55)            => __E_unescaped_12(40).
-	p(NT(55), (NT(40)));
-//G61:  unescaped(37)        => any(2) & ~( __N_2(55) ).	 # conjunctive
-	p(NT(37), (NT(2)) & ~(NT(55)));
-//G62:  esc(41)              => '\\'.
-	p(NT(41), (T(24)));
-//G63:  __E_escaped_13(42)   => '"'.
+//G30:  __E_number_5(27)     => exponent(26).
+	p(NT(27), (NT(26)));
+//G31:  __E_number_5(27)     => null.
+	p(NT(27), (nul));
+//G32:  number(17)           => __E_number_3(22) integral(23) __E_number_4(25) __E_number_5(27).
+	p(NT(17), (NT(22)+NT(23)+NT(25)+NT(27)));
+//G33:  zero(28)             => '0'.
+	p(NT(28), (T(19)));
+//G34:  __N_0(55)            => zero(28).
+	p(NT(55), (NT(28)));
+//G35:  nonzerodigit(29)     => digit(1) & ascii(3) & ~( __N_0(55) ).	 # conjunctive
+	p(NT(29), (NT(1)) & (NT(3)) & ~(NT(55)));
+//G36:  __E_nzintegral_6(32) => null.
+	p(NT(32), (nul));
+//G37:  __E_nzintegral_6(32) => __E_nzintegral_6(32) ascii_digit(31).
+	p(NT(32), (NT(32)+NT(31)));
+//G38:  nzintegral(30)       => nonzerodigit(29) __E_nzintegral_6(32).
+	p(NT(30), (NT(29)+NT(32)));
+//G39:  integral(23)         => '0'.
+	p(NT(23), (T(19)));
+//G40:  integral(23)         => nzintegral(30).
+	p(NT(23), (NT(30)));
+//G41:  __E_fractional_7(33) => ascii_digit(31).
+	p(NT(33), (NT(31)));
+//G42:  __E_fractional_7(33) => __E_fractional_7(33) ascii_digit(31).
+	p(NT(33), (NT(33)+NT(31)));
+//G43:  fractional(24)       => '.' __E_fractional_7(33).
+	p(NT(24), (T(20)+NT(33)));
+//G44:  __E_exponent_8(34)   => 'e'.
+	p(NT(34), (T(8)));
+//G45:  __E_exponent_8(34)   => 'E'.
+	p(NT(34), (T(21)));
+//G46:  __E_exponent_9(35)   => '+'.
+	p(NT(35), (T(22)));
+//G47:  __E_exponent_9(35)   => '-'.
+	p(NT(35), (T(18)));
+//G48:  __E_exponent_9(35)   => null.
+	p(NT(35), (nul));
+//G49:  __E_exponent_10(36)  => ascii_digit(31).
+	p(NT(36), (NT(31)));
+//G50:  __E_exponent_10(36)  => __E_exponent_10(36) ascii_digit(31).
+	p(NT(36), (NT(36)+NT(31)));
+//G51:  exponent(26)         => __E_exponent_8(34) __E_exponent_9(35) __E_exponent_10(36).
+	p(NT(26), (NT(34)+NT(35)+NT(36)));
+//G52:  ascii_digit(31)      => digit(1) & ascii(3).	 # conjunctive
+	p(NT(31), (NT(1)) & (NT(3)));
+//G53:  __E_q_str_11(38)     => unescaped(39).
+	p(NT(38), (NT(39)));
+//G54:  __E_q_str_11(38)     => escaped(40).
+	p(NT(38), (NT(40)));
+//G55:  __E_q_str_12(41)     => null.
+	p(NT(41), (nul));
+//G56:  __E_q_str_12(41)     => __E_q_str_12(41) __E_q_str_11(38).
+	p(NT(41), (NT(41)+NT(38)));
+//G57:  str(37)              => __E_q_str_12(41).
+	p(NT(37), (NT(41)));
+//G58:  q_str(18)            => '"' str(37) '"'.
+	p(NT(18), (T(23)+NT(37)+T(23)));
+//G59:  __E_unescaped_13(42) => '"'.
 	p(NT(42), (T(23)));
-//G64:  __E_escaped_13(42)   => '\\'.
+//G60:  __E_unescaped_13(42) => '\\'.
 	p(NT(42), (T(24)));
-//G65:  __E_escaped_13(42)   => '/'.
-	p(NT(42), (T(26)));
-//G66:  __E_escaped_13(42)   => 'b'.
-	p(NT(42), (T(27)));
-//G67:  __E_escaped_13(42)   => 'f'.
-	p(NT(42), (T(9)));
-//G68:  __E_escaped_13(42)   => 'n'.
-	p(NT(42), (T(13)));
-//G69:  __E_escaped_13(42)   => 'r'.
-	p(NT(42), (T(6)));
-//G70:  __E_escaped_13(42)   => 't'.
-	p(NT(42), (T(5)));
-//G71:  __E_escaped_13(42)   => uni_cp(43).
-	p(NT(42), (NT(43)));
-//G72:  escaped(38)          => esc(41) __E_escaped_13(42).
-	p(NT(38), (NT(41)+NT(42)));
-//G73:  uni_cp(43)           => 'u' ascii_xdigit(44) ascii_xdigit(44) ascii_xdigit(44) ascii_xdigit(44).
-	p(NT(43), (T(7)+NT(44)+NT(44)+NT(44)+NT(44)));
-//G74:  ascii_xdigit(44)     => ascii(3) & xdigit(4).	 # conjunctive
-	p(NT(44), (NT(3)) & (NT(4)));
-//G75:  __E_arr_14(45)       => values(46) _(7).
-	p(NT(45), (NT(46)+NT(7)));
-//G76:  __E_arr_14(45)       => null.
-	p(NT(45), (nul));
-//G77:  arr(17)              => '[' _(7) __E_arr_14(45) ']'.
-	p(NT(17), (T(28)+NT(7)+NT(45)+T(29)));
-//G78:  __E_values_15(47)    => _(7) ',' _(7) value(8).
-	p(NT(47), (NT(7)+T(30)+NT(7)+NT(8)));
-//G79:  __E_values_16(48)    => null.
-	p(NT(48), (nul));
-//G80:  __E_values_16(48)    => __E_values_16(48) __E_values_15(47).
-	p(NT(48), (NT(48)+NT(47)));
-//G81:  values(46)           => value(8) __E_values_16(48).
-	p(NT(46), (NT(8)+NT(48)));
-//G82:  __E___E_object_17_18(51) => _(7) ',' _(7) object_pair(50).
-	p(NT(51), (NT(7)+T(30)+NT(7)+NT(50)));
-//G83:  __E___E_object_17_19(52) => null.
-	p(NT(52), (nul));
-//G84:  __E___E_object_17_19(52) => __E___E_object_17_19(52) __E___E_object_17_18(51).
-	p(NT(52), (NT(52)+NT(51)));
-//G85:  __E_object_17(49)    => object_pair(50) __E___E_object_17_19(52) _(7).
-	p(NT(49), (NT(50)+NT(52)+NT(7)));
-//G86:  __E_object_17(49)    => null.
-	p(NT(49), (nul));
-//G87:  object(18)           => '{' _(7) __E_object_17(49) '}'.
-	p(NT(18), (T(31)+NT(7)+NT(49)+T(32)));
-//G88:  object_pair(50)      => q_str(16) _(7) ':' _(7) value(8).
-	p(NT(50), (NT(16)+NT(7)+T(33)+NT(7)+NT(8)));
+//G61:  __N_1(56)            => '\x7f'.
+	p(NT(56), (T(25)));
+//G62:  __E_unescaped_13(42) => ~( __N_1(56) ) & ascii(3) & cntrl(5).	 # conjunctive
+	p(NT(42), ~(NT(56)) & (NT(3)) & (NT(5)));
+//G63:  __N_2(57)            => __E_unescaped_13(42).
+	p(NT(57), (NT(42)));
+//G64:  unescaped(39)        => any(2) & ~( __N_2(57) ).	 # conjunctive
+	p(NT(39), (NT(2)) & ~(NT(57)));
+//G65:  esc(43)              => '\\'.
+	p(NT(43), (T(24)));
+//G66:  __E_escaped_14(44)   => '"'.
+	p(NT(44), (T(23)));
+//G67:  __E_escaped_14(44)   => '\\'.
+	p(NT(44), (T(24)));
+//G68:  __E_escaped_14(44)   => '/'.
+	p(NT(44), (T(26)));
+//G69:  __E_escaped_14(44)   => 'b'.
+	p(NT(44), (T(27)));
+//G70:  __E_escaped_14(44)   => 'f'.
+	p(NT(44), (T(9)));
+//G71:  __E_escaped_14(44)   => 'n'.
+	p(NT(44), (T(13)));
+//G72:  __E_escaped_14(44)   => 'r'.
+	p(NT(44), (T(6)));
+//G73:  __E_escaped_14(44)   => 't'.
+	p(NT(44), (T(5)));
+//G74:  __E_escaped_14(44)   => uni_cp(45).
+	p(NT(44), (NT(45)));
+//G75:  escaped(40)          => esc(43) __E_escaped_14(44).
+	p(NT(40), (NT(43)+NT(44)));
+//G76:  uni_cp(45)           => 'u' ascii_xdigit(46) ascii_xdigit(46) ascii_xdigit(46) ascii_xdigit(46).
+	p(NT(45), (T(7)+NT(46)+NT(46)+NT(46)+NT(46)));
+//G77:  ascii_xdigit(46)     => ascii(3) & xdigit(4).	 # conjunctive
+	p(NT(46), (NT(3)) & (NT(4)));
+//G78:  __E_arr_15(47)       => values(48) _(7).
+	p(NT(47), (NT(48)+NT(7)));
+//G79:  __E_arr_15(47)       => null.
+	p(NT(47), (nul));
+//G80:  arr(19)              => '[' _(7) __E_arr_15(47) ']'.
+	p(NT(19), (T(28)+NT(7)+NT(47)+T(29)));
+//G81:  __E_values_16(49)    => _(7) ',' _(7) value(8).
+	p(NT(49), (NT(7)+T(30)+NT(7)+NT(8)));
+//G82:  __E_values_17(50)    => null.
+	p(NT(50), (nul));
+//G83:  __E_values_17(50)    => __E_values_17(50) __E_values_16(49).
+	p(NT(50), (NT(50)+NT(49)));
+//G84:  values(48)           => value(8) __E_values_17(50).
+	p(NT(48), (NT(8)+NT(50)));
+//G85:  __E___E_object_18_19(53) => _(7) ',' _(7) object_pair(52).
+	p(NT(53), (NT(7)+T(30)+NT(7)+NT(52)));
+//G86:  __E___E_object_18_20(54) => null.
+	p(NT(54), (nul));
+//G87:  __E___E_object_18_20(54) => __E___E_object_18_20(54) __E___E_object_18_19(53).
+	p(NT(54), (NT(54)+NT(53)));
+//G88:  __E_object_18(51)    => object_pair(52) __E___E_object_18_20(54) _(7).
+	p(NT(51), (NT(52)+NT(54)+NT(7)));
+//G89:  __E_object_18(51)    => null.
+	p(NT(51), (nul));
+//G90:  object(20)           => '{' _(7) __E_object_18(51) '}'.
+	p(NT(20), (T(31)+NT(7)+NT(51)+T(32)));
+//G91:  object_pair(52)      => q_str(18) _(7) ':' _(7) value(8).
+	p(NT(52), (NT(18)+NT(7)+T(33)+NT(7)+NT(8)));
 	#undef T
 	#undef NT
 	return p;

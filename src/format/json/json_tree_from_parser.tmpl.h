@@ -179,6 +179,7 @@ inline diagnostics::result<tref> tree::get(const parse_tree& t,
 			break;
 		}
 		case json_parser::start:
+		case json_parser::wire_line:
 		case json_parser::value:
 			if (auto c = trv(p) | trv::only_child; c)
 				x = mapped(c.value());
@@ -239,6 +240,9 @@ inline diagnostics::result<tref> tree::get(json_parser::result& r,
 	}
 	tref n = r.get_shaped_tree2();
 	if (!r.report().nodes().empty()) R.append(std::move(r.report()));
+	if (parse_tree::get(n).is(json_parser::wire_line)
+			&& !(trv(n) | json_parser::value))
+		return std::move(R).with_value(nullptr);
 	auto x = get(parse_tree::get(n), o);
 	tref v = x.has_value() ? x.value() : nullptr;
 	R.append(std::move(x).report());

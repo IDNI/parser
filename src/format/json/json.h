@@ -302,6 +302,7 @@ struct tree : public lcrs_tree<node> {
 	/// value node or the node of one JSON value, such as a str.
 	static diagnostics::result<tref> get(const parse_tree& t,
 		const read_options& o = {});
+	/// A wire_line parse of only whitespace gives nullptr and no error.
 	static diagnostics::result<tref> get(json_parser::result& r,
 		const read_options& o = {});
 	/// Parse a JSON text. On a syntax error or a bad escape the result

@@ -18,6 +18,8 @@
 
 # start representing JSON text is a value
 start          => _ value _.
+# one line of the JSON wire: a value or only whitespace
+wire_line      => [_ value] _.
 
 # whitespace
 __             => (' ' | '\t' | '\r' | '\n') _.
@@ -58,3 +60,4 @@ values         => value (_ ',' _ value)*.
 # object
 object         => '{' _ [object_pair (_ ',' _ object_pair)* _] '}'.
 object_pair    => q_str _ ':' _ value.
+
