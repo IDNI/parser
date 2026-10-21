@@ -85,6 +85,10 @@ struct line_server_options {
 	/// refuses every browser origin, because any web page can open a
 	/// WebSocket to 127.0.0.1.
 	std::vector<std::string> allowed_origins{};
+	/// websocket: decides the Origin of an upgrade request. When set, it
+	/// replaces allowed_origins. True accepts the upgrade. A request with
+	/// no Origin header passes without a call.
+	std::function<bool(std::string_view origin)> accept_origin{};
 	/// At this count the server refuses a new connection with busy_message.
 	size_t max_sessions = 16;
 	/// websocket: close a client that sends no complete upgrade request in

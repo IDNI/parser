@@ -927,8 +927,10 @@ void ws_upgrade::on_read(error_code ec) {
 	if (auto it = req.find(http::field::origin); it != req.end()) {
 		peer.origin.assign(it->value().data(), it->value().size());
 		const auto& o = srv->opt;
-		if (std::find(o.allowed_origins.begin(), o.allowed_origins.end(),
-				peer.origin) == o.allowed_origins.end())
+		const bool refused = o.accept_origin ? !o.accept_origin(peer.origin)
+			: std::find(o.allowed_origins.begin(), o.allowed_origins.end(),
+				peer.origin) == o.allowed_origins.end();
+		if (refused)
 			return answer(http::status::forbidden,
 				parser_strings::messages::net_origin_refused);
 	}

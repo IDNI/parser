@@ -549,6 +549,39 @@ TEST_SUITE("line server: websocket") {
 		CHECK(has(read_to_close(c), "The WebSocket origin is not allowed"));
 		CHECK(c.eof_seen);
 	}
+	TEST_CASE("accept_origin decides the origin in place of the list") {
+		auto o = ws_options();
+		o.allowed_origins = { "http://listed.example" };
+		std::vector<std::string> asked;
+		std::mutex m;
+		// localhost with any port, as a node accepts the page of a wallet
+		o.accept_origin = [&](std::string_view origin) {
+			std::lock_guard g(m);
+			asked.emplace_back(origin);
+			return origin.starts_with("http://localhost:");
+		};
+		server_thread s(o);
+		for (const char* port : { "8000", "51234" }) {
+			tcp_client c(loopback(s.tcp_port()));
+			c.send_raw(upgrade_request("/ws",
+				std::string("http://localhost:") + port));
+			CHECK(c.read_line() == "HTTP/1.1 101 Switching Protocols");
+		}
+		for (const char* origin : { "http://listed.example",
+				"http://evil.example" })
+		{
+			tcp_client c(loopback(s.tcp_port()));
+			c.send_raw(upgrade_request("/ws", origin));
+			CHECK(c.read_line() == "HTTP/1.1 403 Forbidden");
+		}
+		tcp_client none(loopback(s.tcp_port()));
+		none.send_raw(upgrade_request("/ws", ""));
+		CHECK(none.read_line() == "HTTP/1.1 101 Switching Protocols");
+		std::lock_guard g(m);
+		CHECK(asked == std::vector<std::string>{ "http://localhost:8000",
+			"http://localhost:51234", "http://listed.example",
+			"http://evil.example" });
+	}
 	TEST_CASE("an empty allowed_origins refuses every browser origin") {
 		server_thread s(ws_options());
 		tcp_client c(loopback(s.tcp_port()));
