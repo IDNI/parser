@@ -1701,7 +1701,8 @@ struct peer_handler : session_handler {
 	explicit peer_handler(peer_info p) : peer(std::move(p)) {}
 	peer_info peer;
 	void on_text(std::string_view, reply_sink& out) override {
-		out.write(peer.address + " " + std::to_string(peer.port));
+		out.write(peer.address + " " + std::to_string(peer.port)
+			+ (peer.loopback ? " loopback" : ""));
 	}
 };
 
@@ -1718,6 +1719,7 @@ TEST_SUITE("line server: peer address") {
 		const peer_info p;
 		CHECK(p.address.empty());
 		CHECK(p.port == 0);
+		CHECK_FALSE(p.loopback);
 	}
 	TEST_CASE("a tcp peer: its address and port") {
 		server_thread s(peer_options(tcp_options()));
@@ -1725,7 +1727,7 @@ TEST_SUITE("line server: peer address") {
 		const uint16_t port = c.sock.local_endpoint().port();
 		c.send("who");
 		CHECK(c.read_line()
-			== "127.0.0.1 " + std::to_string(port));
+			== "127.0.0.1 " + std::to_string(port) + " loopback");
 	}
 	TEST_CASE("an IPv4 peer of an IPv6 listener shows in the IPv4 form") {
 		auto o = peer_options(tcp_options());
@@ -1757,6 +1759,68 @@ TEST_SUITE("line server: peer address") {
 		CHECK(t->send_line("who"));
 		REQUIRE(t->read_line(l) == read_status::ok);
 		CHECK(has(l, "127.0.0.1 "));
+	}
+}
+
+TEST_SUITE("line server: loopback peer") {
+	TEST_CASE("127.0.0.1 is a loopback peer") {
+		server_thread s(peer_options(tcp_options()));
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("who");
+		CHECK(c.read_line().ends_with(" loopback"));
+	}
+	TEST_CASE("::1 is a loopback peer") {
+		auto o = peer_options(tcp_options());
+		o.listen[0].host = "::1";
+		server_thread s(o);
+		s.wait_listening(1);
+		if (s.done) return;
+		tcp_client c({ ba::ip::make_address("::1"), s.tcp_port() });
+		c.send("who");
+		const std::string l = c.read_line();
+		CHECK(l.starts_with("::1 "));
+		CHECK(l.ends_with(" loopback"));
+	}
+	TEST_CASE("an IPv4 loopback mapped into IPv6 is a loopback peer") {
+		auto o = peer_options(tcp_options());
+		o.listen[0].host = "::ffff:127.0.0.1";
+		server_thread s(o);
+		s.wait_listening(1);
+		if (s.done) return;
+		tcp_client c(loopback(s.tcp_port()));
+		c.send("who");
+		const std::string l = c.read_line();
+		CHECK(l.starts_with("127.0.0.1 "));
+		CHECK(l.ends_with(" loopback"));
+	}
+#ifdef __linux__
+	TEST_CASE("an address of 127.0.0.0/8 other than 127.0.0.1 is a loopback peer") {
+		auto o = peer_options(tcp_options());
+		o.listen[0].host = "127.0.0.2";
+		server_thread s(o);
+		s.wait_listening(1);
+		REQUIRE_FALSE(s.done.load());
+		tcp_client c({ ba::ip::make_address("127.0.0.2"), s.tcp_port() });
+		c.send("who");
+		const std::string l = c.read_line();
+		CHECK(l.ends_with(" loopback"));
+	}
+#endif
+	TEST_CASE("a local socket peer is no loopback address") {
+#ifndef _WIN32
+		const std::string path = (std::filesystem::temp_directory_path()
+			/ ("line_server_lo_" + std::to_string(::getpid()) + ".sock"))
+			.string();
+		line_server_options o;
+		o.listen = { { line_transport_kind::local_socket, path, 0 } };
+		o.json = true;
+		server_thread s(peer_options(o));
+		REQUIRE_FALSE(s.wait_listening(1).empty());
+		line_client_test::local_client c{
+			ba::local::stream_protocol::endpoint(path) };
+		c.send("who");
+		CHECK(c.read_line() == " 0");
+#endif
 	}
 }
 

@@ -133,6 +133,7 @@ peer_info tcp_peer(line_transport_kind kind, const tcp::socket& s) {
 		a = ba::ip::make_address_v4(ba::ip::v4_mapped, a.to_v6());
 	p.address = a.to_string();
 	p.port = ep.port();
+	p.loopback = a.is_loopback();
 	return p;
 }
 

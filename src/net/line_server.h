@@ -85,6 +85,9 @@ struct peer_info {
 	std::string address{};
 	/// tcp and websocket: the port of the peer.
 	uint16_t port = 0;
+	/// tcp and websocket: the address is in 127.0.0.0/8 or is ::1, also
+	/// an IPv4 loopback mapped into IPv6.
+	bool loopback = false;
 };
 
 /// One connection on the server.
