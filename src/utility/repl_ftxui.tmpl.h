@@ -558,8 +558,7 @@ void repl_eval_widget<evaluator_t>::start(ftxui::ScreenInteractive* screen,
 	ticker_ = std::thread([this] {
 		while (ticker_running_.load(std::memory_order_relaxed)) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
-			if (ticker_running_.load(std::memory_order_relaxed) && screen_)
-				screen_->PostEvent(ftxui::Event::Custom);
+			post_event(screen_, true);
 		}
 	});
 	// the evaluator reads and sets the options of the thread that runs
@@ -570,7 +569,7 @@ void repl_eval_widget<evaluator_t>::start(ftxui::ScreenInteractive* screen,
 		err_tsb_->set_routed_thread(std::this_thread::get_id());
 		result_ = evaluator_.eval(text_).value_or(0);
 		done_.store(true, std::memory_order_release);
-		if (screen_) screen_->PostEvent(ftxui::Event::Custom);
+		post_event(screen_);
 	});
 }
 
@@ -578,8 +577,10 @@ template <typename evaluator_t>
 void repl_eval_widget<evaluator_t>::handle_custom_event() {
 	if (!active()) return;
 	++spinner_frame_;
-	if (clear_requested_.exchange(false))
+	if (clear_requested_.exchange(false)) {
+		std::lock_guard<std::mutex> lock(screen_io_mutex_);
 		screen_->WithRestoredIO([] { term::clear(); })();
+	}
 	if (done_.load(std::memory_order_acquire)) finish();
 }
 
@@ -624,6 +625,7 @@ void repl_eval_widget<evaluator_t>::drain_output(bool flush_partial) {
 	if (ready.empty()) return;
 	if (flush_partial && ready.back().second.back() != '\n')
 		ready.back().second += '\n';
+	std::lock_guard<std::mutex> lock(screen_io_mutex_);
 	screen_->WithRestoredIO([&] {
 		// Clears rows the previous frame drew below the cursor, not just the current line.
 		std::cout << "\r\033[J";
@@ -638,10 +640,28 @@ void repl_eval_widget<evaluator_t>::drain_output(bool flush_partial) {
 }
 
 template <typename evaluator_t>
+void repl_eval_widget<evaluator_t>::post_event(
+	ftxui::ScreenInteractive* screen, bool from_ticker)
+{
+	// The loop thread resets the sender that PostEvent reads in each restore.
+	std::lock_guard<std::mutex> lock(screen_io_mutex_);
+	if (from_ticker && !ticker_running_.load(std::memory_order_relaxed))
+		return;
+	if (screen) screen->PostEvent(ftxui::Event::Custom);
+}
+
+template <typename evaluator_t>
+void repl_eval_widget<evaluator_t>::request_redraw(
+	ftxui::ScreenInteractive* screen)
+{
+	post_event(screen);
+}
+
+template <typename evaluator_t>
 void repl_eval_widget<evaluator_t>::request_clear() {
 	if (!active()) return;
 	clear_requested_.store(true, std::memory_order_relaxed);
-	if (screen_) screen_->PostEvent(ftxui::Event::Custom);
+	post_event(screen_);
 }
 
 template <typename evaluator_t>
@@ -683,7 +703,7 @@ void repl_ftxui<evaluator_t>::set_prompt(const std::string& p) {
 		std::lock_guard<std::mutex> lock(prompt_mutex());
 		prompt_ = p;
 	}
-	if (screen_) screen_->PostEvent(ftxui::Event::Custom); // request redraw
+	eval_widget_.request_redraw(screen_);
 }
 
 template <typename evaluator_t>
@@ -692,7 +712,7 @@ void repl_ftxui<evaluator_t>::set_continuation_prompt(const std::string& p) {
 		std::lock_guard<std::mutex> lock(prompt_mutex());
 		continuation_prompt_ = p;
 	}
-	if (screen_) screen_->PostEvent(ftxui::Event::Custom); // request redraw
+	eval_widget_.request_redraw(screen_);
 }
 
 template <typename evaluator_t>

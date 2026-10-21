@@ -38,9 +38,13 @@ struct repl_eval_widget {
 	void handle_custom_event();
 	void request_clear();
 	void shutdown();
+	/// Ask @p screen to draw again. Any thread may call it.
+	void request_redraw(ftxui::ScreenInteractive* screen);
 
 private:
 	void finish();
+	void post_event(ftxui::ScreenInteractive* screen,
+		bool from_ticker = false);
 	void drain_output(bool flush_partial);
 
 	evaluator_t& evaluator_;
@@ -50,6 +54,9 @@ private:
 	std::atomic<bool> done_{false};
 	std::atomic<bool> ticker_running_{false};
 	std::atomic<bool> clear_requested_{false};
+	// Held around each post from another thread and each restore of the
+	// terminal, because Uninstall resets the sender that a post reads.
+	std::mutex screen_io_mutex_;
 	std::thread worker_;
 	std::thread ticker_;
 	int result_ = 0;
