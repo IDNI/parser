@@ -294,6 +294,15 @@ private:
 					old_names.insert(cc_name);
 			for (const auto& [cc_name, local] : cc_aliases)
 				cc_locals.insert(local);
+			auto warn_unproductive = [&](const std::string& name) {
+				// a @use name that is no class got its load error
+				if (cc_locals.count(name)) return;
+				// a @dynamic nonterminal has no alternatives yet
+				if (dynamic_names.count(name)) return;
+				diag->warning(
+					messages::unproductive_nonterminal,
+					{{ label::name, name }});
+			};
 			for (auto nt : referenced) {
 				if (defined.count(nt)) continue;
 				if (cc.is_fn(nt)) continue;
@@ -305,25 +314,14 @@ private:
 						{{ label::name, name }});
 					continue;
 				}
-				// a @use name that is no class got its load error
-				if (cc_locals.count(name)) continue;
 				if (name.size() >= 2 && name[0] == '_'
 					&& name[1] == '_') continue;
-				// a @dynamic nonterminal has no alternatives yet
-				if (dynamic_names.count(name)) continue;
-				diag->warning(
-					messages::unproductive_nonterminal,
-					{{ label::name, name }});
+				warn_unproductive(name);
 			}
 			std::set<std::string> defined_names;
 			for (auto nt : defined) defined_names.insert(nts.get(nt));
-			for (auto& name : highlight_plain_names) {
-				if (defined_names.count(name)) continue;
-				if (cc_locals.count(name)) continue;
-				diag->warning(
-					messages::unproductive_nonterminal,
-					{{ label::name, name }});
-			}
+			for (auto& name : highlight_plain_names)
+				if (!defined_names.count(name)) warn_unproductive(name);
 		}
 		int parse(const char* s, size_t l, size_t line,
 			idni::diagnostics::result<grammar<C, T>>& res,

@@ -787,6 +787,23 @@ TEST_SUITE("grammar options") {
 		CHECK(printed.str().find("empty_tn") != string::npos);
 	}
 
+	TEST_CASE("a @dynamic name in @highlight gives no unproductive warning") {
+		nonterminals<char> nts;
+		auto gr = tgf<char>::from_string(nts, string(
+			"@dynamic dyn_kw.\n"
+			"@highlight keyword : dyn_kw, missing_kw.\n"
+			"start => dyn_kw | 'a'.\n"));
+		REQUIRE(gr.has_value());
+		ostringstream printed;
+		gr.report().print(printed);
+		const string unproductive(
+			parser_strings::messages::unproductive_nonterminal);
+		CHECK(printed.str().find(unproductive + " (name=missing_kw)")
+			!= string::npos);
+		CHECK(printed.str().find(unproductive + " (name=dyn_kw)")
+			== string::npos);
+	}
+
 	TEST_CASE("the default of start is start") {
 		options_repository repo;
 		options_scope scope(repo);
