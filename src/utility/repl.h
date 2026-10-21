@@ -4,6 +4,7 @@
 #ifndef __IDNI__PARSER__UTILITY__REPL_H__
 #define __IDNI__PARSER__UTILITY__REPL_H__
 
+#include <csignal>
 #include <iostream>
 #include <filesystem>
 #include <vector>
@@ -24,7 +25,71 @@ namespace idni {
 struct repl_front {
 	virtual ~repl_front() = default;
 	virtual void set_prompt(const std::string& p) = 0;
+	/// Sets the prompt of the lines after the first while the input is
+	/// incomplete. A front with no such lines ignores it.
+	virtual void set_continuation_prompt(const std::string&) {}
 	virtual void clear() = 0;
+	/// True after the user asked to stop the command that runs now. A
+	/// loop of an evaluator asks it between two steps. The next command
+	/// starts with false.
+	virtual bool stop_requested() = 0;
+};
+
+/// The SIGINT of a command that a REPL runs. The first SIGINT asks the
+/// command to stop. A second SIGINT ends the process as without the REPL,
+/// so a command that never asks can still be stopped.
+struct repl_stop_signal {
+	/// Clears the flag and catches SIGINT until the scope ends. A raw
+	/// terminal gets its interrupt key back for that time.
+	struct scope {
+		scope() {
+			flag = 0;
+			old_ = std::signal(SIGINT, on_signal);
+			interrupt_key(true);
+		}
+		~scope() {
+			interrupt_key(false);
+			std::signal(SIGINT, old_ == SIG_ERR ? SIG_DFL : old_);
+			flag = 0;
+		}
+		scope(const scope&) = delete;
+		scope& operator=(const scope&) = delete;
+	private:
+		void (*old_)(int);
+	};
+	static bool requested() { return flag != 0; }
+	static inline volatile std::sig_atomic_t flag = 0;
+	static inline bool key_on = false;
+private:
+	static void on_signal(int) {
+		if (flag) {
+#ifndef _WIN32
+			// the default action leaves no destructor to restore the terminal
+			if (term::opened)
+				tcsetattr(STDIN_FILENO, TCSANOW, &term::orig_attrs);
+#endif
+			std::signal(SIGINT, SIG_DFL);
+			std::raise(SIGINT);
+			return;
+		}
+		flag = 1;
+	}
+	/// Only POSIX turns the key off: a Windows console keeps Ctrl-C a
+	/// signal in the raw mode of term::open().
+	static void interrupt_key([[maybe_unused]] bool on) {
+#ifndef _WIN32
+		if (!term::opened || key_on == on) return;
+		termios attrs = term::raw_attrs;
+		if (on) {
+			attrs.c_lflag |= ISIG;
+			// only Ctrl-C becomes a signal, Ctrl-\ and Ctrl-Z stay keys
+			attrs.c_cc[VQUIT] = _POSIX_VDISABLE;
+			attrs.c_cc[VSUSP] = _POSIX_VDISABLE;
+		}
+		tcsetattr(STDIN_FILENO, TCSANOW, &attrs);
+		key_on = on;
+#endif
+	}
 };
 
 /// Link the evaluator @p re to the front end @p f through its member
@@ -140,7 +205,11 @@ struct repl : repl_front {
 		std::string s = line;
 		// only the first command, maybe over several lines, starts the input
 		if (!input_started_) term::drop_utf8_bom(s);
-		auto ret = re_.eval(s).value_or(0);
+		int ret = 0;
+		{
+			repl_stop_signal::scope stop;
+			ret = re_.eval(s).value_or(0);
+		}
 		if (ret != 2) input_started_ = true;
 		TDBG(std::cerr << " <EVAL: " << ret << ">";)
 		if (ret == 2) { // Unexpected end of file, continue
@@ -188,10 +257,12 @@ struct repl : repl_front {
 	void set_prompt(const std::string& p) override { prompt_ = p; }
 	/// Sets the prompt of the lines after the first while the input is
 	/// incomplete (pipe mode only); empty by default
-	void set_continuation_prompt(const std::string& p) {
+	void set_continuation_prompt(const std::string& p) override {
 		continuation_prompt_ = p;
 	}
 	void clear() override { if (!is_pipe_) term::clear(); }
+	/// A SIGINT, or Ctrl-C on a terminal, during the current command.
+	bool stop_requested() override { return repl_stop_signal::requested(); }
 	/// Returns the current prompt
 	std::string prompt() const { return prompt_; }
 private:

@@ -48,6 +48,7 @@ struct test_front : repl_front {
 	bool cleared = false;
 	void set_prompt(const string& p) override { prompt = p; }
 	void clear() override { cleared = true; }
+	bool stop_requested() override { return false; }
 };
 
 // Run @p src with the error stream captured.

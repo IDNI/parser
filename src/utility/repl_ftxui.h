@@ -40,6 +40,10 @@ struct repl_eval_widget {
 	void shutdown();
 	/// Ask @p screen to draw again. Any thread may call it.
 	void request_redraw(ftxui::ScreenInteractive* screen);
+	/// Ask the evaluation that runs now to stop. The next one starts
+	/// without the request.
+	void request_stop();
+	bool stop_requested() const;
 
 private:
 	void finish();
@@ -54,6 +58,7 @@ private:
 	std::atomic<bool> done_{false};
 	std::atomic<bool> ticker_running_{false};
 	std::atomic<bool> clear_requested_{false};
+	std::atomic<bool> stop_requested_{false};
 	// Held around each post from another thread and each restore of the
 	// terminal, because Uninstall resets the sender that a post reads.
 	std::mutex screen_io_mutex_;
@@ -116,10 +121,13 @@ struct repl_ftxui : repl_front {
 	void set_prompt(const std::string& p) override;
 	/// Sets the prompt of the lines after the first while the input is
 	/// incomplete; empty (the default) indents them under the prompt.
-	void set_continuation_prompt(const std::string& p);
+	void set_continuation_prompt(const std::string& p) override;
 
 	/// Clears the terminal while the interactive screen is temporarily restored.
 	void clear() override;
+
+	/// Ctrl-C during the current command, or a SIGINT in pipe mode.
+	bool stop_requested() override;
 
 private:
 	diagnostics::result<int> run_interactive();

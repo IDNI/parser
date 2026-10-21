@@ -8,6 +8,7 @@
 #include "utility/repl_history.h"
 #include "utility/repl_run.h"
 
+#include <csignal>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -98,7 +99,61 @@ std::vector<std::string> run_repl_on(const std::string& input,
 	return ev.seen;
 }
 
+// An evaluator whose command "loop." runs up to 20 steps and asks for a
+// stop between two steps. The first loop raises SIGINT at its third step.
+struct looping_evaluator {
+	repl<looping_evaluator>* r = nullptr;
+	bool raise_once = true;
+	std::vector<int> steps;
+	std::vector<bool> stop_at_start;
+	diagnostics::result<int> eval(const std::string& s) {
+		if (s == "loop.") {
+			stop_at_start.push_back(r->stop_requested());
+			int step = 0;
+			while (step < 20 && !r->stop_requested()) {
+				if (++step == 3 && raise_once)
+					raise_once = false, std::raise(SIGINT);
+			}
+			steps.push_back(step);
+		}
+		diagnostics::result<int> res;
+		res = 0;
+		return res;
+	}
+};
+
 } // namespace
+
+TEST_SUITE("repl: stop_requested") {
+
+	TEST_CASE("a SIGINT stops the loop of one command only") {
+		const std::string in_path = cleaned("doctest_repl_stop_input.tmp");
+		std::ofstream(in_path, std::ios::binary) << "loop.\nloop.\n";
+		const int saved = dup_fd(0);
+		const int in = open_read(in_path.c_str());
+		REQUIRE(saved >= 0);
+		REQUIRE(in >= 0);
+		REQUIRE(dup2_fd(in, 0) == 0);
+		close_fd(in);
+		auto marker = [](int) {};
+		using handler_t = void (*)(int);
+		const handler_t before = std::signal(SIGINT, +marker);
+		looping_evaluator ev;
+		{
+			repl<looping_evaluator> r(ev, "> ", { "" });
+			r.echo = false;
+			r.run();
+			CHECK_FALSE(r.stop_requested());
+		}
+		const handler_t after = std::signal(SIGINT, before);
+		dup2_fd(saved, 0);
+		close_fd(saved);
+		std::filesystem::remove(in_path);
+		CHECK(after == +marker);
+		CHECK(ev.steps == std::vector<int>{ 3, 20 });
+		CHECK(ev.stop_at_start == std::vector<bool>{ false, false });
+	}
+}
 
 TEST_SUITE("repl: a leading byte order mark") {
 
@@ -307,6 +362,7 @@ TEST_SUITE("repl_front") {
 		int clears = 0;
 		void set_prompt(const std::string& p) override { prompt = p; }
 		void clear() override { ++clears; }
+		bool stop_requested() override { return false; }
 	};
 	struct front_evaluator { idni::repl_front* front = nullptr; };
 	struct typed_evaluator { idni::repl<typed_evaluator>* r = nullptr; };

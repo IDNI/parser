@@ -308,7 +308,11 @@ diagnostics::result<int> repl_ftxui<evaluator_t>::run_pipe() {
 		cout << line << "\n";
 		string full = acc.empty() ? line : acc + "\n" + line;
 		if (full.empty()) continue;
-		int ret = re_.eval(full).value_or(0);
+		int ret = 0;
+		{
+			repl_stop_signal::scope stop;
+			ret = re_.eval(full).value_or(0);
+		}
 		if (ret == 2) {
 			acc = std::move(full);
 			cout << continuation_prompt_;
@@ -410,6 +414,7 @@ diagnostics::result<int> repl_ftxui<evaluator_t>::run_interactive() {
 	Component root = CatchEvent(line, [&](Event e) {
 		if (eval_widget_.active()) {
 			if (e == Event::Custom) eval_widget_.handle_custom_event();
+			else if (e == Event::CtrlC) eval_widget_.request_stop();
 			return true;
 		}
 		// Single-key hook: let the evaluator claim a keypress (e.g. a
@@ -542,6 +547,7 @@ void repl_eval_widget<evaluator_t>::start(ftxui::ScreenInteractive* screen,
 	allow_incomplete_ = allow_incomplete;
 	completion_ = std::move(completion);
 	result_ = 0;
+	stop_requested_.store(false, std::memory_order_relaxed);
 	spinner_frame_ = 0;
 	started_ = std::chrono::steady_clock::now();
 	done_.store(false, std::memory_order_relaxed);
@@ -603,6 +609,7 @@ void repl_eval_widget<evaluator_t>::finish() {
 	out_tsb_.reset();
 	err_tsb_.reset();
 	stream_lock_.unlock();
+	stop_requested_.store(false, std::memory_order_relaxed);
 	active_.store(false, std::memory_order_relaxed);
 	if (completion_)
 		completion_(result_, text_, cursor_, store_, allow_incomplete_);
@@ -662,6 +669,16 @@ void repl_eval_widget<evaluator_t>::request_redraw(
 	ftxui::ScreenInteractive* screen)
 {
 	post_event(screen);
+}
+
+template <typename evaluator_t>
+void repl_eval_widget<evaluator_t>::request_stop() {
+	if (active()) stop_requested_.store(true, std::memory_order_relaxed);
+}
+
+template <typename evaluator_t>
+bool repl_eval_widget<evaluator_t>::stop_requested() const {
+	return stop_requested_.load(std::memory_order_relaxed);
 }
 
 template <typename evaluator_t>
@@ -742,6 +759,12 @@ void repl_ftxui<evaluator_t>::clear() {
 		return;
 	}
 	screen_->WithRestoredIO([] { term::clear(); })();
+}
+
+template <typename evaluator_t>
+bool repl_ftxui<evaluator_t>::stop_requested() {
+	if (!screen_) return repl_stop_signal::requested();
+	return eval_widget_.stop_requested();
 }
 
 } // namespace idni

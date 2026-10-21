@@ -17,12 +17,14 @@
 using namespace std::chrono_literals;
 
 struct slow_evaluator {
-	idni::repl_ftxui<slow_evaluator>* r_ftx = nullptr;
+	idni::repl_front* front = nullptr;
 
 	void reprompt() {
-		r_ftx->set_prompt("test> ");
-		r_ftx->set_continuation_prompt("...> ");
+		front->set_prompt("test> ");
+		front->set_continuation_prompt("...> ");
 	}
+
+	const char* stop_text() { return front->stop_requested() ? "yes" : "no"; }
 
 	idni::diagnostics::result<int> eval(const std::string& text) {
 		idni::diagnostics::result<int> result;
@@ -31,6 +33,20 @@ struct slow_evaluator {
 			std::this_thread::sleep_for(400ms);
 			std::cout << "partial output";
 			std::this_thread::sleep_for(200ms);
+			result = 0;
+		} else if (text == "loop") {
+			// a step of 50 ms gives a test 5 s to stop it
+			std::cout << "loop start, stop: " << stop_text() << "\n";
+			int step = 0;
+			while (step < 100 && !front->stop_requested()) {
+				std::this_thread::sleep_for(50ms);
+				if (++step == 1) std::cout << "loop step 1\n";
+			}
+			std::cout << (step < 100 ? "loop stopped" : "loop done")
+				<< "\n";
+			result = 0;
+		} else if (text == "check") {
+			std::cout << "stop: " << stop_text() << "\n";
 			result = 0;
 		} else if (text == "incomplete") result = 2;
 		else if (text == "quit") {
@@ -66,6 +82,12 @@ int main(int argc, char** argv) {
 	if (argc > 1 && std::string(argv[1]) == "--hex")
 		return print_stdin_hex();
 	slow_evaluator evaluator;
+	if (argc > 1 && std::string(argv[1]) == "--plain") {
+		idni::repl<slow_evaluator> repl(evaluator, "test> ", {});
+		evaluator.reprompt();
+		auto run = repl.run();
+		return run.has_value() ? run.value() : 1;
+	}
 	idni::repl_ftxui repl(evaluator, "test> ", {});
 	auto run = repl.run();
 	if (run.report().has_error())
