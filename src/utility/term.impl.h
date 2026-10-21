@@ -231,6 +231,8 @@ inline std::ptrdiff_t in(char* s, size_t l) {
 inline void out(const char* data, size_t size) {
 	// TODO (HIGH) handle write errors
 	if (size == 0) return;
+	// the text that an evaluator writes to std::cout comes before this text
+	std::cout.flush();
 #ifndef _WIN32
 	const ssize_t written = write(STDOUT_FILENO, data, size);
 	if (written < 0 || static_cast<size_t>(written) != size)
