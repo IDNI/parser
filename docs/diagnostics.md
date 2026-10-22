@@ -107,7 +107,7 @@ Access the embedded diagnostics tree. The `&&` overload moves the report out —
 Push a message (same names as `report::error` / `warning` / `info`). Each has a primary-form (with `int64_t primary`) and a shorthand that takes only the attribute list. `error` enforces the *errored result carries no value* invariant.
 
 
-### template <typename U = T> result&& with_value(U&& value);
+### template \<typename U = T\> result&& with_value(U&& value);
 ### result&& with_error(code c, ...);
 ### result&& with_error(code c);
 
@@ -171,8 +171,8 @@ Same shape as [`report::step`](#reportstep) — forwards to the underlying repor
 Append a foreign `report` under whichever scope is currently open on this result.
 
 
-### template <typename U> result& merge(result<U>&& child);
-### template <typename U> result& operator<<(result<U>&& child);
+### template \<typename U\> result& merge(result\<U\>&& child);
+### template \<typename U\> result& operator\<\<(result\<U\>&& child);
 
 Append the child's report into this one, drop its value, and enforce the value/error invariant. `operator<<` is a stream-style shorthand that returns `*this`, so merges chain: `r << child_a << child_b;`.
 
@@ -182,15 +182,15 @@ Append the child's report into this one, drop its value, and enforce the value/e
 Take the child's value (if any), merge its report into this result, return the value. Replaces the manual extract-then-`merge` pattern.
 
 
-### template <typename U> std::optional<U> take_or_error(result<U>&& child, code c, std::string_view msg);
+### template \<typename U\> std::optional\<U\> take_or_error(result\<U\>&& child, code c, std::string_view msg);
 
 Take and merge a child result. If the child has neither a value nor an error,
 add the supplied error. An existing child error passes through unchanged.
 
 
-### template <typename F> auto and_then(F&& f) &&;
-### template <typename F> auto transform(F&& f) &&;
-### template <typename F> result<T> or_else(F&& f) &&;
+### template \<typename F\> auto and_then(F&& f) &&;
+### template \<typename F\> auto transform(F&& f) &&;
+### template \<typename F\> result\<T\> or_else(F&& f) &&;
 ### T value_or(T fallback) &&;
 
 `and_then` calls a fallible next step. `transform` calls an infallible value
@@ -445,7 +445,7 @@ A `sink` is one output slot for a single severity band. Three sinks bundle toget
 
 ### sink::sink();
 ### sink::sink(std::ostream* os);
-### template <typename F> sink::sink(F&& f);
+### template \<typename F\> sink::sink(F&& f);
 ### explicit operator bool() const noexcept;
 ### void operator()(std::string_view line) const;
 

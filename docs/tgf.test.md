@@ -66,7 +66,11 @@ An input is a bare name or a quoted string. A bare name holds only letters, digi
 start : true, false, null.
 ```
 
-A quoted string allows any character between `"` and `"`, plus these escapes: `\"` `\\` `\/` `\a` `\b` `\f` `\n` `\r` `\t` `\v` `\xHH` `\uHHHH` `\UHHHHHHHH`.
+A quoted string allows any character between `"` and `"`, plus these escapes:
+
+```
+\" \\ \/ \a \b \f \n \r \t \v \xHH \uHHHH \UHHHHHHHH
+```
 
 ```
 start > file > record > escaped > ^ 'b' escaped_quote 'c' $ : "\"b\"\"c\"".
@@ -83,11 +87,11 @@ A matcher is [treemr](../src/format/treemr/) pattern text, read verbatim and com
 | `a > b` | `b` is a direct child of `a` | `A > B : "x" @any.` |
 | `a >> b` | `b` sits anywhere below `a` | `start >> number : "0".` |
 | `^ ... $` | pin the sequence to the first and last child | `start >> number > ^ '0' $ : "0".` |
-| `%` | any single node | `A > (%) : "x" @all.` |
+| `%` | any single node | `` A > (%) : "x" @all. `` |
 | `'c'` | a node whose collected text is `c` | `start > file > record > escaped > ^ 'a' ',' 'b' $ : "\"a,b\"".` |
 | `"text"` | a node whose collected text is `text` | `start > file > record > "abc" : "abc".` |
 | `x!` | `x` has no children | `start > file > record > escaped! : "\"\"".` |
-| `(a \| b)` | either `a` or `b` matches | `A > (B \| C) : "x" @any.` |
+| `(a \| b)` | either `a` or `b` matches | `` A > (B \| C) : "x" @any. `` |
 | `x*` `x+` `x?` | zero or more, one or more, zero or one | `start > file > record > non_escaped* : "a,b,c".` |
 
 ## Negation

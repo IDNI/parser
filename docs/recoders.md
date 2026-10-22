@@ -10,7 +10,7 @@ Encoder encodes terminal type `T` into input type `C`.
 
 Both can be passed to a `parser` in [`parser::options`](parser_options.md).
 
-### parser<C, T>::decoder_type
+## parser<C, T>::decoder_type
 
 ```
 using decoder_type = std::function<std::vector<T>(parser<C, T>::input&)>
@@ -18,7 +18,7 @@ using decoder_type = std::function<std::vector<T>(parser<C, T>::input&)>
 
 When parser calls a decoder it passes a reference to [`parser<C, T>::input`](docs/parser_input.md) as an argument. Decoder returns a vector of terminals produced by the input char. It is a conversion from a templated type `C` to a templated type `T`.
 
-### parser<C, T>::encoder_type
+## parser<C, T>::encoder_type
 
 ```
 using encoder_type  = std::function<std::basic_string<C>(const std::vector<T>&)>;

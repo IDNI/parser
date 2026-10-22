@@ -767,19 +767,19 @@ struct result {
 		requires(!std::is_void_v<U>);
 
 	/// Chain a fallible step. On value, calls @p f with the moved value and
-	/// returns its @ref result<U>, this result's report merged in before
+	/// returns its @ref result\<U\>, this result's report merged in before
 	/// the child's so message order stays this-then-child. On error,
-	/// @p f is not called; returns a @ref result<U> carrying the moved
-	/// report. F: T -> result<U>.
+	/// @p f is not called; returns a @ref result\<U\> carrying the moved
+	/// report. F: T -> result\<U\>.
 	template <typename F>
 	[[nodiscard]] auto and_then(F&& f) &&
 		-> std::invoke_result_t<F, stored_t&&>
 		requires(!std::is_void_v<T>);
 
 	/// Chain an infallible transform. On value, wraps @c f(value) in a
-	/// @ref result<U> together with the moved report; a null pointer @c U
+	/// @ref result\<U\> together with the moved report; a null pointer @c U
 	/// remains a legitimate value. On error,
-	/// @p f is not called; returns a @ref result<U> carrying the moved
+	/// @p f is not called; returns a @ref result\<U\> carrying the moved
 	/// report. F: T -> U.
 	template <typename F>
 	[[nodiscard]] auto transform(F&& f) &&

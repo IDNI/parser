@@ -12,7 +12,7 @@ It offers methods counting trees, traversal or tree or graph extractions.
 
 `forest` is a generic structure since the type of nodes `NodeT` is templated.
 
-### parse forest
+## parse forest
 
 This library uses `forest` to represent all parse trees parsed from a given input. Each `parser<C, T>::parse(...)` call produces a `parser<C, T>::result` which stores either a forest or a bintree depending on the parse mode.
 

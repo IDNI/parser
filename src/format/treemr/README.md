@@ -70,9 +70,13 @@ An atom matches one node.
 | `( … )`       | capture    | a capture group (see [Captures](#captures)) |
 | `( a \| b )`  | union      | alternation inside a capture |
 
-A name follows `(alpha|_)(alnum|_)*`. Both literal kinds accept
-`\a \b \f \n \r \t \v \\ \/`, `\xHH`, `\uHHHH`, and `\UHHHHHHHH`. A char
-literal also accepts `\'`. A string literal also accepts `\"`.
+A name follows `(alpha|_)(alnum|_)*`. The literals accept these escapes:
+
+```
+both kinds:     \a \b \f \n \r \t \v \\ \/ \xHH \uHHHH \UHHHHHHHH
+char literal:   \'
+string literal: \"
+```
 
 A string literal also matches a run of consecutive childless terminal
 siblings whose concatenated text equals the string.

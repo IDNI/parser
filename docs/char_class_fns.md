@@ -70,7 +70,7 @@ The library has common [character classes](charclasses.md). A helper function re
 
 ### char_cc_fns\<T> predefined_car_classes(const std::vector\<std::string>& cc_fn_names, nonterminals<C, T>& nts);
 
-`nts` is a reference to `nonterminals`. `cc_fn_names`` is a vector of names of functions we want to use. Any of the following function names is available:
+`nts` is a reference to `nonterminals`. `cc_fn_names` is a vector of names of functions we want to use. Any of the following function names is available:
 
 ```
 // { function name, predefined function used }

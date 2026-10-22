@@ -16,7 +16,7 @@ parser library itself never uses Boost.
     ./dev preset release -DTAU_PARSER_BUILD_SERVE=ON -DTAU_PARSER_DEPS_FROM_STORE=ON
 
 With the store option, configure gets the headers from the store. Without
-it, configure uses -DTAU_BOOST_INCLUDE_DIR=<dir> or a system Boost 1.86 or
+it, configure uses `-DTAU_BOOST_INCLUDE_DIR=<dir>` or a system Boost 1.86 or
 newer.
 
 The `-all` presets turn the option on. The option is always off for

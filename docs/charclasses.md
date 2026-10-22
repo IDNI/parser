@@ -44,7 +44,7 @@ The plain classes give the answer of `<cctype>` in the C locale.
   They cast the character to `unsigned char` before the call.
 - The `char32_t` functions give the same answer for ASCII.
   A code point above U+007F is in no plain class.
-  For example, `isdigit<char32_t>(U'\u0663')` is false.
+  For example, `isdigit<char32_t>` is false for the code point U+0663.
 
 ## Unicode classes
 
