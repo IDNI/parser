@@ -113,14 +113,25 @@ tauparser_setup(tgf PRIVATE tgf_cli_core)
 # Round-trip self-check first, archive only the binary that passed it.
 # Both steps run the binary on the host, which a cross build cannot do.
 # bash runs the scripts: cmd.exe opens a .sh in a GUI program and does not wait.
+# The archive writes into the source tree, so only a build under its own
+# build/ folder archives. A store build or a parent project leaves it alone.
+get_filename_component(_tgf_build_root "${PROJECT_SOURCE_DIR}/build" REALPATH)
+get_filename_component(_tgf_binary_dir "${PROJECT_BINARY_DIR}" REALPATH)
+string(FIND "${_tgf_binary_dir}/" "${_tgf_build_root}/" _tgf_in_build_root)
 if(NOT CMAKE_CROSSCOMPILING)
-	if(TAU_PARSER_BASH)
+	if(TAU_PARSER_BASH AND _tgf_in_build_root EQUAL 0)
 		add_custom_command(TARGET tgf POST_BUILD
 			COMMAND "${TAU_PARSER_BASH}"
 				"${PROJECT_SOURCE_DIR}/scripts/tgf-roundtrip-self-check.sh" "$<TARGET_FILE:tgf>"
 			COMMAND "${TAU_PARSER_BASH}"
 				"${PROJECT_SOURCE_DIR}/scripts/archive-tgf.sh" "$<TARGET_FILE:tgf>"
 			COMMENT "Round-trip self-check, then archiving the passing binary"
+		)
+	elseif(TAU_PARSER_BASH)
+		add_custom_command(TARGET tgf POST_BUILD
+			COMMAND "${TAU_PARSER_BASH}"
+				"${PROJECT_SOURCE_DIR}/scripts/tgf-roundtrip-self-check.sh" "$<TARGET_FILE:tgf>"
+			COMMENT "Round-trip self-check"
 		)
 	else()
 		message(WARNING "tgf: no bash found, so the build skips the round-trip self-check")
