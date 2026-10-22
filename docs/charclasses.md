@@ -111,6 +111,7 @@ The tables are Unicode 17.0.0. A program that must match another Unicode
 version can differ for the code points that are new or changed after that
 version.
 
+<a id="python-string-classes"></a>
 ## Python string classes
 
 `src/utility/python_charclasses.h` gives the character classes of the CPython `str` methods,

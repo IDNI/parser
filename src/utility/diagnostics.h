@@ -232,7 +232,7 @@ struct report {
 	[[nodiscard]] scope_guard open(std::string_view name, code tag,
 		size_t value);
 
-	/// Like @ref open(key) but conditional. Disabled returns a no-op guard.
+	/// Like @ref open but conditional. Disabled returns a no-op guard.
 	[[nodiscard]] scope_guard open_if(bool enable, key name,
 		code tag = code::info_micros, int_t value = 0);
 	[[nodiscard]] scope_guard open_if(bool enable, key name,
@@ -577,7 +577,7 @@ struct result {
 
 	/// Set the success value in place. If the report already holds an
 	/// error, the new value is silently dropped (see
-	/// @ref enforce_error_no_value_invariant); a DBG-build assertion
+	/// `enforce_error_no_value_invariant`); a DBG-build assertion
 	/// catches the misuse.
 	stored_t& emplace(stored_t&& v)
 		requires(!std::is_void_v<T>);
@@ -590,7 +590,7 @@ struct result {
 	result& operator=(U&& v)
 		requires(!std::is_void_v<T>);
 
-	/// @ref operator=, and it returns the result, so a caller returns in
+	/// `operator=`, and it returns the result, so a caller returns in
 	/// one statement. The rvalue return admits no further call.
 	template <typename U = stored_t>
 	[[nodiscard]] result&& with_value(U&& v)
@@ -617,9 +617,9 @@ struct result {
 	[[nodiscard]] diagnostics_report&&     report() &&;
 
 	/// Semantic @p code applies to errors only; warnings and infos are
-	/// message-only (severity is @ref node_kind).
+	/// message-only (the top two bits of the `code` tag give the severity).
 	/// NOTE: an error on a result that already holds a value will discard
-	/// that value (see @ref enforce_error_no_value_invariant).
+	/// that value (see `enforce_error_no_value_invariant`).
 	void error(code c, std::string_view msg, int_t primary = 0,
 		   std::initializer_list<attr_in> extra = {});
 	void error(code c, std::string_view msg, size_t primary,
@@ -637,7 +637,7 @@ struct result {
 	[[nodiscard]] result&& with_error(code c, std::string_view msg,
 		   std::initializer_list<attr_in> extra);
 
-	/// @ref with_error using @ref code_name(@p c) as the message.
+	/// @ref with_error using @ref code_name "code_name(c)" as the message.
 	[[nodiscard]] result&& with_error(code c);
 
 	/// @ref with_error, plus a DBG assertion of @ref is_well_formed.
@@ -648,7 +648,7 @@ struct result {
 	[[nodiscard]] result&& with_assert_check_error(code c, std::string_view msg,
 		   std::initializer_list<attr_in> extra);
 
-	/// @ref with_assert_check_error using @ref code_name(@p c) as the message.
+	/// @ref with_assert_check_error using @ref code_name "code_name(c)" as the message.
 	[[nodiscard]] result&& with_assert_check_error(code c);
 
 	void warning(std::string_view msg, int_t primary = 0,
@@ -825,9 +825,9 @@ template <typename T>
 [[nodiscard]] result<T> error(code c, std::string_view msg, size_t primary,
 			      std::initializer_list<attr_in> extra = {});
 
-/// Forward @p src's diagnostic report into a new @ref result<T> whose value
+/// Forward @p src's diagnostic report into a new @ref result whose value
 /// is @p value on success, absent on failure. The value/error invariant
-/// (@ref result::enforce_error_no_value_invariant) still applies, so when
+/// (`result::enforce_error_no_value_invariant`) still applies, so when
 /// @p src carries an error @p value is dropped.
 template <typename T, typename U>
 [[nodiscard]] result<T> forward_as(result<U>&& src, T value);

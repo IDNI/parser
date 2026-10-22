@@ -373,6 +373,7 @@ option_value effective(std::size_t i) const;
 The value of the option at index `i`: the field of a bound option, else the stored value, else the default of `command`, else the default of the option. The second form uses the command of the last `parse_args()`. Every read goes through it.
 
 
+<a id="codec"></a>
 ## codec
 
 ```

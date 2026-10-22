@@ -136,6 +136,7 @@ Use parentheses to scope an edge to a single atom.
 (row > cell) ',' cell    # `row > cell`, THEN a sibling ',', THEN a sibling cell
 ```
 
+<a id="anchors"></a>
 ### Anchors
 
 Within a sibling sequence, an anchor pins the match to one end of the child
@@ -242,6 +243,7 @@ A group that holds only an anchor, such as `(^)` or `($)`, is a compile
 error. Every group is a capture, and an anchor-only group can never
 capture a node. It would only shift the numbering of later captures.
 
+<a id="captures"></a>
 ### Captures
 
 Every `( … )` is a **capture group**. The first node it matches is

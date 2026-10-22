@@ -1,4 +1,4 @@
-[back to index](../README.md)
+[back to index](../README.md#classes-and-structs)
 
 # creating grammars programatically
 

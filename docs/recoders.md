@@ -16,7 +16,7 @@ Both can be passed to a `parser` in [`parser::options`](parser_options.md).
 using decoder_type = std::function<std::vector<T>(parser<C, T>::input&)>
 ```
 
-When parser calls a decoder it passes a reference to [`parser<C, T>::input`](docs/parser_input.md) as an argument. Decoder returns a vector of terminals produced by the input char. It is a conversion from a templated type `C` to a templated type `T`.
+When parser calls a decoder it passes a reference to [`parser<C, T>::input`](parser_input.md) as an argument. Decoder returns a vector of terminals produced by the input char. It is a conversion from a templated type `C` to a templated type `T`.
 
 ## parser<C, T>::encoder_type
 
