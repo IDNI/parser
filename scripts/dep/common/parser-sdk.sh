@@ -15,8 +15,9 @@
 #
 # Two packages share this script because they share the parser source tree and
 # the identity of that tree:
-#   sdk  the parser SDK: headers, libtauparser.a, tauparserConfig.cmake and the
-#        package it exports. TAU_PARSER_INSTALL=ON, tgf not built.
+#   sdk  the parser SDK: headers, libtauparser.a, libtauparser_net.a (not on
+#        wasm), tauparserConfig.cmake and the package it exports.
+#        TAU_PARSER_INSTALL=ON, tgf not built.
 #   tgf  the host tgf tool only (bin/tgf). A target build consumes this package
 #        so it never compiles tgf itself. Keyed by the host triple and the
 #        parser identity.
@@ -103,7 +104,7 @@ _dep_parser_resolve_dep() {
 }
 
 _dep_parser_field_block() {
-	local dep="$1" ftxui_id="$2" unordered_dense_id="$3"
+	local dep="$1" ftxui_id="$2" unordered_dense_id="$3" boost_headers_id="$4"
 	local build_helper publish_helper manifest store
 	local recipe_hash recipe_common_hash build_hash publish_hash manifest_hash store_hash
 	build_helper="${__devrc_dir}/dep-build"
@@ -129,6 +130,7 @@ _dep_parser_field_block() {
 		"provenance.store_writer_hash=${store_hash}" \
 		"ftxui_package_id=${ftxui_id}" \
 		"unordered_dense_package_id=${unordered_dense_id}" \
+		"boost_headers_package_id=${boost_headers_id}" \
 		"configure_args=${_DEP_PARSER_CONFIGURE_ARGS[*]}" \
 		"cxx_standard=${PARSER_CXX_STANDARD}" \
 		"cflags=${DEP_PARSER_CFLAGS}" \
@@ -154,11 +156,12 @@ _dep_parser_field_block() {
 }
 
 # Producer callback. $1 is the staging prefix, $2 the FTXUI prefix, $3 the
-# unordered_dense prefix. The parser is configured and built out of tree; the
+# unordered_dense prefix, $4 the Boost headers prefix (empty without net). The parser is configured and built out of tree; the
 # generated parser files land in the source tree, which the install reads.
 _dep_parser_producer() {
 	local staging_prefix="$1" ftxui_prefix="$2" unordered_dense_prefix="$3"
-	local staging work build target component prefix_map
+	local boost_headers_prefix="$4"
+	local staging work build targets component prefix_map boost_args
 	staging="$(dirname "$staging_prefix")"
 	work="${staging}/work"
 	build="${work}/build"
@@ -172,11 +175,16 @@ _dep_parser_producer() {
 	fi
 	rm -rf "$work"
 	mkdir -p "$work"
+	boost_args=()
 	if [ "$PARSER_PACKAGE" = "tgf" ]; then
-		target=tgf
+		targets=(tgf)
 		component=tgf
+	elif [ -n "$boost_headers_prefix" ]; then
+		targets=(tauparser_static tauparser_net)
+		component=""
+		boost_args=("-DTAU_BOOST_INCLUDE_DIR=${boost_headers_prefix}/include")
 	else
-		target=tauparser_static
+		targets=(tauparser_static)
 		component=""
 	fi
 	# A producer passes a shared set of variables, and a project reads only some.
@@ -191,10 +199,11 @@ _dep_parser_producer() {
 		"-DTAU_BUILD_JOBS=$DEP_PARSER_JOBS" \
 		"-DTAU_PARSER_FTXUI_PREFIX=$ftxui_prefix" \
 		"-DTAU_PARSER_UNORDERED_DENSE_PREFIX=$unordered_dense_prefix" \
+		${boost_args[@]+"${boost_args[@]}"} \
 		-DCMAKE_INSTALL_PREFIX="$staging_prefix" \
 		|| { rm -rf "$work"; return 1; }
 	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS \
-		"$DEP_PARSER_CMAKE" --build "$build" --target "$target" -- -j "$DEP_PARSER_JOBS" \
+		"$DEP_PARSER_CMAKE" --build "$build" --target "${targets[@]}" -- -j "$DEP_PARSER_JOBS" \
 		|| { rm -rf "$work"; return 1; }
 	if [ -n "$component" ]; then
 		env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS \
@@ -214,10 +223,13 @@ _dep_parser_producer() {
 	local archive
 	for archive in "$staging_prefix/lib/libtauparser.a" \
 			"$staging_prefix/lib/tauparser.lib" \
-			"$staging_prefix/lib/tauparser_static.lib"; do
+			"$staging_prefix/lib/tauparser_static.lib" \
+			"$staging_prefix/lib/libtauparser_net.a" \
+			"$staging_prefix/lib/tauparser_net.lib"; do
 		[ -f "$archive" ] || continue
 		if ! "$DEP_PYTHON" - "$archive" "$build" "$staging_prefix" "$PARSER_SOURCE" \
-			"$work" "$staging" "$ftxui_prefix" "$unordered_dense_prefix" <<'PY'
+			"$work" "$staging" "$ftxui_prefix" "$unordered_dense_prefix" \
+			"$boost_headers_prefix" <<'PY'
 import sys
 path, *olds = sys.argv[1:]
 data = open(path, 'rb').read()
@@ -353,7 +365,6 @@ if dep_target_needs_toolchain "$DEP_PARSER_TARGET"; then
 	fi
 	_DEP_PARSER_TOOLCHAIN_ARGS=(-DCMAKE_TOOLCHAIN_FILE="$DEP_PARSER_TOOLCHAIN")
 fi
-_DEP_PARSER_TARGET_ARGS=()
 DEP_PARSER_HOST_CC="$(dep_var TAU_PARSER_HOST_C_COMPILER "")"
 DEP_PARSER_HOST_CXX="$(dep_var TAU_PARSER_HOST_CXX_COMPILER "")"
 _DEP_PARSER_HOST_ARGS=()
@@ -383,6 +394,23 @@ fi
 FTXUI_PACKAGE_ID="$(basename "$(dirname "$FTXUI_PREFIX")")"
 UNORDERED_DENSE_PACKAGE_ID="$(basename "$(dirname "$UNORDERED_DENSE_PREFIX")")"
 
+# The net library of the SDK compiles against the Boost headers. tgf and the
+# wasm target build no net, so they consume no Boost package.
+PARSER_BUILD_NET=OFF
+BOOST_HEADERS_PREFIX=""
+BOOST_HEADERS_PACKAGE_ID=""
+if [ "$PARSER_PACKAGE" = "sdk" ] && [ "$DEP_PARSER_TARGET" != "wasm32-emscripten" ]; then
+	PARSER_BUILD_NET=ON
+	BOOST_HEADERS_DEP_SCRIPT="$(dep_producer_script "$DEV_ROOT" boost-headers "$DEP_PARSER_TARGET")" \
+		|| exit 1
+	if ! BOOST_HEADERS_PREFIX="$(_dep_parser_resolve_dep "$BOOST_HEADERS_DEP_SCRIPT" "$mode")" \
+			|| [ -z "$BOOST_HEADERS_PREFIX" ]; then
+		echo "dep-parser-sdk: cannot resolve the boost_headers package" >&2
+		exit 1
+	fi
+	BOOST_HEADERS_PACKAGE_ID="$(basename "$(dirname "$BOOST_HEADERS_PREFIX")")"
+fi
+
 # Thin LTO comes from CMake's IPO flags, which force -fno-fat-lto-objects. Fat
 # LTO comes from the parser's own -flto=auto plus -ffat-lto-objects in the CXX
 # flags, with CMake IPO off so its -fno-fat-lto-objects cannot override it.
@@ -411,6 +439,7 @@ else
 	PARSER_BUILD_OPTIONS=(
 		-DTAU_PARSER_BUILD_STATIC_LIBRARY=ON
 		-DTAU_PARSER_BUILD_TGF=OFF
+		-DTAU_PARSER_BUILD_NET="$PARSER_BUILD_NET"
 	)
 fi
 
@@ -433,19 +462,19 @@ _DEP_PARSER_CONFIGURE_ARGS=(
 	-DTAU_PARSER_BUILD_SERVE=OFF
 	-DFETCHCONTENT_FULLY_DISCONNECTED=ON
 	${_DEP_PARSER_TOOLCHAIN_ARGS[@]+"${_DEP_PARSER_TOOLCHAIN_ARGS[@]}"}
-	${_DEP_PARSER_TARGET_ARGS[@]+"${_DEP_PARSER_TARGET_ARGS[@]}"}
 	"${PARSER_BUILD_OPTIONS[@]}"
 )
 
 block="$(_dep_parser_field_block "$DEP_PARSER_NAME" \
-	"$FTXUI_PACKAGE_ID" "$UNORDERED_DENSE_PACKAGE_ID")" || {
+	"$FTXUI_PACKAGE_ID" "$UNORDERED_DENSE_PACKAGE_ID" \
+	"$BOOST_HEADERS_PACKAGE_ID")" || {
 	echo "dep-parser-sdk: cannot build the identity field block" >&2
 	exit 1
 }
 
 out=""
 if ! dep_ensure out "$mode" "$DEP_PARSER_NAME" "$block" _dep_parser_producer \
-		"$FTXUI_PREFIX" "$UNORDERED_DENSE_PREFIX"; then
+		"$FTXUI_PREFIX" "$UNORDERED_DENSE_PREFIX" "$BOOST_HEADERS_PREFIX"; then
 	echo "dep-parser-sdk: ${mode} failed for ${DEP_PARSER_NAME}" >&2
 	exit 1
 fi

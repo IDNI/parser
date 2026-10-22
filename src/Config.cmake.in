@@ -1,5 +1,11 @@
 @PACKAGE_INIT@
 
+set(TAU_PARSER_HAS_NET @TAU_PARSER_CONFIG_HAS_NET@)
+if(TAU_PARSER_HAS_NET)
+	include(CMakeFindDependencyMacro)
+	find_dependency(Threads)
+endif()
+
 include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")
 
 check_required_components(@PROJECT_NAME@)

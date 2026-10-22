@@ -237,6 +237,10 @@ if(TAU_PARSER_INSTALL)
 endif()
 
 include(CMakePackageConfigHelpers)
+set(TAU_PARSER_CONFIG_HAS_NET OFF)
+if(TARGET tauparser_net)
+	set(TAU_PARSER_CONFIG_HAS_NET ON)
+endif()
 write_basic_package_version_file(
 	"${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
 	VERSION "${version}"
