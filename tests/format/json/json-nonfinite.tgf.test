@@ -16,10 +16,11 @@ start > value > nonfinite : "NaN", "Infinity", "-Infinity".
 start > value > nonfinite > ^ 'N' 'a' 'N' $ : "NaN".
 start > value > nonfinite > ^ '-' 'I' 'n' 'f' 'i' 'n' 'i' 't' 'y' $ : "-Infinity".
 
-# A constant in an array and in an object.
+# A constant in an array, in an object and in the wire line.
 start : "[NaN,Infinity,-Infinity]", "{\"a\":NaN}", " [ -Infinity ] ".
 start > value > arr > values > value > nonfinite : "[NaN]".
 start > value > object > object_pair > value > nonfinite : "{\"a\":Infinity}".
+wire_line : "NaN", " Infinity ".
 
 # A negative number is no nonfinite constant.
 start > value > number : "-1".
