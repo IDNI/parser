@@ -2542,3 +2542,27 @@ TEST_SUITE("parser: every input byte") {
 			"Syntax Error: Unexpected 'd' at 1:1 (1):"));
 	}
 }
+
+TEST_SUITE("parser tree: terminal collection") {
+	TEST_CASE("get_terminals skips a hand-built null literal leaf") {
+		using parser_t = parser<char>;
+		const parser_t::pnode null_leaf(lit<char>{}, { 0, 0 });
+		const tref t = parser_t::tree::get(null_leaf);
+		CHECK(parser_t::tree::get(t).get_terminals().empty());
+	}
+
+	TEST_CASE("get_terminals retains a real NUL input byte") {
+		nonterminals<char> nts;
+		auto start = nts("start");
+		prods<char> ps, nul('\0');
+		ps(start, nul);
+		grammar<char> g(nts, ps, start, {});
+		parser<char> p(g);
+		const std::string input(1, '\0');
+		auto r = p.parse(input.data(), input.size(),
+			{ .tree_path = parse_tree_path::bintree_path });
+		REQUIRE(r.found);
+		CHECK(parser<char>::tree::get(r.get_bintree()).get_terminals()
+			== input);
+	}
+}
