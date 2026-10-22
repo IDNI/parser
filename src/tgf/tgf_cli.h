@@ -124,8 +124,10 @@ struct tgf_repl_evaluator : tgf_repl_evaluator_base {
 	/// Data of the load command from source text: {"grammar", "loaded"}.
 	tref load_source_data(const std::string& name,
 		const std::string& text);
-	/// Data of the reload command for a grammar loaded from source text.
-	tref reload_source_data();
+	/// Data of the reload command: reload the stored text of a
+	/// source-backed grammar, else the file @p filename. No data when a
+	/// fixed grammar or the path rule refuses it.
+	tref reload_data(const std::string& filename);
 
 	/// Run one statement and return its data. Writes nothing to cout or
 	/// cerr; errors and warnings go into the returned report.
@@ -219,10 +221,16 @@ private:
 	/// Load a grammar file and adopt it, without printing. On success
 	/// tgf_filename names @p filename.
 	bool load_file(const std::string& filename);
+	/// Build the grammar of @p text and adopt it under the name @p name.
+	/// A source-backed grammar reloads from its text, else from its file.
+	bool adopt_grammar(const std::string& name, std::string text,
+		bool from_source);
 	/// Report "server path" and return false when paths are forbidden.
 	bool paths_allowed();
-	/// Data of the load and reload commands: {"grammar", "loaded"}.
-	tref reload_data(const std::string& new_tgf_file);
+	/// Data of the load command for a file: {"grammar", "loaded"}.
+	tref load_file_data(const std::string& filename);
+	/// Warn and return false when the grammar is fixed.
+	bool loads_allowed();
 	/// The {"grammar", "loaded"} data of a load of @p name.
 	tref load_answer(bool loaded,
 		const std::string& name) const;

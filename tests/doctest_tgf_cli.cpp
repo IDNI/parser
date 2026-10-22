@@ -273,6 +273,22 @@ TEST_SUITE("tgf cli: a load writes the command line again") {
 	}
 }
 
+TEST_SUITE("tgf cli: reload data") {
+	TEST_CASE("reload data restores a source-backed grammar") {
+		options_repository mine;
+		options_scope scope(mine);
+		tgf_repl_evaluator re(tgf_repl_evaluator::options{});
+		REQUIRE(re.load_source("memory", "start => 'a'.\n"));
+		auto data = re.reload_data("unused.tgf");
+		auto loaded = format::json::tree::get(data).find("loaded");
+		REQUIRE(loaded);
+		CHECK(format::json::tree::get(loaded).get_bool());
+		const auto* name = format::json::string_member(data, "grammar");
+		REQUIRE(name);
+		CHECK(*name == "memory");
+	}
+}
+
 TEST_SUITE("tgf cli: environment") {
 
 	TEST_CASE("TGF_MAX_LENGTH sets max-length") {

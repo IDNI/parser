@@ -269,35 +269,19 @@ bool tgf_repl_evaluator::load_file(const std::string& filename) {
 	}
 	std::string text((istreambuf_iterator<char>(f)),
 		istreambuf_iterator<char>());
-	auto next_nts = make_unique<nonterminals_type>();
-	auto gr = tgf<char_type, terminal_type>::from_string(*next_nts, text,
-		idni::options().get<bool>("measure"));
-	if (!gr.has_value()) {
-		report.append(std::move(gr).report());
-		return false;
-	}
-	auto next_grammar = make_unique<grammar_type>(std::move(gr).value());
-	auto next_parser = make_unique<parser_type>(*next_grammar,
-		default_parser_options<char_type, terminal_type>());
-	report.append(std::move(gr).report());
-
-	// the unbind of the old parser and grammar reads the old nonterminals
-	owned_p       = std::move(next_parser);
-	owned_g       = std::move(next_grammar);
-	owned_nts     = std::move(next_nts);
-	p_            = owned_p.get();
-	bind_grammar_options();
-	report.append(p().bind_options().report());
-	write_argv_values();
-	tgf_filename = filename;
-	grammar_source = std::move(text);
-	grammar_from_source = false;
-	grammar_loaded = true;
-	return true;
+	return adopt_grammar(filename, std::move(text), false);
 }
 
 bool tgf_repl_evaluator::load_source(const std::string& name,
 	const std::string& text)
+{
+	return adopt_grammar(name, text, true);
+}
+
+// The text stays, so a session and a source-backed reload use the bytes of
+// this load. A file-backed reload reads the file again.
+bool tgf_repl_evaluator::adopt_grammar(const std::string& name,
+	std::string text, bool from_source)
 {
 	auto next_nts = make_unique<nonterminals_type>();
 	auto gr = tgf<char_type, terminal_type>::from_string(*next_nts, text,
@@ -320,8 +304,8 @@ bool tgf_repl_evaluator::load_source(const std::string& name,
 	report.append(p().bind_options().report());
 	write_argv_values();
 	tgf_filename        = name;
-	grammar_source      = text;
-	grammar_from_source = true;
+	grammar_source      = std::move(text);
+	grammar_from_source = from_source;
 	grammar_loaded      = true;
 	return true;
 }
@@ -537,35 +521,26 @@ tref tgf_repl_evaluator::productions_value(const char* key,
 }
 
 bool tgf_repl_evaluator::reload(const string& new_tgf_file) {
-	if (fixed_grammar) {
-		report.warning(parser_strings::messages::loading_grammars_unavailable);
-		return false;
-	}
-
-	// A grammar loaded from text has no file to read; reload the stored
-	// text instead. @p new_tgf_file is ignored in that case.
-	if (grammar_from_source) {
-		std::string name = tgf_filename;
-		std::string text = grammar_source;
-		if (!load_source(name, text)) {
-			report.error(diagnostics::code::io_error,
-				parser_strings::messages::reload_failed,
-				{{parser_strings::label::path, name}});
-			return false;
-		}
-		report.info(parser_strings::messages::reload_succeeded,
-			{{parser_strings::label::path, tgf_filename}});
-		return true;
-	}
-	if (!load_file(new_tgf_file)) {
+	bintree<format::json::node>::gc_pause pause;
+	const tref v = reload_data(new_tgf_file);
+	const tref loaded = jt::get(v).find(tp::loaded);
+	if (!loaded) return false;
+	const std::string& name = *format::json::string_member(v, tp::grammar);
+	if (!jt::get(loaded).get_bool()) {
 		report.error(diagnostics::code::io_error,
 			parser_strings::messages::reload_failed,
-			{{parser_strings::label::path, new_tgf_file}});
+			{{parser_strings::label::path, name}});
 		return false;
 	}
 	report.info(parser_strings::messages::reload_succeeded,
-		{{parser_strings::label::path, tgf_filename}});
+		{{parser_strings::label::path, name}});
 	return true;
+}
+
+bool tgf_repl_evaluator::loads_allowed() {
+	if (!fixed_grammar) return true;
+	report.warning(parser_strings::messages::loading_grammars_unavailable);
+	return false;
 }
 
 tref tgf_repl_evaluator::load_answer(bool loaded,
@@ -576,29 +551,27 @@ tref tgf_repl_evaluator::load_answer(bool loaded,
 		jt::build_pair(tp::loaded, jt::build_bool(loaded)) });
 }
 
-// Data of the load and reload commands. @p new_tgf_file is the file to
-// load; on success tgf_filename names it. The caller checked fixed_grammar.
-tref tgf_repl_evaluator::reload_data(const std::string& new_tgf_file) {
-	if (!load_file(new_tgf_file)) return load_answer(false, new_tgf_file);
-	return load_answer(true, tgf_filename);
+tref tgf_repl_evaluator::load_file_data(const std::string& filename) {
+	return load_answer(load_file(filename), filename);
 }
 
 tref tgf_repl_evaluator::load_source_data(const std::string& name,
 	const std::string& text)
 {
-	if (fixed_grammar) {
-		report.warning(parser_strings::messages::loading_grammars_unavailable);
-		return load_answer(false, name);
-	}
-	if (!load_source(name, text)) return load_answer(false, name);
-	return load_answer(true, tgf_filename);
+	if (!loads_allowed()) return load_answer(false, name);
+	return load_answer(load_source(name, text), name);
 }
 
-tref tgf_repl_evaluator::reload_source_data() {
-	std::string name = tgf_filename;
-	std::string text = grammar_source;
-	if (!load_source(name, text)) return load_answer(false, name);
-	return load_answer(true, tgf_filename);
+tref tgf_repl_evaluator::reload_data(const std::string& filename) {
+	if (!loads_allowed()) return jt::build_object({});
+	// A grammar loaded from text has no file to read, so it reloads the
+	// stored text and ignores @p filename.
+	if (grammar_from_source) {
+		const std::string name = tgf_filename;
+		return load_answer(load_source(name, grammar_source), name);
+	}
+	if (!paths_allowed()) return jt::build_object({});
+	return load_file_data(filename);
 }
 
 tref tgf_repl_evaluator::get_cmd(std::string_view name) {
@@ -944,29 +917,15 @@ cmd_result tgf_repl_evaluator::run(const trv& s) {
 				option_text(s), false);
 			break;
 		case p::reload_cmd:
-			if (fixed_grammar) {
-				report.warning(parser_strings::messages::
-					loading_grammars_unavailable);
-				break;
-			}
 			if (!require_grammar()) break;
-			// A file-backed grammar needs a path; a source-backed one
-			// reloads from the text it was loaded from.
-			if (!grammar_from_source && !paths_allowed()) break;
-			data = grammar_from_source
-				? reload_source_data() : reload_data(tgf_filename);
+			data = reload_data(tgf_filename);
 			break;
 		case p::load_cmd: {
-			if (fixed_grammar) {
-				report.warning(parser_strings::messages::
-					loading_grammars_unavailable);
-				break;
-			}
-			if (!paths_allowed()) break;
+			if (!loads_allowed() || !paths_allowed()) break;
 			auto n = s | p::filename;
 			auto filename = unquote(n | tt::terminals, report);
 			if (report.has_error()) break;
-			data = reload_data(filename);
+			data = load_file_data(filename);
 			break;
 		}
 		case p::start_cmd: {
