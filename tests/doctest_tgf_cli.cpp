@@ -289,6 +289,44 @@ TEST_SUITE("tgf cli: reload data") {
 	}
 }
 
+TEST_SUITE("tgf cli: file read reports") {
+	TEST_CASE("a missing grammar file keeps its path") {
+		const auto path = std::filesystem::temp_directory_path()
+			/ "tgf_cli_missing_grammar.tgf";
+		std::filesystem::remove(path);
+		options_repository mine;
+		options_scope scope(mine);
+		tgf_repl_evaluator re(tgf_repl_evaluator::options{});
+		CHECK_FALSE(re.load_file_source(path.string()));
+		auto report = re.take_report();
+		auto index = report.first_error_index();
+		REQUIRE(index);
+		CHECK(report.format_message(*index).find(
+			path.filename().string()) != string::npos);
+	}
+
+	TEST_CASE("a failed reload keeps its path") {
+		const auto path = std::filesystem::temp_directory_path()
+			/ "tgf_cli_failed_reload.tgf";
+		{
+			std::ofstream f(path);
+			f << "start => 'a'.\n";
+		}
+		options_repository mine;
+		options_scope scope(mine);
+		tgf_repl_evaluator re(path.string());
+		REQUIRE(re.good());
+		re.take_report();
+		std::filesystem::remove(path);
+		CHECK_FALSE(re.reload(path.string()));
+		auto report = re.take_report();
+		auto index = report.first_error_index();
+		REQUIRE(index);
+		CHECK(report.format_message(*index).find(
+			path.filename().string()) != string::npos);
+	}
+}
+
 TEST_SUITE("tgf cli: environment") {
 
 	TEST_CASE("TGF_MAX_LENGTH sets max-length") {

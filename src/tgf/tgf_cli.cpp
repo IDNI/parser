@@ -23,6 +23,7 @@
 #include "tgf_serve.h"
 #include "tgf_connect.h"
 #endif
+#include "utility/filesystem.h"
 #include "utility/repl_run.h"
 #include "utility/win_args.h"
 #include "format/tgf.test/tgf_test.h"
@@ -214,15 +215,12 @@ void tgf_repl_evaluator::make_grammar_source_backed() {
 }
 
 bool tgf_repl_evaluator::load_file_source(const std::string& filename) {
-	ifstream f(filename, ios::binary);
-	if (!f) {
-		report.error(diagnostics::code::io_error,
-			parser_strings::messages::cannot_open_file);
+	auto text = fs::read(fs::to_path(filename));
+	if (!text.has_value()) {
+		report.append(text.report());
 		return false;
 	}
-	std::string text((istreambuf_iterator<char>(f)),
-		istreambuf_iterator<char>());
-	return load_source(filename, text);
+	return load_source(filename, text.value());
 }
 
 std::string tgf_repl_evaluator::start_symbol() const {
@@ -257,19 +255,13 @@ void tgf_repl_evaluator::begin_server_session(const std::string& id) {
 	set_colors();
 }
 
-// The text stays, so a session and a source-backed reload use the bytes of
-// this load. A file-backed reload reads the file again.
 bool tgf_repl_evaluator::load_file(const std::string& filename) {
-	ifstream f(filename, ios::binary);
-	if (!f) {
-		report.error(diagnostics::code::io_error,
-			parser_strings::messages::cannot_open_file,
-			{ { parser_strings::label::path, filename } });
+	auto text = fs::read(fs::to_path(filename));
+	if (!text.has_value()) {
+		report.append(text.report());
 		return false;
 	}
-	std::string text((istreambuf_iterator<char>(f)),
-		istreambuf_iterator<char>());
-	return adopt_grammar(filename, std::move(text), false);
+	return adopt_grammar(filename, std::move(text).value(), false);
 }
 
 bool tgf_repl_evaluator::load_source(const std::string& name,
