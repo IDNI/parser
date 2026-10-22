@@ -516,7 +516,7 @@ struct lcrs_tree : public bintree<T> {
 
 	/**
 	 * @brief Get the tree node shared handle
-	 * @param h The tree node handle
+	 * @param id The tree node's tref id
 	 * @return The tree node shared handle
 	 */
 	static const htref geth(tref id);
@@ -611,7 +611,7 @@ struct lcrs_tree : public bintree<T> {
 	/**
 	 * @brief Creates new tree node from value and children vector of nodes
 	 * @param v The node
-	 * @param ch Children nodes vector
+	 * @param children Children nodes vector
 	 * @param r The right sibling
 	 * @return The new tree node's tref id
 	 */
@@ -621,7 +621,7 @@ struct lcrs_tree : public bintree<T> {
 	/**
 	 * @brief Creates new tree node from value and children tref initializer list
 	 * @param v The node
-	 * @param ch Children tref initializer list
+	 * @param children Children nodes initializer list
 	 * @param r The right sibling
 	 * @return The new tree node's tref id
 	 */
@@ -806,21 +806,18 @@ struct lcrs_tree : public bintree<T> {
 
 	/**
 	 * @brief Get the first child tree node without checks for safety!
-	 * @param id The child node's tref id
 	 * @return The child tree node
 	 */
 	const lcrs_tree<T>& first_tree() const;
 
 	/**
 	 * @brief Get the second child tree node without checks for safety!
-	 * @param id The child node's tref id
 	 * @return The child tree node
 	 */
 	const lcrs_tree<T>& second_tree() const;
 
 	/**
 	 * @brief Get the third child tree node without checks for safety!
-	 * @param id The child node's tref id
 	 * @return The child tree node
 	 */
 	const lcrs_tree<T>& third_tree()  const;

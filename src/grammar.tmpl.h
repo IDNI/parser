@@ -554,24 +554,24 @@ std::shared_ptr<nonterminals<C, T>> grammar<C, T>::table_or_new(
 }
 template <typename C, typename T>
 grammar<C, T>::grammar(nonterminals<C, T>& nts_,
-	typename grammar<C, T>::options opt)
+	options opt)
 	: grammar(std::shared_ptr<nonterminals<C, T>>(
 		std::shared_ptr<void>(), &nts_), opt) { }
 template <typename C, typename T>
 grammar<C, T>::grammar(std::shared_ptr<nonterminals<C, T>> nts_,
-	typename grammar<C, T>::options opt)
+	options opt)
 	: opt_(opt), nts_handle_(table_or_new(std::move(nts_))),
 	  nts(*nts_handle_), start(nts.get("start"), &nts) { }
 template <typename C, typename T>
 grammar<C, T>::grammar(nonterminals<C, T>& nts_, const prods<C, T>& ps,
 	const prods<C, T>& start, const char_class_fns<T>& cc_fns,
-	typename grammar<C, T>::options opt, idni::diagnostics::report* diag)
+	options opt, idni::diagnostics::report* diag)
 	: grammar(std::shared_ptr<nonterminals<C, T>>(
 		std::shared_ptr<void>(), &nts_), ps, start, cc_fns, opt, diag) { }
 template <typename C, typename T>
 grammar<C, T>::grammar(std::shared_ptr<nonterminals<C, T>> nts_,
 	const prods<C, T>& ps, const prods<C, T>& start,
-	const char_class_fns<T>& cc_fns, typename grammar<C, T>::options opt,
+	const char_class_fns<T>& cc_fns, options opt,
 	idni::diagnostics::report* diag)
 	: opt_(opt), nts_handle_(table_or_new(std::move(nts_))),
 	  nts(*nts_handle_), start(start.to_lit()), cc_fns(cc_fns)
