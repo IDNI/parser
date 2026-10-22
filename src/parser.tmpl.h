@@ -1509,14 +1509,15 @@ std::string parser<C, T>::error::to_str(info_lvl elvl, size_t line_start) const{
 		if (s.size() >= 2) ss << s.substr(1, s.size() - 2);
 	}
 	std::string s{ ss.str() }; ss = {};
-	if (invalid_input) ss << "invalid UTF-8";
-	else if (!eof && s.size()) {
+	ss << "Syntax Error";
+	if (invalid_input) ss << ": Unexpected invalid UTF-8";
+	else if (eof || s.empty()) ss << ": Unexpected end of file";
+	else {
 		char quote = unexp.size() > 1 ? '"' : '\'';
-		ss << quote << s << quote;
-	} else ss << "end of file";
-	s = ss.str();
-	ss = {}, ss << "Syntax Error: Unexpected " << s << " at "
-		<< (line_start+line) << ":" << col << " (" << loc+1 << "): ";
+		ss << ": Unexpected " << quote << s << quote;
+	}
+	ss << " at " << (line_start+line) << ":" << col << " (" << loc+1 << ")";
+	ss << ": ";
 	for (size_t i = ctxt.size(); i-- > 1; ) {
 		const T c = ctxt[i];
 		// a NUL and a byte 0xFF are input, so they show as escapes

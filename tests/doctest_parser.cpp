@@ -2516,4 +2516,29 @@ TEST_SUITE("parser: every input byte") {
 		for (source s : sources)
 			CHECK(parse_bytes(p2, std::string("a\0", 2), s).found);
 	}
+
+	TEST_CASE("syntax error messages preserve their input class") {
+		auto invalid = parse_json(std::string(1, static_cast<char>(0xff)),
+			source::string);
+		REQUIRE_FALSE(invalid.found);
+		CHECK(invalid.msg.starts_with(
+			"Syntax Error: Unexpected invalid UTF-8 at 1:1 (1):"));
+
+		auto eof = parse_json("[\"a", source::string);
+		REQUIRE_FALSE(eof.found);
+		CHECK(eof.msg.starts_with(
+			"Syntax Error: Unexpected end of file at 1:4 (4):"));
+
+		nonterminals<char> nts;
+		auto start = nts("start");
+		prods<char> ps, a('a'), b('b'), c('c');
+		ps(start, a + b + c);
+		grammar<char> g(nts, ps, start, {}, make_grammar_options());
+		parser<char> p(g, make_parser_options());
+		auto unexpected = p.parse("d", 1);
+		REQUIRE_FALSE(unexpected.found);
+		CHECK(unexpected.parse_error.to_str(
+			parser<char>::error::info_lvl::INFO_BASIC).starts_with(
+			"Syntax Error: Unexpected 'd' at 1:1 (1):"));
+	}
 }
