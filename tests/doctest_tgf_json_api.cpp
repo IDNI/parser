@@ -163,6 +163,8 @@ static std::string load_source_request(int id, const std::string& name,
 		{ "source", source } });
 }
 
+
+
 static std::string read_file(const std::string& path) {
 	auto text = fs::read(fs::to_path(path));
 	REQUIRE(text.has_value());
@@ -200,8 +202,7 @@ TEST_CASE("a missing fixture file reports a read error") {
 static bool strings_are(const jt* v,
 	const std::vector<std::string>& want)
 {
-	if (!v || !v->is_array() || v->children_size() != want.size())
-		return false;
+	if (!v || !v->is_array() || v->children_size() != want.size()) return false;
 	for (size_t i = 0; i != want.size(); ++i)
 		if ((*v)[i].get_string() != want[i]) return false;
 	return true;
