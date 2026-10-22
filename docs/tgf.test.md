@@ -76,7 +76,7 @@ The start symbol of a top-level entry comes from its matcher. The tool reads the
 
 ## Matchers
 
-A matcher is [treemr](../src/format/treemr/README.md) pattern text, read verbatim and compiled once per distinct matcher string. See the treemr README for the full pattern language. These are the forms used most in the suites, one real example each.
+A matcher is [treemr](../src/format/treemr/) pattern text, read verbatim and compiled once per distinct matcher string. See the treemr README for the full pattern language. These are the forms used most in the suites, one real example each.
 
 | form | meaning | example |
 |------|---------|---------|

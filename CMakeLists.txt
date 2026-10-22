@@ -564,26 +564,29 @@ if(TAU_PARSER_BUILD_DOC)
 	find_package(Doxygen)
 	if(DOXYGEN_FOUND)
 		message("Doxygen build started")
+		# The Doxyfile paths are relative to the source root, as for the Pages
+		# workflow. A configure copy sends the pages to the build folder.
+		file(READ "${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile" _tau_doxyfile)
+		file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/Doxyfile"
+			"${_tau_doxyfile}\nOUTPUT_DIRECTORY = ${CMAKE_CURRENT_BINARY_DIR}/_site\n")
+		set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS Doxyfile)
 		# note the option ALL which allows to build the docs together with the application
 		add_custom_target(documentation ALL
-			COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile
-			# The Doxyfile paths are relative to the source root, as for the
-			# Pages workflow, and the install step reads _site from there.
+			COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
 			WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 			COMMENT "Generating API documentation with Doxygen"
 			VERBATIM
 		)
+		if(TAU_PARSER_INSTALL)
+			message(STATUS "Installing generated docs to ${TAU_PARSER_DOC_DESTINATION}/api")
+			install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/_site/
+				DESTINATION ${TAU_PARSER_DOC_DESTINATION}/api
+				COMPONENT "Documentation"
+				OPTIONAL)
+		endif()
 	else()
 		message(ERROR " Doxygen need to be installed to generate the doxygen documentation")
 	endif()
-endif()
-
-# if _site directory with generated API documentation exists, install it
-if(TAU_PARSER_INSTALL AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/_site)
-	message(STATUS "Installing generated docs to ${TAU_PARSER_DOC_DESTINATION}/api")
-	install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/_site/
-		DESTINATION ${TAU_PARSER_DOC_DESTINATION}/api
-		COMPONENT "Documentation")
 endif()
 
 # cpack configuration for building release packages
