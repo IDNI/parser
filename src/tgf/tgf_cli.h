@@ -125,6 +125,7 @@ struct tgf_repl_evaluator : tgf_repl_evaluator_base {
 	/// of the declaration.
 	tref option_values() const;
 
+	/// Data of parse: the parts of @p r that the print options select.
 	tref parsed(parser_type::result& r);
 	tref parse(const char* input, size_t size);
 	tref parse(std::istream& instream);

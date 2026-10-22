@@ -1476,11 +1476,18 @@ static int run_command(const parsed_args& args, tgf_tool& tool,
 			return command_line_error("multiple inputs specified, "
 				"use either --input or --input-expression, not "
 				"both");
+		// The internal grammar prints first, and before the parse adds
+		// to the report.
+		if (!json && opts.get<bool>("grammar")) re.eval("i");
+		cmd_result parse_result;
+		parse_result.cmd = tgf_repl_evaluator_base::name_of(
+			tgf_repl_parser::parse_cmd);
+		tref data = nullptr;
+		if (infile == "-") data = re.parse(cin);
+		else if (infile.size()) data = re.parse(infile);
+		else data = re.parse(inexp.c_str(), inexp.size());
+		parse_result.data = jt::geth(data);
 		if (json) {
-			tref data = nullptr;
-			if (infile == "-") data = re.parse(cin);
-			else if (infile.size()) data = re.parse(infile);
-			else data = re.parse(inexp.c_str(), inexp.size());
 			if (opts.get<bool>("grammar")) {
 				string start = re.start_symbol();
 				auto prods = re.g().reachable_productions(
@@ -1492,22 +1499,12 @@ static int run_command(const parsed_args& args, tgf_tool& tool,
 				data = jt::set_member(data, "bintree_totals",
 					bintree_process_totals_value());
 			auto rep = re.take_report();
-			cmd_status st = rep.has_error()
-				? cmd_status::error : cmd_status::ok;
+			cmd_status st = tgf_repl_evaluator_base::report_status(rep);
 			format::json::write_line(json_result_response(st,
-				tgf_command_spec(tgf_command::parse).name, data,
-				state_value(re), rep), cout);
+				parse_result.cmd, data, state_value(re), rep),
+				cout);
 			return st == cmd_status::error ? 1 : 0;
 		}
-		if (opts.get<bool>("grammar")) re.eval("i");
-		cmd_result parse_result;
-		parse_result.cmd = tgf_repl_evaluator_base::name_of(
-			tgf_repl_parser::parse_cmd);
-		tref data = nullptr;
-		if (infile == "-") data = re.parse(cin);
-		else if (infile.size()) data = re.parse(infile);
-		else data = re.parse(inexp.c_str(), inexp.size());
-		parse_result.data = jt::geth(data);
 		re.render_text(parse_result, cout);
 		// A failed parse leaves its error in the report, as in --json.
 		auto rep = re.take_report();

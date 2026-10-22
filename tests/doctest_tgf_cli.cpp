@@ -589,6 +589,20 @@ TEST_SUITE("tgf cli: parse exit code") {
 		CHECK(capture_tgf_run({ "tgf", json_path(), "parse", "--json",
 			"-e", "nul" }).code == 1);
 	}
+
+	TEST_CASE("--grammar prints before the parse tree") {
+		options_repository mine;
+		options_scope scope(mine);
+		const string tiny = string(PROJECT_SOURCE_DIR)
+			+ "/tests/fixtures/tiny.tgf";
+		auto r = capture_tgf_run({ "tgf", tiny, "parse", "--grammar",
+			"-e", "123", "-c", "false" }, "", false);
+		const auto grammar = r.out.find("internal grammar for symbol");
+		const auto parsed = r.out.find("parsed graph:");
+		REQUIRE(grammar != string::npos);
+		REQUIRE(parsed != string::npos);
+		CHECK(grammar < parsed);
+	}
 }
 
 TEST_SUITE("tgf cli: trim keeps the root") {
