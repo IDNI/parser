@@ -259,6 +259,23 @@ dep_compiler_triple() {
 	"$cxx" -dumpmachine 2>/dev/null || echo "unknown-${target}"
 }
 
+# The flag that turns off the warning about unused -D variables. CMake 4.4
+# deprecates --no-warn-unused-cli, and an older CMake ignores -Wno-unused-cli.
+dep_cmake_no_unused_cli() {
+	local version major minor
+	version="$("$1" --version 2>/dev/null | head -n 1)"
+	version="${version##* }"
+	major="${version%%.*}"
+	minor="${version#*.}"
+	minor="${minor%%.*}"
+	if [[ $major =~ ^[0-9]+$ && $minor =~ ^[0-9]+$ ]] \
+			&& (( major > 4 || (major == 4 && minor >= 4) )); then
+		echo "-Wno-unused-cli"
+	else
+		echo "--no-warn-unused-cli"
+	fi
+}
+
 # /etc/os-release exists on Linux only; macOS reports its product version.
 dep_os_release_hash() {
 	if [ -f /etc/os-release ]; then

@@ -104,7 +104,7 @@ _dep_ftxui_producer() {
 	# A producer passes a shared set of variables, and a project reads only some.
 	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS \
 		"$DEP_FTXUI_CMAKE" -S "$work" -B "$build" \
-		--no-warn-unused-cli \
+		"$(dep_cmake_no_unused_cli "$DEP_FTXUI_CMAKE")" \
 		"${_DEP_FTXUI_CONFIGURE_ARGS[@]}" \
 		${_DEP_FTXUI_TOOLCHAIN_ARGS[@]+"${_DEP_FTXUI_TOOLCHAIN_ARGS[@]}"} \
 		-DCMAKE_C_COMPILER="$DEP_FTXUI_CC" \

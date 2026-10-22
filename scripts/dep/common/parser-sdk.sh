@@ -190,7 +190,7 @@ _dep_parser_producer() {
 	# A producer passes a shared set of variables, and a project reads only some.
 	env -u CPPFLAGS -u CXXFLAGS -u CFLAGS -u LDFLAGS \
 		"$DEP_PARSER_CMAKE" -S "$PARSER_SOURCE" -B "$build" \
-		--no-warn-unused-cli \
+		"$(dep_cmake_no_unused_cli "$DEP_PARSER_CMAKE")" \
 		"${_DEP_PARSER_CONFIGURE_ARGS[@]}" \
 		${_DEP_PARSER_HOST_ARGS[@]+"${_DEP_PARSER_HOST_ARGS[@]}"} \
 		"-DCMAKE_C_COMPILER=$DEP_PARSER_CC" \
