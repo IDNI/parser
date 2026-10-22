@@ -502,7 +502,6 @@ constexpr bool is_error(code c);       // 00 band
 constexpr bool is_warning(code c);     // 01 band
 constexpr bool is_info(code c);        // 10 band (includes metrics)
 constexpr bool is_metric(code c);      // info_micros / info_kb / info_count
-constexpr bool uses_micros_scale(code c);
 ```
 
 

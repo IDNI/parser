@@ -93,7 +93,6 @@ constexpr bool is_info_message(code c);
 /// True for a metric tag: @ref code::info_micros, @ref code::info_kb or
 /// @ref code::info_count.
 constexpr bool is_metric(code c);
-constexpr bool uses_micros_scale(code c);
 
 /// Human-readable sentence-form label for @p c (e.g. "Parse error.",
 /// "Unknown character class."). Capitalized first word, trailing

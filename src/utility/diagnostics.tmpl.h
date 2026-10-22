@@ -40,7 +40,6 @@ constexpr bool is_info_message(code c) {
 	return is_info(c) && !is_metric(c) && c != code::info_scope;
 }
 
-constexpr bool uses_micros_scale(code c) { return c == code::info_micros; }
 
 namespace detail {
 
