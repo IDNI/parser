@@ -2318,6 +2318,10 @@ TEST_SUITE("chart item size") {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Every input byte reaches the parser: the end of the input is a position,
+// a NUL and a 0xFF byte are input, and an invalid UTF-8 byte is an error.
+// ---------------------------------------------------------------------------
 TEST_SUITE("parser: every input byte") {
 
 	using jp_t = parser<char, char32_t>;
