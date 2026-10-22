@@ -258,6 +258,19 @@ TEST_SUITE("input: utf8 decode (char -> char32_t)") {
 		std::u32string actual(r.begin(), r.end());
 		CHECK(actual == U"Hi τ!");
 	}
+
+	TEST_CASE("a long stream keeps every terminal while its buffer grows") {
+		using input_t = parser<char, char32_t>::input;
+		std::string src;
+		for (size_t i = 0; i != 3000; ++i) src += i % 2 ? "a" : "τ";
+		std::stringstream is(src);
+		input_t in(is, 0, u8conv);
+		std::u32string got;
+		while (!in.teof()) got.push_back(in.tcur()), in.tnext();
+		REQUIRE(got.size() == 3000u);
+		for (size_t i = 0; i != got.size(); ++i)
+			if (got[i] != (i % 2 ? U'a' : U'τ')) FAIL("at " << i);
+	}
 }
 
 // ---------------------------------------------------------------------------
