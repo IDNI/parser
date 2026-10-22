@@ -4,18 +4,22 @@
 #ifndef __IDNI__PARSER__TGF__TGF_CLI_OPTIONS_H__
 #define __IDNI__PARSER__TGF__TGF_CLI_OPTIONS_H__
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
-#include "../utility/options.h"
-#include "../utility/term_colors.h"
+#include "defs.h"
 #include "tgf_repl_evaluator_base.h"
+#include "../utility/options.h"
+#include "../utility/program_args.h"
+#include "../utility/term_colors.h"
 
 namespace idni {
 
@@ -368,6 +372,27 @@ inline constexpr std::string_view tgf_one_address =
 inline int command_line_error(std::string_view msg) {
 	std::cerr << msg << "\n";
 	return 1;
+}
+
+/// Read the environment (`TGF_*`) and @p argv with read_program_args(),
+/// print the report, then the text of an info flag. Without a value the
+/// program ends with @p code.
+inline std::optional<parsed_args> tgf_read_args(int argc, char** argv,
+	const args_config& cfg, int& code)
+{
+	code = 1;
+	const program_identity tgf{ "tgf", tauparser::full_version,
+		tauparser::license };
+	auto r = read_program_args(argc, argv, tgf, cfg);
+	tgf_repl_evaluator_base::print_report(r.report(), false,
+		tgf_report_colors());
+	if (!r.has_value()) return std::nullopt;
+	if (r.value().info != info_flag::none) {
+		print_info(tgf, r.value());
+		code = 0;
+		return std::nullopt;
+	}
+	return std::move(r.value().args);
 }
 
 } // namespace idni

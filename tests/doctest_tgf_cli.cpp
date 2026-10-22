@@ -744,6 +744,27 @@ TEST_SUITE("tgf cli: render_text") {
 	}
 }
 
+TEST_SUITE("tgf cli: shared argument reader") {
+	TEST_CASE("multiple info flags print only the first result") {
+		options_repository mine;
+		options_scope scope(mine);
+		REQUIRE(options().declare(tgf_option_set).has_value());
+		string a0 = "tgf", a1 = "--version", a2 = "--license";
+		char* argv[] = { a0.data(), a1.data(), a2.data() };
+		std::ostringstream out, err;
+		auto* old_out = std::cout.rdbuf(out.rdbuf());
+		auto* old_err = std::cerr.rdbuf(err.rdbuf());
+		int code = -1;
+		auto args = tgf_read_args(3, argv, tgf_args_config, code);
+		std::cout.rdbuf(old_out);
+		std::cerr.rdbuf(old_err);
+		CHECK_FALSE(args.has_value());
+		CHECK(code == 0);
+		CHECK(out.str() == string(tauparser::full_version) + "\n");
+		CHECK(err.str().empty());
+	}
+}
+
 TEST_SUITE("tgf cli: the REPL on the evaluator base") {
 
 	static string tiny_grammar() {
