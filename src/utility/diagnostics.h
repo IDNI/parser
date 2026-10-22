@@ -22,6 +22,8 @@
 #include "defs.h"
 #include "measure.h"
 
+/// Reports of diagnostic nodes, results that carry a value and a report,
+/// and the codes that tag the nodes.
 namespace idni::diagnostics {
 
 /// Discriminated tag for a @ref node. A node's role *and* (for metrics) its
@@ -32,11 +34,11 @@ namespace idni::diagnostics {
 ///   01  0x4000..0x7FFF  warnings
 ///   10  0x8000..0xBFFF  info
 ///   11  0xC000..0xFFFF  unused
-/// Metric tags (@ref info_micros, @ref info_kb, @ref info_count) sit at the
-/// start of the info band; @ref is_metric tells them apart from a plain
-/// @ref info.
+/// Metric tags (@ref code::info_micros, @ref code::info_kb,
+/// @ref code::info_count) sit at the start of the info band; @ref is_metric
+/// tells them apart from a plain @ref code::info.
 ///
-/// Timed scopes use @ref info_micros — a scope is just an @c info_micros node that
+/// Timed scopes use @ref code::info_micros — a scope is just an @c info_micros node that
 /// happens to have children attached. The structural role is determined by
 /// the parent/child graph, not the tag.
 enum class code : uint16_t {
@@ -63,17 +65,21 @@ enum class code : uint16_t {
 	invalid_utf8             = 20,
 
 	// 01 band — warnings
+	/// A warning message.
 	warning                  = 0x4000,
 
 	// 10 band — info message plus metric unit tags
-	info                     = 0x8000, // unit-less informational message
-	info_micros              = 0x8001, // time in microseconds (auto-scales
-	                                // to µs / ms / s on print);
-	                                // also the tag used by timed scopes
-	info_kb                  = 0x8002, // memory, kilobytes
-	info_count               = 0x8003, // counter, dimensionless
-	info_scope               = 0x8004, // structural container; silent when
-	                                   // it has no children
+	/// A unit-less informational message.
+	info                     = 0x8000,
+	/// Time in microseconds, auto-scaled to µs / ms / s on print. Timed
+	/// scopes use this tag.
+	info_micros              = 0x8001,
+	/// Memory in kilobytes.
+	info_kb                  = 0x8002,
+	/// A counter, dimensionless.
+	info_count               = 0x8003,
+	/// A structural container. It prints nothing when it has no children.
+	info_scope               = 0x8004,
 	// Adding a new metric tag: extend is_metric() (whitelist, not
 	// range check) and CODE_LABELS in parser_strings.h.
 };
@@ -84,16 +90,19 @@ constexpr bool is_info(code c);
 /// True for an info node that is no metric and no scope. Such a node prints
 /// as a message line.
 constexpr bool is_info_message(code c);
+/// True for a metric tag: @ref code::info_micros, @ref code::info_kb or
+/// @ref code::info_count.
 constexpr bool is_metric(code c);
 constexpr bool uses_micros_scale(code c);
 
 /// Human-readable sentence-form label for @p c (e.g. "Parse error.",
 /// "Unknown character class."). Capitalized first word, trailing
-/// period. Strings live in the @ref idni::parser_strings::CODE_LABELS
-/// table and are looked up via @ref idni::parser_strings::str_code.
+/// period. Strings live in the `CODE_LABELS` table of `parser_strings.h`
+/// and are looked up via `idni::parser_strings::str_code`.
 /// This is the form emitted as the `message` field by
-/// @ref idni::format::json::print when called with print_names = true.
-/// Returns "Unknown." for any value outside the @ref code enum.
+/// `idni::format::json::print` when called with print_names = true.
+/// Returns the label that register_codes() gave a program code, and an
+/// empty string for any other value outside the @ref code enum.
 const char* code_name(code c);
 
 /// Single output slot for one severity band. Accepts either a stream
@@ -243,6 +252,8 @@ struct report {
 	[[nodiscard]] scope_guard open_if(bool enable,
 		std::string_view name, code tag, size_t value);
 
+	/// Run @p f in a timed scope @p name when @p enable is true, and return
+	/// what @p f returns.
 	template <typename F>
 	auto step(bool enable, key name, F&& f) -> decltype(f());
 	template <typename F>
@@ -337,17 +348,18 @@ struct report {
 	void append(const report& other);
 	void append(report&& other);
 
+	/// True when the report holds an error node.
 	[[nodiscard]] bool has_error() const;
 
 	/// The value of the first attribute @p k on an error node, or nullopt
 	/// when no error node has it.
 	[[nodiscard]] std::optional<int64_t> error_attr(key k) const;
 
-	/// The index in @ref nodes() of the first error node, or nullopt when
-	/// no node is an error. @ref format_message of it gives the message
+	/// The index in @c nodes() of the first error node, or nullopt when
+	/// no node is an error. @c format_message gives the message
 	/// with the attributes of the node.
 	[[nodiscard]] std::optional<size_t> first_error_index() const;
-	/// The message of the first error node in the order of @ref nodes(),
+	/// The message of the first error node in the order of @c nodes(),
 	/// or "" when no node is an error.
 	[[nodiscard]] std::string_view first_error_message() const;
 	/// The code of the first error node, or code::unknown.
@@ -554,6 +566,8 @@ struct result {
 
 	~result();
 
+	/// True when the result holds a value. A @c void result holds one when
+	/// its report has no error.
 	[[nodiscard]] bool has_value() const;
 
 	stored_t&	 value() &
@@ -664,6 +678,9 @@ struct result {
 
 	[[nodiscard]] bool has_error() const;
 
+	/// Print the report to @p os, or to sinks. With no argument, errors and
+	/// warnings go to @c std::cerr and info to @c std::cout. An empty report
+	/// prints nothing.
 	void print(std::ostream& os) const;
 	void print(const sink& s) const;
 	void print(const sinks& s) const;
@@ -688,6 +705,7 @@ struct result {
 	[[nodiscard]] bool print_and_ok(const sink& s) const;
 	[[nodiscard]] bool print_and_ok(const sinks& s) const;
 
+	/// True when the result holds a value or its report holds an error.
 	[[nodiscard]] bool is_well_formed() const;
 
 	/// Open a parent scope on this result's report. Tag-driven: info_micros
