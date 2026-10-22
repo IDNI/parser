@@ -1277,11 +1277,6 @@ tgf_tool::~tgf_tool() {
 	for (const auto& name : bound) idni::options().unbind(name);
 }
 
-static int command_line_error(string_view msg) {
-	cerr << msg << "\n";
-	return 1;
-}
-
 static int gen_command(tgf_tool& tool, tgf_repl_evaluator& re) {
 	bintree<format::json::node>::gc_pause pause;
 	const bool json = idni::options().get<bool>("json");
@@ -1711,7 +1706,7 @@ int tgf_run(int argc, char** argv) {
 		return run_tool(argc, argv, tgf_args_config, tool, re, false);
 	}
 	if (!ifstream(tgf_file).good())
-		return command_line_error("TGF file does not exist");
+		return command_line_error(tgf_missing_grammar_file);
 	tgf_repl_evaluator re(tgf_file);
 	return run_tool(argc, argv, tgf_args_config, tool, re, true);
 }

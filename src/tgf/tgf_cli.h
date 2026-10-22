@@ -30,21 +30,6 @@ int tgf_run(int argc, char** argv);
 /// reads the arguments from the command line of the process.
 int tgf_main(int argc, char** argv);
 
-/// The options of tgf_repl_evaluator::options.
-inline const option_set tgf_repl_option_set = { .options = {
-	{ "print-terminals", "repl", true, "print the parsed terminals", {} },
-	{ "status", "repl", true, "print status after each command", {} },
-	{ "print-ambiguity", "repl", true, "print ambiguous nodes", {} },
-	{ "print-graphs", "repl", true, "print the parsed graph", {} },
-	{ "print-tml-rules", "repl", false,
-		"print the forest as TML rules", {} },
-	{ "print-tml-facts", "repl", false,
-		"print the forest as TML facts", {} },
-	{ "print-input", "repl", false, "print the input", {} },
-	{ "colors", "ui", true, "use terminal colors", {} },
-	{ "json", "cli", false, "print and read JSON", {} },
-} };
-
 /// The evaluator of repl<> and repl_ftxui<> that runs each statement on a
 /// grammar it loads itself.
 struct tgf_repl_evaluator : tgf_repl_evaluator_base {

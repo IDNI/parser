@@ -7,6 +7,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <iostream>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -14,6 +15,7 @@
 
 #include "../utility/options.h"
 #include "../utility/term_colors.h"
+#include "tgf_repl_evaluator_base.h"
 
 namespace idni {
 
@@ -153,6 +155,26 @@ inline const option_set tgf_option_set = {
 		{ "test", "run tester (with provided tgf.test file)" },
 	},
 };
+
+/// The options of tgf_repl_options.
+inline const option_set tgf_repl_option_set = { .options = {
+	{ "print-terminals", "repl", tgf_repl_options{}.print_terminals,
+		"print the parsed terminals", {} },
+	{ "status", "repl", tgf_repl_options{}.status,
+		"print status after each command", {} },
+	{ "print-ambiguity", "repl", tgf_repl_options{}.print_ambiguity,
+		"print ambiguous nodes", {} },
+	{ "print-graphs", "repl", tgf_repl_options{}.print_graphs,
+		"print the parsed graph", {} },
+	{ "print-tml-rules", "repl", tgf_repl_options{}.tml_rules,
+		"print the forest as TML rules", {} },
+	{ "print-tml-facts", "repl", tgf_repl_options{}.tml_facts,
+		"print the forest as TML facts", {} },
+	{ "print-input", "repl", tgf_repl_options{}.print_input,
+		"print the input", {} },
+	{ "colors", "ui", tgf_repl_options{}.colors, "use terminal colors", {} },
+	{ "json", "cli", tgf_repl_options{}.json, "print and read JSON", {} },
+} };
 
 /// The entry of command @p c in tgf_option_set.commands.
 inline const command_spec& tgf_command_spec(tgf_command c) {
@@ -326,6 +348,18 @@ inline diagnostics::sink_colors tgf_report_colors() {
 	return diagnostics::output_colors(!on ? color_mode::off
 		: opts.given("colors") ? color_mode::always
 		: color_mode::terminal);
+}
+
+/// The command line errors that both programs give.
+inline constexpr std::string_view tgf_missing_grammar_file =
+	"TGF file does not exist";
+inline constexpr std::string_view tgf_one_address =
+	"connect takes one server address at most";
+
+/// Print @p msg as a command line error and return the exit code 1.
+inline int command_line_error(std::string_view msg) {
+	std::cerr << msg << "\n";
+	return 1;
 }
 
 } // namespace idni

@@ -12,10 +12,12 @@
 #include "test_env.h"
 #include "tgf_run_capture.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <initializer_list>
+#include <iostream>
 #include <iterator>
 #include <sstream>
 #include <streambuf>
@@ -49,6 +51,43 @@ struct tgf_options_fixture {
 			argv.data(), tgf_args_config);
 	}
 };
+
+TEST_SUITE("tgf cli: evaluator option defaults") {
+	TEST_CASE("the REPL option defaults match the evaluator fields") {
+		const tgf_repl_options defaults{};
+		const std::pair<std::string_view, bool> values[] = {
+			{ "print-terminals", defaults.print_terminals },
+			{ "status", defaults.status },
+			{ "print-ambiguity", defaults.print_ambiguity },
+			{ "print-graphs", defaults.print_graphs },
+			{ "print-tml-rules", defaults.tml_rules },
+			{ "print-tml-facts", defaults.tml_facts },
+			{ "print-input", defaults.print_input },
+			{ "colors", defaults.colors },
+			{ "json", defaults.json },
+		};
+		REQUIRE(tgf_repl_option_set.options.size() == std::size(values));
+		for (const auto& [name, expected] : values) {
+			auto it = std::find_if(tgf_repl_option_set.options.begin(),
+				tgf_repl_option_set.options.end(),
+				[name](const option_spec& option) {
+					return option.name == name;
+				});
+			REQUIRE(it != tgf_repl_option_set.options.end());
+			REQUIRE(std::holds_alternative<bool>(it->fallback));
+			CHECK(std::get<bool>(it->fallback) == expected);
+		}
+	}
+
+	TEST_CASE("command line errors write text and return one") {
+		std::ostringstream err;
+		std::streambuf* old = std::cerr.rdbuf(err.rdbuf());
+		const int code = command_line_error("bad command");
+		std::cerr.rdbuf(old);
+		CHECK(code == 1);
+		CHECK(err.str() == "bad command\n");
+	}
+}
 
 // ---------------------------------------------------------------------------
 // TEST SUITE: subcommand routing
