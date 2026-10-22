@@ -287,14 +287,19 @@ static void render_data_grammar(const cmd_result& r, std::ostream& os) {
 
 // The production list of internal-grammar and unreachable, from data.
 // Split a production body on spaces. The internal grammar writes one
-// literal per token and every literal is a name or a quoted character, so
-// no literal carries a space; '&', '~(' and ')' are the only other tokens.
+// literal per token: a name or a quoted character, which can be a space.
+// '&', '~(' and ')' are the only other tokens.
 static std::vector<std::string> split_production_body(const std::string& s) {
 	std::vector<std::string> out;
 	size_t i = 0;
 	while (i != s.size()) {
 		while (i != s.size() && s[i] == ' ') ++i;
 		size_t b = i;
+		if (i != s.size() && s[i] == '\'') {
+			for (++i; i != s.size() && s[i] != '\''; ++i)
+				if (s[i] == '\\' && i + 1 != s.size()) ++i;
+			if (i != s.size()) ++i;
+		}
 		while (i != s.size() && s[i] != ' ') ++i;
 		if (i != b) out.push_back(s.substr(b, i - b));
 	}

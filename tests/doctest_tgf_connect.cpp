@@ -55,6 +55,10 @@ static std::string write_temp_grammar(const std::string& text) {
 	return path;
 }
 
+static void remove_temp_grammar(const std::string& path) {
+	std::filesystem::remove_all(std::filesystem::path(path).parent_path());
+}
+
 // The text a local evaluator renders for one command from its data. The
 // remote text must match it for grammar and parse.
 static std::string local_text(const std::string& grammar,
@@ -182,6 +186,14 @@ TEST_CASE("connect: grammar, load, parse, quit and attach again") {
 
 	std::filesystem::remove_all(
 		std::filesystem::path(gpath).parent_path());
+}
+
+TEST_CASE("internal-grammar text keeps a space terminal") {
+	std::string gpath = write_temp_grammar("start => 'a' ' ' word.\n"
+		"word => 'b'.\n");
+	std::string text = local_text(gpath, { "i" });
+	CHECK(text.find("=> 'a' ' ' word(") != std::string::npos);
+	remove_temp_grammar(gpath);
 }
 
 TEST_CASE("connect: prints the answers buffered before an attach") {
