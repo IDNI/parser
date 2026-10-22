@@ -164,12 +164,14 @@ ARG BUILD_JOBS=1
 
 # Build tests and run them if TESTS is set to yes. Stop the build if they fail
 RUN echo " (BUILD) -- Running tests: $TESTS"
-# `run` on a -tests preset makes ./dev call ctest itself
+# `run` on a -tests preset makes ./dev call ctest itself. The image has the
+# test venv, so a missing venv is an error here.
 RUN --mount=type=cache,target=/root/.ccache,sharing=locked \
 	--mount=type=secret,id=gh_token \
 	if [ "$TESTS" = "yes" ]; then \
 	scripts/with-gh-token ./dev preset ${BUILD_PRESET}-tests run -DTAU_BUILD_JOBS=${BUILD_JOBS} \
 		-DTAU_PARSER_DEPS_FROM_STORE=ON -DTAU_PARSER_BUILD_SERVE=ON \
+		-DTAU_PARSER_TEST_PYTHON_REQUIRED=ON \
 		|| exit 1; \
 fi
 
