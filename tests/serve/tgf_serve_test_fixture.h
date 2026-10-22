@@ -43,26 +43,34 @@ inline idni::tgf_repl_options repl_options(bool json = true,
 	return opt;
 }
 
-// The path of the tgf binary. ctest passes it through the environment so
-// a Windows backslash needs no escaping; the build path is the fallback.
-inline std::string tgf_binary_path() {
+// The path of the program @p name. ctest passes it in the variable @p env,
+// so a Windows backslash needs no escaping; the build path is the fallback.
+inline std::string program_path(const char* env, const std::string& name) {
 #ifdef _MSC_VER
 	// the MSVC CRT marks getenv unsafe and asks for _dupenv_s
 	char* raw = nullptr;
 	std::size_t raw_size = 0;
-	const bool read = _dupenv_s(&raw, &raw_size, "TGF_BINARY_PATH") == 0;
+	const bool read = _dupenv_s(&raw, &raw_size, env) == 0;
 	const std::string p = read && raw ? raw : "";
 	std::free(raw);
 	if (!p.empty()) return p;
 #else
-	const char* p = std::getenv("TGF_BINARY_PATH");
+	const char* p = std::getenv(env);
 	if (p && *p) return p;
 #endif
 #ifdef _WIN32
-	return std::string(PROJECT_BINARY_DIR) + "/tgf.exe";
+	return std::string(PROJECT_BINARY_DIR) + "/" + name + ".exe";
 #else
-	return std::string(PROJECT_BINARY_DIR) + "/tgf";
+	return std::string(PROJECT_BINARY_DIR) + "/" + name;
 #endif
+}
+
+inline std::string tgf_binary_path() {
+	return program_path("TGF_BINARY_PATH", "tgf");
+}
+
+inline std::string tgf_connect_binary_path() {
+	return program_path("TGF_CONNECT_BINARY_PATH", "tgf-connect");
 }
 
 // A server on a free port, started as a real process. @p grammar

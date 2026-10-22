@@ -289,11 +289,26 @@ foreach(X IN LISTS DOCTESTS)
 		set_tests_properties(${N} PROPERTIES
 			ENVIRONMENT "TGF_BINARY_PATH=$<TARGET_FILE:tgf>")
 	endif()
+	# These cases run the tgf-connect program against a real server.
+	if(${N} STREQUAL "doctest_tgf_connect" AND TARGET tgf-connect)
+		target_compile_definitions(${N} PRIVATE TAU_TEST_HAS_TGF_CONNECT)
+		add_dependencies(${N} tgf-connect)
+		set_tests_properties(${N} PROPERTIES ENVIRONMENT
+			"TGF_BINARY_PATH=$<TARGET_FILE:tgf>;TGF_CONNECT_BINARY_PATH=$<TARGET_FILE:tgf-connect>")
+	endif()
 	if(${N} STREQUAL "doctest_measure")
 		set_tests_properties(${N} PROPERTIES TIMEOUT 120)
 	endif()
 	# add_dependencies(${N} ${TAU_PARSER_STATIC_LIB_NAME})
 endforeach()
+
+# tgf-connect links the client only: no grammar loader, no local evaluator.
+if(TARGET tgf-connect AND CMAKE_NM AND NOT MSVC)
+	add_test(NAME tgf_connect_symbols
+		COMMAND "${CMAKE_COMMAND}" -DNM=${CMAKE_NM}
+			-DBINARY=$<TARGET_FILE:tgf-connect>
+			-P "${CMAKE_CURRENT_SOURCE_DIR}/serve/tgf_connect_symbols.cmake")
+endif()
 
 # The FTXUI REPL fixture and its pipe-mode tests (only when the tgf tool is
 # built with FTXUI). The fixture builds on every platform, because Windows

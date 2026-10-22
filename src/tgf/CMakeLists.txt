@@ -21,10 +21,11 @@ if(NOT WIN32)
 	target_compile_options(tgf_connect_core PRIVATE -fPIC)
 endif()
 
+# tgf connect and tgf-connect need the line transport of tauparser_net.
 # Only tgf_serve.cpp and the net library include Boost.Asio, so the parser
 # core stays free of Boost.
-if(TAU_PARSER_BUILD_SERVE)
-	# serve without TAU_PARSER_BUILD_NET still needs the library
+if(TAU_PARSER_BUILD_SERVE OR TAU_PARSER_BUILD_CONNECT)
+	# serve or connect without TAU_PARSER_BUILD_NET still needs the library
 	if(NOT TARGET tauparser_net)
 		add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../net"
 			"${CMAKE_CURRENT_BINARY_DIR}/net")
@@ -39,6 +40,34 @@ if(TAU_PARSER_BUILD_SERVE)
 	if(WIN32)
 		target_link_libraries(tgf_connect_core PUBLIC ws2_32 mswsock)
 	endif()
+endif()
+
+# FTXUI-based REPL.  TAU_PARSER_HAS_FTXUI is defined when the FTXUI targets resolve;
+# otherwise the REPL silently falls back to the legacy terminal REPL.
+include(ftxui)
+if(TAU_PARSER_HAS_FTXUI_DEP)
+	find_package(Threads REQUIRED)
+	target_link_libraries(tgf_connect_core PUBLIC
+		ftxui::screen ftxui::dom ftxui::component Threads::Threads)
+	target_compile_definitions(tgf_connect_core PUBLIC TAU_PARSER_HAS_FTXUI)
+	message(STATUS "tgf: FTXUI REPL enabled (legacy via -X)")
+elseif(NOT TAU_PARSER_DONT_USE_FTXUI)
+	message(WARNING "tgf: FTXUI not available - legacy terminal REPL will be used")
+endif()
+
+if(TAU_PARSER_BUILD_CONNECT)
+	add_executable(tgf-connect)
+	target_sources(tgf-connect PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/tgf_connect_main.cpp")
+	tauparser_setup(tgf-connect PRIVATE tgf_connect_core)
+	message(STATUS "installing tgf-connect to ${CMAKE_INSTALL_BINDIR}")
+	install(TARGETS tgf-connect
+		RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+		COMPONENT "tgf")
+endif()
+
+if(NOT TAU_PARSER_BUILD_TGF)
+	return()
 endif()
 
 add_library(tgf_cli_core STATIC
@@ -74,19 +103,6 @@ if(TAU_PARSER_BUILD_SERVE)
 		# The session id reads the OS entropy source through BCryptGenRandom.
 		target_link_libraries(tgf_cli_core PUBLIC ws2_32 mswsock bcrypt)
 	endif()
-endif()
-
-# FTXUI-based REPL.  TAU_PARSER_HAS_FTXUI is defined when the FTXUI targets resolve;
-# otherwise the REPL silently falls back to the legacy terminal REPL.
-include(ftxui)
-if(TAU_PARSER_HAS_FTXUI_DEP)
-	find_package(Threads REQUIRED)
-	target_link_libraries(tgf_connect_core PUBLIC
-		ftxui::screen ftxui::dom ftxui::component Threads::Threads)
-	target_compile_definitions(tgf_connect_core PUBLIC TAU_PARSER_HAS_FTXUI)
-	message(STATUS "tgf: FTXUI REPL enabled (legacy via -X)")
-elseif(NOT TAU_PARSER_DONT_USE_FTXUI)
-	message(WARNING "tgf: FTXUI not available - legacy terminal REPL will be used")
 endif()
 
 add_executable(tgf)

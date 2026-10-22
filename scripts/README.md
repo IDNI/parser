@@ -140,6 +140,7 @@ Default preset name is `release` if omitted. Every build-type preset has
 | `release-tests`, `debug-tests` | + tests | same |
 | `release-tgf`, `debug-tgf` | + TGF | same |
 | `release-tgf-serve` | + TGF with `tgf serve` and `tgf connect` (needs the Boost headers) | `build/release` |
+| `release-tgf-connect` | the `tgf-connect` client only, no TGF (needs the Boost headers) | `build/release` |
 | `release-tgf-clang`, `debug-tgf-clang` | + TGF (clang) | `build/release`, `build/debug` |
 | `release-clang`, `debug-clang` (+ `-make-`, `-ninja-`) | header-only (default) | `build/release`, `build/debug` |
 | `release-make-gcc`, `release-ninja-gcc` (+ `debug-`, `devel-`) | header-only (gcc) | `build/release-gcc`, … |

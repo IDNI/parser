@@ -262,6 +262,13 @@
 			}
 		},
 		{
+			"name": "_build-connect",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_PARSER_BUILD_CONNECT": "ON"
+			}
+		},
+		{
 			"name": "_build-net",
 			"hidden": true,
 			"cacheVariables": {
@@ -518,6 +525,7 @@
 				"release-w64",
 				"_build-tests",
 				"_build-tgf",
+				"_build-connect",
 				"_build-net"
 			],
 			"cacheVariables": {
@@ -531,6 +539,7 @@
 				"debug-w64",
 				"_build-tests",
 				"_build-tgf",
+				"_build-connect",
 				"_build-net"
 			],
 			"cacheVariables": {
@@ -544,6 +553,7 @@
 				"devel-w64",
 				"_build-tests",
 				"_build-tgf",
+				"_build-connect",
 				"_build-net"
 			],
 			"cacheVariables": {
@@ -609,6 +619,7 @@
 				"release-arm64",
 				"_build-tests",
 				"_build-tgf",
+				"_build-connect",
 				"_build-net"
 			]
 		},
@@ -618,6 +629,7 @@
 				"debug-arm64",
 				"_build-tests",
 				"_build-tgf",
+				"_build-connect",
 				"_build-net"
 			]
 		},
@@ -627,6 +639,7 @@
 				"devel-arm64",
 				"_build-tests",
 				"_build-tgf",
+				"_build-connect",
 				"_build-net"
 			]
 		},
@@ -670,6 +683,7 @@
 			"inherits": [
 				"release-msvc-clang-cl",
 				"_build-all",
+				"_build-connect",
 				"_build-net"
 			]
 		},
@@ -678,6 +692,7 @@
 			"inherits": [
 				"debug-msvc-clang-cl",
 				"_build-all",
+				"_build-connect",
 				"_build-net"
 			]
 		},
@@ -686,6 +701,7 @@
 			"inherits": [
 				"devel-msvc-clang-cl",
 				"_build-all",
+				"_build-connect",
 				"_build-net"
 			]
 		},
@@ -897,6 +913,7 @@
 			"inherits": [
 				"release-msvc-cl",
 				"_build-all",
+				"_build-connect",
 				"_build-net"
 			]
 		},
@@ -905,6 +922,7 @@
 			"inherits": [
 				"debug-msvc-cl",
 				"_build-all",
+				"_build-connect",
 				"_build-net"
 			]
 		},
@@ -913,6 +931,7 @@
 			"inherits": [
 				"devel-msvc-cl",
 				"_build-all",
+				"_build-connect",
 				"_build-net"
 			]
 		},
@@ -1011,6 +1030,7 @@
 				"_build-tests",
 				"_build-tgf",
 				"_build-serve",
+				"_build-connect",
 				"_build-net"
 			]
 		},
@@ -1021,6 +1041,7 @@
 				"_build-tests",
 				"_build-tgf",
 				"_build-serve",
+				"_build-connect",
 				"_build-net",
 				"_build-type-debug"
 			]
@@ -1032,6 +1053,7 @@
 				"_build-tests",
 				"_build-tgf",
 				"_build-serve",
+				"_build-connect",
 				"_build-net"
 			]
 		},
@@ -1047,6 +1069,7 @@
 			"inherits": [
 				"release",
 				"_build-all",
+				"_build-connect",
 				"_build-net"
 			]
 		},
@@ -1056,6 +1079,7 @@
 				"debug",
 				"_build-all",
 				"_build-type-debug",
+				"_build-connect",
 				"_build-net"
 			]
 		},
@@ -1064,6 +1088,7 @@
 			"inherits": [
 				"devel",
 				"_build-all",
+				"_build-connect",
 				"_build-net"
 			]
 		},
@@ -1085,6 +1110,13 @@
 			"inherits": [
 				"release-tgf",
 				"_build-serve"
+			]
+		},
+		{
+			"name": "release-tgf-connect",
+			"inherits": [
+				"release",
+				"_build-connect"
 			]
 		},
 		{
@@ -1787,6 +1819,10 @@
 		{
 			"name": "release-tgf-serve",
 			"configurePreset": "release-tgf-serve"
+		},
+		{
+			"name": "release-tgf-connect",
+			"configurePreset": "release-tgf-connect"
 		},
 		{
 			"name": "debug-tgf",

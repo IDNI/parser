@@ -158,7 +158,7 @@ if(TAU_PARSER_DEPS_FROM_STORE)
 	endif()
 	# The headers are identical on every target, so the producer needs no
 	# compiler. Only serve, connect and net read them.
-	if(TAU_PARSER_BUILD_SERVE OR TAU_PARSER_BUILD_NET)
+	if(TAU_PARSER_BUILD_SERVE OR TAU_PARSER_BUILD_CONNECT OR TAU_PARSER_BUILD_NET)
 		_parser_deps_ensure(boost_headers boost-headers
 			TAU_PARSER_BOOST_HEADERS_PREFIX)
 	endif()

@@ -349,6 +349,56 @@ inline const args_config tgf_args_config = {
 	.global_surface = "",
 };
 
+/// The options without a connect surface that the client of `tgf connect`
+/// reads from the environment.
+inline const std::array<std::string_view, 1> tgf_connect_env_options = {
+	"status" };
+
+/// The options of the tgf-connect program: each option that the connect
+/// command or the whole tool shows, and the environment options of the
+/// client. Each one shows without a command.
+inline option_set tgf_connect_option_set() {
+	option_set out;
+	for (const auto* set : { &tgf_option_set, &tgf_repl_option_set })
+		for (const auto& o : set->options) {
+			std::vector<option_surface> surfaces;
+			auto take = [&surfaces](const option_surface& s) {
+				if (s.command != "connect" && !s.command.empty())
+					return;
+				option_surface global = s;
+				global.command.clear();
+				// help prints the short letter of the first surface only
+				if (surfaces.empty()) surfaces.push_back(global);
+				else if (!surfaces[0].short_name)
+					surfaces[0] = global;
+			};
+			for (const auto& s : o.surfaces) take(s);
+			for (const auto& [name, s] : tgf_surfaces)
+				if (name == o.name) take(s);
+			const bool env = std::ranges::find(tgf_connect_env_options,
+				o.name) != tgf_connect_env_options.end();
+			if (surfaces.empty() && !env) continue;
+			option_spec spec = o;
+			spec.surfaces = std::move(surfaces);
+			out.options.push_back(std::move(spec));
+		}
+	return out;
+}
+
+/// The program data of the command line of tgf-connect. The description
+/// is the help of the connect command.
+inline args_config tgf_connect_args_config() {
+	return {
+		.name = "tgf-connect",
+		.help_header = "tgf-connect [<address>] [<TGF file>]",
+		.description = tgf_command_spec(tgf_command::connect).help,
+		.default_command = "",
+		.default_command_when_inputs = "",
+		.global_surface = "",
+		.free_inputs = true,
+	};
+}
+
 /// The colors of a report without an evaluator, per output. A `colors`
 /// value from argv or `TGF_COLORS` holds for each output, a pipe included.
 /// Without one, an output has colors only when it is a terminal.

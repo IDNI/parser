@@ -554,3 +554,95 @@ TEST_CASE("connect: prints the answers buffered before an attach") {
 	f.proc.stop();
 	std::filesystem::remove_all(dir);
 }
+
+#ifdef TAU_TEST_HAS_TGF_CONNECT
+// Read stdout of @p proc until a line holds @p text. All lines read go to
+// @p all, so a failed check shows them.
+static bool read_until(tgf_serve_test::child_process& proc,
+	const std::string& text, std::string& all)
+{
+	std::string line;
+	while (proc.read_stdout_line(line, 20000)) {
+		all += line + "\n";
+		if (line.find(text) != std::string::npos) return true;
+	}
+	return false;
+}
+
+TEST_CASE("tgf-connect: version over the text REPL") {
+	serve_fixture f;
+	tgf_serve_test::child_process proc;
+	REQUIRE(proc.start(tgf_serve_test::tgf_connect_binary_path(), {
+		"-p", std::to_string(f.bound_port()), "-c", "false",
+		"--legacy-repl" }));
+	std::string all;
+	INFO(all);
+	CHECK(read_until(proc, "session ", all));
+	REQUIRE(proc.write_stdin("version"));
+	CHECK(read_until(proc, "TGF version", all));
+	REQUIRE(proc.write_stdin("quit"));
+	CHECK(read_until(proc, "Quit.", all));
+}
+
+TEST_CASE("tgf-connect: a grammar file argument loads into the session") {
+	serve_fixture f;
+	std::string gpath = write_temp_grammar("start => 'a'+.\n");
+	tgf_serve_test::child_process proc;
+	// The file comes before the address: the .tgf name tells them apart.
+	REQUIRE(proc.start(tgf_serve_test::tgf_connect_binary_path(), {
+		gpath, "tgf://127.0.0.1:" + std::to_string(f.bound_port()),
+		"-c", "false", "--legacy-repl" }));
+	std::string all;
+	INFO(all);
+	CHECK(read_until(proc, "loaded: " + gpath, all));
+	REQUIRE(proc.write_stdin("version"));
+	CHECK(read_until(proc, "TGF version", all));
+	REQUIRE(proc.write_stdin("quit"));
+	CHECK(read_until(proc, "Quit.", all));
+	proc.stop();
+	remove_temp_grammar(gpath);
+}
+
+TEST_CASE("tgf-connect --json: hello, then the version answer") {
+	serve_fixture f;
+	tgf_serve_test::child_process proc;
+	REQUIRE(proc.start(tgf_serve_test::tgf_connect_binary_path(), {
+		"--json", "-p", std::to_string(f.bound_port()) }));
+	std::string line;
+	REQUIRE(proc.read_stdout_line(line, 20000));
+	CHECK(member(parse_line(line), "hello") != nullptr);
+	REQUIRE(proc.write_stdin(R"({"id":1,"cmd":"version"})"));
+	REQUIRE(proc.read_stdout_line(line, 20000));
+	const auto v = parse_line(line);
+	const auto* id = member(v, "id");
+	REQUIRE(id != nullptr);
+	CHECK(id->get_number() == 1);
+	CHECK(member(v, "status")->get_string() == "ok");
+	const auto* result = member(v, "result");
+	REQUIRE(result != nullptr);
+	const auto* version = member(result, "version");
+	REQUIRE(version != nullptr);
+	CHECK(version->get_string().find("TGF version") != std::string::npos);
+	REQUIRE(proc.write_stdin(R"({"id":2,"cmd":"quit"})"));
+	REQUIRE(proc.read_stdout_line(line, 20000));
+	CHECK(line.find("\"quit\"") != std::string::npos);
+}
+
+TEST_CASE("tgf-connect: the inputs it refuses") {
+	auto stderr_of = [](const std::vector<std::string>& args) {
+		tgf_serve_test::child_process proc;
+		REQUIRE(proc.start(tgf_serve_test::tgf_connect_binary_path(),
+			args));
+		std::string all, line;
+		while (proc.read_stderr_line(line, 10000)) all += line + "\n";
+		return all;
+	};
+	// A .tgf name is a grammar file even when it does not exist.
+	CHECK(stderr_of({ "no-such-grammar.tgf", "-p", "1" })
+		.find("TGF file does not exist") != std::string::npos);
+	CHECK(stderr_of({ "localhost:1", "localhost:2" })
+		.find("one server address at most") != std::string::npos);
+	CHECK(stderr_of({ "localhost:1", "-p", "1" })
+		.find("either as an address argument") != std::string::npos);
+}
+#endif

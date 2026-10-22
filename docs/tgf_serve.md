@@ -165,6 +165,29 @@ An attach prints the answers the session buffered while no client was
 attached before the first prompt, under one `earlier answers:` header,
 with the same renderer as a normal answer.
 
+## tgf-connect
+
+`tgf-connect` is a small program that runs only the client of
+`tgf connect`. It has no grammar loader, no parser generator and no server.
+
+    ./dev preset release-tgf-connect
+
+The CMake option `TAU_PARSER_BUILD_CONNECT` builds it. The option is off by
+default, and it does not need `TAU_PARSER_BUILD_TGF`. It needs the Boost
+headers, the same as `TAU_PARSER_BUILD_SERVE`.
+
+    tgf-connect [<address>] [<grammar>] [--host H] [--port N]
+        [--session ID] [--json] [--colors BOOL] [--legacy-repl]
+
+    tgf-connect -p 5000
+    tgf-connect g.tgf tgf://example.org:5000
+
+The options and the address forms are those of `tgf connect`. An argument
+that names a file or ends in `.tgf` is the grammar file. Any other argument
+is the address. A `.tgf` name that does not exist gives an error before the
+connect. The client loads the grammar file into the session, the same as
+`tgf <grammar> connect`.
+
 ## The session
 
 The first line of a connection picks a session:

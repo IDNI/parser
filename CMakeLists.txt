@@ -82,10 +82,11 @@ else()
 	set(_TAU_SERVE_USER_SET ON)
 endif()
 option(TAU_PARSER_BUILD_SERVE          "Build tgf serve and tgf connect (needs the Boost headers)" OFF)
+option(TAU_PARSER_BUILD_CONNECT        "Build the tgf-connect client (needs the Boost headers)" OFF)
 option(TAU_PARSER_BUILD_NET            "Build the line server and client library (needs the Boost headers)" OFF)
 option(TAU_PARSER_BUILD_FUZZ           "Build the libFuzzer targets (clang only)" OFF)
 set(TAU_BOOST_INCLUDE_DIR "" CACHE PATH
-	"Boost headers for TAU_PARSER_BUILD_SERVE and TAU_PARSER_BUILD_NET (empty tries the store, then the system)")
+	"Boost headers for TAU_PARSER_BUILD_SERVE, TAU_PARSER_BUILD_CONNECT and TAU_PARSER_BUILD_NET (empty tries the store, then the system)")
 option(TAU_RUN_GRAMMAR_TESTS           "Run the .tgf.test grammar suites"   OFF)
 option(TAU_PARSER_TEST_PYTHON_REQUIRED "Fail the configure when the REPL and schema tests get no Python venv" OFF)
 option(TAU_PARSER_BUILD_BROWSER_TESTS  "Run WASM tests in headless Chrome (Emscripten only)" OFF)
@@ -136,6 +137,7 @@ set_property(CACHE TAU_PARSER_BUILD_TESTS           PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_EXAMPLES        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_TGF             PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_SERVE           PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_PARSER_BUILD_CONNECT         PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_NET             PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_PARSER_BUILD_FUZZ            PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_RUN_GRAMMAR_TESTS            PROPERTY STRINGS "OFF" "ON")
@@ -230,6 +232,11 @@ endif()
 unset(_TAU_SERVE_USER_SET)
 message(STATUS "TAU_PARSER_BUILD_SERVE: ${TAU_PARSER_BUILD_SERVE}")
 # Emscripten has no sockets.
+if(TAU_PARSER_BUILD_EMSCRIPTEN)
+	set(TAU_PARSER_BUILD_CONNECT OFF
+		CACHE BOOL "Build the tgf-connect client (needs the Boost headers)" FORCE)
+endif()
+message(STATUS "TAU_PARSER_BUILD_CONNECT: ${TAU_PARSER_BUILD_CONNECT}")
 if(TAU_PARSER_BUILD_EMSCRIPTEN)
 	set(TAU_PARSER_BUILD_NET OFF
 		CACHE BOOL "Build the line server and client library (needs the Boost headers)" FORCE)
@@ -454,7 +461,7 @@ include(parser-deps)
 # wins over a system package, because a store build must use the headers it
 # resolved. The check fails early with a fix instead of a compiler error.
 set(TAU_BOOST_INCLUDE_DIR_RESOLVED "")
-if(TAU_PARSER_BUILD_SERVE OR TAU_PARSER_BUILD_NET)
+if(TAU_PARSER_BUILD_SERVE OR TAU_PARSER_BUILD_CONNECT OR TAU_PARSER_BUILD_NET)
 	if(TAU_BOOST_INCLUDE_DIR)
 		set(TAU_BOOST_INCLUDE_DIR_RESOLVED "${TAU_BOOST_INCLUDE_DIR}")
 	elseif(TAU_PARSER_DEPS_FROM_STORE AND TAU_PARSER_BOOST_HEADERS_PREFIX)
@@ -468,7 +475,7 @@ if(TAU_PARSER_BUILD_SERVE OR TAU_PARSER_BUILD_NET)
 	endif()
 	if(NOT EXISTS "${TAU_BOOST_INCLUDE_DIR_RESOLVED}/boost/version.hpp")
 		message(FATAL_ERROR
-			"TAU_PARSER_BUILD_SERVE and "
+			"TAU_PARSER_BUILD_SERVE, TAU_PARSER_BUILD_CONNECT and "
 			"TAU_PARSER_BUILD_NET need the Boost headers, but no "
 			"boost/version.hpp was found. Set -DTAU_BOOST_INCLUDE_DIR=<dir>, "
 			"enable -DTAU_PARSER_DEPS_FROM_STORE=ON, or install Boost 1.86.")
@@ -501,7 +508,8 @@ else()
 	add_subdirectory("src")
 endif()
 
-if(TAU_PARSER_BUILD_TGF AND NOT TAU_PARSER_BUILD_EMSCRIPTEN)
+if((TAU_PARSER_BUILD_TGF OR TAU_PARSER_BUILD_CONNECT)
+		AND NOT TAU_PARSER_BUILD_EMSCRIPTEN)
 	add_subdirectory(src/tgf)
 endif()
 
