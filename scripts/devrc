@@ -834,6 +834,7 @@ _tau_dep_ensure_run() {
 	local _tau_dep_ensure_prefix_out
 	local _tau_dep_ensure_published _tau_dep_ensure_timeout _tau_dep_ensure_poll
 	local _tau_dep_ensure_now _tau_dep_ensure_deadline
+	local _tau_dep_ensure_wait_start _tau_dep_ensure_next_note
 	local _tau_dep_ensure_host _tau_dep_ensure_owner_file
 	local _tau_dep_ensure_owner_host _tau_dep_ensure_owner_pid
 	local _tau_dep_ensure_tag _tau_dep_ensure_start _tau_dep_ensure_log
@@ -959,6 +960,7 @@ _tau_dep_ensure_run() {
 	[ "$_tau_dep_ensure_poll" -lt 1 ] && _tau_dep_ensure_poll=1
 	_tau_dep_ensure_now="$(date +%s)"
 	_tau_dep_ensure_deadline=$((_tau_dep_ensure_now + _tau_dep_ensure_timeout))
+	_tau_dep_ensure_wait_start=""
 	while :; do
 		if mkdir "${_tau_dep_ensure_claim_dir}/${_tau_dep_ensure_id}.claim" 2>/dev/null; then
 			_tau_dep_ensure_claim="${_tau_dep_ensure_claim_dir}/${_tau_dep_ensure_id}.claim"
@@ -980,6 +982,8 @@ _tau_dep_ensure_run() {
 		fi
 		# A claim from another host, or one with no owner file yet, is live.
 		_tau_dep_ensure_owner_file="${_tau_dep_ensure_claim_dir}/${_tau_dep_ensure_id}.claim/owner"
+		_tau_dep_ensure_owner_host=""
+		_tau_dep_ensure_owner_pid=""
 		if [ -f "$_tau_dep_ensure_owner_file" ]; then
 			read -r _tau_dep_ensure_owner_host _tau_dep_ensure_owner_pid \
 				< "$_tau_dep_ensure_owner_file"
@@ -1004,6 +1008,15 @@ _tau_dep_ensure_run() {
 			return 0
 		fi
 		_tau_dep_ensure_now="$(date +%s)"
+		# A wait of minutes with no output looks like a hang.
+		if [ -z "$_tau_dep_ensure_wait_start" ]; then
+			_tau_dep_ensure_wait_start="$_tau_dep_ensure_now"
+			_tau_dep_ensure_next_note="$_tau_dep_ensure_now"
+			dep_note "${_tau_dep_ensure_tag}: waiting for the build of ${_tau_dep_ensure_owner_host:-an unknown host} ${_tau_dep_ensure_owner_pid:-(no owner file yet)} (claim ${_tau_dep_ensure_claim_dir}/${_tau_dep_ensure_id}.claim)"
+		elif [ "$_tau_dep_ensure_now" -ge $((_tau_dep_ensure_next_note + 30)) ]; then
+			_tau_dep_ensure_next_note="$_tau_dep_ensure_now"
+			dep_note "${_tau_dep_ensure_tag}: still waiting after $((_tau_dep_ensure_now - _tau_dep_ensure_wait_start))s, timeout ${_tau_dep_ensure_timeout}s"
+		fi
 		if [ "$_tau_dep_ensure_now" -ge "$_tau_dep_ensure_deadline" ]; then
 			echo "dep_ensure: timed out after ${_tau_dep_ensure_timeout}s waiting for the producer claim ${_tau_dep_ensure_claim_dir}/${_tau_dep_ensure_id}.claim; if that claim is stale, remove it with: rm -r ${_tau_dep_ensure_claim_dir}/${_tau_dep_ensure_id}.claim" >&2
 			_tau_dep_ensure_cleanup
@@ -1030,8 +1043,8 @@ _tau_dep_ensure_run() {
 		_tau_dep_ensure_cleanup
 		return 1
 	fi
-	printf '%s: building from source, log: %s\n' "$_tau_dep_ensure_tag" \
-		"$_tau_dep_ensure_log" >&2
+	# The first object of a fat LTO build can take a minute with no output.
+	dep_note "${_tau_dep_ensure_tag}: building from source, the first compile step can be silent for a minute, log: ${_tau_dep_ensure_log}"
 	_tau_dep_ensure_group_open "${_tau_dep_ensure_tag} build"
 	dep_build_producer "$_tau_dep_ensure_staging" "$_tau_dep_ensure_producer" "$@" 2>&1 \
 		| tee "$_tau_dep_ensure_log" >&2

@@ -240,6 +240,26 @@ fi
 [ "$(calls)" -eq "$before" ] || fail "a stale claim ran a producer"
 grep -q "timed out" "$SCRATCH/stale.err" || fail "the stale claim error was not reported"
 
+# 10a. a wait on a live claim names the owner and the claim
+WAIT_BLOCK="$(printf 'dep=waitdep\nsource=abc')"
+wait_id="$(bridge_id "$WAIT_BLOCK")"
+wait_claim="$TAU_SHARED_PREFIX/store/waitdep/$wait_id.claim"
+mkdir -p "$wait_claim"
+printf 'otherhost 4242\n' > "$wait_claim/owner"
+before="$(calls)"
+if TAU_DEP_CLAIM_TIMEOUT=1 TAU_DEP_CLAIM_POLL=1 \
+		dep_ensure unused_wait producer waitdep "$WAIT_BLOCK" fake_producer \
+		2>"$SCRATCH/wait.err"; then
+	fail "a wait on a live claim did not time out"
+fi
+[ "$(calls)" -eq "$before" ] || fail "a wait on a live claim ran a producer"
+[ "$(grep -c "waiting for the build of" "$SCRATCH/wait.err")" -eq 1 ] \
+	|| fail "the wait start was not reported once"
+grep -q "waitdep: waiting for the build of otherhost 4242 (claim $wait_claim)" \
+	"$SCRATCH/wait.err" || fail "the wait start line does not name the owner and the claim"
+grep -q "timed out" "$SCRATCH/wait.err" || fail "the wait timeout was not reported"
+rm -r "$wait_claim"
+
 # 10b. a claim owned by a dead pid on this host is reclaimed: the owner file and
 # the claim directory go away and the producer runs.
 sleep 0 & dead_pid=$!
