@@ -27,6 +27,11 @@
 
 namespace idni {
 
+diagnostics::result<connect_target> parse_connect_iri(std::string_view iri)
+{
+	return parse_connect_address(iri, tgf_address_rules());
+}
+
 namespace ba = boost::asio;
 using ba::ip::tcp;
 using boost::system::error_code;

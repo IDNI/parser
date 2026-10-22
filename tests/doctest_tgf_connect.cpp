@@ -269,3 +269,42 @@ TEST_CASE("connect: prints the answers buffered before an attach") {
 	f.proc.stop();
 	std::filesystem::remove_all(dir);
 }
+
+static std::string report_text(const diagnostics::report& rep) {
+	std::ostringstream os;
+	rep.print(os, term::colors(false));
+	return os.str();
+}
+
+TEST_CASE("connect: the address argument forms") {
+	auto ok = [](const std::string& iri, const std::string& host,
+		uint16_t port)
+	{
+		auto t = parse_connect_iri(iri);
+		REQUIRE(t.has_value());
+		CHECK(t.value().host == host);
+		CHECK(t.value().port == port);
+	};
+	ok("tgf://localhost:4101", "localhost", 4101);
+	ok("tgf://localhost:4101/", "localhost", 4101);
+	ok("tgf://localhost", "localhost", 4000);
+	ok("localhost:4101", "localhost", 4101);
+	ok("localhost", "localhost", 4000);
+	ok("127.0.0.1:4101", "127.0.0.1", 4101);
+	ok("[::1]:4101", "::1", 4101);
+	ok("[::1]", "::1", 4000);
+	// a non-ASCII host name: "buecher" with u-umlaut, in UTF-8
+	ok("b\xc3\xbc" "cher.example:5000", "b\xc3\xbc" "cher.example", 5000);
+	for (const char* bad : { "http://localhost:4000",
+		"tgf://localhost:4000/x", "localhost:99999", "localhost:0",
+		"localhost:", "tgf://user@localhost", "localhost?a",
+		"localhost#a", "::1:4000", "[::1", "[]:4000", "[::1]x",
+		"tgf://", "" })
+	{
+		auto t = parse_connect_iri(bad);
+		CHECK_FALSE(t.has_value());
+		// The error names the argument.
+		if (*bad) CHECK(report_text(t.report()).find(bad)
+			!= std::string::npos);
+	}
+}

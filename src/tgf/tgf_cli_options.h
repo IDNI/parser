@@ -6,6 +6,7 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -15,6 +16,10 @@
 #include "../utility/term_colors.h"
 
 namespace idni {
+
+/// The server of `tgf connect` without an address.
+inline constexpr const char* tgf_default_host = "localhost";
+inline constexpr std::uint16_t tgf_default_port = 4000;
 
 /// The commands of the tool, in the order of tgf_option_set.commands.
 enum class tgf_command { grammar, parse, gen, repl, serve, connect, test };
@@ -89,7 +94,7 @@ inline const option_set tgf_option_set = {
 		{ "encoder", "generator", std::string(), "encoder function",
 			{ { "gen", 'e' } } },
 
-		{ "port", "serve", std::size_t{ 4000 },
+		{ "port", "serve", std::size_t{ tgf_default_port },
 			"TCP port of the server, 0 lets serve pick a free port",
 			{ { "serve", 'p' } } },
 		{ "max-sessions", "serve", std::size_t{ 16 },

@@ -9,7 +9,9 @@
 #include <ostream>
 #include <set>
 #include <string>
+#include <string_view>
 
+#include "net/line_address.h"
 #include "tgf_cli.h"
 #include "utility/diagnostics.h"
 #include "utility/repl.h"
@@ -18,6 +20,15 @@
 #endif
 
 namespace idni {
+
+/// Address rules for `tgf connect`, which has no default local socket.
+inline connect_address_rules tgf_address_rules() {
+	return { "tgf", "", tgf_default_host, tgf_default_port };
+}
+
+/// Parse a `tgf connect` argument. An error names @p iri.
+diagnostics::result<connect_target> parse_connect_iri(
+	std::string_view iri);
 
 /// Options of the `tgf connect` subcommand. The client never sees a grammar
 /// file: the session of the server holds the grammar.
