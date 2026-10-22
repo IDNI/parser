@@ -22,11 +22,11 @@ Call this if your input wasn't parsed successfully and you want to know more det
 
 ### std::vector<T> ctxt
 
-Closest matching context
+Closest matching context. It shows a NUL as `\0` and a byte 0xFF as `\xff`.
 
 ### T unexp
 
-Terminal which was scanned in a place where it was not expected
+Terminal which was scanned in a place where it was not expected.
 
 ### std::vector<exp_prod_t> expv
 
