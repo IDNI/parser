@@ -185,14 +185,6 @@ static tref bintree_process_totals_value() {
 			jt::build_array(sample_arr)) });
 }
 
-static void print_version() {
-	std::cout << tauparser::full_version << "\n";
-}
-
-static void print_license() {
-	std::cout << tauparser::license << "\n";
-}
-
 const std::string& tgf_repl_evaluator::filename() const noexcept {
 	return tgf_filename;
 }
@@ -1538,26 +1530,10 @@ static int run_tool(int argc, char** argv, const args_config& cfg,
 	tgf_tool& tool, tgf_repl_evaluator& re, bool grammar_input)
 {
 	if (!re.good()) return re.flush_report(), 1;
-	auto& opts = idni::options();
-	diagnostics::report rep;
-	auto env = opts.load_env("TGF_");
-	const bool env_ok = !env.has_error();
-	rep.append(env.report());
-	auto parsed = env_ok ? opts.parse_args(argc, argv, cfg)
-		: diagnostics::result<parsed_args>{};
-	if (env_ok) rep.append(parsed.report());
-	if (!rep.nodes().empty())
-		tgf_repl_evaluator_base::print_report(rep, false,
-			tgf_report_colors());
-	if (!env_ok || !parsed.has_value()) return 1;
-	parsed_args args = std::move(parsed).value();
-
-	bool quit = false;
-	if (opts.get<bool>("version")) quit = true, print_version();
-	if (opts.get<bool>("license")) quit = true, print_license();
-	if (opts.get<bool>("help")) quit = true, opts.help(cout,
-		args.command_given ? args.command : string());
-	if (quit) return 0;
+	int code = 0;
+	auto read = tgf_read_args(argc, argv, cfg, code);
+	if (!read) return code;
+	parsed_args args = std::move(*read);
 
 	re.set_argv_values(args.values);
 	if (grammar_input && !args.inputs.empty())

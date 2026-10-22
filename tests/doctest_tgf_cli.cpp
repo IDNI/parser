@@ -765,6 +765,40 @@ TEST_SUITE("tgf cli: shared argument reader") {
 	}
 }
 
+TEST_SUITE("tgf cli: info flag priority") {
+	TEST_CASE("only the highest-priority info flag prints") {
+		const char* version_env = std::getenv("TGF_VERSION");
+		const bool had_version = version_env != nullptr;
+		const string saved_version = version_env ? version_env : "";
+		const char* license_env = std::getenv("TGF_LICENSE");
+		const bool had_license = license_env != nullptr;
+		const string saved_license = license_env ? license_env : "";
+		const char* help_env = std::getenv("TGF_HELP");
+		const bool had_help = help_env != nullptr;
+		const string saved_help = help_env ? help_env : "";
+		test_unsetenv("TGF_VERSION");
+		test_unsetenv("TGF_LICENSE");
+		test_unsetenv("TGF_HELP");
+		auto run = [](std::vector<std::string> args) {
+			options_repository mine;
+			options_scope scope(mine);
+			return capture_tgf_run(args, "", false);
+		};
+		auto version = run({ "tgf", "--version", "--license" });
+		CHECK(version.code == 0);
+		CHECK(version.out == run({ "tgf", "--version" }).out);
+		auto help = run({ "tgf", "--version", "--license", "--help" });
+		CHECK(help.code == 0);
+		CHECK(help.out == run({ "tgf", "--help" }).out);
+		if (had_version) test_setenv("TGF_VERSION", saved_version.c_str());
+		else test_unsetenv("TGF_VERSION");
+		if (had_license) test_setenv("TGF_LICENSE", saved_license.c_str());
+		else test_unsetenv("TGF_LICENSE");
+		if (had_help) test_setenv("TGF_HELP", saved_help.c_str());
+		else test_unsetenv("TGF_HELP");
+	}
+}
+
 TEST_SUITE("tgf cli: the REPL on the evaluator base") {
 
 	static string tiny_grammar() {
