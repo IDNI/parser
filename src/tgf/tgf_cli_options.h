@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "../utility/options.h"
+#include "../utility/term_colors.h"
 
 namespace idni {
 
@@ -283,6 +284,19 @@ inline const args_config tgf_args_config = {
 		tgf_command_spec(tgf_command::repl).name,
 	.global_surface = "",
 };
+
+/// The colors of a report without an evaluator, per output. A `colors`
+/// value from argv or `TGF_COLORS` holds for each output, a pipe included.
+/// Without one, an output has colors only when it is a terminal.
+inline diagnostics::sink_colors tgf_report_colors() {
+	using diagnostics::color_mode;
+	auto& opts = idni::options();
+	const bool on = opts.find("colors") != nullptr
+		&& opts.get<bool>("colors");
+	return diagnostics::output_colors(!on ? color_mode::off
+		: opts.given("colors") ? color_mode::always
+		: color_mode::terminal);
+}
 
 } // namespace idni
 

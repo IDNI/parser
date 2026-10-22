@@ -21,6 +21,7 @@
 
 #include "format/json/json.h"
 #include "parser_strings.h"
+#include "tgf_cli_options.h"
 #include "parser_term_color_macros.h"
 #include "utility/diagnostics.h"
 
@@ -165,7 +166,7 @@ bool tgf_remote_evaluator::connect(const std::string& host, uint16_t port,
 			if (tref rep = rt.find("report"); rep)
 				tgf_repl_evaluator_base::print_report(
 					format::json::report_of(rep), false,
-					idni::TC);
+					tgf_report_colors());
 			report.error(diagnostics::code::invalid_argument,
 				parser_strings::messages::connect_failed);
 			return false;
@@ -216,7 +217,8 @@ cmd_status tgf_remote_evaluator::render_response(tref resp,
 		if (tref rep = jt::get(r).find("report");
 				rep && jt::get(rep).is_object())
 			tgf_repl_evaluator_base::print_report(
-				format::json::report_of(rep), false, idni::TC);
+				format::json::report_of(rep), false,
+				tgf_report_colors());
 	};
 	auto render_one = [this, &print_report](tref r,
 		const std::string& cmd0)

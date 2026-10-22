@@ -1331,7 +1331,8 @@ static int gen_command(tgf_tool& tool, tgf_repl_evaluator& re) {
 			cmd_status::error,
 			tgf_command_spec(tgf_command::gen).name,
 			jt::build_object({}), state_value(re), rep), cout);
-		else tgf_repl_evaluator_base::print_report(rep, false, TC);
+		else tgf_repl_evaluator_base::print_report(rep, false,
+			tgf_report_colors());
 		return 1;
 	};
 	if (!re.require_grammar()) return fail(re.take_report());
@@ -1372,7 +1373,8 @@ static int gen_command(tgf_tool& tool, tgf_repl_evaluator& re) {
 			state_value(re), rep), cout);
 		return st == cmd_status::error ? 1 : 0;
 	}
-	tgf_repl_evaluator_base::print_report(rep, false, TC);
+	tgf_repl_evaluator_base::print_report(rep, false,
+		tgf_report_colors());
 	return gr.has_value() ? 0 : 1;
 }
 
@@ -1474,7 +1476,8 @@ static int serve_command(tgf_tool& tool, tgf_repl_evaluator& re) {
 	auto r = tgf_serve_run(opt);
 	// A warning (for example the Windows session memory note) is not an
 	// error, so print the report even on a clean stop.
-	tgf_repl_evaluator_base::print_report(r.report(), false, TC);
+	tgf_repl_evaluator_base::print_report(r.report(), false,
+		tgf_report_colors());
 	return r.has_value() ? r.value() : 1;
 #endif
 }
@@ -1516,7 +1519,8 @@ static int connect_command(const vector<string>& inputs) {
 	opt.legacy_repl = idni::options().get<bool>("legacy-repl");
 	auto r = tgf_connect_run(opt);
 	if (!r.has_value()) {
-		tgf_repl_evaluator_base::print_report(r.report(), false, TC);
+		tgf_repl_evaluator_base::print_report(r.report(), false,
+			tgf_report_colors());
 		return 1;
 	}
 	return r.value();
@@ -1628,7 +1632,8 @@ static int run_command(const parsed_args& args, tgf_tool& tool,
 		re.render_text(parse_result, cout);
 		// A failed parse leaves its error in the report, as in --json.
 		auto rep = re.take_report();
-		tgf_repl_evaluator_base::print_report(rep, false, TC);
+		tgf_repl_evaluator_base::print_report(rep, false,
+			tgf_report_colors());
 		if (opts.get<bool>("measure")) print_bintree_process_totals();
 		return rep.has_error() || !re.has_grammar() ? 1 : 0;
 	}
@@ -1666,7 +1671,8 @@ static int run_tool(int argc, char** argv, const args_config& cfg,
 		: diagnostics::result<parsed_args>{};
 	if (env_ok) rep.append(parsed.report());
 	if (!rep.nodes().empty())
-		tgf_repl_evaluator_base::print_report(rep, false, TC);
+		tgf_repl_evaluator_base::print_report(rep, false,
+			tgf_report_colors());
 	if (!env_ok || !parsed.has_value()) return 1;
 	parsed_args args = std::move(parsed).value();
 
@@ -1696,10 +1702,11 @@ int tgf_specialized_run(int argc, char** argv,
 	const string tgf_label = display_name ? display_name : "<compiled>";
 	if (auto r = declare_tgf_options(idni::options()); r.has_error())
 		return tgf_repl_evaluator_base::print_report(r.report(), false,
-			TC), 1;
+			tgf_report_colors()), 1;
 	tgf_tool tool;
 	if (!tool.report.nodes().empty())
-		tgf_repl_evaluator_base::print_report(tool.report, false, TC);
+		tgf_repl_evaluator_base::print_report(tool.report, false,
+			tgf_report_colors());
 	if (tool.report.has_error()) return 1;
 
 	args_config cfg = tgf_args_config;
@@ -1714,10 +1721,11 @@ int tgf_specialized_run(int argc, char** argv,
 int tgf_run(int argc, char** argv) {
 	if (auto r = declare_tgf_options(idni::options()); r.has_error())
 		return tgf_repl_evaluator_base::print_report(r.report(), false,
-			TC), 1;
+			tgf_report_colors()), 1;
 	tgf_tool tool;
 	if (!tool.report.nodes().empty())
-		tgf_repl_evaluator_base::print_report(tool.report, false, TC);
+		tgf_repl_evaluator_base::print_report(tool.report, false,
+			tgf_report_colors());
 	if (tool.report.has_error()) return 1;
 
 	// The first argument names the grammar file unless it is a command

@@ -50,6 +50,9 @@ the system picks a port and the server writes one line on stdout:
 
     {"listening":5000}
 
+A text report has colors only when the `colors` option is on, in every tgf command.
+`-c false` turns them off.
+
 A SIGINT or SIGTERM stops the server and ends its sessions.
 
 ## tgf connect

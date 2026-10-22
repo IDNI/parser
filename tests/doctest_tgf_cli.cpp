@@ -412,6 +412,53 @@ TEST_SUITE("tgf cli: derived character classes") {
 	}
 }
 
+TEST_SUITE("tgf cli: report colors") {
+
+	TEST_CASE("a failed parse with -c false prints no escape sequence") {
+		string off = capture_tgf_run({ "tgf", json_path(),
+			"parse", "-c", "false", "-e", "{" }).out;
+		CHECK_FALSE(off.empty());
+		CHECK(off.find('\x1b') == string::npos);
+		// The same failure with colors on proves the check sees colors.
+		string on = capture_tgf_run({ "tgf", json_path(),
+			"parse", "-c", "true", "-e", "{" }).out;
+		CHECK(on.find('\x1b') != string::npos);
+	}
+
+	TEST_CASE("a command error with -c false prints no escape sequence") {
+		string off = capture_tgf_run({ "tgf", "parse", "-c", "false",
+			"-e", "1" }).out;
+		CHECK_FALSE(off.empty());
+		CHECK(off.find('\x1b') == string::npos);
+	}
+
+	TEST_CASE("a command report follows its output terminal by default") {
+		options_repository mine;
+		options_scope scope(mine);
+		auto r = capture_tgf_run({ "tgf", "parse", "-e", "1" }, "", false);
+		CHECK(r.code == 1);
+		REQUIRE_FALSE(r.err.empty());
+		CHECK((r.err.find('\x1b') != string::npos) == term::is_tty(stderr));
+	}
+
+	TEST_CASE("TGF_COLORS controls command reports in a pipe") {
+		const char* current = std::getenv("TGF_COLORS");
+		const bool had_value = current != nullptr;
+		const string saved = current ? current : "";
+		for (const char* value : { "false", "true" }) {
+			options_repository mine;
+			options_scope scope(mine);
+			test_setenv("TGF_COLORS", value);
+			auto r = capture_tgf_run({ "tgf", "parse", "-e", "1" }, "", false);
+			CHECK(r.code == 1);
+			CHECK_FALSE(r.err.empty());
+			CHECK((r.err.find('\x1b') != string::npos) == (string(value) == "true"));
+		}
+		if (had_value) test_setenv("TGF_COLORS", saved.c_str());
+		else test_unsetenv("TGF_COLORS");
+	}
+}
+
 TEST_SUITE("tgf cli: parse exit code") {
 
 	TEST_CASE("-e: a valid input gives 0, a syntax error gives 1") {
