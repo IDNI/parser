@@ -361,15 +361,15 @@ struct shaping_options {
 	/**
 	 * @brief Nonterminal ids of symbols to trim (including their children) away from the resulting tree.
 	 *
-	 * List can be provided in TGF with @trim whitespace, comment.
+	 * List can be provided in TGF with `@trim whitespace, comment.`
 	 */
 	std::set<size_t> to_trim{};
-	/// nonterminal ids which children to trim by shaping coming from @trim children ...
+	/// nonterminal ids which children to trim by shaping coming from `@trim children ...`
 	std::set<size_t> to_trim_children{};
 	/**
 	 * @brief Nonterminal ids of symbols which children will be trimmed away from the resulting tree.
 	 *
-	 * List can be provided in TGF with @trim children sym1, sym2.
+	 * List can be provided in TGF with `@trim children sym1, sym2.`
 	 */
 	std::set<size_t> to_trim_children_terminals{};
 	/**
@@ -377,11 +377,11 @@ struct shaping_options {
 	 *
 	 * If trim_terminals is true it trims all terminals from the resulting parse tree. It is false by default.
 	 *
-	 * This can be set to true in TGF by @trim all terminals.
+	 * This can be set to true in TGF by `@trim all terminals.`
 	 */
 	bool trim_terminals = false;
 	std::set<size_t> dont_trim_terminals_of{}; /// except children of ...
-	/// nonterminal ids to inline by shaping coming from @inline ...
+	/// nonterminal ids to inline by shaping coming from `@inline ...`
 	/**
 	 * @brief Replaces a node with its children.
 	 *
@@ -395,11 +395,11 @@ struct shaping_options {
 	 * ids in the vector. First nonterminal is replaced by the last nonterminal
 	 * node in the vector.
 	 *
-	 * This can be populated by @inline directive.
+	 * This can be populated by `@inline` directive.
 	 *
-	 * @inline chars. Node chars is replaced by its children.
+	 * `@inline chars.` Node chars is replaced by its children.
 	 *
-	 * @inline expr > block > expr. Node expr containing a child node block
+	 * `@inline expr > block > expr.` Node expr containing a child node block
 	 * which contains a child node expr is replaced by the expr child.
 	 */
 	std::set<std::vector<size_t>> to_inline{};
@@ -408,13 +408,13 @@ struct shaping_options {
 	 *
 	 * If inline_char_classes is true shaping will also inline all character
 	 * class functions. Is a short alternative to adding them into to_inline or
-	 * @inline one by one.
+	 * `@inline` one by one.
 	 *
 	 * Default value is false.
 	 *
-	 * In TGF this can be set to true by adding char classes to @inline directive.
+	 * In TGF this can be set to true by adding char classes to `@inline` directive.
 	 *
-	 * @inline char classes.
+	 * `@inline char classes.`
 	 */
 	bool inline_char_classes = false;
 };
@@ -464,7 +464,7 @@ struct grammar {
 		 * to an order of production rule appearance in the grammar. Setting
 		 * this to false would make parser to provide all possible parse trees.
 		 *
-		 * This can be also disabled by TGF directive @disable disambiguation.
+		 * This can be also disabled by TGF directive `@disable disambiguation.`
 		 */
 		bool auto_disambiguate = true;
 		/**
@@ -472,23 +472,23 @@ struct grammar {
 		 * ids of symbols we don't want to disambiguate and we want to keep
 		 * ambiguity in the resulting parse forest.
 		 *
-		 * This list can be set by TGF directive: @ambiguous symbol1, symbol2.
+		 * This list can be set by TGF directive: `@ambiguous symbol1, symbol2.`
 		 */
 		std::set<size_t> nodisambig_list{};
 		/// Parsed tree shaping_options
 		shaping_options shaping = {};
 		/// Production guard names
 		std::set<std::string> enabled_guards = {};
-		/// Alternatives supplied by the host for a @dynamic nonterminal.
+		/// Alternatives supplied by the host for a `@dynamic` nonterminal.
 		std::map<std::basic_string<C>, std::vector<std::basic_string<C>>>
 			dynamic = {};
-		/// @highlight directive: type_name -> nonterminal names
-		/// Populated by @highlight type : nt1, nt2; type2 : nt3.
+		/// `@highlight` directive: type_name -> nonterminal names
+		/// Populated by `@highlight type : nt1, nt2; type2 : nt3.`
 		std::vector<std::pair<std::string, std::vector<std::string>>>
 			highlights = {};
-		/// @highlight auto: enable name and content heuristics.
+		/// `@highlight auto`: enable name and content heuristics.
 		bool highlight_heuristics = false;
-		/// @variant: the production guards of each profile.
+		/// `@variant`: the production guards of each profile.
 		std::map<std::string, std::set<std::string>> variants = {};
 		/// The selected profile, empty when no profile has the guards.
 		std::string variant = {};
@@ -546,7 +546,7 @@ public:
 	void productions_enable(const std::string& guard);
 	void productions_disable(const std::string& guard);
 	/**
-	 * Adds an alternative for every value of a @dynamic nonterminal nt.
+	 * Adds an alternative for every value of a `@dynamic` nonterminal nt.
 	 * Every value becomes a terminal string production. A value added
 	 * already is skipped. An empty value is an error, and nothing is
 	 * added. The grammar object is shared by every parser
@@ -596,7 +596,7 @@ public:
 	/// or inner rule. Used for the parse error hint.
 	bool cc_rejects_by_negation(size_t nt, T ch) const;
 	/**
-	 * Adds one pending alternative to a @dynamic nonterminal l, skipping
+	 * Adds one pending alternative to a `@dynamic` nonterminal l, skipping
 	 * the full rebuild add_dynamic does (same trade as
 	 * add_char_class_production). Dedups against dynamic_idx_: a value
 	 * already host or committed adds nothing; a value already pending for
@@ -615,7 +615,7 @@ public:
 	 * commit or rollback: a confirmed one moves to the committed state and
 	 * is written into ctx's values, staying linked in ntsm; an unconfirmed
 	 * one is retired the same way rollback_dynamic retires it. Never
-	 * writes into opt_.dynamic, which holds @dynamic host values only.
+	 * writes into opt_.dynamic, which holds `@dynamic` host values only.
 	 * Returns true if anything was confirmed.
 	 */
 	bool commit_dynamic(dynamic_context<C>& ctx);

@@ -132,7 +132,7 @@ struct highlights_codec {
 	diagnostics::result<pairs> from_value(const option_value& v) const;
 };
 
-/// The values of the @dynamic nonterminals, as entries `name=value`, one
+/// The values of the `@dynamic` nonterminals, as entries `name=value`, one
 /// per value. `name=` is a name with no value.
 template <typename C>
 struct dynamic_codec {

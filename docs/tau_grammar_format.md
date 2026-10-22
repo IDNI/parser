@@ -209,7 +209,7 @@ repeat_group   => '{' _ alternation _ '}'.
 
 ### directives
 
-#### @use
+#### `@use`
 
 This directive loads rules from other grammars or predefined rule lists.
 Currently it takes comma separated list of predefined character class function names used after a keyword `char class` or `char classes`.
@@ -264,7 +264,7 @@ comment => '#' printable* '\n'.
 ```
 Here `digit` is the Unicode class and `ascii_digit` is the `<cctype>` class.
 
-#### @start
+#### `@start`
 
 Start directives tells parser what is the starting symbol. Allows to pick another symbol as a starting one instead of a default `start`.
 It writes the grammar option `start`. The default of the option is `start`.
@@ -275,7 +275,7 @@ Usage:
 S => S S | S | '1'.
 ```
 
-#### @disable
+#### `@disable`
 
 Disable directive can disable a grammar option.
 
@@ -288,7 +288,7 @@ Usage:
 ```
 
 
-#### @ambiguous
+#### `@ambiguous`
 
 Accepts a comma separated list of symbols which are not disambiguated according to production rule order of grammar appearance.
 It writes the grammar option `nodisambig-list`.
@@ -296,7 +296,7 @@ It writes the grammar option `nodisambig-list`.
 `@ambiguous symbol1, symbol2.`
 
 
-#### @dynamic
+#### `@dynamic`
 
 A `@dynamic` nonterminal takes its alternatives from the host program at run time, not from the grammar file. Each alternative is a plain terminal string.
 The directive writes the grammar option `dynamic`, with one entry `name=value` for each value, or `name=` for a name with no value.
@@ -319,7 +319,7 @@ Usage:
 ```
 
 
-#### @variants and @variant
+#### `@variants` and `@variant`
 
 A variant is a named profile of production guards.
 `@variants <name>: <guard>, <guard>, ...; <name>: <guard>, ... .` defines one profile per pair. It writes the grammar option `variants`, with one entry `name=guard` for each guard.
@@ -340,7 +340,7 @@ Usage:
 
 The `tgf` tool selects a variant with `--variant <name>` and with the REPL command `set variant <name>`.
 
-#### @inline
+#### `@inline`
 
 Inlining is a parsed tree shaping action which takes a node and replaces it with children or with a child from its subtree.
 It writes the grammar options `inline` and `inline-char-classes`.
@@ -356,7 +356,7 @@ Usage:
 ```
 
 
-#### @trim
+#### `@trim`
 
 Trim is a parsed tree shaping action which removes a node and its subtree from the parsed tree.
 The root of the parsed tree is never removed, also when `@trim` names it.
@@ -368,7 +368,7 @@ Usage:
 ```
 
 
-#### @trim children
+#### `@trim children`
 
 Trim children removes children and its subtrees from a node.
 It writes the grammar option `trim-children`.
@@ -379,7 +379,7 @@ Usage:
 ```
 
 
-#### @trim all terminals
+#### `@trim all terminals`
 
 This directive removes all terminals from the parsed tree.
 It writes the grammar option `trim-terminals`. The names after `except children of` go to the grammar option `dont-trim-terminals-of`.
@@ -390,7 +390,7 @@ Usage:
 ```
 
 
-#### @trim children terminals
+#### `@trim children terminals`
 
 This directive removes terminal children from the nonterminals in a comma separated list.
 It writes the grammar option `trim-children-terminals`.
