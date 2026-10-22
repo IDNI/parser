@@ -4,6 +4,7 @@
 #ifndef __IDNI__PARSER__TGF__REPL_CLIENT_EVALUATOR_H__
 #define __IDNI__PARSER__TGF__REPL_CLIENT_EVALUATOR_H__
 
+#include <istream>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -32,6 +33,9 @@ struct repl_client_evaluator : tgf_repl_evaluator_base {
 	/// Read the grammar file @p path and load its text into the session.
 	/// The answer prints like the answer of `load`.
 	cmd_status load_grammar(const std::string& path);
+	/// Send each line of @p in as one request and write each answer as one
+	/// line. Returns at the end of @p in or after a quit answer.
+	int run_json(std::istream& in);
 
 private:
 	tref state() const override;

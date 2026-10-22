@@ -141,6 +141,65 @@ static bool open_local(repl_client_evaluator& remote, uint16_t port,
 		.host = "127.0.0.1", .port = port }, session));
 }
 
+struct line_capture_peer {
+	ba::io_context io;
+	tcp::acceptor acceptor;
+	uint16_t port;
+	std::thread worker;
+	bool received = false;
+	std::string request;
+
+	line_capture_peer()
+		: acceptor(io, tcp::endpoint(tcp::v4(), 0)),
+		  port(acceptor.local_endpoint().port()),
+		  worker([this] {
+			  tcp::socket sock(io);
+			  error_code ec;
+			  acceptor.accept(sock, ec);
+			  if (ec) return;
+			  ba::streambuf buf;
+			  auto read_line = [&sock, &buf](std::string& line) {
+				  error_code read_ec;
+				  ba::read_until(sock, buf, '\n', read_ec);
+				  if (read_ec) return false;
+				  std::istream in(&buf);
+				  return static_cast<bool>(std::getline(in, line));
+			  };
+			  auto write_line = [&sock](const std::string& line) {
+				  error_code write_ec;
+				  ba::write(sock, ba::buffer(line), write_ec);
+				  return !write_ec;
+			  };
+			  std::string first;
+			  if (!read_line(first)) return;
+			  std::ostringstream hello;
+			  format::json::write_line(jt::build_object({
+				  jt::build_pair("hello", jt::build_object({
+					  jt::build_pair("session", jt::build_string("capture")) })),
+				  jt::build_pair("state", jt::build_object({})) }), hello);
+			  if (!write_line(hello.str())) return;
+			  if (!read_line(request)) return;
+			  received = true;
+			  std::ostringstream response;
+			  format::json::write_line(jt::build_object({
+				  jt::build_pair("status", jt::build_string("error")) }),
+				  response);
+			  write_line(response.str());
+		  })
+	{
+	}
+
+	~line_capture_peer() {
+		error_code ec;
+		acceptor.close(ec);
+		join();
+	}
+
+	void join() {
+		if (worker.joinable()) worker.join();
+	}
+};
+
 TEST_CASE("connect: grammar, load, parse, quit and attach again") {
 	serve_fixture f;
 
@@ -484,6 +543,67 @@ TEST_CASE("connect: many answers keep the client cache small") {
 	remove_temp_grammar(gpath);
 }
 
+TEST_CASE("connect --json: hello, load and answers as JSON lines") {
+	serve_fixture f;
+
+	std::ostringstream sink;
+	repl_client_evaluator remote(sink, repl_options(true, false));
+	REQUIRE(open_local(remote, f.bound_port(), ""));
+	CHECK(remote.load_grammar(grammar_path()) == cmd_status::ok);
+	// The empty line gets no answer, and nothing after quit is sent.
+	std::istringstream in(
+		"{\"id\":1,\"cmd\":\"version\"}\n"
+		"\n"
+		"{\"id\":2,\"cmd\":\"quit\"}\n"
+		"{\"id\":3,\"cmd\":\"version\"}\n");
+	CHECK(remote.run_json(in) == 0);
+
+	std::vector<htref> lines;
+	std::istringstream out(sink.str());
+	for (std::string l; std::getline(out, l); )
+		lines.push_back(parse_line(l));
+	REQUIRE(lines.size() == 4);
+	CHECK(member(lines[0], "hello") != nullptr);
+	CHECK(member(lines[1], "status")->get_string() == "ok");
+	CHECK(member(lines[2], "id")->get_number() == 1);
+	CHECK(member(lines[2], "status")->get_string() == "ok");
+	CHECK(member(lines[3], "id")->get_number() == 2);
+	CHECK(member(lines[3], "status")->get_string() == "quit");
+}
+
+TEST_CASE("connect --json forwards non-JSON input unchanged") {
+	line_capture_peer peer;
+	std::ostringstream sink;
+	{
+		repl_client_evaluator remote(sink, repl_options(true, false));
+		REQUIRE(remote.open_session(client_of({
+			.kind = line_transport_kind::tcp,
+			.host = "127.0.0.1", .port = peer.port })));
+		std::istringstream in("not-json\n");
+		CHECK(remote.run_json(in) == 0);
+	}
+	peer.join();
+	CHECK(peer.received);
+	CHECK(peer.request == "not-json");
+}
+
+TEST_CASE("connect --json drops CR at the end of an input line") {
+	line_capture_peer peer;
+	std::ostringstream sink;
+	{
+		repl_client_evaluator remote(sink, repl_options(true, false));
+		REQUIRE(remote.open_session(client_of({
+			.kind = line_transport_kind::tcp,
+			.host = "127.0.0.1", .port = peer.port })));
+		std::istringstream in("\r\n");
+		CHECK(remote.run_json(in) == 0);
+	}
+	peer.join();
+	CHECK_FALSE(peer.received);
+}
+
+}
+
 TEST_CASE("connect: the address argument forms") {
 	auto ok = [](const std::string& iri, const std::string& host,
 		uint16_t port)
@@ -633,6 +753,4 @@ TEST_CASE("connect: prints the answers buffered before an attach") {
 	// The server holds the session log open, so stop it before the remove.
 	f.proc.stop();
 	std::filesystem::remove_all(dir);
-}
-
 }

@@ -229,6 +229,35 @@ cmd_status repl_client_evaluator::load_grammar(const std::string& path) {
 		jt::build_pair(tp::file, jt::build_string(path)) }), gone);
 }
 
+int repl_client_evaluator::run_json(std::istream& in) {
+	for (std::string line; std::getline(in, line); ) {
+		drop_cr(line);
+		if (line.empty()) continue;
+		bool gone = false;
+		cmd_status st = cmd_status::ok;
+		bool is_json = true;
+		{
+			bintree<format::json::node>::gc_pause pause;
+			auto parsed = jt::get(std::string_view(line));
+			is_json = parsed.has_value();
+			if (is_json) st = request(parsed.value(), gone);
+		}
+		jt::gc_if_grown();
+		if (!is_json) {
+			// The session answers a line that is no JSON with its
+			// own error, so pass it on unchanged.
+			if (!link || !link->send_line(line)) return 1;
+			std::string answer;
+			if (link->read_line(answer) != read_status::ok) return 1;
+			out << answer << "\n" << std::flush;
+			continue;
+		}
+		if (gone) return 1;
+		if (st == cmd_status::quit) return 0;
+	}
+	return 0;
+}
+
 cmd_result repl_client_evaluator::run_statement(const trv& s) {
 	cmd_result cr;
 	cr.cmd = name_of(s | trv::nonterminal);
