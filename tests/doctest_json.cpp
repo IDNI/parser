@@ -6,7 +6,6 @@
 #include "format/json/json.h"
 #include "format/ast.json/ast_json.h"
 #include "parser.h"
-#include "utility/options_types.h"
 
 #include <sstream>
 #include <string>
@@ -25,80 +24,67 @@ static tref parsed(std::string_view text) {
 
 TEST_SUITE("json: value kinds") {
 	TEST_CASE("null") {
-		auto r = parse("null");
-		REQUIRE(r.has_value());
-		CHECK(r.value().is_null());
+		CHECK(jt::get(parsed("null")).is_null());
 	}
 	TEST_CASE("true") {
-		auto r = parse("true");
-		REQUIRE(r.has_value());
-		CHECK(r.value().is_bool());
-		CHECK(r.value().as_bool());
+		const jt& t = jt::get(parsed("true"));
+		CHECK(t.is_bool());
+		CHECK(t.get_bool());
 	}
 	TEST_CASE("false") {
-		auto r = parse("false");
-		REQUIRE(r.has_value());
-		CHECK(r.value().is_bool());
-		CHECK_FALSE(r.value().as_bool());
+		const jt& t = jt::get(parsed("false"));
+		CHECK(t.is_bool());
+		CHECK_FALSE(t.get_bool());
 	}
 	TEST_CASE("integer number") {
-		auto r = parse("42");
-		REQUIRE(r.has_value());
-		CHECK(r.value().is_number());
-		CHECK(r.value().as_number() == 42);
+		const jt& t = jt::get(parsed("42"));
+		CHECK(t.is_number());
+		CHECK(t.get_number() == 42);
 	}
 	TEST_CASE("negative fractional exponent number") {
-		auto r = parse("-1.5e2");
-		REQUIRE(r.has_value());
-		CHECK(r.value().as_number() == -150);
+		CHECK(jt::get(parsed("-1.5e2")).get_number() == -150);
 	}
 	TEST_CASE("string") {
-		auto r = parse("\"hello\"");
-		REQUIRE(r.has_value());
-		CHECK(r.value().is_string());
-		CHECK(r.value().as_string() == "hello");
+		const jt& t = jt::get(parsed("\"hello\""));
+		CHECK(t.is_string());
+		CHECK(t.get_string() == "hello");
 	}
 	TEST_CASE("array") {
-		auto r = parse("[1,2,3]");
-		REQUIRE(r.has_value());
-		CHECK(r.value().is_array());
-		CHECK(r.value().size() == 3);
+		const jt& t = jt::get(parsed("[1,2,3]"));
+		CHECK(t.is_array());
+		CHECK(t.children_size() == 3);
 	}
 	TEST_CASE("object") {
-		auto r = parse("{\"a\":1}");
-		REQUIRE(r.has_value());
-		CHECK(r.value().is_object());
-		REQUIRE(r.value().find("a") != nullptr);
-		CHECK(r.value().find("a")->as_number() == 1);
+		const jt& t = jt::get(parsed("{\"a\":1}"));
+		CHECK(t.is_object());
+		REQUIRE(t.find("a") != nullptr);
+		CHECK(jt::get(t.find("a")).get_number() == 1);
 	}
 }
 
 TEST_SUITE("json: array indexing and iteration") {
-	TEST_CASE("operator[] and range-for see the same elements") {
-		auto r = parse("[10,20,30]");
-		REQUIRE(r.has_value());
-		auto& v = r.value();
-		CHECK(v[0].as_number() == 10);
-		CHECK(v[1].as_number() == 20);
-		CHECK(v[2].as_number() == 30);
+	TEST_CASE("operator[] and children see the same elements") {
+		const jt& t = jt::get(parsed("[10,20,30]"));
+		CHECK(t[0].get_number() == 10);
+		CHECK(t[1].get_number() == 20);
+		CHECK(t[2].get_number() == 30);
 		double sum = 0;
-		for (auto& e : v) sum += e.as_number();
+		for (const jt& e : t.children_trees()) sum += e.get_number();
 		CHECK(sum == 60);
 	}
 }
 
 TEST_SUITE("json: nesting") {
 	TEST_CASE("object containing an array containing an object") {
-		auto r = parse(R"({"a":[1,{"b":true},null],"c":{"d":[]}})");
-		REQUIRE(r.has_value());
-		auto& v = r.value();
-		REQUIRE(v.find("a") != nullptr);
-		CHECK(v.find("a")->size() == 3);
-		CHECK((*v.find("a"))[1].find("b")->as_bool());
-		REQUIRE(v.find("c") != nullptr);
-		REQUIRE(v.find("c")->find("d") != nullptr);
-		CHECK(v.find("c")->find("d")->is_array());
-		CHECK(v.find("c")->find("d")->size() == 0);
+		tref t = parsed(R"({"a":[1,{"b":true},null],"c":{"d":[]}})");
+		auto a = tt(t) | tt::member("a");
+		REQUIRE(a.has_value());
+		CHECK(a.value_tree().children_size() == 3);
+		CHECK((tt(a.value_tree()[1]) | tt::member("b") | tt::boolean));
+		auto d = tt(t) | tt::member("c") | tt::member("d");
+		REQUIRE(d.has_value());
+		CHECK(d.value_tree().is_array());
+		CHECK(d.value_tree().children_size() == 0);
 	}
 }
 
@@ -106,88 +92,77 @@ TEST_SUITE("json: escaped string round trip") {
 	TEST_CASE("newline escape reads back as a real newline") {
 		std::ostringstream os;
 		escape(os, "a\nb");
-		auto r = parse(os.str());
-		REQUIRE(r.has_value());
-		CHECK(r.value().as_string() == "a\nb");
+		CHECK(jt::get(parsed(os.str())).get_string() == "a\nb");
 	}
 	TEST_CASE("quote and backslash round trip") {
 		std::ostringstream os;
 		escape(os, "a\"b\\c");
-		auto r = parse(os.str());
-		REQUIRE(r.has_value());
-		CHECK(r.value().as_string() == "a\"b\\c");
+		CHECK(jt::get(parsed(os.str())).get_string() == "a\"b\\c");
 	}
 }
 
 TEST_SUITE("json: CR whitespace") {
 	TEST_CASE("CR is whitespace between every token") {
-		auto r = parse("{\r\"a\"\r:\r[\r1\r,\r2\r]\r,\r\"b\"\r:\rtrue\r}\r");
-		REQUIRE(r.has_value());
-		CHECK(r.value().is_object());
-		REQUIRE(r.value().find("a") != nullptr);
-		CHECK(r.value().find("a")->is_array());
-		CHECK(r.value().find("a")->size() == 2);
-		REQUIRE(r.value().find("b") != nullptr);
-		CHECK(r.value().find("b")->as_bool());
+		tref t = parsed("{\r\"a\"\r:\r[\r1\r,\r2\r]\r,\r\"b\"\r:\rtrue\r}\r");
+		CHECK(jt::get(t).is_object());
+		auto a = tt(t) | tt::member("a");
+		REQUIRE(a.has_value());
+		CHECK(a.value_tree().is_array());
+		CHECK(a.value_tree().children_size() == 2);
+		CHECK((tt(t) | tt::member("b") | tt::boolean));
 	}
 	TEST_CASE("CR before the first token") {
-		auto r = parse("\r\r1");
-		REQUIRE(r.has_value());
-		CHECK(r.value().as_number() == 1);
+		CHECK(jt::get(parsed("\r\r1")).get_number() == 1);
 	}
 }
 
 TEST_SUITE("json: empty containers") {
 	TEST_CASE("empty array") {
-		auto r = parse("[]");
-		REQUIRE(r.has_value());
-		CHECK(r.value().is_array());
-		CHECK(r.value().size() == 0);
+		const jt& t = jt::get(parsed("[]"));
+		CHECK(t.is_array());
+		CHECK(t.children_size() == 0);
 	}
 	TEST_CASE("empty object") {
-		auto r = parse("{}");
-		REQUIRE(r.has_value());
-		CHECK(r.value().is_object());
-		CHECK(r.value().size() == 0);
+		const jt& t = jt::get(parsed("{}"));
+		CHECK(t.is_object());
+		CHECK(t.children_size() == 0);
 	}
 }
 
 TEST_SUITE("json: missing object key") {
 	TEST_CASE("find returns nullptr, not a crash") {
-		auto r = parse("{\"a\":1}");
-		REQUIRE(r.has_value());
-		CHECK(r.value().find("missing") == nullptr);
+		CHECK(jt::get(parsed("{\"a\":1}")).find("missing") == nullptr);
 	}
 }
 
 TEST_SUITE("json: malformed input reports an error") {
 	TEST_CASE("empty input") {
-		auto r = parse("");
+		auto r = jt::get("");
 		CHECK_FALSE(r.has_value());
 		CHECK(r.has_error());
 	}
 	TEST_CASE("trailing comma in array") {
-		auto r = parse("[1,2,]");
+		auto r = jt::get("[1,2,]");
 		CHECK_FALSE(r.has_value());
 		CHECK(r.has_error());
 	}
 	TEST_CASE("trailing comma in object") {
-		auto r = parse("{\"a\":1,}");
+		auto r = jt::get("{\"a\":1,}");
 		CHECK_FALSE(r.has_value());
 		CHECK(r.has_error());
 	}
 	TEST_CASE("unterminated string") {
-		auto r = parse("\"abc");
+		auto r = jt::get("\"abc");
 		CHECK_FALSE(r.has_value());
 		CHECK(r.has_error());
 	}
 	TEST_CASE("lone high surrogate is a semantic error the grammar can't catch") {
-		auto r = parse("\"\\uD800\"");
+		auto r = jt::get("\"\\uD800\"");
 		CHECK_FALSE(r.has_value());
 		CHECK(r.has_error());
 	}
 	TEST_CASE("lone high surrogate as an object key") {
-		auto r = parse("{\"\\uD800\":1}");
+		auto r = jt::get("{\"\\uD800\":1}");
 		CHECK_FALSE(r.has_value());
 		CHECK(r.has_error());
 	}
@@ -195,26 +170,23 @@ TEST_SUITE("json: malformed input reports an error") {
 
 TEST_SUITE("json: writer builds arbitrary objects and arrays") {
 	TEST_CASE("build, print, and re-parse an object with a nested array") {
-		value v = value::object();
-		v.set("id", value::number(1));
-		v.set("result", value::string("ok"));
-		value nums = value::array();
-		nums.push_back(value::number(1)).push_back(value::number(2));
-		v.set("nums", nums);
-
-		std::ostringstream os;
-		print(v, os);
-		auto r = parse(os.str());
-		REQUIRE(r.has_value());
-		REQUIRE(r.value().find("id") != nullptr);
-		CHECK(r.value().find("id")->as_number() == 1);
-		CHECK(r.value().find("result")->as_string() == "ok");
-		REQUIRE(r.value().find("nums") != nullptr);
-		CHECK(r.value().find("nums")->size() == 2);
+		tref v = jt::build_object({
+			jt::build_pair("id", jt::build_number(1)),
+			jt::build_pair("result", jt::build_string("ok")),
+			jt::build_pair("nums", jt::build_array({
+				jt::build_number(1), jt::build_number(2) })) });
+		const std::string text = jt::get(v).to_str();
+		CHECK(text == R"({"id":1,"result":"ok","nums":[1,2]})");
+		tref r = parsed(text);
+		CHECK(r == v);
+		CHECK((tt(r) | tt::member("id") | tt::number) == 1);
+		CHECK((tt(r) | tt::member("result") | tt::string) == "ok");
+		CHECK((tt(r) | tt::member("nums")).value_tree().children_size()
+			== 2);
 	}
 }
 
-TEST_SUITE("json: report to nested value") {
+TEST_SUITE("json: report to nested JSON") {
 	using idni::diagnostics::code;
 	using idni::diagnostics::report;
 	using idni::parser_strings::label;
@@ -225,33 +197,35 @@ TEST_SUITE("json: report to nested value") {
 			auto s = r.open("parse", code::info_count, size_t(120));
 			r.info("child");
 		}
-		auto v = to_value(r, true);
-		REQUIRE(v.is_object());
-		auto nodes = v.find("nodes");
-		REQUIRE(nodes != nullptr);
-		REQUIRE(nodes->is_array());
-		REQUIRE(nodes->size() == 1);
-		const auto& n = (*nodes)[0];
-		CHECK(n.find("tag")->as_number()
+		tref v = jt::build_report(r, true);
+		REQUIRE(jt::get(v).is_object());
+		auto nodes = tt(v) | tt::member("nodes");
+		REQUIRE(nodes.is(json_parser::arr));
+		REQUIRE(nodes.value_tree().children_size() == 1);
+		tt n(nodes.value_tree()[0]);
+		CHECK((n | tt::member("tag") | tt::number)
 			== static_cast<double>(code::info_count));
-		CHECK(n.find("message")->as_string()
-			== std::string(idni::diagnostics::code_name(code::info_count)));
-		CHECK(n.find("key")->as_string() == "parse");
-		CHECK(n.find("value")->as_number() == 120);
-		auto kids = n.find("children");
-		REQUIRE(kids != nullptr);
-		REQUIRE(kids->size() == 1);
-		CHECK((*kids)[0].find("message")->as_string()
+		CHECK((n | tt::member("message") | tt::string)
+			== std::string(idni::diagnostics::code_name(
+				code::info_count)));
+		CHECK((n | tt::member("key") | tt::string) == "parse");
+		CHECK((n | tt::member("value") | tt::number) == 120);
+		auto kids = n | tt::member("children");
+		REQUIRE(kids.has_value());
+		REQUIRE(kids.value_tree().children_size() == 1);
+		tt kid(kids.value_tree()[0]);
+		CHECK((kid | tt::member("message") | tt::string)
 			== std::string(idni::diagnostics::code_name(code::info)));
-		CHECK((*kids)[0].find("children") == nullptr);
+		CHECK_FALSE((kid | tt::member("children")).has_value());
 	}
 
 	TEST_CASE("names false omits the message field") {
 		report r;
 		r.error(code::parse_error, "bad");
-		auto v = to_value(r, false);
-		REQUIRE(v.find("nodes")->size() == 1);
-		CHECK((*v.find("nodes"))[0].find("message") == nullptr);
+		auto nodes = tt(jt::build_report(r, false)) | tt::member("nodes");
+		REQUIRE(nodes.value_tree().children_size() == 1);
+		CHECK_FALSE((tt(nodes.value_tree()[0]) | tt::member("message"))
+			.has_value());
 	}
 
 	TEST_CASE("a text label attr is a string, a numeric attr a number") {
@@ -259,27 +233,28 @@ TEST_SUITE("json: report to nested value") {
 		r.error(code::io_error, "failed", 7,
 			{{label::name, std::string_view("tok")},
 			 {label::exit_code, idni::int_t(-1)}});
-		auto v = to_value(r, true);
-		REQUIRE(v.find("nodes")->size() == 1);
-		const auto& n = (*v.find("nodes"))[0];
-		CHECK(n.find("value")->as_number() == 7);
-		auto attrs = n.find("attrs");
-		REQUIRE(attrs != nullptr);
-		REQUIRE(attrs->size() == 2);
-		CHECK((*attrs)[0].find("key")->as_string() == "name");
-		CHECK((*attrs)[0].find("value")->is_string());
-		CHECK((*attrs)[0].find("value")->as_string() == "tok");
-		CHECK((*attrs)[1].find("value")->is_number());
-		CHECK((*attrs)[1].find("value")->as_number() == -1);
+		auto nodes = tt(jt::build_report(r, true)) | tt::member("nodes");
+		REQUIRE(nodes.value_tree().children_size() == 1);
+		tt n(nodes.value_tree()[0]);
+		CHECK((n | tt::member("value") | tt::number) == 7);
+		auto attrs = n | tt::member("attrs");
+		REQUIRE(attrs.has_value());
+		REQUIRE(attrs.value_tree().children_size() == 2);
+		tt a0(attrs.value_tree()[0]), a1(attrs.value_tree()[1]);
+		CHECK((a0 | tt::member("key") | tt::string) == "name");
+		CHECK((a0 | tt::member("value")).is(json_parser::str));
+		CHECK((a0 | tt::member("value") | tt::string) == "tok");
+		CHECK((a1 | tt::member("value")).is(json_parser::number));
+		CHECK((a1 | tt::member("value") | tt::number) == -1);
 	}
 
 	TEST_CASE("the report print is one line") {
 		report r;
 		r.error(code::parse_error, "bad");
-		std::ostringstream os;
-		print(r, os, true);
-		CHECK(os.str().find('\n') == std::string::npos);
-		CHECK(os.str().find("\"nodes\"") != std::string::npos);
+		const std::string text = jt::get(jt::build_report(r, true))
+			.to_str();
+		CHECK(text.find('\n') == std::string::npos);
+		CHECK(text.find("\"nodes\"") != std::string::npos);
 	}
 
 	TEST_CASE("report to JSON and back prints the same text") {
@@ -292,8 +267,7 @@ TEST_SUITE("json: report to nested value") {
 			{{label::name, std::string_view("tok")},
 			 {label::exit_code, idni::int_t(-1)}});
 		r.warning("careful");
-		auto v = to_value(r, true);
-		auto back = report_from_value(v);
+		auto back = report_of(jt::build_report(r, true));
 		std::ostringstream a, b;
 		r.print(a);
 		back.print(b);
@@ -497,71 +471,24 @@ TEST_SUITE("json: report print and report nodes") {
 	}
 }
 
-namespace {
-
-// The value of a JSON text that the test knows to be valid.
-value json_of(std::string_view text) {
-	auto r = parse(text);
-	REQUIRE(r.has_value());
-	return std::move(r).value();
-}
-
-std::string printed(const value& v) {
-	std::ostringstream os;
-	print(v, os);
-	return os.str();
-}
-
-template <typename T>
-bool round_trips(const T& x) {
-	auto back = from_json<T>(to_json(x));
-	return back.has_value() && *back == x;
-}
-
-} // namespace
-
-TEST_SUITE("json: standard types") {
-
-	TEST_CASE("a standard value reads back as itself") {
-		CHECK(round_trips(true));
-		CHECK(round_trips(size_t{ 7 }));
-		CHECK(round_trips(std::string("a\"b")));
-		CHECK(round_trips(std::vector<std::string>{ "a", "" }));
-		CHECK(round_trips(std::vector<size_t>{ 1, 2 }));
+TEST_SUITE("json: parse a text and a parse tree node") {
+	TEST_CASE("result holds the tree of a parsed text") {
+		result r = jt::get("[1,\"a\"]");
+		REQUIRE(r.has_value());
+		CHECK(jt::get(r.value()).to_str() == "[1,\"a\"]");
 	}
 
-	TEST_CASE("the printed form of a standard value") {
-		CHECK(printed(to_json(size_t{ 7 })) == "7");
-		CHECK(printed(to_json(std::vector<std::string>{ "a", "b" }))
-			== "[\"a\",\"b\"]");
-	}
-
-	TEST_CASE("a JSON value of another shape gives nothing") {
-		CHECK(!from_json<size_t>(json_of("-1")).has_value());
-		CHECK(!from_json<size_t>(json_of("1.5")).has_value());
-		CHECK(!from_json<size_t>(json_of("\"7\"")).has_value());
-		CHECK(!from_json<size_t>(json_of("null")).has_value());
-		CHECK(!from_json<bool>(json_of("1")).has_value());
-		CHECK(!from_json<std::vector<std::string>>(
-			json_of("[\"a\", 1]")).has_value());
-	}
-
-	TEST_CASE("an option value converts by its alternative") {
-		CHECK(to_json(option_value(true)).is_bool());
-		CHECK(printed(to_json(option_value(option_list{ "a > b" })))
-			== "[\"a > b\"]");
-		auto flag = from_json<option_value>(json_of("true"));
-		REQUIRE(flag.has_value());
-		CHECK(*flag == option_value(true));
-		auto number = from_json<option_value>(json_of("7"));
-		REQUIRE(number.has_value());
-		CHECK(*number == option_value(size_t{ 7 }));
-		auto text = from_json<option_value>(json_of("\"x\""));
-		REQUIRE(text.has_value());
-		CHECK(*text == option_value(std::string("x")));
-		auto list = from_json<option_value>(json_of("[\"a\"]"));
-		REQUIRE(list.has_value());
-		CHECK(*list == option_value(option_list{ "a" }));
-		CHECK(!from_json<option_value>(json_of("null")).has_value());
+	TEST_CASE("the tree of one str node of a parse tree") {
+		const std::string text = "\"a\\nb\"";
+		json_parser::parse_options po{ .start = json_parser::start };
+		auto pr = json_parser::instance().parse(text.data(), text.size(),
+			po);
+		REQUIRE(pr.found);
+		auto str = trv(pr.get_shaped_tree2()) | json_parser::value
+			| json_parser::str;
+		REQUIRE(str.has_value());
+		auto r = jt::get(parse_tree::get(str.value()));
+		REQUIRE(r.has_value());
+		CHECK(jt::get(r.value()).get_string() == "a\nb");
 	}
 }

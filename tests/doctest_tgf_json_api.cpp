@@ -1380,26 +1380,6 @@ TEST_SUITE("tgf json api: no grammar") {
 		return parse_line(line);
 	}
 
-	static bool node_has_key(const jt& node, const std::string& key) {
-		const jt* k = member(node, "key");
-		if (k && k->get_string() == key) return true;
-		const jt* ch = member(node, "children");
-		if (!ch) return false;
-		for (const jt& c : ch->children_trees())
-			if (node_has_key(c, key)) return true;
-		return false;
-	}
-
-	static bool report_has_key(const htref& resp, const std::string& key) {
-		const jt* rep = member(resp, "report");
-		if (!rep) return false;
-		const jt* nodes = member(rep, "nodes");
-		if (!nodes) return false;
-		for (const jt& n : nodes->children_trees())
-			if (node_has_key(n, key)) return true;
-		return false;
-	}
-
 	TEST_CASE("hello and state carry a null grammar") {
 		auto r = run_repl_no_grammar({});
 		htref p = hello_value(r);
@@ -1469,7 +1449,7 @@ TEST_SUITE("tgf json api: no grammar") {
 		REQUIRE(r.responses.size() == 5);
 		for (const auto& resp : r.responses) {
 			CHECK(member(resp, "status")->get_string() == "error");
-			CHECK(report_has_key(resp,
+			CHECK(report_contains_key(resp,
 				"no grammar loaded, use load"));
 		}
 	}
