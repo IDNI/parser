@@ -31,9 +31,15 @@ inline std::string grammar_path() {
 	return std::string(PROJECT_SOURCE_DIR) + "/tests/fixtures/tiny.tgf";
 }
 
-inline idni::tgf_repl_evaluator::options json_options() {
-	idni::tgf_repl_evaluator::options opt;
-	opt.json = true;
+// The options of an evaluator in a test: JSON output, terminal colors and
+// the path restriction of a server session.
+inline idni::tgf_repl_options repl_options(bool json = true,
+	bool colors = true, bool no_server_paths = false)
+{
+	idni::tgf_repl_options opt;
+	opt.json = json;
+	opt.colors = colors;
+	opt.no_server_paths = no_server_paths;
 	return opt;
 }
 
@@ -99,6 +105,67 @@ struct serve_fixture {
 	child_process proc;
 	uint16_t port = 0;
 };
+
+using jt = idni::format::json::tree;
+
+// Parse one response line. A handle holds it, so a later gc keeps it.
+inline idni::htref parse_line(const std::string& line) {
+	auto p = jt::get(std::string_view(line));
+	REQUIRE(p.has_value());
+	return jt::geth(p.value());
+}
+
+// The member @p key of the object @p o, or nullptr when it is absent.
+inline const jt* member(const jt& o, std::string_view key) {
+	idni::tref m = o.find(key);
+	return m ? &jt::get(m) : nullptr;
+}
+inline const jt* member(const jt* o, std::string_view key) {
+	return o ? member(*o, key) : nullptr;
+}
+inline const jt* member(const idni::htref& o, std::string_view key) {
+	return member(jt::get(o), key);
+}
+
+// True when a report node or one of its children has the key @p key.
+inline bool json_node_has_key(const jt& node, const std::string& key) {
+	std::vector<const jt*> pending{ &node };
+	while (!pending.empty()) {
+		const jt& current = *pending.back();
+		pending.pop_back();
+		if (auto k = member(current, "key"); k && k->is_string()
+				&& k->get_string() == key) return true;
+		if (auto ch = member(current, "children"); ch && ch->is_array())
+			for (const jt& c : ch->children_trees())
+				pending.push_back(&c);
+	}
+	return false;
+}
+
+// True when the report of @p resp, or of one of its eval results, holds
+// the key @p key.
+inline bool report_contains_key(const jt& resp, const std::string& key) {
+	auto has_key = [&key](const jt& rep) {
+		auto nodes = member(rep, "nodes");
+		if (!nodes || !nodes->is_array()) return false;
+		for (const jt& n : nodes->children_trees())
+			if (json_node_has_key(n, key)) return true;
+		return false;
+	};
+	if (auto rep = member(resp, "report"); rep && has_key(*rep))
+		return true;
+	// An eval response carries the report of each statement.
+	if (auto res = member(resp, "results"); res && res->is_array())
+		for (const jt& e : res->children_trees())
+			if (auto rep = member(e, "report"); rep && has_key(*rep))
+				return true;
+	return false;
+}
+inline bool report_contains_key(const idni::htref& resp,
+	const std::string& key)
+{
+	return report_contains_key(jt::get(resp), key);
+}
 
 // A unique temporary directory, so the log test works on both platforms.
 inline std::string make_temp_dir(const std::string& prefix) {

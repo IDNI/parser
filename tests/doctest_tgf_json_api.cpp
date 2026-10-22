@@ -8,6 +8,7 @@
 #include "quiet_doctest.h"
 #include "../src/tgf/tgf_cli.h"
 #include "tgf_run_capture.h"
+#include "serve/tgf_serve_test_fixture.h"
 #include "format/json/json.h"
 
 #include <filesystem>
@@ -22,13 +23,15 @@
 
 using namespace idni;
 using namespace idni::format;
+using tgf_serve_test::grammar_path;
+using tgf_serve_test::json_node_has_key;
+using tgf_serve_test::member;
+using tgf_serve_test::parse_line;
+using tgf_serve_test::repl_options;
+using tgf_serve_test::report_contains_key;
 
 using jt = json::tree;
 using jtt = json::tt;
-
-static std::string grammar_path() {
-	return std::string(PROJECT_SOURCE_DIR) + "/tests/fixtures/tiny.tgf";
-}
 
 static std::string csv_grammar_path() {
 	return std::string(PROJECT_SOURCE_DIR) + "/src/format/csv/csv.tgf";
@@ -41,38 +44,6 @@ static std::string json_grammar_path() {
 static std::string ambig_bc_path() {
 	return std::string(PROJECT_SOURCE_DIR)
 		+ "/tests/fixtures/ambig_bc.tgf";
-}
-
-static tgf_repl_evaluator::options json_options() {
-	tgf_repl_evaluator::options opt;
-	opt.json = true;
-	return opt;
-}
-
-// JSON options with the server path restriction of a `tgf serve` session.
-static tgf_repl_evaluator::options no_paths_options() {
-	auto opt = json_options();
-	opt.no_server_paths = true;
-	return opt;
-}
-
-// Parse one response line. A handle holds it, so a later gc keeps it.
-static htref parse_line(const std::string& line) {
-	auto p = jt::get(std::string_view(line));
-	REQUIRE(p.has_value());
-	return jt::geth(p.value());
-}
-
-// The member @p key of the object @p o, or nullptr when it is absent.
-static const jt* member(const jt& o, std::string_view key) {
-	tref m = o.find(key);
-	return m ? &jt::get(m) : nullptr;
-}
-static const jt* member(const jt* o, std::string_view key) {
-	return o ? member(*o, key) : nullptr;
-}
-static const jt* member(const htref& o, std::string_view key) {
-	return member(jt::get(o), key);
 }
 
 TEST_CASE("tgf error response preserves the id without session state") {
@@ -91,6 +62,37 @@ TEST_CASE("tgf error response preserves the id without session state") {
 	CHECK(decoded.first_error_message() == "invalid request");
 	CHECK(member(response, "state") == nullptr);
 	CHECK(member(response, "cmd") == nullptr);
+}
+
+TEST_SUITE("tgf serve: report keys") {
+	TEST_CASE("only keys in report children match") {
+		using tgf_serve_test::json_node_has_key;
+		auto node = tgf_serve_test::parse_line(R"({"key":"root","children":[
+			{"key":17},{"key":"first"},
+			{"children":[{"key":"nested"}]},null,
+			{"children":{"key":"not-an-array"}},
+			{"other":{"key":"unrelated"}}]})");
+		const jt& tree = jt::get(node);
+		CHECK(json_node_has_key(tree, "root"));
+		CHECK(json_node_has_key(tree, "first"));
+		CHECK(json_node_has_key(tree, "nested"));
+		CHECK_FALSE(json_node_has_key(tree, "17"));
+		CHECK_FALSE(json_node_has_key(tree, "not-an-array"));
+		CHECK_FALSE(json_node_has_key(tree, "unrelated"));
+		CHECK_FALSE(json_node_has_key(tree, "absent"));
+		CHECK_FALSE(json_node_has_key(jt::get(jt::_null()), "root"));
+	}
+
+	TEST_CASE("deep report children use no recursive calls") {
+		bintree<json::node>::gc_pause pause;
+		tref node = jt::build_object({
+			jt::build_pair("key", jt::build_string("leaf")) });
+		for (size_t depth = 0; depth < 10000; ++depth)
+			node = jt::build_object({ jt::build_pair("children",
+				jt::build_array({ node })) });
+		CHECK(tgf_serve_test::json_node_has_key(jt::get(node), "leaf"));
+		CHECK_FALSE(tgf_serve_test::json_node_has_key(jt::get(node), "absent"));
+	}
 }
 
 struct repl_run {
@@ -124,7 +126,7 @@ static repl_run run_repl_re(tgf_repl_evaluator& re,
 static repl_run run_repl_on(const std::string& grammar,
 	const std::vector<std::string>& lines)
 {
-	tgf_repl_evaluator re(grammar, json_options());
+	tgf_repl_evaluator re(grammar, repl_options());
 	return run_repl_re(re, lines);
 }
 
@@ -132,7 +134,7 @@ static repl_run run_repl_on(const std::string& grammar,
 static repl_run run_repl_no_grammar(
 	const std::vector<std::string>& lines)
 {
-	tgf_repl_evaluator re(json_options());
+	tgf_repl_evaluator re(repl_options());
 	return run_repl_re(re, lines);
 }
 
@@ -189,33 +191,6 @@ static std::string load_source_request(int id, const std::string& name,
 {
 	return request_text(id, { { "cmd", "load" }, { "name", name },
 		{ "source", source } });
-}
-
-static bool json_node_has_key(const jt& node, const std::string& key) {
-	if (auto k = member(node, "key"); k && k->is_string()
-			&& k->get_string() == key) return true;
-	if (auto ch = member(node, "children"); ch && ch->is_array())
-		for (const jt& c : ch->children_trees())
-			if (json_node_has_key(c, key)) return true;
-	return false;
-}
-
-static bool report_contains_key(const htref& resp, const std::string& key) {
-	auto has_key = [&key](const jt& rep) {
-		auto nodes = member(rep, "nodes");
-		if (!nodes || !nodes->is_array()) return false;
-		for (const jt& n : nodes->children_trees())
-			if (json_node_has_key(n, key)) return true;
-		return false;
-	};
-	if (auto rep = member(resp, "report"); rep && has_key(*rep))
-		return true;
-	// An eval response carries the report of each statement.
-	if (auto res = member(resp, "results"); res && res->is_array())
-		for (const jt& e : res->children_trees())
-			if (auto rep = member(e, "report"); rep && has_key(*rep))
-				return true;
-	return false;
 }
 
 static std::string read_file(const std::string& path) {
@@ -355,7 +330,7 @@ TEST_SUITE("tgf json api: hello") {
 	}
 
 	TEST_CASE("a load and a reload give the directives as options") {
-		tgf_repl_evaluator re(json_options());
+		tgf_repl_evaluator re(repl_options());
 		auto o = load_options(re, "@start num.\n"
 			"@use char classes digit, alpha.\n"
 			"@enable productions comma, crlf.\n"
@@ -369,7 +344,7 @@ TEST_SUITE("tgf json api: hello") {
 	}
 
 	TEST_CASE("the enabled productions hold only guard names") {
-		tgf_repl_evaluator re(json_options());
+		tgf_repl_evaluator re(repl_options());
 		auto o = load_options(re, "@enable productions guard1.\n"
 			"@enable disambiguation.\n"
 			"@disable disambiguation.\n"
@@ -382,7 +357,7 @@ TEST_SUITE("tgf json api: hello") {
 	}
 
 	TEST_CASE("a renamed class is the entry class as name") {
-		tgf_repl_evaluator re(json_options());
+		tgf_repl_evaluator re(repl_options());
 		auto o = load_options(re,
 			"@use char classes alpha, digit as d.\n"
 			"start => alpha d.\n");
@@ -391,7 +366,7 @@ TEST_SUITE("tgf json api: hello") {
 	}
 
 	TEST_CASE("the classes without a rename are plain entries") {
-		tgf_repl_evaluator re(json_options());
+		tgf_repl_evaluator re(repl_options());
 		auto o = load_options(re,
 			"@use char classes alpha, digit.\n"
 			"start => alpha digit.\n");
@@ -621,7 +596,7 @@ TEST_SUITE("tgf json api: option values as JSON") {
 
 TEST_SUITE("tgf json api: gc") {
 	TEST_CASE("many requests keep the node cache small and the state") {
-		tgf_repl_evaluator re(grammar_path(), json_options());
+		tgf_repl_evaluator re(grammar_path(), repl_options());
 		std::vector<std::string> lines{
 			R"({"id":1,"cmd":"start","symbol":"num"})",
 			R"({"id":2,"cmd":"set","option":"print-ambiguity",)"
@@ -1182,7 +1157,7 @@ TEST_SUITE("tgf json api: option commands") {
 	}
 
 	TEST_CASE("set gc false reaches the parse options") {
-		tgf_repl_evaluator re(grammar_path(), json_options());
+		tgf_repl_evaluator re(grammar_path(), repl_options());
 		std::string src = R"({"id":1,"cmd":"set","option":"gc","value":false})";
 		src += "\n" + eval_request(2, "get gc");
 		src += "\n" + eval_request(3, "set gc true");
@@ -1836,7 +1811,7 @@ TEST_SUITE("tgf json api: hello request") {
 	}
 
 	TEST_CASE("the session id appears in the hello line and the response") {
-		tgf_repl_evaluator re(grammar_path(), json_options());
+		tgf_repl_evaluator re(grammar_path(), repl_options());
 		re.session_id = "0123456789abcdef";
 		auto r = run_repl_re(re, { R"({"id":1,"cmd":"hello"})" });
 		std::istringstream ls(r.raw);
@@ -1931,7 +1906,7 @@ TEST_SUITE("tgf json api: load from source") {
 TEST_SUITE("tgf json api: server paths") {
 	TEST_CASE("file paths are refused when no_server_paths is on") {
 		scratch_file in("tgf_json_api_server_input.txt", "123");
-		tgf_repl_evaluator re(grammar_path(), no_paths_options());
+		tgf_repl_evaluator re(grammar_path(), repl_options(true, true, true));
 		auto r = run_repl_re(re, {
 			file_request(1, "parse_file", in.path),
 			file_request(2, "load", grammar_path()),
@@ -1949,7 +1924,7 @@ TEST_SUITE("tgf json api: server paths") {
 
 	TEST_CASE("load source and its reload are allowed") {
 		const std::string text = read_file(grammar_path());
-		tgf_repl_evaluator re(grammar_path(), no_paths_options());
+		tgf_repl_evaluator re(grammar_path(), repl_options(true, true, true));
 		auto r = run_repl_re(re, {
 			load_source_request(1, "g.tgf", text),
 			R"({"id":2,"cmd":"reload"})",
@@ -1963,7 +1938,7 @@ TEST_SUITE("tgf json api: server paths") {
 
 TEST_SUITE("tgf json api: line limit") {
 	TEST_CASE("a line over the limit is an error and the loop goes on") {
-		tgf_repl_evaluator re(grammar_path(), json_options());
+		tgf_repl_evaluator re(grammar_path(), repl_options());
 		std::istringstream in(
 			"{\"id\":1,\"cmd\":\"version\"}\n"
 			"{\"cmd\":\"version\"}\n"
@@ -1999,7 +1974,7 @@ TEST_SUITE("tgf json api: line limit") {
 
 TEST_SUITE("tgf json api: a line of only whitespace") {
 	TEST_CASE("a request line of only whitespace gets no answer") {
-		tgf_repl_evaluator re(grammar_path(), json_options());
+		tgf_repl_evaluator re(grammar_path(), repl_options());
 		std::istringstream in(
 			"{\"id\":1,\"cmd\":\"version\"}\n"
 			"  \t\n"
@@ -2023,7 +1998,7 @@ TEST_SUITE("tgf json api: a line of only whitespace") {
 	}
 
 	TEST_CASE("an init line of only whitespace is a missing field") {
-		tgf_repl_evaluator re(grammar_path(), json_options());
+		tgf_repl_evaluator re(grammar_path(), repl_options());
 		std::istringstream in(" \t\n{\"id\":1,\"cmd\":\"version\"}\n");
 		std::ostringstream out;
 		tgf_json_loop(re, in, out, tgf_json_max_line, true);

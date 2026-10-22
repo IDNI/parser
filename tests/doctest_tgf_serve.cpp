@@ -35,7 +35,6 @@ using namespace idni;
 using namespace idni::format;
 using tgf_serve_test::child_process;
 using tgf_serve_test::grammar_path;
-using tgf_serve_test::json_options;
 using tgf_serve_test::serve_fixture;
 using tgf_serve_test::tgf_binary_path;
 

@@ -33,7 +33,7 @@
 using namespace idni;
 using namespace idni::format;
 using tgf_serve_test::grammar_path;
-using tgf_serve_test::json_options;
+using tgf_serve_test::repl_options;
 using tgf_serve_test::serve_fixture;
 
 namespace ba = boost::asio;
@@ -54,7 +54,7 @@ static std::string write_temp_grammar(const std::string& text) {
 static std::string local_text(const std::string& grammar,
 	const std::string& src)
 {
-	tgf_repl_evaluator local(grammar, json_options());
+	tgf_repl_evaluator local(grammar, repl_options());
 	auto er = local.run(src);
 	REQUIRE_FALSE(er.results.empty());
 	std::ostringstream os;
