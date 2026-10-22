@@ -156,11 +156,15 @@ if(TAU_PARSER_INSTALL)
 	endif()
 
 	message(STATUS "installing library targets to ${CMAKE_INSTALL_BINDIR}, ${CMAKE_INSTALL_LIBDIR}, ${CMAKE_INSTALL_INCLUDEDIR}")
+	# The SDK carries no Boost, so the header that includes it stays in the
+	# build. The net headers go with the net library only.
+	set(_tau_parser_header_excludes PATTERN "line_server_asio.h" EXCLUDE)
 	install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
 		DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}
 		COMPONENT "Library"
 		FILES_MATCHING
 			PATTERN "*.h"
+			${_tau_parser_header_excludes}
 			PATTERN "tgf" EXCLUDE
 			PATTERN "doctest*.h" EXCLUDE
 			PATTERN "CMakeFiles" EXCLUDE
