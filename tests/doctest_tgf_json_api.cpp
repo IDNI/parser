@@ -10,6 +10,7 @@
 #include "tgf_run_capture.h"
 #include "serve/tgf_serve_test_fixture.h"
 #include "format/json/json.h"
+#include "utility/filesystem.h"
 
 #include <filesystem>
 #include <fstream>
@@ -163,10 +164,9 @@ static std::string load_source_request(int id, const std::string& name,
 }
 
 static std::string read_file(const std::string& path) {
-	std::ifstream f(path, std::ios::binary);
-	std::ostringstream os;
-	os << f.rdbuf();
-	return os.str();
+	auto text = fs::read(fs::to_path(path));
+	REQUIRE(text.has_value());
+	return std::move(text).value();
 }
 
 // A scratch file under the build tree, removed when the test ends.
@@ -185,6 +185,16 @@ struct scratch_file {
 	scratch_file(const scratch_file&) = delete;
 	scratch_file& operator=(const scratch_file&) = delete;
 };
+
+TEST_CASE("a missing fixture file reports a read error") {
+	scratch_file fixture("missing_read_fixture", "content");
+	std::error_code ec;
+	REQUIRE(std::filesystem::remove(fixture.path, ec));
+	REQUIRE_FALSE(ec);
+	auto text = fs::read(fs::to_path(fixture.path));
+	CHECK_FALSE(text.has_value());
+	CHECK(text.report().has_error());
+}
 
 // Compare a JSON array of tree paths with @p want.
 static bool strings_are(const jt* v,
