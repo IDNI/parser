@@ -90,6 +90,10 @@ struct tgf_repl_evaluator_base : repl_evaluator_base<tgf_repl_parser,
 	/// remote answer print the same text.
 	void render_text(const cmd_result& r, std::ostream& os) const;
 
+	/// The answer {"id","status":"error","report"} to a request that
+	/// ran nothing. It carries no state.
+	static tref error_response(tref id, const diagnostics::report& rep);
+
 	/// The name of a command or help argument nonterminal without its
 	/// "_cmd" or "_sym", for example "parse_file". Empty for any other
 	/// nonterminal.

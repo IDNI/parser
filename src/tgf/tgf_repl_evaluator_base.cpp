@@ -80,6 +80,16 @@ size_t tgf_repl_evaluator_base::help_argument_of(std::string_view name) {
 	return nonterminal_with(name, "_sym");
 }
 
+tref tgf_repl_evaluator_base::error_response(tref id,
+	const diagnostics::report& rep)
+{
+	return jt::build_object({
+		jt::build_pair(tp::id, id),
+		jt::build_pair(tp::status,
+			jt::build_string(status_name(cmd_status::error))),
+		jt::build_pair(tp::report, jt::build_report(rep, true)) });
+}
+
 string tgf_repl_evaluator_base::option_name(const trv& s) {
 	auto n = s | tgf_repl_parser::option_name;
 	return n.has_value() ? n | trv::terminals : string();

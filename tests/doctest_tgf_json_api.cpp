@@ -75,6 +75,24 @@ static const jt* member(const htref& o, std::string_view key) {
 	return member(jt::get(o), key);
 }
 
+TEST_CASE("tgf error response preserves the id without session state") {
+	bintree<json::node>::gc_pause pause;
+	diagnostics::report rep;
+	rep.error(diagnostics::code::invalid_argument, "invalid request");
+	const tref id = jt::build_string("request-42");
+	const jt& response = jt::get(tgf_repl_evaluator_base::error_response(id, rep));
+	CHECK(response.find("id") == id);
+	REQUIRE(member(response, "status") != nullptr);
+	CHECK(member(response, "status")->get_string() == "error");
+	REQUIRE(member(response, "report") != nullptr);
+	auto decoded = json::report_of(response.find("report"));
+	CHECK(decoded.has_error());
+	CHECK(decoded.first_error_code() == diagnostics::code::invalid_argument);
+	CHECK(decoded.first_error_message() == "invalid request");
+	CHECK(member(response, "state") == nullptr);
+	CHECK(member(response, "cmd") == nullptr);
+}
+
 struct repl_run {
 	std::vector<htref> responses;   // hello is not included
 	std::string raw;
