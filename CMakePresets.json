@@ -255,6 +255,13 @@
 			}
 		},
 		{
+			"name": "_build-serve",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_PARSER_BUILD_SERVE": "ON"
+			}
+		},
+		{
 			"name": "_build-net",
 			"hidden": true,
 			"cacheVariables": {
@@ -1003,6 +1010,7 @@
 				"release",
 				"_build-tests",
 				"_build-tgf",
+				"_build-serve",
 				"_build-net"
 			]
 		},
@@ -1012,6 +1020,7 @@
 				"debug",
 				"_build-tests",
 				"_build-tgf",
+				"_build-serve",
 				"_build-net",
 				"_build-type-debug"
 			]
@@ -1022,6 +1031,7 @@
 				"devel",
 				"_build-tests",
 				"_build-tgf",
+				"_build-serve",
 				"_build-net"
 			]
 		},
@@ -1068,6 +1078,13 @@
 			"inherits": [
 				"release",
 				"_build-tgf"
+			]
+		},
+		{
+			"name": "release-tgf-serve",
+			"inherits": [
+				"release-tgf",
+				"_build-serve"
 			]
 		},
 		{
@@ -1766,6 +1783,10 @@
 		{
 			"name": "release-tgf",
 			"configurePreset": "release-tgf"
+		},
+		{
+			"name": "release-tgf-serve",
+			"configurePreset": "release-tgf-serve"
 		},
 		{
 			"name": "debug-tgf",
