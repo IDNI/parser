@@ -775,6 +775,25 @@ TEST_SUITE("tgf cli: the REPL on the evaluator base") {
 		CHECK(r.err.find('\x1b') != string::npos);
 	}
 
+	TEST_CASE("enable colors forces color output in a pipe") {
+		const char* current = std::getenv("TGF_COLORS");
+		const bool had_value = current != nullptr;
+		const string saved = current ? current : "";
+		test_unsetenv("TGF_COLORS");
+		auto run = [](const string& command) {
+			options_repository mine;
+			options_scope scope(mine);
+			return capture_tgf_run({ "tgf", tiny_grammar(), "repl",
+				"-e", command }, "", false);
+		};
+		auto enabled = run("enable colors . parse 1x");
+		CHECK(enabled.err.find('\x1b') != string::npos);
+		auto disabled = run("disable colors . parse 1x");
+		CHECK(disabled.err.find('\x1b') == string::npos);
+		if (had_value) test_setenv("TGF_COLORS", saved.c_str());
+		else test_unsetenv("TGF_COLORS");
+	}
+
 	TEST_CASE("the debug graph prints with the tree renderer") {
 		options_repository mine;
 		options_scope scope(mine);

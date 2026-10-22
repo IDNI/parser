@@ -671,7 +671,9 @@ tref tgf_repl_evaluator::flag_cmd(std::string_view name,
 	if (!option_of_kind(name, option_kind::flag))
 		return jt::build_object({});
 	auto& opts = idni::options();
-	opts.set(name, update(opts.get<bool>(name)));
+	// a value of the user, so `enable colors` forces colors like `set`
+	report.append(opts.set(name,
+		option_value{ update(opts.get<bool>(name)) }).report());
 	return get_cmd(name);
 }
 
