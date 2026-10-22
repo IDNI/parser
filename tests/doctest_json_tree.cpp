@@ -5,6 +5,7 @@
 #include "quiet_doctest.h"
 #include "format/json/json.h"
 #include "format/ast.json/ast_json.h"
+#include "parser.h"
 
 #include <bit>
 #include <cmath>
