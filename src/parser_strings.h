@@ -278,6 +278,8 @@ struct messages {
 	static constexpr sv session_attached       =
 		"Session already has a client";
 	static constexpr sv session_start_failed   = "Could not start a session";
+	static constexpr sv connection_gone        =
+		"The connection to the server is gone";
 	static constexpr sv entropy_failed         =
 		"Could not read the OS entropy source";
 	static constexpr sv session_memory_failed  =

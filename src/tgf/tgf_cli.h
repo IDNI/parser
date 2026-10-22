@@ -5,6 +5,7 @@
 #define __IDNI__PARSER__TGF__TGF_CLI_H__
 
 #include <functional>
+#include <istream>
 #include <memory>
 #include <optional>
 #include <ostream>

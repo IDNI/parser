@@ -1,6 +1,7 @@
 # The client core holds the REPL parser and renderer, not the grammar loader.
 add_library(tgf_connect_core STATIC
-	"${CMAKE_CURRENT_SOURCE_DIR}/tgf_repl_evaluator_base.cpp")
+	"${CMAKE_CURRENT_SOURCE_DIR}/tgf_repl_evaluator_base.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/repl_client_evaluator.cpp")
 tauparser_setup(tgf_connect_core PUBLIC tauparser)
 target_compile_definitions_if(tgf_connect_core PRIVATE
 	"${TAU_PARSER_DEFINITIONS}")
