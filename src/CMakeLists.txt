@@ -159,6 +159,9 @@ if(TAU_PARSER_INSTALL)
 	# The SDK carries no Boost, so the header that includes it stays in the
 	# build. The net headers go with the net library only.
 	set(_tau_parser_header_excludes PATTERN "line_server_asio.h" EXCLUDE)
+	if(NOT TARGET tauparser_net)
+		list(APPEND _tau_parser_header_excludes PATTERN "net" EXCLUDE)
+	endif()
 	install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
 		DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}
 		COMPONENT "Library"
