@@ -16,11 +16,6 @@
 #include <variant>
 #include <vector>
 
-#ifdef _WIN32
-#include <fcntl.h>
-#include <io.h>
-#endif
-
 #include "defs.h"
 #include "parser.h"
 #include "parser_strings.h"
@@ -217,14 +212,6 @@ tref state_value(const tgf_repl_evaluator& re) {
 		jt::build_pair(tp::start, re.start_symbol().empty()
 			? jt::_null() : jt::build_string(re.start_symbol())),
 		jt::build_pair(tp::char_classes, jt::build_array(cc)) });
-}
-
-void json_write_line(std::ostream& os, const format::json::value& v) {
-#ifdef _WIN32
-	// A JSON message ends with one '\n', so stdout must not add a '\r'.
-	if (&os == &std::cout) ::_setmode(::_fileno(stdout), _O_BINARY);
-#endif
-	format::json::print(v, os) << '\n' << std::flush;
 }
 
 // The hello object carries the evaluator state and the pending report of

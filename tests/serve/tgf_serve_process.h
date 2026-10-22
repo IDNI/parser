@@ -143,7 +143,9 @@ struct child_process {
 		HANDLE out_r = nullptr, out_w = nullptr;
 		HANDLE err_r = nullptr, err_w = nullptr;
 		if (!::CreatePipe(&in_r, &in_w, &sa, 0)) return false;
-		if (!::CreatePipe(&out_r, &out_w, &sa, 0)) {
+		// The server prints a line per event and a test may never read
+		// them, so the default pipe buffer could fill and block it.
+		if (!::CreatePipe(&out_r, &out_w, &sa, 1u << 20)) {
 			::CloseHandle(in_r);
 			::CloseHandle(in_w);
 			return false;

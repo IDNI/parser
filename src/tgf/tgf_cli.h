@@ -248,9 +248,6 @@ int tgf_json_loop(tgf_repl_evaluator& re, std::istream& in,
 	bool init_stdin = false,
 	diagnostics::report extra = diagnostics::report{});
 
-/// Write @p v as one JSON line and flush.
-void json_write_line(std::ostream& os, const format::json::value& v);
-
 /// The {"grammar","start"} state object that every response carries.
 tref state_value(const tgf_repl_evaluator& re);
 

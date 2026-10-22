@@ -116,6 +116,7 @@ def read_listening(proc, timeout=30):
         value = json.loads(line)
     except ValueError as exc:
         raise HarnessError("the first stdout line is not JSON: %s" % exc)
-    if "listening" not in value:
+    listening = value.get("listening") if isinstance(value, dict) else None
+    if not isinstance(listening, dict) or "port" not in listening:
         raise HarnessError("the first stdout line is not a listening line")
-    return value["listening"]
+    return listening["port"]

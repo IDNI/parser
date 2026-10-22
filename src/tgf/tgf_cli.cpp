@@ -1309,8 +1309,16 @@ tgf_tool::tgf_tool() {
 	bind("session-memory", serve.session_memory_mb);
 	bind("max-line", serve.max_line);
 	bind("write-timeout", serve.write_timeout_seconds);
+	bind("first-line-timeout", serve.first_line_timeout_seconds);
+	bind("max-pending", serve.max_pending);
+	bind("max-open-requests", serve.max_open_requests);
+	bind("max-answer", serve.max_answer);
+	bind("max-stderr-line", serve.max_stderr_line);
+	bind("detached-buffer", serve.detached_buffer);
+	bind("end-timeout", serve.end_timeout_seconds);
 	bind("log-dir", serve.log_dir);
 	bind("no-log", serve.no_log);
+	bind("debug-sessions", serve.debug_sessions);
 #endif
 }
 
@@ -1472,11 +1480,23 @@ static int serve_command(tgf_tool& tool, tgf_repl_evaluator& re) {
 		return command_line_error("--max-sessions must be at least 1");
 	if (opt.max_line < 1)
 		return command_line_error("--max-line must be at least 1");
+	if (opt.max_pending < 1)
+		return command_line_error("--max-pending must be at least 1");
+	if (opt.max_open_requests < 1)
+		return command_line_error(
+			"--max-open-requests must be at least 1");
+	if (opt.max_answer < 1)
+		return command_line_error("--max-answer must be at least 1");
 	opt.evaluator = &re;
+	opt.json = idni::options().get<bool>("json");
 	auto r = tgf_serve_run(opt);
+	// The line server marks a busy port with a port attribute and names no option.
+	if (r.report().error_attr(parser_strings::label::port))
+		r.report().info("Use -p <port> for another port, "
+			"or -p 0 for a free port");
 	// A warning (for example the Windows session memory note) is not an
 	// error, so print the report even on a clean stop.
-	tgf_repl_evaluator_base::print_report(r.report(), false,
+	tgf_repl_evaluator_base::print_report(r.report(), opt.json,
 		tgf_report_colors());
 	return r.has_value() ? r.value() : 1;
 #endif

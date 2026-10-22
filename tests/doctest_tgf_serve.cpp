@@ -12,6 +12,7 @@
 #include "../src/tgf/tgf_serve.h"
 #include "format/json/json.h"
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -19,6 +20,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <vector>
 
 // The dep script ships headers only, so Boost.System must stay header-only.
 #ifndef BOOST_ERROR_CODE_HEADER_ONLY
@@ -35,18 +37,16 @@ using namespace idni;
 using namespace idni::format;
 using tgf_serve_test::child_process;
 using tgf_serve_test::grammar_path;
+using tgf_serve_test::member;
+using tgf_serve_test::parse_line;
+using tgf_serve_test::report_contains_key;
 using tgf_serve_test::serve_fixture;
 using tgf_serve_test::tgf_binary_path;
 
 namespace ba = boost::asio;
 using ba::ip::tcp;
 using boost::system::error_code;
-
-static json::value parse_line(const std::string& line) {
-	auto p = json::parse(line);
-	REQUIRE(p.has_value());
-	return p.value();
-}
+using jt = json::tree;
 
 // One TCP client with one line at a time. Every read has a deadline, so a
 // server that stops answering fails the test instead of hanging it.
@@ -160,35 +160,45 @@ struct serve_client {
 	bool eof_seen = false;
 };
 
-static std::string hello_session(const json::value& v) {
-	auto hello = v.find("hello");
+static std::string hello_session(const htref& v) {
+	auto hello = member(v, "hello");
 	REQUIRE(hello != nullptr);
-	auto s = hello->find("session");
+	auto s = member(hello, "session");
 	REQUIRE(s != nullptr);
-	return std::string(s->as_string());
+	return std::string(s->get_string());
 }
 
-static bool json_node_has_key(const json::value& node,
-	const std::string& key)
-{
-	if (auto k = node.find("key"); k && k->is_string()
-			&& k->as_string() == key) return true;
-	if (auto ch = node.find("children"); ch && ch->is_array())
-		for (const auto& c : *ch)
-			if (json_node_has_key(c, key)) return true;
-	return false;
-}
 
-static bool report_contains_key(const json::value& resp,
-	const std::string& key)
-{
-	auto rep = resp.find("report");
-	if (!rep) return false;
-	auto nodes = rep->find("nodes");
-	if (!nodes || !nodes->is_array()) return false;
-	for (const auto& n : *nodes)
-		if (json_node_has_key(n, key)) return true;
-	return false;
+
+TEST_SUITE("tgf serve: report keys") {
+	TEST_CASE("only keys in report children match") {
+		using tgf_serve_test::json_node_has_key;
+		auto node = parse_line(R"({"key":"root","children":[
+			{"key":17},{"key":"first"},
+			{"children":[{"key":"nested"}]},null,
+			{"children":{"key":"not-an-array"}},
+			{"other":{"key":"unrelated"}}]})");
+		const jt& tree = jt::get(node);
+		CHECK(json_node_has_key(tree, "root"));
+		CHECK(json_node_has_key(tree, "first"));
+		CHECK(json_node_has_key(tree, "nested"));
+		CHECK_FALSE(json_node_has_key(tree, "17"));
+		CHECK_FALSE(json_node_has_key(tree, "not-an-array"));
+		CHECK_FALSE(json_node_has_key(tree, "unrelated"));
+		CHECK_FALSE(json_node_has_key(tree, "absent"));
+		CHECK_FALSE(json_node_has_key(jt::get(jt::_null()), "root"));
+	}
+
+	TEST_CASE("deep report children use no recursive calls") {
+		bintree<json::node>::gc_pause pause;
+		tref node = jt::build_object({
+			jt::build_pair("key", jt::build_string("leaf")) });
+		for (size_t depth = 0; depth < 10000; ++depth)
+			node = jt::build_object({ jt::build_pair("children",
+				jt::build_array({ node })) });
+		CHECK(tgf_serve_test::json_node_has_key(jt::get(node), "leaf"));
+		CHECK_FALSE(tgf_serve_test::json_node_has_key(jt::get(node), "absent"));
+	}
 }
 
 TEST_SUITE("tgf serve: sessions") {
@@ -199,32 +209,32 @@ TEST_SUITE("tgf serve: sessions") {
 			serve_client c(f.bound_port());
 			c.send(R"({"cmd":"new"})");
 			auto hello = parse_line(c.read_line());
-			REQUIRE(hello.find("hello") != nullptr);
+			REQUIRE(member(hello, "hello") != nullptr);
 			id = hello_session(hello);
 			CHECK(id.size() == 32);
 
 			c.send(R"({"id":1,"cmd":"version"})");
 			auto v = parse_line(c.read_line());
-			CHECK(v.find("cmd")->as_string() == "version");
-			CHECK(v.find("status")->as_string() == "ok");
-			CHECK(v.find("result")->find("version") != nullptr);
+			CHECK(member(v, "cmd")->get_string() == "version");
+			CHECK(member(v, "status")->get_string() == "ok");
+			CHECK(member(member(v, "result"), "version") != nullptr);
 
 			// The child answers quit itself, so the answer carries
 			// the state, and the parent then closes the socket.
 			c.send(R"({"id":2,"cmd":"quit"})");
 			auto q = parse_line(c.read_line());
-			CHECK(q.find("cmd")->as_string() == "quit");
-			CHECK(q.find("status")->as_string() == "quit");
-			CHECK(q.find("id")->as_number() == 2);
-			CHECK(q.find("state") != nullptr);
+			CHECK(member(q, "cmd")->get_string() == "quit");
+			CHECK(member(q, "status")->get_string() == "quit");
+			CHECK(member(q, "id")->get_number() == 2);
+			CHECK(member(q, "state") != nullptr);
 			CHECK(c.at_eof());
 		}
 		// The session outlived the connection.
 		serve_client c2(f.bound_port());
 		c2.send("{\"cmd\":\"attach\",\"session\":\"" + id + "\"}");
 		auto h = parse_line(c2.read_line());
-		CHECK(h.find("cmd")->as_string() == "hello");
-		CHECK(h.find("status")->as_string() == "ok");
+		CHECK(member(h, "cmd")->get_string() == "hello");
+		CHECK(member(h, "status")->get_string() == "ok");
 		CHECK(hello_session(h) == id);
 	}
 
@@ -232,18 +242,18 @@ TEST_SUITE("tgf serve: sessions") {
 		serve_fixture f;
 		serve_client c(f.bound_port());
 		c.send(R"({"cmd":"new"})");
-		REQUIRE(parse_line(c.read_line()).find("hello") != nullptr);
+		REQUIRE(member(parse_line(c.read_line()), "hello") != nullptr);
 		c.send(R"({"id":1,"cmd":"eval","src":"quit"})");
 		auto q = parse_line(c.read_line());
-		CHECK(q.find("status")->as_string() == "quit");
+		CHECK(member(q, "status")->get_string() == "quit");
 		// The connection stays: only a plain quit request closes it.
 		CHECK_FALSE(c.at_eof());
 		c.send(R"({"id":2,"cmd":"version"})");
 		auto v = parse_line(c.read_line());
-		CHECK(v.find("status")->as_string() == "ok");
+		CHECK(member(v, "status")->get_string() == "ok");
 		c.send(R"({"id":3,"cmd":"end-session"})");
 		auto e = parse_line(c.read_line());
-		CHECK(e.find("status")->as_string() == "quit");
+		CHECK(member(e, "status")->get_string() == "quit");
 	}
 
 	TEST_CASE("end-session removes the session") {
@@ -255,16 +265,16 @@ TEST_SUITE("tgf serve: sessions") {
 			id = hello_session(parse_line(c.read_line()));
 			c.send(R"({"id":3,"cmd":"end-session"})");
 			auto q = parse_line(c.read_line());
-			CHECK(q.find("cmd")->as_string() == "quit");
-			CHECK(q.find("status")->as_string() == "quit");
+			CHECK(member(q, "cmd")->get_string() == "quit");
+			CHECK(member(q, "status")->get_string() == "quit");
 			// The parent answers end-session with no state.
-			CHECK(q.find("state") == nullptr);
+			CHECK(member(q, "state") == nullptr);
 			CHECK(c.at_eof());
 		}
 		serve_client c2(f.bound_port());
 		c2.send("{\"cmd\":\"attach\",\"session\":\"" + id + "\"}");
 		auto e = parse_line(c2.read_line());
-		CHECK(e.find("status")->as_string() == "error");
+		CHECK(member(e, "status")->get_string() == "error");
 		CHECK(report_contains_key(e, "Unknown session id"));
 	}
 
@@ -273,7 +283,7 @@ TEST_SUITE("tgf serve: sessions") {
 		serve_client c(f.bound_port());
 		c.send(R"({"cmd":"attach","session":"0123456789abcdef0123456789abcdef"})");
 		auto e = parse_line(c.read_line());
-		CHECK(e.find("status")->as_string() == "error");
+		CHECK(member(e, "status")->get_string() == "error");
 		CHECK(report_contains_key(e, "Unknown session id"));
 		CHECK(c.at_eof());
 	}
@@ -286,7 +296,7 @@ TEST_SUITE("tgf serve: sessions") {
 		serve_client c2(f.bound_port());
 		c2.send("{\"cmd\":\"attach\",\"session\":\"" + id + "\"}");
 		auto e = parse_line(c2.read_line());
-		CHECK(e.find("status")->as_string() == "error");
+		CHECK(member(e, "status")->get_string() == "error");
 		CHECK(report_contains_key(e, "Session already has a client"));
 	}
 
@@ -315,10 +325,10 @@ TEST_SUITE("tgf serve: sessions") {
 		c.send_raw("{\"cmd\":\"new\"}\n"
 			"{\"id\":7,\"cmd\":\"quit\"}\n");
 		auto hello = parse_line(c.read_line());
-		CHECK(hello.find("hello") != nullptr);
+		CHECK(member(hello, "hello") != nullptr);
 		auto q = parse_line(c.read_line());
-		CHECK(q.find("cmd")->as_string() == "quit");
-		CHECK(q.find("id")->as_number() == 7);
+		CHECK(member(q, "cmd")->get_string() == "quit");
+		CHECK(member(q, "id")->get_number() == 7);
 		CHECK(c.at_eof());
 	}
 
@@ -330,20 +340,20 @@ TEST_SUITE("tgf serve: sessions") {
 		for (int i = 0; i != 24; ++i) {
 			serve_client c(f.bound_port());
 			c.send(R"({"cmd":"new"})");
-			REQUIRE(parse_line(c.read_line()).find("hello")
+			REQUIRE(member(parse_line(c.read_line()), "hello")
 				!= nullptr);
 			c.send(R"({"id":1,"cmd":"end-session"})");
 			auto q = parse_line(c.read_line());
-			REQUIRE(q.find("status")->as_string() == "quit");
+			REQUIRE(member(q, "status")->get_string() == "quit");
 			REQUIRE(c.at_eof());
 		}
 		serve_client c(f.bound_port());
 		c.send(R"({"cmd":"new"})");
-		REQUIRE(parse_line(c.read_line()).find("hello") != nullptr);
+		REQUIRE(member(parse_line(c.read_line()), "hello") != nullptr);
 		c.send(R"({"id":1,"cmd":"version"})");
 		auto v = parse_line(c.read_line());
-		CHECK(v.find("status")->as_string() == "ok");
-		CHECK(v.find("cmd")->as_string() == "version");
+		CHECK(member(v, "status")->get_string() == "ok");
+		CHECK(member(v, "cmd")->get_string() == "version");
 	}
 }
 
@@ -352,34 +362,71 @@ TEST_SUITE("tgf serve: limits") {
 		serve_fixture f(16, 18);
 		serve_client c(f.bound_port());
 		c.send(R"({"cmd":"new"})");
-		REQUIRE(parse_line(c.read_line()).find("hello") != nullptr);
+		REQUIRE(member(parse_line(c.read_line()), "hello") != nullptr);
 		// 22 bytes: over the 18 byte limit.
 		c.send(R"({"id":1,"cmd":"version"})");
 		auto e = parse_line(c.read_line());
-		CHECK(e.find("status")->as_string() == "error");
+		CHECK(member(e, "status")->get_string() == "error");
 		// The server builds this answer itself, so it has no state.
-		CHECK(e.find("state") == nullptr);
+		CHECK(member(e, "state") == nullptr);
 		CHECK(report_contains_key(e, "Line is longer than the limit"));
 		// The connection is still there.
 		c.send(R"({"cmd":"version"})");
 		auto v = parse_line(c.read_line());
-		CHECK(v.find("status")->as_string() == "ok");
-		CHECK(v.find("cmd")->as_string() == "version");
+		CHECK(member(v, "status")->get_string() == "ok");
+		CHECK(member(v, "cmd")->get_string() == "version");
+	}
+
+	TEST_CASE("a connection with no first line is closed") {
+		serve_fixture f(16, 16777216, "", true, "",
+			{ "--first-line-timeout", "1" });
+		serve_client c(f.bound_port());
+		CHECK(c.at_eof(5000));
+	}
+
+	TEST_CASE("a line over the limit goes into the session log") {
+		std::string dir = tgf_serve_test::make_temp_dir(
+			"tgf_serve_long_");
+		{
+			serve_fixture f(16, 18, dir, false);
+			serve_client c(f.bound_port());
+			c.send(R"({"cmd":"new"})");
+			REQUIRE(member(parse_line(c.read_line()), "hello")
+				!= nullptr);
+			c.send(R"({"id":1,"cmd":"version"})");
+			CHECK(member(parse_line(c.read_line()), "status")
+				->get_string() == "error");
+			std::this_thread::sleep_for(
+				std::chrono::milliseconds(300));
+		}
+		std::string session_log, server_log;
+		for (const auto& e : std::filesystem::directory_iterator(dir)) {
+			std::ifstream in(e.path());
+			std::string text((std::istreambuf_iterator<char>(in)),
+				std::istreambuf_iterator<char>());
+			if (e.path().filename() == "server.log") server_log = text;
+			else session_log = text;
+		}
+		CHECK(session_log.find("\"event\":\"line-too-long\"")
+			!= std::string::npos);
+		CHECK(server_log.find("\"event\":\"line-too-long\"")
+			!= std::string::npos);
+		std::filesystem::remove_all(dir);
 	}
 
 	TEST_CASE("a padded quit is still intercepted") {
 		serve_fixture f;
 		serve_client c(f.bound_port());
 		c.send(R"({"cmd":"new"})");
-		REQUIRE(parse_line(c.read_line()).find("hello") != nullptr);
+		REQUIRE(member(parse_line(c.read_line()), "hello") != nullptr);
 		// The parent parses the whole line for the command name, so
 		// the 6000 padding bytes must not hide the quit.
 		std::string pad(6000, 'x');
 		c.send("{\"id\":5,\"cmd\":\"quit\",\"pad\":\""
 			+ pad + "\"}");
 		auto q = parse_line(c.read_line());
-		CHECK(q.find("status")->as_string() == "quit");
-		CHECK(q.find("id")->as_number() == 5);
+		CHECK(member(q, "status")->get_string() == "quit");
+		CHECK(member(q, "id")->get_number() == 5);
 		CHECK(c.at_eof());
 	}
 
@@ -387,13 +434,71 @@ TEST_SUITE("tgf serve: limits") {
 		serve_fixture f(1);
 		serve_client c1(f.bound_port());
 		c1.send(R"({"cmd":"new"})");
-		REQUIRE(parse_line(c1.read_line()).find("hello") != nullptr);
+		REQUIRE(member(parse_line(c1.read_line()), "hello") != nullptr);
 		serve_client c2(f.bound_port());
 		c2.send(R"({"cmd":"new"})");
 		auto e = parse_line(c2.read_line());
-		CHECK(e.find("status")->as_string() == "error");
+		CHECK(member(e, "status")->get_string() == "error");
 		CHECK(report_contains_key(e, "Too many sessions"));
 		CHECK(c2.at_eof());
+	}
+
+	TEST_CASE("max pending refuses a second silent connection") {
+		serve_fixture f(16, 16777216, "", true, "",
+			{ "--max-pending", "1", "--first-line-timeout", "5" });
+		serve_client c1(f.bound_port());
+		serve_client c2(f.bound_port());
+		c2.send(R"({"cmd":"new"})");
+		auto e = parse_line(c2.read_line());
+		CHECK(member(e, "status")->get_string() == "error");
+		CHECK(c2.at_eof());
+		c1.close();
+	}
+
+	TEST_CASE("a small answer limit closes a session") {
+		serve_fixture f(16, 16777216, "", true, "",
+			{ "--max-answer", "32" });
+		serve_client c(f.bound_port());
+		c.send(R"({"cmd":"new"})");
+		CHECK(c.at_eof(5000));
+	}
+
+	TEST_CASE("a held port: the error names no option, the report has the hint") {
+		const std::string hint =
+			"Use -p <port> for another port, or -p 0 for a free port";
+		serve_fixture f;
+		const std::string port = std::to_string(f.bound_port());
+		{
+			child_process text;
+			REQUIRE(text.start(tgf_binary_path(), { grammar_path(),
+				"serve", "--port", port, "--no-log" }));
+			std::string line, error_line;
+			REQUIRE(text.read_stderr_line(error_line, 30000));
+			// a pipe is no terminal, so the lines have no colors
+			CHECK(error_line == "Port is in use (port=" + port + ")");
+			REQUIRE(text.read_stdout_line(line, 30000));
+			CHECK(line == hint);
+		}
+		child_process json_mode;
+		REQUIRE(json_mode.start(tgf_binary_path(), { grammar_path(),
+			"serve", "--json", "--port", port, "--no-log" }));
+		std::string line;
+		REQUIRE(json_mode.read_stdout_line(line, 30000));
+		auto rep = parse_line(line);
+		auto nodes = member(rep, "nodes");
+		REQUIRE(nodes != nullptr);
+		bool error_seen = false, hint_seen = false;
+		for (const jt& n : nodes->children_trees()) {
+			auto k = member(n, "key");
+			if (!k || !k->is_string()) continue;
+			if (k->get_string() == "Port is in use") error_seen = true;
+			if (k->get_string() == hint) {
+				hint_seen = true;
+				CHECK(member(n, "value") == nullptr);
+			}
+		}
+		CHECK(error_seen);
+		CHECK(hint_seen);
 	}
 }
 
@@ -422,7 +527,26 @@ TEST_SUITE("tgf serve: detached buffer") {
 			"{\"id\":1,\"cmd\":\"parse\",\"status\":\"ok\",", 0)
 			== 0);
 		auto h = parse_line(c2.read_line());
-		CHECK(h.find("cmd")->as_string() == "hello");
+		CHECK(member(h, "cmd")->get_string() == "hello");
+	}
+
+	TEST_CASE("a small detached buffer drops the old answer") {
+		serve_fixture f(16, 16777216, "", true, "",
+			{ "--detached-buffer", "1" });
+		std::string id;
+		{
+			serve_client c(f.bound_port());
+			c.send(R"({"cmd":"new"})");
+			id = hello_session(parse_line(c.read_line()));
+			c.send("{\"id\":1,\"cmd\":\"parse\",\"input\":\""
+				+ std::string(50, '1') + "\"}");
+			c.close();
+		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+		serve_client c2(f.bound_port());
+		c2.send("{\"cmd\":\"attach\",\"session\":\"" + id + "\"}");
+		auto hello = parse_line(c2.read_line());
+		CHECK(member(hello, "cmd")->get_string() == "hello");
 	}
 }
 
@@ -435,24 +559,56 @@ TEST_SUITE("tgf serve: backpressure") {
 		{
 			serve_client c(f.bound_port());
 			c.send(R"({"cmd":"new"})");
-			REQUIRE(parse_line(c.read_line()).find("hello")
+			REQUIRE(member(parse_line(c.read_line()), "hello")
 				!= nullptr);
 			c.send("{\"id\":1,\"cmd\":\"parse\",\"input\":\""
 				+ digits + "\"}");
 			c.send(R"({"id":2,"cmd":"end-session"})");
 			auto e = parse_line(c.read_line());
-			CHECK(e.find("cmd")->as_string() == "quit");
+			CHECK(member(e, "cmd")->get_string() == "quit");
 		}
 		bool ok = false;
 		for (int i = 0; i != 40 && !ok; ++i) {
 			serve_client c2(f.bound_port());
 			c2.send(R"({"cmd":"new"})");
 			auto h = parse_line(c2.read_line());
-			if (h.find("hello") != nullptr) { ok = true; break; }
+			if (member(h, "hello") != nullptr) { ok = true; break; }
 			std::this_thread::sleep_for(
 				std::chrono::milliseconds(100));
 		}
 		CHECK(ok);
+	}
+
+	TEST_CASE("a client that sends faster than the child answers waits") {
+		serve_fixture f(16, 16777216, "", true, "",
+			{ "--max-open-requests", "2", "--debug-sessions" });
+		serve_client c(f.bound_port());
+		c.send(R"({"cmd":"new"})");
+		REQUIRE(member(parse_line(c.read_line()), "hello") != nullptr);
+		// A small request with a large answer: the child is the slow end.
+		const std::string req = "{\"cmd\":\"parse\",\"input\":\""
+			+ std::string(2000, '1') + "\"}\n";
+		std::string many;
+		for (int i = 0; i != 200; ++i) many += req;
+		size_t off = 0, in = 0, out = 0, worst = 0;
+		auto deadline = std::chrono::steady_clock::now()
+			+ std::chrono::seconds(3);
+		while (std::chrono::steady_clock::now() < deadline) {
+			error_code ec;
+			if (off != many.size()) off += c.sock.write_some(
+				ba::buffer(many.data() + off, many.size() - off), ec);
+			while (!c.read_line(1).empty()) {}
+			std::string l;
+			while (f.proc.read_stdout_line(l, 1)) {
+				if (l.find("\"dir\":\"in\"") != std::string::npos) ++in;
+				if (l.find("\"dir\":\"out\"") != std::string::npos) ++out;
+				// the first in line is the new request
+				if (in > out + 1) worst = std::max(worst, in - out - 1);
+			}
+		}
+		CHECK(in > 2);
+		// two open requests and the rest of one read of the server
+		CHECK(worst <= 5);
 	}
 
 	TEST_CASE("a connection that does not read its output is closed") {
@@ -461,17 +617,71 @@ TEST_SUITE("tgf serve: backpressure") {
 			{ "--write-timeout", "1" });
 		serve_client c(f.bound_port());
 		c.send(R"({"cmd":"new"})");
-		REQUIRE(parse_line(c.read_line()).find("hello") != nullptr);
+		REQUIRE(member(parse_line(c.read_line()), "hello") != nullptr);
 		std::string digits(8000, '1');
-		// Queue large answers, then a quit whose answer must follow
-		// them. The client never reads, so the socket stalls and the
-		// write deadline closes the connection.
+		// Queue large answers and a quit that waits behind them. The client
+		// never reads, so the server's write deadline, the one under test,
+		// closes the socket. The client deadline only bounds a slow host.
 		for (int i = 0; i != 8; ++i)
 			c.send("{\"id\":" + std::to_string(i + 1)
 				+ ",\"cmd\":\"parse\",\"input\":\""
 				+ digits + "\"}");
 		c.send(R"({"id":99,"cmd":"quit"})");
-		CHECK(c.drain_to_eof(6000));
+		CHECK(c.drain_to_eof(30000));
+	}
+
+	TEST_CASE("--debug-sessions copies the session log lines to stdout") {
+		for (bool debug : { true, false }) {
+			std::vector<std::string> extra;
+			if (debug) extra.push_back("--debug-sessions");
+			serve_fixture f(16, 16777216, "", true, "", extra);
+			serve_client c(f.bound_port());
+			c.send(R"({"cmd":"new"})");
+			REQUIRE(member(parse_line(c.read_line()), "hello") != nullptr);
+			c.send(R"({"id":7,"cmd":"version"})");
+			REQUIRE_FALSE(c.read_line().empty());
+			c.close();
+			// Read the server stdout up to the detach of the client.
+			int in_version = 0, out_version = 0, copies = 0;
+			bool detached = false;
+			std::string line;
+			while (!detached && f.proc.read_stdout_line(line, 10000)) {
+				auto v = parse_line(line);
+				if (auto e = member(v, "event"); e
+						&& e->get_string() == "detach")
+					detached = true;
+				auto text = member(v, "line");
+				if (!text) continue;
+				++copies;
+				CHECK(member(v, "session") != nullptr);
+				std::string dir = member(v, "dir")->get_string();
+				std::string payload = text->get_string();
+				// The hello carries a version too; only the request
+				// and its answer carry the id.
+				if (payload.find("\"id\":7") == std::string::npos)
+					continue;
+				if (dir == "in") ++in_version;
+				if (dir == "out") ++out_version;
+			}
+			CHECK(detached);
+			CHECK(in_version == (debug ? 1 : 0));
+			CHECK(out_version == (debug ? 1 : 0));
+			if (!debug) CHECK(copies == 0);
+		}
+	}
+
+	TEST_CASE("an idle connection outlives the write timeout") {
+		serve_fixture f(16, 16777216, "", true, "",
+			{ "--write-timeout", "1" });
+		serve_client c(f.bound_port());
+		c.send(R"({"cmd":"new"})");
+		REQUIRE(member(parse_line(c.read_line()), "hello") != nullptr);
+		// No output waits, so the deadline must not close the socket.
+		std::this_thread::sleep_for(std::chrono::milliseconds(2500));
+		c.send(R"({"id":1,"cmd":"version"})");
+		std::string resp = c.read_line();
+		REQUIRE_FALSE(resp.empty());
+		CHECK(member(parse_line(resp), "status")->get_string() == "ok");
 	}
 }
 
@@ -480,10 +690,10 @@ TEST_SUITE("tgf serve: no server paths") {
 		serve_fixture f;
 		serve_client c(f.bound_port());
 		c.send(R"({"cmd":"new"})");
-		REQUIRE(parse_line(c.read_line()).find("hello") != nullptr);
+		REQUIRE(member(parse_line(c.read_line()), "hello") != nullptr);
 		c.send(R"({"id":1,"cmd":"parse_file","file":"/etc/passwd"})");
 		auto e = parse_line(c.read_line());
-		CHECK(e.find("status")->as_string() == "error");
+		CHECK(member(e, "status")->get_string() == "error");
 		CHECK(report_contains_key(e,
 			"File paths are not allowed in a server session"));
 	}
@@ -497,14 +707,14 @@ TEST_SUITE("tgf serve: logs") {
 			serve_fixture f(16, 100000, dir, false);
 			serve_client c(f.bound_port());
 			c.send(R"({"cmd":"new"})");
-			REQUIRE(parse_line(c.read_line()).find("hello")
+			REQUIRE(member(parse_line(c.read_line()), "hello")
 				!= nullptr);
 			c.send(R"({"id":1,"cmd":"version"})");
-			REQUIRE(parse_line(c.read_line()).find("status")
-				->as_string() == "ok");
+			REQUIRE(member(parse_line(c.read_line()), "status")
+				->get_string() == "ok");
 			c.send(R"({"id":2,"cmd":"end-session"})");
-			REQUIRE(parse_line(c.read_line()).find("status")
-				->as_string() == "quit");
+			REQUIRE(member(parse_line(c.read_line()), "status")
+				->get_string() == "quit");
 			// Give the child and the parent a moment to flush.
 			std::this_thread::sleep_for(
 				std::chrono::milliseconds(300));
@@ -541,6 +751,43 @@ TEST_SUITE("tgf serve: logs") {
 		in.close();
 		std::filesystem::remove_all(dir);
 	}
+#ifndef _WIN32
+	TEST_CASE("--log-dir: a new folder gets 0700, each log gets 0600") {
+		const std::string base = tgf_serve_test::make_temp_dir(
+			"tgf_serve_modes_");
+		const std::string dir = base + "/logs";
+		{
+			serve_fixture f(16, 100000, dir, false);
+			serve_client c(f.bound_port());
+			c.send(R"({"cmd":"new"})");
+			REQUIRE(member(parse_line(c.read_line()), "hello")
+				!= nullptr);
+			c.send(R"({"id":1,"cmd":"end-session"})");
+			REQUIRE(member(parse_line(c.read_line()), "status")
+				->get_string() == "quit");
+		}
+		auto mode = [](const std::filesystem::path& p) {
+			return static_cast<unsigned>(
+				std::filesystem::status(p).permissions()) & 0777u;
+		};
+		CHECK(mode(dir) == 0700);
+		size_t logs = 0;
+		for (const auto& e : std::filesystem::directory_iterator(dir)) {
+			++logs;
+			CHECK(mode(e.path()) == 0600);
+		}
+		CHECK(logs == 2);
+		// The line server writes server.log, the events of tgf serve too.
+		std::ifstream is(dir + "/server.log");
+		const std::string log((std::istreambuf_iterator<char>(is)),
+			std::istreambuf_iterator<char>());
+		CHECK(log.find("\"event\":\"new\"") != std::string::npos);
+		CHECK(log.find("\"event\":\"end-session\"")
+			!= std::string::npos);
+		is.close();
+		std::filesystem::remove_all(base);
+	}
+#endif
 }
 
 TEST_SUITE("tgf serve: init line") {
@@ -554,42 +801,39 @@ TEST_SUITE("tgf serve: init line") {
 			"repl", "--json", "--init-stdin" };
 		REQUIRE(proc.start(tgf_binary_path(), args));
 
-		json::value g = json::value::object();
-		g.set("name", json::value::string("tiny.tgf"));
-		g.set("source", json::value::string(source));
-		json::value opts = json::value::object();
-		opts.set("print-terminals", json::value::boolean(false));
-		json::value init = json::value::object();
-		init.set("grammar", std::move(g));
-		init.set("start", json::value::string("start"));
-		init.set("options", std::move(opts));
-		json::value line = json::value::object();
-		line.set("init", std::move(init));
-		std::ostringstream os;
-		json::print(line, os);
-		REQUIRE(proc.write_stdin(os.str()));
+		tref g = jt::build_object({
+			jt::build_pair("name", jt::build_string("tiny.tgf")),
+			jt::build_pair("source", jt::build_string(source)) });
+		tref opts = jt::build_object({ jt::build_pair(
+			"print-terminals", jt::build_bool(false)) });
+		tref init = jt::build_object({
+			jt::build_pair("grammar", g),
+			jt::build_pair("start", jt::build_string("start")),
+			jt::build_pair("options", opts) });
+		REQUIRE(proc.write_stdin(jt::get(jt::build_object({
+			jt::build_pair("init", init) })).to_str()));
 
 		std::string hello_line;
 		REQUIRE(proc.read_stdout_line(hello_line, 30000));
 		auto hello = parse_line(hello_line);
-		auto h = hello.find("hello");
+		auto h = member(hello, "hello");
 		REQUIRE(h != nullptr);
-		auto name = h->find("grammar");
+		auto name = member(h, "grammar");
 		REQUIRE(name != nullptr);
-		CHECK(name->as_string() == "tiny.tgf");
-		auto start = h->find("start");
+		CHECK(name->get_string() == "tiny.tgf");
+		auto start = member(h, "start");
 		REQUIRE(start != nullptr);
-		CHECK(start->as_string() == "start");
-		auto o = h->find("options");
+		CHECK(start->get_string() == "start");
+		auto o = member(h, "options");
 		REQUIRE(o != nullptr);
-		auto cc = o->find("char-classes");
+		auto cc = member(o, "char-classes");
 		REQUIRE(cc != nullptr);
 		REQUIRE(cc->is_array());
-		REQUIRE(cc->size() == 1);
-		CHECK((*cc)[0].as_string() == "digit");
-		auto pt = o->find("print-terminals");
+		REQUIRE(cc->children_size() == 1);
+		CHECK((*cc)[0].get_string() == "digit");
+		auto pt = member(o, "print-terminals");
 		REQUIRE(pt != nullptr);
-		CHECK_FALSE(pt->as_bool());
+		CHECK_FALSE(pt->get_bool());
 	}
 
 	TEST_CASE("the init line sets the line limit") {
@@ -598,17 +842,14 @@ TEST_SUITE("tgf serve: init line") {
 			"repl", "--json", "--init-stdin" };
 		REQUIRE(proc.start(tgf_binary_path(), args));
 
-		json::value init = json::value::object();
-		init.set("max_line", json::value::number(4096));
-		json::value line = json::value::object();
-		line.set("init", std::move(init));
-		std::ostringstream os;
-		json::print(line, os);
-		REQUIRE(proc.write_stdin(os.str()));
+		tref init = jt::build_object({
+			jt::build_pair("max_line", jt::build_number(4096)) });
+		REQUIRE(proc.write_stdin(jt::get(jt::build_object({
+			jt::build_pair("init", init) })).to_str()));
 
 		std::string hello_line;
 		REQUIRE(proc.read_stdout_line(hello_line, 30000));
-		REQUIRE(parse_line(hello_line).find("hello") != nullptr);
+		REQUIRE(member(parse_line(hello_line), "hello") != nullptr);
 
 		// 5000 bytes: over the init limit of 4096.
 		std::string pad(5000, 'x');
@@ -618,34 +859,55 @@ TEST_SUITE("tgf serve: init line") {
 		std::string resp;
 		REQUIRE(proc.read_stdout_line(resp, 30000));
 		auto e = parse_line(resp);
-		CHECK(e.find("status")->as_string() == "error");
+		CHECK(member(e, "status")->get_string() == "error");
 		// The child answers its own line-too-long error with state.
-		CHECK(e.find("state") != nullptr);
+		CHECK(member(e, "state") != nullptr);
 
 		// The loop goes on with the new limit applied.
 		REQUIRE(proc.write_stdin(R"({"id":2,"cmd":"version"})"));
 		REQUIRE(proc.read_stdout_line(resp, 30000));
-		CHECK(parse_line(resp).find("status")->as_string() == "ok");
+		CHECK(member(parse_line(resp), "status")->get_string() == "ok");
 	}
 }
 
 TEST_SUITE("tgf serve: options") {
+	TEST_CASE("the default port metadata is 4000") {
+		auto port = std::find_if(tgf_option_set.options.begin(),
+			tgf_option_set.options.end(), [](const option_spec& option) {
+				return option.name == "port";
+			});
+		REQUIRE(port != tgf_option_set.options.end());
+		REQUIRE(std::holds_alternative<std::size_t>(port->fallback));
+		CHECK(std::get<std::size_t>(port->fallback) == 4000);
+	}
+
+	TEST_CASE("non-default stderr and end limits are accepted") {
+		serve_fixture f(16, 16777216, "", true, "",
+			{ "--max-stderr-line", "32", "--end-timeout", "1" });
+		serve_client c(f.bound_port());
+		c.send(R"({"cmd":"new"})");
+		REQUIRE(member(parse_line(c.read_line()), "hello") != nullptr);
+		c.send(R"({"id":1,"cmd":"end-session"})");
+		CHECK(member(parse_line(c.read_line()), "status")
+			->get_string() == "quit");
+	}
+
 	TEST_CASE("serve forwards --enabled-productions to the session") {
 		serve_fixture f(16, 16777216, "", true, "",
 			{ "--enabled-productions", "guard1" });
 		serve_client c(f.bound_port());
 		c.send(R"({"cmd":"new"})");
 		auto hello = parse_line(c.read_line());
-		auto h = hello.find("hello");
+		auto h = member(hello, "hello");
 		REQUIRE(h != nullptr);
-		auto o = h->find("options");
+		auto o = member(h, "options");
 		REQUIRE(o != nullptr);
-		auto ep = o->find("enabled-productions");
+		auto ep = member(o, "enabled-productions");
 		REQUIRE(ep != nullptr);
 		REQUIRE(ep->is_array());
 		bool found = false;
-		for (const auto& e : *ep)
-			if (e.is_string() && e.as_string() == "guard1")
+		for (const jt& e : ep->children_trees())
+			if (e.is_string() && e.get_string() == "guard1")
 				found = true;
 		CHECK(found);
 	}
@@ -660,28 +922,28 @@ TEST_SUITE("tgf serve: reload") {
 		serve_fixture f;
 		serve_client c(f.bound_port());
 		c.send(R"({"cmd":"new"})");
-		REQUIRE(parse_line(c.read_line()).find("hello") != nullptr);
+		REQUIRE(member(parse_line(c.read_line()), "hello") != nullptr);
 		c.send(R"({"id":1,"cmd":"reload"})");
 		auto v = parse_line(c.read_line());
-		CHECK(v.find("status")->as_string() == "ok");
-		auto result = v.find("result");
+		CHECK(member(v, "status")->get_string() == "ok");
+		auto result = member(v, "result");
 		REQUIRE(result != nullptr);
-		CHECK(result->find("loaded")->as_bool());
-		CHECK(result->find("grammar")->as_string() == grammar_path());
+		CHECK(member(result, "loaded")->get_bool());
+		CHECK(member(result, "grammar")->get_string() == grammar_path());
 		// The reloaded grammar is the same text, and it still parses.
 		c.send(R"({"id":2,"cmd":"grammar"})");
 		auto g = parse_line(c.read_line());
-		CHECK(g.find("status")->as_string() == "ok");
-		auto data = g.find("result");
+		CHECK(member(g, "status")->get_string() == "ok");
+		auto data = member(g, "result");
 		REQUIRE(data != nullptr);
-		CHECK(data->find("file")->as_string() == grammar_path());
-		CHECK(data->find("source")->as_string() == source);
+		CHECK(member(data, "file")->get_string() == grammar_path());
+		CHECK(member(data, "source")->get_string() == source);
 		c.send(R"({"id":3,"cmd":"parse","input":"12"})");
 		auto p = parse_line(c.read_line());
-		CHECK(p.find("status")->as_string() == "ok");
-		auto tree = p.find("result")->find("tree");
+		CHECK(member(p, "status")->get_string() == "ok");
+		auto tree = member(member(p, "result"), "tree");
 		REQUIRE(tree != nullptr);
-		CHECK(tree->find("symbol")->as_string() == "start");
+		CHECK(member(tree, "symbol")->get_string() == "start");
 	}
 
 	TEST_CASE("a session keeps the bytes the server loaded") {
@@ -710,26 +972,64 @@ TEST_SUITE("tgf serve: reload") {
 			}
 			serve_client c(f.bound_port());
 			c.send(R"({"cmd":"new"})");
-			REQUIRE(parse_line(c.read_line()).find("hello")
+			REQUIRE(member(parse_line(c.read_line()), "hello")
 				!= nullptr);
 			c.send(R"({"id":1,"cmd":"grammar"})");
 			auto g = parse_line(c.read_line());
-			CHECK(g.find("status")->as_string() == "ok");
-			auto data = g.find("result");
+			CHECK(member(g, "status")->get_string() == "ok");
+			auto data = member(g, "result");
 			REQUIRE(data != nullptr);
-			CHECK(data->find("file")->as_string() == path);
-			CHECK(data->find("source")->as_string() == original);
+			CHECK(member(data, "file")->get_string() == path);
+			CHECK(member(data, "source")->get_string() == original);
 			c.send(R"({"id":2,"cmd":"reload"})");
 			auto v = parse_line(c.read_line());
-			CHECK(v.find("status")->as_string() == "ok");
-			CHECK(v.find("result")->find("loaded")->as_bool());
+			CHECK(member(v, "status")->get_string() == "ok");
+			CHECK(member(member(v, "result"), "loaded")->get_bool());
 			// The reload kept the loaded bytes, not the changed file.
 			c.send(R"({"id":3,"cmd":"grammar"})");
 			auto g2 = parse_line(c.read_line());
-			auto data2 = g2.find("result");
+			auto data2 = member(g2, "result");
 			REQUIRE(data2 != nullptr);
-			CHECK(data2->find("source")->as_string() == original);
+			CHECK(member(data2, "source")->get_string() == original);
 		}
 		std::filesystem::remove_all(dir);
+	}
+}
+
+TEST_SUITE("tgf: colors in a pipe") {
+
+	// The stdout of tgf with @p args, after the lines @p input on stdin.
+	static std::string stdout_of(const std::vector<std::string>& args,
+		const std::vector<std::string>& input = {})
+	{
+		child_process proc;
+		REQUIRE(proc.start(tgf_binary_path(), args));
+		for (const auto& l : input) REQUIRE(proc.write_stdin(l));
+		std::string all, line;
+		while (proc.read_stdout_line(line, 10000)) all += line + "\n";
+		return all;
+	}
+
+	TEST_CASE("parse -e into a pipe has no escape byte") {
+		const std::string out = stdout_of({ grammar_path(), "parse",
+			"-e", "12" });
+		CHECK(out.find("12") != std::string::npos);
+		CHECK(out.find('\x1b') == std::string::npos);
+	}
+
+	TEST_CASE("parse -c true -e into a pipe has an escape byte") {
+		const std::string out = stdout_of({ grammar_path(), "parse",
+			"-c", "true", "-e", "12" });
+		CHECK(out.find('\x1b') != std::string::npos);
+	}
+
+	TEST_CASE("set colors true in a REPL session gives colors") {
+		const std::string plain = stdout_of({ grammar_path() },
+			{ "p 12", "q" });
+		CHECK(plain.find("12") != std::string::npos);
+		CHECK(plain.find('\x1b') == std::string::npos);
+		const std::string colored = stdout_of({ grammar_path() },
+			{ "set colors true", "p 12", "q" });
+		CHECK(colored.find('\x1b') != std::string::npos);
 	}
 }

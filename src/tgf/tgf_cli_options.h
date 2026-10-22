@@ -89,8 +89,8 @@ inline const option_set tgf_option_set = {
 		{ "encoder", "generator", std::string(), "encoder function",
 			{ { "gen", 'e' } } },
 
-		{ "port", "serve", std::size_t{ 0 },
-			"TCP port to listen on, 0 picks a free port",
+		{ "port", "serve", std::size_t{ 4000 },
+			"TCP port of the server, 0 lets serve pick a free port",
 			{ { "serve", 'p' } } },
 		{ "max-sessions", "serve", std::size_t{ 16 },
 			"refuse a new session at this count", { { "serve" } } },
@@ -107,11 +107,35 @@ inline const option_set tgf_option_set = {
 			"close a connection that does not drain its output "
 			"within this many seconds, 0 disables",
 			{ { "serve" } } },
+		{ "first-line-timeout", "serve", std::size_t{ 30 },
+			"close a connection that sends no first line within "
+			"this many seconds, 0 disables", { { "serve" } } },
+		{ "max-pending", "serve", std::size_t{ 16 },
+			"refuse a new connection while this many have sent no "
+			"first line", { { "serve" } } },
+		{ "max-open-requests", "serve", std::size_t{ 64 },
+			"stop reading a client while this many of its requests "
+			"wait for an answer", { { "serve" } } },
+		{ "max-answer", "serve", std::size_t{ 16777216 },
+			"largest answer line in bytes: a longer line of a "
+			"session ends it", { { "serve" } } },
+		{ "max-stderr-line", "serve", std::size_t{ 1048576 },
+			"largest stderr line of a session in bytes, the tail "
+			"of a longer line is dropped", { { "serve" } } },
+		{ "detached-buffer", "serve", std::size_t{ 16777216 },
+			"answers in bytes that a session keeps while no client "
+			"is attached", { { "serve" } } },
+		{ "end-timeout", "serve", std::size_t{ 5 },
+			"stop a session that does not exit within this many "
+			"seconds after its end", { { "serve" } } },
 		{ "log-dir", "serve", std::string(),
 			"directory of the session logs and server.log, empty "
 			"uses ~/.tau/tgf/logs", { { "serve" } } },
 		{ "no-log", "serve", false, "write no session logs",
 			{ { "serve" } } },
+		{ "debug-sessions", "serve", false,
+			"print each session log line (in, out, stderr) on stdout",
+			{ { "serve", 'd' } } },
 	},
 	.commands = {
 		{ "grammar", "show information about grammar" },
@@ -271,7 +295,8 @@ inline const std::vector<std::pair<std::string_view, option_surface>>
 	{ "json", { "parse", 'J' } },
 	{ "json", { "gen", 'J' } },
 	{ "json", { "repl", 'J' } },
-	{ "json", { "test", 'J' } },
+	{ "json", { "serve", 'J' } },
+	{ "json", { "test", 'J' } }
 };
 
 /// The program data of the command line of the tool.

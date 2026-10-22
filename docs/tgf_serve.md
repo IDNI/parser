@@ -24,34 +24,73 @@ Emscripten.
 
 ## tgf serve
 
-    tgf [<grammar>] serve [--port N] [--max-sessions N]
+    tgf [<grammar>] serve [--port N] [--json] [--debug-sessions] [--max-sessions N]
         [--idle-timeout N] [--session-memory N] [--max-line N]
-        [--write-timeout N] [--enabled-productions LIST] [--log-dir DIR]
-        [--no-log]
+        [--write-timeout N] [--first-line-timeout N] [--max-pending N]
+        [--max-open-requests N] [--max-answer N] [--max-stderr-line N]
+        [--detached-buffer N] [--end-timeout N]
+        [--enabled-productions LIST] [--log-dir DIR] [--no-log]
 
 The grammar file is optional. Without it every session starts with no
 grammar and a `load` command installs one.
 
 | Option | Default | Meaning |
 |---|---|---|
-| `--port N`, `-p N` | 0 | TCP port. 0 lets the system pick a free port. |
+| `--port N`, `-p N` | 4000 | TCP port. 0 lets the system pick a free port. |
+| `--json`, `-J` | off | Write JSON lines on stdout instead of text lines. |
+| `--debug-sessions`, `-d` | off | Also print each session log line (`in`, `out`, `stderr`) on stdout. It works with `--no-log` too. |
 | `--max-sessions N` | 16 | Refuse a new session at this count. |
 | `--idle-timeout N` | 30 | End a session after N minutes with no traffic. 0 disables the timeout. |
 | `--session-memory N` | 0 | Address space limit of a session in MB. 0 means no limit. POSIX only. |
 | `--max-line N` | 16 MiB | Largest request line in bytes. A longer line is an error and its tail is dropped up to the next newline. The session child reads with the same limit, so the option holds end to end. |
 | `--write-timeout N` | 30 | Close a connection that makes no write progress on its queued output for N seconds. The deadline restarts on every completed write. 0 disables the deadline. |
-| `--log-dir DIR` | `~/.tau/tgf/logs` | Directory of the session logs and `server.log`. |
+| `--first-line-timeout N` | 30 | Close a connection that sends no first line within N seconds. 0 disables the deadline. |
+| `--max-pending N` | 16 | Refuse a new connection while N connections have sent no first line. |
+| `--max-open-requests N` | 64 | Stop the read of a client while N of its requests wait for an answer of the child. The read also stops while `--max-line` bytes wait for the child. |
+| `--max-answer N` | 16 MiB | Largest answer line of a child in bytes. A longer line ends the session. |
+| `--max-stderr-line N` | 1 MiB | Largest stderr line of a child in bytes. The tail of a longer line is dropped. |
+| `--detached-buffer N` | 16 MiB | Child answers in bytes that a session keeps while no client is attached. |
+| `--end-timeout N` | 5 | Stop a child that does not exit within N seconds after `end-session`, or after the server ends the session. |
+| `--log-dir DIR` | `~/.tau/tgf/logs` | Directory of the session logs and `server.log`. With no home folder, give `--log-dir` or `--no-log`. |
 | `--no-log` | off | Write no logs. |
 | `--start SYM`, `-s SYM` | none | Initial start symbol of each session. |
 | `--enabled-productions LIST`, `-G LIST` | none | Comma-separated production guards each session enables. |
 
-The server binds `127.0.0.1` only. No host option exists. With `--port 0`
-the system picks a port and the server writes one line on stdout:
+The server binds `127.0.0.1` only. No host option exists. When the port
+is busy, the server stops with an error that names the port. Use `-p <port>`
+for another port, or `-p 0` to let the system pick a free port.
 
-    {"listening":5000}
+Without `--json`, the server writes text lines on stdout. The first lines
+give the port and the log directory. Then each server event writes one
+line. Each line starts with the UTC time, the same `t` value that the log
+line of the event gets:
 
-A text report has colors only when the `colors` option is on, in every tgf command.
-`-c false` turns them off.
+    2026-10-13T08:02:14.328Z listening on 127.0.0.1:4000
+    2026-10-13T08:02:14.328Z logs in ~/.tau/tgf/logs
+    2026-10-13T08:02:20.101Z session bf48da16a1c0e1f2a3b4c5d6e7f80910 new
+    2026-10-13T08:02:31.554Z session bf48da16a1c0e1f2a3b4c5d6e7f80910 detach
+    2026-10-13T08:02:40.012Z session bf48da16a1c0e1f2a3b4c5d6e7f80910 exit 143
+
+With `--json`, stdout gets JSON lines only. The first line gives the port,
+and each server event writes the JSON object that `server.log` gets.
+
+    {"listening":{"kind":"tcp","port":4000}}
+    {"t":"2026-10-13T10:15:03.123Z","dir":"event","event":"new","session":"bf48..."}
+
+With `--debug-sessions`, each line that goes to a session log also goes to
+stdout, with the full payload. A text line has the time and session prefix
+of the event lines, then the direction:
+
+    2026-10-13T08:02:14.328Z session ff267e05604ed0bd9ce56640790485e0 in  {"cmd":"version"}
+    2026-10-13T08:02:14.330Z session ff267e05604ed0bd9ce56640790485e0 out {"id":null,"cmd":"version",...}
+
+The JSON form adds a `session` field to the log object.
+
+A program that reads the port starts the server with `--json -p 0`. The
+server prints its report (errors and warnings) at the end, as text or as
+one JSON line. The log files always hold JSON. A text report has colors
+only when the `colors` option is on, in every tgf command. `-c false`
+turns them off.
 
 A SIGINT or SIGTERM stops the server and ends its sessions.
 
@@ -94,7 +133,7 @@ An unknown id, a session that already has a client, and a session count
 past `--max-sessions` give an error.
 
 While no client is attached the session keeps the child responses in a
-buffer of 16 MiB. Past the limit the server drops the oldest lines and the
+buffer of `--detached-buffer` bytes. Past the limit the server drops the oldest lines and the
 session stays.
 
 `quit` is forwarded to the child. The child answers with the status `quit`
@@ -111,8 +150,10 @@ itself, with no `state`:
     {"id":9,"cmd":"quit","status":"quit"}
 
 The server removes the session when the child exits. A child that does not
-exit after the end grace is stopped with `SIGKILL` on POSIX; on Windows
-the server calls `TerminateProcess`.
+exit within `--end-timeout` seconds is stopped with `SIGKILL` on POSIX; on
+Windows the server calls `TerminateProcess`. An idle timeout or a lost pipe
+sends `SIGTERM` first and does not wait for the exit: the reap writes
+`child-exit` later.
 
 The idle timeout ends a session with no traffic. While a request waits for
 its answer, the timeout counts from the last child output, so a child that
@@ -159,7 +200,8 @@ the parent writes to the child. `event` carries `event` and,
 for a session event,
 `session`; the events are `new`, `attach`, `detach`, `quit`, `end-session`,
 `idle-timeout`, `line-too-long`, `dropped-buffer-lines` (with `count`) and
-`child-exit` (with `exit`). `stderr` carries the standard error of the
+`child-exit` (with `exit`). `first-line-timeout` (with `kind`) goes into
+`server.log` only, because the connection has no session yet. `stderr` carries the standard error of the
 child in `line`. The server never deletes a log. A failed log write goes in
 the report of the server once and never stops it.
 
@@ -180,7 +222,7 @@ session that the server started with a grammar file.
 
 The serve and connect doctests run on Linux, macOS and Windows, and in
 the MinGW cross build under wine. Every platform starts the `tgf` binary
-with `serve --port 0` through `tests/serve/tgf_serve_process.h` and reads
+with `serve --json --port 0` through `tests/serve/tgf_serve_process.h` and reads
 the `listening` line; no test forks. `tests/serve/tgf_serve_smoke.py`
 drives a real `tgf serve` process through `tests/serve/harness.py`, which
 reads process lines with a thread and uses socket timeouts; a cross build

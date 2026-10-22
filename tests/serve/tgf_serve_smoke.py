@@ -19,7 +19,8 @@ def main():
     grammar = sys.argv[1]
     program = sys.argv[2:]
 
-    proc = Process(program + [grammar, "serve", "--port", "0", "--no-log"])
+    proc = Process(program + [grammar, "serve", "--json", "--port", "0",
+                              "--no-log"])
     try:
         port = read_listening(proc)
         c = Client(port)

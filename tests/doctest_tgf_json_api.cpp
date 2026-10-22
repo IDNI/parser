@@ -64,37 +64,6 @@ TEST_CASE("tgf error response preserves the id without session state") {
 	CHECK(member(response, "cmd") == nullptr);
 }
 
-TEST_SUITE("tgf serve: report keys") {
-	TEST_CASE("only keys in report children match") {
-		using tgf_serve_test::json_node_has_key;
-		auto node = tgf_serve_test::parse_line(R"({"key":"root","children":[
-			{"key":17},{"key":"first"},
-			{"children":[{"key":"nested"}]},null,
-			{"children":{"key":"not-an-array"}},
-			{"other":{"key":"unrelated"}}]})");
-		const jt& tree = jt::get(node);
-		CHECK(json_node_has_key(tree, "root"));
-		CHECK(json_node_has_key(tree, "first"));
-		CHECK(json_node_has_key(tree, "nested"));
-		CHECK_FALSE(json_node_has_key(tree, "17"));
-		CHECK_FALSE(json_node_has_key(tree, "not-an-array"));
-		CHECK_FALSE(json_node_has_key(tree, "unrelated"));
-		CHECK_FALSE(json_node_has_key(tree, "absent"));
-		CHECK_FALSE(json_node_has_key(jt::get(jt::_null()), "root"));
-	}
-
-	TEST_CASE("deep report children use no recursive calls") {
-		bintree<json::node>::gc_pause pause;
-		tref node = jt::build_object({
-			jt::build_pair("key", jt::build_string("leaf")) });
-		for (size_t depth = 0; depth < 10000; ++depth)
-			node = jt::build_object({ jt::build_pair("children",
-				jt::build_array({ node })) });
-		CHECK(tgf_serve_test::json_node_has_key(jt::get(node), "leaf"));
-		CHECK_FALSE(tgf_serve_test::json_node_has_key(jt::get(node), "absent"));
-	}
-}
-
 struct repl_run {
 	std::vector<htref> responses;   // hello is not included
 	std::string raw;

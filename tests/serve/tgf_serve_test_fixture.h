@@ -2,7 +2,7 @@
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
 // Shared fixture for the tgf serve and connect tests. Every platform runs
-// `tgf serve --port 0` as a process and reads the port from its listening
+// `tgf serve --json --port 0` as a process and reads the port from its listening
 // line, then connects with a plain socket.
 
 #ifndef __IDNI__PARSER__TESTS__TGF_SERVE_TEST_FIXTURE_H__
@@ -78,6 +78,7 @@ struct serve_fixture {
 		std::vector<std::string> args;
 		args.push_back(grammar.empty() ? grammar_path() : grammar);
 		args.push_back("serve");
+		args.push_back("--json");
 		args.push_back("--port");
 		args.push_back("0");
 		args.push_back("--max-sessions");
@@ -93,11 +94,15 @@ struct serve_fixture {
 		REQUIRE(proc.start(tgf_binary_path(), args));
 		std::string line;
 		REQUIRE(proc.read_stdout_line(line, 30000));
-		auto v = idni::format::json::parse(line);
+		auto v = idni::format::json::tree::get(std::string_view(line));
 		REQUIRE(v.has_value());
-		auto p = v.value().find("listening");
+		idni::tref l = idni::format::json::tree::get(v.value())
+			.find("listening");
+		REQUIRE(l != nullptr);
+		idni::tref p = idni::format::json::tree::get(l).find("port");
 		REQUIRE(p != nullptr);
-		port = static_cast<uint16_t>(p->as_number());
+		port = static_cast<uint16_t>(
+			idni::format::json::tree::get(p).get_number());
 	}
 
 	uint16_t bound_port() const { return port; }
