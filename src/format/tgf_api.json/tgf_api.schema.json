@@ -11,6 +11,12 @@
 			"$ref": "#/$defs/listening_line"
 		},
 		{
+			"$ref": "#/$defs/event_line"
+		},
+		{
+			"$ref": "#/$defs/debug_line"
+		},
+		{
 			"$ref": "#/$defs/test_case_line"
 		},
 		{
@@ -1166,13 +1172,111 @@
 			"type": "object",
 			"properties": {
 				"listening": {
-					"type": "integer",
-					"minimum": 0,
-					"maximum": 65535
+					"type": "object",
+					"description": "The one tcp address of the server, as the generic line server prints it.",
+					"properties": {
+						"kind": {
+							"const": "tcp"
+						},
+						"port": {
+							"type": "integer",
+							"minimum": 0,
+							"maximum": 65535
+						}
+					},
+					"required": [
+						"kind",
+						"port"
+					],
+					"additionalProperties": false
 				}
 			},
 			"required": [
 				"listening"
+			],
+			"additionalProperties": false
+		},
+		"event_line": {
+			"type": "object",
+			"description": "One server event that tgf serve --json writes on stdout, the same object as its server.log line.",
+			"properties": {
+				"t": {
+					"type": "string",
+					"description": "UTC time in ISO 8601 with milliseconds."
+				},
+				"dir": {
+					"const": "event"
+				},
+				"event": {
+					"enum": [
+						"new",
+						"attach",
+						"detach",
+						"quit",
+						"end-session",
+						"child-exit",
+						"idle-timeout",
+						"line-too-long",
+						"dropped-buffer-lines",
+						"first-line-timeout"
+					]
+				},
+				"session": {
+					"type": "string"
+				},
+				"kind": {
+					"enum": [
+						"local_socket",
+						"tcp",
+						"websocket"
+					],
+					"description": "Transport of the connection, only on first-line-timeout."
+				},
+				"exit": {
+					"type": "integer",
+					"description": "Exit code of the session child, only on child-exit."
+				},
+				"count": {
+					"type": "integer",
+					"minimum": 1,
+					"description": "Number of dropped lines, only on dropped-buffer-lines."
+				}
+			},
+			"required": [
+				"t",
+				"dir",
+				"event",
+				"session"
+			],
+			"additionalProperties": false
+		},
+		"debug_line": {
+			"type": "object",
+			"description": "One session log line that tgf serve --json --debug-sessions copies to stdout, the log line plus its session.",
+			"properties": {
+				"t": {
+					"type": "string",
+					"description": "UTC time in ISO 8601 with milliseconds."
+				},
+				"dir": {
+					"enum": [
+						"in",
+						"out",
+						"stderr"
+					]
+				},
+				"line": {
+					"type": "string"
+				},
+				"session": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"t",
+				"dir",
+				"line",
+				"session"
 			],
 			"additionalProperties": false
 		},

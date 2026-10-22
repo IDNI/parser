@@ -72,7 +72,8 @@ line of the event gets:
     2026-10-13T08:02:40.012Z session bf48da16a1c0e1f2a3b4c5d6e7f80910 exit 143
 
 With `--json`, stdout gets JSON lines only. The first line gives the port,
-and each server event writes the JSON object that `server.log` gets.
+and each server event writes the JSON object that `server.log` gets. The
+`event_line` definition of the API schema describes these lines:
 
     {"listening":{"kind":"tcp","port":4000}}
     {"t":"2026-10-13T10:15:03.123Z","dir":"event","event":"new","session":"bf48..."}
@@ -84,7 +85,9 @@ of the event lines, then the direction:
     2026-10-13T08:02:14.328Z session ff267e05604ed0bd9ce56640790485e0 in  {"cmd":"version"}
     2026-10-13T08:02:14.330Z session ff267e05604ed0bd9ce56640790485e0 out {"id":null,"cmd":"version",...}
 
-The JSON form adds a `session` field to the log object.
+With `--json`, the line is the JSON object of the session log plus a
+`session` field. The `debug_line` definition of the API schema describes
+it.
 
 A program that reads the port starts the server with `--json -p 0`. The
 server prints its report (errors and warnings) at the end, as text or as

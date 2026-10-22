@@ -3,8 +3,8 @@
 `tgf <grammar> repl --json` turns the TGF REPL into a request and
 response API on stdin and stdout. One JSON object goes on each line.
 `tgf <grammar> parse --json`, `grammar --json` and `gen --json` run one
-command and print one response. `tgf test --json` writes JSON lines of its
-own.
+command and print one response. `tgf test --json` and `tgf serve --json`
+write JSON lines of their own.
 
 Each message ends with one `\n`, on every platform. A request line may
 end with `\r\n`, and CR counts as whitespace wherever the JSON reader
@@ -317,7 +317,7 @@ A null node is skipped. The schema is
 
 The exit code is `1` when the status is `error`, else `0`.
 
-## Test
+## Test and serve
 
 - `test --json <file>...` writes one line per test item,
   `{"test_case":{"file":..,"matcher":..,"input":..,"passed":true,
@@ -328,7 +328,15 @@ The exit code is `1` when the status is `error`, else `0`.
   or when a test file cannot be read or parsed. Errors of the tool report
   go under `report` in the summary. The exit code does not change.
 
-The schema defines these lines as `test_case_line` and `test_summary_line`.
+- `serve --json` writes `{"listening":{"kind":"tcp","port":<port>}}`
+  first, then one line per server event:
+  `{"t":..,"dir":"event","event":..,"session":..}`, with
+  `exit` on `child-exit` and `count` on `dropped-buffer-lines`.
+- `serve --json --debug-sessions` also writes each session log line:
+  `{"t":..,"dir":"in"|"out"|"stderr","line":..,"session":..}`.
+
+The schema defines these lines as `test_case_line`, `test_summary_line`,
+`listening_line`, `event_line` and `debug_line`.
 
 ## No grammar
 

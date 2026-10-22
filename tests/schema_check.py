@@ -2,6 +2,8 @@
 # Validate real tgf JSON output against the AST schema or the whole API schema.
 import json
 import os
+import select
+import socket
 import subprocess
 import sys
 import tempfile
@@ -150,6 +152,76 @@ def check_report_sample(jsonschema, report_path):
     return validate_line(validator, sample, "report of an info message")
 
 
+def check_serve_event_samples(validator):
+    samples = [
+        ("first-line-timeout", {
+            "t": "2026-01-01T00:00:00.000Z", "dir": "event",
+            "event": "first-line-timeout", "kind": "tcp",
+            "session": "0" * 32 }),
+        ("child-exit", {
+            "t": "2026-01-01T00:00:00.000Z", "dir": "event",
+            "event": "child-exit", "session": "0" * 32, "exit": 0 }),
+        ("dropped-buffer-lines", {
+            "t": "2026-01-01T00:00:00.000Z", "dir": "event",
+            "event": "dropped-buffer-lines", "session": "0" * 32,
+            "count": 1 }),
+    ]
+    return all(validate_line(validator, json.dumps(value),
+        "serve sample " + kind) for kind, value in samples)
+
+
+def read_line_within(stream, timeout):
+    ready, _, _ = select.select([stream], [], [], timeout)
+    if not ready:
+        return None
+    return stream.readline()
+
+
+def run_serve(tgf, validator):
+    """Validate the stdout lines of serve --json: listening, events and
+    the session log copies of --debug-sessions."""
+    proc = subprocess.Popen([tgf, "serve", "--json", "-p", "0", "--no-log",
+        "--debug-sessions"],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        bufsize=1)
+    ok = True
+    try:
+        line = read_line_within(proc.stdout, 30)
+        if not line:
+            # a build without serve has no server to check
+            if proc.poll() is not None and "not built" in \
+                    proc.stderr.read():
+                return True
+            print("api schema check: serve wrote no listening line")
+            return False
+        ok &= validate_line(validator, line, "serve listening")
+        port = json.loads(line)["listening"]["port"]
+        with socket.create_connection(("127.0.0.1", port), 30) as s:
+            s.sendall(b'{"cmd":"new"}\n')
+            s.makefile("r").readline()
+        seen = set()
+        while "detach" not in seen:
+            line = read_line_within(proc.stdout, 30)
+            if not line:
+                print("api schema check: serve lines up to detach missing")
+                return False
+            value = json.loads(line)
+            kind = value.get("event", value.get("dir"))
+            seen.add(kind)
+            ok &= validate_line(validator, line, "serve " + str(kind))
+        for kind in ("new", "in", "out"):
+            if kind not in seen:
+                print("api schema check: serve wrote no %s line" % kind)
+                ok = False
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+    return ok
+
+
 def run_api(tgf, fixture, api_path, report_path, ast_path):
     mods = require_jsonschema()
     if mods is None:
@@ -275,6 +347,8 @@ def run_api(tgf, fixture, api_path, report_path, ast_path):
         ok &= run_oneshot(tgf, validator,
             [fixture, "test", "--json", test_path], "test")
         ok &= check_report_sample(jsonschema, report_path)
+        ok &= check_serve_event_samples(validator)
+        ok &= run_serve(tgf, validator)
 
     if not ok:
         print("api schema check: FAILED")
