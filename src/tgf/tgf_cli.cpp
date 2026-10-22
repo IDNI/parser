@@ -325,7 +325,7 @@ void tgf_repl_evaluator::set_grammar_option(std::string_view name,
 
 void tgf_repl_evaluator::bind_repl_options() {
 	auto& opts = idni::options();
-	auto declared = opts.declare(tgf_repl_option_set);
+	auto declared = opts.declare(tgf_repl_option_set());
 	const bool ok = !declared.has_error();
 	report.append(declared.report());
 	if (!ok) return;
@@ -1086,7 +1086,7 @@ tgf_repl_evaluator::~tgf_repl_evaluator() {
 		p().unbind_options();
 	}
 	if (repl_options_bound)
-		for (const auto& o : tgf_repl_option_set.options)
+		for (const auto& o : tgf_repl_option_set().options)
 			idni::options().unbind(o.name);
 }
 
@@ -1514,10 +1514,10 @@ static diagnostics::result<void> declare_tgf_options(
 	options_repository& repo)
 {
 	diagnostics::result<void> r;
-	for (const auto* set : { &tgf_option_set, &grammar_option_set(),
-		&parser_option_set(), &tgf_repl_option_set })
+	for (const auto* set : { &tgf_option_set(), &grammar_option_set(),
+		&parser_option_set(), &tgf_repl_option_set() })
 			if (!r.merge_ok(repo.declare(*set))) return r;
-	for (const auto& [name, surface] : tgf_surfaces)
+	for (const auto& [name, surface] : tgf_surfaces())
 		r.merge(repo.add_surface(name, surface));
 	return r;
 }
@@ -1561,7 +1561,7 @@ int tgf_specialized_run(int argc, char** argv,
 			tgf_report_colors());
 	if (tool.report.has_error()) return 1;
 
-	args_config cfg = tgf_args_config;
+	args_config cfg = tgf_args_config();
 	cfg.name = tgf_label;
 	cfg.help_header = tgf_label;
 	cfg.description = "Tau Grammar Format (TGF) specialized grammar tool";
@@ -1584,18 +1584,18 @@ int tgf_run(int argc, char** argv) {
 	// or an option.
 	string tgf_file;
 	if (argc > 1 && argv[1][0] != '-' && ranges::none_of(
-		tgf_option_set.commands, [&](const command_spec& c) {
+		tgf_option_set().commands, [&](const command_spec& c) {
 			return c.name == argv[1]; }))
 				tgf_file = argv[1];
 	if (tgf_file.empty()) {
 		tgf_repl_evaluator re(tgf_repl_evaluator::options{});
-		return run_tool(argc, argv, tgf_args_config, tool, re, false);
+		return run_tool(argc, argv, tgf_args_config(), tool, re, false);
 	}
 	if (!ifstream(tgf_file).good())
 		return command_line_error(tgf_missing_grammar_file);
 	tgf_repl_evaluator re(tgf_file);
 	tool.grammar_file = tgf_file;
-	return run_tool(argc, argv, tgf_args_config, tool, re, true);
+	return run_tool(argc, argv, tgf_args_config(), tool, re, true);
 }
 
 int tgf_main(int argc, char** argv) {

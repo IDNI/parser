@@ -54,7 +54,7 @@ struct tgf_repl_evaluator : tgf_repl_evaluator_base {
 		std::string grammar_source,
 		options opt);
 	/// Unbinds the grammar options, also of a grammar it does not own,
-	/// and the options of tgf_repl_option_set.
+	/// and the options of tgf_repl_option_set().
 	~tgf_repl_evaluator();
 	tgf_repl_evaluator(const tgf_repl_evaluator&) = delete;
 	tgf_repl_evaluator& operator=(const tgf_repl_evaluator&) = delete;
@@ -162,7 +162,7 @@ struct tgf_repl_evaluator : tgf_repl_evaluator_base {
 	void bind_grammar_options();
 	/// Write a grammar option through options(). An error goes to report.
 	void set_grammar_option(std::string_view name, idni::option_value v);
-	/// Declare tgf_repl_option_set and bind it to the fields of opt.
+	/// Declare tgf_repl_option_set() and bind it to the fields of opt.
 	void bind_repl_options();
 	/// Declare parser_option_set() and give each parse option its default,
 	/// before the first parser of the evaluator binds.
@@ -191,7 +191,7 @@ struct tgf_repl_evaluator : tgf_repl_evaluator_base {
 private:
 	bool fixed_grammar = false;
 	bool grammar_loaded = false;
-	/// True when the options of tgf_repl_option_set are bound to opt.
+	/// True when the options of tgf_repl_option_set() are bound to opt.
 	bool repl_options_bound = false;
 	/// True when the grammar came from stored text, not a file.
 	bool grammar_from_source = false;

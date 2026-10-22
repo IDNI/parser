@@ -872,11 +872,11 @@ TEST_SUITE("tgf serve: init line") {
 
 TEST_SUITE("tgf serve: options") {
 	TEST_CASE("the default port metadata is 4000") {
-		auto port = std::find_if(tgf_option_set.options.begin(),
-			tgf_option_set.options.end(), [](const option_spec& option) {
+		auto port = std::find_if(tgf_option_set().options.begin(),
+			tgf_option_set().options.end(), [](const option_spec& option) {
 				return option.name == "port";
 			});
-		REQUIRE(port != tgf_option_set.options.end());
+		REQUIRE(port != tgf_option_set().options.end());
 		REQUIRE(std::holds_alternative<std::size_t>(port->fallback));
 		CHECK(std::get<std::size_t>(port->fallback) == 4000);
 	}

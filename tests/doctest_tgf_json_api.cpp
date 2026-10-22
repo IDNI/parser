@@ -248,7 +248,7 @@ TEST_SUITE("tgf json api: hello") {
 		options_repository mine;
 		options_scope scope(mine);
 		// the tool declares port; the evaluator declares json
-		REQUIRE(idni::options().declare(tgf_option_set).has_value());
+		REQUIRE(idni::options().declare(tgf_option_set()).has_value());
 		auto r = run_repl({
 			R"({"id":1,"cmd":"set","option":"port","value":80})" });
 		std::istringstream ls(r.raw);

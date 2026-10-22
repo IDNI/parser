@@ -35,10 +35,10 @@ using namespace idni;
 struct tgf_options_fixture {
 	options_repository repo;
 	tgf_options_fixture() {
-		for (const auto* set : { &tgf_option_set, &grammar_option_set(),
-			&parser_option_set(), &tgf_repl_option_set })
+		for (const auto* set : { &tgf_option_set(), &grammar_option_set(),
+			&parser_option_set(), &tgf_repl_option_set() })
 				REQUIRE(repo.declare(*set).has_value());
-		for (const auto& [name, surface] : tgf_surfaces)
+		for (const auto& [name, surface] : tgf_surfaces())
 			REQUIRE(repo.add_surface(name, surface).has_value());
 	}
 	diagnostics::result<parsed_args> parse(
@@ -48,7 +48,7 @@ struct tgf_options_fixture {
 		vector<char*> argv;
 		for (auto& a : store) argv.push_back(a.data());
 		return repo.parse_args(static_cast<int>(argv.size()),
-			argv.data(), tgf_args_config);
+			argv.data(), tgf_args_config());
 	}
 };
 
@@ -66,14 +66,14 @@ TEST_SUITE("tgf cli: evaluator option defaults") {
 			{ "colors", defaults.colors },
 			{ "json", defaults.json },
 		};
-		REQUIRE(tgf_repl_option_set.options.size() == std::size(values));
+		REQUIRE(tgf_repl_option_set().options.size() == std::size(values));
 		for (const auto& [name, expected] : values) {
-			auto it = std::find_if(tgf_repl_option_set.options.begin(),
-				tgf_repl_option_set.options.end(),
+			auto it = std::find_if(tgf_repl_option_set().options.begin(),
+				tgf_repl_option_set().options.end(),
 				[name](const option_spec& option) {
 					return option.name == name;
 				});
-			REQUIRE(it != tgf_repl_option_set.options.end());
+			REQUIRE(it != tgf_repl_option_set().options.end());
 			REQUIRE(std::holds_alternative<bool>(it->fallback));
 			CHECK(std::get<bool>(it->fallback) == expected);
 		}
@@ -663,13 +663,13 @@ TEST_SUITE("tgf cli: tgf_command") {
 			{ tgf_command::connect, "connect" },
 			{ tgf_command::test, "test" },
 		};
-		CHECK(tgf_option_set.commands.size() == std::size(names));
+		CHECK(tgf_option_set().commands.size() == std::size(names));
 		for (const auto& [c, name] : names) {
 			CAPTURE(name);
 			CHECK(tgf_command_spec(c).name == name);
 		}
-		CHECK(tgf_args_config.default_command == "repl");
-		CHECK(tgf_args_config.default_command_when_inputs == "repl");
+		CHECK(tgf_args_config().default_command == "repl");
+		CHECK(tgf_args_config().default_command_when_inputs == "repl");
 	}
 }
 
@@ -706,6 +706,17 @@ struct tree_text_check_buf : std::streambuf {
 	}
 	int sync() override { return scan(), 0; }
 };
+
+TEST_SUITE("tgf cli: accessor tables") {
+	TEST_CASE("repeated calls return the same table objects") {
+		CHECK(&tgf_option_set() == &tgf_option_set());
+		CHECK(&tgf_repl_option_set() == &tgf_repl_option_set());
+		CHECK(&tgf_grammar_commands() == &tgf_grammar_commands());
+		CHECK(&tgf_surface_rows() == &tgf_surface_rows());
+		CHECK(&tgf_surfaces() == &tgf_surfaces());
+		CHECK(&tgf_args_config() == &tgf_args_config());
+	}
+}
 
 TEST_SUITE("tgf cli: render_text") {
 	TEST_CASE("the parse tree of a chain 30000 levels deep renders each "
@@ -748,14 +759,14 @@ TEST_SUITE("tgf cli: shared argument reader") {
 	TEST_CASE("multiple info flags print only the first result") {
 		options_repository mine;
 		options_scope scope(mine);
-		REQUIRE(options().declare(tgf_option_set).has_value());
+		REQUIRE(options().declare(tgf_option_set()).has_value());
 		string a0 = "tgf", a1 = "--version", a2 = "--license";
 		char* argv[] = { a0.data(), a1.data(), a2.data() };
 		std::ostringstream out, err;
 		auto* old_out = std::cout.rdbuf(out.rdbuf());
 		auto* old_err = std::cerr.rdbuf(err.rdbuf());
 		int code = -1;
-		auto args = tgf_read_args(3, argv, tgf_args_config, code);
+		auto args = tgf_read_args(3, argv, tgf_args_config(), code);
 		std::cout.rdbuf(old_out);
 		std::cerr.rdbuf(old_err);
 		CHECK_FALSE(args.has_value());
