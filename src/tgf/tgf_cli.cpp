@@ -1220,6 +1220,8 @@ static int run_tests(tgf_repl_evaluator& re, const vector<string>& files,
 // to the options of one run of the tool.
 struct tgf_tool {
 	parser_gen_options gen;
+	/// The grammar file of the command line, empty without one.
+	string grammar_file;
 #ifdef TAU_PARSER_BUILD_SERVE
 	serve_options serve;
 #endif
@@ -1448,48 +1450,21 @@ static int serve_command(tgf_tool& tool, tgf_repl_evaluator& re) {
 #endif
 }
 
-#ifdef TAU_PARSER_BUILD_SERVE
-// Parse "<host>:<port>". IPv6 is out of scope: the server binds an IPv4
-// loopback address only.
-static bool connect_parse_host_port(const string& s, string& host,
-	uint16_t& port)
+static int connect_command(const parsed_args& args, const tgf_tool& tool)
 {
-	auto pos = s.rfind(':');
-	if (pos == string::npos || pos == 0 || pos + 1 >= s.size())
-		return false;
-	host = s.substr(0, pos);
-	unsigned long p = 0;
-	for (size_t i = pos + 1; i != s.size(); ++i) {
-		char c = s[i];
-		if (c < '0' || c > '9') return false;
-		p = p * 10 + static_cast<unsigned long>(c - '0');
-		if (p > 65535) return false;
-	}
-	port = static_cast<uint16_t>(p);
-	return true;
-}
-#endif
-
-static int connect_command(const vector<string>& inputs) {
 #ifndef TAU_PARSER_BUILD_SERVE
-	(void)inputs;
+	(void)args;
+	(void)tool;
 	return command_line_error("tgf connect was not built: configure with "
 		"-DTAU_PARSER_BUILD_SERVE=ON");
 #else
-	if (inputs.size() != 1) return command_line_error(
-		"connect needs one <host>:<port> argument");
-	tgf_connect_options opt;
-	if (!connect_parse_host_port(inputs.front(), opt.host, opt.port))
-		return command_line_error("invalid <host>:<port> argument");
-	opt.session = idni::options().get<string>("session");
-	opt.legacy_repl = idni::options().get<bool>("legacy-repl");
-	auto r = tgf_connect_run(opt);
-	if (!r.has_value()) {
-		tgf_repl_evaluator_base::print_report(r.report(), false,
-			tgf_report_colors());
+	if (args.inputs.size() > 1) {
+		command_line_error(tgf_one_address);
+		idni::options().help(cerr,
+			tgf_command_spec(tgf_command::connect).name);
 		return 1;
 	}
-	return r.value();
+	return tgf_connect_command(args, tool.grammar_file);
 #endif
 }
 
@@ -1502,15 +1477,17 @@ static int run_command(const parsed_args& args, tgf_tool& tool,
 		return args.command == tgf_command_spec(c).name;
 	};
 	// A session child runs the JSON API for `tgf serve`, so it sets
-	// no_server_paths itself and refuses a path a client sends.
-	if (string sid = opts.get<string>("session"); !sid.empty())
+	// no_server_paths itself and refuses a path a client sends. The
+	// --session of connect names the session to attach to instead.
+	if (string sid = opts.get<string>("session");
+			!sid.empty() && is(tgf_command::repl))
 		re.begin_server_session(sid);
 
 	if (is(tgf_command::grammar)) return show_command(re);
 
 	if (is(tgf_command::serve)) return serve_command(tool, re);
 
-	if (is(tgf_command::connect)) return connect_command(args.inputs);
+	if (is(tgf_command::connect)) return connect_command(args, tool);
 
 	if (is(tgf_command::gen)) return gen_command(tool, re);
 
@@ -1708,6 +1685,7 @@ int tgf_run(int argc, char** argv) {
 	if (!ifstream(tgf_file).good())
 		return command_line_error(tgf_missing_grammar_file);
 	tgf_repl_evaluator re(tgf_file);
+	tool.grammar_file = tgf_file;
 	return run_tool(argc, argv, tgf_args_config, tool, re, true);
 }
 

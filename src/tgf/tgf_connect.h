@@ -4,106 +4,62 @@
 #ifndef __IDNI__PARSER__TGF__TGF_CONNECT_H__
 #define __IDNI__PARSER__TGF__TGF_CONNECT_H__
 
-#include <cstdint>
-#include <memory>
-#include <ostream>
-#include <set>
 #include <string>
 #include <string_view>
 
 #include "net/line_address.h"
-#include "tgf_cli.h"
+#include "net/line_client.h"
+#include "repl_client_evaluator.h"
+#include "tgf_cli_options.h"
 #include "utility/diagnostics.h"
-#include "utility/repl.h"
-#ifdef TAU_PARSER_HAS_FTXUI
-#include "utility/repl_ftxui.h"
-#endif
+#include "utility/options.h"
 
 namespace idni {
 
-/// Address rules for `tgf connect`, which has no default local socket.
+/// The address rules of tgf: the scheme tgf, no default socket, so
+/// an empty address is an error.
 inline connect_address_rules tgf_address_rules() {
 	return { "tgf", "", tgf_default_host, tgf_default_port };
 }
 
-/// Parse a `tgf connect` argument. An error names @p iri.
-diagnostics::result<connect_target> parse_connect_iri(
-	std::string_view iri);
+/// Parse a `tgf connect` argument with @ref tgf_address_rules. A bad
+/// address is an error that names @p iri.
+diagnostics::result<connect_target> parse_connect_iri(std::string_view iri);
 
-/// Options of the `tgf connect` subcommand. The client never sees a grammar
-/// file: the session of the server holds the grammar.
+/// The client settings of tgf: tcp on the default host and port.
+inline connect_options tgf_default_client() {
+	connect_options c;
+	c.target = { line_transport_kind::tcp, "", tgf_default_host,
+		tgf_default_port };
+	return c;
+}
+
+/// Options of the `tgf connect` subcommand. The server binds 127.0.0.1
+/// only; port forwarding or a tunnel can make another host reach it.
 struct tgf_connect_options {
-	std::string host = "127.0.0.1";
-	uint16_t port = 0;
-	/// Attach to this session instead of starting a new one. Empty starts
-	/// a new session.
-	std::string session{};
-	/// True uses the legacy terminal REPL instead of FTXUI.
-	bool legacy_repl = false;
+	/// The server, the first line, json, colors and legacy_repl. The
+	/// member "session" of open_fields attaches to that session.
+	connect_options client = tgf_default_client();
+	/// A grammar file the client reads and loads into the session after
+	/// the connect. Empty loads nothing.
+	std::string grammar_file{};
+	/// Show the status part of the prompt. The print options belong to
+	/// the session on the server.
+	bool status = true;
 };
 
-struct tgf_remote_client;
-
-/// The evaluator of `repl<evaluator_t>` and `repl_ftxui<evaluator_t>` that
-/// runs each command in a server session and renders the answer as text.
-struct tgf_remote_evaluator {
-	explicit tgf_remote_evaluator(std::ostream& out, bool colors = false);
-	~tgf_remote_evaluator();
-
-	tgf_remote_evaluator(const tgf_remote_evaluator&) = delete;
-	tgf_remote_evaluator& operator=(const tgf_remote_evaluator&) = delete;
-
-	// The REPL front ends link themselves here.
-	repl<tgf_remote_evaluator>* r = nullptr;
-#ifdef TAU_PARSER_HAS_FTXUI
-	repl_ftxui<tgf_remote_evaluator>* r_ftx = nullptr;
-#endif
-
-	std::ostream& out;
-
-	/// Connect to @p host:@p port and pick a session. A non-empty
-	/// @p session attaches to it; an empty one starts a new session. On
-	/// failure the error is in the report of take_report().
-	bool connect(const std::string& host, uint16_t port,
-		const std::string& session);
-
-	/// The id of the session, for the attach-again message.
-	const std::string& session_id() const noexcept { return session_id_; }
-
-	/// Turn terminal colors on or off for the rendered text.
-	void set_colors(bool on) { TC.set(on); }
-
-	diagnostics::result<int> eval(const std::string& src);
-	void reprompt();
-
-	/// Move the accumulated report out and clear it.
-	diagnostics::report take_report();
-
-private:
-	std::unique_ptr<tgf_remote_client> client;
-	std::string session_id_;
-	term::colors TC;
-	bool state_grammar_set = false;
-	std::string state_grammar;
-	bool state_start_set = false;
-	std::string state_start;
-	/// Character class nonterminals of the session grammar, from state.
-	std::set<size_t> state_char_classes;
-	diagnostics::report report;
-
-	void apply_state(tref state);
-	/// Render one response object as text and return its command status.
-	/// @p fallback_cmd names the command when the response carries none.
-	cmd_status render_response(tref resp,
-		const std::string& fallback_cmd);
-	// Send one structured request and render the answer. 0 continues, 1 is
-	// quit and 2 is incomplete.
-	int send_statement(tref req);
-};
-
-/// Run `tgf connect`: connect, run the text REPL with a remote evaluator and
-/// return when the client quits. The returned report carries every error.
+/// Run `tgf connect`: connect, load the grammar file of the options, then
+/// run the text REPL or, with `json`, the JSON loop on stdin with a client
+/// evaluator. Returns when the client quits; a failed load returns 1. The
+/// returned report carries every error.
 diagnostics::result<int> tgf_connect_run(const tgf_connect_options& opt);
+
+/// Run `tgf connect` from the parsed command line @p args and the options:
+/// the server comes from the one input of @p args or from --host and
+/// --port. @p grammar_file is loaded after the connect when it is not
+/// empty. Returns the exit code.
+int tgf_connect_command(const parsed_args& args,
+	const std::string& grammar_file);
 
 } // namespace idni
 

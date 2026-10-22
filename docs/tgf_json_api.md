@@ -3,7 +3,8 @@
 `tgf <grammar> repl --json` turns the TGF REPL into a request and
 response API on stdin and stdout. One JSON object goes on each line.
 `tgf <grammar> parse --json`, `grammar --json` and `gen --json` run one
-command and print one response. `tgf test --json` and `tgf serve --json`
+command and print one response. `tgf connect --json` runs the same request
+loop in a session of `tgf serve`. `tgf test --json` and `tgf serve --json`
 write JSON lines of their own.
 
 Each message ends with one `\n`, on every platform. A request line may
@@ -317,7 +318,7 @@ A null node is skipped. The schema is
 
 The exit code is `1` when the status is `error`, else `0`.
 
-## Test and serve
+## Test, connect and serve
 
 - `test --json <file>...` writes one line per test item,
   `{"test_case":{"file":..,"matcher":..,"input":..,"passed":true,
@@ -327,7 +328,11 @@ The exit code is `1` when the status is `error`, else `0`.
   `OK (negated)` or the `FAIL` reason. `ok` is false when a test fails
   or when a test file cannot be read or parsed. Errors of the tool report
   go under `report` in the summary. The exit code does not change.
-
+- `connect --json` reads requests on stdin and writes the answers of the
+  session on stdout, in the shapes of this document. The first line is
+  the `hello` line of the session. With a grammar file, the answer of
+  its `load` follows. A `load` or `parse_file` request with `file` reads
+  the file on the client and sends its text.
 - `serve --json` writes `{"listening":{"kind":"tcp","port":<port>}}`
   first, then one line per server event:
   `{"t":..,"dir":"event","event":..,"session":..}`, with

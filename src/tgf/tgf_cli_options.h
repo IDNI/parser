@@ -98,7 +98,11 @@ inline const option_set tgf_option_set = {
 
 		{ "port", "serve", std::size_t{ tgf_default_port },
 			"TCP port of the server, 0 lets serve pick a free port",
-			{ { "serve", 'p' } } },
+			{ { "serve", 'p' }, { "connect", 'p' } } },
+		{ "host", "serve", std::string(tgf_default_host),
+			"host of the server, which binds 127.0.0.1 only: use "
+			"port forwarding or tailscale serve to reach it from "
+			"another machine", { { "connect", 'H' } } },
 		{ "max-sessions", "serve", std::size_t{ 16 },
 			"refuse a new session at this count", { { "serve" } } },
 		{ "idle-timeout", "serve", std::size_t{ 30 },
@@ -125,7 +129,8 @@ inline const option_set tgf_option_set = {
 			"wait for an answer", { { "serve" } } },
 		{ "max-answer", "serve", std::size_t{ 16777216 },
 			"largest answer line in bytes: a longer line of a "
-			"session ends it", { { "serve" } } },
+			"session ends it, connect refuses it",
+			{ { "serve" }, { "connect" } } },
 		{ "max-stderr-line", "serve", std::size_t{ 1048576 },
 			"largest stderr line of a session in bytes, the tail "
 			"of a longer line is dropped", { { "serve" } } },
@@ -151,7 +156,8 @@ inline const option_set tgf_option_set = {
 		{ "gen", "generate a parser code" },
 		{ "repl", "run TGF repl" },
 		{ "serve", "serve TGF sessions on a TCP port" },
-		{ "connect", "run a text REPL in a tgf serve session" },
+		{ "connect", "run a REPL in a tgf serve session at "
+			"[tgf://]<host>[:<port>], localhost:4000 by default", true },
 		{ "test", "run tester (with provided tgf.test file)" },
 	},
 };
@@ -318,11 +324,13 @@ inline const std::vector<std::pair<std::string_view, option_surface>>
 	{ "colors", { "grammar", 'c' } },
 	{ "colors", { "parse", 'c' } },
 	{ "colors", { "repl", 'c' } },
+	{ "colors", { "connect", 'c' } },
 	{ "json", { "grammar", 'J' } },
 	{ "json", { "parse", 'J' } },
 	{ "json", { "gen", 'J' } },
 	{ "json", { "repl", 'J' } },
 	{ "json", { "serve", 'J' } },
+	{ "json", { "connect", 'J' } },
 	{ "json", { "test", 'J' } }
 };
 

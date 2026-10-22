@@ -47,7 +47,7 @@ grammar and a `load` command installs one.
 | `--first-line-timeout N` | 30 | Close a connection that sends no first line within N seconds. 0 disables the deadline. |
 | `--max-pending N` | 16 | Refuse a new connection while N connections have sent no first line. |
 | `--max-open-requests N` | 64 | Stop the read of a client while N of its requests wait for an answer of the child. The read also stops while `--max-line` bytes wait for the child. |
-| `--max-answer N` | 16 MiB | Largest answer line of a child in bytes. A longer line ends the session. |
+| `--max-answer N` | 16 MiB | Largest answer line of a child in bytes. A longer line ends the session. `connect` refuses a longer answer. |
 | `--max-stderr-line N` | 1 MiB | Largest stderr line of a child in bytes. The tail of a longer line is dropped. |
 | `--detached-buffer N` | 16 MiB | Child answers in bytes that a session keeps while no client is attached. |
 | `--end-timeout N` | 5 | Stop a child that does not exit within N seconds after `end-session`, or after the server ends the session. |
@@ -99,16 +99,63 @@ A SIGINT or SIGTERM stops the server and ends its sessions.
 
 ## tgf connect
 
-    tgf connect <host>:<port> [--session ID] [--legacy-repl]
+    tgf [<grammar>] connect [<address>] [--host H] [--port N]
+        [--session ID] [--json] [--colors BOOL] [--legacy-repl]
 
-    tgf connect 127.0.0.1:5000
-    tgf connect 127.0.0.1:5000 --session 0123456789abcdef0123456789abcdef
+    tgf connect
+    tgf connect -p 5000
+    tgf connect tgf://example.org:5000
+    tgf connect [::1]:5000
+    tgf g.tgf connect --session 0123456789abcdef0123456789abcdef
 
-`connect` needs no grammar file; the session holds the grammar. Without
-`--session` it starts a new session, otherwise it attaches to the session
-with that id. `--legacy-repl` uses the plain terminal REPL instead of the
-FTXUI one. The client prints its session id at start, so a user can attach
-again later.
+`connect` reaches the server at `--host` (`-H`, `localhost` by default)
+on `--port` (`-p`, 4000 by default). Port 0 is an error. An address
+argument gives the host and the port instead. It has one of these forms:
+
+- `tgf://<host>[:<port>][/]`
+- `<host>[:<port>]`
+- `[<ipv6>][:<port>]`, an IPv6 address in brackets
+
+A missing port is 4000. Another scheme, a path, a query, a fragment, user
+info or a bad port is an error that names the address. An address argument
+together with `--host` or `--port` is an error. Only the command line
+counts here, not a default or an environment value. The client resolves the
+host and tries each of its addresses. A host that does not resolve gives
+an error with the host. A failed connect gives an error with the host and
+the port. On glibc, a non-ASCII host name resolves through IDN. Without
+IDN support, the client gives an error for such a name.
+
+The server binds `127.0.0.1` only. To reach it from another machine, use
+port forwarding (for example `ssh -L 4000:127.0.0.1:4000 server`) or
+`tailscale serve`.
+
+Without `--session` the client starts a new session, otherwise it attaches
+to the session with that id.
+`--legacy-repl` uses the plain terminal REPL instead of the FTXUI one. The
+client prints its session id at start, so a user can attach again later.
+
+With a grammar file, the client loads the file into the session after the
+connect, the same as the REPL command `load "<file>"`. This also replaces
+the grammar of an attached session. When the load fails, the client prints
+the report and exits with 1. Without a grammar file, the session keeps its
+grammar.
+
+A specialized binary, for example `json_grammar`, serves its built-in
+grammar with `serve`. Its `connect` sends no grammar, so the session keeps
+its grammar.
+
+The client prompt is the prompt of `tgf repl`. With no grammar it is
+`[ (no grammar loaded) ] tgf> `. The client reads the `colors` and
+`status` options from its own command line and environment, for example
+`--colors false`. The client sends nothing about colors to the server. The
+print options belong to the session, so `set` changes them on the server.
+
+With `--json`, the client reads one JSON request per line on stdin and
+writes each answer of the server as one line on stdout, the protocol of
+`tgf repl --json`. It writes the `hello` line first, then the answer of
+the grammar load, if any. It shows no prompt and no colors. A `load` or a
+`parse_file` request with `file` reads the file on the client. The loop
+stops at the end of stdin or after a `quit` answer.
 
 The client parses each REPL line itself. `load "f"` and `parse file "f"`
 read the file on the client and send its text; the server never reads a

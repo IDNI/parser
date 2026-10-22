@@ -1,4 +1,5 @@
-# The client core holds the REPL parser and renderer, not the grammar loader.
+# The client of tgf serve: the REPL command parser, the text renderer and,
+# with the Boost headers, the connection. It holds no grammar loader.
 add_library(tgf_connect_core STATIC
 	"${CMAKE_CURRENT_SOURCE_DIR}/tgf_repl_evaluator_base.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/repl_client_evaluator.cpp")
@@ -28,6 +29,8 @@ if(TAU_PARSER_BUILD_SERVE)
 		add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../net"
 			"${CMAKE_CURRENT_BINARY_DIR}/net")
 	endif()
+	target_sources(tgf_connect_core PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/tgf_connect.cpp")
 	target_link_libraries(tgf_connect_core PUBLIC tauparser_net)
 	target_include_directories(tgf_connect_core SYSTEM PUBLIC
 		"${TAU_BOOST_INCLUDE_DIR_RESOLVED}")
@@ -64,8 +67,7 @@ endif()
 
 if(TAU_PARSER_BUILD_SERVE)
 	target_sources(tgf_cli_core PRIVATE
-		"${CMAKE_CURRENT_SOURCE_DIR}/tgf_serve.cpp"
-		"${CMAKE_CURRENT_SOURCE_DIR}/tgf_connect.cpp")
+		"${CMAKE_CURRENT_SOURCE_DIR}/tgf_serve.cpp")
 	target_compile_definitions(tgf_cli_core PRIVATE TAU_PARSER_BUILD_SERVE)
 	if(WIN32)
 		# Asio's accept path calls AcceptEx and GetAcceptExSockaddrs, which live in mswsock.
