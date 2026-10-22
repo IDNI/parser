@@ -1507,7 +1507,9 @@ tref merge_trees(tref a, tref b, JoinFn&& join_fn,
 
 template <typename T>
 struct std::hash<const idni::bintree<T>> {
-	size_t operator()(const idni::bintree<T>& b) const noexcept;
+	size_t operator()(const idni::bintree<T>& b) const noexcept {
+		return static_cast<size_t>(b.hash);
+	}
 };
 
 // Non-const version required by ankerl::unordered_dense (key stored by value)

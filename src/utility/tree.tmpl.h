@@ -1257,9 +1257,3 @@ tref merge_trees(tref a, tref b, JoinFn&& join_fn, MismatchFn&& mismatch_fn) {
 //------------------------------------------------------------------------------
 
 } // idni namespace
-
-template<typename T>
-size_t std::hash<const idni::bintree<T>>::operator()(
-	const idni::bintree<T>& b) const noexcept {
-	return static_cast<size_t>(b.hash);
-}
