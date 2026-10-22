@@ -693,11 +693,16 @@ struct tree_text_check_buf : std::streambuf {
 	int sync() override { return scan(), 0; }
 };
 
-TEST_SUITE("tgf cli: render_command_text") {
+TEST_SUITE("tgf cli: render_text") {
 	TEST_CASE("the parse tree of a chain 30000 levels deep renders each "
 		"level on its own line with one more tab")
 	{
 		using jt = format::json::tree;
+		options_repository mine;
+		options_scope scope(mine);
+		tgf_repl_evaluator::options opt;
+		opt.colors = false;
+		tgf_repl_evaluator re(opt);
 		// the text grows with the square of the depth
 		constexpr size_t depth = 30000;
 		auto node = [](size_t id, tref child) {
@@ -718,7 +723,7 @@ TEST_SUITE("tgf cli: render_command_text") {
 			jt::build_pair("tree", t) }));
 		tree_text_check_buf buf(depth);
 		std::ostream os(&buf);
-		render_command_text(r, os, term::colors(false));
+		re.render_text(r, os);
 		os.flush();
 		CHECK(buf.lines == depth + 1);
 		CHECK(buf.bad == 0);

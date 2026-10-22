@@ -147,7 +147,6 @@ static void print_text_source(ostream& os, const string& src) {
 }
 
 // The text of the grammar command, with one blank line after the last line.
-// The local REPL and the client of `tgf serve` both print it.
 static void print_grammar_source(ostream& os, const string& src) {
 	os << "grammar:\n";
 	std::ostringstream norm;
@@ -445,17 +444,25 @@ static void render_data_productions(const cmd_result& r, std::ostream& os,
 	}
 }
 
-void render_command_text(const cmd_result& r, std::ostream& os,
-	const term::colors& TC, const std::set<size_t>* char_classes)
+void tgf_repl_evaluator_base::render_text(const cmd_result& r,
+	std::ostream& os) const
 {
-	const size_t nt = tgf_repl_evaluator_base::command_of(r.cmd);
+	const size_t nt = command_of(r.cmd);
 	if (nt == rp::parse_cmd || nt == rp::parse_file_cmd) {
 		render_data_parse(r, os, TC);
 		return;
 	}
 	if (nt == rp::grammar_cmd) { render_data_grammar(r, os); return; }
 	if (nt == rp::igrammar_cmd || nt == rp::unreachable_cmd) {
-		render_data_productions(r, os, TC, char_classes);
+		// A character class nonterminal takes its own color.
+		std::set<size_t> char_classes;
+		auto cc = jtt(state()) | jtt::member(tp::char_classes);
+		if (cc.is(json_parser::arr))
+			for (tref n : (cc | jtt::children | jtt::refs))
+				if (jt::get(n).is_number()) char_classes.insert(
+					static_cast<size_t>(
+						jt::get(n).get_number()));
+		render_data_productions(r, os, TC, &char_classes);
 		return;
 	}
 	if (nt == rp::quit_cmd) { os << "Quit.\n"; return; }
@@ -512,23 +519,6 @@ void render_command_text(const cmd_result& r, std::ostream& os,
 				<< "\n";
 		return;
 	}
-}
-
-void tgf_repl_evaluator_base::render_text(const cmd_result& res,
-	std::ostream& os) const
-{
-	// A character class nonterminal takes its own color.
-	std::set<size_t> char_classes;
-	const size_t nt = command_of(res.cmd);
-	if (nt == rp::igrammar_cmd || nt == rp::unreachable_cmd) {
-		auto cc = jtt(state()) | jtt::member(tp::char_classes);
-		if (cc.is(json_parser::arr))
-			for (tref n : (cc | jtt::children | jtt::refs))
-				if (jt::get(n).is_number()) char_classes.insert(
-					static_cast<size_t>(
-						jt::get(n).get_number()));
-	}
-	render_command_text(res, os, TC, &char_classes);
 }
 #ifdef _MSC_VER
 #	pragma warning(pop)

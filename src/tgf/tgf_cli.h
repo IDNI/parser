@@ -245,11 +245,6 @@ int tgf_json_loop(tgf_repl_evaluator& re, std::istream& in,
 /// The {"grammar","start"} state object that every response carries.
 tref state_value(const tgf_repl_evaluator& re);
 
-/// One structured JSON request for one parsed REPL statement. A `load`
-/// carries the field `file` and a `parse file` keeps that command name;
-/// the client of `tgf serve` reads the file and rewrites both.
-tref statement_request(const tgf_repl_evaluator::trv& n);
-
 /// The JSON form of an option value: a bool, a number, a string or an
 /// array of strings.
 tref build_option(const option_value& v);

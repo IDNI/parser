@@ -41,7 +41,6 @@ using tp = tgf_protocol;
 
 using tt = tgf_repl_parser::tree::traverser;
 using jt = format::json::tree;
-using jtt = format::json::tt;
 
 static tref range_value(const std::array<size_t, 2>& range) {
 	return jt::build_array({
@@ -1029,71 +1028,6 @@ void tgf_repl_evaluator::end_answer() {
 
 tref tgf_repl_evaluator::state() const {
 	return state_value(*this);
-}
-
-tref statement_request(const tgf_repl_evaluator::trv& n) {
-	using p = tgf_repl_parser;
-	using base = tgf_repl_evaluator_base;
-	const auto nt = n | tt::nonterminal;
-	trefs req{ jt::build_pair(tp::cmd, jt::build_string(base::name_of(nt))) };
-	auto add = [&req](const char* key, std::string_view v) {
-		req.push_back(jt::build_pair(key, jt::build_string(v)));
-	};
-	switch (nt) {
-	case p::parse_cmd: {
-		auto i = n | p::parse_input;
-		std::string input;
-		if (auto seq = i | p::parse_input_char_seq; seq.has_value())
-			input = seq | tt::terminals;
-		else if (auto qs = i | p::quoted_string; qs.has_value()) {
-			diagnostics::report rep;
-			input = base::unquote(qs | tt::terminals, rep);
-		}
-		add(tp::input, input);
-		break;
-	}
-	case p::parse_file_cmd:
-	case p::load_cmd: {
-		auto fn = n | p::filename;
-		diagnostics::report rep;
-		add(tp::file, base::unquote(fn | tt::terminals, rep));
-		break;
-	}
-	case p::start_cmd:
-	case p::igrammar_cmd:
-	case p::unreachable_cmd: {
-		auto sym = n | p::symbol;
-		if (sym.has_value()) add(tp::symbol, sym | tt::terminals);
-		break;
-	}
-	case p::help_cmd: {
-		auto h = n | p::help_arg;
-		if (h.has_value()) add(tp::command, base::name_of(
-			h | tt::only_child | tt::nonterminal));
-		break;
-	}
-	case p::get_cmd:
-		if (auto name = base::option_name(n); !name.empty())
-			add(tp::option, name);
-		break;
-	// The client knows no option kind, so the server reads the text.
-	case p::set_cmd:
-	case p::add_cmd:
-	case p::del_cmd:
-		add(tp::option, base::option_name(n));
-		add(tp::text, base::option_text(n));
-		break;
-	case p::toggle_cmd:
-	case p::enable_cmd:
-	case p::disable_cmd:
-		add(tp::option, base::option_name(n));
-		break;
-	default:
-		// grammar, reload, version, license, quit and clear carry no
-		// field beyond cmd.
-		break;
-	}
-	return jt::build_object(req);
 }
 
 tgf_repl_evaluator::tgf_repl_evaluator(std::string tgf_file)

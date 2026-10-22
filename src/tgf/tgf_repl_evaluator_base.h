@@ -6,7 +6,6 @@
 
 #include <cstddef>
 #include <ostream>
-#include <set>
 #include <string>
 #include <string_view>
 
@@ -104,6 +103,12 @@ struct tgf_repl_evaluator_base : repl_evaluator_base<tgf_repl_parser,
 	/// name.
 	static size_t help_argument_of(std::string_view name);
 
+protected:
+	/// The {"grammar","start","char_classes"} state of the session.
+	virtual tref state() const = 0;
+	/// The status of state() and "tgf>".
+	std::string prompt_text() const override;
+
 	/// The option name of a get, set, add, delete or toggle statement.
 	static std::string option_name(const trv& s);
 	/// The option value text of a set, add or delete statement.
@@ -112,20 +117,7 @@ struct tgf_repl_evaluator_base : repl_evaluator_base<tgf_repl_parser,
 	/// it is. A bad escape goes to @p rep and gives an empty text.
 	static std::string unquote(const std::string& s,
 		diagnostics::report& rep);
-
-protected:
-	/// The {"grammar","start","char_classes"} state of the session.
-	virtual tref state() const = 0;
-	/// The status of state() and "tgf>".
-	std::string prompt_text() const override;
 };
-
-/// Text of one command result from its data only. The local REPL and the
-/// remote evaluator of `tgf connect` share it, so the remote text matches
-/// the local text.
-void render_command_text(const cmd_result& r, std::ostream& os,
-	const term::colors& TC,
-	const std::set<size_t>* char_classes = nullptr);
 
 } // namespace idni
 
