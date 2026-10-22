@@ -156,6 +156,10 @@ if(TAU_PARSER_BUILD_SERVE AND NOT EMSCRIPTEN AND TARGET tgf)
 	list(APPEND DOCTESTS tgf_serve tgf_connect)
 endif()
 
+if(TARGET tgf_connect_core AND NOT EMSCRIPTEN)
+	list(APPEND DOCTESTS tgf_connect_core)
+endif()
+
 # The JSON document tree on the tree library.
 list(APPEND DOCTESTS json_tree)
 
@@ -183,6 +187,8 @@ foreach(X IN LISTS DOCTESTS)
 	add_executable(${N} "${N}.cpp")
 	if(EMSCRIPTEN)
 		tauparser_emcc_setup(${N})
+	elseif(X STREQUAL "tgf_connect_core")
+		tauparser_setup(${N} PRIVATE tgf_connect_core)
 	elseif(X STREQUAL "tgf_json_api")
 		tauparser_setup(${N} PRIVATE tgf_cli_core)
 	elseif(X STREQUAL "tgf_serve")

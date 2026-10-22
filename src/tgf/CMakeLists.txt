@@ -1,20 +1,54 @@
-add_library(tgf_cli_core STATIC
-	"${CMAKE_CURRENT_SOURCE_DIR}/tgf_cli.cpp"
-	"${CMAKE_CURRENT_SOURCE_DIR}/tgf_repl_evaluator_base.cpp"
-	"${CMAKE_CURRENT_SOURCE_DIR}/tgf_json_api.cpp")
-tauparser_setup(tgf_cli_core PUBLIC tauparser)
-target_compile_definitions_if(tgf_cli_core PRIVATE
+# The client core holds the REPL parser and renderer, not the grammar loader.
+add_library(tgf_connect_core STATIC
+	"${CMAKE_CURRENT_SOURCE_DIR}/tgf_repl_evaluator_base.cpp")
+tauparser_setup(tgf_connect_core PUBLIC tauparser)
+target_compile_definitions_if(tgf_connect_core PRIVATE
 	"${TAU_PARSER_DEFINITIONS}")
-target_include_directories(tgf_cli_core PUBLIC
+target_include_directories(tgf_connect_core PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
 )
+# a header-only build resolves productions() inline instead
+if(NOT TAU_PARSER_BUILD_HEADER_ONLY)
+	target_sources(tgf_connect_core PRIVATE
+		"${CMAKE_CURRENT_SOURCE_DIR}/tgf_repl_parser.generated.cpp")
+	set_source_files_properties(
+		"${CMAKE_CURRENT_SOURCE_DIR}/tgf_repl_parser.generated.cpp"
+		PROPERTIES COMPILE_OPTIONS "${TAU_PARSER_DATA_SOURCE_OPTIONS}")
+endif()
+if(NOT WIN32)
+	target_compile_options(tgf_connect_core PRIVATE -fPIC)
+endif()
 
-# tgf_cli.cpp reaches tgf_repl_parser (via tgf_cli.h), tgf_test_parser and
-# treemr_parser (via tgf_test.h) directly; a header-only build resolves
-# productions() inline instead, so these stay out of that build entirely
+# Only tgf_serve.cpp and the net library include Boost.Asio, so the parser
+# core stays free of Boost.
+if(TAU_PARSER_BUILD_SERVE)
+	# serve without TAU_PARSER_BUILD_NET still needs the library
+	if(NOT TARGET tauparser_net)
+		add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../net"
+			"${CMAKE_CURRENT_BINARY_DIR}/net")
+	endif()
+	target_link_libraries(tgf_connect_core PUBLIC tauparser_net)
+	target_include_directories(tgf_connect_core SYSTEM PUBLIC
+		"${TAU_BOOST_INCLUDE_DIR_RESOLVED}")
+	find_package(Threads REQUIRED)
+	target_link_libraries(tgf_connect_core PUBLIC Threads::Threads)
+	if(WIN32)
+		target_link_libraries(tgf_connect_core PUBLIC ws2_32 mswsock)
+	endif()
+endif()
+
+add_library(tgf_cli_core STATIC
+	"${CMAKE_CURRENT_SOURCE_DIR}/tgf_cli.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/tgf_json_api.cpp")
+tauparser_setup(tgf_cli_core PUBLIC tgf_connect_core)
+target_compile_definitions_if(tgf_cli_core PRIVATE
+	"${TAU_PARSER_DEFINITIONS}")
+
+# tgf_cli.cpp reaches tgf_test_parser and treemr_parser (via tgf_test.h)
+# directly; a header-only build resolves productions() inline instead, so
+# these stay out of that build entirely
 if(NOT TAU_PARSER_BUILD_HEADER_ONLY)
 	set(TGF_CLI_CORE_GENERATED_SOURCES
-		"${CMAKE_CURRENT_SOURCE_DIR}/tgf_repl_parser.generated.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/../format/treemr/treemr_parser.generated.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/../format/tgf.test/tgf_test_parser.generated.cpp"
 	)
@@ -27,17 +61,11 @@ if(NOT WIN32)
 	target_compile_options(tgf_cli_core PRIVATE -fPIC)
 endif()
 
-# tgf serve and tgf connect need Boost.Asio. The option keeps the parser
-# core free of Boost; only tgf_serve.cpp includes Asio.
 if(TAU_PARSER_BUILD_SERVE)
 	target_sources(tgf_cli_core PRIVATE
 		"${CMAKE_CURRENT_SOURCE_DIR}/tgf_serve.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/tgf_connect.cpp")
 	target_compile_definitions(tgf_cli_core PRIVATE TAU_PARSER_BUILD_SERVE)
-	target_include_directories(tgf_cli_core SYSTEM PUBLIC
-		"${TAU_BOOST_INCLUDE_DIR_RESOLVED}")
-	find_package(Threads REQUIRED)
-	target_link_libraries(tgf_cli_core PUBLIC Threads::Threads)
 	if(WIN32)
 		# Asio's accept path calls AcceptEx and GetAcceptExSockaddrs, which live in mswsock.
 		# The session id reads the OS entropy source through BCryptGenRandom.
@@ -50,9 +78,9 @@ endif()
 include(ftxui)
 if(TAU_PARSER_HAS_FTXUI_DEP)
 	find_package(Threads REQUIRED)
-	target_link_libraries(tgf_cli_core PUBLIC
+	target_link_libraries(tgf_connect_core PUBLIC
 		ftxui::screen ftxui::dom ftxui::component Threads::Threads)
-	target_compile_definitions(tgf_cli_core PUBLIC TAU_PARSER_HAS_FTXUI)
+	target_compile_definitions(tgf_connect_core PUBLIC TAU_PARSER_HAS_FTXUI)
 	message(STATUS "tgf: FTXUI REPL enabled (legacy via -X)")
 elseif(NOT TAU_PARSER_DONT_USE_FTXUI)
 	message(WARNING "tgf: FTXUI not available - legacy terminal REPL will be used")
