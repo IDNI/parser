@@ -21,7 +21,7 @@ namespace idni {
 
 /// Options of the `tgf connect` subcommand. The client never sees a grammar
 /// file: the session of the server holds the grammar.
-struct connect_options {
+struct tgf_connect_options {
 	std::string host = "127.0.0.1";
 	uint16_t port = 0;
 	/// Attach to this session instead of starting a new one. Empty starts
@@ -92,7 +92,7 @@ private:
 
 /// Run `tgf connect`: connect, run the text REPL with a remote evaluator and
 /// return when the client quits. The returned report carries every error.
-diagnostics::result<int> tgf_connect_run(const connect_options& opt);
+diagnostics::result<int> tgf_connect_run(const tgf_connect_options& opt);
 
 } // namespace idni
 

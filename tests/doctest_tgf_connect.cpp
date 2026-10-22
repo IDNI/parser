@@ -9,6 +9,7 @@
 #include "serve/tgf_serve_test_fixture.h"
 #include "../src/tgf/tgf_cli.h"
 #include "../src/tgf/tgf_connect.h"
+#include "../src/net/line_client.h"
 #include "../src/tgf/tgf_serve.h"
 #include "format/json/json.h"
 
@@ -18,6 +19,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <type_traits>
 
 // The dep script ships headers only, so Boost.System must stay header-only.
 #ifndef BOOST_ERROR_CODE_HEADER_ONLY
@@ -39,6 +41,10 @@ using tgf_serve_test::serve_fixture;
 namespace ba = boost::asio;
 using ba::ip::tcp;
 using boost::system::error_code;
+
+TEST_CASE("tgf and net connect options have distinct types") {
+	CHECK((!std::is_same_v<tgf_connect_options, connect_options>));
+}
 
 static std::string write_temp_grammar(const std::string& text) {
 	std::string dir = tgf_serve_test::make_temp_dir("tgf_connect_");

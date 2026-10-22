@@ -326,7 +326,7 @@ diagnostics::result<int> tgf_remote_evaluator::eval(const std::string& src) {
 	return res;
 }
 
-diagnostics::result<int> tgf_connect_run(const connect_options& opt) {
+diagnostics::result<int> tgf_connect_run(const tgf_connect_options& opt) {
 	diagnostics::result<int> res;
 	tgf_remote_evaluator re(std::cout);
 	if (!re.connect(opt.host, opt.port, opt.session)) {

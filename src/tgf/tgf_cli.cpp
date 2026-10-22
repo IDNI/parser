@@ -1532,7 +1532,7 @@ static int connect_command(const vector<string>& inputs) {
 #else
 	if (inputs.size() != 1) return command_line_error(
 		"connect needs one <host>:<port> argument");
-	connect_options opt;
+	tgf_connect_options opt;
 	if (!connect_parse_host_port(inputs.front(), opt.host, opt.port))
 		return command_line_error("invalid <host>:<port> argument");
 	opt.session = idni::options().get<string>("session");
