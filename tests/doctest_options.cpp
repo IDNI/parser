@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cstdlib>
+#include <filesystem>
 #include <initializer_list>
 #include <set>
 #include <sstream>
@@ -953,6 +954,15 @@ TEST_CASE("a URL is an input") {
 		CHECK(r.value().inputs == vector<string>{ url });
 		CHECK(r.value().command == "show");
 	}
+}
+
+TEST_CASE("a directory is an input") {
+	const string dir = std::filesystem::temp_directory_path().string();
+	fixture f;
+	argv_of a{ "tool", "run", dir.c_str() };
+	auto r = f.repo.parse_args(a.argc(), a.argv(), tool_config());
+	REQUIRE(r.has_value());
+	CHECK(r.value().inputs == vector<string>{ dir });
 }
 
 TEST_CASE("a word that is no file and no URL is an error") {

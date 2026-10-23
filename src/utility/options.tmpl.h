@@ -9,6 +9,7 @@
 #include <cctype>
 #include <charconv>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <map>
 #include <memory>
@@ -606,7 +607,11 @@ inline diagnostics::result<parsed_args> options_repository::parse_args(
 		if (cat.command(opt)) return 2;
 		bool is_short = false;
 		if (!detail::option_prefix(opt, is_short)) {
+			// A directory is an input, so the command names it in its own
+			// refusal: Windows does not open one as a stream.
+			std::error_code ec;
 			if (opt == "-" || std::ifstream(opt).good()
+				|| std::filesystem::is_directory(opt, ec)
 				|| detail::is_url(opt))
 			{
 				out.inputs.push_back(opt);
