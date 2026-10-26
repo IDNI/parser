@@ -19,20 +19,38 @@
 #include "utility/forest.h"
 #include "parser.h"
 
-// use boost log if available otherwise use std::cout
-#ifdef BOOST_LOG_TRIVIAL
-#	define LOG_DEBUG BOOST_LOG_TRIVIAL(debug)
-#	define LOG_INFO  BOOST_LOG_TRIVIAL(info)
-#	define LOG_ERROR BOOST_LOG_TRIVIAL(error)
-#	define LOG_END  ""
-#	define LOG_REWRITING false
+// Errors go to the host's LOG_ERROR when it has one, else to Boost.Log when
+// available, else to std::cerr.
+#if defined(LOG_ERROR)
+#	define REWRITING_LOG_ERROR LOG_ERROR
+#	define REWRITING_LOG_ERROR_END ""
+#elif defined(BOOST_LOG_TRIVIAL)
+#	define REWRITING_LOG_ERROR BOOST_LOG_TRIVIAL(error) << "(Error) "
+#	define REWRITING_LOG_ERROR_END ""
 #else
-#	define LOG_DEBUG std::cout
-#	define LOG_INFO  std::cout
-#	define LOG_ERROR std::cerr
-#	define LOG_END   "\n"
-#	ifdef DEBUG
-#		define LOG_REWRITING true
+#	include <iostream>
+#	define REWRITING_LOG_ERROR std::cerr << "(Error) "
+#	define REWRITING_LOG_ERROR_END "\n"
+#endif
+
+// Defining DEBUG_TREE_REWRITER compiles in the logs of the rewriter, which run
+// on every rewritten node. A host with logging channels (one defining
+// LOG_CHANNEL_NAME and LOG_DEBUG, as tau does) gets them on the channel
+// "rewriting"; otherwise they go to Boost.Log when available, else std::cout.
+#ifdef DEBUG_TREE_REWRITER
+#	if defined(LOG_CHANNEL_NAME) && defined(LOG_DEBUG)
+#		pragma push_macro("LOG_CHANNEL_NAME")
+#		undef LOG_CHANNEL_NAME
+#		define LOG_CHANNEL_NAME "rewriting"
+#		define REWRITING_LOG_DEBUG LOG_DEBUG
+#		define REWRITING_LOG_END   ""
+#	elif defined(BOOST_LOG_TRIVIAL)
+#		define REWRITING_LOG_DEBUG BOOST_LOG_TRIVIAL(debug) << "[rewriting] "
+#		define REWRITING_LOG_END   ""
+#	else
+#		include <iostream>
+#		define REWRITING_LOG_DEBUG std::cout << "[rewriting] "
+#		define REWRITING_LOG_END   "\n"
 #	endif
 #endif
 
@@ -1776,15 +1794,14 @@ node_t apply_rule(const rule<node_t>& r, const node_t& n, const is_capture_t& c)
 	pattern_matcher2<node_t, is_capture_t> matcher {r, c};
 	post_order(n).search_unique(matcher);
 	auto nn = matcher.replace_root(n);
-#ifdef LOG_REWRITING
-	if constexpr (LOG_REWRITING) {
-		if (nn != n) {
-			auto [p , s] = r;
-			LOG_DEBUG << "(R) " << p << " := " << s << LOG_END;
-			LOG_DEBUG << "(F) " << nn << LOG_END;
-		}
+#ifdef DEBUG_TREE_REWRITER
+	if (nn != n) {
+		auto [p , s] = r;
+		REWRITING_LOG_DEBUG << "Rule applied: " << p << " := " << s
+			<< REWRITING_LOG_END;
+		REWRITING_LOG_DEBUG << "Rewritten tree: " << nn << REWRITING_LOG_END;
 	}
-#endif // LOG_REWRITING
+#endif // DEBUG_TREE_REWRITER
 	return nn;
 }
 
@@ -1802,14 +1819,13 @@ node_t apply_if(const rule<node_t>& r, const node_t& n,
 	environment<node_t> u;
 	pattern_matcher_if<node_t, is_capture_t, predicate_t> matcher {p, u, c, predicate};
 	auto nn = apply(s, n, matcher);
-#ifdef LOG_REWRITING
-	if constexpr (LOG_REWRITING) {
-		if (nn != n) {
-			LOG_DEBUG << "(R) " << p << " := " << s << LOG_END;
-			LOG_DEBUG << "(F) " << nn << LOG_END;
-		}
+#ifdef DEBUG_TREE_REWRITER
+	if (nn != n) {
+		REWRITING_LOG_DEBUG << "Rule applied: " << p << " := " << s
+			<< REWRITING_LOG_END;
+		REWRITING_LOG_DEBUG << "Rewritten tree: " << nn << REWRITING_LOG_END;
 	}
-#endif // LOG_REWRITING
+#endif // DEBUG_TREE_REWRITER
 	return nn;
 }
 
@@ -1868,7 +1884,7 @@ sp_node<symbol_t> make_node_from_parse_result(
 	if (r.found) return make_node_from_tree<
 		parser_t, transformer_t, symbol_t>(
 			transformer, r.get_shaped_tree());
-	LOG_ERROR << "(Error) " << r.parse_error << LOG_END;
+	REWRITING_LOG_ERROR << r.parse_error << REWRITING_LOG_ERROR_END;
 	return 0;
 }
 
@@ -1914,9 +1930,13 @@ struct std::hash<idni::rewriter::depreciating::node<symbol_t>> {
 	}
 };
 
-#undef LOG_DEBUG
-#undef LOG_INFO
-#undef LOG_ERROR
-#undef LOG_END
-#undef LOG_REWRITING
+#undef REWRITING_LOG_ERROR
+#undef REWRITING_LOG_ERROR_END
+#ifdef DEBUG_TREE_REWRITER
+#	if defined(LOG_CHANNEL_NAME) && defined(LOG_DEBUG)
+#		pragma pop_macro("LOG_CHANNEL_NAME")
+#	endif
+#	undef REWRITING_LOG_DEBUG
+#	undef REWRITING_LOG_END
+#endif
 #endif // __IDNI__PARSER__REWRITING_H__
