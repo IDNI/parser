@@ -1592,13 +1592,23 @@ typename parser<C, T>::error parser<C, T>::get_error() {
 		predict_all_at(i);
 		size_t from = 0;
 		bool unexp_neg = false;
-		// decide the negation report before the main pass, so it
-		// does not depend on this set's insertion order
+		auto is_neg = [this](const item& t) {
+			return !g.conjunctive(t.prod) && completed(t)
+				&& get_nt(t).to_std_string().rfind("__N_", 0) == 0;
+		};
+		// The start of the last token: the latest start of an item
+		// that is not a negation.
+		size_t last_from = 0;
 		for (const item& t : S[i])
-			if (!g.conjunctive(t.prod) && completed(t) &&
-				get_nt(t).to_std_string().rfind("__N_", 0)
-					== 0)
-			{
+			if (!is_neg(t) && t.from != t.set && t.from > last_from)
+				last_from = t.from;
+		// decide the negation report before the main pass, so it
+		// does not depend on this set's insertion order. A negation
+		// that starts before the last token spans words the parse
+		// read another way (`a-b-c d` as `(a-b)-c d`, against an
+		// exclusion like `bf & ~bf_sub`), so it is not what failed.
+		for (const item& t : S[i])
+			if (is_neg(t) && t.from >= last_from) {
 				err.unexp = {};
 				for (size_t k = t.from; k < t.set; ++k)
 					err.unexp.emplace_back(in.tat(k));
