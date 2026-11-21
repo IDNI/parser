@@ -202,11 +202,9 @@ int main(int argc, char** argv) {
     print(bench_union_find(std::min(N, (size_t)50000)));
     print(bench_merge(std::min(N, (size_t)1024)));
 
-    std::cout << "\nNote: ankerl/unordered_dense v4.4.0 is vendored in external/.\n";
-    std::cout << "  M() uses std::unordered_map (node-based) because gc() requires\n";
-    std::cout << "  stable tref addresses across both inserts AND erases; segmented_map\n";
-    std::cout << "  only guarantees insert-stability. ankerl maps/sets are available\n";
-    std::cout << "  for other use cases where erase-stability is not required.\n\n";
+    std::cout << "\nNote: nodes live in a block arena, so a tref stays valid across\n";
+    std::cout << "  inserts AND erases; M() is an ankerl::unordered_dense::map\n";
+    std::cout << "  (open addressing) from node pointers to their handles.\n\n";
 
     return 0;
 }

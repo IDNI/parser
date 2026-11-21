@@ -22,6 +22,7 @@
 #include <iterator>
 #include <shared_mutex>
 #include <atomic>
+#include "ankerl/unordered_dense.h"
 #include "../defs.h"
 #include "tree_types.h"
 
@@ -318,7 +319,10 @@ struct bintree {
 	static size_t& geth_calls();
 	static size_t node_count();
 
-	/// bucket health of the intern map, for diagnosing lookup cost
+	/// bucket health of the intern map, for diagnosing lookup cost. The
+	/// index is open-addressing, so it has no chains: a non-empty index
+	/// reports max_chain = mean_chain = 1, and the histogram counts empty
+	/// buckets in bin 0 and entries in bin 1.
 	static void bucket_stats(size_t& buckets, size_t& entries,
 		double& load_factor, size_t& max_chain, double& mean_chain,
 		std::array<size_t, 8>* chain_len_histogram = nullptr);
@@ -371,11 +375,67 @@ protected:
 	const std::string str() const;
 
 	/**
-	 * @brief Map of tree nodes to their handles
+	 * @brief Hash of an interned node read through its pointer. It also
+	 * hashes a node value, so the index can be searched with a temporary.
 	 */
-	// Node-based storage: tref = &key must remain valid across inserts AND erases
-	// (gc() requires stable addresses on erase; segmented_map only guarantees insert-stability).
-	static std::unordered_map<bintree, htree::wp>& M();
+	struct node_ptr_hash {
+		using is_transparent = void;
+		std::uint64_t operator()(const bintree* p) const { return p->hash; }
+		std::uint64_t operator()(const bintree& b) const { return b.hash; }
+	};
+
+	/**
+	 * @brief Equality of interned nodes by content (value and children),
+	 * read through their pointers, with mixed forms for searching.
+	 */
+	struct node_ptr_eq {
+		using is_transparent = void;
+		bool operator()(const bintree* a, const bintree* b) const {
+			return a == b || *a == *b;
+		}
+		bool operator()(const bintree& a, const bintree* b) const {
+			return a == *b;
+		}
+		bool operator()(const bintree* a, const bintree& b) const {
+			return *a == b;
+		}
+	};
+
+	/**
+	 * @brief Intern index: an open-addressing map from each live node to
+	 * its weak handle. Its keys point into the node arena (see storage), so
+	 * the map may move its entries while every node, and every tref, stays.
+	 */
+	using index_t = ankerl::unordered_dense::map<const bintree*,
+		htree::wp, node_ptr_hash, node_ptr_eq>;
+
+	/**
+	 * @brief Node storage: the intern index and an arena of fixed-size
+	 * blocks. A node is constructed in place and never moves, so a tref (its
+	 * address) stays valid across inserts AND erases of other nodes. gc()
+	 * destroys a swept node and puts its slot on a free list for reuse.
+	 */
+	struct storage {
+		static constexpr size_t block_nodes = 4096;
+		index_t index;
+		std::vector<bintree*> blocks;
+		std::vector<bintree*> free_slots;
+		size_t used_in_last = block_nodes;
+		storage() = default;
+		storage(const storage&) = delete;
+		storage& operator=(const storage&) = delete;
+		~storage();
+		// constructs a copy of n in a free slot and returns its address
+		const bintree* make(const bintree& n);
+		// destroys the node at p and recycles its slot
+		void destroy(const bintree* p);
+	};
+	static storage& S();
+
+	/**
+	 * @brief The intern index of all live nodes and their handles
+	 */
+	static index_t& M();
 };
 
 template <typename T> struct pre_order;
