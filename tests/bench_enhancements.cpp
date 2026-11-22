@@ -1,15 +1,11 @@
 // To view the license please visit
 // https://github.com/IDNI/parser/blob/main/LICENSE.md
 
-// Benchmark: compare node interning throughput before/after the ankerl
-// segmented_map switch and measure new APIs.
+// Benchmark: node interning (new nodes and repeated lookups), gc, and the
+// April 2026 APIs. To compare two storage layouts, build and run it on each.
 //
 // Run with:   ./build/bench_enhancements [N]
-//   N = number of intern operations (default 500000)
-//
-// The "before" baseline is emulated by using std::unordered_map<bintree<char>>
-// with per-node heap allocation (the old behaviour). The "after" is the live
-// M() map (now a segmented_map).
+//   N = number of intern operations (default 100000)
 
 #include <chrono>
 #include <iostream>
@@ -59,43 +55,58 @@ void print(const Result& r) {
 // Measures how fast bintree<char>::get(v, l, r) can intern new nodes.
 // ---------------------------------------------------------------------------
 
-Result bench_intern(size_t N) {
-    // Build N distinct nodes: single-char nodes for 26 letters,
-    // then combine them into a binary tree by repeated interning.
+// Node i takes the node built just before it as its left child, so all N
+// nodes are distinct and every call of the first pass creates a node (a
+// miss); its right child is a pseudo-random earlier node. The second pass
+// repeats the same N calls, and each finds its node (a hit). gc is paused
+// while the pool holds plain trefs (no handles), so nothing is swept under it.
+std::pair<Result, Result> bench_intern(size_t N) {
+    bintree<char>::gc_pause pause;
     std::vector<tref> pool;
-    pool.reserve(26);
+    pool.reserve(N + 26);
     for (char c = 'a'; c <= 'z'; ++c)
         pool.push_back(bintree<char>::get(c, nullptr, nullptr));
+    std::vector<size_t> right(N);
+    std::mt19937_64 rng(1);
+    for (size_t i = 0; i < N; ++i) right[i] = rng() % (26 + i);
 
-    size_t ops = 0;
-    double ms = time_ms([&] {
-        // Repeatedly intern combinations
-        for (size_t i = 0; i < N; ++i) {
-            tref l = pool[i % 26];
-            tref r = pool[(i * 7 + 3) % 26];
-            char v = char('a' + (i * 13 + 5) % 26);
-            pool.push_back(bintree<char>::get(v, l, r));
-            ++ops;
-            // GC every 10000 ops to keep map size bounded
-            if (ops % 10000 == 0) bintree<char>::gc();
-        }
+    double ms_miss = time_ms([&] {
+        for (size_t i = 0; i < N; ++i)
+            pool.push_back(bintree<char>::get(char('a' + i % 26),
+                pool[25 + i], pool[right[i]]));
     });
-    return { "intern N nodes (M() segmented_map)", ms, ops };
+    size_t same = 0;
+    double ms_hit = time_ms([&] {
+        for (size_t i = 0; i < N; ++i)
+            same += bintree<char>::get(char('a' + i % 26),
+                pool[25 + i], pool[right[i]]) == pool[26 + i];
+    });
+    if (same != N)
+        std::cerr << "bench_intern: " << N - same
+                  << " lookups did not return their node\n";
+    return { { "intern N new nodes (misses)", ms_miss, N },
+             { "intern the same N nodes again (hits)", ms_hit, N } };
 }
 
 // ---------------------------------------------------------------------------
 // Benchmark 2: GC throughput
-// Measures how fast gc() can collect unreachable nodes.
+// Builds N distinct nodes that no handle holds (a chain), then times one
+// gc() that sweeps them. A first, untimed gc() clears the earlier benchmark.
 // ---------------------------------------------------------------------------
 
 Result bench_gc(size_t N) {
-    // Create N nodes without anchoring them (no htref) then time gc().
-    for (size_t i = 0; i < N; ++i) {
-        char v = char('a' + i % 26);
-        bintree<char>::get(v, nullptr, nullptr);
+    bintree<char>::gc();
+    {
+        bintree<char>::gc_pause pause;
+        tref prev = nullptr;
+        for (size_t i = 0; i < N; ++i)
+            prev = bintree<char>::get(char('a' + i % 26), prev, nullptr);
     }
+    size_t before = bintree<char>::node_count();
     double ms = time_ms([&] { bintree<char>::gc(); });
-    return { "gc() after " + std::to_string(N) + " unanchored nodes", ms, N };
+    size_t swept = before - bintree<char>::node_count();
+    return { "gc() sweeping " + std::to_string(swept) + " unanchored nodes",
+             ms, swept };
 }
 
 // ---------------------------------------------------------------------------
@@ -183,17 +194,17 @@ int main(int argc, char** argv) {
               << std::setw(15) << "Throughput\n";
     std::cout << std::string(67, '-') << "\n";
 
-    print(bench_intern(N));
-    print(bench_gc(N / 10));
+    auto [miss, hit] = bench_intern(N);
+    print(miss);
+    print(hit);
+    print(bench_gc(N));
     print(bench_fixpoint(N));
     print(bench_union_find(std::min(N, (size_t)50000)));
     print(bench_merge(std::min(N, (size_t)1024)));
 
-    std::cout << "\nNote: ankerl/unordered_dense v4.4.0 is vendored in external/.\n";
-    std::cout << "  M() uses std::unordered_map (node-based) because gc() requires\n";
-    std::cout << "  stable tref addresses across both inserts AND erases; segmented_map\n";
-    std::cout << "  only guarantees insert-stability. ankerl maps/sets are available\n";
-    std::cout << "  for other use cases where erase-stability is not required.\n\n";
+    std::cout << "\nNote: nodes live in a block arena, so a tref stays valid across\n";
+    std::cout << "  inserts AND erases; M() is an ankerl::unordered_dense::map\n";
+    std::cout << "  (open addressing) from node pointers to their handles.\n\n";
 
     return 0;
 }
