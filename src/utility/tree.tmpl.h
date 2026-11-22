@@ -106,8 +106,9 @@ const htref bintree<T>::geth(tref h) {
 	if (h == NULL) return htree::null();
 	MC(++geth_calls();)
 	std::unique_lock lock(mutex());
-	auto res = M().find(*reinterpret_cast<const bintree*>(h));
-	if (res == M().end()) {
+	auto& m = M();
+	auto res = m.find(reinterpret_cast<const bintree*>(h));
+	if (res == m.end()) {
 		DBG(assert(false && "geth: stale tref not found in M()");)
 		return htree::null();
 	}
@@ -137,17 +138,29 @@ tref bintree<T>::get(const T& v, tref l, tref r) {
 	// Fast path: shared lock for the common case where the node already exists.
 	{
 		std::shared_lock lock(mutex());
-		auto it = M().find(bn);
-		if (it != M().end()) {
+		auto& m = M();
+		auto it = m.find(bn);
+		if (it != m.end()) {
 			MC(++get_hits();)
-			return reinterpret_cast<tref>(std::addressof(it->first));
+			return reinterpret_cast<tref>(it->first);
 		}
 	}
-	// Slow path: exclusive lock to insert (double-check after acquiring).
+	// Slow path: exclusive lock; build the node in the arena and insert it,
+	// unless another thread inserted an equal node in between (then the
+	// new copy is destroyed and the existing node is returned).
 	std::unique_lock lock(mutex());
-	auto res = M().emplace(bn, htree::wp());
+	auto& s = S();
+	const bintree* p = s.make(bn);
+	std::pair<typename index_t::iterator, bool> res;
+	try {
+		res = s.index.try_emplace(p, htree::wp());
+	} catch (...) {
+		s.destroy(p);
+		throw;
+	}
+	if (!res.second) s.destroy(p);
 	MC(res.second ? ++get_misses() : ++get_hits();)
-	return reinterpret_cast<tref>(std::addressof(res.first->first));
+	return reinterpret_cast<tref>(res.first->first);
 }
 
 template <typename T>
@@ -157,8 +170,8 @@ template <typename T>
 void bintree<T>::dump() {
 	std::cout << "-----\n";
 	std::cout << "MB:" << M().size() << "\n";
-	for (auto& x : M) {
-		std::cout << x.first.str() << " " << x.second.lock() << " "
+	for (auto& x : M()) {
+		std::cout << x.first->str() << " " << x.second.lock() << " "
 			<< x.second.use_count() << "\n";
 	}
 	std::cout << "-----\n";
@@ -246,11 +259,19 @@ void bintree<T>::gc(std::unordered_set<tref>& keep) {
 	}
 	htree::M = std::move(hm);
 	*/
-	//delete non-reachable garbage nodes from M
-	for (auto it = M().begin(); it != M().end(); )
-		if (next.count(it->first.get()) == 0)
-			it = M().erase(it);
-		else keep.insert(it->first.get()), it++;
+	// delete non-reachable garbage nodes: unlink each from the index first
+	// (its hash and equality read the node), then destroy it and recycle its
+	// slot. Reachable nodes are not touched, so their trefs stay valid.
+	auto& s = S();
+	std::vector<const bintree*> garbage;
+	for (const auto& x : s.index)
+		if (next.count(x.first->get()) == 0) garbage.push_back(x.first);
+		else keep.insert(x.first->get());
+	s.free_slots.reserve(s.free_slots.size() + garbage.size());
+	for (const bintree* p : garbage) {
+		s.index.erase(p);
+		s.destroy(p);
+	}
 
 	// call callbacks to rebuild caches
 	for (const auto& cb : gc_callbacks) cb(keep);
@@ -367,10 +388,52 @@ std::vector<const bintree<T>*> bintree<T>::V;
 */
 
 template <typename T>
-std::unordered_map<bintree<T>, htree::wp>& bintree<T>::M() {
-	static std::unordered_map<bintree<T>, htree::wp> m;
-	return m;
+bintree<T>::storage::~storage() {
+	// destroy the nodes still alive, then release the blocks
+	for (const auto& x : index) x.first->~bintree();
+	std::allocator<bintree> a;
+	for (bintree* b : blocks) a.deallocate(b, block_nodes);
 }
+
+template <typename T>
+const bintree<T>* bintree<T>::storage::make(const bintree& n) {
+	bintree* slot;
+	if (!free_slots.empty()) {
+		slot = free_slots.back();
+		free_slots.pop_back();
+	} else {
+		if (used_in_last == block_nodes) {
+			// reserve first, so the push_back below cannot throw and
+			// leak the new block
+			if (blocks.size() == blocks.capacity())
+				blocks.reserve(2 * blocks.size() + 1);
+			blocks.push_back(std::allocator<bintree>{}.allocate(block_nodes));
+			used_in_last = 0;
+		}
+		slot = blocks.back() + used_in_last++;
+	}
+	try {
+		return ::new (static_cast<void*>(slot)) bintree(n);
+	} catch (...) {
+		free_slots.push_back(slot);
+		throw;
+	}
+}
+
+template <typename T>
+void bintree<T>::storage::destroy(const bintree* p) {
+	p->~bintree();
+	free_slots.push_back(const_cast<bintree*>(p));
+}
+
+template <typename T>
+typename bintree<T>::storage& bintree<T>::S() {
+	static storage s;
+	return s;
+}
+
+template <typename T>
+typename bintree<T>::index_t& bintree<T>::M() { return S().index; }
 
 template <typename T>
 size_t& bintree<T>::get_hits() {
@@ -403,22 +466,15 @@ void bintree<T>::bucket_stats(size_t& buckets, size_t& entries,
 	buckets = m.bucket_count();
 	entries = m.size();
 	load_factor = m.load_factor();
-	max_chain = 0;
-	if (chain_len_histogram) chain_len_histogram->fill(0);
-	size_t nonempty = 0, sum = 0;
-	for (size_t i = 0; i < buckets; ++i) {
-		size_t bs = m.bucket_size(i);
-		if (bs > max_chain) max_chain = bs;
-		if (bs) ++nonempty, sum += bs;
-		if (chain_len_histogram) {
-			// bins: 0, 1, 2, 3, 4-7, 8-15, 16-63, 64+
-			size_t bin = bs <= 3 ? bs
-				: bs <=  7 ? 4 : bs <= 15 ? 5
-				: bs <= 63 ? 6 : 7;
-			++(*chain_len_histogram)[bin];
-		}
+	// open addressing: every entry sits in its own bucket, there are no chains
+	max_chain = entries ? 1 : 0;
+	mean_chain = entries ? 1.0 : 0.0;
+	if (chain_len_histogram) {
+		// bins: 0, 1, 2, 3, 4-7, 8-15, 16-63, 64+
+		chain_len_histogram->fill(0);
+		(*chain_len_histogram)[0] = buckets > entries ? buckets - entries : 0;
+		(*chain_len_histogram)[1] = entries;
 	}
-	mean_chain = nonempty ? double(sum) / double(nonempty) : 0.0;
 }
 
 template <typename T>
@@ -437,7 +493,7 @@ void bintree<T>::hash_group_stats(size_t& distinct_hashes,
 	std::shared_lock lock(mutex());
 	auto& m = M();
 	std::unordered_map<std::uint64_t, std::vector<const bintree*>> groups;
-	for (auto& [node, wp] : m) groups[node.hash].push_back(&node);
+	for (auto& [node, wp] : m) groups[node->hash].push_back(node);
 	distinct_hashes = groups.size();
 	std::multimap<size_t, std::uint64_t, std::greater<size_t>> by_size;
 	for (auto& [h, nodes] : groups) by_size.emplace(nodes.size(), h);
@@ -452,7 +508,7 @@ void bintree<T>::hash_group_stats(size_t& distinct_hashes,
 	largest_group_hash = by_size.empty() ? 0 : by_size.begin()->second;
 	largest_group_stale_count = 0;
 	for (auto& [node, wp] : m)
-		if (node.hashit(node.value, node.l, node.r) != node.hash)
+		if (node->hashit(node->value, node->l, node->r) != node->hash)
 			++stale_hash_count;
 	size_t i = 0;
 	for (auto it = by_size.begin(); it != by_size.end() && i < 5; ++it, ++i) {

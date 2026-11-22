@@ -55,10 +55,10 @@ struct tiny_grammar {
 };
 
 // ---------------------------------------------------------------------------
-// 0/8. segmented_map stability
+// 0/8. node storage stability (block arena + open-addressing index)
 // ---------------------------------------------------------------------------
 
-TEST_SUITE("enhancement 8: segmented_map stability") {
+TEST_SUITE("enhancement 8: node storage stability") {
 
     TEST_CASE("node addresses remain stable after bulk insertions") {
         tref ref = chtree::get('A');
@@ -80,6 +80,54 @@ TEST_SUITE("enhancement 8: segmented_map stability") {
         tref a = n('a', { n('b') });
         tref b = n('a', { n('c') });
         CHECK(a != b);
+    }
+
+    TEST_CASE("a held node keeps its tref while gc sweeps other nodes") {
+        tref a = chtree::get('A', { chtree::get('B') });
+        auto ha = chtree::geth(a);
+        {
+            bintree<char>::gc_pause pause;
+            tref prev = nullptr;
+            for (int i = 0; i < 5000; ++i) // unanchored garbage
+                prev = bintree<char>::get(char('a' + i % 26), prev, nullptr);
+        }
+        size_t before = bintree<char>::node_count();
+        bintree<char>::gc();
+        CHECK(bintree<char>::node_count() < before);
+        CHECK(chtree::get(a).value == 'A');
+        CHECK(chtree::geth(a) == ha);
+        // new nodes may take the swept slots; the held node does not move
+        tref prev = nullptr;
+        for (int i = 0; i < 5000; ++i)
+            prev = bintree<char>::get(char('z' - i % 26), prev, nullptr);
+        CHECK(chtree::get(a).value == 'A');
+        CHECK(chtree::get('A', { chtree::get('B') }) == a);
+    }
+
+    TEST_CASE("a swept node can be interned again") {
+        {
+            tref x = chtree::get('Q', { chtree::get('R'), chtree::get('S') });
+            CHECK(chtree::get(x).value == 'Q');
+        }
+        bintree<char>::gc(); // nothing holds x: it is swept
+        tref y = chtree::get('Q', { chtree::get('R'), chtree::get('S') });
+        CHECK(chtree::get(y).value == 'Q');
+        CHECK(chtree::get('Q', { chtree::get('R'), chtree::get('S') }) == y);
+    }
+
+    TEST_CASE("bucket_stats describes the open-addressing index") {
+        chtree::get('A');
+        size_t buckets = 0, entries = 0, max_chain = 0;
+        double load_factor = 0.0, mean_chain = 0.0;
+        std::array<size_t, 8> hist{};
+        bintree<char>::bucket_stats(buckets, entries, load_factor,
+            max_chain, mean_chain, &hist);
+        CHECK(entries == bintree<char>::node_count());
+        CHECK(buckets >= entries);
+        CHECK(max_chain == 1);
+        CHECK(mean_chain == 1.0);
+        CHECK(hist[0] + hist[1] == buckets);
+        CHECK(hist[1] == entries);
     }
 }
 
