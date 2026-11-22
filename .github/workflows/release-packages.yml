@@ -136,6 +136,15 @@ jobs:
         with:
           arch: x64
 
+      # clang-cl from PATH must be the Visual Studio one: the MSVC STL rejects an
+      # older clang, and the standalone LLVM of the runner image lags behind it.
+      - name: Put the Visual Studio clang-cl first on PATH
+        shell: bash
+        run: |
+          llvm="${VCINSTALLDIR}Tools\\Llvm\\x64\\bin"
+          test -f "$llvm\\clang-cl.exe"
+          echo "$llvm" >> "$GITHUB_PATH"
+
       # The windows-latest image has no NSIS, and CPack needs makensis.
       - name: Install NSIS
         shell: pwsh
