@@ -151,14 +151,15 @@ tref bintree<T>::get(const T& v, tref l, tref r) {
 	std::unique_lock lock(mutex());
 	auto& s = S();
 	const bintree* p = s.make(bn);
-	std::pair<typename index_t::iterator, bool> res;
-	try {
-		res = s.index.try_emplace(p, htree::wp());
-	} catch (...) {
-		s.destroy(p);
-		throw;
-	}
-	if (!res.second) s.destroy(p);
+	// destroys the new node unless the index takes it, also when the insert
+	// throws (no try/catch: the wasm build has exceptions disabled)
+	struct release {
+		storage& s;
+		const bintree* p;
+		~release() { if (p) s.destroy(p); }
+	} guard{ s, p };
+	auto res = s.index.try_emplace(p, htree::wp());
+	if (res.second) guard.p = nullptr;
 	MC(res.second ? ++get_misses() : ++get_hits();)
 	return reinterpret_cast<tref>(res.first->first);
 }
@@ -412,12 +413,16 @@ const bintree<T>* bintree<T>::storage::make(const bintree& n) {
 		}
 		slot = blocks.back() + used_in_last++;
 	}
-	try {
-		return ::new (static_cast<void*>(slot)) bintree(n);
-	} catch (...) {
-		free_slots.push_back(slot);
-		throw;
-	}
+	// returns the slot to the free list when the copy throws (no try/catch:
+	// the wasm build has exceptions disabled)
+	struct reclaim {
+		std::vector<bintree*>& free_slots;
+		bintree* slot;
+		~reclaim() { if (slot) free_slots.push_back(slot); }
+	} guard{ free_slots, slot };
+	const bintree* q = ::new (static_cast<void*>(slot)) bintree(n);
+	guard.slot = nullptr;
+	return q;
 }
 
 template <typename T>
