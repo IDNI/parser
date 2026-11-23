@@ -15,6 +15,8 @@ const { execSync } = require('child_process');
 const {
 	readScreenText,
 	waitForPrompt,
+	waitForScreen,
+	countPrompts,
 	waitForWasm,
 	focusTerminal,
 } = require('./browser_helpers');
@@ -29,6 +31,8 @@ const TGF_BIN     = args[0];
 const WASM_DIR    = path.resolve(args[1]);
 const GRAMMAR_SRC = path.resolve(args[2]);
 const COMMANDS    = args.length > 3 ? args.slice(3) : ['grammar', 'p x = 0 || y = 1', 'p x = 2', 'quit'];
+
+const CMD_TIMEOUT_MS = 60000;
 
 const TAU_CHROME_BIN = process.env.TAU_CHROME_BIN;
 if (!TAU_CHROME_BIN) {
@@ -98,12 +102,19 @@ async function runBrowser(port) {
 	}
 	await focusTerminal(page);
 
+	// Wait for each command to finish rather than for a fixed time: every
+	// evaluation starts its own threads, and on a loaded runner a new worker
+	// can take seconds to come up.
 	for (const cmd of COMMANDS) {
+		const prompts = countPrompts(await readScreenText(page));
 		await page.keyboard.type(cmd);
 		await page.keyboard.press('Enter');
-		await new Promise(r => setTimeout(r, 2000));
+		const finished = cmd === 'quit'
+			? text => text.includes('Quit.')
+			: text => countPrompts(text) > prompts;
+		if (!await waitForScreen(page, finished, CMD_TIMEOUT_MS))
+			console.error(`command did not finish in time: ${cmd}`);
 	}
-	await new Promise(r => setTimeout(r, 3000));
 
 	const screen = await readScreenText(page);
 

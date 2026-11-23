@@ -35,6 +35,20 @@ async function waitForPrompt(page, timeoutMs = LOAD_TIMEOUT_MS) {
 	return false;
 }
 
+// Wait until the screen satisfies done(text). Returns whether it did.
+async function waitForScreen(page, done, timeoutMs = LOAD_TIMEOUT_MS) {
+	const deadline = Date.now() + timeoutMs;
+	while (Date.now() < deadline) {
+		if (done(await readScreenText(page))) return true;
+		await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+	}
+	return false;
+}
+
+function countPrompts(text) {
+	return text.split('\n').filter(l => l.includes('tgf>')).length;
+}
+
 async function waitForWasm(page) {
 	await page.waitForFunction(
 		() => typeof Module !== 'undefined' && typeof FS !== 'undefined',
@@ -51,6 +65,8 @@ module.exports = {
 	readScreen,
 	readScreenText,
 	waitForPrompt,
+	waitForScreen,
+	countPrompts,
 	waitForWasm,
 	focusTerminal,
 };
