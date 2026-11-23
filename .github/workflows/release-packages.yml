@@ -78,7 +78,15 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Build the macOS package
-        run: ./dev preset release-macos-packages -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+        # hdiutil on the hosted runners now and then fails with "Resource
+        # busy" while it makes the .dmg; the rerun only repeats the packaging.
+        run: |
+          for attempt in 1 2 3; do
+            ./dev preset release-macos-packages -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} && exit 0
+            echo "::warning::macOS packaging attempt $attempt failed"
+            sleep 30
+          done
+          exit 1
 
       - name: Upload the macOS package
         uses: actions/upload-artifact@v7
@@ -100,7 +108,15 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Build the macOS package
-        run: ./dev preset release-macos-packages -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }}
+        # hdiutil on the hosted runners now and then fails with "Resource
+        # busy" while it makes the .dmg; the rerun only repeats the packaging.
+        run: |
+          for attempt in 1 2 3; do
+            ./dev preset release-macos-packages -DTAU_BUILD_JOBS=${{ env.TAU_BUILD_JOBS }} && exit 0
+            echo "::warning::macOS packaging attempt $attempt failed"
+            sleep 30
+          done
+          exit 1
 
       - name: Upload the macOS package
         uses: actions/upload-artifact@v7
