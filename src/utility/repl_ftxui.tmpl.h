@@ -610,11 +610,13 @@ void repl_eval_widget<evaluator_t>::drain_output(bool flush_partial) {
 		else for (size_t i = written_.size(); i-- > 0;) {
 			size_t newline = written_[i].second.rfind('\n');
 			if (newline == std::string::npos) continue;
-			ready.assign(written_.begin(), written_.begin() + i);
+			const auto end = written_.begin()
+				+ static_cast<std::ptrdiff_t>(i);
+			ready.assign(written_.begin(), end);
 			ready.emplace_back(written_[i].first,
 				written_[i].second.substr(0, newline + 1));
 			written_[i].second.erase(0, newline + 1);
-			written_.erase(written_.begin(), written_.begin() + i);
+			written_.erase(written_.begin(), end);
 			break;
 		}
 	}
