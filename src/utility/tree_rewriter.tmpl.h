@@ -4,6 +4,25 @@
 #include <algorithm>
 #include "tree.h"
 
+// Defining DEBUG_TREE_REWRITER compiles in the logs of the rewriter, which run
+// on every rewritten node. A host with logging channels (one defining
+// LOG_CHANNEL_NAME, LOG_DEBUG and LOG_TRACE, as tau does) gets them on the
+// channel "tree_rewriter"; otherwise they go to std::cout.
+#ifdef DEBUG_TREE_REWRITER
+#	if defined(LOG_CHANNEL_NAME) && defined(LOG_DEBUG) && defined(LOG_TRACE)
+#		pragma push_macro("LOG_CHANNEL_NAME")
+#		undef LOG_CHANNEL_NAME
+#		define LOG_CHANNEL_NAME "tree_rewriter"
+#		define TREE_REWRITER_LOG_DEBUG LOG_DEBUG
+#		define TREE_REWRITER_LOG_TRACE LOG_TRACE
+#		define TREE_REWRITER_LOG_END   ""
+#	else
+#		define TREE_REWRITER_LOG_DEBUG std::cout << "(Debug) [tree_rewriter] "
+#		define TREE_REWRITER_LOG_TRACE std::cout << "(Trace) [tree_rewriter] "
+#		define TREE_REWRITER_LOG_END   "\n"
+#	endif
+#endif
+
 namespace idni {
 
 // former rewriter predicate API
@@ -465,21 +484,21 @@ tref replace(tref n, const std::map<tref, tref>& changes) {
 template <typename node>
 tref replace(tref n, const subtree_map<node, tref>& changes) {
 	DBG(assert(n != nullptr);)
-	// #DEBUG_TREE_REWRITER
-	#if DEBUG_TREE_REWRITER
-		LOG_TRACE << "changes: " << dump_to_str<node>(changes);
-	#endif // DEBUG_TREE_REWRITER
+#ifdef DEBUG_TREE_REWRITER
+	TREE_REWRITER_LOG_TRACE << "replace/n: "
+		<< lcrs_tree<node>::dump_to_str(n) << TREE_REWRITER_LOG_END;
+	TREE_REWRITER_LOG_TRACE << "replace/changes: "
+		<< dump_to_str<node>(changes) << TREE_REWRITER_LOG_END;
+#endif // DEBUG_TREE_REWRITER
 	const auto r = [&changes](tref el) {
-		auto ret = get_cached<node>(el, changes);
-		#if DEBUG_TREE_REWRITER
-		if (el != ret) LOG_TRACE << "el: "
-			<< lcrs_tree<node>::dump_to_str(el, false) << "\n"
-			<< "\tret: "
-			<< lcrs_tree<node>::dump_to_str(ret, false) LOG_END;
-		#endif // DEBUG_TREE_REWRITER
-		return ret;
+		return get_cached<node>(el, changes);
 	};
-	return pre_order<node>(n).apply_unique_until_change(r);
+	tref result = pre_order<node>(n).apply_unique_until_change(r);
+#ifdef DEBUG_TREE_REWRITER
+	TREE_REWRITER_LOG_TRACE << "replace/result: "
+		<< lcrs_tree<node>::dump_to_str(result) << TREE_REWRITER_LOG_END;
+#endif // DEBUG_TREE_REWRITER
+	return result;
 }
 
 template <typename node>
@@ -753,15 +772,17 @@ tref apply_rule(const rewriter::rule& r, tref n, const is_capture_t& c) {
 	pattern_matcher2<node, is_capture_t> matcher{ r, c };
 	post_order<node>(n).search_unique(matcher);
 	auto nn = matcher.replace_root(n);
-#ifdef LOG_REWRITING
-	if constexpr (LOG_REWRITING) {
-		if (nn != n) {
-			auto [p , s] = r;
-			LOG_DEBUG << "(R) " << p << " := " << s << LOG_END;
-			LOG_DEBUG << "(F) " << nn << LOG_END;
-		}
+#ifdef DEBUG_TREE_REWRITER
+	if (nn != n) {
+		auto [p , s] = r;
+		TREE_REWRITER_LOG_DEBUG << "Rule applied: "
+			<< lcrs_tree<node>::dump_to_str(p->get()) << " := "
+			<< lcrs_tree<node>::dump_to_str(s->get())
+			<< TREE_REWRITER_LOG_END;
+		TREE_REWRITER_LOG_DEBUG << "Rewritten tree: "
+			<< lcrs_tree<node>::dump_to_str(nn) << TREE_REWRITER_LOG_END;
 	}
-#endif // LOG_REWRITING
+#endif // DEBUG_TREE_REWRITER
 	return nn;
 }
 
@@ -777,14 +798,16 @@ tref apply_if(const rewriter::rule& r, tref n, is_capture_t& c,
 	pattern_matcher_if<node, is_capture_t, predicate_t>
 						matcher{ p, u, c, predicate };
 	auto nn = apply(s, n, matcher);
-#ifdef LOG_REWRITING
-	if constexpr (LOG_REWRITING) {
-		if (nn != n) {
-			LOG_DEBUG << "(R) " << p << " := " << s << LOG_END;
-			LOG_DEBUG << "(F) " << nn << LOG_END;
-		}
+#ifdef DEBUG_TREE_REWRITER
+	if (nn != n) {
+		TREE_REWRITER_LOG_DEBUG << "Rule applied: "
+			<< lcrs_tree<node>::dump_to_str(p->get()) << " := "
+			<< lcrs_tree<node>::dump_to_str(s->get())
+			<< TREE_REWRITER_LOG_END;
+		TREE_REWRITER_LOG_DEBUG << "Rewritten tree: "
+			<< lcrs_tree<node>::dump_to_str(nn) << TREE_REWRITER_LOG_END;
 	}
-#endif // LOG_REWRITING
+#endif // DEBUG_TREE_REWRITER
 	return nn;
 }
 
@@ -980,3 +1003,12 @@ tref lcrs_tree<node>::apply(tref s, const auto& matcher) const {
 }
 
 } // idni::rewriter namespace
+
+#ifdef DEBUG_TREE_REWRITER
+#	if defined(LOG_CHANNEL_NAME) && defined(LOG_DEBUG) && defined(LOG_TRACE)
+#		pragma pop_macro("LOG_CHANNEL_NAME")
+#	endif
+#	undef TREE_REWRITER_LOG_DEBUG
+#	undef TREE_REWRITER_LOG_TRACE
+#	undef TREE_REWRITER_LOG_END
+#endif
