@@ -331,9 +331,6 @@ jobs:
     if: ${{ always() && needs.check_date.result == 'success' && needs.check_date.outputs.should_run != 'false' && needs.check_tests.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
 
@@ -422,7 +419,18 @@ jobs:
         with:
           path: ${{ github.workspace }}/_site
 
+  # The deploy runs in its own job: in the job that uploads the Pages artifact
+  # it can list the run's artifacts before the new one shows up and fail.
+  deploy_pages:
+    name: Deploy to GitHub Pages
+    needs: [publish, linux_x86_64_package]
+    if: ${{ always() && needs.publish.result == 'success' && needs.linux_x86_64_package.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy to GitHub Pages
-        if: needs.linux_x86_64_package.result == 'success'
         id: deployment
         uses: actions/deploy-pages@v5
